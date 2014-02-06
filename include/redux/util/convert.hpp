@@ -23,14 +23,6 @@ namespace redux {
 
 
         /*!
-         *  @brief      round to nearest int
-         *  @param      d Input
-         */
-        inline int round( double d ) {
-            return static_cast<int>( d < 0 ? d - 0.5 : d + 0.5 );
-        }
-
-        /*!
          *  @brief      Cast with min/max boundaries.
          *  @param      src Input
          *  @param      min min

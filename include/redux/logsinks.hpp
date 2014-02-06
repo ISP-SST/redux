@@ -11,8 +11,6 @@
 
 namespace bsinks = boost::log::sinks;
 
-#define SEV_MASK(sev) (1<<(sev))
-#define SEV_OR_HIGHER(sev) ~((1<<(sev))-1)
 
 namespace redux {
 

@@ -1,11 +1,11 @@
 #ifndef REDUX_UTIL_ARRAY_HPP
 #define REDUX_UTIL_ARRAY_HPP
 
-#include "redux/exception.hpp"
 #include "redux/util/convert.hpp"
 
+#include <stdexcept>
 #include <memory>
-#include <string.h>
+#include <cstring>
 #include <vector>
 #include <iostream>
 
@@ -18,10 +18,10 @@ namespace redux {
          */
 
 
-        class IterationOutOfBounds : public redux::UnrecoverableException {
+        class IterationOutOfBounds : public std::out_of_range {
         public:
-            IterationOutOfBounds( void ) : UnrecoverableException( "Array::BadIteration" ) {}
-            IterationOutOfBounds( const std::string &message ) : UnrecoverableException( message ) {}
+            IterationOutOfBounds( void ) : out_of_range( "Array::BadIteration" ) {}
+            IterationOutOfBounds( const std::string &message ) : out_of_range( message ) {}
 
             virtual ~IterationOutOfBounds( void ) throw() {}
         };
@@ -49,7 +49,7 @@ namespace redux {
             public:
                 const_iterator( const Array<T>& a, size_t begin, size_t end ) : m_Begin( begin ), m_Current( begin ),
                     m_End( end ), m_ConstArrayPtr( &a ), m_ConstData( a.data.get() ) {
-                    if( m_Current > m_End ) throw redux::Exception( "Array::const_iterator:  begin>end" );
+                    if( m_Current > m_End ) throw std::out_of_range( "Array::const_iterator:  begin>end" );
                 }
                 // prefix
                 const_iterator operator++() { increment(); return *this; }
@@ -66,7 +66,7 @@ namespace redux {
             protected:
                 void decrement( void ) {
                     if( m_Current <= m_Begin ) {
-                        throw IterationOutOfBounds( "Iterating past begin()." );
+                        throw std::out_of_range( "Iterating past begin()." );
                     }
                     if( m_Current > m_End ) {
                         m_Current = m_End;
@@ -77,7 +77,7 @@ namespace redux {
                 }
                 void increment( void ) {
                     if( m_Current >= m_End ) {
-                        throw IterationOutOfBounds( "Iterating past end()." );
+                        throw std::out_of_range( "Iterating past end()." );
                     }
                     ++m_Current;
 
@@ -135,14 +135,14 @@ namespace redux {
                 dimSizes = rhs.dimSizes;
                 dimStrides = rhs.dimStrides;
                 if( nDims && ( sizeof...( s ) ) == 2 * nDims ) {
-                    std::vector<int64_t> tmp = {static_cast<int64_t>( s )...};
-
+                    //std::vector<int64_t> tmp = {static_cast<int64_t>( s )...};
+                    int64_t tmp[] = {s...};
                     dimFirst.resize( nDims );
                     dimLast.resize( nDims );
                     nElements = 1;
                     for( size_t i = 0; i < nDims; ++i ) {
                         if( !tmp[nDims + i] ) {
-                            throw redux::Exception( "Attempting to create a sub-array with a dimension of 0 size." );
+                            throw std::logic_error( "Attempting to create a sub-array with a dimension of 0 size." );
                         }
                         dimFirst[i] = redux::util::bound_cast<size_t>( rhs.dimFirst[i] + tmp[i], 0, rhs.dimSizes[i] );
                         dimLast[i] = redux::util::bound_cast<size_t>( dimFirst[i] + tmp[nDims + i] - 1, 0, rhs.dimSizes[i] );
@@ -200,7 +200,7 @@ namespace redux {
             }
 
             template <typename U>
-            void rawCopy( U* rhs ) {
+            void rawCopy( void* ) {
                 // TODO implement
             }
 
@@ -245,7 +245,7 @@ namespace redux {
                     }
                 }
                 else {
-                    throw redux::BadArgument( "Number of total elements must match when setting a list of values." );
+                    throw std::logic_error( "Number of total elements must match when setting a list of values." );
                 }
             }
 
@@ -362,13 +362,13 @@ namespace redux {
             size_t getOffset( const std::vector<size_t>& indices ) const {
                 size_t offset = 0;
                 if( indices.size() > dimSizes.size() ) {
-                    throw redux::Exception( "More indices than dimensions." );
+                    throw std::logic_error( "More indices than dimensions." );
                 }
                 else if( indices.size() ) {
                     size_t dimDiff = nDims - indices.size();
                     for( size_t i = 0; i < indices.size(); ++i ) {
                         if( indices[i] > dimLast[dimDiff + i] ) {
-                            throw redux::IndexOutOfBounds( indices[i], dimLast[dimDiff + i] );
+                            throw std::out_of_range( indices[i], dimLast[dimDiff + i] );
                         }
                         offset += indices[i] * dimStrides[dimDiff + i];
                     }

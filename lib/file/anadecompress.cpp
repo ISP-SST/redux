@@ -1,8 +1,8 @@
 #include "redux/file/anadecompress.hpp"
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
 
 
 int redux::file::anadecrunch32(const unsigned char* x, int32_t* array, int slice, int nx, int ny, int little_endian)

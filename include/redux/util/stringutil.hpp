@@ -23,9 +23,6 @@ namespace redux {
          */
 
 
-        std::vector<std::string> split( const std::string &s, const std::string& delim = "," );
-        std::string trim( const std::string &s );
-
         /*! @fn bool onlyDigits( const std::string &s );
          *  @fn bool onlyAlpha( const std::string &s );
          *  @brief Functions for checking string-content
@@ -36,26 +33,7 @@ namespace redux {
         bool onlyHex( const std::string &s );
         bool isInteger( const std::string &s );
         bool isHex( const std::string &s );
-        bool matches( const std::string &s, const std::string &regex );
 
-        /*! @fn std::string toString( const T &v )
-         *  @brief Converts basic types to strings via a stringstream
-         */
-        template <typename T>
-        std::string toString( const T &v, int d=0) {
-            std::ostringstream oss;
-            if( d ) {
-                if( d < 0 ) {
-                    oss << std::fixed;
-                    d = -d;
-                }
-                oss.precision(d);
-            }
-            oss << v;
-            return oss.str();
-        }
-
-        std::string stripAll( const std::string& in,  const std::string& chars );
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )
          *  @brief Append char 'c' to both sides of s, and form a block of width n
@@ -80,17 +58,6 @@ namespace redux {
         *  @param c fill-character
         */
         std::string alignRight( const std::string& s, size_t n = 20, unsigned char c = ' ' );
-
-
-        /*! @fn std::string lowercase( const std::string& )
-         *  @brief Converts string to lowercase
-         */
-        std::string lowercase( const std::string& );
-
-        /*! @fn std::string uppercase( const std::string& )
-         *  @brief Converts string to uppercase
-         */
-        std::string uppercase( const std::string& );
 
         std::string cleanPath( std::string path, std::string base="" );
 
@@ -173,13 +140,13 @@ namespace redux {
 
             while( end >= ptr )  {
                 bool alpha = ( *end > 31 && *end < 126 );
-                tmp += alignRight( "Byte ", 7 ) + alignLeft( toString( ( int )( end - ptr ) ), 5 );
+                tmp += alignRight( "Byte ", 7 ) + alignLeft( std::to_string( ( int )( end - ptr ) ), 5 );
 
                 for( int j = 128; j; j >>= 1 ) {
                     tmp += alignCenter( ( *end & j ) ? "1" : "0", 3 );
                 }
 
-                tmp += alignRight( toString( ( int ) * end ), 4 ) + std::string( " (" );
+                tmp += alignRight( std::to_string( ( int ) * end ), 4 ) + std::string( " (" );
                 tmp += hexString( ( ( int ) * end ) >> 4, false )
                        + hexString( ( int )( *end ) & 0xF, false );
 
@@ -209,13 +176,13 @@ namespace redux {
 
             while( end >= ptr )  {
                 bool alpha = ( *end > 31 && *end < 126 );
-                tmp += alignRight( "Byte ", 7 ) + alignLeft( toString( ( int )( end - ptr ) ), 5 );
+                tmp += alignRight( "Byte ", 7 ) + alignLeft( std::to_string( ( int )( end - ptr ) ), 5 );
 
                 for( int j = 128; j; j >>= 1 ) {
                     tmp += alignCenter( ( *end & j ) ? "1" : "0", 3 );
                 }
 
-                tmp += alignRight( toString( ( int ) * end ), 4 ) + std::string( " (" );
+                tmp += alignRight( std::to_string( ( int ) * end ), 4 ) + std::string( " (" );
                 tmp += hexString( ( ( int ) * end ) >> 4, false )
                        + hexString( ( int )( *end ) & 0xF, false );
 

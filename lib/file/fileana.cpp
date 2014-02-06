@@ -18,15 +18,15 @@ static const int system_is_big_endian = 1;
 #endif
 
 
-void redux::file::ana::readCompressed( redux::util::File& file, char* data, size_t nElements, const shared_ptr<AnaInfo>& hdr ) {
+void redux::file::ana::readCompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<AnaInfo>& hdr ) {
 
     size_t compressedSize = hdr->m_CompressedHeader.tsize - 14;
 
-    unique_ptr<uint8_t> tmp( new uint8_t[compressedSize] );
+    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize], []( uint8_t* p ) { delete[] p; } );
 
-    size_t count = fread( tmp.get(), 1, compressedSize, file );
-    if( count != compressedSize ) {
-        throw DataIOException( "Failed to read the specified number of bytes." );
+    file.read(reinterpret_cast<char*>(tmp.get()),compressedSize);
+    if( !file.good() ) {
+        throw ios_base::failure( "Failed to read the specified number of bytes." );
     }
 
     // fix a possible problem with chdr.nblocks
@@ -36,7 +36,7 @@ void redux::file::ana::readCompressed( redux::util::File& file, char* data, size
 
     // consistency check
     if( hdr->m_CompressedHeader.type % 2 == hdr->m_Header.datyp ) {
-        throw DataIOException( "readCompressedAna: type-mismatch between primary and compressed headers." );
+        throw logic_error( "readCompressedAna: type-mismatch between primary and compressed headers." );
     }
 
     int slice = hdr->m_CompressedHeader.slice_size;
@@ -60,19 +60,19 @@ void redux::file::ana::readCompressed( redux::util::File& file, char* data, size
             anadecrunch32( tmp.get(), reinterpret_cast<int32_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
             break;
         default:
-            throw DataIOException( "readCompressedAna: unrecognized type of compressed data" );
+            throw invalid_argument( "readCompressedAna: unrecognized type of compressed data" );
     }
 
 }
 
 
-void redux::file::ana::readUncompressed( redux::util::File& file, char* data, size_t nElements, const shared_ptr<AnaInfo>& hdr ) {
+void redux::file::ana::readUncompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<AnaInfo>& hdr ) {
 
     size_t nBytes = nElements * typeSizes[hdr->m_Header.datyp];
 
-    size_t count = fread( data, 1, nBytes, file );
-    if( count != nBytes ) {
-        throw DataIOException( "Failed to read the specified number of bytes." );
+    file.read(data,nBytes);
+    if( !file.good() ) {
+        throw ios_base::failure( "Failed to read the specified number of bytes." );
     }
 
     if( hdr->m_Header.subf & 128 ) { // saved on big endian system.
@@ -87,7 +87,7 @@ void redux::file::ana::readUncompressed( redux::util::File& file, char* data, si
 }
 
 
-int redux::file::ana::compressData( unique_ptr<uint8_t>& out, const char* data, int nElements, const shared_ptr<AnaInfo>& hdr, int slice ) {
+int redux::file::ana::compressData( shared_ptr<uint8_t>& out, const char* data, int nElements, const shared_ptr<AnaInfo>& hdr, int slice ) {
 
     int limit = nElements * typeSizes[hdr->m_Header.datyp];
     limit += ( limit >> 1 );
@@ -96,7 +96,7 @@ int redux::file::ana::compressData( unique_ptr<uint8_t>& out, const char* data, 
     int runlengthflag( 0 );  // runlength unused/untested
     int res;
     uint8_t* cdata = new uint8_t[ limit ]; // allocate double size since compression can fail and generate larger data.
-    out.reset( cdata );
+    out.reset( cdata, []( uint8_t* p ) { delete[] p; } );
 
     switch( hdr->m_Header.datyp ) {
         case( 0 ) : {
@@ -110,32 +110,33 @@ int redux::file::ana::compressData( unique_ptr<uint8_t>& out, const char* data, 
             break;
         }
         case( 2 ) : {
-            if( runlengthflag ) throw DataIOException( "compressData: runlength not supported 32-bit types." );
+            if( runlengthflag ) throw invalid_argument( "compressData: runlength not supported 32-bit types." );
             else res = anacrunch32( cdata, reinterpret_cast<const int32_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
             break;
         }
-        default: throw DataIOException( "compressData: Unsupported data type." );
+        default: throw invalid_argument( "compressData: Unsupported data type." );
     }
 
     return res;
 }
 
 
-void redux::file::readAna( redux::util::File& file, char* data, std::shared_ptr<redux::file::AnaInfo> hdr ) {
+void redux::file::readAna( ifstream& file, char* data, std::shared_ptr<redux::file::AnaInfo> hdr ) {
 
     if( !hdr.get() ) {
         hdr.reset( new AnaInfo() );
         hdr->read( file );
     }
 
-    if( fseek( file, hdr->hdrSize, SEEK_SET ) ) {
-        throw DataIOException( "Seek operation failed." );
+    file.seekg(hdr->hdrSize);
+    if( !file.good() ) {
+        throw ios_base::failure( "Seek operation failed." );
     }
 
     // f0 stores the dimensions with the fast index first, so swap them before allocating the array
     int nDims = hdr->m_Header.ndim;
     size_t nElements = 1;
-    unique_ptr<int> dim( new int[nDims] );
+    unique_ptr<int[]> dim( new int[nDims] );
     for( int i( 0 ); i < nDims; ++i ) {
         dim.get()[i] = hdr->m_Header.dim[nDims - i - 1];
         nElements *= hdr->m_Header.dim[nDims - i - 1];
@@ -147,26 +148,26 @@ void redux::file::readAna( redux::util::File& file, char* data, std::shared_ptr<
 }
 
 
-void redux::file::writeAna( redux::util::File& file, const char* data,
+void redux::file::writeAna( ofstream& file, const char* data,
                             std::shared_ptr<redux::file::AnaInfo> hdr,
                             bool compress, int slice ) {
 
     if( !hdr.get() ) {
-        throw DataIOException( "writeAna: The header object is invalid, cannot write file." );
+        throw invalid_argument( "writeAna: The header object is invalid, cannot write file." );
     }
 
     if( hdr->m_Header.datyp > 5 || hdr->m_Header.datyp < 0 ) {
-        throw DataIOException( "writeAna: hdr.datyp is not valid." );
+        throw invalid_argument( "writeAna: hdr.datyp is not valid." );
     }
 
     if( hdr->m_Header.ndim > 16 ) {
-        throw DataIOException( "writeAna: the ANA/f0 format does not support more dimensions than 16." );
+        throw invalid_argument( "writeAna: the ANA/f0 format does not support more dimensions than 16." );
     }
 
     size_t nElements = 1;
     for( uint8_t i = 0; i < hdr->m_Header.ndim; ++i ) {
         if( hdr->m_Header.dim[i] < 1 ) {
-            throw DataIOException( "writeAna: dimSize < 1" );
+            throw logic_error( "writeAna: dimSize < 1" );
         }
         nElements *= hdr->m_Header.dim[i];
     }
@@ -175,12 +176,12 @@ void redux::file::writeAna( redux::util::File& file, const char* data,
     size_t totalSize = nElements * ana::typeSizes[hdr->m_Header.datyp];
     size_t compressedSize = totalSize;
 
-    hdr->m_Header.synch_pattern = MAGIC_ANA;
+    hdr->m_Header.synch_pattern = AnaInfo::MAGIC_ANA;
     hdr->m_Header.subf = 0;
     hdr->m_Header.nhb = static_cast<uint8_t>( 1 + std::max( textSize + 256, size_t( 0 ) ) / 512 );
     memset( hdr->m_Header.cbytes, 0, 4 );
 
-    unique_ptr<uint8_t> cData;
+    shared_ptr<uint8_t> cData;
     if( compress ) {
         if( hdr->m_Header.ndim == 2 ) {
             compressedSize = ana::compressData( cData, data, nElements, hdr, slice );
@@ -197,15 +198,18 @@ void redux::file::writeAna( redux::util::File& file, const char* data,
             }
         }
         else {
-            throw DataIOException( "writeAna: compression only supported for 2D data." );
+            throw invalid_argument( "writeAna: compression only supported for 2D data." );
         }
     }
 
-    rewind( file );
+    file.seekp(0);
     hdr->write( file );
 
-    if( cData ) fwrite( cData.get() + 14, 1, totalSize, file ); // compressed header is already written, so skip 14 bytes.
-    else  fwrite( data, 1, totalSize, file );
-
+    if( cData ) file.write(reinterpret_cast<char*>(cData.get()) + 14, totalSize); // compressed header is already written, so skip 14 bytes.
+    else  file.write(data, totalSize);
+    
+    if(!file.good())
+        throw ios_base::failure("writeAna: write failed.");
+    
 }
 

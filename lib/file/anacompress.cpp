@@ -3,9 +3,9 @@
 #include "redux/file/anainfo.hpp"
 #include "redux/util/endian.hpp"
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
 
 using namespace redux::util;
 

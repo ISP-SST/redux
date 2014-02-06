@@ -11,6 +11,8 @@
 
 #include <string>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
@@ -37,7 +39,8 @@ namespace {
                 LOG_CRITICAL << "error: different types in specified mode range \"" << elem << "\"";
             }
         }
-        string tmp = stripAll( elem, "ZzKk" );
+        string tmp = elem;
+        tmp.erase(boost::remove_if(tmp, boost::is_any_of("ZzKk")), tmp.end());
         if( n == 0 ) {
             divs.push_back( boost::lexical_cast<int>( tmp ) );
             types.push_back( tp );
@@ -168,11 +171,13 @@ void Channel::parseProperties( bpt::ptree& tree ) {
         if( tmpString.find( "mm" ) != string::npos ) tmpD = 1.00E-03;
         else if( tmpString.find( "cm" ) != string::npos ) tmpD = 1.00E-02;
         else tmpD = 1.0;
-        tmpString = stripAll( tmpString, "cm\" " );
+        tmpString.erase(boost::remove_if(tmpString, boost::is_any_of("cm\" ")), tmpString.end());
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
         tmpTree.put( "tmp", tmpString );
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
-        vector<string> tmp = split( tree.get<string>( "DIV_ORDERS", "" ), "," );
+        vector<string> tmp;
+        tmpString = tree.get<string>( "DIV_ORDERS", "" );
+        boost::split( tmp, tmpString, boost::is_any_of(",") );
         if( tmp.size() == 0 ) {
             if( diversity.size() > 1 ) {
                 LOG_ERR << "multiple coefficients found but no diversity orders specified!";

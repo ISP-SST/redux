@@ -1,13 +1,10 @@
 #ifndef REDUX_FILE_ANAINFO_HPP
 #define REDUX_FILE_ANAINFO_HPP
 
-#include "redux/util/file.hpp"
 #include "redux/file/fileinfo.hpp"
 
 #include <memory>
-
-#define MAGIC_ANA           0x5555aaaa
-#define MAGIC_ANAR          0xaaaa5555          // stored with wrong endianess
+#include <fstream>
 
 namespace redux {
 
@@ -15,13 +12,15 @@ namespace redux {
         
         struct AnaInfo : public redux::util::FileInfo {
             
+            enum Magic { MAGIC_ANA=0x5555aaaa, MAGIC_ANAR=0xaaaa5555 };
+            
             AnaInfo(void);
             AnaInfo(const std::string&);
        
-            void read( redux::util::File& );
+            void read( std::ifstream& );
             void read( const std::string& );
             
-            void write( redux::util::File& );
+            void write( std::ofstream& );
             
             std::string getText(void) {
                 return m_Header.txt + m_ExtendedHeader;

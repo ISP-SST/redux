@@ -187,7 +187,7 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
 
     tmpString = cleanPath( tree.get<string>( "PUPIL", "" ), imageDataDir );
     if( tmpString != "" ) {
-        File file( tmpString );
+        ifstream file( tmpString.c_str(), ifstream::binary );
         std::shared_ptr<AnaInfo> header( new AnaInfo() );
         header->read( file );
 
@@ -286,7 +286,8 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
         output_data_type = MFBD_I16T;
     }
 
-    outputFiles = redux::util::split( tree.get<string>( "OUTPUT_FILES", "" ), "," );
+    tmpString = tree.get<string>( "OUTPUT_FILES", "" );
+    boost::split(outputFiles, tmpString, boost::is_any_of(",") );
 
     size_t nObj( 0 );
     for( auto & it : tree ) {

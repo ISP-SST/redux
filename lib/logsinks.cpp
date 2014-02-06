@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
@@ -105,9 +106,10 @@ void LogSink::parseFilter( string f ) {
 
     channels.clear();
 
-    auto parts = split( f, ":" );
+    vector<string> parts;
+    boost::split(parts, f, boost::is_any_of(":") );
     for( auto & it : parts ) {
-        severity_level tmp = parseSeverity( lowercase( it ) );
+        severity_level tmp = parseSeverity( boost::to_upper_copy( it ) );
         if( tmp ) {
             minSeverity = tmp;
         }

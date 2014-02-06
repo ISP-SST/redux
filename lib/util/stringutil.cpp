@@ -1,7 +1,5 @@
 #include "redux/util/stringutil.hpp"
 
-#include "redux/exception.hpp"
-
 #include <cstdlib>
 #include <pwd.h>
 
@@ -15,42 +13,6 @@ namespace bf = boost::filesystem;
 using namespace redux::util;
 using namespace std;
 
-
-vector<string> redux::util::split( const string &s, const string& delim ) {
-
-    vector<string> ret;
-
-    if( s.size() == 0 || s.size() < delim.size() ) {
-        return ret;
-    }
-
-    size_t pos, last = 0;
-    string tmp = "";
-
-    while( ( pos = s.find( delim, last ) ) != string::npos ) {
-        tmp = s.substr( last, pos - last );
-
-        if( tmp.length() )
-            ret.push_back( tmp );
-
-        last = pos + delim.size();
-    }
-
-    tmp = s.substr( last );
-
-    if( tmp.length() ) {
-        ret.push_back( tmp );
-    }
-
-    return ret;
-
-}
-
-string redux::util::trim( const string &s ) {
-
-    return boost::trim_copy( s );
-
-}
 
 bool redux::util::onlyDigits( const string &s ) {
     static const boost::regex e( "^[[:digit:]]*$" );
@@ -84,21 +46,6 @@ bool redux::util::isHex( const string &s ) {
 }
 
 
-bool redux::util::matches( const string &s, const string &regex ) {
-    boost::regex e( regex );
-    return regex_match( s, e );
-}
-
-
-string redux::util::stripAll( const string& in,  const string& chars ) {
-
-    string tmp = in;
-    for( auto & c : chars ) {
-        tmp.erase( std::remove_if( tmp.begin(), tmp.end(), [&c]( char x ) {return x == c;} ), tmp.end() );
-    }
-    return tmp;
-
-}
 string redux::util::alignCenter( const string& s, size_t n, unsigned char c ) {
 
     if( s.length() > n ) {
@@ -131,26 +78,6 @@ string redux::util::alignRight( const string& s, size_t n, unsigned char c ) {
     }
 
     return string( n - s.length(), c ) + s;
-
-}
-
-string redux::util::lowercase( const string& in ) {
-
-    std::string out( in );
-    for( auto & it : out ) {
-        it = tolower( it );
-    }
-    return out;
-
-}
-
-string redux::util::uppercase( const string& in ) {
-
-    std::string out( in );
-    for( auto & it : out ) {
-        it = toupper( it );
-    }
-    return out;
 
 }
 

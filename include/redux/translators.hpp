@@ -101,7 +101,8 @@ public:
     boost::optional<external_type> get_value( const internal_type& str ) {
         external_type result;
         if( !str.empty() ) {
-            auto tok = redux::util::split( str, "," );
+            std::vector<std::string> tok;
+            boost::split(tok, str, boost::is_any_of(",") );
             if( !std::numeric_limits<T>::is_signed ) {  // only expand hyphen ('-') for unsigned integers
                 for( auto & it : tok ) {
                     parseSegment( result, it );
@@ -143,7 +144,8 @@ public:
     boost::optional<external_type> get_value( const internal_type& str ) {
         external_type result;
         if( !str.empty() ) {
-            auto tok = redux::util::split( str, "," );
+            std::vector<std::string> tok;
+            boost::split(tok, str, boost::is_any_of(",") );
             for( auto & it : tok ) {
                 parseSegment( result, it );
             }

@@ -1,11 +1,11 @@
 #ifndef REDUX_UTIL_BOUNDVALUE_HPP
 #define REDUX_UTIL_BOUNDVALUE_HPP
 
-#include "redux/exception.hpp"
 #include "redux/util/convert.hpp"
 
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -189,7 +189,7 @@ namespace redux {
                     case detail::TRUNCATE: return &( detail::truncate<T> );
                     case detail::WRAP: return &( detail::wrap<T> );
                     case detail::REFLECT: return &( detail::reflect<T> );
-                    default: throw redux::NotImplemented( "Function not defined for this TrimType" );
+                    default: throw std::invalid_argument( "Function not defined for this TrimType" );
                 }
             }
             inline T assignWithTruncation( T val ) {

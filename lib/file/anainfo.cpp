@@ -1,7 +1,8 @@
 #include "redux/file/anainfo.hpp"
 
 #include "redux/util/endian.hpp"
-#include "redux/file/exceptions.hpp"
+
+#include <cstring>
 
 using namespace redux::file;
 using namespace redux::util;
@@ -27,45 +28,45 @@ AnaInfo::AnaInfo( const std::string& filename ) : hdrSize( 0 ) {
     read( filename );
 }
 
-void AnaInfo::read( redux::util::File& file ) {
+void AnaInfo::read( ifstream& file ) {
 
     hdrSize = 0;
-    rewind( file );
+    file.seekg(0);
 
     size_t rawSize = sizeof( struct raw_header );  // = 512 by construction
     memset( &m_Header, 0, rawSize );
 
-    size_t count = fread( reinterpret_cast<char*>( &m_Header ), 1, rawSize, file );
-    if( count < rawSize ) {
-        throw DataIOException( "Failed to read ANA header" );
+    file.read( reinterpret_cast<char*>( &m_Header ), rawSize );
+    if( !file.good() ) {
+        throw ios_base::failure( "Failed to read ANA header" );
     }
 
-    hdrSize += count;
+    hdrSize = file.tellg();
     bool hasMagic = ( m_Header.synch_pattern == MAGIC_ANA );
     bool hasReversedMagic = ( m_Header.synch_pattern == MAGIC_ANAR );
 
     if( !( hasMagic || hasReversedMagic ) ) {
-        throw DataIOException( "Failed to read ANA header: initial 4 bytes does not match ANA" );
+        throw logic_error( "Failed to read ANA header: initial 4 bytes does not match ANA" );
     }
 
     if( m_Header.nhb > 1 ) {                    // read in long header
 
         if( m_Header.nhb > 16 ) {
-            throw DataIOException( "Warning: AnaHeader::read() - extended header is longer than 16 blocks!" );
+            throw logic_error( "Warning: AnaHeader::read() - extended header is longer than 16 blocks!" );
         }
         else {
             size_t extraTextSize = ( m_Header.nhb - 1 ) * rawSize;
-            unique_ptr<char> tmpText( new char [ extraTextSize + 257 ] ); // add space for primary text block and a null-character.
+            unique_ptr<char[]> tmpText( new char [ extraTextSize + 257 ] );
             char* txtPtr = tmpText.get();
             memset( txtPtr+256, 0, extraTextSize + 1 );
             memcpy( txtPtr, m_Header.txt, 256 );
-            count = fread( txtPtr+256, 1, extraTextSize, file );
-            if( count < extraTextSize ) {
-                if( feof( file ) ) {
-                    throw DataIOException( "Failed to read ANA header: <EOF> reached" );
+            file.read( txtPtr+256, extraTextSize );
+            if( !file.good() ) {
+                if( file.eof() ) {
+                    throw ios_base::failure( "Failed to read ANA header: <EOF> reached" );
                 }
             }
-            hdrSize += count;
+            hdrSize = file.tellg();
 
             char* firstNull = txtPtr;
             while( *firstNull ) {
@@ -73,7 +74,6 @@ void AnaInfo::read( redux::util::File& file ) {
             }
 
             char* ptr = firstNull;
-
             while( ++ptr < txtPtr + extraTextSize + 256 ) {
                 if( *ptr ) {
                     swap( *ptr, *firstNull++ );
@@ -92,14 +92,14 @@ void AnaInfo::read( redux::util::File& file ) {
 
     // compressed data
     if( m_Header.subf & 1 ) {
-        size_t chdrSize = 14; // sizeof( struct compressed_header );   <-- struct is usually padded to to next 4-byte boundary (16).
-        count = fread( reinterpret_cast<char*>( &m_CompressedHeader ), 1, chdrSize, file );
-        if( count < chdrSize ) {
-            if( feof( file ) ) {
-                throw DataIOException( "Failed to read ANA header: <EOF> reached" );
+        size_t chdrSize = 14; //  <-- struct is usually padded to to next 4-byte boundary (16).
+        file.read( reinterpret_cast<char*>( &m_CompressedHeader ), chdrSize );
+        if( !file.good() ) {
+            if( file.eof() ) {
+                throw ios_base::failure( "Failed to read ANA header: <EOF> reached" );
             }
         }
-        hdrSize += count;
+        hdrSize += chdrSize;
 
         if( system_is_big_endian ) { // for big endian platforms
             swapEndian( &( m_CompressedHeader.tsize ) );
@@ -111,11 +111,11 @@ void AnaInfo::read( redux::util::File& file ) {
 }
 
 void AnaInfo::read( const std::string& filename ) {
-    File file( filename );
+    ifstream file( filename, ifstream::binary );
     read( file );
 }
 
-void AnaInfo::write( redux::util::File& file ) {
+void AnaInfo::write( ofstream& file ) {
 
     size_t hdrSize = sizeof( struct raw_header );   // = 512 by construction
 
@@ -127,9 +127,9 @@ void AnaInfo::write( redux::util::File& file ) {
         swapEndian( &( m_Header.dim ), m_Header.ndim );
     }
 
-    size_t count = fwrite( reinterpret_cast<char*>( &m_Header ), 1, 256, file );
-    if( count != 256 ) {
-        throw DataIOException( "Failed to write ANA header (m_Header)" );
+    file.write( reinterpret_cast<char*>( &m_Header ), 256 );
+    if( !file.good() ) {
+        throw ios_base::failure( "Failed to write ANA header (m_Header)" );
     }
 
     if( system_is_big_endian ) { // ...and then swap back
@@ -141,18 +141,18 @@ void AnaInfo::write( redux::util::File& file ) {
     // extended header
     if( ( m_Header.nhb > 1 ) && ( m_ExtendedHeader.length() > 0 ) ) {
         size_t txtSize = ( m_Header.nhb - 1 ) * hdrSize + 256;
-        unique_ptr<char> extHdr( new char[txtSize] );
+        unique_ptr<char[]> extHdr( new char[txtSize] );
         memset( extHdr.get(), 0, txtSize );
         memcpy( extHdr.get(), m_ExtendedHeader.c_str(), m_ExtendedHeader.length() );
-        count = fwrite( extHdr.get(), 1, txtSize, file );
-        if( count != txtSize ) {
-            throw DataIOException( "Failed to write ANA header (extHdr)" );
+        file.write( extHdr.get(), txtSize );
+        if( !file.good() ) {
+            throw ios_base::failure( "Failed to write ANA header (extHdr)" );
         }
     }
     else {
-        count = fwrite( m_Header.txt, 1, 256, file );
-        if( count != 256 ) {
-            throw DataIOException( "Failed to write ANA header (txt)" );
+        file.write( m_Header.txt, 256 );
+        if( !file.good() ) {
+            throw ios_base::failure( "Failed to write ANA header (txt)" );
         }
     }
 
@@ -164,9 +164,9 @@ void AnaInfo::write( redux::util::File& file ) {
             swapEndian( &( m_CompressedHeader.bsize ) );
         }
 
-        count = fwrite( reinterpret_cast<char*>( &m_CompressedHeader ), 1, 14, file );
-        if( count != 14 ) {
-            throw DataIOException( "Failed to write ANA header (m_CompressedHeader)" );
+        file.write( reinterpret_cast<char*>( &m_CompressedHeader ), 14 );
+        if( !file.good() ) {
+            throw ios_base::failure( "Failed to write ANA header (m_CompressedHeader)" );
         }
 
         if( system_is_big_endian ) {
