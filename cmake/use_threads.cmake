@@ -1,0 +1,3 @@
+
+FIND_PACKAGE ( Threads REQUIRED )
+append_libs_unique( REDUX_CURRENT_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}" )
