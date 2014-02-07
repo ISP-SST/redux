@@ -86,15 +86,15 @@ void Application::checkGeneralOptions( po::options_description& desc, po::variab
         exit( 0 );
     }
     if( vm.count( "copyright" ) ) {
-        cout << "Not implemented" << endl;
+        cout << "Not implemented\n";
         exit( 0 );
     }
     if( vm.count( "tutorial" ) ) {
-        cout << "Not implemented" << endl;
+        cout << "Not implemented\n";
         exit( 0 );
     }
     if( vm.count( "sample" ) ) {
-        cout << "Not implemented" << endl;
+        cout << "Not implemented\n";
         exit( 0 );
     }
 

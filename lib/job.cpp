@@ -18,7 +18,7 @@ namespace {
 
 size_t Job::registerJob( const string name, JobCreator f ) {
     // BUG in GCC (still in 4.8.1), inserting into a map immediately after initialization causes a segfault.
-    // A workaround is to call clear() before inserting.
+    // A workaround is to call clear() before inserting the first element.
     static bool dummy = []( void ) { jobMap.clear(); return false; }();
     auto ret = jobMap.insert( { boost::to_upper_copy( name ), {nJobTypes + 1, f}} );
     if( ret.second == dummy ) {
@@ -31,7 +31,7 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
     vector<JobPtr> tmp;
     for( auto & it : tree ) {
         string nm = it.first;
-        auto it2 = jobMap.find( boost::to_upper_copy( nm ) );
+        auto it2 = jobMap.find( boost::to_upper_copy( nm ) );       // check if the current tag matches a registered (Job-derived) class.
         if( it2 != jobMap.end() ) {
             LOG_DEBUG << "Parsing configuration \"" << nm << "\".";
             Job* tmpJob = it2->second.second();

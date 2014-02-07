@@ -41,9 +41,6 @@ if (NetCDF_FOUND)
     endif()
 endif()
 
-message(STATUS "REDUX_REVISION_SRC_FILE  =  ${REDUX_REVISION_SRC_FILE}")
-message(STATUS "REDUX_CPP  =  ${REDUX_CPP}")
-message(STATUS "REDUX_HPP  =  ${REDUX_HPP}")
 REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_CPP} ${REDUX_HPP} 
                     ${REDUX_MOMFBD_CPP} ${REDUX_MOMFBD_HPP}

@@ -105,7 +105,7 @@ int main( int argc, char *argv[] ) {
             std::ostringstream archive_stream;
             boost::archive::text_oarchive archive( archive_stream );
             archive << jobs;
-            cout << "[" << archive_stream.str() << "]" << endl;
+            cout << "[" << archive_stream.str() << "]\n";
         }
 
 

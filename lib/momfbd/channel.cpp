@@ -175,10 +175,8 @@ void Channel::parseProperties( bpt::ptree& tree ) {
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
         tmpTree.put( "tmp", tmpString );
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
-        vector<string> tmp;
         tmpString = tree.get<string>( "DIV_ORDERS", "" );
-        boost::split( tmp, tmpString, boost::is_any_of(",") );
-        if( tmp.size() == 0 ) {
+        if( tmpString.empty() ) {
             if( diversity.size() > 1 ) {
                 LOG_ERR << "multiple coefficients found but no diversity orders specified!";
             }
@@ -189,6 +187,8 @@ void Channel::parseProperties( bpt::ptree& tree ) {
             }
         }
         else {
+            vector<string> tmp;
+            boost::split( tmp, tmpString, boost::is_any_of(",") );
             for( auto & it : tmp ) {
                 parseSegment( diversityOrders, diversityTypes, it );
             }
