@@ -1,18 +1,24 @@
 #ifndef REDUX_APPLICATION_HPP
 #define REDUX_APPLICATION_HPP
 
+#include "redux/logger.hpp"
+
 #include <string>
 
 #include <boost/noncopyable.hpp>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
 
+namespace pt = boost::property_tree;
 namespace po = boost::program_options;
 
 namespace redux {
 
     class Application : private boost::noncopyable {
-
+        
     public:
+        enum RunMode { LOOP=0, EXIT, RESET };
+
         struct KillException : public std::exception {
             KillException( void ) {}
             virtual const char *what( void ) const throw() {
@@ -27,7 +33,7 @@ namespace redux {
             }
         };
 
-        Application( po::variables_map& vm );
+        Application( po::variables_map& vm, RunMode=EXIT );
         virtual ~Application( void );
 
         static void getOptions( po::options_description& options, const std::string& );
@@ -41,26 +47,31 @@ namespace redux {
 
         static void checkGeneralOptions( po::options_description& desc, po::variables_map& vm );
 
-        int run( void );
-
-
-        static std::string executableName;
-
-    private:
-
-        void reset( void );
-        void kill( void );
-
-        bool dispatch( void );
+        int run( void );                    //!< application entry-point, basically just a loop that calls \c doWork()
+        
+        virtual void reset( void ) { runMode = RESET; };
+        virtual void stop( void ) { runMode = EXIT; };
 
         std::string getName( void ) const;
+        static std::string executableName;
 
-        std::string m_Name;
-        std::string m_IniFile;
+    protected:
+        /*! Application main method, default application returns false immediately (i.e. exits).
+         *   Overload doWork with something interesting. 
+         */
+        virtual bool doWork( void ) { return false; };
+        
+        volatile RunMode runMode;
+        
+        int returnValue;
 
-        volatile bool m_ShouldStop;
-        volatile bool m_ShouldRestart;
+        std::string applicationName;
+        std::string settingsFile;
 
+        pt::ptree propTree;
+        redux::Logger logger;
+        
+        
     };
 
 

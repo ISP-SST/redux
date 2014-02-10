@@ -95,7 +95,7 @@ int main( int argc, char *argv[] ) {
         if( vm.count( "print" ) ) {
             bpt::ptree dump;     // dump configuration to console
             for( auto & it : jobs ) {
-                it->getProperties( &dump );
+                it->getPropertyTree( &dump );
             }
             bpt::write_info( cout << endl, dump );
         }

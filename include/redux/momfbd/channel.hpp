@@ -22,7 +22,7 @@ namespace redux {
             ~Channel();
 
             void parseProperties( bpt::ptree& tree );
-            bpt::ptree getProperties( bpt::ptree* );
+            bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
         private:
 

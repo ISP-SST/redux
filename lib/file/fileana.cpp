@@ -17,8 +17,172 @@ static const int system_is_big_endian = 1;
 #error REDUX_BYTE_ORDER not set
 #endif
 
+const uint8_t Ana::typeSizes[] = { 1, 2, 4, 4, 8, 8 };
 
-void redux::file::ana::readCompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<AnaInfo>& hdr ) {
+Ana::Ana( void ) : hdrSize( 0 ) {
+    memset( &m_Header, 0, sizeof( raw_header ) );
+    memset( &m_CompressedHeader, 0, sizeof( compressed_header ) );
+}
+
+Ana::Ana( const std::string& filename ) : hdrSize( 0 ) {
+    memset( &m_Header, 0, sizeof( raw_header ) );
+    memset( &m_CompressedHeader, 0, sizeof( compressed_header ) );
+    read( filename );
+}
+
+void Ana::read( ifstream& file ) {
+
+    hdrSize = 0;
+    file.seekg(0);
+
+    size_t rawSize = sizeof( struct raw_header );  // = 512 by construction
+    memset( &m_Header, 0, rawSize );
+
+    file.read( reinterpret_cast<char*>( &m_Header ), rawSize );
+    if( !file.good() ) {
+        throw ios_base::failure( "Failed to read ANA header" );
+    }
+
+    hdrSize = file.tellg();
+    bool hasMagic = ( m_Header.synch_pattern == MAGIC_ANA );
+    bool hasReversedMagic = ( m_Header.synch_pattern == MAGIC_ANAR );
+
+    if( !( hasMagic || hasReversedMagic ) ) {
+        throw logic_error( "Failed to read ANA header: initial 4 bytes does not match ANA" );
+    }
+
+    if( m_Header.nhb > 1 ) {                    // read in long header
+
+        if( m_Header.nhb > 16 ) {
+            throw logic_error( "Warning: AnaHeader::read() - extended header is longer than 16 blocks!" );
+        }
+        else {
+            size_t extraTextSize = ( m_Header.nhb - 1 ) * rawSize;
+            unique_ptr<char[]> tmpText( new char [ extraTextSize + 257 ] );
+            char* txtPtr = tmpText.get();
+            memset( txtPtr+256, 0, extraTextSize + 1 );
+            memcpy( txtPtr, m_Header.txt, 256 );
+            file.read( txtPtr+256, extraTextSize );
+            if( !file.good() ) {
+                if( file.eof() ) {
+                    throw ios_base::failure( "Failed to read ANA header: <EOF> reached" );
+                }
+            }
+            hdrSize = file.tellg();
+
+            char* firstNull = txtPtr;
+            while( *firstNull ) {
+                firstNull++;
+            }
+
+            char* ptr = firstNull;
+            while( ++ptr < txtPtr + extraTextSize + 256 ) {
+                if( *ptr ) {
+                    swap( *ptr, *firstNull++ );
+                }
+            }
+
+            m_ExtendedHeader = txtPtr;
+
+        }
+    }
+
+    // m_Header.dim is always stored as little-endian, so swap endianess if system is big-endian.
+    if( system_is_big_endian ) {
+        swapEndian( &( m_Header.dim ), m_Header.ndim );
+    }
+
+    // compressed data
+    if( m_Header.subf & 1 ) {
+        size_t chdrSize = 14; //  <-- struct is usually padded to to next 4-byte boundary (16).
+        file.read( reinterpret_cast<char*>( &m_CompressedHeader ), chdrSize );
+        if( !file.good() ) {
+            if( file.eof() ) {
+                throw ios_base::failure( "Failed to read ANA header: <EOF> reached" );
+            }
+        }
+        hdrSize += chdrSize;
+
+        if( system_is_big_endian ) { // for big endian platforms
+            swapEndian( &( m_CompressedHeader.tsize ) );
+            swapEndian( &( m_CompressedHeader.nblocks ) );
+            swapEndian( &( m_CompressedHeader.bsize ) );
+        }
+    }
+
+}
+
+void Ana::read( const std::string& filename ) {
+    ifstream file( filename, ifstream::binary );
+    read( file );
+}
+
+void Ana::write( ofstream& file ) {
+
+    size_t hdrSize = sizeof( struct raw_header );   // = 512 by construction
+
+    // file header entries are in little endian order, so swap for big-endian systems.
+    if( system_is_big_endian ) {
+        m_Header.subf |= 128;   // mark file as written on big-endian machine.
+        swapEndian( &( m_Header.synch_pattern ) );
+        swapEndian( &( m_Header.cbytes ) );
+        swapEndian( &( m_Header.dim ), m_Header.ndim );
+    }
+
+    file.write( reinterpret_cast<char*>( &m_Header ), 256 );
+    if( !file.good() ) {
+        throw ios_base::failure( "Failed to write ANA header (m_Header)" );
+    }
+
+    if( system_is_big_endian ) { // ...and then swap back
+        swapEndian( &( m_Header.synch_pattern ) );
+        swapEndian( &( m_Header.cbytes ) );
+        swapEndian( &( m_Header.dim ), m_Header.ndim );
+    }
+
+    // extended header
+    if( ( m_Header.nhb > 1 ) && ( m_ExtendedHeader.length() > 0 ) ) {
+        size_t txtSize = ( m_Header.nhb - 1 ) * hdrSize + 256;
+        unique_ptr<char[]> extHdr( new char[txtSize] );
+        memset( extHdr.get(), 0, txtSize );
+        memcpy( extHdr.get(), m_ExtendedHeader.c_str(), m_ExtendedHeader.length() );
+        file.write( extHdr.get(), txtSize );
+        if( !file.good() ) {
+            throw ios_base::failure( "Failed to write ANA header (extHdr)" );
+        }
+    }
+    else {
+        file.write( m_Header.txt, 256 );
+        if( !file.good() ) {
+            throw ios_base::failure( "Failed to write ANA header (txt)" );
+        }
+    }
+
+    // compressed data
+    if( m_Header.subf & 1 ) {
+        if( system_is_big_endian ) {
+            swapEndian( &( m_CompressedHeader.tsize ) );
+            swapEndian( &( m_CompressedHeader.nblocks ) );
+            swapEndian( &( m_CompressedHeader.bsize ) );
+        }
+
+        file.write( reinterpret_cast<char*>( &m_CompressedHeader ), 14 );
+        if( !file.good() ) {
+            throw ios_base::failure( "Failed to write ANA header (m_CompressedHeader)" );
+        }
+
+        if( system_is_big_endian ) {
+            swapEndian( &( m_CompressedHeader.tsize ) );
+            swapEndian( &( m_CompressedHeader.nblocks ) );
+            swapEndian( &( m_CompressedHeader.bsize ) );
+        }
+    }
+
+
+}
+
+
+void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<Ana>& hdr ) {
 
     size_t compressedSize = hdr->m_CompressedHeader.tsize - 14;
 
@@ -66,7 +230,7 @@ void redux::file::ana::readCompressed( ifstream& file, char* data, size_t nEleme
 }
 
 
-void redux::file::ana::readUncompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<AnaInfo>& hdr ) {
+void redux::file::Ana::readUncompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<Ana>& hdr ) {
 
     size_t nBytes = nElements * typeSizes[hdr->m_Header.datyp];
 
@@ -87,7 +251,7 @@ void redux::file::ana::readUncompressed( ifstream& file, char* data, size_t nEle
 }
 
 
-int redux::file::ana::compressData( shared_ptr<uint8_t>& out, const char* data, int nElements, const shared_ptr<AnaInfo>& hdr, int slice ) {
+int redux::file::Ana::compressData( shared_ptr<uint8_t>& out, const char* data, int nElements, const shared_ptr<Ana>& hdr, int slice ) {
 
     int limit = nElements * typeSizes[hdr->m_Header.datyp];
     limit += ( limit >> 1 );
@@ -95,7 +259,7 @@ int redux::file::ana::compressData( shared_ptr<uint8_t>& out, const char* data, 
     int ny = nElements / nx;
     int runlengthflag( 0 );  // runlength unused/untested
     int res;
-    uint8_t* cdata = new uint8_t[ limit ]; // allocate double size since compression can fail and generate larger data.
+    uint8_t* cdata = new uint8_t[ limit ]; // allocates +50% size since compression can fail and generate larger data.
     out.reset( cdata, []( uint8_t* p ) { delete[] p; } );
 
     switch( hdr->m_Header.datyp ) {
@@ -110,7 +274,7 @@ int redux::file::ana::compressData( shared_ptr<uint8_t>& out, const char* data, 
             break;
         }
         case( 2 ) : {
-            if( runlengthflag ) throw invalid_argument( "compressData: runlength not supported 32-bit types." );
+            if( runlengthflag ) throw invalid_argument( "compressData: runlength not supported for 32-bit types." );
             else res = anacrunch32( cdata, reinterpret_cast<const int32_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
             break;
         }
@@ -121,10 +285,10 @@ int redux::file::ana::compressData( shared_ptr<uint8_t>& out, const char* data, 
 }
 
 
-void redux::file::readAna( ifstream& file, char* data, std::shared_ptr<redux::file::AnaInfo> hdr ) {
+void redux::file::Ana::read( ifstream& file, char* data, std::shared_ptr<redux::file::Ana> hdr ) {
 
     if( !hdr.get() ) {
-        hdr.reset( new AnaInfo() );
+        hdr.reset( new Ana() );
         hdr->read( file );
     }
 
@@ -142,14 +306,14 @@ void redux::file::readAna( ifstream& file, char* data, std::shared_ptr<redux::fi
         nElements *= hdr->m_Header.dim[nDims - i - 1];
     }
 
-    if( hdr->m_Header.subf & 1 ) ana::readCompressed( file, data, nElements, hdr );
-    else ana::readUncompressed( file, data, nElements, hdr );
+    if( hdr->m_Header.subf & 1 ) readCompressed( file, data, nElements, hdr );
+    else readUncompressed( file, data, nElements, hdr );
 
 }
 
 
-void redux::file::writeAna( ofstream& file, const char* data,
-                            std::shared_ptr<redux::file::AnaInfo> hdr,
+void redux::file::Ana::write( ofstream& file, const char* data,
+                            std::shared_ptr<redux::file::Ana> hdr,
                             bool compress, int slice ) {
 
     if( !hdr.get() ) {
@@ -173,10 +337,10 @@ void redux::file::writeAna( ofstream& file, const char* data,
     }
 
     size_t textSize = hdr->m_ExtendedHeader.length();
-    size_t totalSize = nElements * ana::typeSizes[hdr->m_Header.datyp];
+    size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
     size_t compressedSize = totalSize;
 
-    hdr->m_Header.synch_pattern = AnaInfo::MAGIC_ANA;
+    hdr->m_Header.synch_pattern = MAGIC_ANA;
     hdr->m_Header.subf = 0;
     hdr->m_Header.nhb = static_cast<uint8_t>( 1 + std::max( textSize + 256, size_t( 0 ) ) / 512 );
     memset( hdr->m_Header.cbytes, 0, 4 );
@@ -184,7 +348,7 @@ void redux::file::writeAna( ofstream& file, const char* data,
     shared_ptr<uint8_t> cData;
     if( compress ) {
         if( hdr->m_Header.ndim == 2 ) {
-            compressedSize = ana::compressData( cData, data, nElements, hdr, slice );
+            compressedSize = compressData( cData, data, nElements, hdr, slice );
             if( compressedSize < totalSize ) {
                 int tmp = static_cast<int>( compressedSize );
                 hdr->m_Header.subf |= 1;

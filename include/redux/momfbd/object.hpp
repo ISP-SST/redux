@@ -25,7 +25,7 @@ namespace redux {
             ~Object();
 
             void parseProperties( bpt::ptree& tree, const std::string& fn );
-            bpt::ptree getProperties( bpt::ptree* );
+            bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
             std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
             double reg_gamma, weight, angle, lambda;

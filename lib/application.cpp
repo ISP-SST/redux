@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <boost/filesystem.hpp>
+#include <boost/property_tree/info_parser.hpp>
 
 namespace fs = boost::filesystem;
 using namespace redux;
@@ -13,9 +14,9 @@ using namespace std;
 
 string Application::executableName;
 
-#define lg Logger::lg
+#define lg Logger::mlg
 namespace {
-    const string thisChannel = "main";
+    const string thisChannel = "app";
 }
 
 void Application::getOptions( po::options_description& options, const string& name ) {
@@ -31,6 +32,7 @@ void Application::getOptions( po::options_description& options, const string& na
 
     po::options_description config( "Configuration" );
     config.add_options()
+    ( "settings", "Configuration file to load settings from." )
     ( "name", po::value<string>()->default_value( name ),
       "Name used to identify this application instance." )
     ( "unique,u", "Prevent any other application-based process with this flag from"
@@ -101,9 +103,19 @@ void Application::checkGeneralOptions( po::options_description& desc, po::variab
 }
 
 
-Application::Application( po::variables_map& vm ) : m_ShouldStop( false ), m_ShouldRestart( true ) {
+Application::Application( po::variables_map& vm, RunMode rm ) : runMode(rm), returnValue(0), logger(vm) {
 
-    m_Name = vm["name"].as<string>();
+    if( vm.count("settings") ) {
+        settingsFile = vm["settings"].as<string>();
+        if( fs::is_regular(settingsFile) ) {
+            LOG_DETAIL << "Loading file \"" <<  settingsFile << "\"";
+            pt::read_info( settingsFile, propTree );
+        } else {
+            LOG_ERR << "Failed to load file \"" << settingsFile << "\", starting with default settings.";
+            //throw KillException();
+        }
+    }
+    applicationName = vm["name"].as<string>();
 
 }
 
@@ -113,58 +125,25 @@ Application::~Application( void ) {
 }
 
 
-void Application::reset( void ) {
-    m_ShouldStop = true;
-}
-
-
-void Application::kill( void ) {
-    m_ShouldRestart = false;
-    m_ShouldStop = true;
-}
-
-
 string Application::getName( void ) const {
-    return m_Name;
+    return applicationName;
 }
 
 
 int Application::run( void ) {
 
-    while( !m_ShouldStop && dispatch() ) ;
+    while( doWork() && !runMode ) {       // keep calling doWork() until it returns false, or shouldStop is raised
 
-    if( m_ShouldStop ) {
-        if( m_ShouldRestart ) {
-            throw ResetException();
-        }
-        else {
-            throw KillException();
-        }
+    }
+    
+    switch(runMode) {
+        case RESET: throw ResetException();           // this will cause a complete reset (i.e. creation of a new Application instance)
+        //case EXIT:  throw KillException();            // exits the loop in main()
+        default: ;
     }
 
-    // end of execution.
-    return 0;
+    // No work left.
+    return returnValue;
 }
 
-
-bool Application::dispatch( void ) {
-    static size_t count = 0;
-    try {
-        //usleep( 100000 );
-        BOOST_LOG_CHANNEL_SEV( lg, "loop", static_cast<severity_level>( count % 8 ) ) << "tic";
-        if( ( count + 1 ) % 30 == 0 ) {
-            m_ShouldRestart = false;
-        }
-        if( ++count % 10 == 0 ) {
-            m_ShouldStop = true;
-            return false;
-        }
-        return true; //eventQueue.dispatch();
-    }
-    catch( ... ) {
-        LOG_DEBUG << "Event dispatch interrupted";
-    }
-
-    return true;
-}
 

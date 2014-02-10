@@ -16,7 +16,7 @@ namespace redux {
         ~DebugJob(void);
 
         void parseProperties( po::variables_map& vm, bpt::ptree& tree );
-        bpt::ptree getProperties( bpt::ptree* ) { return bpt::ptree(); };
+        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) { return bpt::ptree(); };
         
     private:
         void* prePart( void );

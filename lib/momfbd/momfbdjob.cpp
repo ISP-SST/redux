@@ -188,7 +188,7 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     tmpString = cleanPath( tree.get<string>( "PUPIL", "" ), imageDataDir );
     if( tmpString != "" ) {
         ifstream file( tmpString.c_str(), ifstream::binary );
-        std::shared_ptr<AnaInfo> header( new AnaInfo() );
+        std::shared_ptr<Ana> header( new Ana() );
         header->read( file );
 
         if( header->m_Header.ndim != 2 ) {
@@ -200,7 +200,7 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
             LOG_ERR << "pupil file \"" << tmpString << "\" not square (" << pupilSize << "x" << tmpInt << ")";
         }
         pupil = Array<double>( pupilSize, tmpInt );
-        readAna( file, pupil, header );
+        Ana::read( file, pupil, header );
 
     }
 
@@ -305,11 +305,12 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
 
 }
 
-bpt::ptree MomfbdJob::getProperties( bpt::ptree* root ) {
+bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
+    
     bpt::ptree tree;
 
     for( auto & it : objects ) {
-        it->getProperties( &tree );
+        it->getPropertyTree( &tree );
     }
 
     // TODO BASIS
@@ -367,8 +368,10 @@ bpt::ptree MomfbdJob::getProperties( bpt::ptree* root ) {
     if( flags & MFBD_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", ( bool )( flags & MFBD_SAVE_FFDATA ) );
 
 
-    if( root )
+    if( root ) {
         root->push_back( bpt::ptree::value_type( "momfbd", tree ) );
+    }
+    
     return tree;
 }
 

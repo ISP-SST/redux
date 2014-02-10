@@ -255,11 +255,12 @@ void Channel::parseProperties( bpt::ptree& tree ) {
 
 
     LOG_DEBUG << "Channel::parseProperties() done.";
+    
 }
 
 
 
-bpt::ptree Channel::getProperties( bpt::ptree* root ) {
+bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
 
     bpt::ptree tree;
 
@@ -291,9 +292,10 @@ bpt::ptree Channel::getProperties( bpt::ptree* root ) {
     if( dflags & MFBD_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", ( bool )( flags & MFBD_SAVE_FFDATA ) );
     // TODO "INCOMPLETE"
 
-    if( root )
+    if( root ) {
         root->push_back( bpt::ptree::value_type( "channel", tree ) );
-
+    }
+    
     return tree;
 
 }

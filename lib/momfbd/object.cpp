@@ -199,7 +199,7 @@ void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
 }
 
 
-bpt::ptree Object::getProperties( bpt::ptree* root ) {
+bpt::ptree Object::getPropertyTree( bpt::ptree* root ) {
 
     bpt::ptree tree;
 
@@ -229,11 +229,12 @@ bpt::ptree Object::getProperties( bpt::ptree* root ) {
     if( !outputFileName.empty() ) tree.put( "OUTPUT_FILE", outputFileName );
 
     for( auto & it : channels ) {
-        it->getProperties( &tree );
+        it->getPropertyTree( &tree );
     }
 
-    if( root )
+    if( root ) {
         root->push_back( bpt::ptree::value_type( "object", tree ) );
+    }
     
     return tree;
     

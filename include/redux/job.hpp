@@ -26,7 +26,12 @@ namespace redux {
 
         static std::vector<JobPtr> parseTree(po::variables_map& vm, bpt::ptree& tree);
         virtual void parseProperties( po::variables_map&, bpt::ptree& ) {};
-        virtual bpt::ptree getProperties( bpt::ptree* tree=nullptr ) { return bpt::ptree(); };
+        
+        /*! @brief Returns a boost::property_tree containing the settings for this job.
+         *  @details If 
+         * 
+         */
+        virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) { return bpt::ptree(); };
 
         Job(void);
         virtual ~Job(void);

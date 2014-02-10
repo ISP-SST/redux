@@ -30,7 +30,7 @@ namespace redux {
             ~MomfbdJob( void );
 
             void parseProperties( po::variables_map& vm, bpt::ptree& tree );
-            bpt::ptree getProperties( bpt::ptree* );
+            bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
         private:
 

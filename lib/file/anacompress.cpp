@@ -1,6 +1,6 @@
 #include "redux/file/anacompress.hpp"
 
-#include "redux/file/anainfo.hpp"
+#include "redux/file/fileana.hpp"
 #include "redux/util/endian.hpp"
 
 #include <cstring>
@@ -15,7 +15,7 @@ uint32_t redux::file::anacrunchrun8(uint8_t* x, const uint8_t* array, int slice,
 /* compress 8 bit array into x (a byte array) using ny blocks each of size
    nx, bit slice size slice, returns # of bytes in x */
 {
-    AnaInfo::compressed_header* ch;
+    Ana::compressed_header* ch;
     const uint8_t* p;
     uint32_t nb;
     uint32_t outBytes, j, outBits;
@@ -47,7 +47,7 @@ uint32_t redux::file::anacrunchrun8(uint8_t* x, const uint8_t* array, int slice,
         nb = 3;
     y.i = 0;
     /* do the compression header */
-    ch = reinterpret_cast<AnaInfo::compressed_header*>(x);
+    ch = reinterpret_cast<Ana::compressed_header*>(x);
     /* important note - can't use the sizeof(struct compresshead) because it
        is 14 on some machines and rounded up to 16 on others */
     x = x + 14;
@@ -293,7 +293,7 @@ uint32_t redux::file::anacrunch8(uint8_t* x, const uint8_t* array, int slice, in
 /* compress 8 bit array into x (a byte array) using ny blocks each of size
    nx, bit slice size slice, returns # of bytes in x */
 {
-    AnaInfo::compressed_header* ch;
+    Ana::compressed_header* ch;
     uint32_t nb, ixa, ixb;
     uint32_t outBytes, j, outBits, inIndex;
     int r0, r3, mask;
@@ -325,7 +325,7 @@ uint32_t redux::file::anacrunch8(uint8_t* x, const uint8_t* array, int slice, in
         nb = 3;
     y.i = 0;
     /* do the compression header */
-    ch = reinterpret_cast<AnaInfo::compressed_header*>(x);
+    ch = reinterpret_cast<Ana::compressed_header*>(x);
     /* important note - can't use the sizeof(struct compresshead) because it
        is 14 on some machines and rounded up to 16 on others */
     x = x + 14;
@@ -467,7 +467,7 @@ uint32_t redux::file::anacrunchrun(uint8_t* x, const int16_t* array, int slice, 
 /* compress 16 bit array into x (a byte array) using ny blocks each of size
    nx, bit slice size slice, returns # of bytes in x */
 {
-    AnaInfo::compressed_header* ch;
+    Ana::compressed_header* ch;
     short* p;
     uint32_t nb;
     uint32_t outBytes, j, outBits;
@@ -503,7 +503,7 @@ uint32_t redux::file::anacrunchrun(uint8_t* x, const int16_t* array, int slice, 
     };
     y.i = 0;
     /* do the compression header */
-    ch = reinterpret_cast<AnaInfo::compressed_header*>(x);
+    ch = reinterpret_cast<Ana::compressed_header*>(x);
     /* important note - can't use the sizeof(struct compresshead) because it
        is 14 on some machines and rounded up to 16 on others */
     x = x + 14;
@@ -784,7 +784,7 @@ uint32_t redux::file::anacrunch(uint8_t* x, const int16_t* array, int slice, int
     else
         nb = 3;
     y.i = 0;
-    AnaInfo::compressed_header* ch = reinterpret_cast<AnaInfo::compressed_header*>(x);   // the compression header
+    Ana::compressed_header* ch = reinterpret_cast<Ana::compressed_header*>(x);   // the compression header
 
 // important note: can't use the sizeof(struct compresshead) because it
 //                 is 14 on some machines and rounded up to 16 on others
@@ -923,7 +923,7 @@ uint32_t redux::file::anacrunch32(uint8_t* x, const int32_t* array, int slice, i
    nx, bit slice size slice, returns # of bytes in x */
 {
 
-    AnaInfo::compressed_header* ch;
+    Ana::compressed_header* ch;
     uint32_t nb, ixa, ixb, big = 0;
     uint32_t outBytes, j, outBits, inIndex;
     int r0;
@@ -954,7 +954,7 @@ uint32_t redux::file::anacrunch32(uint8_t* x, const int32_t* array, int slice, i
 
     y.i = 0;
     /* do the compression header */
-    ch = reinterpret_cast<AnaInfo::compressed_header*>(x);
+    ch = reinterpret_cast<Ana::compressed_header*>(x);
     /* important note - can't use the sizeof(struct compresshead) because it
        is 14 on some machines and rounded up to 16 on others */
     x = x + 14;
