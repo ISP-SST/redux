@@ -12,7 +12,7 @@ namespace redux {
          *  @{
          */
 
-        /*!  @file  array.hpp
+        /*!  @file  arrayutil.hpp
          *   @brief     Set of templates for creating/deleting arrays of arbitrary types and dimensionality.
          *   @author    Tomas Hillberg (hillberg@astro.su.se)
          *   @date      2013

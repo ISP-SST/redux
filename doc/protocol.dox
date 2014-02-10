@@ -1,0 +1,16 @@
+/**
+ * @page com_prot Communication protocol
+ *
+ * The communication between master/slaves is specified in this document.
+ * @todo Complete me !!
+ *
+ * @msc
+  server,client;
+#  server box server [label="server"],
+#  client box client [label="client"];
+  server<-client [ label = "connect()" ] ;
+  server->client [ label = "OK" ] ;
+ * @endmsc
+ *
+ * 
+ */

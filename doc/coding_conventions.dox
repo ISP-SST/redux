@@ -1,0 +1,106 @@
+/**
+ * @page coding_conventions REDUX Coding Conventions
+ *
+ * This page describes the genereal coding conventions that should be 
+ * followed while developing REDUX modules or projects based on the
+ * REDUX platform.
+ *
+ * @section CC_TOC Table of contents
+ * \ref CC_1 \n 
+ * \ref CC_1_a \n 
+ * \ref CC_1_b \n 
+ * \ref CC_2 \n 
+ * \ref CC_3 \n 
+ * \ref CC_3_a \n
+ * \ref CC_4 \n 
+ *
+ * @section CC_1 1. Directories and Files. 
+ * 
+ * @subsection CC_1_a 1a. Filenames
+ * File names use all lower case letters and words are connected without spaces
+ * or underscores. Header files use the \c .hpp extension and implementation 
+ * files use the \c .cpp extension.
+ * 
+ * Examples: \c myclass.hpp and \c myclass.cpp
+ *
+ * @subsection CC_1_b 1b. Include Guards
+ * Include guards should be used in \em all header files. 
+ * 
+ * Example: The file \c redux/foo/bar.hpp 
+ * @code
+ *   #ifndef REDUX_FOO_BAR_HPP
+ *   #define REDUX_FOO_BAR_HPP
+ * 
+ *       // ... code ...
+ * 
+ *   #endif // REDUX_FOO_BAR_HPP
+ * @endcode
+ *
+ * Also, end all files with a new line.
+ * 
+ * 
+ *
+ * @section CC_2 2. Coding Style Conventions
+ * Adopt the style conventions of the following example:
+ * 
+ * @code
+ * namespace imagestuff {             // Lower case names for namespaces
+ *
+ *     class Raster {                 // Capitalize every first letter in words in class names 
+ *     public:
+ *         Raster(int w, int h);      // Short but obvious names are OK 
+ *         ~Raster(void);             // Use 'void' argument in void functions 
+ *
+ *         int getHeight(void) const; // 'get'-functions to read attributes
+ *         void setHeight(int h);     // 'set'-functions to write attributes
+ *
+ *     private:                       // Private stuff at the end of the class
+ *         int width;                 // Use meaningful names
+ *         int height;                // Declare one variable per line
+ *         unsigned char *data;
+ *     };
+ *
+ * }
+ * @endcode
+ *
+ * If you use member variable markers, do it in the following manner:
+ *
+ * @code
+ * ...
+ *     private:
+ *         int width_;                // Underscore at the end
+ *         int height_;
+ *         unsigned char *data_;
+ * ...
+ * @endcode
+ *
+ * Keep classes and functions small. \n If you need to keep more than seven
+ * variables (local and members) in mind at any point, \n you should consider
+ * breaking up the class of function.
+ * 
+ * 
+ * @section CC_3 3. Documentation and Comments
+ *
+ * The source code should be purpousfully commented. Here are some general guide lines:
+ *
+ * \li Implementation specific comments should only be present in the \c .cpp files
+ * \li Don't comment the obvious
+ *
+ * @subsection CC_3_a 3a. Doxygen
+ * The source code should be documented with doxygen comments (in the header 
+ * files). 
+ * 
+ * This is a good doxygen ref.: http://www.stack.nl/~dimitri/doxygen/commands.html
+ *
+ *
+ * @section CC_4 4. Other conventions
+ *   \li When you need to make a 'fix me later' note in the code, use one of the following.
+ *       There is a known problem that should be fixed in otherwise (somewhat) working: \n
+ *       @code // BUG: This function leaks memory. @endcode
+ *       There is work left to do:
+ *       @code // TODO: Replace bubble sort. @endcode
+ *       There is something to be determined, pending further thought and discussion.
+ *       @code // TBD: Should we use a smart pointer here? @endcode
+ *       Sign with your initials if it is appropriate.
+ *   \li Don't use tabs. Use 4 spaces.
+ */

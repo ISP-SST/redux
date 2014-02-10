@@ -1,0 +1,54 @@
+/**
+ * @page tools_and_utils Tools and Utils
+ *
+ * This page lists the tools used when compiling this software.
+ * Some of the tools are required and should be installed
+ * and continually updated to the specified versions by all
+ * developers. Other tools are optional and should be installed if they
+ * are needed.
+ *
+ * Please, check up on this page from time to time to make sure that 
+ * your development environment is up to date with the right versions 
+ * of the different tools.
+ *
+ * @section TAUTOC Table of contents
+ * \ref TAUCMake \n 
+ * \ref TAUGIT \n  
+ * \ref TAUDOX \n
+ * \ref TAUCPPCHECK \n
+ * \ref TAUQT \n
+ *
+ *
+ * @section TAUCMake CMake (required)
+ * <b>What:</b> The meta build tool \n
+ * <b>Recomended version is:</b> >= 2.8.0 \n
+ * <b>Comments:</b> n/a
+ *
+ *
+ * @section TAUGIT Git (required)
+ * <b>What:</b> The revision control software \n
+ * <b>Recomended version is:</b> >= 1.8 \n
+ * <b>Comments:</b> n/a
+ *
+ *
+ * @section TAUDOX Doxygen (optional)
+ * <b>What:</b> Documentation tool \n
+ * <b>Recomended version is:</b> >= 1.8.0 \n
+ * <b>Get it from:</b> http://www.stack.nl/~dimitri/doxygen/download.html#latestsrc \n
+ * <b>Comments:</b> Extract code comments and generate an html/latex manual. To get inheritance graphs \c graphviz and \c dot is needed.
+ * For generating the communication sequence diagram, \c mscgen is also necessary. All these are available for most linux distributions.
+ *
+ * 
+ * @section TAUCPPCHECK CppCheck (optional)
+ * <b>What:</b> Static source code analyzer \n
+ * <b>Recomended version is:</b> >= 1.60 \n
+ * <b>Get it from:</b> It is pre-packaged for many linux distributions, otherwise get it at http://cppcheck.sourceforge.net/ \n
+ * <b>Comments:</b> Provides source code analysis and error detection.
+ *
+ * @section TAUQT Qt (optional)
+ * <b>What:</b> Qt GUI library and tools \n
+ * <b>Recomended version is:</b> >= 4.8.0 \n
+ * <b>Comments:</b> Only needed to build the GUI tools (although none exists yet :-P)
+ *
+ * 
+ */

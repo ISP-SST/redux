@@ -1,0 +1,39 @@
+/**
+ * @page git_faq Git FAQ
+ *
+ * This FAQ explains how to use Git and how release and
+ * version numbering works.
+ *
+ * @section RASQ_TOC Table of contents
+ * \ref RASQ_Q1 \n 
+ * \ref RASQ_Q2 \n 
+ * \ref RASQ_Q3 \n 
+ *
+ * @section RASQ_Q1 Q1. What Git client to use and how do I set it up?
+ * See: @ref TAUGIT "Tools and Utils section: Git"
+ *
+ *   
+ * @section RASQ_Q2 Q8. How do I create a new release?
+ * First make sure that everything compiles and executes without issues. Then add an "annotated tag"
+ * @code git tag release/1.2.3 -m "Release message" @endcode
+ * 
+ *
+ * @section RASQ_Q3 Q10. How does version numbering work?
+ * The REDUX library has a three digit version number \c x.y.z \n
+ * The version numbers will be automatically extracted from the git repository by the CMake scripts,
+ * and passed as @e defines during compilation. 
+ *
+ * The first digit is increased with large and fundamental changes. \n
+ * It will initially be 0 but incresed to 1 for the first stable version. \n Increasing 
+ * this number is a major event and should generally be celebrated with an internal 
+ * release party.
+ * 
+ * The second digit is increased every time the functionality of the API changes. \n This is generally 
+ * what happens after (re)writing a module which results in \n newly added functionality or modified call signatures. \n
+ * It is a good practice to update the \c doc/release_notes.dox file with 
+ * a list of the major changes and additions that has been made since the last version.
+ *
+ * The last digit is increased to reflect bug fixes, minor additions of functionality and the 
+ * passing of time in general.
+ * 
+ */

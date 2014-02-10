@@ -13,7 +13,7 @@ namespace redux {
 
     namespace util {
 
-        /*!  @ingroup util
+        /*! @defgroup util Util
          *  @{
          */
 

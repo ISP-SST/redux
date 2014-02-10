@@ -12,8 +12,15 @@ namespace redux {
 
     namespace momfbd {
 
+        /*! @ingroup momfbd
+         *  @{
+         */
+        
         class Object;
         class MomfbdJob;
+        /*! @brief Class containing the channel-specific configuration for a MomfbdJob/Object
+         * 
+         */
         class Channel {
 
         public:
@@ -72,6 +79,8 @@ namespace redux {
             friend class Object;
         };
 
+        /*! @} */
+                
     }   // momfbd
 
 }   // redux

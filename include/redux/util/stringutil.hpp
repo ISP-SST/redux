@@ -229,8 +229,7 @@ namespace redux {
 
 
         //@{
-        /*! @fn std::string printArray( const T data, const char* s="vector", int d=3 )
-         *  @brief Print the content of a vector as data = [[ 1, 2], [3, 4], ..., [n-1, n] ]
+        /*! @brief Print the content of a vector as data = [[ 1, 2], [3, 4], ..., [n-1, n] ]
          *  @details Simple way to output a vector in a form that can be copy/pasted into IDL etc.
          *  @param data reference to input or pointer to data
          *  @param n number of elements to print (for pointer version)

@@ -1,0 +1,21 @@
+msc {
+  hscale = "2";
+
+  server,client;
+
+  server<-client [ label = "connect" ] ;
+  server->client [ label = "OK" ] ;
+  server->client [ label = "bc(TRUE)"];
+  client=>client [ label = "process(1)" ];
+  client=>client [ label = "process(2)" ];
+  ...;
+  client=>client [ label = "process(n)" ];
+  client=>client [ label = "process(END)" ];
+  server<<=client [ label = "callback()"];
+  ---  [ label = "If more to run", ID="*" ];
+  server->server [ label = "next()"];
+  server->client [ label = "ac1()\nac2()"];
+  server<-client [ label = "cb(TRUE)"];
+  server->server [ label = "stalled(...)"];
+  server<-server [ label = "ab() = FALSE"];
+}

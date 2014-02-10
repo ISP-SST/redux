@@ -14,7 +14,14 @@ namespace bpt = boost::property_tree;
 
 
 namespace redux {
+        
+    /*! @ingroup redux
+     *  @{
+     */
 
+    /*! Base class for a "job" to be processed by the redux framework.
+     * 
+     */
     class Job {
         
     public:
@@ -28,8 +35,14 @@ namespace redux {
         virtual void parseProperties( po::variables_map&, bpt::ptree& ) {};
         
         /*! @brief Returns a boost::property_tree containing the settings for this job.
-         *  @details If 
-         * 
+         *  @details If a ptree pointer is provided, the tree will also be appended to it,
+         *  inside a named block
+         *  @code
+         *  "jobtag"
+         *  {
+                // settings //
+            }
+         *  @endcode
          */
         virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) { return bpt::ptree(); };
 
@@ -52,6 +65,8 @@ namespace redux {
     };
 
 
+    /*! @} */
+        
 }  // redux
 
 

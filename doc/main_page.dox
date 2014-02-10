@@ -1,0 +1,26 @@
+/**
+ * @mainpage REDUX Documentation
+ *
+ * Welcome to the documentation for REDUX!
+ *
+ *
+ * @section mainpage_admin_sec Software structure
+ *
+ * @li @ref com_prot Communication protocol
+ *
+ *
+ * @section mainpage_tutorial_sec Tutorials
+ *
+ * \li @ref coding_conventions "Coding conventions" \n
+ *
+ * @section mainpage_faq_sec Questions and Answers
+ *
+ *  To be written...
+ *
+ * @section mainpage_admin_sec Compiling and Source Code Management
+ *
+ * \li @ref release_notes "Release notes for REDUX" \n
+ * \li @ref cmake_faq "CMake FAQ" \n
+ * \li @ref git_faq "Git FAQ" \n
+ *
+ */

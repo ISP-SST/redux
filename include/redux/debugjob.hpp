@@ -6,6 +6,13 @@
 
 namespace redux {
 
+    /*! @ingroup redux
+     *  @{
+     */
+
+    /*! "Dummy" job for testing the framework.
+     * 
+     */
     class DebugJob : public Job {
 
     public:
@@ -39,7 +46,8 @@ namespace redux {
         
         friend class boost::serialization::access;
     };
-
+   
+    /*! @} */
     
     namespace debugjob {
         const size_t dummy = redux::DebugJob::jobType;       // this will trigger the registration of DebugJob in Job::jobMap

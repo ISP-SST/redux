@@ -3,7 +3,11 @@
 
 namespace redux {
 
-    namespace util {
+    namespace file {
+        
+        /*! @defgroup file FileIO
+         *  @{
+         */
         
         struct FileInfo {
             
@@ -11,6 +15,8 @@ namespace redux {
             virtual ~FileInfo(void){}
 
         };
+        
+        /*! @} */
 
     }
 

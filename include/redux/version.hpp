@@ -4,6 +4,10 @@
 #include <string>
 
 namespace redux {
+    
+    /*! @defgroup redux REDUX
+     *  @{
+     */
 
     /*!  @file      version.hpp
      *   @brief     Functions for retrieving revision numbers/strings in some organized form.
@@ -45,6 +49,8 @@ namespace redux {
      *   @date      2013
      */
     extern std::string getLongVersionString( void );
+
+    /*! @} */
 
 }
 

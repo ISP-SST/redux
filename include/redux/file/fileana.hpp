@@ -12,7 +12,14 @@ namespace redux {
 
     namespace file {
 
-        struct Ana : public redux::util::FileInfo {
+        /*! @ingroup file
+         *  @{
+         */
+
+        /*! Container for reading/writing ANA files.
+        *
+        */
+        struct Ana : public redux::file::FileInfo {
 
             enum Magic { MAGIC_ANA = 0x5555aaaa, MAGIC_ANAR = 0xaaaa5555 };
             enum TypeIndex { ANA_BYTE = 0/*uint8*/, ANA_WORD/*int16*/, ANA_INT/*int32*/, ANA_FLOAT, ANA_DOUBLE, ANA_LONG };
@@ -112,6 +119,7 @@ namespace redux {
 
         };
 
+        /*! @} */
 
     } // end namespace file
 

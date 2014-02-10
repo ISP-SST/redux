@@ -4,6 +4,10 @@
 #include <math.h>
 
 namespace redux {
+    
+    /*!  @ingroup redux
+     *  @{
+     */
 
     /*!  @file      constants.hpp
      *   @brief     Some physical/mathematical constants
@@ -23,6 +27,7 @@ namespace redux {
     //    => = 5.7883817555×10−9     eV/Gauss
     //    => = 5.7883817555×10−9 * planck*CC*1e10    /(Gauss*Ångström)
 
+    /*! @} */
 
 
 }

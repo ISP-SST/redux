@@ -16,7 +16,15 @@ namespace redux {
 
     namespace momfbd {
 
+        /*! @ingroup momfbd
+         *  @{
+         */
+
         class MomfbdJob;
+        
+        /*! @brief Class containing the object-specific configuration a MOMFBD job
+         * 
+         */
         class Object {
 
         public:
@@ -73,6 +81,9 @@ namespace redux {
 
         };
 
+
+        /*! @} */
+        
     }
 
 }

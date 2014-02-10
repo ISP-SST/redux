@@ -1,0 +1,104 @@
+/**
+ * @page cmake_faq CMake FAQ 
+ *
+ * This FAQ explains how to build the binaries using CMake.
+ *
+ * @section CMAKEQ_TOC Table of contents
+ * \ref CMAKEQ_Q1 \n 
+ * \ref CMAKEQ_Q2 \n 
+ * \ref CMAKEQ_Q3 \n 
+ * \ref CMAKEQ_Q4 \n 
+ * \ref CMAKEQ_Q5 \n 
+ * \ref CMAKEQ_Q6 \n 
+ * \ref CMAKEQ_Q7 \n 
+ * \ref CMAKEQ_Q8 \n 
+ * \ref CMAKEQ_Q9 \n 
+ * \ref CMAKEQ_Q10 \n 
+ *
+ *
+ * @section CMAKEQ_Q1 Q1. What version of CMake should I use?
+ * See: @ref TAUCMake "Tools and Utils section: CMake"
+ *
+ *
+ * @section CMAKEQ_Q2 Q2. Where do I get CMake?
+ * For most linux distributions it is avalable from the package repositories.
+ * If not, you can get it from http://www.cmake.org/cmake/resources/software.html
+ *
+ *
+ * @section CMAKEQ_Q3 Q3. Where is the CMake reference documentation?
+ * Main documentation: http://www.cmake.org/HTML/Documentation.html \n
+ * Wiki page: http://www.cmake.org/Wiki/CMake \n
+ * Usefull variables: http://www.cmake.org/Wiki/CMake_Useful_Variables \n
+ * Official FAQ: http://www.cmake.org/Wiki/CMake_FAQ \n
+ * 
+ *
+ * @section CMAKEQ_Q4 Q4. What do I have to do before running CMake?
+ * Make sure you have the third-party software available that you wish to use. (cfitsio/fftw3/doxygen/cppcheck...)
+ *
+ *
+ * @section CMAKEQ_Q5 Q5. How do I generate the makefiles ?
+ * Either from the command line:
+ * @code
+ * mkdir build
+ * cd build
+ * cmake /path/to/redux
+ * @endcode
+ * Now the makefiles should be generated and ready to be compiled with @c make.
+ *
+ * Using the gui:
+ *   \li Start cmake-gui
+ *   \li Enter the projects root directory in the "Where is the source code:" field.
+ *   \li Enter the build directory in the "Where to build the binaries:" field.
+ *   \li Click "Configure".
+ *   \li Click "Generate".
+ *
+ * Now the makefiles should be generated and ready to be compiled with @c make.
+ * A solution file has now been created in the \c ./build directory.
+ * 
+ * @section CMAKEQ_Q6 Q6. How do I link against a specific library?
+ * All the dependencies of redux are linked against automatically by some cmake macros. \n If you add
+ * a new dependency, follow the examples of the existing ones to get the automatic include paths and linking.
+ *
+ *
+ * @section CMAKEQ_Q7 Q7. Where are the executable(s) / libraries?
+ * The executables (and the libraries) are built in the \c build folder specified when running CMake. \n
+ * By default the libraries/binaries/headers are installed in the \c dist/ directory of the source tree,
+ * the target directory can be changed in CMake. 
+ *   
+ * 
+ * @section CMAKEQ_Q8 Q8. How do I add a new library to the project?
+ * To add the library reduxfoo, follow these steps:
+ *   \li Add the directory \c lib/foo
+ *   \li Add the directory \c include/redux/foo
+ *   \li Add header files, ex. \c include/redux/foo/bar.hpp
+ *   \li Add source files, ex. \c lib/foo/bar.cpp
+ *   \li Create a file \c lib/foo/CMakeLists.txt with the following content.
+ * @code
+ * # Code for config module
+ * FILE(GLOB REDUX_FOO_CPP "*.cpp")
+ * FILE(GLOB REDUX_FOO_HPP "${REDUX_SOURCE_DIR}/include/redux/*.hpp")
+ * 
+ * # Combine sources into library
+ * ADD_LIBRARY(reduxfoo ${REDUX_FOO_CPP} ${REDUX_FOO_HPP})
+ * SET_TARGET_PROPERTIES(reduxfoo PROPERTIES DEBUG_POSTFIX "-d")
+ *
+ * INSTALL(TARGETS reduxfoo DESTINATION ${REDUX_INSTALL_DIR}/lib CONFIGURATIONS Release Debug)
+ * @endcode
+ *   \li Re-run the CMake config tool.
+ *   \li Done!
+ *
+ * @section CMAKEQ_Q9 Q9. How do I add a third party library.
+ * All the dependencies of redux are linked against automatically by some cmake macros. If you add dependencies on a new
+ * external library, follow the examples of the existing ones to get the automatic include paths and linking. \n
+ * <b>Use widely available libraries rather than exotic ones if the choice exist!</b>
+ * 
+ *
+ * @section CMAKEQ_Q10 Q10. How do I run cppcheck on the sources ?
+ * The benefit of running cppcheck through through the CMake targets is that the include paths are appended automatically,
+ * so all dependencies is included automatically. \n
+ * If cppcheck is detected by cmake, there will be an option to "REDUX_CPPCHECK_TARGETS" presented in the gui. Check it
+ * and re-run cmake, and the build-tree will get one CPPCHECK target for each binary/library in the source tree. \n Simply run
+ * e.g. @code make CPPCHECK_redux @endcode to run it. \n
+ * For details about Cppcheck, see: @ref TAUCPPCHECK "Tools and Utils section: CppCheck"
+ * 
+ */

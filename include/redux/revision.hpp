@@ -2,6 +2,10 @@
 #define REDUX_REVISION_HPP
 
 namespace redux {
+    
+    /*!  @ingroup redux
+     *  @{
+     */
 
     /*!  @file      revision.hpp
      *   @brief     Constants containing the version numbers and revision details of the library.
@@ -23,6 +27,8 @@ namespace redux {
     extern const char* reduxCommitTime;       //!< Commit timestamp
     extern const char* reduxBuildTime;        //!< Compilation timestamp
 
+    /*! @} */
+    
 }
 
 #endif // REDUX_REVISION_HPP

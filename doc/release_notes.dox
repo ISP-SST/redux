@@ -1,0 +1,13 @@
+/**
+ * @page release_notes Release notes for the REDUX library and toolkit
+ *
+ * Each time a release is made, update this document to reflect changes 
+ * from the previous version.
+ *
+ * @section RNVTOC Table of contents
+ * \ref RNV0_0_0 \n 
+ *
+ * @section RNV0_0_0 0.0.0 - Demo Release
+ * Just some examples to demonstrate general syntax and layout.
+ *
+ */

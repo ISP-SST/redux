@@ -13,12 +13,19 @@
 namespace redux {
 
     namespace momfbd {
-
+        
+        /*! @defgroup momfbd MOMFBD
+         *  @{
+         */
+        
         extern const std::map<std::string, int> getstepMap;
         extern const std::map<std::string, int> gradientMap;
         extern const std::map<std::string, int> fillpixMap;
 
         class Channel;
+        /*! @brief Class containing the configuration settings for a MOMFBD job.
+         * 
+         */
         class MomfbdJob : public Job {
 
         public:
@@ -34,14 +41,6 @@ namespace redux {
 
         private:
 
-            uint8_t basis;
-            std::vector<uint32_t> modes, imageNumbers, darkNumbers;
-            std::string imageDataDir;
-            std::vector<std::string> outputFiles;
-            int nPoints, sequenceNumber;
-            double reg_gamma;
-            uint32_t flags;
-
             void* prePart( void );
             void postPart( void* );
             void* runPreJob( void );
@@ -50,6 +49,14 @@ namespace redux {
             uint32_t preProcess( void );
             uint32_t postProcess( void );
             uint32_t runJob( void );
+
+            uint8_t basis;
+            std::vector<uint32_t> modes, imageNumbers, darkNumbers;
+            std::string imageDataDir;
+            std::vector<std::string> outputFiles;
+            int nPoints, sequenceNumber;
+            double reg_gamma;
+            uint32_t flags;
 
             std::vector<std::shared_ptr<Object>> objects;
 
@@ -110,6 +117,8 @@ namespace redux {
         };
 
         const size_t dummy = MomfbdJob::jobType;       // this will trigger the registration of MomfbdJob in Job::jobMap
+
+        /*! @} */
 
     }   // momfbd
 
