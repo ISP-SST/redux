@@ -96,6 +96,7 @@ void MomfbdJob::maybeOverride( bool value, uint32_t& set, uint32_t flag ) {
 
 MomfbdJob::MomfbdJob( void ) : sequenceNumber( 0 ) {
     LOG_DEBUG << "MomfbdJob::MomfbdJob()   (jobType = " << jobType << ")";
+    info.typeString = "momfbd";
 }
 
 MomfbdJob::~MomfbdJob( void ) {
@@ -124,15 +125,14 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     imageNumbers = tree.get<vector<uint32_t>>( "imgn", vector<uint32_t>() );
     if( imageNumbers.size() == 0 ) imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", vector<uint32_t>() );
     darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", vector<uint32_t>() );
-    sequenceNumber = tree.get<int>( "SEQUENCE_NUM", sequenceNumber );
+    sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", sequenceNumber );
 
-    klMinMode  = tree.get<int>( "KL_MIN_MODE", DEF_KL_MIN_MODE );
-    klMaxMode  = tree.get<int>( "KL_MAX_MODE", DEF_KL_MAX_MODE );
-    nPoints    = tree.get<int>( "NUM_POINTS", DEF_NUM_POINTS );
-    borderClip = tree.get<int>( "BORDER_CLIP", DEF_BORDER_CLIP );
+    klMinMode  = tree.get<uint32_t>( "KL_MIN_MODE", DEF_KL_MIN_MODE );
+    klMaxMode  = tree.get<uint32_t>( "KL_MAX_MODE", DEF_KL_MAX_MODE );
+    nPoints    = tree.get<uint32_t>( "NUM_POINTS", DEF_NUM_POINTS );
+    borderClip = tree.get<uint32_t>( "BORDER_CLIP", DEF_BORDER_CLIP );
 
-    telescopeDiameter = tree.get<int>( "TELESCOPE_D", DEF_TELESCOPE_D );
-
+    telescopeDiameter = tree.get<double>( "TELESCOPE_D", DEF_TELESCOPE_D );
     telescopeFocalLength = tree.get<double>( "TELESCOPE_F", 0 );
     arcSecsPerPixel = tree.get<double>( "ARCSECPERPIX", 0 );
     pixelSize = tree.get<double>( "PIXELSIZE", 0 );
@@ -143,9 +143,9 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     LOG << "Arcseconds per pixel = " << arcSecsPerPixel;
     LOG << "Telescope focal length = " << telescopeFocalLength;
 
-    minIterations = tree.get<int>( "MIN_ITER", DEF_MIN_ITER );
-    maxIterations = tree.get<int>( "MAX_ITER", DEF_MAX_ITER );
-    nDoneMask = tree.get<int>( "N_DONE_ITER", DEF_N_DONE_ITER );
+    minIterations = tree.get<uint32_t>( "MIN_ITER", DEF_MIN_ITER );
+    maxIterations = tree.get<uint32_t>( "MAX_ITER", DEF_MAX_ITER );
+    nDoneMask = tree.get<uint32_t>( "N_DONE_ITER", DEF_N_DONE_ITER );
     nDoneMask = ( 1 << nDoneMask ) - 1;
 
     FTOL = tree.get<double>( "FTOL", DEF_FTOL );
@@ -177,9 +177,9 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     time_obs = tree.get<string>( "TIME_OBS", "" );
     date_obs = tree.get<string>( "DATE_OBS", DEF_DATE_OBS );
 
-    max_local_shift = tree.get<int>( "MAX_LOCAL_SHIFT", DEF_MAX_LOCAL_SHIFT );
-    mstart = tree.get<int>( "MODE_START", DEF_MODE_START );
-    mstep = tree.get<int>( "MODE_STEP", DEF_MODE_STEP );
+    max_local_shift = tree.get<uint32_t>( "MAX_LOCAL_SHIFT", DEF_MAX_LOCAL_SHIFT );
+    mstart = tree.get<uint32_t>( "MODE_START", DEF_MODE_START );
+    mstep = tree.get<uint32_t>( "MODE_STEP", DEF_MODE_STEP );
 
     if( tree.get<bool>( "FLATFIELD", false ) && tree.get<bool>( "CALIBRATE", false ) ) {
         LOG_ERR << "both FLATFIELD and CALIBRATE mode requested";
@@ -375,6 +375,21 @@ bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
     return tree;
 }
 
+size_t MomfbdJob::size(void) const {
+    size_t sz = Job::size();
+    
+    return sz;
+}
+
+char* MomfbdJob::pack(char* ptr) const {
+    ptr = Job::pack(ptr);
+    return ptr;
+}
+
+const char* MomfbdJob::unpack(const char* ptr, bool doSwap) {
+    ptr = Job::unpack(ptr, doSwap);
+    return ptr;
+}
 
 uint32_t MomfbdJob::preProcess( void ) {
     uint32_t ret( 0 );

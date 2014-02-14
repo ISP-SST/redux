@@ -81,6 +81,21 @@ string redux::util::alignRight( const string& s, size_t n, unsigned char c ) {
 
 }
 
+
+string redux::util::getUname( __uid_t id ) {
+    if( !id ) id = geteuid();
+    struct passwd* pwd = getpwuid( id );
+    
+    string tmp;
+    if( pwd ) {
+        tmp = pwd->pw_name;
+    } else {
+        tmp = std::to_string((int)id);
+    }
+    return tmp;
+}
+
+
 string expandTilde( string in ) {
     if( in.empty() || in[0] != '~' ) return in;
     string tmp;

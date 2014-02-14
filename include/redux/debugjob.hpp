@@ -25,6 +25,10 @@ namespace redux {
         void parseProperties( po::variables_map& vm, bpt::ptree& tree );
         bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) { return bpt::ptree(); };
         
+        size_t size(void) const;
+        char* pack(char*) const;
+        const char* unpack(const char*, bool);
+        
     private:
         void* prePart( void );
         void postPart( void* );

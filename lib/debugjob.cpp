@@ -16,10 +16,11 @@ namespace {
         return new DebugJob();
     }
 }
-size_t DebugJob::jobType = Job::registerJob( "DebugJob", createDebugJob );
+size_t DebugJob::jobType = Job::registerJob( "Debug", createDebugJob );
 
 
 DebugJob::DebugJob( void )  {
+    info.typeString = "debug";
     LOG_DEBUG << "DebugJob::DebugJob()";
 }
 
@@ -31,6 +32,19 @@ DebugJob::~DebugJob( void ) {
 
 void DebugJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     LOG_DETAIL << "DebugJob::parseProperties()";
+}
+
+size_t DebugJob::size(void) const {
+    size_t sz = Job::size();
+    return sz;
+}
+
+char* DebugJob::pack(char* ptr) const {
+    return Job::pack(ptr);
+}
+
+const char* DebugJob::unpack(const char* ptr, bool doSwap) {
+    return Job::unpack(ptr, doSwap);
 }
 
 uint32_t DebugJob::preProcess( void ) {
@@ -71,3 +85,5 @@ void* DebugJob::runPreJob( void ) {
 void DebugJob::runPostJob( void* ) {
     LOG_DETAIL << "DebugJob::runPostJob()";
 }
+
+

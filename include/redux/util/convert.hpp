@@ -1,8 +1,10 @@
 #ifndef REDUX_UTIL_CONVERT_HPP
 #define REDUX_UTIL_CONVERT_HPP
 
+#include <ctime>
 #include <limits>
 
+#include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 namespace redux {
@@ -49,6 +51,11 @@ namespace redux {
             }
         }
 
+        /*! Convert a boost ptime into std time_t
+         */
+        time_t to_time_t(const boost::posix_time::ptime& pt);
+        
+        
         /*! @} */
 
     }
