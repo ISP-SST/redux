@@ -8,7 +8,6 @@
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
-#include <boost/archive/text_oarchive.hpp>
 
 namespace po = boost::program_options;
 namespace bpt = boost::property_tree;
@@ -35,18 +34,15 @@ namespace redux {
                                JST_COMPLETED,    
                                JST_ERR = 255
                              };
-                             
         typedef std::shared_ptr<Job> JobPtr;
+        struct JobCompare {
+            bool operator()( const JobPtr &a, const JobPtr &b ) const { return ( *a < *b ); }
+        };
+        typedef std::set < JobPtr, JobCompare> JobSet;
         typedef Job* ( *JobCreator )( void );
         typedef std::map<std::string, std::pair<size_t, JobCreator>> MapT;
 
-        static MapT& getMap(void) { static MapT m = []( void ) {
-            MapT tmp;
-            std::cout << "NEW" << std::endl;
-            tmp.clear();
-            return tmp; }();
-            return m;
-        };
+        static MapT& getMap(void) { static MapT m; return m; };
         static size_t registerJob( const std::string&, JobCreator f );
         static std::vector<JobPtr> parseTree( po::variables_map& vm, bpt::ptree& tree );
         static JobPtr newJob( const std::string& );
@@ -65,6 +61,14 @@ namespace redux {
             static std::string printHeader(void);
             std::string print(void);
         } info;
+        
+        struct Part {
+            size_t id;
+            virtual size_t size(void) const;
+            virtual char* pack(char*) const;
+            virtual const char* unpack(const char*, bool);
+        };
+        typedef std::shared_ptr<Part> PartPtr;
         
         virtual void parseProperties( po::variables_map&, bpt::ptree& ) {};
         
@@ -87,23 +91,11 @@ namespace redux {
         virtual char* pack(char*) const;
         virtual const char* unpack(const char*, bool);
         
-        const size_t& id(void) { return info.id; };
-        void setID(size_t id) { info.id = id; };
-         
-    private:
-        //static std::map<std::string, std::pair<size_t, JobCreator>> jobMap;
-        static size_t nJobTypes;
+        bool operator<(const Job& rhs);
     
     protected:
-        
-        template <typename Archive>
-        void serialize( Archive& ar, const unsigned int version ) {
-            std::string tmp = "Job";
-            ar & tmp;
-            // no members yet...
-        }
-        
-        friend class boost::serialization::access;
+        std::vector<PartPtr> parts;
+
     };
 
 

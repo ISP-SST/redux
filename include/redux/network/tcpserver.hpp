@@ -23,7 +23,7 @@ namespace redux {
 
         private:
 
-            void onAccept( TcpConnection::ptr conn, const boost::system::error_code& error );
+            void onAccept( TcpConnection::Ptr conn, const boost::system::error_code& error );
 
             tcp::acceptor acceptor;
             TcpConnection::callback onConnected;

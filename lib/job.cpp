@@ -5,6 +5,8 @@
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <mutex>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/date_time/posix_time/time_formatters.hpp>
@@ -13,7 +15,6 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-size_t Job::nJobTypes( Job::getMap().size() );
 
 #define lg Logger::lg
 namespace {
@@ -23,9 +24,14 @@ namespace {
     const std::string StateNames[7] = { "undefined", "queued", "idle", "active", "paused", "completed", "error" };
     const std::string StateTags[7] = { "-", "Q", "I", "A", "P", "C", "E" };
 
+    mutex globalJobMutex;
+    
 }
 
+
 size_t Job::registerJob( const string& name, JobCreator f ) {
+    static size_t nJobTypes(0);
+    std::unique_lock<mutex> lock(globalJobMutex);
     auto ret = getMap().insert( { boost::to_upper_copy( name ), {nJobTypes + 1, f}} );
     if( ret.second ) {
         return ret.first->second.first;
@@ -33,8 +39,10 @@ size_t Job::registerJob( const string& name, JobCreator f ) {
     return nJobTypes++;
 }
 
+
 vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
     vector<JobPtr> tmp;
+    std::unique_lock<mutex> lock(globalJobMutex);
     for( auto & it : tree ) {
         string nm = it.first;
         auto it2 = getMap().find( boost::to_upper_copy( nm ) );       // check if the current tag matches a registered (Job-derived) class.
@@ -47,8 +55,10 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
     return tmp;
 }
 
+
 Job::JobPtr Job::newJob( const string& name ) {
     JobPtr tmp;
+    std::unique_lock<mutex> lock(globalJobMutex);
     auto it = getMap().find( boost::to_upper_copy( name ) );
     if( it != getMap().end() ) {
         tmp.reset( it->second.second() );
@@ -58,13 +68,17 @@ Job::JobPtr Job::newJob( const string& name ) {
 }
 
 
-Job::Info::Info(void) : id(0), priority(0), verbosity(0), state(JST_UNDEFINED) { }
+Job::Info::Info(void) : id(0), priority(0), verbosity(0), state(JST_UNDEFINED) {
+    
+}
+
 
 size_t Job::Info::size(void) const {
     size_t sz = sizeof(size_t) + sizeof(time_t) + sizeof(State) + 2;
     sz += typeString.length() + name.length() + user.length() + host.length() + logFile.length() + 5 ;
     return sz;
 }
+
 
 char* Job::Info::pack(char* ptr) const {
 
@@ -85,7 +99,8 @@ char* Job::Info::pack(char* ptr) const {
    
 }
 
-const char* Job::Info::unpack(const char* ptr, bool doSwap) {
+
+const char* Job::Info::unpack(const char* ptr, bool swap_endian) {
     
     using redux::util::unpack;
     
@@ -94,26 +109,24 @@ const char* Job::Info::unpack(const char* ptr, bool doSwap) {
     ptr = unpack(ptr,user);  
     ptr = unpack(ptr,host);  
     ptr = unpack(ptr,logFile);  
-    ptr = unpack(ptr,id);
+    ptr = unpack(ptr,id,swap_endian);
     ptr = unpack(ptr,priority);
     ptr = unpack(ptr,verbosity);
     ptr = unpack(ptr,state);
     time_t timestamp;
-    ptr = unpack(ptr,timestamp);
-    if( doSwap ) {
-        swapEndian(id);
-        swapEndian(timestamp);
-    }
+    ptr = unpack(ptr,timestamp,swap_endian);
     submitTime = boost::posix_time::from_time_t( timestamp );
     
     return ptr;
 }
+
 
 std::string Job::Info::printHeader(void) {
     string hdr = alignRight("ID",5) + alignCenter("type",10) + alignCenter("submitted",20);
     hdr += alignCenter("name",15) + alignLeft("user",15) + alignCenter("priority",8) + alignCenter("state",8);
     return hdr;
 }
+
 
 std::string Job::Info::print(void) {
     string info = alignRight(std::to_string(id),5) + alignCenter(typeString,10);
@@ -122,26 +135,63 @@ std::string Job::Info::print(void) {
     return info;
 }
 
+
+size_t Job::Part::size(void) const {
+    size_t sz = sizeof(id);
+    return sz;
+}
+
+
+char* Job::Part::pack(char* ptr) const {
+
+    using redux::util::pack;
+    
+    ptr = pack(ptr,id);
+    
+    return ptr;
+   
+}
+
+
+const char* Job::Part::unpack(const char* ptr, bool swap_endian) {
+    
+    using redux::util::unpack;
+ 
+    ptr = unpack(ptr,id,swap_endian);
+    
+    return ptr;
+}
+
+
 Job::Job( void ) {
     info.user = getUname();
     info.host = boost::asio::ip::host_name();
 }
 
+
 Job::~Job( void ) {
 
 }
+
 
 size_t Job::size(void) const {
     size_t sz = info.size();
     return sz;
 }
 
+
 char* Job::pack(char* ptr) const {
     ptr = info.pack(ptr);
     return ptr;
 }
 
-const char* Job::unpack(const char* ptr, bool doSwap) {
-    ptr = info.unpack(ptr,doSwap);
+
+const char* Job::unpack(const char* ptr, bool swap_endian) {
+    ptr = info.unpack(ptr,swap_endian);
     return ptr;
+}
+
+
+bool Job::operator<(const Job& rhs) {
+    return (info.id < rhs.info.id);
 }

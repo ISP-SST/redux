@@ -14,7 +14,6 @@ namespace {
 }
 
 TcpConnection::~TcpConnection( void ) {
-
     mySocket.close();
 }
 
@@ -41,14 +40,12 @@ void TcpConnection::connect( string host, string service ) {
     
     if( host == "" ) host = "localhost";
 
-    LOG_ERR << "connect   host=" << host;
     ba::ip::tcp::resolver::query query( host, service );
     ba::ip::tcp::resolver resolver( myService );
     ba::ip::tcp::resolver::iterator destination = resolver.resolve( query );
     ba::ip::tcp::resolver::iterator end ;
     ba::ip::tcp::endpoint endpoint;
 
-    LOG_ERR << "connect2   host=" << host;
     while( destination != end ) {       // TODO: try connect to each destination and return on success...
         mySocket.connect( *destination++ );
         if( mySocket.is_open() ) return;
@@ -69,7 +66,7 @@ void TcpConnection::idle( void ) {
     
 }
 
-void TcpConnection::onActivity( ptr connptr, const boost::system::error_code& error ) {
+void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& error ) {
 
     if( !error ) {
         if( activityCallback ) {

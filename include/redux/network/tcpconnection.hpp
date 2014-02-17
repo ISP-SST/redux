@@ -3,6 +3,8 @@
 
 #include "redux/network/protocol.hpp"
 
+#include <memory>
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 
@@ -18,14 +20,14 @@ namespace redux {
             
         public:
             
-            typedef std::shared_ptr<TcpConnection> ptr;
-            typedef std::function<void( ptr )> callback;
+            typedef std::shared_ptr<TcpConnection> Ptr;
+            typedef std::function<void( Ptr )> callback;
 
             ~TcpConnection( void );
 
 
-            static ptr newPtr( boost::asio::io_service& io_service ) {
-                return ptr( new TcpConnection( io_service ) );
+            static Ptr newPtr( boost::asio::io_service& io_service ) {
+                return Ptr( new TcpConnection( io_service ) );
             }
 
             template <class T>
@@ -36,11 +38,12 @@ namespace redux {
                 }
             }
             tcp::socket& socket() { return mySocket; }
+            operator bool() const { return mySocket.is_open(); };
 
             void connect( std::string host, std::string service );
             void setCallback( callback cb = nullptr ) { activityCallback = cb; };
             void idle( void );
-            void onActivity( ptr conn, const boost::system::error_code& error );
+            void onActivity( Ptr conn, const boost::system::error_code& error );
 
             TcpConnection& operator<<( const Command& );
             TcpConnection& operator>>( Command& );

@@ -22,12 +22,14 @@ namespace redux {
         ~Worker( void );
 
         void init( void );
+        void stop( void );
 
+        void updateStatus(void);
     private:
 
 //         boost::asio::io_service ioService;
 //         const po::variables_map& params;
-        network::TcpConnection::ptr conn;
+        network::TcpConnection::Ptr conn;
         Daemon& daemon;
         network::Peer::HostInfo master;
     };

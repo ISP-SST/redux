@@ -9,9 +9,6 @@
 #include "redux/logger.hpp"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/serialization/export.hpp>
-
-BOOST_CLASS_EXPORT( redux::momfbd::MomfbdJob )
 
 using namespace redux::momfbd;
 using namespace redux::file;
@@ -95,12 +92,12 @@ void MomfbdJob::maybeOverride( bool value, uint32_t& set, uint32_t flag ) {
 }
 
 MomfbdJob::MomfbdJob( void ) : sequenceNumber( 0 ) {
-    LOG_DEBUG << "MomfbdJob::MomfbdJob()   (jobType = " << jobType << ")";
+    //LOG_DEBUG << "MomfbdJob::MomfbdJob()   (jobType = " << jobType << ")";
     info.typeString = "momfbd";
 }
 
 MomfbdJob::~MomfbdJob( void ) {
-    LOG_DEBUG << "MomfbdJob::~MomfbdJob()";
+    //LOG_DEBUG << "MomfbdJob::~MomfbdJob()";
 }
 
 void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
@@ -195,7 +192,7 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
             LOG_ERR << "pupil file \"" << tmpString << "\" not 2 dimensional.";
         }
         pupilSize = header->m_Header.dim[0];
-        int tmpInt = header->m_Header.dim[1];
+        uint32_t tmpInt = header->m_Header.dim[1];
         if( pupilSize != tmpInt ) {
             LOG_ERR << "pupil file \"" << tmpString << "\" not square (" << pupilSize << "x" << tmpInt << ")";
         }
@@ -386,8 +383,8 @@ char* MomfbdJob::pack(char* ptr) const {
     return ptr;
 }
 
-const char* MomfbdJob::unpack(const char* ptr, bool doSwap) {
-    ptr = Job::unpack(ptr, doSwap);
+const char* MomfbdJob::unpack(const char* ptr, bool swap_endian) {
+    ptr = Job::unpack(ptr, swap_endian);
     return ptr;
 }
 

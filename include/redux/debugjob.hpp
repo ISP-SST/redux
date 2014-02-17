@@ -39,16 +39,6 @@ namespace redux {
         uint32_t postProcess( void );
         uint32_t runJob( void );
 
-
-        template <typename Archive>
-        void serialize( Archive& ar, const unsigned int version ) {
-            ar & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Job);
-            std::string tmp = "DebugJob";
-            ar & tmp;
-            // no members yet...
-        }
-        
-        friend class boost::serialization::access;
     };
    
     /*! @} */

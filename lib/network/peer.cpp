@@ -6,29 +6,35 @@
 #include "redux/logger.hpp"
 #include "redux/version.hpp"
 
+#include <thread>
 #include <unistd.h>
 #include <sys/utsname.h>
 
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/date_time/posix_time/conversion.hpp>
+#include <boost/algorithm/string.hpp>
+using boost::algorithm::iequals;
 
 using namespace redux::network;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+const std::string Peer::StateNames[] = { "offline", "idle", "active", "error" };
+const std::string Peer::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
+
 #define lg Logger::lg
 namespace {
     const std::string thisChannel = "net";
 }
 
-
-Peer::HostInfo::HostInfo( void ) {
+Peer::HostInfo::HostInfo( void ) : peerType(0) {
 
     int one = 1;
     littleEndian = *(char*)&one;
     reduxVersion = getVersionNumber();
     pid = getpid();
+    nCores = std::thread::hardware_concurrency();
     startedAt = boost::posix_time::second_clock::local_time();
     name = boost::asio::ip::host_name();
     struct utsname nm;
@@ -48,7 +54,11 @@ Peer::PeerStatus::PeerStatus( void ) : currentJob( 0 ), nThreads( 1 ), state( PE
 
 }
 
-Peer::Peer(const HostInfo& hi, TcpConnection::ptr c, size_t i) : host(hi), id(i), conn(c) {
+Peer::Peer() : id(0) {
+
+}
+
+Peer::Peer(const HostInfo& hi, TcpConnection::Ptr c, size_t i) : host(hi), id(i), conn(c) {
 
 }
 
@@ -71,20 +81,16 @@ char* Peer::pack( char* ptr ) const {
     return ptr;
 }
 
-const char* Peer::unpack( const char* ptr, bool needsSwap ) {
+const char* Peer::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
-    ptr = unpack(ptr,id);
+    ptr = unpack(ptr,id,swap_endian);
     time_t timestamp;
-    ptr = unpack(ptr,timestamp);
-    ptr = host.unpack(ptr,needsSwap);
-    ptr = stat.unpack(ptr,needsSwap);
+    ptr = unpack(ptr,timestamp,swap_endian);
+    ptr = host.unpack(ptr,swap_endian);
+    ptr = stat.unpack(ptr,swap_endian);
     
-    if( needsSwap ) {
-        swapEndian(id);
-        swapEndian(timestamp);
-    }
     lastSeen = boost::posix_time::from_time_t( timestamp );
     
     return ptr;
@@ -105,41 +111,62 @@ std::string Peer::print(void) {
 }
 
 
+shared_ptr<char> Peer::receiveBlock( size_t& blockSize, bool& swap_endian ) {
+
+    using redux::util::unpack;
+    shared_ptr<char> buf;
+    
+    try {
+        char sz[sizeof( size_t )];
+        size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( sz, sizeof( size_t ) ) );
+
+        if( count != sizeof( size_t ) ) {
+            throw ios_base::failure( "blockSize: Only received " + to_string( count ) + "/" + to_string( sizeof( size_t ) ) + " bytes." );
+        }
+        
+        int one = 1;
+        char littleEndian = *(char*)&one;
+        swap_endian = ( host.littleEndian != littleEndian );
+        unpack( sz, blockSize, swap_endian );
+
+        buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
+        count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), blockSize ) );
+
+        if( count != blockSize ) {
+            throw ios_base::failure( "Only received " + to_string( count ) + "/" + to_string( blockSize ) + " bytes." );
+        }
+    }
+    catch( const exception& e ) {
+        cout << "Failed to receive datablock: " << e.what() << endl;
+        LOG_ERR << "Failed to receive datablock: " << e.what();
+        blockSize = 0;
+        buf.reset();
+    }
+    return buf;
+
+}
+
+
 bool Peer::operator>( const Peer& rhs ) const {
-    //if( hostType != rhs.hostType ) return ( hostType > rhs.hostType );
-    //if (IP != rhs.IP) return (IP > rhs.IP);
-    //if (listeningPort != rhs.listeningPort) return (listeningPort > rhs.listeningPort);
-    //if (PID != rhs.PID) return (PID > rhs.PID);
-    return ( host.name.compare( rhs.host.name ) < 0 );
+    if( host.peerType == rhs.host.peerType ) {
+        if( iequals( host.name, rhs.host.name ) ) {
+            return (host.pid > rhs.host.pid);
+        } else return ( host.name.compare( rhs.host.name ) < 0 );
+    } else return (host.peerType > rhs.host.peerType);
 }
 
 
 bool Peer::operator<( const Peer& rhs ) const {
-    // if( hostType != rhs.hostType ) return ( hostType < rhs.hostType );
-    //if (IP != rhs.IP) return (IP < rhs.IP);
-    //if ( listeningPort != rhs.listeningPort ) return (listeningPort < rhs.listeningPort);
-    //if ( hostName.compare( rhs.hostName ) == 0 ) return (PID < rhs.PID);
-    return ( host.name.compare( rhs.host.name ) > 0 );
+    if( host.peerType == rhs.host.peerType ) {
+        if( iequals( host.name, rhs.host.name ) ) {
+            return (host.pid < rhs.host.pid);
+        } else return ( host.name.compare( rhs.host.name ) > 0 );
+    } else return (host.peerType < rhs.host.peerType);
 }
 
 
-// use this one to compare the "configuration" of 2 hosts.
 bool Peer::operator==( const Peer& rhs ) const {
-    //if (IP && rhs.IP) return (IP == rhs.IP);
-    //else
-    return ( !host.name.compare( rhs.host.name ) );
-}
-
-
-// use this one to differentiate between different computers
-bool Peer::operator!=( const Peer& rhs ) const {
-    return ( host.name != rhs.host.name );
-    uint tmp = 1; //IP;
-    uint tmpRHS = 1; //rhs.IP;
-    //if ( !tmp ) hostLookup( hostName, &tmp );
-    //if ( !tmpRHS ) hostLookup( rhs.hostName, &tmpRHS );
-    return ( tmp != tmpRHS );
-    //if ( (hostName.size() > 0) && (rhs.hostName.size() > 0) ) return (bool)(hostName.compare( rhs.hostName ));
+    return (host == rhs.host);
 }
 
 
@@ -155,21 +182,9 @@ Peer& Peer::operator=( const Peer& rhs ) {
 }
 
 
-void Peer::HostInfo::print( void ) {
-    
-    cout << "Peer::HostInfo  littleEndian = " << ( int )littleEndian << endl;
-    cout << "Peer::HostInfo  reduxVersion = " << reduxVersion << endl;
-    cout << "Peer::HostInfo           pid = " << pid << endl;
-    cout << "Peer::HostInfo     startedAt = " << to_iso_extended_string( startedAt ) << endl;
-    cout << "Peer::HostInfo          name = " << name << endl;
-    cout << "Peer::HostInfo            os = " << os << endl;
-    cout << "Peer::HostInfo       machine = " << arch << endl;
-    
-}
-
 size_t Peer::HostInfo::size(void) const {
-    size_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(time_t);
-    sz += name.length() + os.length() + arch.length() + 3;
+    size_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(uint16_t) + sizeof(time_t);
+    sz += name.length() + os.length() + arch.length() + 4;  // 3*\0 & peerType
     return sz;
 }
 
@@ -181,6 +196,8 @@ char* Peer::HostInfo::pack( char* ptr ) const {
     *ptr++ = littleEndian;
     ptr = pack(ptr,reduxVersion);
     ptr = pack(ptr,pid);
+    ptr = pack(ptr,peerType);
+    ptr = pack(ptr,nCores);
     ptr = pack(ptr,to_time_t( startedAt ));
     ptr = pack(ptr,name);
     ptr = pack(ptr,os);
@@ -189,37 +206,33 @@ char* Peer::HostInfo::pack( char* ptr ) const {
     return ptr;
 }
 
-const char* Peer::HostInfo::unpack( const char* ptr, bool needsSwap ) {
+const char* Peer::HostInfo::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
     littleEndian = *ptr++;
-    ptr = unpack(ptr,reduxVersion);
-    ptr = unpack(ptr,pid);
+    ptr = unpack(ptr,reduxVersion, swap_endian);
+    ptr = unpack(ptr,pid,swap_endian);
+    ptr = unpack(ptr,peerType, swap_endian);
+    ptr = unpack(ptr,nCores, swap_endian);
     time_t timestamp;
-    ptr = unpack(ptr,timestamp);
+    ptr = unpack(ptr,timestamp,swap_endian);
+    startedAt = boost::posix_time::from_time_t( timestamp );
     ptr = unpack(ptr,name);
     ptr = unpack(ptr,os);
     ptr = unpack(ptr,arch);
-    
-    if( needsSwap ) {
-        swapEndian(reduxVersion);
-        swapEndian(pid);
-        swapEndian(timestamp);
-    }
-    startedAt = boost::posix_time::from_time_t( timestamp );
     
     return ptr;
 }
 
 
-bool Peer::HostInfo::operator==(const HostInfo& rhs) {
+bool Peer::HostInfo::operator==(const HostInfo& rhs) const {
     return (name == rhs.name && pid == rhs.pid);
 }
 
 
 size_t Peer::PeerStatus::size(void) const {
-    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + 1;
+    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + sizeof(uint16_t);
     return sz;
 }
 
@@ -228,7 +241,7 @@ char* Peer::PeerStatus::pack( char* ptr ) const {
     
     using redux::util::pack;
     
-    *ptr++ = nThreads;
+    ptr = pack(ptr,nThreads);
     ptr = pack(ptr,state);
     ptr = pack(ptr,currentJob);
     ptr = pack(ptr,loadAvg);
@@ -238,21 +251,15 @@ char* Peer::PeerStatus::pack( char* ptr ) const {
 }
 
 
-const char* Peer::PeerStatus::unpack( const char* ptr, bool needsSwap ) {
+const char* Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
-    nThreads = *ptr++;
-    ptr = unpack(ptr,state);
-    ptr = unpack(ptr,currentJob);
-    ptr = unpack(ptr,loadAvg);
-    ptr = unpack(ptr,progress);
-    
-    if( needsSwap ) {
-        swapEndian(currentJob);
-        swapEndian(loadAvg);
-        swapEndian(progress);
-    }
+    ptr = unpack(ptr,nThreads, swap_endian);
+    ptr = unpack(ptr,state, swap_endian);
+    ptr = unpack(ptr,currentJob, swap_endian);
+    ptr = unpack(ptr,loadAvg, swap_endian);
+    ptr = unpack(ptr,progress, swap_endian);
     
     return ptr;
 }
@@ -282,25 +289,24 @@ TcpConnection& redux::network::operator>>(TcpConnection& conn, Peer::HostInfo& i
 
     size_t count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), hdrSz) );
     if( count != hdrSz ) {
-        LOG_ERR << "TcpConnection << HostInfo: Failed to read buffer.";
+        LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
     int one = 1;
     char* ptr = buf.get();
-    bool needsSwap = *((char*)&one) != *reinterpret_cast<uint8_t*>(ptr++);
+    bool swap_endian = *((char*)&one) != *ptr++;
     
     size_t sz;
-    unpack(ptr,sz);
-    if(needsSwap) swapEndian(sz);
+    unpack(ptr,sz,swap_endian);
     
     buf.reset(new char[sz]);
 
     count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( count != sz ) {
-        LOG_ERR << "TcpConnection << HostInfo: Failed to read buffer.";
+        LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
-    in.unpack(buf.get(), needsSwap);
+    in.unpack(buf.get(), swap_endian);
 
     return conn;
     

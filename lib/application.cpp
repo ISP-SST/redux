@@ -48,7 +48,9 @@ pair<string, string> Application::customParser( const string& s ) {
 }
 
 po::options_description& Application::parseCmdLine( int argc, const char* const argv[],  po::variables_map& vm,
-                                                    po::options_description* programOptions, parserFunction parser ) {
+                                                    po::options_description* programOptions,
+                                                    po::positional_options_description *positionalOptions,
+                                                    parserFunction customParser ) {
     static po::options_description all;
     if( programOptions ) {
         all.add( *programOptions );
@@ -56,14 +58,19 @@ po::options_description& Application::parseCmdLine( int argc, const char* const 
 
     Application::executableName = fs::path( argv[0] ).filename().string();
     getOptions( all, Application::executableName );
+    
+    po::command_line_parser parser( argc, argv );
+    parser.options( all );
+    if( customParser ){
+        //parser.extra_parser( *customParser );
+    }
+    if( positionalOptions ){
+        parser.allow_unregistered().positional(*positionalOptions);
+    }
+    po::store( parser.run(), vm );
 
-    po::store( po::command_line_parser( argc, argv )
-               .options( all )
-               .extra_parser( customParser )
-               .run(), vm );
-
-    if( parser ) {
-        parser( all, vm );
+    if( customParser ) {
+        customParser( all, vm );
     }
 
     // If e.g. --help was specified, just dump output and exit.

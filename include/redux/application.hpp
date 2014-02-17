@@ -43,7 +43,9 @@ namespace redux {
 
         static std::pair<std::string, std::string> customParser( const std::string& s );
         static po::options_description& parseCmdLine( int argc, const char* const argv[], po::variables_map& vm,
-                                                      po::options_description* programOptions = nullptr, parserFunction parser = nullptr );
+                                                      po::options_description* programOptions = nullptr,
+                                                      po::positional_options_description * positionalOptions = nullptr,
+                                                      parserFunction customParser = nullptr );
 
         static void checkGeneralOptions( po::options_description& desc, po::variables_map& vm );
 

@@ -53,29 +53,6 @@ namespace redux {
             Object& myObject;
             MomfbdJob& myJob;
 
-            template <typename Archive>
-            void serialize( Archive& ar, const unsigned int version ) {
-
-                ar & imageNumbers & darkNumbers;
-                ar & alignClip;     // {xl,xh,yl,yh}
-                ar & wf_num;
-                ar & imageDataDir & filenameTemplate & darkTemplate & gainFile;
-                ar & responseFile & backgainFile & psfFile & mmFile;
-                ar & offxFile & offyFile;
-                ar & stokesWeights;
-                ar & diversity;
-                ar & diversityOrders;
-                ar & diversityTypes;
-
-                ar & flags;
-                ar & mmRow & mmWidth;
-                ar & fillpix_method;
-                ar & image_num_offs & sequenceNumber;
-                ar & nf;
-
-            }
-
-            friend class boost::serialization::access;
             friend class Object;
         };
 

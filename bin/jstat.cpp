@@ -53,48 +53,24 @@ namespace {
     }
 }
 
-void printJobList( TcpConnection::ptr conn, bool swapNeeded ) {
+void printJobList( Peer& master ) {
 
-    Command cmd = CMD_JSTAT;
-    *conn << cmd;
-    *conn >> cmd;
-    if( cmd != CMD_OK ) {
-        LOG_ERR << "Failure while requesting joblist  (server replied = " << cmd << ")";
-        return;
-    }
-    
-    size_t sz = sizeof( size_t );
-    unique_ptr<char[]> buf( new char[ sz ] );
+    *master.conn << CMD_JSTAT;
 
-    LOG_DEBUG << "printJobList(): about to receive " << sz << " bytes.";
-    size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), sz ) );
-    if( count != sz ) {
-        LOG_ERR << "printJobList: Failed to receive blocksize.";
-        return;
-    }
+    size_t blockSize;
+    bool swap_endian;
+    shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
 
-    sz = *reinterpret_cast<size_t*>( buf.get() );
-    if( swapNeeded ) {
-        swapEndian( sz );
-    }
+    if ( !blockSize ) return;
 
-    buf.reset( new char[ sz ] );
-    char* ptr = buf.get();
-    char* end = ptr+sz;
-    const char* cptr=nullptr;
+    const char* cptr = buf.get();
+    char* end = buf.get() + blockSize;
     try {
-        LOG_DEBUG << "printJobList(): about to receive " << sz << " bytes.";
-        count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sz ) );
-        if( count != sz ) {
-            LOG_ERR << "printJobList: Failed to receive data block.";
-        } else {
-            cptr = ptr;
-            Job::Info info;
-            cout << info.printHeader() << endl;
-            while( cptr < end ) {
-                cptr = info.unpack(cptr,swapNeeded);
-                cout << info.print() << endl;
-            }
+        Job::Info info;
+        cout << info.printHeader() << endl;
+        while( cptr < end ) {
+            cptr = info.unpack(cptr,swap_endian);
+            cout << info.print() << endl;
         }
     } catch ( const exception& e) {
         LOG_ERR << "printJobList: Exception caught while parsing block: " << e.what();
@@ -105,48 +81,25 @@ void printJobList( TcpConnection::ptr conn, bool swapNeeded ) {
 
 }
 
-void printPeerList( TcpConnection::ptr conn, bool swapNeeded ) {
+void printPeerList( Peer& master ) {
 
     Command cmd = CMD_PSTAT;
-    *conn << cmd;
-    *conn >> cmd;
-    if( cmd != CMD_OK ) {
-        LOG_ERR << "Failure while requesting peerlist  (server replied = " << cmd << ")";
-        return;
-    }
-    
-    size_t sz = sizeof( size_t );
-    unique_ptr<char[]> buf( new char[ sz ] );
+    *master.conn << cmd;
 
-    LOG_DEBUG << "printPeerList(): about to receive " << sz << " bytes.";
-    size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), sz ) );
-    if( count != sz ) {
-        LOG_ERR << "printPeerList: Failed to receive blocksize.";
-        return;
-    }
+    size_t blockSize;
+    bool swap_endian;
+    shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
 
-    sz = *reinterpret_cast<size_t*>( buf.get() );
-    if( swapNeeded ) {
-        swapEndian( sz );
-    }
+    if ( !blockSize ) return;
 
-    buf.reset( new char[ sz ] );
-    char* ptr = buf.get();
-    char* end = ptr+sz;
-    const char* cptr=nullptr;
+    const char* cptr = buf.get();
+    char* end = buf.get() + blockSize;
     try {
-        LOG_DEBUG << "printPeerList(): about to receive " << sz << " bytes.";
-        count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sz ) );
-        if( count != sz ) {
-            LOG_ERR << "printPeerList: Failed to receive data block.";
-        } else {
-            cptr = ptr;
-            Peer peer;
-            cout << peer.printHeader() << endl;
-            while( cptr < end ) {
-                cptr = peer.unpack(cptr,swapNeeded);
-                cout << peer.print() << endl;
-            }
+        Peer peer;
+        cout << peer.printHeader() << endl;
+        while( cptr < end ) {
+            cptr = peer.unpack(cptr,swap_endian);
+            cout << peer.print() << endl;
         }
     } catch ( const exception& e) {
         LOG_ERR << "printPeerList: Exception caught while parsing block: " << e.what();
@@ -176,12 +129,13 @@ int main( int argc, char *argv[] ) {
     try {
         Logger logger( vm );
         boost::asio::io_service ioservice;
-        TcpConnection::ptr conn = TcpConnection::newPtr( ioservice );
+        TcpConnection::Ptr conn = TcpConnection::newPtr( ioservice );
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
             Command cmd;
-            Peer::HostInfo me, master;
+            Peer::HostInfo me;
+            Peer master;
             *conn << CMD_CONNECT;
             *conn >> cmd;
             if( cmd == CMD_AUTH ) {
@@ -189,20 +143,20 @@ int main( int argc, char *argv[] ) {
             }
             if( cmd == CMD_CFG ) {  // handshake requested
                 *conn << me;
-                *conn >> master;
+                *conn >> master.host;
                 *conn >> cmd;       // ok or err
             }
             if( cmd != CMD_OK ) {
                 LOG_ERR << "Handshake with server failed.";
                 return EXIT_FAILURE;
             }
-            bool swapNeeded = ( me.littleEndian != master.littleEndian );
-            if( vm.count( "jobs" ) ) printJobList( conn, swapNeeded );
-            if( vm.count( "slaves" ) ) printPeerList( conn, swapNeeded );
+            master.conn = conn;
+            if( vm.count( "jobs" ) ) printJobList( master );
+            if( vm.count( "slaves" ) ) printPeerList( master );
             while( loop ) {
                 sleep(vm["time"].as<int>());
-                if( vm.count( "jobs" ) ) printJobList( conn, swapNeeded );
-                if( vm.count( "slaves" ) ) printPeerList( conn, swapNeeded );
+                if( vm.count( "jobs" ) ) printJobList( master );
+                if( vm.count( "slaves" ) ) printPeerList( master );
             }
         }
     }

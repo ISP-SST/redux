@@ -19,7 +19,7 @@ TcpServer::TcpServer( boost::asio::io_service& io_service, uint16_t port )
 }
 
 void TcpServer::accept(void) {
-    TcpConnection::ptr nextConnection =
+    TcpConnection::Ptr nextConnection =
         TcpConnection::newPtr( acceptor.get_io_service() );
 
     acceptor.async_accept( nextConnection->socket(),
@@ -27,7 +27,7 @@ void TcpServer::accept(void) {
                                         boost::asio::placeholders::error ) );
 }
 
-void TcpServer::onAccept( TcpConnection::ptr conn,
+void TcpServer::onAccept( TcpConnection::Ptr conn,
                                const boost::system::error_code& error ) {
     accept();    // always start another accept
     if( !error ) {

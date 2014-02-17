@@ -38,9 +38,9 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
     logging.add_options()
     ( "verbosity", bpo::value< int >(), "Specify verbosity level" )
     ( "verbose,v", bpo::value<vector<string>>()->implicit_value( vector<string>( 1, "1" ), "" )
-      ->composing(), "More output. (ignored if -verbosity is specified)" )
+      ->composing(), "More output. (ignored if --verbosity is specified)" )
     ( "quiet,q", bpo::value<vector<string>>()->implicit_value( vector<string>( 1, "-1" ), "" )
-      ->composing(), "Less output. (ignored if -verbosity is specified)" )
+      ->composing(), "Less output. (ignored if --verbosity is specified)" )
 
     ( "log-file,L", bpo::value< vector<string> >()->default_value( vector<string>( 1, "" ), "" )
       ->composing(),

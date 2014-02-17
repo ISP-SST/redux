@@ -2,10 +2,6 @@
 
 #include "redux/logger.hpp"
 
-#include <boost/serialization/export.hpp>
-
-BOOST_CLASS_EXPORT( redux::DebugJob )
-
 using namespace redux;
 using namespace std;
 
@@ -21,17 +17,17 @@ size_t DebugJob::jobType = Job::registerJob( "Debug", createDebugJob );
 
 DebugJob::DebugJob( void )  {
     info.typeString = "debug";
-    LOG_DEBUG << "DebugJob::DebugJob()";
+    //LOG_DEBUG << "DebugJob::DebugJob()";
 }
 
 
 DebugJob::~DebugJob( void ) {
-    LOG_DEBUG << "DebugJob::~DebugJob()";
+    //LOG_DEBUG << "DebugJob::~DebugJob()";
 }
 
 
 void DebugJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
-    LOG_DETAIL << "DebugJob::parseProperties()";
+    //LOG_DETAIL << "DebugJob::parseProperties()";
 }
 
 size_t DebugJob::size(void) const {
@@ -43,8 +39,8 @@ char* DebugJob::pack(char* ptr) const {
     return Job::pack(ptr);
 }
 
-const char* DebugJob::unpack(const char* ptr, bool doSwap) {
-    return Job::unpack(ptr, doSwap);
+const char* DebugJob::unpack(const char* ptr, bool swap_endian) {
+    return Job::unpack(ptr, swap_endian);
 }
 
 uint32_t DebugJob::preProcess( void ) {

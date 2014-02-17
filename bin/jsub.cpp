@@ -73,7 +73,7 @@ namespace {
     }
 }
 
-void uploadJobs(TcpConnection::ptr conn, vector<Job::JobPtr>& jobs) {
+void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     
     Command cmd;
     Peer::HostInfo me, master;
@@ -99,7 +99,7 @@ void uploadJobs(TcpConnection::ptr conn, vector<Job::JobPtr>& jobs) {
     }
     unique_ptr<char[]> buf( new char[ sz+sizeof(size_t)+1 ] );
     char* ptr = buf.get();
-    *ptr++ = CMD_NEW_JOB;
+    *ptr++ = CMD_ADD_JOB;
     *reinterpret_cast<size_t*>( ptr ) = sz;
     ptr += sizeof(size_t);
     sz += sizeof(size_t)+1;
@@ -158,7 +158,7 @@ int main( int argc, char *argv[] ) {
         }
 
         boost::asio::io_service ioservice;
-        TcpConnection::ptr conn = TcpConnection::newPtr(ioservice);
+        TcpConnection::Ptr conn = TcpConnection::newPtr(ioservice);
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {

@@ -3,12 +3,9 @@
 
 #include "redux/momfbd/object.hpp"
 #include "redux/job.hpp"
-#include "redux/serialization.hpp"
 #include "redux/util/array.hpp"
 
 #include <map>
-
-#include <boost/serialization/vector.hpp>
 
 namespace redux {
 
@@ -55,7 +52,7 @@ namespace redux {
             uint32_t runJob( void );
             
 
-            char basis,fillpix_method, output_data_type;
+            char basis, fillpix_method, output_data_type;
             
             uint32_t flags, nPoints, sequenceNumber;
             uint32_t klMinMode, klMaxMode, borderClip;
@@ -79,38 +76,6 @@ namespace redux {
 
             redux::util::Array<double> pupil;
 
-            // serialize data to store/send it in compact form
-            template <typename Archive>
-            void serialize( Archive& ar, const unsigned int version ) {
-
-                ar & BOOST_SERIALIZATION_BASE_OBJECT_NVP( Job );
-                ar & basis & modes;
-                ar & imageNumbers & darkNumbers & imageDataDir;
-                ar & outputFiles & nPoints & sequenceNumber;
-                ar & reg_gamma & flags;
-
-                ar & klMinMode & klMaxMode & borderClip;
-                ar & telescopeFocalLength & telescopeDiameter & arcSecsPerPixel;
-                ar & pixelSize & minIterations & maxIterations & nDoneMask;
-                ar & FTOL & EPS & svd_reg;
-                ar & programDataDir & stokesWeights;
-
-                ar & gradient_method & getstep_method & fillpix_method;
-                ar & time_obs & date_obs & max_local_shift;
-                ar & mstart & mstep;
-
-                ar & pupilSize & output_data_type;
-                ar & nsx & nsy;
-                ar & ncal & xl & xh & yl & yh;
-
-                ar & objects;
-
-                // TODO
-                //     redux::util::Array<double> pupil;
-
-            }
-
-            friend class boost::serialization::access;
             friend class Object;
             friend class Channel;
 

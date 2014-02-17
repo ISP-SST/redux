@@ -32,14 +32,19 @@ namespace redux {
         void maintenance( void );
         bool doWork(void);
         
-        void connected(network::TcpConnection::ptr);
-        void activity( network::TcpConnection::ptr );
-        network::Peer::ptr& addOrGetPeer(const network::Peer::HostInfo&, network::TcpConnection::ptr&);
-        network::Peer::ptr& getPeer(const network::TcpConnection::ptr&);
+        void connected(network::TcpConnection::Ptr);
+        void activity( network::TcpConnection::Ptr );
+        network::Peer::Ptr& addOrGetPeer(const network::Peer::HostInfo&, network::TcpConnection::Ptr&);
+        network::Peer::Ptr& getPeer(const network::TcpConnection::Ptr&);
         void cleanupPeers(void);
-        void addJobs( network::Peer::ptr& );
-        void sendJobList( network::TcpConnection::ptr& );
-        void sendPeerList( network::TcpConnection::ptr& );
+        void addJobs( network::Peer::Ptr& );
+        void removeJobs( network::Peer::Ptr& );
+        void sendJobList( network::TcpConnection::Ptr& );
+        void updatePeerStatus( network::Peer::Ptr& );
+        void sendJobStats( network::TcpConnection::Ptr& );
+        void sendPeerList( network::TcpConnection::Ptr& );
+        void updateLoadAvg( void );
+        void updateWorkerStat( void );
         
         std::string master;
         uint16_t port;
@@ -51,8 +56,8 @@ namespace redux {
         std::vector<Job::JobPtr> jobs;
         
         std::mutex peerMutex;
-        network::Peer myInfo;
-        std::map<size_t, network::Peer::ptr> peers;
+        network::Peer::Ptr myInfo;
+        std::map<size_t, network::Peer::Ptr> peers;
         
         boost::asio::io_service ioService;
         std::unique_ptr<network::TcpServer> server;

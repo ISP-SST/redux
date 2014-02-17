@@ -9,9 +9,12 @@ namespace redux {
 
         enum Command : uint8_t { CMD_OK = 0,       // NB: specific-type enums are supported by gcc/clang, but may not behave well with other compilers
                                  CMD_CONNECT,      //   check this !!! /THI
-                                 CMD_NEW_JOB,
+                                 CMD_ADD_JOB,
                                  CMD_MOD_JOB,
                                  CMD_DEL_JOB,
+                                 CMD_GET_JOB,
+                                 CMD_GET_JOBLIST,
+                                 CMD_STAT,
                                  CMD_JSTAT,
                                  CMD_PSTAT,
                                  CMD_SLV_CFG,
@@ -78,8 +81,8 @@ namespace redux {
 #define CMD_START_JOB               (uint8_t)0x86
 #define CMD_STOP_JOB                (uint8_t)0x87
 #define CMD_GET_SYS                 (uint8_t)0x88
-#define CMD_ADD_HOST                (uint8_t)0x89
-#define CMD_DEL_HOST                (uint8_t)0x8A
+#define CMD_ADD_PEER                (uint8_t)0x89
+#define CMD_DEL_PEER                (uint8_t)0x8A
 #define CMD_SIGNOFF                 (uint8_t)0x8B
 #define CMD_LAUNCH                  (uint8_t)0x8C
 #define CMD_KILL                    (uint8_t)0x8D
