@@ -9,3 +9,17 @@ REDUX_ADD_EXECUTABLE( jdel jdel.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
+if (REDUX_SKIP_GUI)
+    message(STATUS "REDUX_SKIP_GUI is set: not building redux-gui.")
+    return()
+endif()
+
+USE_REDUX(reduxgui redux)
+
+# Check that we found Qt4
+if (NOT QT4_FOUND)
+    message(WARNING "QT4 not found: can't build redux-gui!")
+    return()
+endif()
+
+REDUX_ADD_EXECUTABLE( redux-gui redux-gui.cpp )

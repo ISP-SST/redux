@@ -79,7 +79,7 @@ set(THIRDPARTY_DIR "${THIRDPARTY_DIR}" CACHE PATH "Path to thirdparty software."
 
 get_filename_component(REDUX_DIR ${REDUX_DIR} REALPATH)
 
-#option(REDUX_SKIP_GUI "Should the gui/QT parts be skipped?" OFF)
+option(REDUX_SKIP_GUI "Should the gui/QT parts be skipped?" OFF)
 option(REDUX_AUTO_REVISION "Automatically run the revision script on each build ?" ON)
 
 # Try to find cppcheck
@@ -108,6 +108,7 @@ TEST_BIG_ENDIAN(REDUX_BIG_ENDIAN)
 #   before REDUX_LIBLIST because reduxgui depends on pretty much everything else.
 set(REDUX_LIBLIST 
     redux                         # depends on: none
+    reduxgui                      # depends on: none
     CACHE INTERNAL "")
    
 

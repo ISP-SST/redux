@@ -63,3 +63,31 @@ REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
 if(REDUX_AUTO_REVISION AND TARGET GIT_CHECK_REDUX)
     add_dependencies(redux GIT_CHECK_REDUX)
 endif()
+
+
+if (REDUX_SKIP_GUI)
+    message(STATUS "REDUX_SKIP_GUI is set: not building reduxgui.")
+    return()
+endif()
+
+USE_REDUX(reduxgui)
+
+# Check that we found Qt4
+if (NOT QT4_FOUND)
+    message(WARNING "QT4 not found: can't build reduxgui!")
+    return()
+endif()
+
+file(GLOB REDUX_GUI_CPP "gui/*.cpp")
+file(GLOB REDUX_GUI_HPP "${REDUX_HDR_BASE}/gui/*.hpp")
+
+# Work Qt magic to generate files
+#QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP} OPTIONS -DBOOST_TT_HAS_OPERATOR_HPP_INCLUDED)
+QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP})
+
+REDUX_ADD_LIBRARY(reduxgui #${REDUX_REVISION_SRC_FILE}
+                    ${REDUX_GUI_CPP} ${REDUX_GUI_HPP} 
+                    ${REDUX_GUI_MOC_SRC}
+)
+
+
