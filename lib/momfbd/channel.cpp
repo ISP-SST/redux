@@ -27,9 +27,9 @@ namespace {
 
     const string thisChannel = "momfbdch";
 
-    void parseSegment( vector<int>& divs, vector<int>& types, const string& elem ) {
+    void parseSegment( vector<uint32_t>& divs, vector<uint32_t>& types, const string& elem ) {
         size_t n = std::count( elem.begin(), elem.end(), '-' );
-        int tp = CFG_DEFAULT;
+        uint32_t tp = CFG_DEFAULT;
         if( elem.find_first_of( "Zz" ) != string::npos ) tp = CFG_ZERNIKE;
         if( elem.find_first_of( "Kk" ) != string::npos ) {
             if( tp == CFG_DEFAULT ) {
@@ -42,14 +42,14 @@ namespace {
         string tmp = elem;
         tmp.erase(boost::remove_if(tmp, boost::is_any_of("ZzKk")), tmp.end());
         if( n == 0 ) {
-            divs.push_back( boost::lexical_cast<int>( tmp ) );
+            divs.push_back( boost::lexical_cast<uint32_t>( tmp ) );
             types.push_back( tp );
             return;
         }
         else if( n == 1 ) {
             n = tmp.find_first_of( '-' );
-            int first = boost::lexical_cast<int>( tmp.substr( 0, n ) );
-            int last = boost::lexical_cast<int>( tmp.substr( n + 1 ) );
+            uint32_t first = boost::lexical_cast<uint32_t>( tmp.substr( 0, n ) );
+            uint32_t last = boost::lexical_cast<uint32_t>( tmp.substr( n + 1 ) );
             while( first <= last ) {
                 divs.push_back( first++ );
                 types.push_back( tp );
@@ -80,7 +80,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
     imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", myObject.imageNumbers );
 
     if( imageNumbers.size() == 0 ) LOG_CRITICAL << "Still no image sequence numbers at channel level.";
-    sequenceNumber = tree.get<int>( "SEQUENCE_NUM", myObject.sequenceNumber );
+    sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", myObject.sequenceNumber );
     darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", myObject.darkNumbers );
 
     if( tree.get<bool>( "ALIGN_CLIP", false ) ) {

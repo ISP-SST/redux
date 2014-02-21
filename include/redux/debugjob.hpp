@@ -2,7 +2,10 @@
 #define REDUX_DEBUGJOB_HPP
 
 #include "redux/job.hpp"
+#include "redux/work.hpp"
+#include "redux/util/array.hpp"
 
+#include <complex>
 
 namespace redux {
 
@@ -10,10 +13,23 @@ namespace redux {
      *  @{
      */
 
-    /*! "Dummy" job for testing the framework.
+    /*! Dummy job for testing the framework. Also usable as a tutorial for how to implement a new/custom job.
      * 
      */
     class DebugJob : public Job {
+        
+        struct DebugPart : public Part {
+            uint32_t xPixelL, xPixelH, yPixelL, yPixelH;
+            double beginX, endX, beginY, endY;
+            size_t sortedID;
+            redux::util::Array<size_t> result;      // use size_t as temporary storage, cast to int16_t in post-processing
+            size_t size(void) const;
+            char* pack(char*) const;
+            const char* unpack(const char*, bool);
+        } dPart;
+        typedef std::shared_ptr<DebugPart> PartPtr;
+        
+        const char* unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
 
     public:
 
@@ -23,21 +39,31 @@ namespace redux {
         ~DebugJob(void);
 
         void parseProperties( po::variables_map& vm, bpt::ptree& tree );
-        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) { return bpt::ptree(); };
+        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
         
         size_t size(void) const;
         char* pack(char*) const;
         const char* unpack(const char*, bool);
         
-    private:
-        void* prePart( void );
-        void postPart( void* );
-        void* runPreJob( void );
-        void runPostJob( void* );
+        size_t getParts(WorkInProgress&);
+        void ungetParts(WorkInProgress&);
+        void returnParts(WorkInProgress&);
+        
+        bool run(WorkInProgress&);
 
-        uint32_t preProcess( void );
-        uint32_t postProcess( void );
-        uint32_t runJob( void );
+    private:
+
+        void preProcess(void);
+        void runMain(Part::Ptr&);
+        void postProcess(void);
+        
+        void checkParts(void);
+
+        uint32_t maxIterations, patchSize;
+        double gamma;
+        uint32_t xSize, ySize;
+        double coordinates[4];
+        std::map<size_t,PartPtr> jobParts;
 
     };
    

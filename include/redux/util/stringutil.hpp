@@ -127,7 +127,6 @@ namespace redux {
         }
 
 
-
         /*! @fn std::string printBits( T* var, size_t n=1 )
          *  @brief Generate a std::string showing the memory layout of var
          *  @param var pointer to input
@@ -164,6 +163,7 @@ namespace redux {
             return tmp;
         }
 
+        
         /*! @fn std::string printBits( const T& var, size_t n=1 )
          *  @brief Generate a std::string showing the memory layout of var
          *  @param var input
@@ -201,6 +201,7 @@ namespace redux {
             return tmp;
         }
 
+        
         template <typename T>
         std::string printBlock( T* data, size_t n, int d = 3, const std::string& delimiters = "[]", const char separator = ',' ) {
 
@@ -257,6 +258,7 @@ namespace redux {
             return oss.str();
         }
 
+        
         template <typename T>
         inline std::string printArray( const T data, const char* s = "vector", int d = 3 ) {
 

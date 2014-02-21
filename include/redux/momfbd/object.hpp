@@ -36,7 +36,7 @@ namespace redux {
 
             std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
             double reg_gamma, weight, angle, lambda;
-            int nPoints, sequenceNumber, nph;
+            uint32_t nPoints, sequenceNumber, nph;
             std::vector<double> stokesWeights;
 
         private:

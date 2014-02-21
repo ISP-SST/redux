@@ -340,6 +340,7 @@ void redux::file::Ana::write( ofstream& file, const char* data,
     size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
     size_t compressedSize = totalSize;
 
+
     hdr->m_Header.synch_pattern = MAGIC_ANA;
     hdr->m_Header.subf = 0;
     hdr->m_Header.nhb = static_cast<uint8_t>( 1 + std::max( textSize + 256, size_t( 0 ) ) / 512 );

@@ -23,8 +23,8 @@ namespace redux {
         class Constraints {
 
             struct cstrvar {
-                int32_t *o_map, *i_map;
-                int32_t nk, m;
+                uint32_t *o_map, *i_map;
+                uint32_t nk, m;
                 double *k;
                 bool operator<(const cstrvar& rhs) const { return (m<rhs.m); };
             };
@@ -33,13 +33,13 @@ namespace redux {
             double ***rcs;        // reduced constraints
             //double ***groups;        // groups
             std::vector<std::shared_ptr<double*>> groups;
-            int32_t nGroups;           // number of groups
-            std::vector<int32_t> nVerticals, nHorizontals;     // vertical lines/group, horizontal elements/line
-            int32_t n_imap, n_omap;
-            std::vector<int32_t> imap_n, omap_n;
-            std::vector<std::vector<int32_t>> i_map, o_map;
+            uint32_t nGroups;           // number of groups
+            std::vector<uint32_t> nVerticals, nHorizontals;     // vertical lines/group, horizontal elements/line
+            uint32_t n_imap, n_omap;
+            std::vector<uint32_t> imap_n, omap_n;
+            std::vector<std::vector<uint32_t>> i_map, o_map;
             // references to nullspace lines and maps
-            int32_t nrv;
+            uint32_t nrv;
             
         public:
             std::vector<cstrvar> rv;

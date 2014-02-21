@@ -40,6 +40,7 @@ public:
     }
 };
 
+
 // property_tree custom translator for FileType
 template <typename Ch, typename Traits, typename Alloc>
 class FileTypeTranslator {
@@ -76,6 +77,7 @@ public:
         }
     }
 };
+
 
 // property_tree custom translator for vector
 template <typename Ch, typename Traits, typename Alloc, typename T>

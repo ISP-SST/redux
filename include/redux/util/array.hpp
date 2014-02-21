@@ -2,6 +2,8 @@
 #define REDUX_UTIL_ARRAY_HPP
 
 #include "redux/util/convert.hpp"
+#include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <stdexcept>
 #include <memory>
@@ -48,7 +50,7 @@ namespace redux {
             class const_iterator {
             public:
                 const_iterator( const Array<T>& a, size_t begin, size_t end ) : m_Begin( begin ), m_Current( begin ),
-                    m_End( end ), m_ConstArrayPtr( &a ), m_ConstData( a.data.get() ) {
+                    m_End( end ), m_ConstArrayPtr( &a ), m_ConstData( a.datablock.get() ) {
                     if( m_Current > m_End ) throw std::out_of_range( "Array::const_iterator:  begin>end" );
                 }
                 // prefix
@@ -92,7 +94,7 @@ namespace redux {
             class iterator : public const_iterator {
             public:
                 iterator( Array<T>& a, size_t begin, size_t end ) : const_iterator( a, begin, end ),
-                    m_ArrayPtr( &a ), data( a.data.get() ) {}
+                    m_ArrayPtr( &a ), data( a.datablock.get() ) {}
 
                 // prefix
                 iterator operator++() { this->increment(); return *this; }
@@ -134,6 +136,7 @@ namespace redux {
                 datablock = rhs.datablock;
                 dimSizes = rhs.dimSizes;
                 dimStrides = rhs.dimStrides;
+                nElements = 0;
                 if( nDims && ( sizeof...( s ) ) == 2 * nDims ) {
                     //std::vector<int64_t> tmp = {static_cast<int64_t>( s )...};
                     int64_t tmp[] = {s...};
@@ -159,6 +162,42 @@ namespace redux {
                 denseData = !( rhs.denseData && ( nElements == rhs.m_nElements ) );
             }
 
+            size_t size(void) const {
+                size_t sz = sizeof(size_t);                                                            // blockSize
+                if(dimSizes.size()) {
+                    sz += 1 + dimSizes.size()*sizeof(size_t) + nElements*sizeof(T);                    // nDims + dimensions + dataSize
+                }
+                return sz;
+            }
+            
+            char* pack(char* ptr) const {
+                using redux::util::pack;
+                ptr = pack( ptr, size() );
+                if(uint8_t ndims = dimSizes.size()) {
+                    ptr = pack( ptr, ndims );
+                    ptr = pack( ptr, dimSizes );
+                    ptr = pack( ptr, datablock.get(), nElements );
+                }
+                return ptr;
+                
+            }
+            
+            const char* unpack(const char* ptr, bool swap_endian) {
+                using redux::util::unpack;
+                size_t sz;
+                ptr = unpack( ptr, sz, swap_endian );
+                if( sz > 8 ) {
+                    uint8_t ndims;
+                    ptr = unpack( ptr, ndims );
+                    std::vector<size_t> tmp(ndims);
+                    ptr = unpack( ptr, tmp, swap_endian );
+                    reset(tmp);
+                    ptr = unpack( ptr, datablock.get(), nElements, swap_endian );
+                } 
+                return ptr;
+            }
+
+       
             void reset( const std::vector<size_t>& sizes ) {
                 setSizes( sizes );
                 calcStrides();
@@ -168,7 +207,9 @@ namespace redux {
             template <typename ...S>
             void reset( S ...sizes ) { reset( {static_cast<size_t>( sizes )...} ); }
 
-            size_t size( size_t i = 0 ) {
+            size_t nDimensions( void ) { return dimSizes.size(); }
+
+            size_t dimSize( size_t i = 0 ) {
                 if( i < dimSizes.size() ) return dimSizes[i];
                 else return 0;
             }
@@ -368,7 +409,7 @@ namespace redux {
                     size_t dimDiff = nDims - indices.size();
                     for( size_t i = 0; i < indices.size(); ++i ) {
                         if( indices[i] > dimLast[dimDiff + i] ) {
-                            throw std::out_of_range( indices[i], dimLast[dimDiff + i] );
+                            throw std::out_of_range( "Index out of range: " + std::to_string(indices[i])); //indices[i], dimLast[dimDiff + i] );
                         }
                         offset += indices[i] * dimStrides[dimDiff + i];
                     }

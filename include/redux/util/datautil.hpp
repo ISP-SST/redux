@@ -24,64 +24,64 @@ namespace redux {
          */
 
         template <typename T>
-        inline char* pack(char* ptr, const std::vector<T>& data) {
-            size_t sz = data.size()*sizeof(T);
-            memcpy(ptr,reinterpret_cast<char*>(data.front()),sz);
+        inline char* pack(char* ptr, const std::vector<T>& in) {
+            size_t sz = in.size()*sizeof(T);
+            memcpy(ptr,reinterpret_cast<const char*>(in.data()),sz);
             return ptr+sz;
         }
         
         template <typename T>
-        inline char* pack(char* ptr, const T* data, size_t count) {
+        inline char* pack(char* ptr, const T* in, size_t count) {
             size_t sz = count*sizeof(T);
-            memcpy(ptr, reinterpret_cast<const char*>(data), sz);
+            memcpy(ptr, reinterpret_cast<const char*>(in), sz);
             return ptr+sz;
          }
         
         template <typename T>
-        inline char* pack(char* ptr, const T& data) {
-            *reinterpret_cast<T*>(ptr) = data;
+        inline char* pack(char* ptr, const T& in) {
+            *reinterpret_cast<T*>(ptr) = in;
             return ptr+sizeof(T);
         }
         
         template <>
-        inline char* pack<std::string>(char* ptr, const std::string& data) {
-            strcpy(ptr,data.c_str());
-            return ptr + data.length() + 1;
+        inline char* pack<std::string>(char* ptr, const std::string& in) {
+            strcpy(ptr,in.c_str());
+            return ptr + in.length() + 1;
         }
         
         template <typename T>
-        inline const char* unpack(const char* ptr, std::vector<T>& data, bool swap_endian=false) {
-            size_t sz = data.size()*sizeof(T);
-            memcpy(reinterpret_cast<char*>(data.front()),ptr,sz);
+        inline const char* unpack(const char* ptr, std::vector<T>& out, bool swap_endian=false) {
+            size_t sz = out.size()*sizeof(T);
+            memcpy(reinterpret_cast<char*>(out.data()),ptr,sz);
             if(swap_endian) {
-                swapEndian(&data[0],data.size());
+                swapEndian(&out[0],out.size());
             }
             return ptr+sz;
         }
         
         template <typename T>
-        inline const char* unpack(const char* ptr, T* data, size_t count, bool swap_endian=false) {
+        inline const char* unpack(const char* ptr, T* out, size_t count, bool swap_endian=false) {
             size_t sz = count*sizeof(T);
-            memcpy(reinterpret_cast<char*>(data),ptr,sz);
+            memcpy(reinterpret_cast<char*>(out),ptr,sz);
             if(swap_endian) {
-                swapEndian(data,count);
+                swapEndian(out,count);
             }
             return ptr+sz;
         }
         
         template <typename T>
-        inline const char* unpack(const char* ptr, T& data, bool swap_endian=false) {
-            data = *reinterpret_cast<const T*>(ptr);
+        inline const char* unpack(const char* ptr, T& out, bool swap_endian=false) {
+            out = *reinterpret_cast<const T*>(ptr);
             if(swap_endian) {
-                swapEndian(data);
+                swapEndian(out);
             }
             return ptr+sizeof(T);
         }
         
         template <>
-        inline const char* unpack<std::string>(const char* ptr, std::string& data, bool) {
-            data = std::string(ptr);
-            return ptr + data.length() + 1;
+        inline const char* unpack<std::string>(const char* ptr, std::string& out, bool) {
+            out = std::string(ptr);
+            return ptr + out.length() + 1;
         }
         
         /*! @} */

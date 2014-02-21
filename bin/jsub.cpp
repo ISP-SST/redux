@@ -4,8 +4,12 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/tcpconnection.hpp"
 #include "redux/network/peer.hpp"
+#include "redux/util/arrayutil.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <thread>
+
+#include <boost/bind.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
@@ -75,33 +79,45 @@ namespace {
 
 void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     
-    Command cmd;
     Peer::HostInfo me, master;
-     
-    *conn << CMD_CONNECT;
-    *conn >> cmd;
+    uint8_t cmd = CMD_CONNECT;
+    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+    boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
     if( cmd == CMD_AUTH ) {
         // implement
     }
     if( cmd == CMD_CFG ) {  // handshake requested
         *conn << me;
         *conn >> master;
-        *conn >> cmd;       // ok or err
+        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
     }
     if( cmd != CMD_OK ) {
         LOG_ERR << "Handshake with server failed.";
         return;
     }
+    
+ /*   
+    
+    cmd = 222;//CMD_RESET;
+    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+  // conn->writeAndCheck( cmd );
+    
+    return;
+    
+ */   
+    
+    
+    
     // all ok, upload jobs.
     size_t sz = 0;
     for( auto &it: jobs ) {
         sz += it->size();
     }
-    unique_ptr<char[]> buf( new char[ sz+sizeof(size_t)+1 ] );
+    
+    auto buf = sharedArray<char>( sz+sizeof(size_t)+1 );
     char* ptr = buf.get();
-    *ptr++ = CMD_ADD_JOB;
-    *reinterpret_cast<size_t*>( ptr ) = sz;
-    ptr += sizeof(size_t);
+    ptr = pack(ptr,CMD_ADD_JOB);
+    ptr = pack(ptr,sz);
     sz += sizeof(size_t)+1;
     for( auto &it: jobs ) {
         ptr = it->pack(ptr);
@@ -111,27 +127,40 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
         return;
     }
 
-    conn->writeAndCheck( buf.get(), sz );
-    *conn >> cmd;
+    conn->writeAndCheck( buf, sz );
+    boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),sz));
+    LOG << "Waiting for 1 byte.";
+    boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
+   // *conn >> cmd;
     if( cmd != CMD_OK ) {
         LOG_ERR << "Failure while sending jobs  (server reply = " << cmd << ")";
         return;
     }
     ptr = buf.get();
-    size_t* idPtr = reinterpret_cast<size_t*>( ptr );
+    LOG << "Waiting for 8 bytes.";
+    size_t idSize;
     size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(size_t) ) );
     if( count == sizeof(size_t) ) {
-        count = boost::asio::read( conn->socket(), boost::asio::buffer( idPtr+1, (*idPtr)*sizeof(size_t) ) );
-    } else *idPtr = 0;
-    
-    LOG << "Upload of " << *idPtr << " jobs completed successfully";
-    if( *idPtr ) {
-        LOG << printArray(idPtr+1,*idPtr,"Job IDs ");
-    }
+        unpack(ptr, idSize);     // TBD: server swaps now, should the receiver always swap ?
+        LOG << "Waiting for " << (idSize) << " values.";
+        count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, (idSize)*sizeof(size_t) ) );
+        if( count != sz ) {
+            LOG << "Upload of " << idSize << " jobs completed successfully";
+            if( idSize ) {
+                LOG << printArray(reinterpret_cast<size_t*>(buf.get()),idSize,"Job IDs ");
+            }
+        } else {
+            LOG_ERR << "Failed to read job IDs.";
+            return;
+        }
+    //conn.writeAndCheck(buf,sz);
+    } else LOG_ERR << "Failed to read numer of job IDs.";
+
 
 }
 
 int main( int argc, char *argv[] ) {
+
 
     bpo::variables_map vm;
     bpo::options_description programOptions = getOptions();
@@ -162,7 +191,22 @@ int main( int argc, char *argv[] ) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            uploadJobs(conn, jobs);
+            std::vector<std::shared_ptr<std::thread> > threads;
+            for ( int i=0; i<5; ++i) {
+                shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioservice ) ) );
+                threads.push_back( t );
+            }
+                shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs) ) );
+                threads.push_back( t );
+            //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
+            //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
+            //uploadJobs(conn, jobs);
+            //ioservice.run();
+            //t.join();
+            //tt.join();
+            for( auto & it : threads ) {
+                it->join();
+            }
         }
 
     }

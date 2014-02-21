@@ -6,6 +6,7 @@
 #include "redux/translators.hpp"
 #include "redux/network/tcpconnection.hpp"
 #include "redux/network/peer.hpp"
+#include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
@@ -68,60 +69,6 @@ namespace {
     }
 }
 
-void printJobList( TcpConnection::Ptr conn, bool swap_endian ) {
-
-    Command cmd = CMD_JSTAT;
-    *conn << cmd;
-    *conn >> cmd;
-    if( cmd != CMD_OK ) {
-        LOG_ERR << "Failure while requesting joblist  (server replied = " << cmd << ")";
-        return;
-    }
-    
-    size_t sz = sizeof( size_t );
-    unique_ptr<char[]> buf( new char[ sz ] );
-
-    LOG_DEBUG << "sendJobList(): about to receive " << sz << " bytes.";
-    size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), sz ) );
-    if( count != sz ) {
-        LOG_ERR << "printJobList: Failed to receive blocksize.";
-        return;
-    }
-
-    sz = *reinterpret_cast<size_t*>( buf.get() );
-    if( swap_endian ) {
-        swapEndian( sz );
-    }
-
-    buf.reset( new char[ sz ] );
-    char* ptr = buf.get();
-    char* end = ptr+sz;
-    const char* cptr=nullptr;
-    try {
-        LOG_DEBUG << "sendJobList(): about to receive " << sz << " bytes.";
-        count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sz ) );
-        if( count != sz ) {
-            LOG_ERR << "printJobList: Failed to receive data block.";
-        } else {
-            cptr = ptr;
-            Job::Info info;
-            cout << info.printHeader() << endl;
-            while( cptr < end ) {
-                cptr = info.unpack(cptr,swap_endian);
-                cout << info.print() << endl;
-            }
-        }
-    } catch ( const exception& e) {
-        LOG_ERR << "printJobList: Exception caught while parsing block: " << e.what();
-    }
-    if( cptr != end ) {
-        LOG_ERR << "printJobList: Parsing of datablock failed, there was a missmatch of " << (cptr-end) << " bytes.";
-    }
-
-}
-
-void printSlaveList( TcpConnection::Ptr conn, bool swap_endian ) {
-}
 
 int main( int argc, char *argv[] ) {
 
@@ -137,53 +84,55 @@ int main( int argc, char *argv[] ) {
     bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
     vm.notify();
 
-    if( !vm.count( "jobs" ) && !vm.count( "all" ) ) {
-        cout << allOptions << endl;
-        return EXIT_SUCCESS;
-    }
-
+//     if( !vm.count( "jobs" ) && !vm.count( "all" ) ) {
+//         cout << allOptions << endl;
+//         return EXIT_SUCCESS;
+//     }
+// 
     try {
-        Logger logger( vm );
-        boost::asio::io_service ioservice;
-        TcpConnection::Ptr conn = TcpConnection::newPtr( ioservice );
         string jobString;        
-        
         if( vm.count( "jobs" ) ) {
             jobString = boost::algorithm::join(vm["jobs"].as<vector<string>>(), ",");
         }
         
         if( jobString.empty() ) {
-            cout << allOptions << endl;
+            cout << "EMPTY\n" << allOptions << endl;
             return EXIT_SUCCESS;
         }
+        
+        Logger logger( vm );
+        boost::asio::io_service ioservice;
+        TcpConnection::Ptr conn = TcpConnection::newPtr( ioservice );
         
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            Command cmd;
             Peer::HostInfo me, master;
-            *conn << CMD_CONNECT;
-            *conn >> cmd;
+            
+            uint8_t cmd = CMD_CONNECT;
+            boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+            boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
             if( cmd == CMD_AUTH ) {
                 // implement
             }
             if( cmd == CMD_CFG ) {  // handshake requested
                 *conn << me;
                 *conn >> master;
-                *conn >> cmd;       // ok or err
+                boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             }
             if( cmd != CMD_OK ) {
                 LOG_ERR << "Handshake with server failed.";
                 return EXIT_FAILURE;
             }
+
             size_t stringSize = jobString.length()+1;
             size_t totalSize = stringSize + sizeof( size_t ) + 1;
-            unique_ptr<char[]> buf( new char[ totalSize ] );
+            auto buf = sharedArray<char>( totalSize );
             char* ptr = buf.get();
             ptr = pack(ptr,CMD_DEL_JOB);
             ptr = pack(ptr,stringSize);
             ptr = pack(ptr,jobString);
-            conn->writeAndCheck( buf.get(), totalSize );
+            boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),totalSize));
         }
     }
     catch( const exception &e ) {

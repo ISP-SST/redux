@@ -41,13 +41,13 @@ namespace redux {
             std::string offxFile, offyFile;
             std::vector<double> stokesWeights;
             std::vector<double> diversity;
-            std::vector<int> diversityOrders;
-            std::vector<int> diversityTypes;
+            std::vector<uint32_t> diversityOrders;
+            std::vector<uint32_t> diversityTypes;
 
             uint32_t flags;
             uint8_t mmRow, mmWidth;
             uint8_t fillpix_method;
-            int image_num_offs, sequenceNumber;
+            uint32_t image_num_offs, sequenceNumber;
             double nf;
 
             Object& myObject;

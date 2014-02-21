@@ -27,18 +27,18 @@ using boost::algorithm::iequals;
 namespace {
     const string thisChannel = "momfbdobj";
 
-    void pupcfg( double &lim_freq, double &r_c, int &nph, double lambda, int np, double telescope_d, double telescope_f, double arcsecperpix ) {
+    void pupcfg( double &lim_freq, double &r_c, uint32_t &nph, double lambda, uint32_t np, double telescope_d, double telescope_f, double arcsecperpix ) {
         double rad2deg = 360.0 / ( 2.0 * redux::PI );
         double scale_angle2CCD = arcsecperpix / ( rad2deg * 3600.0 );
         double q_number = lambda / ( scale_angle2CCD * telescope_d );
         lim_freq = ( double )np / q_number;
-        nph = np / 4;
+        nph = np>>2;
         r_c = lim_freq / 2.0;       // telescope radius in pupil pixels...
         if( nph < r_c ) {           // this should only be needed for oversampled images
-            int goodsizes[] = {16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144};
+            uint32_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
             for( int i = 0; ( nph = max( goodsizes[i], nph ) ) < r_c; ++i ); // find right size
         }
-        nph *= 2;
+        nph <<= 1;
     }
 
 }
@@ -63,7 +63,7 @@ void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
     lambda = tree.get<double>( "WAVELENGTH" );
 
     imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", myJob.imageNumbers );
-    sequenceNumber = tree.get<int>( "SEQUENCE_NUM", myJob.sequenceNumber );
+    sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", myJob.sequenceNumber );
     darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", myJob.darkNumbers );
     wf_num = tree.get<vector<uint32_t>>( "WFINDEX", vector<uint32_t>() );
 

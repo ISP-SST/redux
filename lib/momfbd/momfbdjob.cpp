@@ -304,7 +304,7 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
 
 bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
     
-    bpt::ptree tree;
+    bpt::ptree tree = Job::getPropertyTree();         // get common properties
 
     for( auto & it : objects ) {
         it->getPropertyTree( &tree );
@@ -386,44 +386,4 @@ char* MomfbdJob::pack(char* ptr) const {
 const char* MomfbdJob::unpack(const char* ptr, bool swap_endian) {
     ptr = Job::unpack(ptr, swap_endian);
     return ptr;
-}
-
-uint32_t MomfbdJob::preProcess( void ) {
-    uint32_t ret( 0 );
-    LOG_DEBUG << "MomfbdJob::preProcess()";
-    return ret;
-}
-
-uint32_t MomfbdJob::postProcess( void ) {
-    uint32_t ret( 0 );
-    LOG_DEBUG << "MomfbdJob::postProcess()";
-    return ret;
-}
-
-
-
-uint32_t MomfbdJob::runJob( void ) {
-    uint32_t ret( 0 );
-    LOG_DEBUG << "MomfbdJob::runJob()";
-    return ret;
-}
-
-
-void* MomfbdJob::prePart( void ) {
-    LOG_DEBUG << "MomfbdJob::prePart()";
-    return nullptr;
-}
-
-void MomfbdJob::postPart( void* ) {
-    LOG_DEBUG << "MomfbdJob::postPart()";
-}
-
-void* MomfbdJob::runPreJob( void ) {
-    LOG_DEBUG << "MomfbdJob::runPreJob()";
-    return nullptr;
-}
-
-void MomfbdJob::runPostJob( void* ) {
-    LOG_DEBUG << "MomfbdJob::runPostJob()";
-
 }

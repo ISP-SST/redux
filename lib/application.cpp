@@ -42,7 +42,7 @@ void Application::getOptions( po::options_description& options, const string& na
     options.add( general ).add( config ).add( Logger::getOptions( name ) );
 }
 
-pair<string, string> Application::customParser( const string& s ) {
+pair<string, string> Application::appCmdParser( const string& s ) {
     // Nothing implemented for the Application class, so just return the customParser from the Logger.
     return Logger::customParser( s );
 }
@@ -50,7 +50,7 @@ pair<string, string> Application::customParser( const string& s ) {
 po::options_description& Application::parseCmdLine( int argc, const char* const argv[],  po::variables_map& vm,
                                                     po::options_description* programOptions,
                                                     po::positional_options_description *positionalOptions,
-                                                    parserFunction customParser ) {
+                                                    parserFunction custom_parser ) {
     static po::options_description all;
     if( programOptions ) {
         all.add( *programOptions );
@@ -61,16 +61,15 @@ po::options_description& Application::parseCmdLine( int argc, const char* const 
     
     po::command_line_parser parser( argc, argv );
     parser.options( all );
-    if( customParser ){
-        //parser.extra_parser( *customParser );
-    }
+    parser.extra_parser( appCmdParser );
+
     if( positionalOptions ){
         parser.allow_unregistered().positional(*positionalOptions);
     }
     po::store( parser.run(), vm );
 
-    if( customParser ) {
-        customParser( all, vm );
+    if( custom_parser ) {
+        custom_parser( all, vm );
     }
 
     // If e.g. --help was specified, just dump output and exit.

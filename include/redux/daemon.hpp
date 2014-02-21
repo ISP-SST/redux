@@ -15,6 +15,7 @@
 
 namespace redux {
 
+    struct WorkInProgress;
 
     class Daemon : public redux::Application {
 
@@ -39,12 +40,15 @@ namespace redux {
         void cleanupPeers(void);
         void addJobs( network::Peer::Ptr& );
         void removeJobs( network::Peer::Ptr& );
+        Job::JobPtr selectJob(bool);
+        bool getWork( WorkInProgress& );
+        void sendWork( network::Peer::Ptr& );
+        void putParts( network::Peer::Ptr& );
         void sendJobList( network::TcpConnection::Ptr& );
         void updatePeerStatus( network::Peer::Ptr& );
         void sendJobStats( network::TcpConnection::Ptr& );
         void sendPeerList( network::TcpConnection::Ptr& );
         void updateLoadAvg( void );
-        void updateWorkerStat( void );
         
         std::string master;
         uint16_t port;
@@ -54,12 +58,15 @@ namespace redux {
         std::mutex jobMutex;
         size_t jobCounter;
         std::vector<Job::JobPtr> jobs;
+        uint8_t nQueuedJobs;
         
         std::mutex peerMutex;
         network::Peer::Ptr myInfo;
         std::map<size_t, network::Peer::Ptr> peers;
+        std::map<network::Peer::Ptr, WorkInProgress> peerWIP;
         
         boost::asio::io_service ioService;
+        boost::asio::deadline_timer timer;
         std::unique_ptr<network::TcpServer> server;
         
         Worker worker;

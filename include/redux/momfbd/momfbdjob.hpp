@@ -40,17 +40,13 @@ namespace redux {
             char* pack(char*) const;
             const char* unpack(const char*, bool);
         
-        private:
-
-            void* prePart( void );
-            void postPart( void* );
-            void* runPreJob( void );
-            void runPostJob( void* );
-
-            uint32_t preProcess( void );
-            uint32_t postProcess( void );
-            uint32_t runJob( void );
+            size_t getParts(WorkInProgress&) { return 0; };
+            void ungetParts(WorkInProgress&) {};
+            void returnParts(WorkInProgress&) {};
+        
+            bool run(WorkInProgress&) { return false; };
             
+        private:
 
             char basis, fillpix_method, output_data_type;
             

@@ -1,5 +1,6 @@
 #include "redux/network/peer.hpp"
 
+#include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
@@ -129,15 +130,16 @@ shared_ptr<char> Peer::receiveBlock( size_t& blockSize, bool& swap_endian ) {
         swap_endian = ( host.littleEndian != littleEndian );
         unpack( sz, blockSize, swap_endian );
 
-        buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
-        count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), blockSize ) );
+        if(blockSize > 0) {
+            buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
+            count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), blockSize ) );
 
-        if( count != blockSize ) {
-            throw ios_base::failure( "Only received " + to_string( count ) + "/" + to_string( blockSize ) + " bytes." );
+            if( count != blockSize ) {
+                throw ios_base::failure( "Only received " + to_string( count ) + "/" + to_string( blockSize ) + " bytes." );
+            }
         }
     }
     catch( const exception& e ) {
-        cout << "Failed to receive datablock: " << e.what() << endl;
         LOG_ERR << "Failed to receive datablock: " << e.what();
         blockSize = 0;
         buf.reset();
@@ -184,7 +186,7 @@ Peer& Peer::operator=( const Peer& rhs ) {
 
 size_t Peer::HostInfo::size(void) const {
     size_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(uint16_t) + sizeof(time_t);
-    sz += name.length() + os.length() + arch.length() + 4;  // 3*\0 & peerType
+    sz += name.length() + os.length() + arch.length() + 4;
     return sz;
 }
 
@@ -232,7 +234,7 @@ bool Peer::HostInfo::operator==(const HostInfo& rhs) const {
 
 
 size_t Peer::PeerStatus::size(void) const {
-    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + sizeof(uint16_t);
+    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + 2*sizeof(uint16_t);
     return sz;
 }
 
@@ -242,6 +244,7 @@ char* Peer::PeerStatus::pack( char* ptr ) const {
     using redux::util::pack;
     
     ptr = pack(ptr,nThreads);
+    ptr = pack(ptr,maxThreads);
     ptr = pack(ptr,state);
     ptr = pack(ptr,currentJob);
     ptr = pack(ptr,loadAvg);
@@ -256,6 +259,7 @@ const char* Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     
     ptr = unpack(ptr,nThreads, swap_endian);
+    ptr = unpack(ptr,maxThreads, swap_endian);
     ptr = unpack(ptr,state, swap_endian);
     ptr = unpack(ptr,currentJob, swap_endian);
     ptr = unpack(ptr,loadAvg, swap_endian);
@@ -268,27 +272,30 @@ const char* Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
 TcpConnection& redux::network::operator<<(TcpConnection& conn, const Peer::HostInfo& out) {
     
     size_t sz = out.size() + sizeof(size_t) + 1;
-    std::unique_ptr<char[]> buf(new char[sz]);
+    auto buf = sharedArray<char>(sz);
     char* ptr = buf.get();
     memset(ptr,0,sz);
     
-    *ptr++ = out.littleEndian;
+    ptr = pack(ptr,out.littleEndian);
     ptr = pack(ptr,out.size());
     
     out.pack(ptr);
     
-    conn.writeAndCheck(buf.get(),sz);
+    size_t count = boost::asio::write( conn.socket(), boost::asio::buffer(buf.get(), sz) );
+    if( count != sz ) {
+        LOG_ERR << "TcpConnection << HostInfo: Failed to write buffer.";
+    }
     
     return conn;
     
 }
 TcpConnection& redux::network::operator>>(TcpConnection& conn, Peer::HostInfo& in) {
     
-    size_t hdrSz = sizeof(size_t)+1;
-    std::unique_ptr<char[]> buf(new char[hdrSz]);
+    size_t sz = sizeof(size_t)+1;
+    auto buf = sharedArray<char>(sz);
 
-    size_t count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), hdrSz) );
-    if( count != hdrSz ) {
+    size_t count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
+    if( count != sz ) {
         LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
@@ -296,10 +303,9 @@ TcpConnection& redux::network::operator>>(TcpConnection& conn, Peer::HostInfo& i
     char* ptr = buf.get();
     bool swap_endian = *((char*)&one) != *ptr++;
     
-    size_t sz;
     unpack(ptr,sz,swap_endian);
     
-    buf.reset(new char[sz]);
+    buf = sharedArray<char>(sz);
 
     count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( count != sz ) {

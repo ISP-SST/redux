@@ -35,6 +35,7 @@ void TcpServer::onAccept( TcpConnection::Ptr conn,
             LOG_DETAIL << "Accepted connection from \"" << conn->socket().remote_endpoint().address().to_string() << "\"";
             Command cmd;
             *conn >> cmd;
+
             if( cmd != CMD_CONNECT ) return;    // The connection is terminated when going out of scope.
             
             if( false ) {                       // TODO authentication. (key exchange ?)

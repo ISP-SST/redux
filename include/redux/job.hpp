@@ -1,8 +1,12 @@
 #ifndef REDUX_JOB_HPP
 #define REDUX_JOB_HPP
 
+#include "redux/work.hpp"
+
+#include <atomic>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <boost/date_time/posix_time/ptime.hpp>
@@ -19,6 +23,8 @@ namespace redux {
      *  @{
      */
 
+    struct WorkInProgress;
+    
     /*! Base class for a "job" to be processed by the redux framework.
      * 
      */
@@ -26,13 +32,21 @@ namespace redux {
         
     public:
         
-        enum State : uint8_t { JST_UNDEFINED = 0,       // NB: specific-type enums are supported by gcc/clang, but may not behave well with other compilers
-                               JST_QUEUED,    
-                               JST_IDLE,
-                               JST_ACTIVE,
-                               JST_PAUSED,
-                               JST_COMPLETED,    
-                               JST_ERR = 255
+        enum Step : uint8_t { JSTEP_PRE_SUBMIT  = 0,            //!< Pristine job, prepare stuff for submission
+                              JSTEP_SUBMIT      = 1,            //!< Job will be sent to master.
+                              JSTEP_RECEIVED    = 2,            //!< Received by master, waiting for pre-processing 
+                              JSTEP_QUEUED      = 4,            //!< Queued for main processing
+                              JSTEP_RUNNING     = 8,            //!< Job is active on the cluster
+                              JSTEP_POSTPROCESS = 16,           //!< Done, waiting for post-processing on master.
+                              JSTEP_COMPLETED   = 32,           //!< Job waits in queue until marked for removal
+                              JSTEP_REMOVE      = 64,
+                              JSTEP_ERR         = 128           //!< Error flag. Should not be used, dynamic error handling is better...
+                            };
+        enum State : uint8_t { JSTATE_IDLE      = 1,
+                               JSTATE_ACTIVE    = 2,    
+                               JSTATE_PAUSED    = 4,
+                               JSTATE_CANCELLED = 64,
+                               JSTATE_ERR       = 128           // Error flag. Should not be used, dynamic error handling is better...
                              };
         typedef std::shared_ptr<Job> JobPtr;
         struct JobCompare {
@@ -47,10 +61,15 @@ namespace redux {
         static std::vector<JobPtr> parseTree( po::variables_map& vm, bpt::ptree& tree );
         static JobPtr newJob( const std::string& );
         
+        static std::string stepString(uint8_t);
+        static std::string stateString(uint8_t);
+        static std::string stateTag(uint8_t);
+        
         struct Info {
             size_t id;
-            uint8_t priority, verbosity;
-            State state;
+            uint8_t priority, verbosity, nThreads, maxPartRetries;
+            std::atomic<uint8_t> step;
+            std::atomic<uint8_t> state;
             std::string typeString, name, user, host;
             std::string logFile;
             boost::posix_time::ptime submitTime;
@@ -62,16 +81,9 @@ namespace redux {
             std::string print(void);
         } info;
         
-        struct Part {
-            size_t id;
-            virtual size_t size(void) const;
-            virtual char* pack(char*) const;
-            virtual const char* unpack(const char*, bool);
-        };
-        typedef std::shared_ptr<Part> PartPtr;
+        virtual const char* unpackParts(const char* ptr, std::vector<Part::Ptr>& p, bool) { p.clear(); return ptr; };
         
-        virtual void parseProperties( po::variables_map&, bpt::ptree& ) {};
-        
+        virtual void parseProperties( po::variables_map&, bpt::ptree& );
         /*! @brief Returns a boost::property_tree containing the settings for this job.
          *  @details If a ptree pointer is provided, the tree will also be appended to it,
          *  inside a named block
@@ -82,7 +94,7 @@ namespace redux {
             }
          *  @endcode
          */
-        virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) { return bpt::ptree(); };
+        virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
         Job(void);
         virtual ~Job(void);
@@ -91,10 +103,18 @@ namespace redux {
         virtual char* pack(char*) const;
         virtual const char* unpack(const char*, bool);
         
+        virtual size_t getParts(WorkInProgress&) { return 0; };
+        virtual void ungetParts(WorkInProgress&) { };
+        virtual void returnParts(WorkInProgress&) { };
+        
+        virtual bool run(WorkInProgress&) = 0;
+        
         bool operator<(const Job& rhs);
+        bool operator!=(const Job& rhs);
     
     protected:
-        std::vector<PartPtr> parts;
+        
+        std::mutex jobMutex;
 
     };
 

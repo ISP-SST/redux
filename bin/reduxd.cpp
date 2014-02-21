@@ -1,6 +1,6 @@
 #include "redux/daemon.hpp"
 
-#include "redux/debugjob.hpp"
+#include "redux/logger.hpp"
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/protocol.hpp"

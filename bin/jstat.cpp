@@ -55,7 +55,8 @@ namespace {
 
 void printJobList( Peer& master ) {
 
-    *master.conn << CMD_JSTAT;
+    uint8_t cmd = CMD_JSTAT;
+    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
     bool swap_endian;
@@ -83,8 +84,8 @@ void printJobList( Peer& master ) {
 
 void printPeerList( Peer& master ) {
 
-    Command cmd = CMD_PSTAT;
-    *master.conn << cmd;
+    uint8_t cmd = CMD_PSTAT;
+    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
     bool swap_endian;
@@ -133,23 +134,24 @@ int main( int argc, char *argv[] ) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            Command cmd;
             Peer::HostInfo me;
             Peer master;
-            *conn << CMD_CONNECT;
-            *conn >> cmd;
+            uint8_t cmd = CMD_CONNECT;
+            boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+            boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
             if( cmd == CMD_AUTH ) {
                 // implement
             }
             if( cmd == CMD_CFG ) {  // handshake requested
                 *conn << me;
                 *conn >> master.host;
-                *conn >> cmd;       // ok or err
+                boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             }
             if( cmd != CMD_OK ) {
                 LOG_ERR << "Handshake with server failed.";
                 return EXIT_FAILURE;
             }
+
             master.conn = conn;
             if( vm.count( "jobs" ) ) printJobList( master );
             if( vm.count( "slaves" ) ) printPeerList( master );
