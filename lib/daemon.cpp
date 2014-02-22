@@ -416,6 +416,7 @@ bool Daemon::getWork( WorkInProgress& wip ) {
                 }
             }
         }
+        if(ret) wip.peer = myInfo;
     }
     if( wip.job ) {
         wip.job->info.state.store( Job::JSTATE_ACTIVE );

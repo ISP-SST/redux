@@ -126,16 +126,11 @@ bool Worker::fetchWork( void ) {
             LOG_DEBUG << "fetchWork()  no socket, returning.";
             return false;
         }
-        size_t blockSize;// = 1;
-        //bool includeJob = true;         // true for CMD_GET_JOB, false for CMD_GET_PARTS
-        bool swap_endian;
 
-//         auto buf = sharedArray<char>( blockSize );
-//         pack( buf.get(), CMD_GET_WORK );
-// 
-//         master->conn->writeAndCheck( buf, blockSize );                // request
         *master->conn << CMD_GET_WORK;
 
+        size_t blockSize;
+        bool swap_endian;
         auto buf = master->receiveBlock( blockSize, swap_endian );               // reply
 
         if( !blockSize ) return false;
@@ -170,16 +165,14 @@ bool Worker::getWork( void ) {
 
     Job::JobPtr lastJob = wip.job;
 
-    if( wip.peer ) {            // remote work: return parts.
+    if( wip.peer && (wip.peer != daemon.myInfo)) {            // remote work: return parts.
         returnWork();
-        wip.peer.reset();
-    }
-    else {
-        wip.job.reset();        // local jobs are accessed directly, no need to return anything.
     }
 
+    wip.peer.reset();
+
     if( daemon.getWork( wip ) || fetchWork() ) {    // first check for local work, then remote
-        //if( *(wip.job) != *lastJob ) { // NB: just a placeholder/example, this check actually crashes :-P
+        //if( *(wip.job) != *lastJob ) { // NB: just a placeholder/example
             // TBD: call a generic init-function to configure new jobs ??
         //}
         LOG_DETAIL << "Got work: " + wip.print();

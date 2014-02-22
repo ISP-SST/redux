@@ -22,7 +22,7 @@ namespace redux {
             uint32_t xPixelL, xPixelH, yPixelL, yPixelH;
             double beginX, endX, beginY, endY;
             size_t sortedID;
-            redux::util::Array<size_t> result;      // use size_t as temporary storage, cast to int16_t in post-processing
+            redux::util::Array<int64_t> result;      // use int64_t as temporary storage, cast to int16_t in post-processing
             size_t size(void) const;
             char* pack(char*) const;
             const char* unpack(const char*, bool);
@@ -54,7 +54,7 @@ namespace redux {
     private:
 
         void preProcess(void);
-        void runMain(Part::Ptr&);
+        void runMain(Part::Ptr&,int);
         void postProcess(void);
         
         void checkParts(void);

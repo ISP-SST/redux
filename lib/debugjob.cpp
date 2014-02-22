@@ -18,10 +18,30 @@ using namespace std;
 
 #define lg Logger::mlg
 namespace {
+    
     const string thisChannel = "debugjob";
     static Job* createDebugJob(void) {
         return new DebugJob();
     }
+    
+    int64_t mandelbrot( const complex<double>& p, int maxIterations = 100 ) {
+
+        complex<double> Z( 0, 0 );
+        int32_t i(0);
+        for( i = 1; i <= maxIterations; ++i ) {
+            Z = Z*Z + p;
+            if( std::norm( Z ) > 2 ) {
+                break;
+            }
+        }
+        if( i > maxIterations || (log(i) < log(maxIterations)/2) ) return 0;
+
+        return -i;
+
+    }
+   
+    
+    
 }
 size_t DebugJob::jobType = Job::registerJob("Debug", createDebugJob);
 
@@ -155,22 +175,22 @@ void DebugJob::checkParts(void) {
 size_t DebugJob::getParts(WorkInProgress& wip) {
 
     uint8_t step = info.step.load();
-
+    wip.parts.clear();
     if(step == JSTEP_QUEUED || step == JSTEP_RUNNING) {
         unique_lock<mutex> lock(jobMutex);
-        wip.parts.clear();
         for(auto & it : jobParts) {     // TODO: handle multi-parts per job
             if(it.second->step == JSTEP_QUEUED) {
                 it.second->step = JSTEP_RUNNING;
                 wip.parts.push_back(it.second);
                 info.step.store(JSTEP_RUNNING);
                 info.state.store(JSTATE_ACTIVE);
-                return wip.parts.size();
+                if(wip.parts.size() > 5) break;
+                //return wip.parts.size();
             }
         }
         checkParts();
     }
-    return 0;
+    return wip.parts.size();
 }
 
 
@@ -208,7 +228,7 @@ bool DebugJob::run(WorkInProgress& wip) {
     else if(step == JSTEP_RUNNING || step == JSTEP_QUEUED) {            // main processing
         vector<thread > threads;
         for(auto & it : wip.parts) {      // TODO: multi-threading
-            threads.push_back(thread(&DebugJob::runMain, this, boost::ref(it)));
+            threads.push_back(thread(&DebugJob::runMain, this, boost::ref(it), wip.peer->host.nCores));
         }
         for(auto & it : threads) {
             it.join();
@@ -266,7 +286,14 @@ void DebugJob::preProcess(void) {
 }
 
 
-void DebugJob::runMain(Part::Ptr& part) {
+void DebugJob::runMain(Part::Ptr& part, int nThreads) {
+
+    static atomic<int> tCount(0);
+    int cnt;
+    while((cnt = ++tCount) > nThreads) {    // An event-based version thread-blocker would be better, but this is simple enough.
+        tCount--;
+        usleep(10);
+    }
 
     auto ptr = static_pointer_cast<DebugPart>(part);
 
@@ -284,27 +311,35 @@ void DebugJob::runMain(Part::Ptr& part) {
         x = ptr->beginX + ix * stepX;
         for(uint32_t iy = 0; iy < sizeY; ++iy) {
             y = ptr->beginY + iy * stepY;
-
-            if(fabs((x * x + y * y) - 0.8) < 0.01) {       // add a circle just to see that the the mozaic seems ok.
-                res[iy][ix] = 0;
-                continue;
-            }
+            
+            res[iy][ix] = mandelbrot( complex<double>( x, y ), maxIterations );
+            
+            if (res[iy][ix] < 0 ) continue;
+//             if(fabs((x * x + y * y) - 0.8) < 0.01) {        // add a circle just to see that the the mozaic seems ok.
+//                 res[iy][ix] = 0;
+//                 continue;
+//             }
 
             if(ix < iy) {                                   // top-left triangle showing the real part-ID (should increase upwards and to the right)
                 res[iy][ix] = ptr->sortedID;
             }
-            else if(ix > (sizeY - iy)) {                     // right triangle: the unsorted part-ID (=processing order)
+            else if(ix > (sizeY - iy)) {                    // right triangle: the unsorted part-ID (=processing order)
                 res[iy][ix] = ptr->id;
             }
-            else  {                                          // bottom triangle, pid, to distinguish parts processed on different machines or instances.
+            else if(ix > sizeX / 2) {                       //  bottom right triangle: thread ID (well, not really, more like the "entry counter" to this function)
+                res[iy][ix] = cnt;
+            }
+            else  {                                         // bottom left triangle: pid, to distinguish parts processed on different machines or instances.
                 res[iy][ix] = pid;
             }
         }
     }
 
     part->step = JSTEP_POSTPROCESS;
+    //for(size_t i=UINT64_MAX; i; --i) cnt +=i;
+    //usleep(5000 * sizeY);
 
-    usleep(500 * sizeY);
+    tCount--;
 
 }
 
@@ -315,9 +350,9 @@ void DebugJob::postProcess(void) {
     auto image = sharedArray<int16_t>(ySize, xSize);
     int16_t** img = image.get();
 
-    size_t minPID, maxPID, minID, maxID, minSID, maxSID;
-    minPID = minID = minSID = UINT32_MAX;
-    maxPID = maxID = maxSID = 0;
+    int64_t minPID, maxPID, minID, maxID, minSID, maxSID, minTID, maxTID;
+    minPID = minID = minSID = minTID = UINT32_MAX;
+    maxPID = maxID = maxSID = maxTID = 0;
     for(auto & it : jobParts) {
 
         auto ptr = static_pointer_cast<DebugPart>(it.second);
@@ -330,8 +365,10 @@ void DebugJob::postProcess(void) {
 
         for(uint32_t ix = 0; ix < sizeX; ++ix) {
             for(uint32_t iy = 0; iy < sizeY; ++iy) {
-                size_t tmp = res[iy][ix];
-                if(tmp == 0) continue;      // to skip the "circle" for the normalization
+                int64_t tmp = res[iy][ix];
+                if(tmp < 0) {
+                    continue;      // to skip the contour for the normalization
+                }
                 if(ix < iy) {
                     if(tmp > maxSID) maxSID = tmp;
                     if(tmp < minSID) minSID = tmp;
@@ -339,6 +376,10 @@ void DebugJob::postProcess(void) {
                 else if(ix > (sizeY - iy)) {
                     if(tmp > maxID) maxID = tmp;
                     if(tmp < minID) minID = tmp;
+                }
+                else if(ix > sizeX / 2) {
+                    if(tmp > maxTID) maxTID = tmp;
+                    if(tmp < minTID) minTID = tmp;
                 }
                 else {
                     if(tmp > maxPID) maxPID = tmp;
@@ -362,17 +403,26 @@ void DebugJob::postProcess(void) {
             for(uint32_t iy = 0; iy < sizeY; ++iy) {
                 size_t tmp = res[iy][ix];
 
+                if(tmp < 0) {
+                    img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
+                    continue;
+                }
+                
                 if(ix < iy) {
                     if(maxSID == minSID) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minSID) * 1.0 / (maxSID - minSID) * INT16_MAX;
+                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minSID + 1) * 1.0 / (maxSID - minSID + 1) * INT16_MAX;
                 }
                 else if(ix > (sizeY - iy)) {
                     if(maxID == minID) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minID) * 1.0 / (maxID - minID) * INT16_MAX;
+                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minID + 1) * 1.0 / (maxID - minID + 1) * INT16_MAX;
+                }
+                else if(ix > sizeX / 2) {
+                    if(maxTID == minTID) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
+                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minTID + 1) * 1.0 / (maxTID - minTID + 1) * INT16_MAX;
                 }
                 else {
                     if(maxPID == minPID) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minPID) * 1.0 / (maxPID - minPID) * INT16_MAX;
+                    else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = (tmp - minPID + 1) * 1.0 / (maxPID - minPID + 1) * INT16_MAX;
                 }
 
             }
