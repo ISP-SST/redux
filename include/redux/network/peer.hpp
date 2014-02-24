@@ -39,7 +39,7 @@ namespace redux {
 
             struct PeerStatus {     // volatile info, refreshed every now and then.
                 size_t currentJob;
-                uint16_t nThreads, maxThreads;
+                uint8_t nThreads, maxThreads;
                 State state;
                 float loadAvg;
                 float progress;

@@ -21,7 +21,7 @@ namespace {
 }
 
 
-Worker::Worker( Daemon& d ) : strand(ioService), maintenanceTimer( ioService ), runTimer( ioService ), daemon( d ) {
+Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), daemon( d ) {
 
 }
 
@@ -32,19 +32,12 @@ Worker::~Worker( void ) {
 
 
 void Worker::init( void ) {
-    string portstring = to_string( daemon.params["port"].as<uint16_t>() );
-    LOG_DEBUG << "init port = " << portstring << "  master = \"" << daemon.params["master"].as<string>() << "\"";
+
     master.reset( new Peer() );
     master->conn = TcpConnection::newPtr( daemon.ioService );
     connect();
-    maintenanceTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     runTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 1 ) );
     runTimer.async_wait(strand.wrap(boost::bind(&Worker::run, this)));
-    maintenanceTimer.async_wait( boost::bind( &Worker::maintenance, this ) );
-    for( std::size_t i = 0; i < 5; ++i ) {
-        shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioService ) ) );
-        threads.push_back( t );
-    }
 
 }
 
@@ -82,9 +75,7 @@ void Worker::stop( void ) {
     }
     ioService.stop();
     daemon.myInfo->host.peerType &= ~Peer::PEER_WORKER;
-    for( auto & it : threads ) {
-        it->join();
-    }
+
 }
 
 
@@ -95,7 +86,6 @@ void Worker::updateStatus( void ) {
     }
 
     if( master->conn->socket().is_open() ) {
-        daemon.myInfo->stat.nThreads++;
         size_t blockSize = daemon.myInfo->stat.size();
         size_t totSize = blockSize + sizeof( size_t ) + 1;
         auto buf = sharedArray<char>(totSize);
@@ -236,7 +226,7 @@ void Worker::run( void ) {
 
     while( getWork() ) {
         sleepS = 1;
-        while( wip.job && wip.job->run( wip ) ) ;
+        while( wip.job && wip.job->run( wip, ioService, threadPool ) ) ;
     }
     
     runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(sleepS));
@@ -246,14 +236,4 @@ void Worker::run( void ) {
         sleepS <<= 1;
     }
 
-}
-
-
-void Worker::maintenance( void ) {
-
-    LOG_TRACE << "Maintenance";
-    strand.post( std::bind( &Worker::updateStatus, this ) );
-    maintenanceTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
-    maintenanceTimer.async_wait( strand.wrap(boost::bind( &Worker::maintenance, this )) );
-    
 }

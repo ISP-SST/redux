@@ -82,7 +82,8 @@ void Daemon::maintenance( void ) {
 
     updateLoadAvg();
     cleanupPeers();
-
+    worker.updateStatus();
+    
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
 }
@@ -396,6 +397,7 @@ bool Daemon::getWork( WorkInProgress& wip ) {
         }
     }
     else {                          // local worker
+        wip.peer = myInfo;
         if( nQueuedJobs < 2 ) {     // see if another job can be prepared
             for( auto & it : jobs ) {
                 if( it->info.step.load() < Job::JSTEP_QUEUED ) {
@@ -416,7 +418,7 @@ bool Daemon::getWork( WorkInProgress& wip ) {
                 }
             }
         }
-        if(ret) wip.peer = myInfo;
+        if(!ret) wip.peer.reset();
     }
     if( wip.job ) {
         wip.job->info.state.store( Job::JSTATE_ACTIVE );

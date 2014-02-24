@@ -44,7 +44,7 @@ namespace redux {
             void ungetParts(WorkInProgress&) {};
             void returnParts(WorkInProgress&) {};
         
-            bool run(WorkInProgress&) { return false; };
+            bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&) { return false; };
             
         private:
 

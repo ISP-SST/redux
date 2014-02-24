@@ -12,6 +12,7 @@
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace po = boost::program_options;
 namespace bpt = boost::property_tree;
@@ -107,7 +108,7 @@ namespace redux {
         virtual void ungetParts(WorkInProgress&) { };
         virtual void returnParts(WorkInProgress&) { };
         
-        virtual bool run(WorkInProgress&) = 0;
+        virtual bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&) = 0;
         
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);

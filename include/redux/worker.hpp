@@ -5,12 +5,10 @@
 #include "redux/job.hpp"
 #include "redux/work.hpp"
 
-#include <thread>
-
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/program_options.hpp>
-
+#include <boost/thread/thread.hpp>
 
 namespace po = boost::program_options;
 
@@ -31,6 +29,7 @@ namespace redux {
         void stop( void );
 
         void updateStatus(void);
+
     private:
 
         bool fetchWork(void);
@@ -43,13 +42,12 @@ namespace redux {
         void returnParts(void);
         
         void run(void);
-        void maintenance(void);
         
         boost::asio::io_service ioService;
+        boost::thread_group threadPool;
         boost::asio::strand strand;
-        boost::asio::deadline_timer maintenanceTimer, runTimer;
+        boost::asio::deadline_timer runTimer;
 
-        std::vector<std::shared_ptr<std::thread> > threads;
         
         WorkInProgress wip;
 

@@ -49,12 +49,12 @@ namespace redux {
         void ungetParts(WorkInProgress&);
         void returnParts(WorkInProgress&);
         
-        bool run(WorkInProgress&);
+        bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&);
 
     private:
 
         void preProcess(void);
-        void runMain(Part::Ptr&,int);
+        void runMain(Part::Ptr&);
         void postProcess(void);
         
         void checkParts(void);

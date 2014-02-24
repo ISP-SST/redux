@@ -50,7 +50,7 @@ Peer::HostInfo::HostInfo( void ) : peerType(0) {
 }
 
 
-Peer::PeerStatus::PeerStatus( void ) : currentJob( 0 ), nThreads( 1 ), state( PEER_IDLE ),
+Peer::PeerStatus::PeerStatus( void ) : currentJob( 0 ), nThreads( std::thread::hardware_concurrency() ), state( PEER_IDLE ),
     loadAvg( 0 ), progress( 0 ) {
 
 }
@@ -234,7 +234,7 @@ bool Peer::HostInfo::operator==(const HostInfo& rhs) const {
 
 
 size_t Peer::PeerStatus::size(void) const {
-    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + 2*sizeof(uint16_t);
+    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + 2;
     return sz;
 }
 
@@ -258,8 +258,8 @@ const char* Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
-    ptr = unpack(ptr,nThreads, swap_endian);
-    ptr = unpack(ptr,maxThreads, swap_endian);
+    ptr = unpack(ptr,nThreads);
+    ptr = unpack(ptr,maxThreads);
     ptr = unpack(ptr,state, swap_endian);
     ptr = unpack(ptr,currentJob, swap_endian);
     ptr = unpack(ptr,loadAvg, swap_endian);
