@@ -138,8 +138,7 @@ namespace redux {
                 dimStrides = rhs.dimStrides;
                 nElements = 0;
                 if( nDims && ( sizeof...( s ) ) == 2 * nDims ) {
-                    //std::vector<int64_t> tmp = {static_cast<int64_t>( s )...};
-                    int64_t tmp[] = {s...};
+                    std::vector<int64_t> tmp = {static_cast<int64_t>( s )...};
                     dimFirst.resize( nDims );
                     dimLast.resize( nDims );
                     nElements = 1;
