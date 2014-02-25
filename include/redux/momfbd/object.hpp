@@ -34,6 +34,10 @@ namespace redux {
             void parseProperties( bpt::ptree& tree, const std::string& fn );
             bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
+            size_t size(void) const;
+            char* pack(char*) const;
+            const char* unpack(const char*, bool);
+        
             std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
             double reg_gamma, weight, angle, lambda;
             uint32_t nPoints, sequenceNumber, nph;
@@ -46,11 +50,10 @@ namespace redux {
             std::vector<std::shared_ptr<Channel>> channels;
             std::vector<uint32_t> wf_num;
             std::string imageDataDir, outputFileName;
-            uint8_t fillpix_method;
+            uint8_t fillpix_method, output_data_type;
             double lim_freq, r_c;
             MomfbdJob& myJob;
             redux::util::Array<double> pupil;
-            uint8_t output_data_type;
 
             friend class Channel;
 

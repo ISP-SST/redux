@@ -40,15 +40,15 @@ namespace redux {
             char* pack(char*) const;
             const char* unpack(const char*, bool);
         
-            size_t getParts(WorkInProgress&) { return 0; };
-            void ungetParts(WorkInProgress&) {};
-            void returnParts(WorkInProgress&) {};
+            size_t getParts(WorkInProgress&);
+            void ungetParts(WorkInProgress&);
+            void returnParts(WorkInProgress&);
         
-            bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&) { return false; };
+            bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&);
             
         private:
 
-            char basis, fillpix_method, output_data_type;
+            uint8_t basis, fillpix_method, output_data_type;
             
             uint32_t flags, nPoints, sequenceNumber;
             uint32_t klMinMode, klMaxMode, borderClip;

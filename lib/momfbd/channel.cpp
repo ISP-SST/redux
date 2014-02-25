@@ -65,12 +65,13 @@ namespace {
 }
 
 
-Channel::Channel( Object& o, MomfbdJob& j ) : myObject( o ), myJob( j ) {
-    LOG_DEBUG << "Channel::Channel()";
+Channel::Channel( Object& o, MomfbdJob& j ) : flags(o.flags), mmRow(0), mmWidth(0), fillpix_method(o.fillpix_method),
+                                              image_num_offs(0), sequenceNumber(o.sequenceNumber), nf(0), myObject( o ), myJob( j ) {
+    
 }
 
 Channel::~Channel() {
-    LOG_DEBUG << "Channel::~Channel()";
+
 }
 
 void Channel::parseProperties( bpt::ptree& tree ) {
@@ -298,4 +299,91 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
     
     return tree;
 
+}
+
+
+size_t Channel::size(void) const {
+    
+    size_t sz = 3;
+    sz += 3*sizeof(uint32_t);
+    sz += sizeof(double);
+    sz += imageNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += darkNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += alignClip.size()*sizeof(int16_t)+sizeof(size_t);
+    sz += wf_num.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += stokesWeights.size()*sizeof(double)+sizeof(size_t);
+    sz += diversity.size()*sizeof(double)+sizeof(size_t);
+    sz += diversityOrders.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += diversityTypes.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += imageDataDir.length() + filenameTemplate.length() + darkTemplate.length() + gainFile.length() + 4;
+    sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
+    sz += offxFile.length() + offyFile.length() + 2;
+
+    return sz;
+}
+
+
+char* Channel::pack(char* ptr) const {
+    using redux::util::pack;
+
+    ptr = pack(ptr,fillpix_method);
+    ptr = pack(ptr,mmRow);
+    ptr = pack(ptr,mmWidth);
+    ptr = pack(ptr,sequenceNumber);
+    ptr = pack(ptr,image_num_offs);
+    ptr = pack(ptr,flags);
+    ptr = pack(ptr,nf);
+    ptr = pack(ptr,imageNumbers);
+    ptr = pack(ptr,darkNumbers);
+    ptr = pack(ptr,alignClip);
+    ptr = pack(ptr,wf_num);
+    ptr = pack(ptr,stokesWeights);
+    ptr = pack(ptr,diversity);
+    ptr = pack(ptr,diversityOrders);
+    ptr = pack(ptr,diversityTypes);
+    ptr = pack(ptr,imageDataDir);
+    ptr = pack(ptr,filenameTemplate);
+    ptr = pack(ptr,darkTemplate);
+    ptr = pack(ptr,gainFile);
+    ptr = pack(ptr,responseFile);
+    ptr = pack(ptr,backgainFile);
+    ptr = pack(ptr,psfFile);
+    ptr = pack(ptr,mmFile);
+    ptr = pack(ptr,offxFile);
+    ptr = pack(ptr,offyFile);
+
+    return ptr;
+}
+
+
+const char* Channel::unpack(const char* ptr, bool swap_endian) {
+    using redux::util::unpack;
+
+    ptr = unpack(ptr,fillpix_method);
+    ptr = unpack(ptr,mmRow);
+    ptr = unpack(ptr,mmWidth);
+    ptr = unpack(ptr,sequenceNumber, swap_endian);
+    ptr = unpack(ptr,image_num_offs, swap_endian);
+    ptr = unpack(ptr,flags, swap_endian);
+    ptr = unpack(ptr,nf, swap_endian);
+    ptr = unpack(ptr,imageNumbers, swap_endian);
+    ptr = unpack(ptr,darkNumbers, swap_endian);
+    ptr = unpack(ptr,alignClip, swap_endian);
+    ptr = unpack(ptr,wf_num, swap_endian);
+    ptr = unpack(ptr,stokesWeights, swap_endian);
+    ptr = unpack(ptr,diversity, swap_endian);
+    ptr = unpack(ptr,diversityOrders, swap_endian);
+    ptr = unpack(ptr,diversityTypes, swap_endian);
+    ptr = unpack(ptr,imageDataDir);
+    ptr = unpack(ptr,filenameTemplate);
+    ptr = unpack(ptr,darkTemplate);
+    ptr = unpack(ptr,gainFile);
+    ptr = unpack(ptr,responseFile);
+    ptr = unpack(ptr,backgainFile);
+    ptr = unpack(ptr,psfFile);
+    ptr = unpack(ptr,mmFile);
+    ptr = unpack(ptr,offxFile);
+    ptr = unpack(ptr,offyFile);
+    
+    return ptr;
 }

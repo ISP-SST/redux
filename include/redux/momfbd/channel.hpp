@@ -31,6 +31,10 @@ namespace redux {
             void parseProperties( bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
+            size_t size(void) const;
+            char* pack(char*) const;
+            const char* unpack(const char*, bool);
+        
         private:
 
             std::vector<uint32_t> imageNumbers, darkNumbers;

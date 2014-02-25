@@ -44,12 +44,16 @@ namespace {
 }
 
 
-Object::Object( MomfbdJob& j ) : myJob( j ) {
-    LOG_DEBUG << "Object::Object()";
+Object::Object( MomfbdJob& j ) : imageNumbers(j.imageNumbers), darkNumbers(j.darkNumbers), reg_gamma(j.reg_gamma),
+                                 weight(1), angle(0), lambda(0), nPoints(j.nPoints), sequenceNumber(j.sequenceNumber),
+                                 nph(0), stokesWeights(j.stokesWeights), flags(j.flags), imageDataDir(j.imageDataDir),
+                                 fillpix_method(j.fillpix_method), output_data_type(j.output_data_type),
+                                 lim_freq(), r_c(), myJob( j ), pupil(j.pupil) {
+    
+    
 }
 
 Object::~Object() {
-    LOG_DEBUG << "Object::~Object()";
 }
 
 void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
@@ -238,4 +242,88 @@ bpt::ptree Object::getPropertyTree( bpt::ptree* root ) {
     
     return tree;
     
+}
+
+
+size_t Object::size(void) const {
+    size_t sz = 2;
+    sz += 4*sizeof(uint32_t);
+    sz += 6*sizeof(double);
+    sz += imageNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += sequenceNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += darkNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += wf_num.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += stokesWeights.size()*sizeof(double)+sizeof(size_t);
+    sz += imageDataDir.length() + outputFileName.length() + 2;
+    sz += sizeof(size_t);                   // channels.size()
+    for(auto& it: channels) {
+        sz += it->size();
+    }
+    sz += pupil.size();
+    return sz;
+}
+
+
+char* Object::pack(char* ptr) const {
+    using redux::util::pack;
+
+    ptr = pack(ptr, fillpix_method);
+    ptr = pack(ptr, output_data_type);
+    ptr = pack(ptr, nPoints);
+    ptr = pack(ptr, sequenceNumber);
+    ptr = pack(ptr, nph);
+    ptr = pack(ptr, flags);
+    ptr = pack(ptr, reg_gamma);
+    ptr = pack(ptr, weight);
+    ptr = pack(ptr, angle);
+    ptr = pack(ptr, lambda);
+    ptr = pack(ptr, lim_freq);
+    ptr = pack(ptr, r_c);
+    ptr = pack(ptr, imageNumbers);
+    ptr = pack(ptr, sequenceNumbers);
+    ptr = pack(ptr, darkNumbers);
+    ptr = pack(ptr, wf_num);
+    ptr = pack(ptr, stokesWeights);
+    ptr = pack(ptr, imageDataDir);
+    ptr = pack(ptr, outputFileName);
+    ptr = pack(ptr, channels.size());
+    for(auto& it: channels) {
+        ptr = it->pack(ptr);
+    }
+    ptr = pupil.pack(ptr);
+    return ptr;
+}
+
+
+const char* Object::unpack(const char* ptr, bool swap_endian) {
+    using redux::util::unpack;
+
+    ptr = unpack(ptr, fillpix_method);
+    ptr = unpack(ptr, output_data_type);
+    ptr = unpack(ptr, nPoints, swap_endian);
+    ptr = unpack(ptr, sequenceNumber, swap_endian);
+    ptr = unpack(ptr, nph, swap_endian);
+    ptr = unpack(ptr, flags, swap_endian);
+    ptr = unpack(ptr, reg_gamma, swap_endian);
+    ptr = unpack(ptr, weight, swap_endian);
+    ptr = unpack(ptr, angle, swap_endian);
+    ptr = unpack(ptr, lambda, swap_endian);
+    ptr = unpack(ptr, lim_freq, swap_endian);
+    ptr = unpack(ptr, r_c, swap_endian);
+    ptr = unpack(ptr, imageNumbers, swap_endian);
+    ptr = unpack(ptr, sequenceNumbers, swap_endian);
+    ptr = unpack(ptr, darkNumbers, swap_endian);
+    ptr = unpack(ptr, wf_num, swap_endian);
+    ptr = unpack(ptr, stokesWeights, swap_endian);
+    ptr = unpack(ptr, imageDataDir);
+    ptr = unpack(ptr, outputFileName);
+    size_t tmp;
+    ptr = unpack(ptr, tmp, swap_endian);
+    channels.resize(tmp, make_shared<Channel>(*this,myJob));
+    for(auto& it: channels) {
+        ptr = it->unpack(ptr, swap_endian);
+    }
+    ptr = pupil.unpack(ptr, swap_endian);
+    
+   return ptr;
 }

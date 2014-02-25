@@ -91,7 +91,12 @@ void MomfbdJob::maybeOverride( bool value, uint32_t& set, uint32_t flag ) {
     }
 }
 
-MomfbdJob::MomfbdJob( void ) : sequenceNumber( 0 ) {
+MomfbdJob::MomfbdJob( void ) : basis(0), fillpix_method(0), output_data_type(0), flags(0), nPoints(0), sequenceNumber(0),
+                               klMinMode(0), klMaxMode(0), borderClip(0), minIterations(0), maxIterations(0), nDoneMask(0),
+                               gradient_method(0), getstep_method(0), max_local_shift(0), mstart(0), mstep(0), pupilSize(0),
+                               nsx(0), nsy(0), ncal(0), telescopeFocalLength(0), telescopeDiameter(0), arcSecsPerPixel(0),
+                               pixelSize(0), reg_gamma(0), FTOL(0), EPS(0), svd_reg(0) {
+
     //LOG_DEBUG << "MomfbdJob::MomfbdJob()   (jobType = " << jobType << ")";
     info.typeString = "momfbd";
 }
@@ -374,16 +379,163 @@ bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
 
 size_t MomfbdJob::size(void) const {
     size_t sz = Job::size();
-    
+    sz += 3;                                    // basis, fillpix_method, output_data_type;
+    sz += 18*sizeof(uint32_t);
+    sz += 8*sizeof(double);
+    sz += modes.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += imageNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += darkNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += xl.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += xh.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += yl.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += yh.size()*sizeof(uint32_t)+sizeof(size_t);
+    sz += stokesWeights.size()*sizeof(double)+sizeof(size_t);
+    sz += imageDataDir.length() + programDataDir.length()+time_obs.length()+date_obs.length() + 4;            // strings + \0
+    sz += 2*sizeof(size_t);               // outputFiles.size() + objects.size()
+    for(auto& it: outputFiles) {
+        sz += it.length()+1;
+    }
+    for(auto& it: objects) {
+        sz += it->size();
+    }
+    sz += pupil.size();
     return sz;
 }
 
 char* MomfbdJob::pack(char* ptr) const {
+    using redux::util::pack;
     ptr = Job::pack(ptr);
+    ptr = pack(ptr, basis);
+    ptr = pack(ptr, fillpix_method);
+    ptr = pack(ptr, output_data_type);
+    ptr = pack(ptr, flags);
+    ptr = pack(ptr, nPoints);
+    ptr = pack(ptr, sequenceNumber);
+    ptr = pack(ptr, klMinMode);
+    ptr = pack(ptr, klMaxMode);
+    ptr = pack(ptr, borderClip);
+    ptr = pack(ptr, minIterations);
+    ptr = pack(ptr, maxIterations);
+    ptr = pack(ptr, nDoneMask);
+    ptr = pack(ptr, gradient_method);
+    ptr = pack(ptr, getstep_method);
+    ptr = pack(ptr, max_local_shift);
+    ptr = pack(ptr, mstart);
+    ptr = pack(ptr, mstep);
+    ptr = pack(ptr, pupilSize);
+    ptr = pack(ptr, nsx);
+    ptr = pack(ptr, nsy);
+    ptr = pack(ptr, ncal);
+    ptr = pack(ptr, telescopeFocalLength);
+    ptr = pack(ptr, telescopeDiameter);
+    ptr = pack(ptr, arcSecsPerPixel);
+    ptr = pack(ptr, pixelSize);
+    ptr = pack(ptr, reg_gamma);
+    ptr = pack(ptr, FTOL);
+    ptr = pack(ptr, EPS);
+    ptr = pack(ptr, svd_reg);
+    ptr = pack(ptr, modes);
+    ptr = pack(ptr, imageNumbers);
+    ptr = pack(ptr, darkNumbers);
+    ptr = pack(ptr, xl);
+    ptr = pack(ptr, xh);
+    ptr = pack(ptr, yl);
+    ptr = pack(ptr, yh);
+    ptr = pack(ptr, stokesWeights);
+    ptr = pack(ptr, imageDataDir);
+    ptr = pack(ptr, programDataDir);
+    ptr = pack(ptr, time_obs);
+    ptr = pack(ptr, date_obs);
+    ptr = pack(ptr, outputFiles.size());
+    for(auto& it: outputFiles) {
+        ptr = pack(ptr, it);
+    }
+    ptr = pack(ptr, objects.size());
+    for(auto& it: objects) {
+        ptr = it->pack(ptr);
+    }
+    ptr = pupil.pack(ptr);
     return ptr;
 }
 
 const char* MomfbdJob::unpack(const char* ptr, bool swap_endian) {
+    using redux::util::unpack;
     ptr = Job::unpack(ptr, swap_endian);
+    ptr = unpack(ptr, basis);
+    ptr = unpack(ptr, fillpix_method);
+    ptr = unpack(ptr, output_data_type);
+    ptr = unpack(ptr, flags, swap_endian);
+    ptr = unpack(ptr, nPoints, swap_endian);
+    ptr = unpack(ptr, sequenceNumber, swap_endian);
+    ptr = unpack(ptr, klMinMode, swap_endian);
+    ptr = unpack(ptr, klMaxMode, swap_endian);
+    ptr = unpack(ptr, borderClip, swap_endian);
+    ptr = unpack(ptr, minIterations, swap_endian);
+    ptr = unpack(ptr, maxIterations, swap_endian);
+    ptr = unpack(ptr, nDoneMask, swap_endian);
+    ptr = unpack(ptr, gradient_method, swap_endian);
+    ptr = unpack(ptr, getstep_method, swap_endian);
+    ptr = unpack(ptr, max_local_shift, swap_endian);
+    ptr = unpack(ptr, mstart, swap_endian);
+    ptr = unpack(ptr, mstep, swap_endian);
+    ptr = unpack(ptr, pupilSize, swap_endian);
+    ptr = unpack(ptr, nsx, swap_endian);
+    ptr = unpack(ptr, nsy, swap_endian);
+    ptr = unpack(ptr, ncal, swap_endian);
+    ptr = unpack(ptr, telescopeFocalLength, swap_endian);
+    ptr = unpack(ptr, telescopeDiameter, swap_endian);
+    ptr = unpack(ptr, arcSecsPerPixel, swap_endian);
+    ptr = unpack(ptr, pixelSize, swap_endian);
+    ptr = unpack(ptr, reg_gamma, swap_endian);
+    ptr = unpack(ptr, FTOL, swap_endian);
+    ptr = unpack(ptr, EPS, swap_endian);
+    ptr = unpack(ptr, svd_reg, swap_endian);
+    ptr = unpack(ptr, modes, swap_endian);
+    ptr = unpack(ptr, imageNumbers, swap_endian);
+    ptr = unpack(ptr, darkNumbers, swap_endian);
+    ptr = unpack(ptr, xl, swap_endian);
+    ptr = unpack(ptr, xh, swap_endian);
+    ptr = unpack(ptr, yl, swap_endian);
+    ptr = unpack(ptr, yh, swap_endian);
+    ptr = unpack(ptr, stokesWeights, swap_endian);
+    ptr = unpack(ptr, imageDataDir);
+    ptr = unpack(ptr, programDataDir);
+    ptr = unpack(ptr, time_obs);
+    ptr = unpack(ptr, date_obs);
+    size_t tmp;
+    ptr = unpack(ptr, tmp, swap_endian);
+    outputFiles.resize(tmp);
+    for(auto& it: outputFiles) {
+        ptr = unpack(ptr, it, swap_endian);
+    }
+    ptr = unpack(ptr, tmp, swap_endian);
+    objects.resize(tmp, make_shared<Object>(*this));
+    for(auto& it: objects) {
+        ptr = it->unpack(ptr, swap_endian);
+    }
+    ptr = pupil.unpack(ptr, swap_endian);
     return ptr;
 }
+
+
+size_t MomfbdJob::getParts(WorkInProgress&) {
+    info.step.store( JSTEP_COMPLETED );
+    return 0;
+}
+
+
+void MomfbdJob::ungetParts(WorkInProgress&) {
+    
+}
+
+
+void MomfbdJob::returnParts(WorkInProgress&) {
+    
+}
+
+ 
+bool MomfbdJob::run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&) {
+    
+    return false;
+}
+
