@@ -26,6 +26,8 @@ namespace redux {
         template <typename T>
         inline char* pack(char* ptr, const std::vector<T>& in) {
             size_t sz = in.size()*sizeof(T);
+            *reinterpret_cast<size_t*>(ptr) = sz;
+            ptr+=sizeof(size_t);
             memcpy(ptr,reinterpret_cast<const char*>(in.data()),sz);
             return ptr+sz;
         }
@@ -51,7 +53,10 @@ namespace redux {
         
         template <typename T>
         inline const char* unpack(const char* ptr, std::vector<T>& out, bool swap_endian=false) {
-            size_t sz = out.size()*sizeof(T);
+            size_t sz = *reinterpret_cast<const size_t*>(ptr);
+            ptr+=sizeof(size_t);
+            if(swap_endian) swapEndian(sz);
+            out.resize(sz);
             memcpy(reinterpret_cast<char*>(out.data()),ptr,sz);
             if(swap_endian) {
                 swapEndian(&out[0],out.size());

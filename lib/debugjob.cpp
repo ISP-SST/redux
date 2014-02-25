@@ -103,7 +103,7 @@ bpt::ptree DebugJob::getPropertyTree( bpt::ptree* root ) {
     tree.put( "IMAGE_SIZE", tmp );
 
     if( root ) {
-        root->push_back( bpt::ptree::value_type( "momfbd", tree ) );
+        root->push_back( bpt::ptree::value_type( "debug", tree ) );
     }
 
     return tree;
