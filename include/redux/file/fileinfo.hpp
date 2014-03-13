@@ -5,7 +5,7 @@ namespace redux {
 
     namespace file {
         
-        /*! @defgroup file FileIO
+        /*! @ingroup file FileIO
          *  @{
          */
         

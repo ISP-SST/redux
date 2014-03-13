@@ -9,7 +9,7 @@ set( USE_VERSION "1.0" )
 set( EXT_HINT "/usr/local/itt/idl/external/include/"
               "/opt/itt/idl/external/include/"
               "${THIRDPARTY_DIR}/vendor/idl/${USE_VERSION}"
-              "${REDUX_DIR}/include/"
+              "${REDUX_DIR}/include/IDL"
 )
 
 set( EXT_HEADER_FILE "idl_export.h" )

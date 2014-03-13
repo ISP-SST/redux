@@ -125,7 +125,7 @@ char* Job::Info::pack( char* ptr ) const {
 
     using redux::util::pack;
 
-    ptr = pack( ptr, typeString );      // NB: the type-name has to be first in the packed block,
+    ptr = pack( ptr, typeString );      // NB: the type-string has to be first in the packed block,
     ptr = pack( ptr, name );            //   it is used to identify which job-class to instantiate on the receiving side.
     ptr = pack( ptr, user );
     ptr = pack( ptr, host );

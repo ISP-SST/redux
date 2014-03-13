@@ -335,7 +335,7 @@ void DebugJob::runMain( Part::Ptr& part ) {
         }
     }
 
-    pptr->result.reset( sizeY, sizeX );
+    pptr->result.resize( sizeY, sizeX );
     memcpy( pptr->result.ptr(), tmp.get()[0], sizeY * sizeX * sizeof( int64_t ) );
 
     part->step = JSTEP_POSTPROCESS;

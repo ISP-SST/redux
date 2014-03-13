@@ -83,7 +83,7 @@ void Daemon::maintenance( void ) {
     updateLoadAvg();
     cleanupPeers();
     worker.updateStatus();
-    
+
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
 }
@@ -162,11 +162,11 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
     }
 
     LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")";
-    
+
     try {
         Peer::Ptr peer = getPeer( conn );
         peer->lastSeen = boost::posix_time::second_clock::local_time();
-        
+
         switch( cmd ) {
             case CMD_ADD_JOB: conn->strand.post( boost::bind( &Daemon::addJobs, this, peer ) ); break;
             case CMD_DEL_JOB: conn->strand.post( boost::bind( &Daemon::removeJobs, this, peer ) ); break;
@@ -177,7 +177,7 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
             case CMD_JSTAT: conn->strand.post( boost::bind( &Daemon::sendJobStats, this, conn ) ); break;
             case CMD_PSTAT: conn->strand.post( boost::bind( &Daemon::sendPeerList, this, conn ) ); break;
             case CMD_DISCONNECT: conn->socket().close(); break;
-            default: LOG_DETAIL << "Daemon: Unrecognized command: " << (int)cmd << "  " << bitString(cmd);
+            default: LOG_DETAIL << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd );
         }
 
     }
@@ -383,9 +383,10 @@ bool Daemon::getWork( WorkInProgress& wip ) {
             uint8_t step = it->info.step.load();
             if( step == Job::JSTEP_QUEUED ) {
                 wip.job = it;
-                it->getParts( wip );
-                ret = true;
-                break;
+                if( it->getParts( wip ) ) {
+                    ret = true;
+                    break;
+                }
             }
             else if( step == Job::JSTEP_RUNNING ) {
                 wip.job = it;
@@ -418,7 +419,7 @@ bool Daemon::getWork( WorkInProgress& wip ) {
                 }
             }
         }
-        if(!ret) wip.peer.reset();
+        if( !ret ) wip.peer.reset();
     }
     if( wip.job ) {
         wip.job->info.state.store( Job::JSTATE_ACTIVE );
@@ -469,7 +470,7 @@ void Daemon::putParts( Peer::Ptr& peer ) {
     }
     else LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
 
-        *(peer->conn) << CMD_OK;           // all ok
+    *( peer->conn ) << CMD_OK;         // all ok
 
 }
 

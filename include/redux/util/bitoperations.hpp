@@ -2,6 +2,7 @@
 #define REDUX_UTIL_BITOPERATIONS_HPP
 
 #include <cstdint>
+#include <cstdlib>
 
 namespace redux {
 
@@ -190,7 +191,7 @@ namespace redux {
             v = ( v & 0x3333333333333333UL ) + ( ( v >> 2 ) & 0x3333333333333333UL ); // temp
             return ( ( ( v + ( v >> 4 ) ) & 0x0F0F0F0F0F0F0F0FUL ) * 0x0101010101010101UL ) >> 56; // count
         }
-        
+
         //@}
 
         /*

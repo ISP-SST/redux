@@ -26,7 +26,7 @@ namespace redux {
             size_t size(void) const;
             char* pack(char*) const;
             const char* unpack(const char*, bool);
-        } dPart;
+        };
         typedef std::shared_ptr<DebugPart> PartPtr;
         
         const char* unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);

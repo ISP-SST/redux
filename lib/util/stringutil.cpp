@@ -138,7 +138,8 @@ string redux::util::cleanPath( string in, string base ) {
     }
     else result /= *it++;
 
-    bool docanonical = true; //(result.string()[0] != '/');         // don't canonicalize relative paths
+    bool docanonical = (result.string()[0] == '/');         // don't canonicalize relative paths
+    cout << "cleanPath(" << in << ")   base = \"" << base << "\"    docanonical = \"" << docanonical << "\""  << endl;
     for( ; it != ain.end(); ++it ) {
         if( *it == ".." ) result = result.parent_path();
         else if( *it != "." ) {

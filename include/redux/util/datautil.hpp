@@ -23,6 +23,20 @@ namespace redux {
          *   @date      2013
          */
 
+        /*!  Helper for swapping elements between 2 arrays.
+         *   @details This is just an iterator which calls std::swap
+         */
+        template <class T>
+        void swap(T* a, T* b, size_t n = 1) {
+            if(a == b) {
+                return;
+            }
+            while(n--) {
+                std::swap(*a++, *b++);       // uses move semantics since c++11
+            }
+        }
+
+
         template <typename T>
         inline char* pack(char* ptr, const std::vector<T>& in) {
             size_t sz = in.size()*sizeof(T);
@@ -56,7 +70,7 @@ namespace redux {
             size_t sz = *reinterpret_cast<const size_t*>(ptr);
             ptr+=sizeof(size_t);
             if(swap_endian) swapEndian(sz);
-            out.resize(sz);
+            out.resize(sz/sizeof(T));
             memcpy(reinterpret_cast<char*>(out.data()),ptr,sz);
             if(swap_endian) {
                 swapEndian(&out[0],out.size());
@@ -94,7 +108,7 @@ namespace redux {
 
     }  // namespace util
 
-}  // namespace sst
+}  // namespace redux
 
 
 

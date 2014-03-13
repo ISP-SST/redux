@@ -6,11 +6,20 @@ set( EXT_NAME "Boost" )
 #set( EXT_DEBUG "1" )
 
 
-set (EXT_HINT "/usr/local/")
-set( LIB_SUBDIR "/vc80" )
-set( EXT_LIB_SUFFIXES "-mt" "" )
-set( EXT_LIB_DEBUG_SUFFIX "-mt-d" )
-
+if(WIN32)
+set (EXT_HINT "${THIRDPARTY_DIR}/vendor/boost/1.55.0")
+    if (MSVC12)
+        set( EXT_LIB_SUFFIXES "" "-vc120-mt-1_55" )
+        set( EXT_LIB_DEBUG_SUFFIX "-vc120-mt-gd-1_55" )
+    else()
+        set( EXT_LIB_SUFFIXES "" "-vc110-mt-1_555" )
+        set( EXT_LIB_DEBUG_SUFFIX "-vc110-mt-gd-1_555" )
+    endif()
+else()
+    set (EXT_HINT "/usr/local/")
+    set( EXT_LIB_SUFFIXES "-mt" "" )
+    set( EXT_LIB_DEBUG_SUFFIX "-mt-d" )
+endif()
 
 set( EXT_LIB_PREFIX boost_ )
 
