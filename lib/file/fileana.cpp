@@ -19,9 +19,20 @@ static const int system_is_big_endian = 1;
 
 const uint8_t Ana::typeSizes[] = { 1, 2, 4, 4, 8, 8 };
 
+namespace {
+    template <typename T> Ana::TypeIndex getDatyp(void) { return Ana::ANA_UNDEF; }
+    template <> Ana::TypeIndex getDatyp<uint8_t>(void) { return Ana::ANA_BYTE; }
+    template <> Ana::TypeIndex getDatyp<int16_t>(void) { return Ana::ANA_WORD; }
+    template <> Ana::TypeIndex getDatyp<int32_t>(void) { return Ana::ANA_INT; }
+    template <> Ana::TypeIndex getDatyp<float  >(void) { return Ana::ANA_FLOAT; }
+    template <> Ana::TypeIndex getDatyp<double >(void) { return Ana::ANA_DOUBLE; }
+    template <> Ana::TypeIndex getDatyp<int64_t>(void) { return Ana::ANA_LONG; }
+}
+
 Ana::Ana( void ) : hdrSize( 0 ) {
     memset( &m_Header, 0, sizeof( raw_header ) );
     memset( &m_CompressedHeader, 0, sizeof( compressed_header ) );
+    m_Header.datyp = ANA_UNDEF;    // just to make sure no default type is inferred.
 }
 
 Ana::Ana( const std::string& filename ) : hdrSize( 0 ) {
@@ -33,7 +44,7 @@ Ana::Ana( const std::string& filename ) : hdrSize( 0 ) {
 void Ana::read( ifstream& file ) {
 
     hdrSize = 0;
-    file.seekg(0);
+    file.seekg( 0 );
 
     size_t rawSize = sizeof( struct raw_header );  // = 512 by construction
     memset( &m_Header, 0, rawSize );
@@ -60,9 +71,9 @@ void Ana::read( ifstream& file ) {
             size_t extraTextSize = ( m_Header.nhb - 1 ) * rawSize;
             unique_ptr<char[]> tmpText( new char [ extraTextSize + 257 ] );
             char* txtPtr = tmpText.get();
-            memset( txtPtr+256, 0, extraTextSize + 1 );
+            memset( txtPtr + 256, 0, extraTextSize + 1 );
             memcpy( txtPtr, m_Header.txt, 256 );
-            file.read( txtPtr+256, extraTextSize );
+            file.read( txtPtr + 256, extraTextSize );
             if( !file.good() ) {
                 if( file.eof() ) {
                     throw ios_base::failure( "Failed to read ANA header: <EOF> reached" );
@@ -182,20 +193,21 @@ void Ana::write( ofstream& file ) {
 }
 
 
-void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<Ana>& hdr ) {
+void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nElements, const Ana* hdr ) {
 
     size_t compressedSize = hdr->m_CompressedHeader.tsize - 14;
 
-    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize], []( uint8_t* p ) { delete[] p; } );
+    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize], []( uint8_t * p ) { delete[] p; } );
 
-    file.read(reinterpret_cast<char*>(tmp.get()),compressedSize);
+    file.read( reinterpret_cast<char*>( tmp.get() ), compressedSize );
     if( !file.good() ) {
         throw ios_base::failure( "Failed to read the specified number of bytes." );
     }
 
+    int nBlocks = hdr->m_CompressedHeader.nblocks;
     // fix a possible problem with chdr.nblocks
     if( hdr->m_CompressedHeader.bsize * hdr->m_CompressedHeader.nblocks > nElements ) {
-        hdr->m_CompressedHeader.nblocks = static_cast<uint32_t>( nElements / hdr->m_CompressedHeader.bsize );
+        nBlocks = static_cast<uint32_t>( nElements / hdr->m_CompressedHeader.bsize );
     }
 
     // consistency check
@@ -205,7 +217,6 @@ void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nEleme
 
     int slice = hdr->m_CompressedHeader.slice_size;
     int blockSize = hdr->m_CompressedHeader.bsize;
-    int nBlocks = hdr->m_CompressedHeader.nblocks;
 
     switch( hdr->m_CompressedHeader.type ) {
         case( 0 ):
@@ -230,11 +241,11 @@ void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nEleme
 }
 
 
-void redux::file::Ana::readUncompressed( ifstream& file, char* data, size_t nElements, const shared_ptr<Ana>& hdr ) {
+void redux::file::Ana::readUncompressed( ifstream& file, char* data, size_t nElements, const Ana* hdr ) {
 
     size_t nBytes = nElements * typeSizes[hdr->m_Header.datyp];
 
-    file.read(data,nBytes);
+    file.read( data, nBytes );
     if( !file.good() ) {
         throw ios_base::failure( "Failed to read the specified number of bytes." );
     }
@@ -260,7 +271,7 @@ int redux::file::Ana::compressData( shared_ptr<uint8_t>& out, const char* data, 
     int runlengthflag( 0 );  // runlength unused/untested
     int res;
     uint8_t* cdata = new uint8_t[ limit ]; // allocates +50% size since compression can fail and generate larger data.
-    out.reset( cdata, []( uint8_t* p ) { delete[] p; } );
+    out.reset( cdata, []( uint8_t * p ) { delete[] p; } );
 
     switch( hdr->m_Header.datyp ) {
         case( 0 ) : {
@@ -292,7 +303,7 @@ void redux::file::Ana::read( ifstream& file, char* data, std::shared_ptr<redux::
         hdr->read( file );
     }
 
-    file.seekg(hdr->hdrSize);
+    file.seekg( hdr->hdrSize );
     if( !file.good() ) {
         throw ios_base::failure( "Seek operation failed." );
     }
@@ -306,16 +317,16 @@ void redux::file::Ana::read( ifstream& file, char* data, std::shared_ptr<redux::
         nElements *= hdr->m_Header.dim[nDims - i - 1];
     }
 
-    if( hdr->m_Header.subf & 1 ) readCompressed( file, data, nElements, hdr );
-    else readUncompressed( file, data, nElements, hdr );
+    if( hdr->m_Header.subf & 1 ) readCompressed( file, data, nElements, hdr.get() );
+    else readUncompressed( file, data, nElements, hdr.get() );
 
 }
 
 
 void redux::file::Ana::write( ofstream& file, const char* data,
-                            std::shared_ptr<redux::file::Ana> hdr,
-                            bool compress, int slice ) {
-
+                              std::shared_ptr<redux::file::Ana> hdr,
+                              bool compress, int slice ) {
+cout << "write(ofstream): sliceSize = " << slice << endl;
     if( !hdr.get() ) {
         throw invalid_argument( "writeAna: The header object is invalid, cannot write file." );
     }
@@ -367,14 +378,187 @@ void redux::file::Ana::write( ofstream& file, const char* data,
         }
     }
 
-    file.seekp(0);
+    file.seekp( 0 );
     hdr->write( file );
 
-    if( cData ) file.write(reinterpret_cast<char*>(cData.get()) + 14, totalSize); // compressed header is already written, so skip 14 bytes.
-    else  file.write(data, totalSize);
-    
-    if(!file.good())
-        throw ios_base::failure("writeAna: write failed.");
-    
+    if( cData ) file.write( reinterpret_cast<char*>( cData.get() ) + 14, totalSize ); // compressed header is already written, so skip 14 bytes.
+    else  file.write( data, totalSize );
+
+    if( !file.good() )
+        throw ios_base::failure( "writeAna: write failed." );
+
 }
+
+
+template <typename T>
+void redux::file::Ana::read( const string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana>& hdr) {
+    
+    ifstream file( filename, ifstream::binary );
+    if( !file.good() ) {
+        throw std::ios_base::failure( "Failed to open file: "+filename );
+    }
+
+    if( !hdr.get() ) {
+        hdr.reset( new Ana() );
+    }
+    hdr->read( file );
+
+    file.seekg( hdr->hdrSize );
+    if( !file.good() ) {
+        throw std::ios_base::failure( "Seek operation failed." );
+    }
+
+    // f0 stores the dimensions with the fast index first, so swap them before allocating the array
+    int nDims = hdr->m_Header.ndim;
+    int nArrayDims = data.nDimensions();
+    size_t nElements = 1;
+    bool forceResize = (nArrayDims<nDims);
+    std::vector<size_t> dimSizes( nDims, 0 );
+    for( int i( 0 ); i < nDims; ++i ) {
+        dimSizes[i] = hdr->m_Header.dim[nDims - i - 1];
+        if( !forceResize && (dimSizes[i] != data.dimSize(nArrayDims-nDims+i)) ) {
+            forceResize = true;
+        }
+        nElements *= dimSizes[i];
+    }
+
+    if( forceResize ) {
+        data.resize( dimSizes );
+    }
+
+    auto tmp = std::shared_ptr<char>( new char[nElements * typeSizes[hdr->m_Header.datyp]], []( char * p ) { delete[] p; } );
+    if( hdr->m_Header.subf & 1 ) {
+        readCompressed( file, tmp.get(), nElements, hdr.get() );
+    }
+    else {
+        readUncompressed( file, tmp.get(), nElements, hdr.get() );
+    }
+
+    switch( hdr->m_Header.datyp ) {
+        case( ANA_BYTE ):   data.template copyFrom<char>( tmp.get() ); break;
+        case( ANA_WORD ):   data.template copyFrom<uint16_t>( tmp.get() ); break;
+        case( ANA_INT ):    data.template copyFrom<uint32_t>( tmp.get() ); break;
+        case( ANA_FLOAT ):  data.template copyFrom<float>( tmp.get() ); break;
+        case( ANA_DOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
+        default: ;
+    }
+
+}
+template void redux::file::Ana::read( const string& filename, redux::util::Array<uint8_t>& data, std::shared_ptr<redux::file::Ana>& hdr);
+template void redux::file::Ana::read( const string& filename, redux::util::Array<int16_t>& data, std::shared_ptr<redux::file::Ana>& hdr);
+template void redux::file::Ana::read( const string& filename, redux::util::Array<int32_t>& data, std::shared_ptr<redux::file::Ana>& hdr);
+template void redux::file::Ana::read( const string& filename, redux::util::Array<int64_t>& data, std::shared_ptr<redux::file::Ana>& hdr);
+template void redux::file::Ana::read( const string& filename, redux::util::Array<float  >& data, std::shared_ptr<redux::file::Ana>& hdr);
+template void redux::file::Ana::read( const string& filename, redux::util::Array<double >& data, std::shared_ptr<redux::file::Ana>& hdr);
+
+
+template <typename T>
+void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image) {
+    auto hdr = static_pointer_cast<redux::file::Ana>(image.hdr);
+    read(filename,image,hdr);
+    image.hdr = hdr;
+}
+template void redux::file::Ana::read( const string& filename, redux::image::Image<uint8_t>& image);
+template void redux::file::Ana::read( const string& filename, redux::image::Image<int16_t>& image);
+template void redux::file::Ana::read( const string& filename, redux::image::Image<int32_t>& image);
+template void redux::file::Ana::read( const string& filename, redux::image::Image<int64_t>& image);
+template void redux::file::Ana::read( const string& filename, redux::image::Image<float  >& image);
+template void redux::file::Ana::read( const string& filename, redux::image::Image<double >& image);
+
+
+template <typename T>
+void redux::file::Ana::write( const string& filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana> hdr, int sliceSize) {
+
+    ofstream file( filename, ifstream::binary );
+    if( !file.good() ) {
+        throw std::ios_base::failure( "Failed to open file: "+filename );
+    }
+
+    if( !hdr.get() ) {
+        hdr.reset( new Ana() );
+    }
+    
+    size_t nElements = 1;
+    auto end = data.dimensions().rend();
+    int nDims = 0;
+    
+    for( auto it = data.dimensions().rbegin(); it != end; ++it ) {
+        if( *it > 0 ) {     // TBD: should we always discard dimensions of size 1, or leave it to the user ??
+            hdr->m_Header.dim[nDims++] = *it;
+            nElements *= *it;
+        }
+    }
+    hdr->m_Header.ndim = nDims;
+    if( hdr->m_Header.ndim > 16 ) {
+        throw invalid_argument( "Ana::write: the ANA/f0 format does not support more dimensions than 16." );
+    }
+    
+    if( hdr->m_Header.datyp > 5 ) {
+        hdr->m_Header.datyp = getDatyp<T>();
+    }
+
+    size_t textSize = hdr->m_ExtendedHeader.length();
+    size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
+    size_t compressedSize = totalSize;
+
+    hdr->m_Header.synch_pattern = MAGIC_ANA;
+    hdr->m_Header.subf = 0;
+    hdr->m_Header.nhb = static_cast<uint8_t>( 1 + std::max( textSize + 256, size_t( 0 ) ) / 512 );
+    memset( hdr->m_Header.cbytes, 0, 4 );
+
+    shared_ptr<uint8_t> cData;
+    if( sliceSize > 0 ) {
+        //cout << "write(arr): sliceSize = " << sliceSize << endl;
+        if( hdr->m_Header.ndim == 2 ) {
+            if( data.dense() ) {
+                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.ptr() ), nElements, hdr, sliceSize );
+            } else {
+                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.copy().ptr() ), nElements, hdr, sliceSize );
+            }
+            if( compressedSize < totalSize ) {
+                int tmp = static_cast<int>( compressedSize );
+                hdr->m_Header.subf |= 1;
+                memcpy( hdr->m_Header.cbytes, &tmp, 4 );
+                memcpy( &hdr->m_CompressedHeader, cData.get(), 14 );
+                totalSize = compressedSize;
+            }
+            else {          // compressed data larger -> store uncompressed.
+                cData.reset();
+                memset( &hdr->m_CompressedHeader, 0, 14 );
+            }
+        }
+        else {
+            throw invalid_argument( "writeAna: compression only implemented for 2D data." );
+        }
+    }
+
+    hdr->write( file );
+
+    if( cData ) file.write( reinterpret_cast<char*>( cData.get() ) + 14, totalSize ); // compressed header is already written, so skip 14 bytes.
+    else  file.write( reinterpret_cast<const char*>( data.ptr() ), totalSize );
+
+    if( !file.good() )
+        throw ios_base::failure( "writeAna: write failed." );
+    
+
+}
+template void redux::file::Ana::write( const string&, const redux::util::Array<uint8_t>&, std::shared_ptr<redux::file::Ana>, int);
+template void redux::file::Ana::write( const string&, const redux::util::Array<int16_t>&, std::shared_ptr<redux::file::Ana>, int);
+template void redux::file::Ana::write( const string&, const redux::util::Array<int32_t>&, std::shared_ptr<redux::file::Ana>, int);
+template void redux::file::Ana::write( const string&, const redux::util::Array<int64_t>&, std::shared_ptr<redux::file::Ana>, int);
+template void redux::file::Ana::write( const string&, const redux::util::Array<float  >&, std::shared_ptr<redux::file::Ana>, int);
+template void redux::file::Ana::write( const string&, const redux::util::Array<double >&, std::shared_ptr<redux::file::Ana>, int);
+
+
+
+template <typename T>
+void redux::file::Ana::write( const string& filename, const redux::image::Image<T>& image, int sliceSize) {
+    write(filename,image,static_pointer_cast<redux::file::Ana>(image.hdr), sliceSize);
+}
+template void redux::file::Ana::write( const string&, const redux::image::Image<uint8_t>&, int);
+template void redux::file::Ana::write( const string&, const redux::image::Image<int16_t>&, int);
+template void redux::file::Ana::write( const string&, const redux::image::Image<int32_t>&, int);
+template void redux::file::Ana::write( const string&, const redux::image::Image<int64_t>&, int);
+template void redux::file::Ana::write( const string&, const redux::image::Image<float  >&, int);
+template void redux::file::Ana::write( const string&, const redux::image::Image<double >&, int);
 
