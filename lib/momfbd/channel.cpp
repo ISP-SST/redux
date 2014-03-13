@@ -5,6 +5,8 @@
 #include "redux/momfbd/object.hpp"
 
 #include "redux/constants.hpp"
+#include "redux/file/fileana.hpp"
+#include "redux/file/fileio.hpp"
 #include "redux/logger.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
@@ -12,11 +14,13 @@
 #include <string>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/bind.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
 namespace bfs = boost::filesystem;
+using namespace redux::image;
 using namespace redux::momfbd;
 using namespace redux::util;
 using namespace redux;
@@ -40,7 +44,7 @@ namespace {
             }
         }
         string tmp = elem;
-        tmp.erase(boost::remove_if(tmp, boost::is_any_of("ZzKk")), tmp.end());
+        tmp.erase( boost::remove_if( tmp, boost::is_any_of( "ZzKk" ) ), tmp.end() );
         if( n == 0 ) {
             divs.push_back( boost::lexical_cast<uint32_t>( tmp ) );
             types.push_back( tp );
@@ -65,9 +69,9 @@ namespace {
 }
 
 
-Channel::Channel( Object& o, MomfbdJob& j ) : flags(o.flags), mmRow(0), mmWidth(0), fillpix_method(o.fillpix_method),
-                                              image_num_offs(0), sequenceNumber(o.sequenceNumber), nf(0), myObject( o ), myJob( j ) {
-    
+Channel::Channel( const Object& o, const MomfbdJob& j ) : flags( o.flags ), mmRow( 0 ), mmWidth( 0 ), fillpix_method( o.fillpix_method ),
+    image_num_offs( 0 ), sequenceNumber( o.sequenceNumber ), nf( 0 ), myObject( o ), myJob( j ) {
+
 }
 
 Channel::~Channel() {
@@ -96,8 +100,8 @@ void Channel::parseProperties( bpt::ptree& tree ) {
         imageDataDir = cleanPath( "./" );      // Nothing specified in cfg file, use current directory.
     }
 
-    filenameTemplate = cleanPath( tree.get<string>( "FILENAME_TEMPLATE", "" ) );
-    if( filenameTemplate.length() == 0 ) {
+    imageTemplate = cleanPath( tree.get<string>( "FILENAME_TEMPLATE", "" ) );
+    if( imageTemplate.length() == 0 ) {
         LOG_ERR << "no filename template specified.";
     }
 
@@ -172,7 +176,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
         if( tmpString.find( "mm" ) != string::npos ) tmpD = 1.00E-03;
         else if( tmpString.find( "cm" ) != string::npos ) tmpD = 1.00E-02;
         else tmpD = 1.0;
-        tmpString.erase(boost::remove_if(tmpString, boost::is_any_of("cm\" ")), tmpString.end());
+        tmpString.erase( boost::remove_if( tmpString, boost::is_any_of( "cm\" " ) ), tmpString.end() );
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
         tmpTree.put( "tmp", tmpString );
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
@@ -189,7 +193,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
         }
         else {
             vector<string> tmp;
-            boost::split( tmp, tmpString, boost::is_any_of(",") );
+            boost::split( tmp, tmpString, boost::is_any_of( "," ) );
             for( auto & it : tmp ) {
                 parseSegment( diversityOrders, diversityTypes, it );
             }
@@ -216,23 +220,23 @@ void Channel::parseProperties( bpt::ptree& tree ) {
     MomfbdJob::maybeOverride( tree.get<bool>( "SAVE_FFDATA", flags & MFBD_SAVE_FFDATA ), flags, MFBD_SAVE_FFDATA );
 
     size_t p;
-    if( ( p = filenameTemplate.find_first_of( '%' ) ) != string::npos ) {
+    if( ( p = imageTemplate.find_first_of( '%' ) ) != string::npos ) {
         if( sequenceNumber > 0 ) {
             size_t q;
-            if( ( q = filenameTemplate.find_first_of( '%', p + 1 ) ) != string::npos ) {
-                tmpString = boost::str( boost::format( filenameTemplate.substr( 0, q ) ) % sequenceNumber );
-                filenameTemplate = tmpString + filenameTemplate.substr( q );
+            if( ( q = imageTemplate.find_first_of( '%', p + 1 ) ) != string::npos ) {
+                tmpString = boost::str( boost::format( imageTemplate.substr( 0, q ) ) % sequenceNumber );
+                imageTemplate = tmpString + imageTemplate.substr( q );
             }
-            else  LOG_WARN << boost::format( "file name template \"%s\" does not contain a 2nd format specifier (needs 2)" ) % filenameTemplate;
+            else  LOG_WARN << boost::format( "file name template \"%s\" does not contain a 2nd format specifier (needs 2)" ) % imageTemplate;
         }
     }
     else {
-        LOG_WARN << boost::format( "file name template \"%s\" does not contain a format specifier (needs %d)" ) % filenameTemplate % ( 1 + ( sequenceNumber >= 0 ) );
+        LOG_WARN << boost::format( "file name template \"%s\" does not contain a format specifier (needs %d)" ) % imageTemplate % ( 1 + ( sequenceNumber >= 0 ) );
     }
 
     if( tree.get<bool>( "INCOMPLETE", false ) ) {
         for( size_t i( 0 ); i < imageNumbers.size(); ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( filenameTemplate ) % ( image_num_offs + imageNumbers[i] ) ) );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % ( image_num_offs + imageNumbers[i] ) ) );
             if( !bfs::exists( fn ) ) {
                 imageNumbers.erase( imageNumbers.begin() + i );
                 continue;
@@ -240,12 +244,12 @@ void Channel::parseProperties( bpt::ptree& tree ) {
             ++i;
         }
         if( imageNumbers.empty() ) {
-            LOG_CRITICAL << boost::format( "no files found for incomplete object with filename template \"%s\" in directory \"%s\"" ) % filenameTemplate % imageDataDir;
+            LOG_CRITICAL << boost::format( "no files found for incomplete object with filename template \"%s\" in directory \"%s\"" ) % imageTemplate % imageDataDir;
         }
     }
     else {
         for( size_t i( 0 ); i < imageNumbers.size(); ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( filenameTemplate ) % ( image_num_offs + imageNumbers[i] ) ) );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % ( image_num_offs + imageNumbers[i] ) ) );
             if( !bfs::exists( fn ) ) {
                 LOG_CRITICAL << boost::format( "file %s not found!" ) % fn;
             }
@@ -256,7 +260,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
 
 
     LOG_DEBUG << "Channel::parseProperties() done.";
-    
+
 }
 
 
@@ -271,7 +275,7 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
     if( alignClip.size() == 4 ) tree.put( "ALIGN_CLIP", alignClip );
     if( wf_num != myObject.wf_num ) tree.put( "WFINDEX", wf_num );
     if( imageDataDir != myObject.imageDataDir ) tree.put( "IMAGE_DATA_DIR", imageDataDir );
-    if( !filenameTemplate.empty() ) tree.put( "FILENAME_TEMPLATE", filenameTemplate );
+    if( !imageTemplate.empty() ) tree.put( "FILENAME_TEMPLATE", imageTemplate );
     if( !darkTemplate.empty() ) tree.put( "DARK_TEMPLATE", darkTemplate );
     if( !gainFile.empty() ) tree.put( "GAIN_FILE", gainFile );
     if( !responseFile.empty() ) tree.put( "CCD_RESPONSE", responseFile );
@@ -296,94 +300,410 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
     if( root ) {
         root->push_back( bpt::ptree::value_type( "channel", tree ) );
     }
-    
+
     return tree;
 
 }
 
 
-size_t Channel::size(void) const {
-    
+size_t Channel::size( void ) const {
+
     size_t sz = 3;
-    sz += 3*sizeof(uint32_t);
-    sz += sizeof(double);
-    sz += imageNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
-    sz += darkNumbers.size()*sizeof(uint32_t)+sizeof(size_t);
-    sz += alignClip.size()*sizeof(int16_t)+sizeof(size_t);
-    sz += wf_num.size()*sizeof(uint32_t)+sizeof(size_t);
-    sz += stokesWeights.size()*sizeof(double)+sizeof(size_t);
-    sz += diversity.size()*sizeof(double)+sizeof(size_t);
-    sz += diversityOrders.size()*sizeof(uint32_t)+sizeof(size_t);
-    sz += diversityTypes.size()*sizeof(uint32_t)+sizeof(size_t);
-    sz += imageDataDir.length() + filenameTemplate.length() + darkTemplate.length() + gainFile.length() + 4;
+    sz += 3 * sizeof( uint32_t );
+    sz += sizeof( double );
+    sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
+    sz += darkNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
+    sz += alignClip.size() * sizeof( int16_t ) + sizeof( size_t );
+    sz += wf_num.size() * sizeof( uint32_t ) + sizeof( size_t );
+    sz += stokesWeights.size() * sizeof( double ) + sizeof( size_t );
+    sz += diversity.size() * sizeof( double ) + sizeof( size_t );
+    sz += diversityOrders.size() * sizeof( uint32_t ) + sizeof( size_t );
+    sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( size_t );
+    sz += imageDataDir.length() + imageTemplate.length() + darkTemplate.length() + gainFile.length() + 4;
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
     sz += offxFile.length() + offyFile.length() + 2;
+    sz += dark.size();
 
     return sz;
 }
 
 
-char* Channel::pack(char* ptr) const {
+char* Channel::pack( char* ptr ) const {
     using redux::util::pack;
 
-    ptr = pack(ptr,fillpix_method);
-    ptr = pack(ptr,mmRow);
-    ptr = pack(ptr,mmWidth);
-    ptr = pack(ptr,sequenceNumber);
-    ptr = pack(ptr,image_num_offs);
-    ptr = pack(ptr,flags);
-    ptr = pack(ptr,nf);
-    ptr = pack(ptr,imageNumbers);
-    ptr = pack(ptr,darkNumbers);
-    ptr = pack(ptr,alignClip);
-    ptr = pack(ptr,wf_num);
-    ptr = pack(ptr,stokesWeights);
-    ptr = pack(ptr,diversity);
-    ptr = pack(ptr,diversityOrders);
-    ptr = pack(ptr,diversityTypes);
-    ptr = pack(ptr,imageDataDir);
-    ptr = pack(ptr,filenameTemplate);
-    ptr = pack(ptr,darkTemplate);
-    ptr = pack(ptr,gainFile);
-    ptr = pack(ptr,responseFile);
-    ptr = pack(ptr,backgainFile);
-    ptr = pack(ptr,psfFile);
-    ptr = pack(ptr,mmFile);
-    ptr = pack(ptr,offxFile);
-    ptr = pack(ptr,offyFile);
+    ptr = pack( ptr, fillpix_method );
+    ptr = pack( ptr, mmRow );
+    ptr = pack( ptr, mmWidth );
+    ptr = pack( ptr, sequenceNumber );
+    ptr = pack( ptr, image_num_offs );
+    ptr = pack( ptr, flags );
+    ptr = pack( ptr, nf );
+    ptr = pack( ptr, imageNumbers );
+    ptr = pack( ptr, darkNumbers );
+    ptr = pack( ptr, alignClip );
+    ptr = pack( ptr, wf_num );
+    ptr = pack( ptr, stokesWeights );
+    ptr = pack( ptr, diversity );
+    ptr = pack( ptr, diversityOrders );
+    ptr = pack( ptr, diversityTypes );
+    ptr = pack( ptr, imageDataDir );
+    ptr = pack( ptr, imageTemplate );
+    ptr = pack( ptr, darkTemplate );
+    ptr = pack( ptr, gainFile );
+    ptr = pack( ptr, responseFile );
+    ptr = pack( ptr, backgainFile );
+    ptr = pack( ptr, psfFile );
+    ptr = pack( ptr, mmFile );
+    ptr = pack( ptr, offxFile );
+    ptr = pack( ptr, offyFile );
+
+    ptr = dark.pack( ptr );
 
     return ptr;
 }
 
 
-const char* Channel::unpack(const char* ptr, bool swap_endian) {
+const char* Channel::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
 
-    ptr = unpack(ptr,fillpix_method);
-    ptr = unpack(ptr,mmRow);
-    ptr = unpack(ptr,mmWidth);
-    ptr = unpack(ptr,sequenceNumber, swap_endian);
-    ptr = unpack(ptr,image_num_offs, swap_endian);
-    ptr = unpack(ptr,flags, swap_endian);
-    ptr = unpack(ptr,nf, swap_endian);
-    ptr = unpack(ptr,imageNumbers, swap_endian);
-    ptr = unpack(ptr,darkNumbers, swap_endian);
-    ptr = unpack(ptr,alignClip, swap_endian);
-    ptr = unpack(ptr,wf_num, swap_endian);
-    ptr = unpack(ptr,stokesWeights, swap_endian);
-    ptr = unpack(ptr,diversity, swap_endian);
-    ptr = unpack(ptr,diversityOrders, swap_endian);
-    ptr = unpack(ptr,diversityTypes, swap_endian);
-    ptr = unpack(ptr,imageDataDir);
-    ptr = unpack(ptr,filenameTemplate);
-    ptr = unpack(ptr,darkTemplate);
-    ptr = unpack(ptr,gainFile);
-    ptr = unpack(ptr,responseFile);
-    ptr = unpack(ptr,backgainFile);
-    ptr = unpack(ptr,psfFile);
-    ptr = unpack(ptr,mmFile);
-    ptr = unpack(ptr,offxFile);
-    ptr = unpack(ptr,offyFile);
-    
+    ptr = unpack( ptr, fillpix_method );
+    ptr = unpack( ptr, mmRow );
+    ptr = unpack( ptr, mmWidth );
+    ptr = unpack( ptr, sequenceNumber, swap_endian );
+    ptr = unpack( ptr, image_num_offs, swap_endian );
+    ptr = unpack( ptr, flags, swap_endian );
+    ptr = unpack( ptr, nf, swap_endian );
+    ptr = unpack( ptr, imageNumbers, swap_endian );
+    ptr = unpack( ptr, darkNumbers, swap_endian );
+    ptr = unpack( ptr, alignClip, swap_endian );
+    ptr = unpack( ptr, wf_num, swap_endian );
+    ptr = unpack( ptr, stokesWeights, swap_endian );
+    ptr = unpack( ptr, diversity, swap_endian );
+    ptr = unpack( ptr, diversityOrders, swap_endian );
+    ptr = unpack( ptr, diversityTypes, swap_endian );
+    ptr = unpack( ptr, imageDataDir );
+    ptr = unpack( ptr, imageTemplate );
+    ptr = unpack( ptr, darkTemplate );
+    ptr = unpack( ptr, gainFile );
+    ptr = unpack( ptr, responseFile );
+    ptr = unpack( ptr, backgainFile );
+    ptr = unpack( ptr, psfFile );
+    ptr = unpack( ptr, mmFile );
+    ptr = unpack( ptr, offxFile );
+    ptr = unpack( ptr, offyFile );
+
+    ptr = dark.unpack( ptr, swap_endian );
+
     return ptr;
 }
+
+
+bool Channel::isValid( void ) {
+
+    bool allOk( true );
+
+    if( imageTemplate.empty() ) {
+        LOG_ERR << "No images specified.";
+    }
+    else {
+        if( imageNumbers.empty() ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "file %s not found!" ) % fn;
+                allOk = false;
+            }
+        }
+        else {
+            for( auto & it : imageNumbers ) {
+                bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % it ) );
+                if( !bfs::exists( fn ) ) {
+                    LOG_ERR << boost::format( "file %s not found!" ) % fn;
+                    allOk = false;
+                }
+            }
+        }
+    }
+
+    if( !darkTemplate.empty() ) {
+        if( darkNumbers.empty() ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( darkTemplate );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "file %s not found!" ) % fn;
+                allOk = false;
+            }
+        }
+        else {
+            for( auto & it : darkNumbers ) {
+                bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
+                if( !bfs::exists( fn ) ) {
+                    LOG_ERR << boost::format( "file %s not found!" ) % fn;
+                    allOk = false;
+                }
+            }
+        }
+    }
+
+    if( !gainFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( gainFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+    if( !responseFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( responseFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+    if( !backgainFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( backgainFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+    if( !psfFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( psfFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+    if( !mmFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( mmFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+    if( !offxFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offxFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+    if( !offyFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offyFile );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "file %s not found!" ) % fn;
+            allOk = false;
+        }
+    }
+
+
+    return allOk;
+
+}
+
+
+void Channel::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
+
+    // TODO: absolute/relative paths
+    // TODO: cache files and just fetch shared_ptr
+    // TODO: use asio for multithreaded reading
+
+    if( !darkTemplate.empty() ) {
+        if( darkNumbers.empty() ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( darkTemplate );
+            LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+            redux::file::readFile( fn.string(), dark );
+        }
+        else {
+            Image<float> tmp;
+            for( size_t di = 0; di < darkNumbers.size(); ++di ) {
+                bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( darkTemplate ) % darkNumbers[di] ) );
+                LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+                if( !di ) {
+                    redux::file::readFile( fn.string(), dark );
+                }
+                else {
+                    redux::file::readFile( fn.string(), tmp );
+                    dark += tmp;
+                    // TODO: extract nFrames from header
+                }
+            }
+            dark.normalize();
+        }
+    }
+
+
+    if( !gainFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( gainFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), gain );
+    }
+
+    if( !responseFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( responseFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), ccdResponse );
+    }
+
+    if( !backgainFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( backgainFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), ccdScattering );
+    }
+
+    if( !psfFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( psfFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), psf );
+    }
+
+    if( !mmFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( mmFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), modulationMatrix );
+    }
+
+    if( !offxFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offxFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), xOffset );
+    }
+
+    if( !offyFile.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offyFile );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), yOffset );
+    }
+
+
+    if( imageNumbers.empty() ) {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
+        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+        redux::file::readFile( fn.string(), images );
+    }
+    else {
+        Image<float> tmp;
+        size_t nImages = imageNumbers.size();
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[0] ) );
+        redux::file::readFile( fn.string(), tmp );
+        imageMeans.resize( nImages, 0.0 );
+        images.resize( nImages, tmp.dimSize( 0 ), tmp.dimSize( 1 ) );
+
+        for( size_t i = 0; i < nImages; ++i ) {
+            service.post( boost::bind( &Channel::loadImage, this, i ) );
+
+        }
+
+    }
+
+
+}
+
+
+void Channel::preprocessData( boost::asio::io_service& service, boost::thread_group& pool ) {
+
+    size_t nImages = imageNumbers.size();
+    double avgMean = 0.0;
+    for( size_t i = 0; i < nImages; ++i ) {
+        avgMean += imageMeans[i];
+    }
+    avgMean /= static_cast<double>( nImages );
+    LOG_DETAIL << "Image " << printArray( imageMeans, "means", -2 ) << "   avg = " << avgMean;
+
+    cout << "avgMean = " << avgMean << endl;
+    cout << "images.mean() = " << images.mean() << endl;
+
+    for( size_t i = 0; i < nImages; ++i ) {
+        service.post( boost::bind( &Channel::preprocessImage, this, i, avgMean ) );
+    }
+
+
+}
+
+
+void Channel::loadImage( size_t index ) {
+    Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
+    bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
+    LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
+    redux::file::readFile( fn.string(), subimg );
+    imageMeans[index] = subimg.mean();
+}
+
+
+void Channel::preprocessImage( size_t index, double avgMean ) {
+
+    double& mean = imageMeans[index];
+    bool modified = false;
+
+    Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
+    bfs::path fn = bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
+    LOG_DETAIL << boost::format( "Preprocessing image %d" ) % index;
+
+    // Michiel's method for detecting bitshifted Sarnoff images.
+    if( mean > 4 * avgMean ) {
+        LOG_WARN << boost::format( "Image bit shift detected for image %d (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!" ) % index;
+        mean *= 0.625;
+        subimg *= 0.625;
+        modified = true;
+    }
+    else if( mean < 0.25 * avgMean ) {
+        LOG_WARN << boost::format( "Image bit shift detected for image %d (mean < 0.25*avgMean). adjust factor=16 (keep your fingers crossed)!" ) % index;
+        mean *= 16;
+        subimg *= 16;
+        modified = true;
+    }
+
+    LOG_WARN << boost::format( "Dimensions of simg (%s)." ) % printArray( subimg.dimensions(), "" );
+    LOG_WARN << boost::format( "Dimensions of dark (%s)." ) % printArray( dark.dimensions(), "" );
+    LOG_WARN << boost::format( "Dimensions of gain (%s)." ) % printArray( gain.dimensions(), "" );
+
+    if( dark /*&& gain*/ ) {
+        if( ! subimg.sameSize( dark ) ) {
+            LOG_ERR << boost::format( "Dimensions of dark (%s) does not match this image (%s), skipping flatfielding !!" ) % printArray( dark.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
+            return;
+        }
+        if( ! subimg.sameSize( gain ) ) {
+            LOG_ERR << boost::format( "Dimensions of gain (%s) does not match this image (%s), skipping flatfielding !!" ) % printArray( gain.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
+            //return;
+        }
+        if( ccdResponse && !subimg.sameSize( ccdResponse ) ) {
+            LOG_WARN << boost::format( "Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!" ) % printArray( ccdResponse.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
+            ccdResponse.resize();
+        }
+
+        subimg -= dark;
+        modified = true;
+
+        if( ccdResponse ) {  // correct for the detector response (this should not contain the gain correction and must be done before descattering)
+            subimg *= ccdResponse;
+        }
+
+        if( ccdScattering && psf ) {          // apply backscatter correction
+            if( subimg.sameSize( ccdScattering ) && subimg.sameSize( psf ) ) {
+                LOG_DETAIL << boost::format( "Applying correction for CCD transparency." );
+                // TODO:  descatter(data,psf,bgain,io);
+            }
+            else {
+                LOG_ERR << boost::format( "Dimensions of ccdScattering (%s) or psf (%s) does not match this image (%s), skipping flatfielding !!" )
+                        % printArray( ccdScattering.dimensions(), "" ) % printArray( psf.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
+            }
+        }
+
+        //subimg *= gain;
+        // TODO: fillpix(data,1,nx,1,ny,method,io)
+
+    }
+
+    if( modified && flags & MFBD_SAVE_FFDATA ) {
+        fn = bfs::path( fn.leaf().string() + ".cor" );
+        LOG_DETAIL << boost::format( "Saving file \"%s\"" ) % fn.string();
+        redux::file::Ana::write( fn.string(), subimg );
+    }
+
+
+
+}
+

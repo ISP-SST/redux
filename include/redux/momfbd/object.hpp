@@ -4,8 +4,10 @@
 #include "redux/momfbd/channel.hpp"
 #include "redux/util/array.hpp"
 
+#include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/thread.hpp>
 
 namespace po = boost::program_options;
 namespace bpt = boost::property_tree;
@@ -28,7 +30,7 @@ namespace redux {
 
         public:
 
-            Object( MomfbdJob& );
+            Object( const MomfbdJob& );
             ~Object();
 
             void parseProperties( bpt::ptree& tree, const std::string& fn );
@@ -45,6 +47,10 @@ namespace redux {
 
         private:
 
+            void loadData(boost::asio::io_service&, boost::thread_group&);
+            void preprocessData(boost::asio::io_service&, boost::thread_group&);
+            bool isValid(void);
+            
             uint32_t flags;
 
             std::vector<std::shared_ptr<Channel>> channels;
@@ -52,9 +58,10 @@ namespace redux {
             std::string imageDataDir, outputFileName;
             uint8_t fillpix_method, output_data_type;
             double lim_freq, r_c;
-            MomfbdJob& myJob;
+            const MomfbdJob& myJob;
             redux::util::Array<double> pupil;
 
+            friend class MomfbdJob;
             friend class Channel;
 
         };

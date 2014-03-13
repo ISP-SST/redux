@@ -44,8 +44,8 @@ namespace {
 }
 
 
-Object::Object( MomfbdJob& j ) : imageNumbers(j.imageNumbers), darkNumbers(j.darkNumbers), reg_gamma(j.reg_gamma),
-                                 weight(1), angle(0), lambda(0), nPoints(j.nPoints), sequenceNumber(j.sequenceNumber),
+Object::Object( const MomfbdJob& j ) : imageNumbers(j.imageNumbers), darkNumbers(j.darkNumbers), reg_gamma(j.reg_gamma),
+                                 weight(1), angle(0), lambda(0), nPoints(j.patchSize), sequenceNumber(j.sequenceNumber),
                                  nph(0), stokesWeights(j.stokesWeights), flags(j.flags), imageDataDir(j.imageDataDir),
                                  fillpix_method(j.fillpix_method), output_data_type(j.output_data_type),
                                  lim_freq(), r_c(), myJob( j ), pupil(j.pupil) {
@@ -100,7 +100,7 @@ void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
             pupil = myJob.pupil;    // NB: shared data.
         }
     }
-    else pupil.reset();
+    else pupil.resize();
 
     auto filetypes = tree.get<vector<FileType>>( "FILE_TYPE", vector<FileType>( 1, FT_NONE ) );
     if( filetypes.empty() ) LOG_ERR << "\"FILE_TYPE\" has to be one of ANA/FITS/MOMFBD.";
@@ -161,7 +161,7 @@ void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
 
     if( outputFileName.empty() ) {
         if( channels.size() > 0 ) {
-            string tpl = channels[0]->filenameTemplate;
+            string tpl = channels[0]->imageTemplate;
             size_t q, p = tpl.find_first_of( '%' );
             q = tpl.find_first_not_of( '%', p );
             if( ( q = tpl.find_first_not_of( '%', p ) ) != string::npos ) {
@@ -319,11 +319,40 @@ const char* Object::unpack(const char* ptr, bool swap_endian) {
     ptr = unpack(ptr, outputFileName);
     size_t tmp;
     ptr = unpack(ptr, tmp, swap_endian);
-    channels.resize(tmp, make_shared<Channel>(*this,myJob));
+    channels.resize(tmp);
     for(auto& it: channels) {
+        it.reset(new Channel(*this,myJob));
         ptr = it->unpack(ptr, swap_endian);
     }
     ptr = pupil.unpack(ptr, swap_endian);
     
    return ptr;
 }
+
+
+void Object::loadData(boost::asio::io_service& service, boost::thread_group& pool) {
+    cout << "Object::loadData() " << endl;
+    for(auto& it: channels) {
+        it->loadData(service, pool);
+    }
+    
+}
+
+
+void Object::preprocessData(boost::asio::io_service& service, boost::thread_group& pool) {
+    cout << "Object::preprocessData() " << endl;
+    for(auto& it: channels) {
+        it->preprocessData(service, pool);
+    }
+    
+}
+
+
+bool Object::isValid(void) {
+    bool allOk(true);
+    for( auto & it : channels ) {
+        allOk &= it->isValid();
+    }
+    return allOk;
+}
+
