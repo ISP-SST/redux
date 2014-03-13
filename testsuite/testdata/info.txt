@@ -1,0 +1,47 @@
+fzread,img,'/home/tomas/Projects/redux/testsuite/testdata/gradient_16s_4x5_le.f0',hdr
+fzread,img,'/home/tomas/Projects/redux/testsuite/testdata/gradient_32s_40x50_le.f0',hdr
+fzread,img,'/home/tomas/Projects/redux/testsuite/testdata/gradient_32s_40x50_le.fz',hdr
+
+fzread,img,'/scratch/Data/camXIX_im22Apr2008.1804856..1805202.f0',hdr
+fzread,img,'/scratch/Data/camXIX_im22Apr2008.1804856..1805202.f0',hdr
+fzread,img,'/scratch/Data/Dpix_r',hdr
+
+### ANA test files ###
+
+# Files for testing correct loading of data of different types #
+#
+# The data in these files should be: (4x5)
+#    0  1  2  3  4
+#    1  2  3  4  5
+#    2  3  4  5  6
+#    3  4  5  6  7
+#
+gradient_8u_4x5.f0
+gradient_16s_4x5_le.f0
+gradient_32s_4x5_le.f0
+gradient_32f_4x5_le.f0
+gradient_64f_4x5_le.f0
+
+# Files for testing correct handling of files stored on a big-endian architecture #
+#
+# The data in these files should be: (40x50)
+#    0  1  2  ... 49
+#    1  2  3  ... 50
+#    . . . .  ... .
+#    39 40 41 ... 88
+#
+gradient_32s_40x50_le.f0
+gradient_32s_40x50_be.f0
+
+# Files for testing reading of compressed data #
+#
+# The data in these files should be: (40x50)
+#    0  1  2  ... 49
+#    1  2  3  ... 50
+#    . . . .  ... .
+#    39 40 41 ... 88
+#
+gradient_32s_40x50_le.fz
+gradient_32s_40x50_be.fz
+
+######################

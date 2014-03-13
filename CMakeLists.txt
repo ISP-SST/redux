@@ -16,6 +16,7 @@ include_directories(${REDUX_DIR}/include)
 
 add_subdirectory(lib)
 add_subdirectory(bin)
+add_subdirectory(testsuite)
 
 # Installation (distribution) settings
 install(DIRECTORY include/redux
