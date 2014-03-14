@@ -36,6 +36,7 @@ namespace redux {
             const Image<T>& operator*=( const T& rhs ) { for( auto & it : *this ) it *= rhs; return *this; };
             const Image<T>& operator/=( const T& rhs ) { for( auto & it : *this ) it /= rhs; return *this; };
             
+            template <typename U> void setWeight(const U& w) { weight = w; }
             void normalize(void) { *this /= weight; weight = 1; };
             double mean(void) const {
                 double sum(0);
@@ -115,6 +116,7 @@ namespace redux {
                 if( this->sameSize( rhs ) ) {
                     typename Image<U>::const_iterator rhsit = rhs.begin();
                     for( auto & it : *this ) it += redux::util::bound_cast<T>( *rhsit++ );
+                    weight += rhs.weight; 
                 }
                 else {
                     throw std::invalid_argument( "image dimensions does not match." );
@@ -173,7 +175,7 @@ namespace redux {
 
         protected:
 
-            double weight;
+            double weight;      // TODO: decide if this should be used at all, or always normalize on read ?
 
         private:
             template<typename U> friend class Image;

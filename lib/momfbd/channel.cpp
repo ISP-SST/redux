@@ -509,13 +509,13 @@ void Channel::loadData( boost::asio::io_service& service, boost::thread_group& p
 
     // TODO: absolute/relative paths
     // TODO: cache files and just fetch shared_ptr
-    // TODO: use asio for multithreaded reading
 
     if( !darkTemplate.empty() ) {
         if( darkNumbers.empty() ) {
             bfs::path fn = bfs::path( imageDataDir ) / bfs::path( darkTemplate );
             LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
             redux::file::readFile( fn.string(), dark );
+            dark.normalize();
         }
         else {
             Image<float> tmp;
@@ -528,7 +528,6 @@ void Channel::loadData( boost::asio::io_service& service, boost::thread_group& p
                 else {
                     redux::file::readFile( fn.string(), tmp );
                     dark += tmp;
-                    // TODO: extract nFrames from header
                 }
             }
             dark.normalize();
@@ -667,7 +666,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
         }
         if( ! subimg.sameSize( gain ) ) {
             LOG_ERR << boost::format( "Dimensions of gain (%s) does not match this image (%s), skipping flatfielding !!" ) % printArray( gain.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
-            //return;
+            return;
         }
         if( ccdResponse && !subimg.sameSize( ccdResponse ) ) {
             LOG_WARN << boost::format( "Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!" ) % printArray( ccdResponse.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
@@ -683,7 +682,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 
         if( ccdScattering && psf ) {          // apply backscatter correction
             if( subimg.sameSize( ccdScattering ) && subimg.sameSize( psf ) ) {
-                LOG_DETAIL << boost::format( "Applying correction for CCD transparency." );
+                LOG_DETAIL << "Applying correction for CCD transparency.";
                 // TODO:  descatter(data,psf,bgain,io);
             }
             else {
@@ -692,7 +691,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
             }
         }
 
-        //subimg *= gain;
+        subimg *= gain;
         // TODO: fillpix(data,1,nx,1,ny,method,io)
 
     }

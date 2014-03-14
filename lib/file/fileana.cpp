@@ -5,6 +5,10 @@
 #include "redux/file/anacompress.hpp"
 #include "redux/file/anadecompress.hpp"
 
+#include <boost/lexical_cast.hpp>
+#include <boost/regex.hpp>
+#include <regex>
+
 using namespace redux::file;
 using namespace redux::util;
 using namespace std;
@@ -464,18 +468,27 @@ template <typename T>
 void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image ) {
     auto hdr = static_pointer_cast<redux::file::Ana>( image.hdr );
     read( filename, image, hdr );
+    string txt = hdr->getText();
+    boost::regex re( "(\\d+)[ .]+SUM[= ]+" );
+    boost::smatch match;
+    if( boost::regex_search( txt, match, re ) ) {
+        int nFrames = boost::lexical_cast<int>( match[1] );
+        if( nFrames > 1) {
+            image.setWeight(nFrames);
+        } else image.setWeight(1);
+    }
     image.hdr = hdr;
 }
-template void redux::file::Ana::read( const string& filename, redux::image::Image<uint8_t>& image );
-template void redux::file::Ana::read( const string& filename, redux::image::Image<int16_t>& image );
-template void redux::file::Ana::read( const string& filename, redux::image::Image<int32_t>& image );
-template void redux::file::Ana::read( const string& filename, redux::image::Image<int64_t>& image );
-template void redux::file::Ana::read( const string& filename, redux::image::Image<float  >& image );
-template void redux::file::Ana::read( const string& filename, redux::image::Image<double >& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<uint8_t>& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int16_t>& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int32_t>& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int64_t>& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<float  >& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<double >& image );
 
 
 template <typename T>
-void redux::file::Ana::write( const string& filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana> hdr, int sliceSize ) {
+void redux::file::Ana::write( const string & filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana> hdr, int sliceSize ) {
 
     ofstream file( filename, ifstream::binary );
     if( !file.good() ) {
@@ -545,7 +558,8 @@ void redux::file::Ana::write( const string& filename, const redux::util::Array<T
 
     if( cData ) {
         file.write( reinterpret_cast<char*>( cData.get() ) + 14, totalSize ); // compressed header is already written, so skip 14 bytes.
-    } else {
+    }
+    else {
         if( data.dense() ) {
             file.write( reinterpret_cast<const char*>( data.ptr() ), totalSize );
         }
@@ -568,7 +582,7 @@ template void redux::file::Ana::write( const string&, const redux::util::Array<d
 
 
 template <typename T>
-void redux::file::Ana::write( const string& filename, const redux::image::Image<T>& image, int sliceSize ) {
+void redux::file::Ana::write( const string & filename, const redux::image::Image<T>& image, int sliceSize ) {
     write( filename, image, static_pointer_cast<redux::file::Ana>( image.hdr ), sliceSize );
 }
 template void redux::file::Ana::write( const string&, const redux::image::Image<uint8_t>&, int );
