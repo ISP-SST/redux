@@ -61,7 +61,7 @@ namespace {
         BOOST_CHECK_EQUAL( data.dimSize( 1 ), indata.dimSize( 1 ) );
         for( size_t j = 0; j < data.dimSize( 0 ); ++j ) {
             for( size_t k = 0; k < data.dimSize( 1 ); ++k ) {
-                BOOST_CHECK_EQUAL( data( j, k ), j + k );
+                BOOST_CHECK_EQUAL( data( j, k ), indata( j, k ) );
             }
         }
     }
@@ -81,7 +81,7 @@ namespace {
             BOOST_CHECK_EQUAL( data.dimSize( 1 ), indata.dimSize( 1 ) );
             for( size_t j = 0; j < data.dimSize( 0 ); ++j ) {
                 for( size_t k = 0; k < data.dimSize( 1 ); ++k ) {
-                    BOOST_CHECK_EQUAL( data( j, k ), j + k );
+                    BOOST_CHECK_EQUAL( data( j, k ), indata( j, k ) );
                 }
             }
         }
@@ -175,21 +175,13 @@ void anaTest( void ) {
     writeAndVerifyCompressedAna(image);                       // int32_t
     
     
-/*
-    string testFile = "testsuite_ana.f0";
-    Ana::write(testFile,array);
-    Ana::write(testFile,array.copy<uint8_t>());
-    
-    Array<int32_t> array2;
-    readFile( testFile, array2 );
-    BOOST_CHECK_EQUAL( array2.nDimensions(), 2 );
-    BOOST_CHECK_EQUAL( array2.dimSize( 0 ), 40 );
-    BOOST_CHECK_EQUAL( array2.dimSize( 1 ), 50 );
-    for( size_t j = 0; j < array2.dimSize( 0 ); ++j ) {
-        for( size_t k = 0; k < array2.dimSize( 1 ); ++k ) {
-            BOOST_CHECK_EQUAL( array2( j, k ), j + k );
-        }
-    }*/
+    // test writing subimage
+    image.resize(7,7);
+    int cnt=0;
+    for(auto& it: image) it = ++cnt;
+    Image<int32_t> subimage(image,1,5,1,5);
+    writeAndVerifyAna(subimage);            
+    writeAndVerifyCompressedAna(subimage);
 
 
 }

@@ -431,9 +431,7 @@ void DebugJob::postProcess( void ) {
     hdr->m_Header.dim[0] = xSize;
     hdr->m_Header.dim[1] = ySize;
 
-    std::ofstream file( "debugjob_output.f0" );
-
-    Ana::write( file, reinterpret_cast<char*>( *img ), hdr );
+    Ana::write( "debugjob_output.f0", reinterpret_cast<char*>( *img ), hdr );
 
     info.step.store( JSTEP_COMPLETED );
     info.state.store( JSTATE_IDLE );

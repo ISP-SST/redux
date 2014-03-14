@@ -14,7 +14,7 @@ using namespace boost::unit_test_framework;
 namespace {
 }
 
-void imageTest( void ) {
+void imageTests( void ) {
 
     size_t xSize = 7;
     size_t ySize = 7;
@@ -220,7 +220,7 @@ namespace testsuite {
 
             test_suite* ts = BOOST_TEST_SUITE( "IMAGE" );
 
-            ts->add( BOOST_TEST_CASE( &imageTest ) );
+            ts->add( BOOST_TEST_CASE( &imageTests ) );
 
             framework::master_test_suite().add( ts );
 
