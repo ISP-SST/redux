@@ -183,7 +183,15 @@ void anaTest( void ) {
     writeAndVerifyAna(subimage);            
     writeAndVerifyCompressedAna(subimage);
 
-
+    // test reading into subimage
+    Image<int32_t> imagecopy = image.copy();
+    Image<int32_t> subimagecopy(imagecopy,1,5,1,5);
+    subimage *= 10;
+    BOOST_CHECK( imagecopy != image );
+    redux::file::Ana::write(testFileAna,subimage);
+    redux::file::Ana::read(testFileAna,subimagecopy);
+    BOOST_CHECK_EQUAL( imagecopy, image );
+    
 }
 
 
