@@ -87,12 +87,6 @@ void imageTests( void ) {
         Image<int>::const_iterator cit = image.begin();
         Image<int>::const_iterator cendit = image.end();
 
-        // iterate past begin()
-        BOOST_CHECK_THROW( --it,  out_of_range );
-        BOOST_CHECK_THROW( it--,  out_of_range );
-        BOOST_CHECK_THROW( --cit, out_of_range );
-        BOOST_CHECK_THROW( cit--, out_of_range );
-
         // postfix ++
         for( size_t i = 1; i <= ySize * xSize; ++i ) {
             BOOST_CHECK_EQUAL( *it++, i );
@@ -102,12 +96,6 @@ void imageTests( void ) {
         // at end()
         BOOST_CHECK( it == endit );
         BOOST_CHECK( cit == cendit );
-
-        // iterate past end()
-        BOOST_CHECK_THROW( it++,  out_of_range );
-        BOOST_CHECK_THROW( ++it,  out_of_range );
-        BOOST_CHECK_THROW( cit++, out_of_range );
-        BOOST_CHECK_THROW( ++cit, out_of_range );
 
         // prefix --
         for( size_t i = ySize * xSize; i > 0; --i ) {

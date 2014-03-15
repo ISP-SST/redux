@@ -31,7 +31,7 @@ namespace {
 }
 
 void arrayTest( void ) {
-
+    
     Array<int> array4x5( 4, 5 );
     Array<int> array3x3;
 
@@ -44,12 +44,33 @@ void arrayTest( void ) {
                   11, 12, 13, 14, 15,
                   16, 17, 18, 19, 20 );
 
-    // check index out of bounds
-    BOOST_CHECK_THROW( array4x5( 1, 5 ), out_of_range );
-    BOOST_CHECK_THROW( array4x5( 5, 1 ), out_of_range );
-    BOOST_CHECK_THROW( array4x5( -1, 1 ), out_of_range );
-    BOOST_CHECK_THROW( array4x5( 1, -1 ), out_of_range );
+    // check the iterator is accessing the right elements.
+    Array<int>::iterator it = array4x5.begin();
+    BOOST_CHECK_EQUAL( it.pos(), 0 );
+    it = array4x5.end();
+    BOOST_CHECK_EQUAL( it.pos(), 20 );
+    BOOST_CHECK_EQUAL( *--it, 20 );
+    it = array4x5.pos(1,1);
+    BOOST_CHECK_EQUAL( it.pos(), 6 );
+    BOOST_CHECK_EQUAL( it.step(1).pos(), 7 );
+    BOOST_CHECK_EQUAL( it.step(-1).pos(), 6 );
+    BOOST_CHECK_EQUAL( it.step(1,1).pos(), 12 );
+    BOOST_CHECK_EQUAL( it.step(-1,-1).pos(), 6 );
+    BOOST_CHECK_EQUAL( it.step(1,-1).pos(), 10 );
+    BOOST_CHECK_EQUAL( it.step(-1,1).pos(), 6 );
+   
+    // check index out of bounds when using at()
+    BOOST_CHECK_THROW( array4x5.at( 1, 5 ), out_of_range );
+    BOOST_CHECK_THROW( array4x5.at( 5, 1 ), out_of_range );
+    BOOST_CHECK_THROW( array4x5.at( -1, 1 ), out_of_range );
+    BOOST_CHECK_THROW( array4x5.at( 1, -1 ), out_of_range );
+    
+    // test iterator returned by Array::pos() for some values
+    BOOST_CHECK_EQUAL( *array4x5.pos( 0, 0 ), 1 );
+    BOOST_CHECK_EQUAL( *array4x5.pos( 1, 1 ), 7 );
+    BOOST_CHECK_EQUAL( *array4x5.pos( 3, 4 ), 20 );
 
+   
     // check values
     for( int i = 0; i < 4; ++i ) {
         for( int j = 0; j < 5; ++j ) {
@@ -58,16 +79,10 @@ void arrayTest( void ) {
     }
 
     // test iterators
-    Array<int>::iterator it = array4x5.begin();
+    it = array4x5.begin();
     Array<int>::iterator endit = array4x5.end();
     Array<int>::const_iterator cit = array4x5.begin();
     Array<int>::const_iterator cendit = array4x5.end();
-
-    // iterate past begin()
-    BOOST_CHECK_THROW( --it,  out_of_range );
-    BOOST_CHECK_THROW( it--,  out_of_range );
-    BOOST_CHECK_THROW( --cit, out_of_range );
-    BOOST_CHECK_THROW( cit--, out_of_range );
 
     // prefix ++
     for( int i = 1; i <= 20; ++i ) {
@@ -81,11 +96,6 @@ void arrayTest( void ) {
     BOOST_CHECK( it == endit );
     BOOST_CHECK( cit == cendit );
 
-    // iterate past end()
-    BOOST_CHECK_THROW( ++it,  out_of_range );
-    BOOST_CHECK_THROW( it++,  out_of_range );
-    BOOST_CHECK_THROW( ++cit, out_of_range );
-    BOOST_CHECK_THROW( cit++, out_of_range );
 
     // prefix --
     for( int i = 20; i > 0; --i ) {
@@ -143,6 +153,13 @@ void arrayTest( void ) {
     BOOST_CHECK( subarray == array3x3 );
 
 
+    // test subiterator::step() to step along any dimension
+    BOOST_CHECK_EQUAL( *(subarray.pos( 1, 1 ).step()), 14 );
+    BOOST_CHECK_EQUAL( *(subarray.pos( 1, 1 ).step(1)), 14 );
+    BOOST_CHECK_EQUAL( *(subarray.pos( 1, 1 ).step(1,-1)), 17 );
+    BOOST_CHECK_EQUAL( *(subarray.pos( 1, 1 ).step(-1,-1)), 7 );
+    BOOST_CHECK_EQUAL( *(subarray.pos( 1, 1 ).step(-1,1)), 9 );
+
     // test assigning to sub-array
     array3x3.set( 70,  80,  90,
                   120, 130, 140,
@@ -164,7 +181,6 @@ void arrayTest( void ) {
         }
     }
 
-
     Array<int> array4x5x6( 4, 5, 6 );
     size_t cnt( 0 );
     for( auto & it : array4x5x6 ) {
@@ -184,7 +200,7 @@ void arrayTest( void ) {
                 }
             }
         }
-        
+
         // assign to subarray
         subarray = 999;
         cnt = 0;

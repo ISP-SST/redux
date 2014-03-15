@@ -48,115 +48,99 @@ namespace redux {
             typedef ptrdiff_t difference_type;
 
             class const_iterator {
-                typedef void(const_iterator::*StepFunction)(void);
+                typedef void( const_iterator::*StepFunction )( void );
             public:
-                const_iterator( const Array<T>& a, size_t begin, size_t end ) : current_( begin ), end_( end ), m_ConstArrayPtr( &a ), cdata( a.datablock.get() ) {
-
-                    if( m_ConstArrayPtr->nElements_ == m_ConstArrayPtr->dataSize ) {    // dense array
+                const_iterator( const Array<T>& a, int64_t pos, int64_t begin, int64_t end ) : pos_( pos ), begin_( begin ), end_( end ), m_ConstArrayPtr( &a ), cdata( a.datablock.get() ) {
+                    if( a.dense_ ) {
                         incrementor = &redux::util::Array<T>::const_iterator::fastIncrement;
                         decrementor = &redux::util::Array<T>::const_iterator::fastDecrement;
-                    } else {                                                            // segmented array
-                        if (begin < end) indices = m_ConstArrayPtr->dimFirst;
-                        else indices = m_ConstArrayPtr->dimLast;
+                    } else {
                         incrementor = &redux::util::Array<T>::const_iterator::sparseIncrement;
                         decrementor = &redux::util::Array<T>::const_iterator::sparseDecrement;
+                        padding.resize(a.nDims_,a.dataSize); //a.dataSize-a.dimSizes[0]); // padding for the fastest dimension
+                        for(size_t i=1; i<a.nDims_; ++i) {
+                            padding[i] = a.dimStrides[i-1]-a.dimSizes[i]*a.dimStrides[i];
+                        }
+                       
                     }
                 }
-                
+
                 // prefix
-                const_iterator operator++() { (this->*incrementor)(); return *this; }
-                const_iterator operator--() { (this->*decrementor)(); return *this; }
+                const_iterator operator++() { ( this->*incrementor )(); return *this; }
+                const_iterator operator--() { ( this->*decrementor )(); return *this; }
                 // postfix
-                const_iterator operator++( int ) { const_iterator i = *this; (this->*incrementor)(); return i; }
-                const_iterator operator--( int ) { const_iterator i = *this; (this->*decrementor)(); return i; }
+                const_iterator operator++( int ) { const_iterator i = *this; ( this->*incrementor )(); return i; }
+                const_iterator operator--( int ) { const_iterator i = *this; ( this->*decrementor )(); return i; }
 
-                const_reference operator*() { return *( cdata + current_ ); }
-                const_pointer operator->()  { return cdata + current_; }
-                bool operator==( const const_iterator& rhs ) const { return current_ == rhs.current_; }
-                bool operator!=( const const_iterator& rhs ) const { return current_ != rhs.current_; }
-                bool operator>=( const const_iterator& rhs ) const { return current_ >= rhs.current_; }
-                bool operator<=( const const_iterator& rhs ) const { return current_ <= rhs.current_; }
-                bool operator> ( const const_iterator& rhs ) const { return current_ > rhs.current_; }
-                bool operator< ( const const_iterator& rhs ) const { return current_ < rhs.current_; }
+                const_reference operator*() { return *( cdata + pos_ ); }
+                const_pointer operator->()  { return cdata + pos_; }
 
-            protected:
-                void fastDecrement( void ) {
-                    if( current_ == 0 ) {
-                        throw std::out_of_range( "Iterating past begin()." );
+                int64_t pos( void ) { return pos_; };
+
+                const_iterator& step( const std::vector<int64_t>& ind ) {
+                    size_t nIndices = ind.size();
+                    if( nIndices == 0 ) {
+                        ++pos_;
                     }
-                    if( current_ > end_ ) {
-                        current_ = end_;
+                    else  if( nIndices > m_ConstArrayPtr->nDims_ ) {
+                        throw std::out_of_range( "Array::iterator::step() called with more indices than dimensions." );
                     }
                     else {
-                        --current_;
+                        int64_t delta = 0;
+                        for( size_t i = 0; i < nIndices; ++i ) {
+                            delta += ind[nIndices - i - 1] * m_ConstArrayPtr->dimStrides[m_ConstArrayPtr->nDims_ - i - 1];
+                        }
+                        pos_ += delta;
                     }
+                    return *this;
                 }
-                void fastIncrement( void ) {
-                    if( current_ >= end_ ) {
-                        throw std::out_of_range( "Iterating past end()." );
-                    }
-                    current_++;
-                }
+                template <typename ...S> const_iterator& step( S ...s ) { return step( {s...} ); }
+
+                bool operator==( const const_iterator& rhs ) const { return pos_ == rhs.pos_; }
+                bool operator!=( const const_iterator& rhs ) const { return pos_ != rhs.pos_; }
+                bool operator>=( const const_iterator& rhs ) const { return pos_ >= rhs.pos_; }
+                bool operator<=( const const_iterator& rhs ) const { return pos_ <= rhs.pos_; }
+                bool operator> ( const const_iterator& rhs ) const { return pos_ > rhs.pos_; }
+                bool operator< ( const const_iterator& rhs ) const { return pos_ < rhs.pos_; }
+
+            protected:
+                void fastDecrement( void ) { --pos_; }
+                void fastIncrement( void ) { ++pos_; }
 
                 void sparseDecrement( void ) {
-                    if( current_ == 0 ) {
-                        throw std::out_of_range( "Iterating past begin()." );
-                    } else if ( current_ >= end_ ) {
-                        current_ = end_ -1;
-                        indices = m_ConstArrayPtr->dimLast;
-                        return;
-                    }
-                    for( int d = m_ConstArrayPtr->nDims_ - 1; d >= 0; --d ) {
-                        if( indices[d] == m_ConstArrayPtr->dimFirst[d] ) {
-                            if( d == 0 ) {
-                                current_ = 0;
-                                return;
-                            }
-                            indices[d] = m_ConstArrayPtr->dimLast[d];
-                            current_ += ( m_ConstArrayPtr->dimSizes[d] * m_ConstArrayPtr->dimStrides[d]);
-                        } else {
-                            indices[d]--;
-                            while (d<m_ConstArrayPtr->nDims_) {
-                                current_ -= m_ConstArrayPtr->dimStrides[d++];
-                            }
-                            break;
+                    --pos_;
+                    for( int d = m_ConstArrayPtr->nDims_ - 1; d > 0; --d ) {
+                        int64_t remainder = (pos_ % m_ConstArrayPtr->dimStrides[d-1])/m_ConstArrayPtr->dimStrides[d];
+                        // if we went out-of-bounds for dimension d, subtract "padding"
+                        if( remainder > m_ConstArrayPtr->dimLast[d] ||
+                            remainder < m_ConstArrayPtr->dimFirst[d] ) {
+                            pos_ -= padding[d];
                         }
                     }
                 }
-                
+
                 void sparseIncrement( void ) {
-
-                    if( current_ >= end_ ) {
-                        throw std::out_of_range( "Iterating past end()." );
-                    }
-                    for( int d = m_ConstArrayPtr->nDims_ - 1; d >= 0; --d ) {
-                        if( indices[d] == m_ConstArrayPtr->dimLast[d] ) {
-                            if( d == 0 ) {
-                                current_ = end_;
-                                return;
-                            }
-                            indices[d] = m_ConstArrayPtr->dimFirst[d];
-                            current_ -= ( m_ConstArrayPtr->dimSizes[d] * m_ConstArrayPtr->dimStrides[d]);
-                        } else {
-                            indices[d]++;
-                            while (d<m_ConstArrayPtr->nDims_) {
-                                current_ += m_ConstArrayPtr->dimStrides[d++];
-                            }
-                            break;
+                    ++pos_;
+                    for( int d = m_ConstArrayPtr->nDims_ - 1; d > 0; --d ) {
+                        int64_t remainder = (pos_ % m_ConstArrayPtr->dimStrides[d-1])/m_ConstArrayPtr->dimStrides[d];
+                        // if we went out-of-bounds for dimension d, add "padding"
+                        if( remainder > m_ConstArrayPtr->dimLast[d] ||
+                            remainder < m_ConstArrayPtr->dimFirst[d] ) {
+                            pos_ += padding[d];
                         }
                     }
                 }
 
-                size_t current_, end_;
+                int64_t pos_, begin_, end_;
                 const Array<T>* m_ConstArrayPtr;
                 const T* cdata;
                 StepFunction incrementor, decrementor;
-                std::vector<size_t> indices;
+                std::vector<int64_t> padding;
             };
 
             class iterator : public const_iterator {
             public:
-                iterator( Array<T>& a, size_t begin, size_t end ) : const_iterator( a, begin, end ), data( a.datablock.get() ) {}
+                iterator( Array<T>& a, int64_t pos, int64_t begin, int64_t end ) : const_iterator( a, pos, begin, end ), data( a.datablock.get() ) { }
 
                 // prefix
                 iterator operator++() { const_iterator::operator++(); return *this; }
@@ -165,20 +149,17 @@ namespace redux {
                 iterator operator++( int ) { iterator i = *this; const_iterator::operator++(); return i; }
                 iterator operator--( int ) { iterator i = *this; const_iterator::operator--(); return i; }
 
-                reference operator*() { return *( data + this->current_ ); }
-                pointer operator->() { return ( data + this->current_ ); }
+                reference operator*() { return *( data + this->pos_ ); }
+                pointer operator->() { return ( data + this->pos_ ); }
 
             private:
                 T* data;
             };
 
-            template <typename ...S>
-            Array( S ...sizes ) {
-                resize( sizes... );
-            }
+            template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
 
             template <typename ...S>
-            Array( T* ptr, S ...sizes ) {
+            Array( T* ptr, S ...sizes ) : begin_(0) {
                 setSizes( sizes... );
                 calcStrides();
                 if( dataSize ) {
@@ -189,7 +170,7 @@ namespace redux {
             /*! @brief Copy constructor and sub-array constructor, depending on the number of indices passed.
              */
             template <typename ...S>
-            Array( Array<T>& rhs, S ...s ) {
+            Array( Array<T>& rhs, S ...s ) : dense_(true), begin_(0) {
 
                 nDims_ = rhs.dimSizes.size();
                 dataSize = rhs.dataSize;
@@ -207,18 +188,20 @@ namespace redux {
                         dimLast[i] = redux::util::bound_cast<size_t>( rhs.dimFirst[i] + tmp[2 * i + 1], 0, rhs.dimSizes[i] );
                         if( dimFirst[i] > dimLast[i] ) std::swap( dimFirst[i], dimLast[i] );
                         dimSizes[i] = ( dimLast[i] - dimFirst[i] + 1 );
-                        if( !dimSizes[i] ) {
-                            throw std::logic_error( "Attempting to create a sub-array with a dimension of 0 size. " + printArray( tmp, "dims" ) );
-                        }
+                        if( i > 0 && (dimStrides[i-1] > dimSizes[i]) ) dense_ = false;
                         nElements_ *= dimSizes[i];
                     }
-
+                    begin_ = getOffset(dimFirst);
+                    auto it = const_iterator(*this, getOffset(dimLast), begin_, getOffset(dimLast)+nElements_);
+                    end_ = (++it).pos();    // 1 step after last element;
                 }
                 else {  // ordinary copy constructor
                     dimSizes = rhs.dimSizes;
                     dimFirst = rhs.dimFirst;
                     dimLast = rhs.dimLast;
                     nElements_ = rhs.nElements_;
+                    begin_ = rhs.nElements_;
+                    end_ = rhs.end_;
                 }
             }
 
@@ -263,9 +246,7 @@ namespace redux {
                 calcStrides();
                 create();
             }
-
-            template <typename ...S>
-            void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
+            template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
 
             const std::vector<size_t>& dimensions( void ) const { return dimSizes; }
             size_t nDimensions( void ) const { return dimSizes.size(); }
@@ -296,17 +277,17 @@ namespace redux {
                 }
             }
 
-            template <typename U=T>
+            template <typename U = T>
             Array<U> copy( void ) const {
                 std::vector<size_t> newDimSizes;
-                for (auto& it: dimSizes) {
-                    if(it>1) {
-                        newDimSizes.push_back(it);
+                for( auto & it : dimSizes ) {
+                    if( it > 1 ) {
+                        newDimSizes.push_back( it );
                     }
                 }
                 Array<U> tmp( newDimSizes );
                 const_iterator cit = begin();
-                for( auto& it : tmp ) {
+                for( auto & it : tmp ) {
                     it = static_cast<U>( *cit );
                     ++cit;
                 }
@@ -316,14 +297,14 @@ namespace redux {
             template <typename U>
             void copy( Array<U> arr ) const {
                 std::vector<size_t> newDimSizes;
-                for (auto& it: dimSizes) {
-                    if(it>1) {
-                        newDimSizes.push_back(it);
+                for( auto & it : dimSizes ) {
+                    if( it > 1 ) {
+                        newDimSizes.push_back( it );
                     }
                 }
                 arr.resize( newDimSizes );
                 const_iterator cit = begin();
-                for( auto& it : arr ) {
+                for( auto & it : arr ) {
                     it = static_cast<U>( *cit );
                     ++cit;
                 }
@@ -332,33 +313,47 @@ namespace redux {
 
             template <typename ...S>
             T* ptr( S ...s ) {
-                return ( datablock.get() + getOffset( {static_cast<size_t>( s )...}, dimFirst ) );
+                int64_t offset = getOffset<int64_t>( {static_cast<int64_t>( s )...}, dimFirst );
+                if( offset < 0 || offset > dataSize ) {
+                    throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
+                }
+                return ( datablock.get() + offset );
             }
+            template <typename ...S> const T* ptr( S ...s ) const { return const_cast<Array<T>*>( this )->ptr( s... ); }
+
+            T* ptr( const std::vector<int64_t>& indices ) {
+                int64_t offset = getOffset( indices, dimFirst );
+                if( offset < 0 || offset > dataSize ) {
+                    throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
+                }
+                return ( datablock.get() + offset );
+            }
+            const T* ptr( const std::vector<int64_t>& indices ) const { return const_cast<Array<T>*>( this )->ptr( indices ); }
+
+            operator bool() const { return static_cast<bool>( datablock ); }
+
+            template <typename ...S> T& operator()( S ...indices ) { return *ptr( indices... ); }
+            template <typename ...S> const T& operator()( S ...indices ) const { return *ptr( indices... ); }
 
             template <typename ...S>
-            const T* ptr( S ...s ) const {
-                return ( datablock.get() + getOffset( {static_cast<size_t>( s )...}, dimFirst ) );
+            T& at( S ...indices ) {
+                std::vector<int64_t> tmp({indices...});
+                size_t sz = tmp.size();
+                if( sz > nDims_ ) {
+                    throw std::out_of_range( "Array::at() called with more indices than dimensions: " + std::to_string( sz ) );
+                }
+                else if( sz == 0 ) {
+                    return *datablock.get();
+                }
+                for( size_t i = 0; i < sz; ++i ) {
+                    if( tmp[i] >= dimSizes[nDims_ - i - 1] ) {
+                        throw std::out_of_range( "Index out of range. " + printArray(tmp,"indices") );
+                    }
+                }
+                int64_t offset = getOffset( tmp, dimFirst );
+                return *( datablock.get() + offset );
             }
-
-            T* ptr( const std::vector<size_t>& indices ) {
-                return ( datablock.get() + getOffset( indices, dimFirst) );
-            }
-
-            const T* ptr( const std::vector<size_t>& indices ) const {
-                return ( datablock.get() + getOffset( indices, dimFirst ) );
-            }
-
-            operator bool() const { return static_cast<bool>(datablock); }
-
-            template <typename ...S>
-            T& operator()( S ...s ) {
-                return *ptr( s... );
-            }
-
-            template <typename ...S>
-            const T& operator()( S ...s ) const {
-                return *ptr( s... );
-            }
+            template <typename ...S> const T& at( S ...indices ) const { return const_cast<Array<T>*>( this )->at( indices... ); }
 
             template <typename ...S>
             void setBlock( T* data, size_t count, S ...s ) const {
@@ -405,8 +400,7 @@ namespace redux {
                 return *this;
             }
 
-
-
+            
             bool operator==( const Array<T>& rhs ) const {
                 if( ! sameSizes( rhs ) ) {
                     return false;
@@ -417,37 +411,35 @@ namespace redux {
                     }
                 }
                 // compare data.
-                const_iterator it = begin();
-                const_iterator theend = end();
-                const_iterator it2 = rhs.begin();
-                while( it != theend ) {
-                    if( *it++ != *it2++ ) return false;
+                const_iterator rhsit = rhs.begin();
+                for( const auto & it : *this ) {
+                    if( it != *rhsit++ ) return false;
                 }
 
                 return true;
             }
             bool operator!=( const Array<T>& rhs ) const { return !( *this == rhs ); }
 
+            template <typename ...S>
+            iterator pos( S ...indices ) {
+                return iterator( *this, getOffset<int64_t>( {static_cast<int64_t>( indices )...}, dimFirst ), begin_, end_ );
+            }
+            template <typename ...S>
+            const_iterator pos( S ...indices ) const { return const_cast<Array<T>*>( this )->pos( indices... ); }
+
             iterator begin( void ) {
-                return iterator( *this, getOffset(dimFirst), getOffset( dimLast ) + 1 );
+                return iterator( *this, begin_, begin_, end_ );
             }
-            const_iterator begin( void ) const {
-                return const_iterator( *this, getOffset(dimFirst), getOffset( dimLast ) + 1 );
-            }
-            iterator end( void ) {
-                size_t lastp1 = getOffset( dimLast ) + 1;
-                return iterator( *this, lastp1, lastp1 );
-            }
-            const_iterator end( void ) const {
-                size_t lastp1 = getOffset( dimLast ) + 1;
-                return const_iterator( *this, lastp1, lastp1 );
-            }
+            const_iterator begin( void ) const { return const_iterator( *this, begin_, begin_, end_ ); }
+
+            iterator end( void ) { return iterator( *this, end_ , begin_, end_ ); }
+            const_iterator end( void ) const { return const_iterator( *this, end_ , begin_, end_ ); }
 
             T* get( void ) { return datablock.get(); };
             const T* get( void ) const { return datablock.get(); };
 
-            bool dense(void) const { return (nElements_ == dataSize); }
-            
+            bool dense( void ) const { return dense_; }
+
             template <typename U>
             bool sameSize( const Array<U>& rhs ) const {
                 return ( nElements_ == rhs.nElements_ );
@@ -465,18 +457,23 @@ namespace redux {
                 }
                 return true;
             }
-            
+
         private:
             void setSizes( const std::vector<size_t>& sizes ) {
                 dimSizes = sizes;
                 nDims_ = dimSizes.size();
                 dimFirst.resize( nDims_, 0 );
                 dimLast = dimSizes;
-                for( auto & it : dimLast ) it--;
+                dense_ = true;
+                dataSize = 1;
+                for( auto & it : dimLast ) {
+                    dataSize *= it;
+                    it--;
+                }
+                begin_ = 0;
+                end_ = dataSize;
             }
-
-            template <typename ...S>
-            void setSizes( S ...sizes ) { setSizes( {static_cast<size_t>( sizes )...} );  }
+            template <typename ...S> void setSizes( S ...sizes ) { setSizes( {static_cast<size_t>( sizes )...} );  }
 
             void create( void ) {
                 if( dataSize ) {
@@ -490,7 +487,6 @@ namespace redux {
             void calcStrides( void ) {
                 dimStrides.resize( dimSizes.size(), 1 );
                 nElements_ = 0;
-                dataSize = 0;
                 if( dimSizes.size() > 0 ) {
                     nElements_ = 1;
                     for( int i = dimSizes.size() - 1; i > 0; --i ) {
@@ -498,39 +494,37 @@ namespace redux {
                         nElements_ *= ( dimLast[i] - dimFirst[i] + 1 );
                     }
                     nElements_ *= ( dimLast[0] - dimFirst[0] + 1 );
-                    dataSize = dimSizes[0] * dimStrides[0];
                 }
             }
 
-            size_t getOffset( const std::vector<size_t>& indices, const std::vector<size_t>& offsets ) const {
-                size_t offset = 0;
-                if( indices.size() > dimSizes.size() ) {
-                    throw std::logic_error( "More indices than dimensions." );
+            template <typename U>
+            int64_t getOffset( const std::vector<U>& indices, const std::vector<size_t>& offsets ) const {
+                int64_t offset = 0;
+                if( indices.size() > offsets.size() ) {
+                    return getOffset( indices );
+                }
+                else if( indices.size() > dimSizes.size() ) {
+                    throw std::logic_error( "Array::getOffset() called with more indices than dimensions: " + printArray( indices, "indices" ) );
                 }
                 else {
                     size_t dimDiff = nDims_ - indices.size();
                     for( size_t i = 0; i < indices.size(); ++i ) {
-                        size_t tmp = indices[i] + offsets[i];
-                        if( tmp > dimLast[i] ) {
-                            throw std::out_of_range( "Index out of range: " + std::to_string(tmp)  );
-                        }
+                        int64_t tmp = indices[i] + offsets[i];
                         offset += tmp * dimStrides[dimDiff + i];
                     }
                 }
                 return offset;
             }
-            
-            size_t getOffset( const std::vector<size_t>& indices ) const {
-                size_t offset = 0;
+
+            template <typename U>
+            int64_t getOffset( const std::vector<U>& indices ) const {
+                int64_t offset = 0;
                 if( indices.size() > dimSizes.size() ) {
-                    throw std::logic_error( "More indices than dimensions." );
+                    throw std::logic_error( "Array::getOffset() called with more indices than dimensions: " + printArray( indices, "indices" ) );
                 }
                 else {
                     size_t dimDiff = nDims_ - indices.size();
                     for( size_t i = 0; i < indices.size(); ++i ) {
-                        if(  indices[i] > dimLast[i] ) {
-                            throw std::out_of_range( "Index out of range: " + std::to_string( indices[i])  );
-                        }
                         offset += indices[i] * dimStrides[dimDiff + i];
                     }
                 }
@@ -547,6 +541,8 @@ namespace redux {
             size_t nDims_;
             size_t nElements_;
             size_t dataSize;
+            bool dense_;
+            int64_t begin_, end_;
 
             template<typename U> friend class Array;
             friend class const_iterator;

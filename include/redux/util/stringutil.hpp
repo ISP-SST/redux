@@ -260,7 +260,7 @@ namespace redux {
 
         
         template <typename T>
-        inline std::string printArray( const T data, const char* s = "vector", int d = 3 ) {
+        inline std::string printArray( const T& data, const char* s = "vector", int d = 3 ) {
 
             std::ostringstream oss;
             oss << std::setprecision( d ) << s << "=[";

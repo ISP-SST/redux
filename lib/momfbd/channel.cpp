@@ -659,7 +659,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
     LOG_WARN << boost::format( "Dimensions of dark (%s)." ) % printArray( dark.dimensions(), "" );
     LOG_WARN << boost::format( "Dimensions of gain (%s)." ) % printArray( gain.dimensions(), "" );
 
-    if( dark /*&& gain*/ ) {
+    if( dark && gain ) {
         if( ! subimg.sameSize( dark ) ) {
             LOG_ERR << boost::format( "Dimensions of dark (%s) does not match this image (%s), skipping flatfielding !!" ) % printArray( dark.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
             return;
