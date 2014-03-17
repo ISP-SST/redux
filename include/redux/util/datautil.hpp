@@ -37,6 +37,13 @@ namespace redux {
         }
 
 
+        /*! @name pack
+         *  @brief Pack the data into a dense string of characters, suitable for sending across the network or write to file.
+         *  @param   ptr Where to store the data
+         *  @param   in  Data
+         *  @param   count Number of elements to pack
+         */
+        //@{
         template <typename T>
         inline char* pack(char* ptr, const std::vector<T>& in) {
             size_t sz = in.size()*sizeof(T);
@@ -64,7 +71,16 @@ namespace redux {
             strcpy(ptr,in.c_str());
             return ptr + in.length() + 1;
         }
+        //@}
         
+        /*! @name unpack
+         *  @brief Unpack the data stored in a dense string of characters.
+         *  @param   ptr Where to store the data
+         *  @param   in  Data
+         *  @param   count Number of elements to pack
+         *  @param   swap_endian Should the endianess be swapped ?
+         */
+        //@{
         template <typename T>
         inline const char* unpack(const char* ptr, std::vector<T>& out, bool swap_endian=false) {
             size_t sz = *reinterpret_cast<const size_t*>(ptr);
@@ -102,6 +118,7 @@ namespace redux {
             out = std::string(ptr);
             return ptr + out.length() + 1;
         }
+        //@}
         
         /*! @} */
 

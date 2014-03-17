@@ -18,20 +18,33 @@ namespace redux {
          *   @date      2013
          */
 
+        /*! @name delArray
+         *  @brief De-allocate pointers and data-block.
+         *  @details Will recursively call itself for lower pointer orders and delete the memory block.
+         *  @param p Pointer (of any order)
+         */
+        //@{
         template <class T>  void delArray( T*& p ) { delete[] p; }
         template <class T>
         void delArray( T**& p ) {
             delArray( *p );              // Call delArray() for the next pointer-level.
             delete[] p;                  // Delete current pointer-level.
         }
+        //@}
 
-
+        /*! @name delPointers
+         *  @brief De-allocate pointers (but @e NOT memory-block)
+         *  @details Will recursively call itself for lower pointer orders.
+         *  @param p Array of pointers (of any order)
+         */
+        //@{
         template <class T>  void delPointers( T* p ) { }
         template <class T>
         void delPointers( T**& p ) {
             delPointers( *p );           // Call delPointers() for the next pointer-level.
             delete[] p;                  // Delete current pointer-level.
         }
+        //@}
 
         namespace detail {
 
@@ -50,15 +63,19 @@ namespace redux {
         }
 
 
+        /*! @name newArray
+         *  @brief Allocate a multi-dimensional array.
+         *  @details Allocate memory-block and generate a pointer structure for it so it can be accessed as a multi-dimensional array.
+         *  @param n1 Size of dimension
+         *  @param n2 Size of dimension
+         *  @param rest Sizes of dimensions
+         */
+        //@{
         template <class T>
         T* newArray( size_t n1 ) {
             T* ret = new T[ n1 ];
             return ret;
         }
-
-        /*! @brief Create an array of arbitrary type and dimensionality
-         *  @details Recursively calls all lower D versions to allocate the memoryblock, then asigns pointers
-         */
         template <class T, typename... Rest>
         typename detail::Dummy<T, size_t, size_t, Rest...>::ptrType newArray( size_t n1, size_t n2, Rest ...rest ) {
             typedef typename detail::Dummy<T, size_t, Rest...>::ptrType ptrType;
@@ -69,13 +86,17 @@ namespace redux {
             }                                     // starting from p[1] with step length n2.
             return ret;
         }
+        //@}
 
         
-        template <class T>  T* makePointers( T* data, size_t n1 ) { return data; }
-
-        /*! @brief Create a new pointer-structure over a data-block
-         *  @details Recursively calls all lower D versions to allocate/set pointers
+        /*! @name makePointers
+         *  @brief Generate a pointer structure for an already allocated memory-block, so it can be accessed as a multi-dimensional array.
+         *  @param n1 Size of dimension
+         *  @param n2 Size of dimension
+         *  @param rest Sizes of dimensions
          */
+        //@{
+        template <class T>  T* makePointers( T* data, size_t n1 ) { return data; }
         template <class T, typename... Rest>
         typename detail::Dummy<T, size_t, size_t, Rest...>::ptrType makePointers( T* data, size_t n1, size_t n2, Rest ...rest ) {
             typedef typename detail::Dummy<T, size_t, Rest...>::ptrType ptrType;
@@ -86,6 +107,7 @@ namespace redux {
             }                                     // starting from p[1] with step length n2.
             return ret;
         }
+        //@}
 
 
         /*! @brief Create a new shared_ptr wrapped array of arbitrary dimensions/type
@@ -98,8 +120,10 @@ namespace redux {
         }
 
         
-        /*! @brief Create a new shared_ptr wrapped array of pointers over a data-block
+        /*! @brief Create a new shared_ptr wrapped array of pointers over a data-block. Pointers will be cleaned up on destruction.
          *  @details Recursively calls all lower D versions
+         *  @note This wrapper does not store a pointer to the underlying data block, hence it will become invalid if the
+         *  block is freed.
          */
         template <class T, typename ...S>
         std::shared_ptr<typename detail::Dummy<T,S...>::dataType> reshapeArray( T* array, S ...sizes ) {

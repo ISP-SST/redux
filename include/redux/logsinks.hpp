@@ -31,7 +31,7 @@ namespace redux {
         severity_level minSeverity;
         bool truncate;
         LogSink( const severity_level& sev = sev_normal );
-        virtual ~LogSink( void ) {};
+        virtual ~LogSink( void ) = default;
         void parseFilter( std::string );
     };
 

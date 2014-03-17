@@ -66,21 +66,29 @@ namespace redux {
             static void readUncompressed( std::ifstream& file, char* data, size_t nElements, const Ana* hdr );
             static int compressData( std::shared_ptr<uint8_t>& out, const char* data, int nElements, const std::shared_ptr<Ana>& hdr, int slice );
 
+
+
+            /*! @name Read
+             *  @brief Load an ANA file into a data block
+             */
+            //@{
             static void read( const std::string& filename, char* data, std::shared_ptr<redux::file::Ana> hdr=0 );
-            static void write( const std::string& filename, const char* data, std::shared_ptr<redux::file::Ana> hdr, bool compress = false, int slice=5 );
-
-
             template <typename T>
             static void read( const std::string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana>& hdr=0 );
-            
             template <typename T>
             static void read( const std::string& filename, redux::image::Image<T>& data );
+            //@}
             
+            /*! @name Write
+             *  @brief Write data block into an ANA file.
+             */
+            //@{
+            static void write( const std::string& filename, const char* data, std::shared_ptr<redux::file::Ana> hdr, bool compress = false, int slice=5 );
             template <typename T>
             static void write( const std::string& filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana> hdr=0, int sliceSize=0 );
-            
             template <typename T>
             static void write( const std::string& filename, const redux::image::Image<T>& image, int sliceSize=0 );
+           //@}
             
 
         };

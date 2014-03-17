@@ -74,17 +74,17 @@ namespace redux {
             return detail::deBruijnSequence32[( ( uint32_t )( v * detail::deBruijnMagic32 ) ) >> 27];
         }
 
-        //@{
-        /*!
+        /*! @name findLSB  
          *  @brief      Fast, LUT based, calculation of the lowest non-zero bit in an integer
-         *  @details    findLSB1 & findLSB64 returns a 1-based index, and findLSB returns 0-based index.
+         *  @details    findLSB1 & findLSB64 returns a 1-based bit-index, and findLSB returns 0-based bit-index.
          *  @param      v value
-         *  @returns    position of LSB (0 = first position)
+         *  @returns    position of LSB
          *  @code
-         *  int a = 17383;
-         *  int b = findLSB(a);
+         *  int a = 17376;      // = 100001111100000
+         *  int b = findLSB(a); // = 5
          *  @endcode
          */
+        //@{
         inline int findLSB( uint32_t v ) { // returns 0-based index of first non-zero bit.
             return detail::deBruijnSequence32[( ( uint32_t )( ( v & -v ) * detail::deBruijnMagic32 ) ) >> 27];
         }
@@ -126,7 +126,7 @@ namespace redux {
          *  @returns    next power of two larger than (or equal to) v
          *  @code
          *  int a = 17383;
-         *  int b = nextPowerOfTwo(a);
+         *  int b = nextPowerOfTwo(a); // = 32768
          *  @endcode
          */
         inline int nextPowerOfTwo( uint32_t v ) {
@@ -145,10 +145,14 @@ namespace redux {
             return ( v + tmp ) & ~tmp;
         }
 
-        /*! @fn         template <typename T> void swapBits( T& a, T& b, const T mask)
-         *  @brief      swap the bits set in "mask" between a & b
-         *  @param      mask a bitmask specifying which bits to swap between a/b
+        /*! @name swapBits
+         *  @brief      swap the bits set in "mask" between a and b
+         *  @param      a Input
+         *  @param      b Input
+         *  @param      mask a bitmask specifying which bits to swap between a and b
+         *  @param      n number of elements in input arrays
          */
+        //@{
         template <typename T>
         inline void swapBits( T& a, T& b, const T mask = 0xFFFFFFFFFFFFFFFF ) {
             T masked = ( a ^ b ) & mask;
@@ -156,22 +160,18 @@ namespace redux {
             b ^= masked;
         }
 
-        /*! @fn         void swapBits(T* a, T* b, const T mask, size_t n=1)
-         *  @brief      wrapper to call the above swapBits for an array
-         *  @param      mask a bitmask specifying which bits to swap between a/b
-         *  @param      n number of elements in arrays
-         */
         template <typename T>
         void swapBits( T* a, T* b, const T mask, size_t n = 1 ) {
             for( size_t i = 0; i < n; ++i ) {
                 swapBits( *a++, *b++, mask );
             }
         }
-
+        //@}
         /*! @fn         template <typename T> void flipBits(T* a, const T mask, size_t n = 1)
          *  @brief      flip the bits in a which are set in "mask"
+         *  @param      a pointer to the data to be "flipped"
          *  @param      mask a bitmask specifying which bits to flip
-         *  @param      n number of elements in array a
+         *  @param      n number of elements to flip
          */
         template <typename T>
         void flipBits( T* a, const T mask, size_t n = 1 ) {

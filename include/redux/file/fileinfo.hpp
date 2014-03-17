@@ -12,7 +12,7 @@ namespace redux {
         struct FileInfo {
             
             FileInfo(void){}
-            virtual ~FileInfo(void){}
+            virtual ~FileInfo(void) = default;
 
         };
         

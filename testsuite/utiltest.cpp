@@ -217,49 +217,25 @@ void arrayTest( void ) {
         }
         BOOST_CHECK_EQUAL( cnt, 8 );
 
-        
-        
-//         Array<int>::const_iterator cit = subarray.end();
-//         cout << "blaha = " << *cit << endl;
-//         cout << "blaha = " << *--cit << endl;
-//         cout << "blaha = " << *--cit << endl;
-//         cout << "blaha = " << *--cit << endl;
-//         cout << "blaha = " << *--cit << endl;
-        
-//         cout << printArray(array4x5x6,"array4x5x6") << endl;
-//         cout << printArray(subarray,"subarray") << endl;
-//
-//         Array<int> subarray2(array4x5x6,0,3,0,0,0,5);
-//         array4x5x6 = 0;
-//         subarray2 = 2;
-//         cout << " subarray2.nElements=" << subarray2.nElements() << endl;
-//         cout << printArray(array4x5x6,"array4x5x6") << endl;
-//         cout << printArray(subarray2,"subarray2") << endl;
-//         cnt = 0;
-//         for( auto& it: subarray2) {
-//             it = 22;
-//             cnt++;
-//         }
-//         cout << " subarray2.cnt=" << cnt << endl;
-//         cout << printArray(array4x5x6,"array4x5x6") << endl;
-//
-//         Array<int> subarray3(array4x5x6,0,3,0,4,0,0);
-//         array4x5x6 = 0;
-//         subarray3 = 3;
-//         cout << " subarray3.nElements=" << subarray3.nElements() << endl;
-//         cout << printArray(array4x5x6,"array4x5x6") << endl;
-//         cout << printArray(subarray2,"subarray3") << endl;
-//         cnt = 0;
-//         for( auto& it: subarray3) {
-//             it = 33;
-//             cnt++;
-//         }
-//         cout << " subarray3.cnt=" << cnt << endl;
-//         cout << printArray(array4x5x6,"array4x5x6") << endl;
-        //BOOST_CHECK( subarray == array4x5x6 );
     }
-
-
+    
+    {
+        // test access as raw multidimensional array
+        cnt=0;
+        for( auto & it : array4x5x6 ) {
+            it = ++cnt;
+        }
+        shared_ptr<int**> raiiArray = array4x5x6.get(4,5,6);
+        int*** rawArray = raiiArray.get();
+        cnt = 0;
+        for( size_t i=0; i<4; ++i) {
+            for( size_t j=0; j<5; ++j) {
+                for( size_t k=0; k<6; ++k) {
+                    BOOST_CHECK_EQUAL( rawArray[i][j][k], ++cnt );
+                }
+            }
+        }
+    }
 }
 
 
@@ -293,7 +269,6 @@ void bitTest( void ) {
     }
 
     uint32_t mask( ( 1 << 16 ) - 1 );
-
     // swap first 2 bytes of a.i[0] with the first 2 bytes of a.i[1]
     union {
         uint64_t l;

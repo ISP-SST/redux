@@ -1,6 +1,7 @@
 #ifndef REDUX_UTIL_ARRAY_HPP
 #define REDUX_UTIL_ARRAY_HPP
 
+#include "redux/util/arrayutil.hpp"
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
@@ -20,18 +21,9 @@ namespace redux {
          */
 
 
-        class IterationOutOfBounds : public std::out_of_range {
-        public:
-            IterationOutOfBounds( void ) : out_of_range( "Array::BadIteration" ) {}
-            IterationOutOfBounds( const std::string &message ) : out_of_range( message ) {}
-
-            virtual ~IterationOutOfBounds( void ) throw() {}
-        };
-
-
         /*! @brief A wrapper class for a data-block of arbitrary dimensions/type
          *  @details The data is stored in a shared_ptr and accessed via iterators or some (variadic template) methods
-         *  @todo Implement iterators for sparse data (i.e. when it's a sub-array accessing a subset of the datablock.
+         *  @note This class is intended for convenient access to sub-arrays, it is not optimized for speed.
          */
         template <class T = double>
         class Array {
@@ -66,16 +58,27 @@ namespace redux {
                 }
 
                 // prefix
-                const_iterator operator++() { ( this->*incrementor )(); return *this; }
-                const_iterator operator--() { ( this->*decrementor )(); return *this; }
+                const_iterator& operator++() { ( this->*incrementor )(); return *this; }
+                const_iterator& operator--() { ( this->*decrementor )(); return *this; }
                 // postfix
                 const_iterator operator++( int ) { const_iterator i = *this; ( this->*incrementor )(); return i; }
                 const_iterator operator--( int ) { const_iterator i = *this; ( this->*decrementor )(); return i; }
 
                 const_reference operator*() { return *( cdata + pos_ ); }
                 const_pointer operator->()  { return cdata + pos_; }
+                operator const_pointer() const { return ( cdata + pos_ ); }
 
-                int64_t pos( void ) { return pos_; };
+                const_iterator& operator+=( const const_iterator& rhs ) { pos_ += rhs.pos_; trimUp(); return *this; }
+                const_iterator& operator-=( const const_iterator& rhs ) { pos_ -= rhs.pos_; trimUp(); return *this; }
+                
+                const_iterator operator+( difference_type step ) const { const_iterator i = *this; i.pos_ += step; i.trimUp(); return i; }
+                const_iterator operator-( difference_type step ) const { const_iterator i = *this; i.pos_ -= step; i.trimUp(); return i; }
+                
+                difference_type operator+( const const_iterator& rhs ) const { return (this->pos_ + rhs.pos()); }
+                difference_type operator-( const const_iterator& rhs ) const { return (this->pos_ - rhs.pos()); }
+                
+                
+                int64_t pos( void ) const { return pos_; };
 
                 const_iterator& step( const std::vector<int64_t>& ind ) {
                     size_t nIndices = ind.size();
@@ -109,6 +112,26 @@ namespace redux {
 
                 void sparseDecrement( void ) {
                     --pos_;
+                    trimDown();
+                }
+
+                void sparseIncrement( void ) {
+                    ++pos_;
+                    trimUp();
+                }
+
+                void trimUp(void) {
+                    for( int d = m_ConstArrayPtr->nDims_ - 1; d > 0; --d ) {
+                        int64_t remainder = (pos_ % m_ConstArrayPtr->dimStrides[d-1])/m_ConstArrayPtr->dimStrides[d];
+                        // if we went out-of-bounds for dimension d, add "padding"
+                        if( remainder > m_ConstArrayPtr->dimLast[d] ||
+                            remainder < m_ConstArrayPtr->dimFirst[d] ) {
+                            pos_ += padding[d];
+                        }
+                    }
+
+                }
+                void trimDown(void) {
                     for( int d = m_ConstArrayPtr->nDims_ - 1; d > 0; --d ) {
                         int64_t remainder = (pos_ % m_ConstArrayPtr->dimStrides[d-1])/m_ConstArrayPtr->dimStrides[d];
                         // if we went out-of-bounds for dimension d, subtract "padding"
@@ -118,19 +141,7 @@ namespace redux {
                         }
                     }
                 }
-
-                void sparseIncrement( void ) {
-                    ++pos_;
-                    for( int d = m_ConstArrayPtr->nDims_ - 1; d > 0; --d ) {
-                        int64_t remainder = (pos_ % m_ConstArrayPtr->dimStrides[d-1])/m_ConstArrayPtr->dimStrides[d];
-                        // if we went out-of-bounds for dimension d, add "padding"
-                        if( remainder > m_ConstArrayPtr->dimLast[d] ||
-                            remainder < m_ConstArrayPtr->dimFirst[d] ) {
-                            pos_ += padding[d];
-                        }
-                    }
-                }
-
+                
                 int64_t pos_, begin_, end_;
                 const Array<T>* m_ConstArrayPtr;
                 const T* cdata;
@@ -143,15 +154,26 @@ namespace redux {
                 iterator( Array<T>& a, int64_t pos, int64_t begin, int64_t end ) : const_iterator( a, pos, begin, end ), data( a.datablock.get() ) { }
 
                 // prefix
-                iterator operator++() { const_iterator::operator++(); return *this; }
-                iterator operator--() { const_iterator::operator--(); return *this; }
+                iterator& operator++() { const_iterator::operator++(); return *this; }
+                iterator& operator--() { const_iterator::operator--(); return *this; }
                 // postfix
                 iterator operator++( int ) { iterator i = *this; const_iterator::operator++(); return i; }
                 iterator operator--( int ) { iterator i = *this; const_iterator::operator--(); return i; }
 
                 reference operator*() { return *( data + this->pos_ ); }
                 pointer operator->() { return ( data + this->pos_ ); }
+                operator const_pointer() { return ( data + this->pos_ ); }
 
+                iterator& operator+=( const const_iterator& rhs ) { this->pos_ += rhs.pos(); this->trimUp(); return *this; }
+                iterator& operator-=( const const_iterator& rhs ) { this->pos_ -= rhs.pos(); this->trimUp(); return *this; }
+                
+                iterator& operator+=( difference_type step ) { this->pos_ += step; this->trimUp(); return *this; }
+                iterator& operator-=( difference_type step ) { this->pos_ -= step; this->trimUp(); return *this; }
+                
+                iterator operator+( difference_type step ) const { iterator i = *this; i += step; return i; }
+                iterator operator-( difference_type step ) const { iterator i = *this; i -= step; return i; }
+
+                
             private:
                 T* data;
             };
@@ -167,44 +189,46 @@ namespace redux {
                 }
             }
 
-            /*! @brief Copy constructor and sub-array constructor, depending on the number of indices passed.
-             */
-            template <typename ...S>
-            Array( Array<T>& rhs, S ...s ) : dense_(true), begin_(0) {
 
-                nDims_ = rhs.dimSizes.size();
+            template <typename U>
+            Array( Array<T>& rhs, const std::vector<U>& indices ) {
+
+                size_t nIndices = indices.size();
+                nDims_ = rhs.nDims_;
+                
+                if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
+                    throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices: " + printArray(indices,"indices"));
+                }
+
+                dimFirst = rhs.dimFirst;
+                dimLast = rhs.dimLast;
+                dimSizes = rhs.dimSizes;;
                 dataSize = rhs.dataSize;
                 datablock = rhs.datablock;
                 dimStrides = rhs.dimStrides;
-                nElements_ = 0;
-                if( ( sizeof...( s ) ) > 0 ) {
-                    std::vector<int64_t> tmp = {static_cast<int64_t>( s )...};
-                    dimFirst.resize( nDims_ );
-                    dimLast.resize( nDims_ );
-                    dimSizes.resize( nDims_ );
-                    nElements_ = 1;
-                    for( size_t i = 0; i < nDims_; ++i ) {
-                        dimFirst[i] = redux::util::bound_cast<size_t>( rhs.dimFirst[i] + tmp[2 * i], 0, rhs.dimSizes[i] );
-                        dimLast[i] = redux::util::bound_cast<size_t>( rhs.dimFirst[i] + tmp[2 * i + 1], 0, rhs.dimSizes[i] );
-                        if( dimFirst[i] > dimLast[i] ) std::swap( dimFirst[i], dimLast[i] );
-                        dimSizes[i] = ( dimLast[i] - dimFirst[i] + 1 );
-                        if( i > 0 && (dimStrides[i-1] > dimSizes[i]) ) dense_ = false;
-                        nElements_ *= dimSizes[i];
-                    }
-                    begin_ = getOffset(dimFirst);
-                    auto it = const_iterator(*this, getOffset(dimLast), begin_, getOffset(dimLast)+nElements_);
-                    end_ = (++it).pos();    // 1 step after last element;
-                }
-                else {  // ordinary copy constructor
-                    dimSizes = rhs.dimSizes;
-                    dimFirst = rhs.dimFirst;
-                    dimLast = rhs.dimLast;
-                    nElements_ = rhs.nElements_;
-                    begin_ = rhs.nElements_;
-                    end_ = rhs.end_;
+                dense_ = rhs.dense_;
+                if ( nIndices ) {
+                    setLimits(indices);
+                } else {
+                    begin_ = getOffset( dimFirst );
+                    auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
+                    end_ = ( ++it ).pos();  // 1 step after last element;
                 }
             }
-
+            template <typename ...S>
+            Array( Array<T>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            
+            template <typename U, typename V>
+            Array( Array<U>& rhs, const std::vector<V>& indices ) : dense_(true) {
+                rhs.copy(this);
+                rhs.setLimits(indices);
+            }
+            template <typename U, typename ...S>
+            Array( Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            
+            /*! @brief Get the @e packed size of this array
+             *  @details This is only for getting the size needed to store the packed array.
+             */
             size_t size( void ) const {
                 size_t sz = sizeof( size_t );                                                          // blockSize
                 if( dimSizes.size() ) {
@@ -213,6 +237,10 @@ namespace redux {
                 return sz;
             }
 
+            /*! @brief Pack the array into a dense string of characters, suitable for sending across the network or write to file.
+             *  @details For sub-arrays, only the accessed region is packed, so the receiving end will unpack it into a dense array
+             *  of the same dimensions as the sub-array.
+             */
             char* pack( char* ptr ) const {
                 using redux::util::pack;
                 ptr = pack( ptr, size() );
@@ -225,6 +253,9 @@ namespace redux {
 
             }
 
+            /*! @brief Unpack an array from a string of characters, swapping endianess if necessary.
+             *  @details It is always the receiving/unpacking side which checks/fixes the endianess.
+             */
             const char* unpack( const char* ptr, bool swap_endian ) {
                 using redux::util::unpack;
                 size_t sz;
@@ -241,13 +272,19 @@ namespace redux {
             }
 
 
+            /*! @name resize
+             *  @brief Resize the array.
+             *  @warning This will de-allocate the memory-block and allocate a new one, data is not kept/copied !!
+             */
+            //@{
             void resize( const std::vector<size_t>& sizes ) {
                 setSizes( sizes );
                 calcStrides();
                 create();
             }
             template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
-
+            //@}
+            
             const std::vector<size_t>& dimensions( void ) const { return dimSizes; }
             size_t nDimensions( void ) const { return dimSizes.size(); }
             size_t nElements( void ) const { return nElements_; }
@@ -432,12 +469,29 @@ namespace redux {
             }
             const_iterator begin( void ) const { return const_iterator( *this, begin_, begin_, end_ ); }
 
+            iterator mid( void ) {
+                return iterator( *this, (end_-begin_)/2, begin_, end_ );
+            }
+            const_iterator mid( void ) const { return const_iterator( *this, (end_-begin_)/2, begin_, end_ ); }
+
             iterator end( void ) { return iterator( *this, end_ , begin_, end_ ); }
             const_iterator end( void ) const { return const_iterator( *this, end_ , begin_, end_ ); }
 
+
+            /*!
+             * @name Get a raw pointer to the datablock
+             * @note Raw access only works for dense memory-blocks, so don't use it for sub-arrays !!
+             * @todo Throw if non-dense
+             *
+             */
+            //@{
             T* get( void ) { return datablock.get(); };
             const T* get( void ) const { return datablock.get(); };
-
+            template <typename ...S>
+            auto get(S ...s) -> std::shared_ptr<typename redux::util::detail::Dummy<T,S...>::dataType> {
+                return redux::util::reshapeArray(datablock.get(),s...);
+            }
+            //@}
             bool dense( void ) const { return dense_; }
 
             template <typename U>
@@ -457,7 +511,47 @@ namespace redux {
                 }
                 return true;
             }
-
+            
+            template <typename U>
+            void setLimits( const std::vector<U>& limits ) {
+                size_t nArgs = limits.size();
+                if( nArgs&1 || (nArgs > 2*nDims_) )  {  // odd number of indices, or too many indices
+                    throw std::logic_error("Array::setLimits: Too many indices or odd number of indices: " + printArray(limits,"limits"));
+                }
+                nElements_ = 1;
+                for( size_t i = 0; i < nDims_; ++i ) {
+                    dimLast[i] = redux::util::bound_cast<size_t>( dimFirst[i] + limits[2 * i + 1], 0, dimSizes[i] );
+                    dimFirst[i] = redux::util::bound_cast<size_t>( dimFirst[i] + limits[2 * i], 0, dimSizes[i] );
+                    if( dimFirst[i] > dimLast[i] ) std::swap( dimFirst[i], dimLast[i] );
+                    dimSizes[i] = ( dimLast[i] - dimFirst[i] + 1 );
+                    if( i > 0 && ( dimStrides[i - 1] > dimSizes[i] ) ) dense_ = false;
+                    nElements_ *= dimSizes[i];
+                }
+                begin_ = getOffset( dimFirst );
+                auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
+                end_ = ( ++it ).pos();  // 1 step after last element;
+            }
+            template <typename ...S> void setLimits( S ...s ) { setLimits<int64_t>({static_cast<int64_t>(s)...}); }
+            
+            void resetLimits( void ) {
+                nElements_ = 1;
+                dense_ = true;
+                for( size_t i = 1; i < nDims_; ++i ) {
+                    dimSizes[i] = dimStrides[i-1];
+                    dimFirst[i] = 0;
+                    dimLast[i] = dimSizes[i]-1;
+                    if( ( dimStrides[i - 1] > dimSizes[i] ) ) dense_ = false;
+                    nElements_ *= dimSizes[i];
+                }
+                dimSizes[0] = dataSize/nElements_;
+                dimFirst[0] = 0;
+                dimLast[0] = dimSizes[0]-1;
+                nElements_ *= dimSizes[0];
+                begin_ = getOffset( dimFirst );
+                auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
+                end_ = ( ++it ).pos();  // 1 step after last element;
+            }
+            
         private:
             void setSizes( const std::vector<size_t>& sizes ) {
                 dimSizes = sizes;
