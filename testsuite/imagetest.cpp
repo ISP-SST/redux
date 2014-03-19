@@ -2,6 +2,7 @@
 
 
 #include "redux/image/image.hpp"
+#include "redux/image/utils.hpp"
 #include "redux/util/stringutil.hpp"
 
 
@@ -12,6 +13,7 @@ using namespace std;
 using namespace boost::unit_test_framework;
 
 namespace {
+    
 }
 
 void imageTests( void ) {
@@ -199,6 +201,65 @@ void imageTests( void ) {
 
 }
 
+void transformTest( void ) {
+    
+    size_t sizeX = 50;
+    size_t sizeY = 14;
+    size_t sizeZ = 5;
+    Array<int> array( sizeZ, sizeY, sizeX );
+    
+    int cnt = 0;
+    for(auto& it: array) it = ++cnt;
+  
+    // check values
+    for( size_t i = 0; i < sizeZ; ++i ) {
+        for( size_t j = 0; j < sizeY; ++j ) {
+            for( size_t k = 0; k < sizeX; ++k ) {
+                BOOST_CHECK_EQUAL( array( i, j, k ), sizeX*sizeY*i + j*sizeX + k + 1 );
+            }
+        }
+    }
+    
+    shared_ptr<int**> sharedPtr = array.get(sizeZ,sizeY,sizeX);
+    int*** rawPtr = sharedPtr.get();
+    // check reverseX
+    for( size_t i = 0; i < sizeZ; ++i ) reverseX(rawPtr[i],sizeY,sizeX);
+    for( size_t i = 0; i < sizeZ; ++i ) {
+        for( size_t j = 0; j < sizeY; ++j ) {
+            for( size_t k = 0; k < sizeX; ++k ) {
+                BOOST_CHECK_EQUAL( array( i, j, k ), sizeX*sizeY*i + j*sizeX + (sizeX-k-1) + 1 );
+            }
+        }
+    }
+    for( size_t i = 0; i < sizeZ; ++i ) reverseX(rawPtr[i],sizeY,sizeX);        // flip back
+    
+    // check reverseY
+    for( size_t i = 0; i < sizeZ; ++i ) reverseY(rawPtr[i],sizeY,sizeX);
+    for( size_t i = 0; i < sizeZ; ++i ) {
+        for( size_t j = 0; j < sizeY; ++j ) {
+            for( size_t k = 0; k < sizeX; ++k ) {
+                BOOST_CHECK_EQUAL( array( i, j, k ), sizeX*sizeY*i + (sizeY-j-1)*sizeX + k + 1 );
+            }
+        }
+    }
+    for( size_t i = 0; i < sizeZ; ++i ) reverseY(rawPtr[i],sizeY,sizeX);        // flip back
+    
+    Array<int> array2 = array.copy();           // make a copy for comparison
+
+    // check transpose
+    for( size_t i = 0; i < sizeZ; ++i ) transpose(*rawPtr[i],sizeY,sizeX);
+    array.permuteDimensions(1,2);
+    for( size_t i = 0; i < sizeZ; ++i ) {
+        for( size_t j = 0; j < sizeY; ++j ) {
+            for( size_t k = 0; k < sizeX; ++k ) {
+                BOOST_CHECK_EQUAL( array(i,k,j), array2(i,j,k) );
+            }
+        }
+    }
+    
+}
+
+
 
 namespace testsuite {
 
@@ -209,6 +270,7 @@ namespace testsuite {
             test_suite* ts = BOOST_TEST_SUITE( "IMAGE" );
 
             ts->add( BOOST_TEST_CASE( &imageTests ) );
+            ts->add( BOOST_TEST_CASE( &transformTest ) );
 
             framework::master_test_suite().add( ts );
 
