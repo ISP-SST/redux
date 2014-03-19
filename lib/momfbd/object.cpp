@@ -78,7 +78,7 @@ void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
     if( fillpix_method == 0 ) {
         if( tmpString.length() > 0 ) {
             LOG_ERR << "unknown fillpix method \"" << tmpString << "\"\n  Valid entries currently are: "
-                    "\"median\", \"invdistweight\" or \"horizontal interpolation\"";
+                    "\"median\", \"invdistweight\" or \"horint\"";
         }
         fillpix_method = myJob.fillpix_method;
     }
@@ -331,7 +331,6 @@ const char* Object::unpack(const char* ptr, bool swap_endian) {
 
 
 void Object::loadData(boost::asio::io_service& service, boost::thread_group& pool) {
-    cout << "Object::loadData() " << endl;
     for(auto& it: channels) {
         it->loadData(service, pool);
     }
@@ -340,11 +339,9 @@ void Object::loadData(boost::asio::io_service& service, boost::thread_group& poo
 
 
 void Object::preprocessData(boost::asio::io_service& service, boost::thread_group& pool) {
-    cout << "Object::preprocessData() " << endl;
     for(auto& it: channels) {
         it->preprocessData(service, pool);
     }
-    
 }
 
 
@@ -354,5 +351,19 @@ bool Object::isValid(void) {
         allOk &= it->isValid();
     }
     return allOk;
+}
+
+
+Point Object::clipImages(void) {
+    Point sizes;
+    for(auto& it: channels) {
+        Point tmp = it->clipImages();
+        if(sizes.x == 0) {
+            sizes = tmp;
+        } else if( tmp != sizes ) {
+            throw std::logic_error("The clipped images have different sizes for the different channels, please verify the ALIGN_CLIP values.");
+        }
+    }
+    return sizes;
 }
 

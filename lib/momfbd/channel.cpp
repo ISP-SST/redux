@@ -7,6 +7,7 @@
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/file/fileio.hpp"
+#include "redux/image/utils.hpp"
 #include "redux/logger.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
@@ -88,11 +89,11 @@ void Channel::parseProperties( bpt::ptree& tree ) {
     sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", myObject.sequenceNumber );
     darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", myObject.darkNumbers );
 
-    if( tree.get<bool>( "ALIGN_CLIP", false ) ) {
-        alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", vector<int16_t>() );
-        if( alignClip.size() != 4 ) LOG_ERR << "argument to ALIGN_CLIP could not be translated to 4 numbers.";
+    alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", vector<int16_t>() );
+    if( !alignClip.empty() && alignClip.size() != 4 ) {
+        LOG_ERR << "argument to ALIGN_CLIP could not be translated to 4 integers. Whole image area will be used !!";
+        alignClip.clear();
     }
-
     wf_num = tree.get<vector<uint32_t>>( "WFINDEX", myObject.wf_num );
 
     imageDataDir = cleanPath( tree.get<string>( "IMAGE_DATA_DIR", myJob.imageDataDir ) );
@@ -207,7 +208,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
     if( fillpix_method == 0 ) {
         if( tmpString.length() > 0 ) {
             LOG_ERR << "unknown fillpix method \"" << tmpString << "\"\n  Valid entries currently are: "
-                    "\"median\", \"invdistweight\" or \"horizontal interpolation\"";
+                    "\"median\", \"invdistweight\" or \"horint\"";
         }
         fillpix_method = myObject.fillpix_method;
     }
@@ -637,6 +638,8 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
     double& mean = imageMeans[index];
     bool modified = false;
 
+    LOG_WARN << printArray( images.dimensions(),"imagesDims");
+    LOG_DETAIL << boost::format( "Preprocessing image %d" ) % index;
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
     bfs::path fn = bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
     LOG_DETAIL << boost::format( "Preprocessing image %d" ) % index;
@@ -692,9 +695,35 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
         }
 
         subimg *= gain;
-        // TODO: fillpix(data,1,nx,1,ny,method,io)
+        namespace sp = std::placeholders;
+        size_t ni = images.dimSize(0);
+        size_t sy = images.dimSize(1);
+        size_t sx = images.dimSize(2);
+        shared_ptr<float**> array = images.get(ni,sy,sx);
+        float*** arrayPtr = array.get();
+        float badPixelThreshold = 1E-5;     // TODO: configurable threshold.
+        switch(fillpix_method) {
+            case CFG_FPM_HORINT: {
+                function<float(size_t,size_t)> func = bind(horizontalInterpolation<float>, arrayPtr[index], sy, sx, sp::_1, sp::_2);
+                fillPixels(arrayPtr[index], sy, sx, func, std::bind2nd(std::less_equal<float>(),badPixelThreshold) );
+                break;
+            }
+            case CFG_FPM_MEDIAN: {
+                // TODO: median method
+                break;
+            }
+            case CFG_FPM_INVDISTWEIGHT:       // inverse distance weighting is the default method, so fall through
+            default: {
+                function<double(size_t,size_t)> func = bind(inverseDistanceWeight<float>, arrayPtr[index], sy, sx, sp::_1, sp::_2);
+                //function<double(size_t,size_t)> func = bind(inv_dist_wght, arrayPtr[index], sy, sx, sp::_1, sp::_2);
+                fillPixels(arrayPtr[index], sy, sx, func, std::bind2nd(std::less_equal<float>(),badPixelThreshold) );
+            }
+        }
 
     }
+
+
+    // TODO get observation-time and image statistics
 
     if( modified && flags & MFBD_SAVE_FFDATA ) {
         fn = bfs::path( fn.leaf().string() + ".cor" );
@@ -705,4 +734,117 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 
 
 }
+
+
+Point Channel::clipImages(void) {
+
+    if( alignClip.size() != 4 ) {
+        LOG_WARN << "No (or faulty) align-clip supplied, using full images: " << printArray(alignClip,"clip"); 
+        return Point(images.dimSize(1),images.dimSize(2));
+    }
+
+    bool flipX=false,flipY=false;
+    if( alignClip[0] > alignClip[1]) {     // we have the y (row) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
+        std::swap(alignClip[0], alignClip[1]);
+        flipX = true;
+    }
+    if( alignClip[2] > alignClip[3]) {
+        std::swap(alignClip[2], alignClip[3]);
+        flipY = true;
+    }
+    for( auto& it: alignClip ) --it;        // NOTE: momfbd uses 1-based indexes, we start with 0...
+    LOG_DETAIL << "Clipping: " << printArray(alignClip,"alignClip");
+    LOG_DETAIL << "Clipping image stack: " << printArray(images.dimensions(),"original size");
+    images.setLimits( 0, imageNumbers.size()-1, alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
+    images.trim(false);
+    
+    if( dark ) {
+        LOG_DETAIL << "Clipping dark: " << printArray(dark.dimensions(),"original size");
+        dark.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
+        dark.trim();
+    }
+
+    if( gain ) {
+        LOG_DETAIL << "Clipping gain: " << printArray(gain.dimensions(),"original size");
+        gain.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
+        gain.trim();
+    }
+
+    if( ccdResponse ) {
+        LOG_DETAIL << "Clipping ccdResponse: " << printArray(ccdResponse.dimensions(),"original size");
+        ccdResponse.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
+        dark.trim();
+    }
+
+    if( ccdScattering ) {
+        LOG_DETAIL << "Clipping ccdScattering: " << printArray(ccdScattering.dimensions(),"original size");
+        ccdScattering.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
+        ccdScattering.trim();
+    }
+
+    if( psf ) {     // The PSF has to be symmetrically clipped, otherwise the convolution will be skewed.
+        const std::vector<size_t>& dims = psf.dimensions();
+        auto tmp = alignClip;
+        size_t sy = alignClip[3] - alignClip[2] + 1;
+        size_t sx = alignClip[1] - alignClip[0] + 1;
+        if (dims.size() != 2 || dims[0] < sy || dims[1] < sx) throw std::logic_error("PSF has wrong dimensions: " + printArray(dims,"dims"));
+        LOG_DETAIL << "Clipping psf: " << printArray(dims,"original size");
+        int skewY = (dims[0] - sy)/2  - alignClip[2];
+        int skewX = (dims[1] - sx)/2  - alignClip[0];
+        tmp[0] += skewX;
+        tmp[1] += skewX;
+        tmp[2] += skewY;
+        tmp[3] += skewY;
+        LOG_DETAIL << "Clipping psf: " << printArray(tmp,"clip");
+        psf.setLimits( tmp[2], tmp[3], tmp[0], tmp[1] );
+        psf.trim();
+    }
+
+    if( flipX || flipY ) {
+        LOG_DETAIL << "Flipping data.";
+        size_t sy = alignClip[3] - alignClip[2] + 1;
+        size_t sx = alignClip[1] - alignClip[0] + 1;
+        size_t ni = imageNumbers.size();
+        shared_ptr<float**> imgShared = images.get(ni,sy,sx);
+        float*** imgPtr = imgShared.get();
+        for(size_t i=0; i<ni; ++i) {
+            if (flipX) reverseX(imgPtr[i],sy,sx);
+            if (flipY) reverseY(imgPtr[i],sy,sx);
+        }
+        shared_ptr<float*> tmpShared;
+        if( dark ) {
+            tmpShared = dark.get(sy,sx);
+            if (flipX) reverseX(tmpShared.get(),sy,sx);
+            if (flipY) reverseY(tmpShared.get(),sy,sx);
+        }
+
+        if( gain ) {
+            tmpShared = gain.get(sy,sx);
+            if (flipX) reverseX(tmpShared.get(),sy,sx);
+            if (flipY) reverseY(tmpShared.get(),sy,sx);
+        }
+
+        if( ccdResponse ) {
+            tmpShared = ccdResponse.get(sy,sx);
+            if (flipX) reverseX(tmpShared.get(),sy,sx);
+            if (flipY) reverseY(tmpShared.get(),sy,sx);
+        }
+
+        if( ccdScattering ) {
+            tmpShared = ccdScattering.get(sy,sx);
+            if (flipX) reverseX(tmpShared.get(),sy,sx);
+            if (flipY) reverseY(tmpShared.get(),sy,sx);
+        }
+
+        if( psf ) {
+            tmpShared = psf.get(sy,sx);
+            if (flipX) reverseX(tmpShared.get(),sy,sx);
+            if (flipY) reverseY(tmpShared.get(),sy,sx);
+        }
+    }
+    
+    return Point(images.dimSize(1),images.dimSize(2));
+    
+}
+
 

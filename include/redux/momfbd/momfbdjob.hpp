@@ -62,7 +62,7 @@ namespace redux {
             uint32_t minIterations , maxIterations, nDoneMask;
             uint32_t gradient_method, getstep_method;
             uint32_t max_local_shift, mstart, mstep;
-            uint32_t pupilSize, nsx, nsy, ncal;
+            uint32_t pupilSize, nPatchesX, nPatchesY, ncal;
             std::vector<uint32_t> modes, imageNumbers, darkNumbers;
             std::vector<uint32_t> subImagePosX,subImagePosY;
 

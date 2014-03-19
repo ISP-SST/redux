@@ -96,7 +96,7 @@ void MomfbdJob::maybeOverride( bool value, uint32_t& set, uint32_t flag ) {
 MomfbdJob::MomfbdJob( void ) : basis( 0 ), fillpix_method( 0 ), output_data_type( 0 ), flags( 0 ), patchSize( 0 ), sequenceNumber( 0 ),
     klMinMode( 0 ), klMaxMode( 0 ), borderClip( 0 ), minIterations( 0 ), maxIterations( 0 ), nDoneMask( 0 ),
     gradient_method( 0 ), getstep_method( 0 ), max_local_shift( 0 ), mstart( 0 ), mstep( 0 ), pupilSize( 0 ),
-    nsx( 0 ), nsy( 0 ), ncal( 0 ), telescopeFocalLength( 0 ), telescopeDiameter( 0 ), arcSecsPerPixel( 0 ),
+    nPatchesX( 0 ), nPatchesY( 0 ), ncal( 0 ), telescopeFocalLength( 0 ), telescopeDiameter( 0 ), arcSecsPerPixel( 0 ),
     pixelSize( 0 ), reg_gamma( 0 ), FTOL( 0 ), EPS( 0 ), svd_reg( 0 ) {
 
     //LOG_DEBUG << "MomfbdJob::MomfbdJob()   (jobType = " << jobType << ")";
@@ -175,7 +175,7 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     fillpix_method = getFromMap( tree.get<string>( "FPMETHOD", DEF_FPMETHOD ), fillpixMap );
     if( fillpix_method == 0 ) {
         LOG_ERR << "unknown fillpix method \"" << tree.get<string>( "FPMETHOD", DEF_FPMETHOD ) << "\"\n  Valid entries currently are: "
-                "\"median\", \"invdistweight\" or \"horizontal interpolation\"";
+                "\"median\", \"invdistweight\" or \"horint\"";
     }
 
     time_obs = tree.get<string>( "TIME_OBS", "" );
@@ -404,8 +404,8 @@ char* MomfbdJob::pack( char* ptr ) const {
     ptr = pack( ptr, mstart );
     ptr = pack( ptr, mstep );
     ptr = pack( ptr, pupilSize );
-    ptr = pack( ptr, nsx );
-    ptr = pack( ptr, nsy );
+    ptr = pack( ptr, nPatchesX );
+    ptr = pack( ptr, nPatchesY );
     ptr = pack( ptr, ncal );
     ptr = pack( ptr, telescopeFocalLength );
     ptr = pack( ptr, telescopeDiameter );
@@ -458,8 +458,8 @@ const char* MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
     ptr = unpack( ptr, mstart, swap_endian );
     ptr = unpack( ptr, mstep, swap_endian );
     ptr = unpack( ptr, pupilSize, swap_endian );
-    ptr = unpack( ptr, nsx, swap_endian );
-    ptr = unpack( ptr, nsy, swap_endian );
+    ptr = unpack( ptr, nPatchesX, swap_endian );
+    ptr = unpack( ptr, nPatchesY, swap_endian );
     ptr = unpack( ptr, ncal, swap_endian );
     ptr = unpack( ptr, telescopeFocalLength, swap_endian );
     ptr = unpack( ptr, telescopeDiameter, swap_endian );
@@ -618,41 +618,72 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     for( auto & it : objects ) {
         it->loadData(service, pool);
     }
-    cout << "preProcess()  loadData() done, starting read." << endl;
-    info.nThreads = 10;
+
+    info.nThreads = 12;
     // load remaining files asynchronously  (images)
     for( size_t t = 0; t < info.nThreads; ++t ) {
-        cout << "Adding thread #" << (t+1) << endl;
+        cout << "Adding load-thread #" << (t+1) << endl;
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
-    cout << "preProcess()  joining..." << endl;
     pool.join_all();
-    cout << "preProcess()  joinied" << endl;
 
-    // TODO: flatfield
+    // TODO: split in patches
     // TODO: generate/write swap
     service.reset();
+    Point imageSizes;
     for( auto & it : objects ) {
+        Point tmp = it->clipImages();
+        if(imageSizes.x == 0) {
+            imageSizes = tmp;
+        } else if( tmp != imageSizes ) {
+            throw std::logic_error("The clipped images have different sizes for the different objects, please verify the ALIGN_CLIP values.");
+        }
         it->preprocessData(service, pool);
     }
-    cout << "preProcess()  starting preprocessData." << endl;
+
     for( size_t t = 0; t < info.nThreads; ++t ) {
-        cout << "Adding thread #" << (t+1) << endl;
+        cout << "Adding preprocess-thread #" << (t+1) << endl;
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
-    cout << "preProcess()  joining2..." << endl;
     pool.join_all();
-    cout << "preProcess()  joinied2" << endl;
+
+    int minimumOverlap = 16;                // desired width of blending zone in pixels
+    int patchSeparation = 3 * patchSize / 4 - minimumOverlap; // target separation
+    if( subImagePosX.empty() ) {
+        nPatchesX = 1 + ( imageSizes.x - patchSize ) / patchSeparation;
+        int xmx = patchSize + ( nPatchesX - 1 ) * patchSeparation;
+        if( ( imageSizes.x - xmx ) > nPatchesX ) ++nPatchesX;     // accept at most 1 pixel reduction of overlap, (increase always allowed)
+        double xsep = ( nPatchesX > 1 ) ? static_cast<double>( imageSizes.x - patchSize ) / static_cast<double>( nPatchesX - 1 ) : 0;
+        for( size_t i = 0; i < nPatchesX; ++i ) {
+            subImagePosX.push_back(static_cast<uint32_t>( i*xsep + patchSize/2) );
+        }
+    }
+    if( subImagePosY.empty() ) {
+        nPatchesY = 1 + ( imageSizes.y - patchSize ) / patchSeparation;
+        int ymx = patchSize + ( nPatchesY - 1 ) * patchSeparation;
+        if( ( imageSizes.y - ymx ) > nPatchesY ) ++nPatchesY;     // accept at most 1 pixel reduction of overlap, (increase always allowed)
+        double ysep = ( nPatchesY > 1 ) ? static_cast<double>( imageSizes.y - patchSize ) / static_cast<double>( nPatchesY - 1 ) : 0;
+        for( size_t i = 0; i < nPatchesY; ++i ) {
+            subImagePosY.push_back(static_cast<uint32_t>( i*ysep + patchSize/2) );
+        }
+    }
+    
+    if( subImagePosX.empty() || subImagePosY.empty() ) {
+        LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue.";
+        info.step.store( JSTEP_ERR );
+        info.state.store( JSTATE_IDLE );
+        return;
+    }
     
     size_t count = 0;
     uint32_t xid = 0;
-    for( auto & ix : subImagePosX ) {
+    for( auto & posX : subImagePosX ) {
         uint32_t yid = 0;
-        for( auto & iy : subImagePosY ) {
-            Patch::Ptr patch( new Patch( ix, iy, patchSize ) );
+        for( auto & posY : subImagePosY ) {
+            Patch::Ptr patch( new Patch( posX, posY, patchSize ) );
             patch->id = ++count;
-            patch->setIndex( ++yid, ++xid );
-            patches.insert( pair<size_t, Patch::Ptr>( patch->id, patch ) );
+            patch->setIndex( yid++, xid++ );
+            patches.insert( make_pair( patch->id, patch ) );
         }
     }
 
@@ -767,7 +798,7 @@ void MomfbdJob::runMain( Part::Ptr& part ) {
 //     pptr->result.reset( sizeY, sizeX );
 //     memcpy( pptr->result.ptr(), tmp.get()[0], sizeY * sizeX * sizeof( int64_t ) );
 
-    sleep(1);
+    //sleep(1);
     part->step = JSTEP_POSTPROCESS;
 
 }

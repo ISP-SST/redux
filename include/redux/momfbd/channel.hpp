@@ -2,6 +2,9 @@
 #define REDUX_MOMFBD_CHANNEL_HPP
 
 #include <redux/image/image.hpp>
+#include <redux/types.hpp>
+
+
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -46,9 +49,11 @@ namespace redux {
 
             void loadImage(size_t index);
             void preprocessImage(size_t index, double avgMean);
+            
+            Point clipImages(void);
 
             std::vector<uint32_t> imageNumbers, darkNumbers;
-            std::vector<int16_t> alignClip;     // {xl,xh,yl,yh}
+            std::vector<int16_t> alignClip;     // {firstX,lastX,firstY,lastY}
             std::vector<uint32_t> wf_num;
             std::string imageDataDir, imageTemplate, darkTemplate, gainFile;
             std::string responseFile, backgainFile, psfFile, mmFile;

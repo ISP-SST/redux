@@ -3,6 +3,7 @@
 
 #include "redux/momfbd/channel.hpp"
 #include "redux/util/array.hpp"
+#include "redux/types.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
@@ -50,6 +51,8 @@ namespace redux {
             void loadData(boost::asio::io_service&, boost::thread_group&);
             void preprocessData(boost::asio::io_service&, boost::thread_group&);
             bool isValid(void);
+            
+            Point clipImages(void);
             
             uint32_t flags;
 

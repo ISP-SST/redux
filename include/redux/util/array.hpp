@@ -78,7 +78,21 @@ namespace redux {
                 difference_type operator-( const const_iterator& rhs ) const { return (this->pos_ - rhs.pos()); }
                 
                 
-                int64_t pos( void ) const { return pos_; };
+                int64_t pos( void ) const { return pos_; }
+                template <typename U>
+                const Array<T> neighbourhood(const std::vector<U>& maxDistance) {
+                    std::vector<int64_t> first = m_ConstArrayPtr->indexFromPos(pos_);
+                    if( first.size() != maxDistance.size() ) {
+                        throw std::logic_error("Array::iterator::neighbourhood() Dimension mismatch:  " + printArray(maxDistance,"maxDistance"));
+                    }
+                    std::vector<int64_t> last = first;
+                    for (size_t i=0; i<first.size(); ++i) {
+                        first[i] -= maxDistance[i];
+                        last[i]  += maxDistance[i];
+                    }
+                    return Array<T>(*const_cast<Array<T>*>(m_ConstArrayPtr),first,last);
+                }
+                template <typename ...S> const Array<T> neighbourhood( S ...s ) { return neighbourhood<int64_t>({static_cast<int64_t>(s)...}); }
 
                 const_iterator& step( const std::vector<int64_t>& ind ) {
                     size_t nIndices = ind.size();
@@ -178,8 +192,6 @@ namespace redux {
                 T* data;
             };
 
-            template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
-
             template <typename ...S>
             Array( T* ptr, S ...sizes ) : begin_(0) {
                 setSizes( sizes... );
@@ -190,6 +202,19 @@ namespace redux {
             }
 
 
+            template <typename U>
+            Array( Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) {
+
+                nDims_ = rhs.nDims_;
+                dimFirst = rhs.dimFirst;
+                dimLast = rhs.dimLast;
+                dimSizes = rhs.dimSizes;
+                dataSize = rhs.dataSize;
+                datablock = rhs.datablock;
+                dimStrides = rhs.dimStrides;
+                setLimits(first,last);
+
+            }
             template <typename U>
             Array( Array<T>& rhs, const std::vector<U>& indices ) {
 
@@ -221,10 +246,13 @@ namespace redux {
             template <typename U, typename V>
             Array( Array<U>& rhs, const std::vector<V>& indices ) : dense_(true) {
                 rhs.copy(this);
-                rhs.setLimits(indices);
+                setLimits(indices);
             }
             template <typename U, typename ...S>
             Array( Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            
+            template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
+
             
             /*! @brief Get the @e packed size of this array
              *  @details This is only for getting the size needed to store the packed array.
@@ -285,12 +313,42 @@ namespace redux {
             template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
             //@}
             
+            /*! @name permuteDimensions
+             *  @brief Permute the dimensions specified
+             *  @warning This will only shuffle the dimensional information around, the datablock will not be touched.
+             */
+            //@{
+            void permuteDimensions( const std::vector<size_t>& dims ) {
+                if( dims.size() < 2 || dims.size() > nDims_ || dims[dims.size()-1] >= nDims_ ) return;
+                size_t tmp = dims[dims.size()-1];
+                size_t tmpSize = dimSizes[tmp];
+                int64_t tmpFirst = dimFirst[tmp];
+                int64_t tmpLast = dimLast[tmp];
+                for(size_t i=0; i<dims.size(); ++i) {
+                    if( dims[i] >= nDims_ ) throw std::out_of_range("permuteDimensions: Supplied dimension is out of range: " + printArray(dims,"dims"));
+                    std::swap(dimSizes[dims[i]],tmpSize);
+                    std::swap(dimFirst[dims[i]],tmpFirst);
+                    std::swap(dimLast[dims[i]],tmpLast);
+                }
+                calcStrides();
+                if( ! dense() ) {
+                    begin_ = getOffset( dimFirst );
+                    auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
+                    end_ = ( ++it ).pos();  // 1 step after last element;
+                }
+            }
+            
+            template <typename ...S> void permuteDimensions( S ...dims ) { permuteDimensions( {static_cast<size_t>( dims )...} ); }
+            //@}
+            
             const std::vector<size_t>& dimensions( void ) const { return dimSizes; }
             size_t nDimensions( void ) const { return dimSizes.size(); }
             size_t nElements( void ) const { return nElements_; }
 
             size_t dimSize( size_t i = 0 ) const {
-                if( i < dimSizes.size() ) return dimSizes[i];
+                if( i < dimSizes.size() ) {
+                    return dimSizes[i];
+                }
                 else return 0;
             }
 
@@ -315,10 +373,10 @@ namespace redux {
             }
 
             template <typename U = T>
-            Array<U> copy( void ) const {
+            Array<U> copy( bool skipTrivialDims=true ) const {
                 std::vector<size_t> newDimSizes;
                 for( auto & it : dimSizes ) {
-                    if( it > 1 ) {
+                    if( it > 1 || !skipTrivialDims) {
                         newDimSizes.push_back( it );
                     }
                 }
@@ -346,6 +404,12 @@ namespace redux {
                     ++cit;
                 }
 
+            }
+            
+            Array<T>& trim( bool skipTrivialDims=true ) {
+                Array<T> tmp = copy(skipTrivialDims);
+                *this = tmp;
+                return *this;
             }
 
             template <typename ...S>
@@ -384,7 +448,7 @@ namespace redux {
                 }
                 for( size_t i = 0; i < sz; ++i ) {
                     if( tmp[i] >= dimSizes[nDims_ - i - 1] ) {
-                        throw std::out_of_range( "Index out of range. " + printArray(tmp,"indices") );
+                        throw std::out_of_range( "Array::at() Index out of range: " + printArray(tmp,"indices") );
                     }
                 }
                 int64_t offset = getOffset( tmp, dimFirst );
@@ -392,6 +456,15 @@ namespace redux {
             }
             template <typename ...S> const T& at( S ...indices ) const { return const_cast<Array<T>*>( this )->at( indices... ); }
 
+            std::vector<int64_t> indexFromPos(int64_t pos) const {
+                std::vector<int64_t> tmp(nDims_);
+                for (size_t i=0; i<nDims_; ++i) {
+                    tmp[i] = pos / static_cast<int64_t>(dimStrides[i]);
+                    pos -= tmp[i]*dimStrides[i];
+                }
+                return tmp;
+            }
+            
             template <typename ...S>
             void setBlock( T* data, size_t count, S ...s ) const {
                 memcpy( ptr( s... ), data, count * sizeof( T ) );
@@ -513,15 +586,16 @@ namespace redux {
             }
             
             template <typename U>
-            void setLimits( const std::vector<U>& limits ) {
-                size_t nArgs = limits.size();
-                if( nArgs&1 || (nArgs > 2*nDims_) )  {  // odd number of indices, or too many indices
-                    throw std::logic_error("Array::setLimits: Too many indices or odd number of indices: " + printArray(limits,"limits"));
+            void setLimits( const std::vector<U>& first, const std::vector<U>& last) {
+                if( first.size() != nDims_ || last.size() != nDims_ ) {
+                    throw std::logic_error("Array::setLimits: Dimensions does not match:  " + printArray(first,"first") + printArray(last,"  last"));
                 }
                 nElements_ = 1;
                 for( size_t i = 0; i < nDims_; ++i ) {
-                    dimLast[i] = redux::util::bound_cast<size_t>( dimFirst[i] + limits[2 * i + 1], 0, dimSizes[i] );
-                    dimFirst[i] = redux::util::bound_cast<size_t>( dimFirst[i] + limits[2 * i], 0, dimSizes[i] );
+                    int64_t tmpLast = redux::util::bound_cast<int64_t>( dimFirst[i] + last[i], 0, dimLast[i] );
+                    int64_t tmpFirst = redux::util::bound_cast<int64_t>( dimFirst[i] + first[i], 0, dimLast[i] );
+                    dimLast[i] = tmpLast;
+                    dimFirst[i] = tmpFirst;
                     if( dimFirst[i] > dimLast[i] ) std::swap( dimFirst[i], dimLast[i] );
                     dimSizes[i] = ( dimLast[i] - dimFirst[i] + 1 );
                     if( i > 0 && ( dimStrides[i - 1] > dimSizes[i] ) ) dense_ = false;
@@ -530,6 +604,19 @@ namespace redux {
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
                 end_ = ( ++it ).pos();  // 1 step after last element;
+            }
+            template <typename U>
+            void setLimits( const std::vector<U>& limits ) {
+                if( limits.size() != 2*nDims_ )  {  // odd number of indices, or too many indices
+                    throw std::logic_error("Array::setLimits: Dimensions does not match:  " + printArray(limits,"limits"));
+                }
+                std::vector<U> first(nDims_);
+                std::vector<U> last(nDims_);
+                for( size_t i = 0; i < nDims_; ++i ) {
+                    last[i] = limits[2 * i + 1];
+                    first[i] = limits[2 * i];
+                }
+                setLimits(first,last);
             }
             template <typename ...S> void setLimits( S ...s ) { setLimits<int64_t>({static_cast<int64_t>(s)...}); }
             
@@ -554,18 +641,20 @@ namespace redux {
             
         private:
             void setSizes( const std::vector<size_t>& sizes ) {
+                begin_ = end_ = dataSize = 0;
                 dimSizes = sizes;
                 nDims_ = dimSizes.size();
                 dimFirst.resize( nDims_, 0 );
-                dimLast = dimSizes;
+                dimLast.assign(dimSizes.begin(), dimSizes.end());
                 dense_ = true;
-                dataSize = 1;
-                for( auto & it : dimLast ) {
-                    dataSize *= it;
-                    it--;
+                if( nDims_ > 0 ) {
+                    dataSize = 1;
+                    for( auto & it : dimLast ) {
+                        dataSize *= it;
+                        it--;
+                    }
+                    end_ = dataSize;
                 }
-                begin_ = 0;
-                end_ = dataSize;
             }
             template <typename ...S> void setSizes( S ...sizes ) { setSizes( {static_cast<size_t>( sizes )...} );  }
 
@@ -592,7 +681,7 @@ namespace redux {
             }
 
             template <typename U>
-            int64_t getOffset( const std::vector<U>& indices, const std::vector<size_t>& offsets ) const {
+            int64_t getOffset( const std::vector<U>& indices, const std::vector<int64_t>& offsets ) const {
                 int64_t offset = 0;
                 if( indices.size() > offsets.size() ) {
                     return getOffset( indices );
@@ -628,8 +717,8 @@ namespace redux {
             std::vector<size_t> dimSizes;
             std::vector<size_t> dimStrides;
 
-            std::vector<size_t> dimFirst;
-            std::vector<size_t> dimLast;
+            std::vector<int64_t> dimFirst;
+            std::vector<int64_t> dimLast;
 
             std::shared_ptr<T> datablock;
             size_t nDims_;
