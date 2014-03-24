@@ -4,6 +4,7 @@
 #include "redux/util/datautil.hpp"
 
 #include <cstdint>
+#include <complex>
 
 namespace redux {
 
@@ -25,7 +26,7 @@ namespace redux {
         */
         template<class T> struct PointType {
             PointType ( T yy=0, T xx=0 ) : x ( xx ), y ( yy ) {}
-            size_t size(void) const { return 2*sizeof(T); };
+            static size_t size(void) { return 2*sizeof(T); };
             char* pack(char* ptr) const {
                 ptr = redux::util::pack(ptr,x);
                 return redux::util::pack(ptr,y);
@@ -48,7 +49,7 @@ namespace redux {
         */
         template<class T> struct RegionType {
             RegionType ( T y1=0, T x1=0, T y2=0, T x2=0 ) : first(x1,y1), last(x2,y2) {}
-            size_t size(void) const { return first.size()+last.size(); };
+            static size_t size(void) { return 4*sizeof(T); };
             char* pack(char* ptr) const {
                 ptr = first.pack(ptr);
                 return ptr = last.pack(ptr);
@@ -64,6 +65,8 @@ namespace redux {
         typedef RegionType<int> RegionI;
         typedef RegionType<uint32_t> Region;
 
+        
+        typedef std::complex<double> complex_t;
         
         /* @} */
 
