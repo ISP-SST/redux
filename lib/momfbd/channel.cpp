@@ -7,11 +7,13 @@
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/file/fileio.hpp"
+#include "redux/math/functions.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/logger.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <math.h>
 #include <string>
 
 #include <boost/algorithm/string.hpp>
@@ -19,6 +21,8 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
+
+#include "redux/image/fouriertransform.hpp"
 
 namespace bfs = boost::filesystem;
 using namespace redux::image;
@@ -589,7 +593,7 @@ void Channel::loadData( boost::asio::io_service& service, boost::thread_group& p
         size_t nImages = imageNumbers.size();
         bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[0] ) );
         redux::file::readFile( fn.string(), tmp );
-        imageMeans.resize( nImages, 0.0 );
+        imageStats.resize( nImages );
         images.resize( nImages, tmp.dimSize( 0 ), tmp.dimSize( 1 ) );
 
         for( size_t i = 0; i < nImages; ++i ) {
@@ -608,19 +612,32 @@ void Channel::preprocessData( boost::asio::io_service& service, boost::thread_gr
     size_t nImages = imageNumbers.size();
     double avgMean = 0.0;
     for( size_t i = 0; i < nImages; ++i ) {
-        avgMean += imageMeans[i];
+        avgMean += imageStats[i]->mean;
     }
     avgMean /= static_cast<double>( nImages );
-    LOG_DETAIL << "Image " << printArray( imageMeans, "means", -2 ) << "   avg = " << avgMean;
-
-    cout << "avgMean = " << avgMean << endl;
-    cout << "images.mean() = " << images.mean() << endl;
 
     for( size_t i = 0; i < nImages; ++i ) {
         service.post( boost::bind( &Channel::preprocessImage, this, i, avgMean ) );
     }
 
+    srand(time(0));
+}
 
+
+double Channel::getMaxMean(void) {
+    double maxMean = std::numeric_limits<double>::min();
+    for(auto it: imageStats ) {
+        if( it->mean > maxMean ) maxMean = it->mean;
+    }
+    return maxMean;
+}
+
+
+void Channel::normalizeData(boost::asio::io_service& service, boost::thread_group& pool, double value) {
+    size_t nImages = imageNumbers.size();
+    for( size_t i = 0; i < nImages; ++i ) {
+        service.post( boost::bind( &Channel::normalizeImage, this, i, value ) );
+    }
 }
 
 
@@ -629,31 +646,28 @@ void Channel::loadImage( size_t index ) {
     bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
     LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
     redux::file::readFile( fn.string(), subimg );
-    imageMeans[index] = subimg.mean();
+    imageStats[index].reset(new Statistics<float>());
+    imageStats[index]->getStats(myJob.borderClip,subimg,ST_VALUES);                          // only get min/max/mean
 }
 
 
 void Channel::preprocessImage( size_t index, double avgMean ) {
 
-    double& mean = imageMeans[index];
+    double& mean = imageStats[index]->mean;
     bool modified = false;
 
-    LOG_WARN << printArray( images.dimensions(),"imagesDims");
-    LOG_DETAIL << boost::format( "Preprocessing image %d" ) % index;
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
     bfs::path fn = bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
-    LOG_DETAIL << boost::format( "Preprocessing image %d" ) % index;
-
+    LOG_DETAIL << boost::format( "Pre-processing image %s" ) % fn;
+    
     // Michiel's method for detecting bitshifted Sarnoff images.
     if( mean > 4 * avgMean ) {
         LOG_WARN << boost::format( "Image bit shift detected for image %d (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!" ) % index;
-        mean *= 0.625;
         subimg *= 0.625;
         modified = true;
     }
     else if( mean < 0.25 * avgMean ) {
         LOG_WARN << boost::format( "Image bit shift detected for image %d (mean < 0.25*avgMean). adjust factor=16 (keep your fingers crossed)!" ) % index;
-        mean *= 16;
         subimg *= 16;
         modified = true;
     }
@@ -722,19 +736,101 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 
     }
 
-
-    // TODO get observation-time and image statistics
+    imageStats[index]->getStats(myJob.borderClip, subimg);      // get all stats for the cleaned up data
 
     if( modified && flags & MFBD_SAVE_FFDATA ) {
+        string fnT = fn.leaf().string();
         fn = bfs::path( fn.leaf().string() + ".cor" );
+
         LOG_DETAIL << boost::format( "Saving file \"%s\"" ) % fn.string();
         redux::file::Ana::write( fn.string(), subimg );
+        
+      /*  
+        //FourierTransform bla(subimg);
+        Image<float> apod = subimg.copy();
+        apod.trim();
+        cout << printArray(apod.dimensions(),"blaDims") << endl;
+        apodize(apod,45);
+        //subimg *= apod;
+        Image<double> psf(subimg.dimensions(true));
+        size_t sy = psf.dimSize(0);
+        size_t sx = psf.dimSize(1);
+        cout << printArray(psf.dimensions(),"psfDims") << endl;
+        redux::math::gauss(psf.ptr(),sy,sx,5,5,sy/2,sx/2);
+        //FourierTransform::reorder(psf);
+        //redux::file::Ana::write( fnT+".rpsf", psf );
+        FourierTransform psft(psf, FT_REORDER|FT_NORMALIZE);
+        //blat.reorder();
+        auto conv = psft.convolve(subimg);
+        cout << printArray(conv.dimensions(),"convDims") << endl;
+        Image<float> power(psft.dimensions());
+        auto rit = psft.begin();
+        for(auto& it: power) {
+           //it = rit++->real();
+           it = std::abs(*rit++);
+        }
+        //bla.copy(bla2);
+        redux::file::Ana::write( fnT+".psf", psf );
+        redux::file::Ana::write( fnT+".pwr", power );
+        redux::file::Ana::write( fnT+".apod", apod );
+        redux::file::Ana::write( fnT+".conv", conv );
+        */
+        
     }
 
 
 
 }
 
+
+void Channel::normalizeImage( size_t index, double value ) {
+    Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
+    LOG_DETAIL << boost::format( "Normalizing image %d" ) % index;
+    subimg *= (value/imageStats[index]->mean);
+}
+
+
+size_t Channel::sizeOfPatch(uint32_t npixels) const {
+    size_t sz = sizeof(size_t) + imageStats.size()*sizeof(float);
+    sz += npixels*images.dimSize(0)*sizeof(float);
+    return sz;
+}
+
+
+char* Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
+    
+    int localTiltX = 0;
+    int localTiltY = 0;
+    if(xOffset) {
+        Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
+        Statistics<int16_t> stats;
+        stats.getStats(tmpOff,ST_VALUES);
+        double tmp;
+        patch->residualTilts.x = modf(stats.mean/100 , &tmp);
+        localTiltX = lrint(tmp);
+    }
+    if(yOffset) {
+        Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
+        Statistics<int16_t> stats;
+        stats.getStats(Image<int16_t>(yOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x),ST_VALUES);
+        double tmp;
+        patch->residualTilts.y = modf(stats.mean/100 , &tmp);
+        localTiltY = lrint(tmp);
+    }
+
+    vector<float> noise;
+    for(auto it: imageStats) noise.push_back(it->noisePower);
+    ptr = redux::util::pack( ptr, noise );
+    
+    Image<float> tmp = Image<float>( images, 0, images.dimSize(0),
+                                     patch->first.y+localTiltY, patch->last.y+localTiltY,
+                                     patch->first.x+localTiltX, patch->last.x+localTiltX ).copy();
+    ptr = redux::util::pack( ptr, tmp.ptr(), tmp.nElements() );
+    
+    
+    return ptr;
+}
+ 
 
 Point Channel::clipImages(void) {
 

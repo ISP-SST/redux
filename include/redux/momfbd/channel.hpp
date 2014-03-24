@@ -1,9 +1,11 @@
 #ifndef REDUX_MOMFBD_CHANNEL_HPP
 #define REDUX_MOMFBD_CHANNEL_HPP
 
-#include <redux/image/image.hpp>
-#include <redux/types.hpp>
+#include "redux/momfbd/patch.hpp"
 
+#include <redux/image/image.hpp>
+#include <redux/image/statistics.hpp>
+#include <redux/types.hpp>
 
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
@@ -40,15 +42,21 @@ namespace redux {
             size_t size(void) const;
             char* pack(char*) const;
             const char* unpack(const char*, bool);
+            double getMaxMean(void);
         
         private:
             
             bool isValid(void);
             void loadData(boost::asio::io_service&, boost::thread_group&);
             void preprocessData(boost::asio::io_service&, boost::thread_group&);
+            void normalizeData(boost::asio::io_service&, boost::thread_group&, double value);
 
             void loadImage(size_t index);
             void preprocessImage(size_t index, double avgMean);
+            void normalizeImage(size_t index, double value);
+            
+            size_t sizeOfPatch(uint32_t) const;
+            char* packPatch( Patch::Ptr, char* ) const;
             
             Point clipImages(void);
 
@@ -58,7 +66,7 @@ namespace redux {
             std::string imageDataDir, imageTemplate, darkTemplate, gainFile;
             std::string responseFile, backgainFile, psfFile, mmFile;
             std::string offxFile, offyFile;
-            std::vector<double> imageMeans;
+            std::vector<redux::image::Statistics<float>::Ptr> imageStats;
             std::vector<double> stokesWeights;
             std::vector<double> diversity;
             std::vector<uint32_t> diversityOrders;

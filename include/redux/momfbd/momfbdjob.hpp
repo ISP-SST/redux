@@ -34,6 +34,8 @@ namespace redux {
             MomfbdJob( void );
             ~MomfbdJob( void );
 
+            const char* unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
+            
             void parseProperties( po::variables_map& vm, bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
 
@@ -51,6 +53,7 @@ namespace redux {
 
             void checkParts( void );
             void preProcess( boost::asio::io_service&, boost::thread_group& );
+            void packPatch( Patch::Ptr );
             void runMain( Part::Ptr& );
             void postProcess( boost::asio::io_service&, boost::thread_group& );
             bool isValid(void);

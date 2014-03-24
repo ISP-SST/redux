@@ -2,6 +2,7 @@
 #define REDUX_MOMFBD_OBJECT_HPP
 
 #include "redux/momfbd/channel.hpp"
+#include "redux/momfbd/patch.hpp"
 #include "redux/util/array.hpp"
 #include "redux/types.hpp"
 
@@ -48,9 +49,13 @@ namespace redux {
 
         private:
 
+            bool isValid(void);
             void loadData(boost::asio::io_service&, boost::thread_group&);
             void preprocessData(boost::asio::io_service&, boost::thread_group&);
-            bool isValid(void);
+            void normalize(boost::asio::io_service&, boost::thread_group&);
+            
+            size_t sizeOfPatch(uint32_t) const;
+            char* packPatch( Patch::Ptr, char* ) const;
             
             Point clipImages(void);
             

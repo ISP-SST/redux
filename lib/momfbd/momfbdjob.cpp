@@ -107,6 +107,19 @@ MomfbdJob::~MomfbdJob( void ) {
     //LOG_DEBUG << "MomfbdJob::~MomfbdJob()";
 }
 
+const char* MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
+
+    using redux::util::unpack;
+    size_t nParts;
+    ptr = unpack( ptr, nParts, swap_endian );
+    parts.resize( nParts );
+    for( auto & it : parts ) {
+        it.reset( new Patch );
+        ptr = it->unpack( ptr, swap_endian );
+    }
+    return ptr;
+}
+
 void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
 
     LOG_DEBUG << "MomfbdJob::parseProperties()";
@@ -627,8 +640,8 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     }
     pool.join_all();
 
-    // TODO: split in patches
-    // TODO: generate/write swap
+    // Done loading files -> start the preprocessing (flatfielding etc.)
+    
     service.reset();
     Point imageSizes;
     for( auto & it : objects ) {
@@ -642,32 +655,62 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     }
 
     for( size_t t = 0; t < info.nThreads; ++t ) {
-        cout << "Adding preprocess-thread #" << (t+1) << endl;
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
     pool.join_all();
 
-    int minimumOverlap = 16;                // desired width of blending zone in pixels
-    int patchSeparation = 3 * patchSize / 4 - minimumOverlap; // target separation
-    if( subImagePosX.empty() ) {
-        nPatchesX = 1 + ( imageSizes.x - patchSize ) / patchSeparation;
-        int xmx = patchSize + ( nPatchesX - 1 ) * patchSeparation;
-        if( ( imageSizes.x - xmx ) > nPatchesX ) ++nPatchesX;     // accept at most 1 pixel reduction of overlap, (increase always allowed)
-        double xsep = ( nPatchesX > 1 ) ? static_cast<double>( imageSizes.x - patchSize ) / static_cast<double>( nPatchesX - 1 ) : 0;
-        for( size_t i = 0; i < nPatchesX; ++i ) {
-            subImagePosX.push_back(static_cast<uint32_t>( i*xsep + patchSize/2) );
-        }
-    }
-    if( subImagePosY.empty() ) {
-        nPatchesY = 1 + ( imageSizes.y - patchSize ) / patchSeparation;
-        int ymx = patchSize + ( nPatchesY - 1 ) * patchSeparation;
-        if( ( imageSizes.y - ymx ) > nPatchesY ) ++nPatchesY;     // accept at most 1 pixel reduction of overlap, (increase always allowed)
-        double ysep = ( nPatchesY > 1 ) ? static_cast<double>( imageSizes.y - patchSize ) / static_cast<double>( nPatchesY - 1 ) : 0;
-        for( size_t i = 0; i < nPatchesY; ++i ) {
-            subImagePosY.push_back(static_cast<uint32_t>( i*ysep + patchSize/2) );
-        }
-    }
+    // Done pre-processing -> normalize within each object
     
+    service.reset();
+    for( auto & it : objects ) {
+        it->normalize(service, pool);
+    }
+
+    for( size_t t = 0; t < info.nThreads; ++t ) {
+        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    }
+    pool.join_all();
+
+    // Done normalizing -> split in patches
+    
+    int minimumOverlap = 16;                // desired width of blending zone in pixels
+    //int patchSeparation = 3 * patchSize / 4 - minimumOverlap; // target separation
+    if( subImagePosX.empty() ) {
+        // TODO: do we need to handle single patches ?? (this only supports nPatches >= 2)
+        // TODO: verify michiel's splitting method
+        int firstPos = max_local_shift + patchSize/2;
+        int lastPos = imageSizes.x - firstPos - 1;
+        nPatchesX = 2;
+        double separation = (lastPos-firstPos)/static_cast<double>(nPatchesX-1);
+        double overlap = std::max(patchSize-separation,0.0);
+        while(overlap < minimumOverlap) {
+            ++nPatchesX;
+            separation = (lastPos-firstPos)/static_cast<double>(nPatchesX-1);
+            overlap = std::max(patchSize-separation,0.0);
+        }
+        for( size_t i = 0; i < nPatchesX; ++i ) {
+            subImagePosX.push_back(static_cast<uint32_t>( i*separation + firstPos ) );
+        }
+        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"x-pos");
+    }
+
+    if( subImagePosY.empty() ) {
+        int firstPos = max_local_shift + patchSize/2;
+        int lastPos = imageSizes.y - firstPos - 1;
+        nPatchesY = 2;
+        double separation = (lastPos-firstPos)/static_cast<double>(nPatchesY-1);
+        double overlap = std::max(patchSize-separation,0.0);
+        while(overlap < minimumOverlap) {
+            ++nPatchesY;
+            separation = (lastPos-firstPos)/static_cast<double>(nPatchesY-1);
+            overlap = std::max(patchSize-separation,0.0);
+        }
+        for( size_t i = 0; i < nPatchesY; ++i ) {
+            subImagePosY.push_back(static_cast<uint32_t>( i*separation + firstPos ) );
+        }
+        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"y-pos");
+    }
+ 
     if( subImagePosX.empty() || subImagePosY.empty() ) {
         LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue.";
         info.step.store( JSTEP_ERR );
@@ -675,81 +718,67 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         return;
     }
     
+
+   
     size_t count = 0;
-    uint32_t xid = 0;
-    for( auto & posX : subImagePosX ) {
-        uint32_t yid = 0;
-        for( auto & posY : subImagePosY ) {
-            Patch::Ptr patch( new Patch( posX, posY, patchSize ) );
+    uint32_t yid=0,xid=0;
+    service.reset();
+    uint32_t span = patchSize/2 + max_local_shift;
+    for( auto posY : subImagePosY ) {
+        uint32_t trimmedPosY = std::min(std::max(span,posY),imageSizes.y-span);
+        if( trimmedPosY != posY ) cout << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << posY << " -> " << trimmedPosY << endl;
+        for( auto posX : subImagePosX ) {
+            uint32_t trimmedPosX = std::min(std::max(span,posX),imageSizes.x);
+            if( trimmedPosX != posX ) cout << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX << endl;
+            Patch::Ptr patch( new Patch() );
+            patch->first.x = trimmedPosX-span;
+            patch->first.y = trimmedPosY-span;
+            patch->last.x = patch->first.x+2*span-1;
+            patch->last.y = patch->first.y+2*span-1;
             patch->id = ++count;
-            patch->setIndex( yid++, xid++ );
+            //cout << "PATCH: " << count << "  first.x = " << patch->first.x << "  first.y = " << patch->first.y << "  last.x = " << patch->last.x << "  last.y. = " << patch->last.y;
+            //cout << "  szX = " << (patch->last.x-patch->first.x+1) << "  szY = " << (patch->last.y-patch->first.y+1) << "  npix = " << patch->nPixels()  << endl;
+            //cout << "  posX = " << posX << "  posY = " << posY << "  trimmedPosX = " << trimmedPosX;
+            //cout << "  trimmedPosY = " << trimmedPosY << "  span = " << span << "  patchSize = " << patchSize << endl;
+            patch->setIndex( yid, xid++ );
+            service.post( boost::bind( &MomfbdJob::packPatch, this, patch ) );
             patches.insert( make_pair( patch->id, patch ) );
         }
+        yid++;
     }
 
-    LOG << "MomfbdJob::preProcess()  " << printArray(subImagePosX,"SubX");
-    LOG << "MomfbdJob::preProcess()  " << printArray(subImagePosY,"SubY");
-    LOG << "MomfbdJob::preProcess()  nPatches = " << patches.size();
+    LOG_DETAIL << "MomfbdJob::preProcess()  nPatches = " << patches.size();
 
-    /*
-    *
-    *
-    *
-    *
-    *
-    *         for( auto& iy: tmpY ) {
-            Patch::Ptr patch( new Patch(ix,iy,patchSize) );
-            patch->id = ++count;
-            patch->setIndex(++yid,++xid);
-            patches.insert( pair<size_t, Patch::Ptr>( patch->id, patch ) );
-                        subImagePositions.push_back( pair<size_t, Patch::Ptr>( patch->id, patch ) );
-
-        }
-    *
-
-    *
-    *
-    *
-    *
-    *
-    if( xSize < 2 || ySize < 2 ) return;
-
-    double stepX = ( coordinates[1] - coordinates[0] ) / ( xSize - 1 );
-    double stepY = ( coordinates[3] - coordinates[2] ) / ( ySize - 1 );
-    size_t lX, lY, count = 0;
-    unique_lock<mutex> lock;
-    vector<size_t> indices;
-    vector<PartPtr> pts;
-
-    for( uint32_t i = 0; i < xSize; i += patchSize ) {
-        lX = std::min( i + patchSize - 1, xSize - 1 );
-        double x = coordinates[0] + i * stepX;
-        for( uint32_t j = 0; j < ySize; j += patchSize ) {
-            lY = std::min( j + patchSize - 1, ySize - 1 );
-            double y = coordinates[2] + j * stepY;
-            PartPtr part( new DebugPart() );
-            part->id = ++count;
-            part->sortedID = part->id;
-            part->xPixelL = i; part->xPixelH = lX;
-            part->yPixelL = j; part->yPixelH = lY;
-            part->beginX = x; part->endX = coordinates[0] + lX * stepX;
-            part->beginY = y; part->endY = coordinates[2] + lY * stepY;
-            pts.push_back( part );
-            indices.push_back( count );
-        }
-
+    for( size_t t = 0; t < 1/*info.nThreads*/; ++t ) {
+        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
+    pool.join_all();
 
-    std::random_shuffle( indices.begin(), indices.end() );
-    count = 0;
-    for( auto & it : pts ) {
-        it->id = indices[count++];
-        jobParts.insert( pair<size_t, PartPtr>( it->id, it ) );
-    }*/
     info.step.store( JSTEP_QUEUED );
 
 }
 
+void MomfbdJob::packPatch( Patch::Ptr patch ) {
+    
+    LOG_TRACE << "MomfbdJob::packPatch() #" << patch->id;
+    size_t totalPatchSize(0);
+    for( auto & it : objects ) {
+        totalPatchSize += it->sizeOfPatch(patch->nPixels());
+    }
+
+    patch->dataSize = totalPatchSize;
+    patch->data = sharedArray<char>(totalPatchSize);
+    char* ptr = patch->data.get();
+    for( auto & it : objects ) {
+        ptr = it->packPatch(patch,ptr);
+    }
+    
+    if(ptr != patch->data.get()+totalPatchSize) {
+        LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());
+    }
+    // TODO: compress and store in swapfile
+}
+ 
 
 void MomfbdJob::runMain( Part::Ptr& part ) {
 

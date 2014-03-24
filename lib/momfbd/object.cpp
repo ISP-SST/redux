@@ -9,6 +9,7 @@
 #include "redux/constants.hpp"
 #include "redux/logger.hpp"
 
+#include <limits>
 #include <string>
 
 #include <boost/algorithm/string.hpp>
@@ -330,6 +331,15 @@ const char* Object::unpack(const char* ptr, bool swap_endian) {
 }
 
 
+bool Object::isValid(void) {
+    bool allOk(true);
+    for( auto & it : channels ) {
+        allOk &= it->isValid();
+    }
+    return allOk;
+}
+
+
 void Object::loadData(boost::asio::io_service& service, boost::thread_group& pool) {
     for(auto& it: channels) {
         it->loadData(service, pool);
@@ -345,14 +355,35 @@ void Object::preprocessData(boost::asio::io_service& service, boost::thread_grou
 }
 
 
-bool Object::isValid(void) {
-    bool allOk(true);
-    for( auto & it : channels ) {
-        allOk &= it->isValid();
+void Object::normalize(boost::asio::io_service& service, boost::thread_group& pool) {
+    double maxMean = std::numeric_limits<double>::min();
+    for(auto it: channels) {
+        double mM = it->getMaxMean();
+        if( mM > maxMean ) maxMean = mM;
     }
-    return allOk;
+    for(auto it: channels) {
+        it->normalizeData(service, pool, maxMean);
+    }
 }
 
+
+size_t Object::sizeOfPatch(uint32_t npixels) const {
+    size_t sz(0);
+    for( auto & it : channels ) {
+        sz += it->sizeOfPatch(npixels);
+    }
+    return sz;
+}
+
+
+char* Object::packPatch( Patch::Ptr patch, char* ptr ) const {
+    
+    for( auto & it : channels ) {
+        ptr = it->packPatch(patch,ptr);
+    }
+    return ptr;
+}
+ 
 
 Point Object::clipImages(void) {
     Point sizes;

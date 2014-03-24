@@ -18,16 +18,13 @@ namespace redux {
         struct Patch : public Part {
             typedef std::shared_ptr<Patch> Ptr;
             Point index;
-            Region roi;
-            
-            //RegionD coordinates;
-            //uint32_t patchIndexX, patchIndexY,firstPixelX,lastPixelX,firstPixelY,lastPixelY;
-            //double beginX, endX, beginY, endY;
-            //size_t sortedID;
-            //redux::util::Array<int64_t> result;      // use int64_t as temporary storage, cast to int16_t in post-processing
-            Patch() : index(), roi() {};
-            Patch(uint32_t y, uint32_t x, uint32_t sz);
+            Point first,last;
+            PointF residualTilts;
+            std::shared_ptr<char> data;
+            size_t dataSize;
+            //Patch(int y, int x, uint32_t sz=1);
             void setIndex(uint32_t yid, uint32_t xid);
+            size_t nPixels(void);
             size_t size( void ) const;
             char* pack( char* ) const;
             const char* unpack( const char*, bool );
