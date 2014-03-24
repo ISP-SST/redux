@@ -22,6 +22,9 @@ file(GLOB REDUX_FILE_HPP "${REDUX_HDR_BASE}/file/*.hpp")
 file(GLOB REDUX_IMAGE_CPP "image/*.cpp")
 file(GLOB REDUX_IMAGE_HPP "${REDUX_HDR_BASE}/image/*.hpp")
 
+file(GLOB REDUX_MATH_CPP "math/*.cpp")
+file(GLOB REDUX_MATH_HPP "${REDUX_HDR_BASE}/math/*.hpp")
+
 file(GLOB REDUX_MOMFBD_CPP "momfbd/*.cpp")
 file(GLOB REDUX_MOMFBD_HPP "${REDUX_HDR_BASE}/momfbd/*.hpp")
 
@@ -51,6 +54,7 @@ REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_CPP} ${REDUX_HPP} 
                     ${REDUX_FILE_CPP} ${REDUX_FILE_HPP}
                     ${REDUX_IMAGE_CPP} ${REDUX_IMAGE_HPP}
+                    ${REDUX_MATH_CPP} ${REDUX_MATH_HPP}
                     ${REDUX_MOMFBD_CPP} ${REDUX_MOMFBD_HPP}
                     ${REDUX_NETWORK_CPP} ${REDUX_NETWORK_HPP}
                     ${REDUX_UTIL_CPP} ${REDUX_UTIL_HPP}
