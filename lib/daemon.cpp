@@ -431,24 +431,25 @@ bool Daemon::getWork( WorkInProgress& wip ) {
 void Daemon::sendWork( Peer::Ptr& peer ) {
 
     auto it = peerWIP.insert( std::pair<Peer::Ptr, WorkInProgress>( peer, WorkInProgress( peer ) ) );
-    WorkInProgress& pw = it.first->second;
+    WorkInProgress& wip = it.first->second;
 
     size_t blockSize = 0;
     bool includeJob = true;
-    if( getWork( pw ) ) {
-        blockSize = pw.size( includeJob );
+    if( getWork( wip ) ) {
+        blockSize = wip.size( includeJob );
     }
 
-    size_t totalSize = blockSize + sizeof( size_t );
-    auto buf = sharedArray<char>( totalSize );
-    char* ptr = pack( buf.get(), blockSize );
+    auto buf = sharedArray<char>( blockSize + sizeof( size_t ) );
+    char* ptr = buf.get() + sizeof( size_t );
 
     if( blockSize > 0 ) {
-        ptr = pw.pack( ptr, includeJob );
-        if( pw.job ) pw.job->info.step.store( Job::JSTEP_RUNNING );
+        ptr = wip.pack( ptr, includeJob );
+        if( wip.job ) wip.job->info.step.store( Job::JSTEP_RUNNING );
     }
+    blockSize = std::min(blockSize,ptr-buf.get()-sizeof(size_t));       // if something is compressed, we don't send the whole allocated block.
+    pack( buf.get(), blockSize );
 
-    peer->conn->writeAndCheck( buf, totalSize );
+    peer->conn->writeAndCheck( buf, blockSize + sizeof( size_t ) );
 
 }
 

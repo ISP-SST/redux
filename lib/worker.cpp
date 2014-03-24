@@ -232,7 +232,7 @@ void Worker::run( void ) {
     runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(sleepS));
     runTimer.async_wait( strand.wrap(boost::bind( &Worker::run, this )) );
     
-    if( sleepS < 16 ) {
+    if( sleepS < 4 ) {
         sleepS <<= 1;
     }
 

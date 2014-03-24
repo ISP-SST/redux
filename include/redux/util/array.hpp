@@ -64,8 +64,8 @@ namespace redux {
                 const_iterator operator++( int ) { const_iterator i = *this; ( this->*incrementor )(); return i; }
                 const_iterator operator--( int ) { const_iterator i = *this; ( this->*decrementor )(); return i; }
 
-                const_reference operator*() { return *( cdata + pos_ ); }
-                const_pointer operator->()  { return cdata + pos_; }
+                const_reference operator*() const { return *( cdata + pos_ ); }
+                const_pointer operator->() const { return cdata + pos_; }
                 operator const_pointer() const { return ( cdata + pos_ ); }
 
                 const_iterator& operator+=( const const_iterator& rhs ) { pos_ += rhs.pos_; trimUp(); return *this; }
@@ -203,7 +203,7 @@ namespace redux {
 
 
             template <typename U>
-            Array( Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) {
+            Array( const Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) {
 
                 nDims_ = rhs.nDims_;
                 dimFirst = rhs.dimFirst;
@@ -215,12 +215,13 @@ namespace redux {
                 setLimits(first,last);
 
             }
+            //template <typename U>
+            //Array( const Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) : Array(const_cast<Array<T>&>(rhs),first,last) {}
             template <typename U>
-            Array( Array<T>& rhs, const std::vector<U>& indices ) {
+            Array( const Array<T>& rhs, const std::vector<U>& indices ) {
 
                 size_t nIndices = indices.size();
                 nDims_ = rhs.nDims_;
-                
                 if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
                     throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices: " + printArray(indices,"indices"));
                 }
@@ -241,15 +242,15 @@ namespace redux {
                 }
             }
             template <typename ...S>
-            Array( Array<T>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            Array( const Array<T>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
             
             template <typename U, typename V>
-            Array( Array<U>& rhs, const std::vector<V>& indices ) : dense_(true) {
+            Array( const Array<U>& rhs, const std::vector<V>& indices ) : dense_(true) {
                 rhs.copy(this);
                 setLimits(indices);
             }
             template <typename U, typename ...S>
-            Array( Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            Array( const Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
             
             template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
 
@@ -315,7 +316,7 @@ namespace redux {
             
             /*! @name permuteDimensions
              *  @brief Permute the dimensions specified
-             *  @warning This will only shuffle the dimensional information around, the datablock will not be touched.
+             *  @note This will only shuffle the dimensional information around, the datablock will not be touched.
              */
             //@{
             void permuteDimensions( const std::vector<size_t>& dims ) {
@@ -341,7 +342,21 @@ namespace redux {
             template <typename ...S> void permuteDimensions( S ...dims ) { permuteDimensions( {static_cast<size_t>( dims )...} ); }
             //@}
             
-            const std::vector<size_t>& dimensions( void ) const { return dimSizes; }
+            const std::vector<int64_t>& first( void ) const { return dimFirst; }
+            const std::vector<int64_t>& last( void ) const { return dimLast; }
+            const std::vector<size_t>& dimensions(void) const { return dimSizes; }
+            const std::vector<size_t> dimensions( bool skipTrivialDims ) const {
+                if(skipTrivialDims) {
+                    std::vector<size_t> newDimSizes;
+                    for( auto & it : dimSizes ) {
+                        if( it > 1 || !skipTrivialDims) {
+                            newDimSizes.push_back( it );
+                        }
+                    }
+                    return std::move(newDimSizes);
+                }
+                return dimSizes;
+            }
             size_t nDimensions( void ) const { return dimSizes.size(); }
             size_t nElements( void ) const { return nElements_; }
 
@@ -390,7 +405,7 @@ namespace redux {
             }
 
             template <typename U>
-            void copy( Array<U> arr ) const {
+            void copy( Array<U>& arr ) const {
                 std::vector<size_t> newDimSizes;
                 for( auto & it : dimSizes ) {
                     if( it > 1 ) {
@@ -502,11 +517,62 @@ namespace redux {
             const Array<T>& operator/=( const T& rhs ) { for( auto & it : *this ) it /= rhs; return *this; };
             virtual void zero( void ) { if( nElements_ ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
 
+            
+            template <typename U>
+            const Array<T>& operator+=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it += *rhsit++;
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            template <typename U>
+            const Array<T>& operator-=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it -= *rhsit++;
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            template <typename U>
+            const Array<T>& operator*=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it *= *rhsit++;
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            template <typename U>
+            const Array<T>& operator/=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it /= *rhsit++;
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            
+            
             template <typename U>
             const Array<T>& operator=( const Array<U>& rhs ) {
                 if( !sameSizes( rhs ) ) this->resize( rhs.dimSizes );
                 typename Array<U>::const_iterator rhsit = rhs.begin();
-                for( auto & it : *this ) it = redux::util::bound_cast<T>( *rhsit++ );
+                for( auto & it : *this ) it = *rhsit++;
                 return *this;
             }
 

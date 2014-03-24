@@ -23,12 +23,13 @@ namespace redux {
 
             Image( void ) : weight( 1 ) {};
 
+            template <typename U>
+            Image( const Image<T>& rhs, const std::vector<U>& indices ) : redux::util::Array<T>(reinterpret_cast<const redux::util::Array<T>&>(rhs), indices ), weight( rhs.weight ) {}
+            template <typename ...S>
+            Image( const Image<T>& rhs, S ...s ) : Image<T>(rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
             template <typename ...S>
             Image( S ...s ) : redux::util::Array<T>(s... ), weight( 1 ) {}
             
-            template <typename ...S>
-            Image( Image<T>& rhs, S ...s ) : redux::util::Array<T>(reinterpret_cast<redux::util::Array<T>&>(rhs), s... ), weight( rhs.weight ) {}
-
             // operators with scalars
             const Image<T>& operator= ( const T& rhs ) { for( auto & it : *this ) it  = rhs; return *this; };
             const Image<T>& operator+=( const T& rhs ) { for( auto & it : *this ) it += rhs; return *this; };
@@ -86,83 +87,41 @@ namespace redux {
                 }
                 return tmp;
             }
-            
-            template <typename U>
-            void copy( Image<U> img ) const {
-                std::vector<size_t> newDimSizes;
-                for (auto& it: this->dimensions()) {
-                    if(it>1) {
-                        newDimSizes.push_back(it);
-                    }
-                }
-                img.resize( newDimSizes );
-                auto cit = this->begin();
-                for( auto& it : img ) {
-                    it = static_cast<U>( *cit );
-                    ++cit;
-                }
 
-            } 
 
             template <typename U>
-            const Image<T>& operator=( const Image<U>& rhs ) {
+            const Image<T>& operator=( const redux::util::Array<U>& rhs ) {
                 redux::util::Array<T>::operator=(rhs);
-                weight = rhs.weight; 
                 return *this;
             }
 
             template <typename U>
-            const Image<T>& operator+=( const Image<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    typename Image<U>::const_iterator rhsit = rhs.begin();
-                    for( auto & it : *this ) it += redux::util::bound_cast<T>( *rhsit++ );
-                    weight += rhs.weight; 
-                }
-                else {
-                    throw std::invalid_argument( "image dimensions does not match." );
-                }
+            const Image<T>& operator+=( const redux::util::Array<U>& rhs ) {
+                redux::util::Array<T>::operator+=(rhs);
                 return *this;
             }
 
             template <typename U>
-            const Image<T>& operator-=( const Image<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    typename Image<U>::const_iterator rhsit = rhs.begin();
-                    for( auto & it : *this ) it -= redux::util::bound_cast<T>( *rhsit++ );
-                }
-                else {
-                    throw std::invalid_argument( "image dimensions does not match." );
-                }
+            const Image<T>& operator-=( const redux::util::Array<U>& rhs ) {
+                redux::util::Array<T>::operator-=(rhs);
                 return *this;
             }
 
             template <typename U>
-            const Image<T>& operator*=( const Image<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    typename Image<U>::const_iterator rhsit = rhs.begin();
-                    for( auto & it : *this ) it *= redux::util::bound_cast<T>( *rhsit++ );
-                }
-                else {
-                    throw std::invalid_argument( "image dimensions does not match." );
-                }
+            const Image<T>& operator*=( const redux::util::Array<U>& rhs ) {
+                redux::util::Array<T>::operator*=(rhs);
                 return *this;
-            }
+           }
 
             template <typename U>
-            const Image<T>& operator/=( const Image<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    typename Image<U>::const_iterator rhsit = rhs.begin();
-                    for( auto & it : *this ) it /= redux::util::bound_cast<T>( *rhsit++ );
-                }
-                else {
-                    throw std::invalid_argument( "image dimensions does not match." );
-                }
+            const Image<T>& operator/=( const redux::util::Array<U>& rhs ) {
+                redux::util::Array<T>::operator/=(rhs);
                 return *this;
             }
 
 
             template <typename U>
-            bool operator==( const Image<U>& rhs ) const {
+            bool operator==( const redux::util::Array<U>& rhs ) const {
                 if( this->sameSize( rhs ) ) {
                     typename Image<U>::const_iterator rhsit = rhs.begin();
                     for( auto & it : *this ) if( it != *rhsit++ ) return false;
