@@ -1,5 +1,7 @@
 #include "redux/image/utils.hpp"
 
+#include "redux/math/functions.hpp"
+
 #include <map>
 
 using namespace redux::image;
@@ -129,3 +131,36 @@ double redux::image::horizontalInterpolation( T** array, size_t sizeY, size_t si
 }
 template double redux::image::horizontalInterpolation( float**, size_t, size_t, size_t, size_t );
 template double redux::image::horizontalInterpolation( double**, size_t, size_t, size_t, size_t );
+
+
+template <typename T>
+void redux::image::apodize( Array<T>& array, size_t blendRegion ) {
+    if(!blendRegion) return;
+    size_t sizeY = array.dimSize(0);
+    size_t sizeX = array.dimSize(1);
+    if( blendRegion > sizeX || blendRegion > sizeY ) throw logic_error("apodize(Array<T>&) only implemented for 2 dimensions");
+    
+    T* tmp = new T[blendRegion+1];
+    tmp[0] = 0;
+    redux::math::apodize( tmp, blendRegion, T(1) );
+    auto sharedPtrs = array.get(sizeY,sizeX);
+    T** data = sharedPtrs.get();
+    for(size_t y=0,yy=sizeY-1; y<sizeY; ++y,--yy ) {
+        double yfactor = 1;
+        if( y < blendRegion ) yfactor *= tmp[y];
+        for(size_t x=0,xx=sizeX-1; x<sizeX; ++x,--xx ) {
+            double xfactor = yfactor;
+            if( x < blendRegion ) xfactor *= tmp[x];
+            if(xfactor < 1) {
+                data[y][x]   *= xfactor;
+                data[yy][x]  *= xfactor;
+                data[y][xx]  *= xfactor;
+                data[yy][xx] *= xfactor;
+            }
+        }
+    }
+    delete[] tmp;
+}
+template void redux::image::apodize( Array<double>&, size_t );
+template void redux::image::apodize( Array<float>&, size_t );
+

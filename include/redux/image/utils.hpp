@@ -208,6 +208,8 @@ namespace redux {
             }
         }
 
+        template <typename T>
+        void apodize( redux::util::Array<T>& array, size_t blendRegion );
 
     }   // image
 
