@@ -37,6 +37,43 @@ namespace redux {
         }
 
 
+
+        /*! @brief Find the new location of element "i" after transposing an MxN matrix.
+        *   @param i Original location (as linear offset from the first element in the matrix)
+        *   @param sizeY Size of the first dimension ( "row", slow )
+        *   @param sizeX Size of the second dimension ( "column", fast )
+        *   @returns The new location
+        */
+        inline size_t nextLocation( int i, size_t sizeY, size_t sizeX ) {
+            return ( i % sizeX ) * sizeY + i / sizeX;
+        }
+
+        /*! @brief Transpose a 2D array (MxN matrix) of arbitrary type and size.
+         *  @details Performs an in-place transpose of the matrix. The Method works by traversing through the permutaion-cycles, swapping the elements pairwise.
+         *  @param data Input 2D Array (matrix)
+         *  @param sizeY Size of the first dimension ("row",slow)
+         *  @param sizeX Size of the second dimension ("column",fast)
+         */
+        template <class T>
+        void transpose( T* data, size_t sizeY, size_t sizeX ) {
+
+            if( sizeY && sizeX && data ) {
+                size_t stillToMove = sizeY * sizeX;
+                for( size_t i = 0; stillToMove; ++i ) {
+                    size_t j, k;
+                    for( j = nextLocation( i, sizeY, sizeX ); j > i; j = nextLocation( j, sizeY, sizeX ) ) ; //cycle.push_back(j+1);
+                    if( j < i ) continue; // If true, we already traversed this cycle earlier.
+                    // Note: j=nextLocation(i,sizeY,sizeX) => i=nextLocation(j,sizeX,sizeY) (cf. transposing MxN vs. NxM)
+                    // We need to traverse the cycle backwards to get the elements in the right place by simple swapping, so interchange sizeY & sizeX
+                    for( k = i, j = nextLocation( i, sizeX, sizeY ); j != i; k = j, j = nextLocation( j, sizeX, sizeY ) ) {
+                        std::swap( data[k], data[j] );
+                        --stillToMove;
+                    }
+                    --stillToMove;
+                }
+            }
+        }
+
         /*! @name pack
          *  @brief Pack the data into a dense string of characters, suitable for sending across the network or write to file.
          *  @param   ptr Where to store the data

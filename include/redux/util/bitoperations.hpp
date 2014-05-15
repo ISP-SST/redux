@@ -129,7 +129,7 @@ namespace redux {
          *  int b = nextPowerOfTwo(a); // = 32768
          *  @endcode
          */
-        inline int nextPowerOfTwo( uint32_t v ) {
+        inline uint32_t nextPowerOfTwo( uint32_t v ) {
             v--;
             v |= v >> 1;
             v |= v >> 2;

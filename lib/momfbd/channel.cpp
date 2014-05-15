@@ -676,7 +676,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
     LOG_WARN << boost::format( "Dimensions of dark (%s)." ) % printArray( dark.dimensions(), "" );
     LOG_WARN << boost::format( "Dimensions of gain (%s)." ) % printArray( gain.dimensions(), "" );
 
-    if( dark && gain ) {
+    if( dark.valid() && gain.valid() ) {
         if( ! subimg.sameSize( dark ) ) {
             LOG_ERR << boost::format( "Dimensions of dark (%s) does not match this image (%s), skipping flatfielding !!" ) % printArray( dark.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
             return;
@@ -685,7 +685,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
             LOG_ERR << boost::format( "Dimensions of gain (%s) does not match this image (%s), skipping flatfielding !!" ) % printArray( gain.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
             return;
         }
-        if( ccdResponse && !subimg.sameSize( ccdResponse ) ) {
+        if( ccdResponse.valid() && !subimg.sameSize( ccdResponse ) ) {
             LOG_WARN << boost::format( "Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!" ) % printArray( ccdResponse.dimensions(), "" ) % printArray( subimg.dimensions(), "" );
             ccdResponse.resize();
         }
@@ -693,11 +693,11 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
         subimg -= dark;
         modified = true;
 
-        if( ccdResponse ) {  // correct for the detector response (this should not contain the gain correction and must be done before descattering)
+        if( ccdResponse.valid() ) {  // correct for the detector response (this should not contain the gain correction and must be done before descattering)
             subimg *= ccdResponse;
         }
 
-        if( ccdScattering && psf ) {          // apply backscatter correction
+        if( ccdScattering.valid() && psf.valid() ) {          // apply backscatter correction
             if( subimg.sameSize( ccdScattering ) && subimg.sameSize( psf ) ) {
                 LOG_DETAIL << "Applying correction for CCD transparency.";
                 // TODO:  descatter(data,psf,bgain,io);
@@ -739,7 +739,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
     imageStats[index]->getStats(myJob.borderClip, subimg);      // get all stats for the cleaned up data
 
     if( modified && flags & MFBD_SAVE_FFDATA ) {
-        string fnT = fn.leaf().string();
+        //string fnT = fn.leaf().string();
         fn = bfs::path( fn.leaf().string() + ".cor" );
 
         LOG_DETAIL << boost::format( "Saving file \"%s\"" ) % fn.string();
@@ -801,7 +801,7 @@ char* Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
     
     int localTiltX = 0;
     int localTiltY = 0;
-    if(xOffset) {
+    if(xOffset.valid()) {
         Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
         Statistics<int16_t> stats;
         stats.getStats(tmpOff,ST_VALUES);
@@ -809,7 +809,7 @@ char* Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
         patch->residualTilts.x = modf(stats.mean/100 , &tmp);
         localTiltX = lrint(tmp);
     }
-    if(yOffset) {
+    if(yOffset.valid()) {
         Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
         Statistics<int16_t> stats;
         stats.getStats(Image<int16_t>(yOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x),ST_VALUES);
@@ -854,31 +854,31 @@ Point Channel::clipImages(void) {
     images.setLimits( 0, imageNumbers.size()-1, alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
     images.trim(false);
     
-    if( dark ) {
+    if( dark.valid() ) {
         LOG_DETAIL << "Clipping dark: " << printArray(dark.dimensions(),"original size");
         dark.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         dark.trim();
     }
 
-    if( gain ) {
+    if( gain.valid() ) {
         LOG_DETAIL << "Clipping gain: " << printArray(gain.dimensions(),"original size");
         gain.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         gain.trim();
     }
 
-    if( ccdResponse ) {
+    if( ccdResponse.valid() ) {
         LOG_DETAIL << "Clipping ccdResponse: " << printArray(ccdResponse.dimensions(),"original size");
         ccdResponse.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         dark.trim();
     }
 
-    if( ccdScattering ) {
+    if( ccdScattering.valid() ) {
         LOG_DETAIL << "Clipping ccdScattering: " << printArray(ccdScattering.dimensions(),"original size");
         ccdScattering.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         ccdScattering.trim();
     }
 
-    if( psf ) {     // The PSF has to be symmetrically clipped, otherwise the convolution will be skewed.
+    if( psf.valid() ) {     // The PSF has to be symmetrically clipped, otherwise the convolution will be skewed.
         const std::vector<size_t>& dims = psf.dimensions();
         auto tmp = alignClip;
         size_t sy = alignClip[3] - alignClip[2] + 1;
@@ -908,31 +908,31 @@ Point Channel::clipImages(void) {
             if (flipY) reverseY(imgPtr[i],sy,sx);
         }
         shared_ptr<float*> tmpShared;
-        if( dark ) {
+        if( dark.valid() ) {
             tmpShared = dark.get(sy,sx);
             if (flipX) reverseX(tmpShared.get(),sy,sx);
             if (flipY) reverseY(tmpShared.get(),sy,sx);
         }
 
-        if( gain ) {
+        if( gain.valid() ) {
             tmpShared = gain.get(sy,sx);
             if (flipX) reverseX(tmpShared.get(),sy,sx);
             if (flipY) reverseY(tmpShared.get(),sy,sx);
         }
 
-        if( ccdResponse ) {
+        if( ccdResponse.valid() ) {
             tmpShared = ccdResponse.get(sy,sx);
             if (flipX) reverseX(tmpShared.get(),sy,sx);
             if (flipY) reverseY(tmpShared.get(),sy,sx);
         }
 
-        if( ccdScattering ) {
+        if( ccdScattering.valid() ) {
             tmpShared = ccdScattering.get(sy,sx);
             if (flipX) reverseX(tmpShared.get(),sy,sx);
             if (flipY) reverseY(tmpShared.get(),sy,sx);
         }
 
-        if( psf ) {
+        if( psf.valid() ) {
             tmpShared = psf.get(sy,sx);
             if (flipX) reverseX(tmpShared.get(),sy,sx);
             if (flipY) reverseY(tmpShared.get(),sy,sx);

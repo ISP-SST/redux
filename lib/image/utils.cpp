@@ -135,16 +135,17 @@ template double redux::image::horizontalInterpolation( double**, size_t, size_t,
 
 template <typename T>
 void redux::image::apodize( Array<T>& array, size_t blendRegion ) {
-    if(!blendRegion) return;
-    size_t sizeY = array.dimSize(0);
-    size_t sizeX = array.dimSize(1);
-    if( blendRegion > sizeX || blendRegion > sizeY ) throw logic_error("apodize(Array<T>&) only implemented for 2 dimensions");
+    if(!blendRegion) return;        // nothing to do
+    const vector<int64_t>& first = array.first();
+    size_t sizeY = array.last()[0]-first[0]+1;
+    size_t sizeX = array.last()[1]-first[1]+1;
+    blendRegion = std::min(std::min(blendRegion,sizeY),sizeX);
     
     T* tmp = new T[blendRegion+1];
     tmp[0] = 0;
     redux::math::apodize( tmp, blendRegion, T(1) );
-    auto sharedPtrs = array.get(sizeY,sizeX);
-    T** data = sharedPtrs.get();
+//     auto sharedPtrs = array.get(sizeY,sizeX);
+//     T** data = sharedPtrs.get();
     for(size_t y=0,yy=sizeY-1; y<sizeY; ++y,--yy ) {
         double yfactor = 1;
         if( y < blendRegion ) yfactor *= tmp[y];
@@ -152,15 +153,17 @@ void redux::image::apodize( Array<T>& array, size_t blendRegion ) {
             double xfactor = yfactor;
             if( x < blendRegion ) xfactor *= tmp[x];
             if(xfactor < 1) {
-                data[y][x]   *= xfactor;
-                data[yy][x]  *= xfactor;
-                data[y][xx]  *= xfactor;
-                data[yy][xx] *= xfactor;
+                array(y,x)   *= xfactor;
+                array(yy,x)  *= xfactor;
+                array(y,xx)  *= xfactor;
+                array(yy,xx) *= xfactor;
             }
         }
     }
     delete[] tmp;
 }
+template void redux::image::apodize( Array<int16_t>&, size_t );
+template void redux::image::apodize( Array<int32_t>&, size_t );
 template void redux::image::apodize( Array<double>&, size_t );
 template void redux::image::apodize( Array<float>&, size_t );
 

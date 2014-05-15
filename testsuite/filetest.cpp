@@ -1,12 +1,10 @@
 #include <boost/test/unit_test.hpp>
 
-
 #include "redux/file/fileio.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/stringutil.hpp"
-
 
 using namespace redux::file;
 using namespace redux::image;
@@ -89,7 +87,6 @@ namespace {
 
 
 }
-
 
 void anaTest( void ) {
 
@@ -190,10 +187,9 @@ void anaTest( void ) {
     BOOST_CHECK( imagecopy != image );
     redux::file::Ana::write(testFileAna,subimage);
     redux::file::Ana::read(testFileAna,subimagecopy);
-    BOOST_CHECK_EQUAL( imagecopy, image );
+    BOOST_CHECK( imagecopy == image );
     
 }
-
 
 namespace testsuite {
 

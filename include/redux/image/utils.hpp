@@ -32,45 +32,6 @@ namespace redux {
         }
 
 
-        /*! @fn size_t nextLocation( int i, size_t M, size_t sizeX )
-        *   @brief Find the new location of element "i" after transposing an MxN matrix.
-        *   @param i Original location (as linear offset from the first element in the matrix)
-        *   @param sizeY Size of the first dimension ( "row", slow )
-        *   @param sizeX Size of the second dimension ( "column", fast )
-        *   @returns The new location
-        */
-        inline size_t nextLocation( int i, size_t sizeY, size_t sizeX ) {
-            return ( i % sizeX ) * sizeY + i / sizeX;
-        }
-
-        /*! @fn void transpose( T* data, size_t sizeY, size_t sizeX )
-         *  @brief Transpose a 2D array (MxN matrix) of arbitrary type and size.
-         *  @details Performs an in-place transpose of the matrix. The Method works by traversing through the permutaion-cycles, swapping the elements pairwise.
-         *  @param data Input 2D Array (matrix)
-         *  @param sizeY Size of the first dimension ("row",slow)
-         *  @param sizeX Size of the second dimension ("column",fast)
-         */
-        template <class T>
-        void transpose( T* data, size_t sizeY, size_t sizeX ) {
-
-            if( sizeY && sizeX && data ) {
-                size_t stillToMove = sizeY * sizeX;
-                for( size_t i = 0; stillToMove; ++i ) {
-                    size_t j, k;
-                    for( j = nextLocation( i, sizeY, sizeX ); j > i; j = nextLocation( j, sizeY, sizeX ) ) ; //cycle.push_back(j+1);
-                    if( j < i ) continue; // If true, we already traversed this cycle earlier.
-                    // Note: j=nextLocation(i,sizeY,sizeX) => i=nextLocation(j,sizeX,sizeY) (cf. transposing MxN vs. NxM)
-                    // We need to traverse the cycle backwards to get the elements in the right place by simple swapping, so interchange sizeY & sizeX
-                    for( k = i, j = nextLocation( i, sizeX, sizeY ); j != i; k = j, j = nextLocation( j, sizeX, sizeY ) ) {
-                        std::swap( data[k], data[j] );
-                        --stillToMove;
-                    }
-                    --stillToMove;
-                }
-            }
-        }
-
-
         template <typename T>
         double total( const redux::util::Array<T>& in ) {
             double sum( 0 );
@@ -139,10 +100,10 @@ namespace redux {
             }
             size_t nElements = a.nElements();
             if( nElements == 0 ) return 0.0;
-            double tmp, chisq = 0;
+            double chisq = 0;
             typename redux::util::Array<U>::const_iterator bit = b.begin();
             for( auto ait : a ) {
-                tmp = ait - *bit++;
+                double tmp = ait - *bit++;
                 chisq += tmp * tmp;
             }
             return chisq / static_cast<double>( nElements );
@@ -157,7 +118,7 @@ namespace redux {
             double tmp, chisq = 0;
             typename redux::util::Array<U>::const_iterator bit = b.begin();
             typename redux::util::Array<V>::const_iterator wit = weight.begin()--;
-            size_t count;
+            size_t count(0);
             for( auto ait : a ) {
                 if( *++wit ) {
                     tmp = ( ait - *bit++ ) * ( *wit );
@@ -185,19 +146,15 @@ namespace redux {
             size_t offset = 0;
             for( size_t y = 0; y < sy; ++y ) {
                 for( size_t x = 0; x < sx; ++x ) {
-                    //std::cout << "x = " << x << "    y = " << y << "    arr = " << array[y][x] << "    pred = " << (int)predicate(array[y][x]) << std::endl;
                     if( predicate( array[y][x] ) ) tmp.insert( std::pair<size_t, T>( offset, filler( y, x ) ) );
                     ++offset;
                 }
             }
             size_t cnt = 0;
             for( auto it : tmp ) {
-                //std::cout << "first = " << it.first << "    second = " << it.second << "    orig = " << ptr[it.first] << std::endl;
                 ptr[it.first] = it.second;
                 ++cnt;
             }
-            std::cout << "cnt = " << cnt << std::endl;
-            std::cout << "fillPixels   sy = " << sy << "   sx = " << sx << std::endl;
         }
 
 

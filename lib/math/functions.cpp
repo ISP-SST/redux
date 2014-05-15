@@ -49,6 +49,8 @@ void redux::math::apodize( T* data, size_t n, const T& target ) {
     }
 
 }
+template void redux::math::apodize( int16_t*, size_t, const int16_t&);
+template void redux::math::apodize( int32_t*, size_t, const int32_t&);
 template void redux::math::apodize( float*, size_t, const float&);
 template void redux::math::apodize( double*, size_t, const double&);
 

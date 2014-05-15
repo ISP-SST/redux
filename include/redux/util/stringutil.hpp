@@ -15,7 +15,7 @@ namespace redux {
          *  @{
          */
 
-        
+
         /*!  @file      stringutil.hpp
          *   @brief     Collection of functions for string-manipulation
          *   @author    Tomas Hillberg (hillberg@astro.su.se)
@@ -59,11 +59,10 @@ namespace redux {
         */
         std::string alignRight( const std::string& s, size_t n = 20, unsigned char c = ' ' );
 
-        std::string getUname( __uid_t id=0 );
-        std::string cleanPath( std::string path, std::string base="" );
+        std::string getUname( __uid_t id = 0 );
+        std::string cleanPath( std::string path, std::string base = "" );
 
-        /*! @fn std::string hexString( const T& v, bool prefix=true )
-         *  @brief Converts integer types to a hexadecimal std::string
+        /*! @brief Converts integer types to a hexadecimal std::string
          */
         template <typename T>
         std::string hexString( const T& v, bool prefix = true ) {
@@ -78,10 +77,22 @@ namespace redux {
         }
 
 
-        /*! @fn template <typename T> std::string bitString( T var )
-         *  @brief Print the bit-content of a variable as an std::string, e.g bitString((int)4) returns "00000000 00000000 00000000 00000100"
+        /*! @name bitString
+         *  @brief Return the bit-content of a variable as an std::string.
          */
-        template <typename T> std::string bitString( T var ) {
+        //@{
+        /*!
+         *  @param var pointer to input
+         *  @code 
+         *  int64_t foo = (1L<<60);
+         *  cout << bitString(foo) << endl;
+         *  @endcode
+         *  will output
+         *  @code
+         *  00010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+         *  @endcode
+         */
+        template <typename T> std::string bitString( const T& var ) {
 
             std::string tmp;
             uint8_t* begin = ( uint8_t* )( &var );
@@ -101,11 +112,17 @@ namespace redux {
         }
 
 
-        /*! @fn std::string bitString( T* var, size_t n=1 )
-         *  @brief Print the bit-content of an array of data as an std::string \n
-         *  e.g uint8_t a[] = {0,1,2,3} => bitString(aa,4) returns "00000011 00000010 00000001 00000000"
+        /*! 
          *  @param var pointer to input
          *  @param n number of elements to iterate over
+         *  @code 
+         *  char foo[] = {0,0,0,0,0,0,0,16};
+         *  cout << bitString(foo,8) << endl;
+         *  @endcode
+         *  will output
+         *  @code
+         *  00010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+         *  @endcode
          */
         template <typename T> std::string bitString( T* var, size_t n ) {
 
@@ -125,12 +142,30 @@ namespace redux {
 
             return tmp;
         }
+        //@}
 
-
-        /*! @fn std::string printBits( T* var, size_t n=1 )
+        /*! @name
          *  @brief Generate a std::string showing the memory layout of var
          *  @param var pointer to input
          *  @param n number of elements to be printed
+         *  @code 
+         *  int64_t foo = (1L<<60);
+         *  cout << printBits(foo) << endl;
+         *  cout << endl << bitString(foo) << endl;
+         *  @endcode
+         *  will output
+         *  @code
+         *     MSB <<  7  6  5  4  3  2  1  0  << LSB
+         *  Byte 7     0  0  0  1  0  0  0  0   16 (10)
+         *  Byte 6     0  0  0  0  0  0  0  0    0 (00)
+         *  Byte 5     0  0  0  0  0  0  0  0    0 (00)
+         *  Byte 4     0  0  0  0  0  0  0  0    0 (00)
+         *  Byte 3     0  0  0  0  0  0  0  0    0 (00)
+         *  Byte 2     0  0  0  0  0  0  0  0    0 (00)
+         *  Byte 1     0  0  0  0  0  0  0  0    0 (00)
+         *  Byte 0     0  0  0  0  0  0  0  0    0 (00)
+         *            ------------------------            
+         *  @endcode
          */
         template <typename T> inline std::string printBits( T* var, size_t n = 1 ) {
 
@@ -163,7 +198,7 @@ namespace redux {
             return tmp;
         }
 
-        
+
         /*! @fn std::string printBits( const T& var, size_t n=1 )
          *  @brief Generate a std::string showing the memory layout of var
          *  @param var input
@@ -201,49 +236,119 @@ namespace redux {
             return tmp;
         }
 
-        
+
+        /*! @name printArray
+         *  @details Simple way to output arrays in a form that can be copy/pasted into IDL/Matlab etc.
+         */
+        //@{
+        /*! @brief Print the content of a matrix as name = [[ 1, 2], [3, 4], ..., [n-1, n]]
+         *  @param data Pointer to data (second order)
+         *  @param firstY First row index.
+         *  @param lastY  Last row index.
+         *  @param firstX First column index.
+         *  @param lastX  Last column index.
+         *  @param name Name to be printed
+         *  @param delimiters List with two delimiters (column/row separators). The square brackets are always added around each row.
+         *  @param d width/precision parameter to be passed on to stringstream.precision()
+         *  @code
+         *  cout << printArray(myData,2,4,2,4,"foo", {",",";\n      "}) << endl;
+         *  @endcode
+         *  will output something like
+         *  @code
+         *  foo = [[-0.433, 0.852, -0.294];
+         *        [-0.477, -0.493, -0.727];
+         *        [-0.764, -0.175, 0.62]]
+         *  @endcode
+         */
         template <typename T>
-        std::string printBlock( T* data, size_t n, int d = 3, const std::string& delimiters = "[]", const char separator = ',' ) {
-
+        std::string printArray( T** data, size_t firstY, size_t lastY, size_t firstX, size_t lastX, const std::string& name = "matrix", const std::vector<std::string>& delimiters = {",",","}, int d = 3 ) {
             std::ostringstream oss;
-            size_t mid = delimiters.length() >> 1;
-            if( mid ) {
-                oss << delimiters.substr( 0, mid );
-            }
-
-            oss << std::setprecision( d );
-            bool notFirst( true );
-            for( size_t i = 0; i < n; ++i ) {
-                if( notFirst ) {
-                    oss << separator;
+            oss.precision( d );
+            oss << name << " = [";
+            bool rowSeparator( false );
+            for( size_t i = firstY; i <= lastY; ++i ) {
+                bool elementSeparator( false );
+                    if( rowSeparator ) {
+                        oss << delimiters[1] << " ";
+                    } else {
+                        rowSeparator = true;
+                    }
+                    oss << "[";
+                for( size_t j = firstX; j <= lastX; ++j ) {
+                    if( elementSeparator ) {
+                        oss << delimiters[0] << " ";
+                    } else elementSeparator = true;
+                    oss << data[i][j];
                 }
-                oss << data[i];
-                notFirst = true;
+                oss << "]";
             }
+            oss << "]";
+            return oss.str();
+        }
 
-            oss << delimiters[1];
-            if( mid ) {
-                oss << delimiters.substr( mid );
+        /*! @brief Print the content of a matrix as name = [[ 1, 2], [3, 4], ..., [n-1, n]]
+         *  @param data Pointer to data (second order)
+         *  @param m First (slow/row) dimension size.
+         *  @param n Second (fast/column) dimension size.
+         *  @param name Name to be printed
+         *  @param delimiters List with two delimiters (column/row separators). The square brackets are always added around each row.
+         *  @param d width/precision parameter to be passed on to stringstream.precision()
+         *  @code
+         *  cout << printArray(myData,3,3,"foo", {",",";\n      "}) << endl;
+         *  @endcode
+         *  will output something like
+         *  @code
+         *  foo = [[-0.433, 0.852, -0.294];
+         *        [-0.477, -0.493, -0.727];
+         *        [-0.764, -0.175, 0.62]]
+         *  @endcode
+         */
+        template <typename T>
+        std::string printArray( T** data, size_t m, size_t n, const std::string& name = "matrix", const std::vector<std::string>& delimiters = {",",","}, int d = 3 ) {
+            std::ostringstream oss;
+            oss.precision( d );
+            oss << name << " = [";
+            bool rowSeparator( false );
+            for( size_t i = 0; i < m; ++i ) {
+                bool elementSeparator( false );
+                    if( rowSeparator ) {
+                        oss << delimiters[1] << " ";
+                    } else {
+                        rowSeparator = true;
+                    }
+                    oss << "[";
+                for( size_t j = 0; j < n; ++j ) {
+                    if( elementSeparator ) {
+                        oss << delimiters[0] << " ";
+                    } else elementSeparator = true;
+                    oss << data[i][j];
+                }
+                oss << "]";
             }
-
+            oss << "]";
             return oss.str();
         }
 
 
-        //@{
-        /*! @brief Print the content of a vector as data = [[ 1, 2], [3, 4], ..., [n-1, n] ]
-         *  @details Simple way to output a vector in a form that can be copy/pasted into IDL etc.
-         *  @param data reference to input or pointer to data
-         *  @param n number of elements to print (for pointer version)
-         *  @param s name to be printed
-         *  @param d width/precision parameter to be passed on to toString()
+        /*! @brief Print the content of an array as name = [ 1, 2, 3, ..., n ]
+         *  @param data Pointer to data (second order)
+         *  @param n Size of array.
+         *  @param name Name to be printed
+         *  @param d width/precision parameter to be passed on to stringstream.precision()
+         *  @code
+         *  cout << printArray(myData,9,"foo", 5) << endl;
+         *  @endcode
+         *  will output something like
+         *  @code
+         *  foo = [-0.43326, 0.85281, -0.29473, -0.47733, -0.49376, -0.72729, -0.76411, -0.17500, 0.62737]
+         *  @endcode
          */
         template <typename T>
-        std::string printArray( T* data, size_t n, const char* s = "vector", int d = 3 ) {
+        std::string printArray( T* data, size_t n, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
-            oss.precision(d);
-            oss << s << "=[";
+            oss.precision( d );
+            oss << name << " = [";
             bool separator( false );
             for( size_t i = 0; i < n; ++i ) {
                 if( separator ) {
@@ -258,12 +363,24 @@ namespace redux {
             return oss.str();
         }
 
-        
+
+        /*! @brief Print the content of an STL container (or anything that has begin()/end() iterator initializers as name = [ 1, 2, 3, ..., n ]
+         *  @param data Reference to container
+         *  @param name Name to be printed
+         *  @param d width/precision parameter to be passed on to stringstream.precision()
+         *  @code
+         *  cout << printArray(myData,"foo") << endl;
+         *  @endcode
+         *  will output something like
+         *  @code
+         *  foo = [-0.433, 0.881, -0.293, -0.433, -0.493, -0.729, -0.764, -0.175, 0.627]
+         *  @endcode
+         */
         template <typename T>
-        inline std::string printArray( const T& data, const char* s = "vector", int d = 3 ) {
+        inline std::string printArray( const T& data, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
-            oss << std::setprecision( d ) << s << "=[";
+            oss << std::setprecision( d ) << name << " = [";
             bool separator( false );
             for( auto & it : data ) {
                 if( separator ) {
