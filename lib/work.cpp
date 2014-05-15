@@ -46,7 +46,7 @@ WorkInProgress::WorkInProgress( network::Peer::Ptr p ) : peer( p ) {
 }
 
 size_t WorkInProgress::size( bool includeJob ) const {
-    size_t sz = sizeof( size_t ); // nParts
+    size_t sz = sizeof( size_t ) + 1 ; // nParts + includeJob
     if( includeJob ) {
         sz += job->size();
     }
@@ -61,10 +61,12 @@ size_t WorkInProgress::size( bool includeJob ) const {
 
 
 char* WorkInProgress::pack( char* ptr, bool includeJob ) const {
-    using redux::util::pack;
+
     if( includeJob ) {
+        ptr = redux::util::pack( ptr, uint8_t(1) );
         ptr = job->pack( ptr );
-    }
+    } else ptr = redux::util::pack( ptr, uint8_t(0) );
+
     ptr = pack( ptr, parts.size() );
     for( auto & it : parts ) {
         if( it ) {
@@ -75,9 +77,11 @@ char* WorkInProgress::pack( char* ptr, bool includeJob ) const {
 }
 
 
-const char* WorkInProgress::unpack( const char* cptr, bool includeJob, bool swap_endian ) {
-    using redux::util::unpack;
-    if( includeJob ) {
+const char* WorkInProgress::unpack( const char* cptr, bool swap_endian ) {
+
+    uint8_t hasJob;
+    cptr = redux::util::unpack( cptr, hasJob );
+    if( hasJob ) {
         string tmpS = string( cptr );
         job = Job::newJob( tmpS );
         if( job ) {

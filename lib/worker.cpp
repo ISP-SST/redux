@@ -128,7 +128,7 @@ bool Worker::fetchWork( void ) {
         const char* cptr = buf.get();
         char* end = buf.get() + blockSize;
 
-        cptr = wip.unpack( cptr, true, swap_endian );
+        cptr = wip.unpack( cptr, swap_endian );
 
         if( cptr != end ) {
             throw invalid_argument( "Parsing of datablock failed, there was a missmatch of " + to_string( cptr - end ) + " bytes." );
@@ -162,9 +162,13 @@ bool Worker::getWork( void ) {
     wip.peer.reset();
 
     if( daemon.getWork( wip ) || fetchWork() ) {    // first check for local work, then remote
-        //if( *(wip.job) != *lastJob ) { // NB: just a placeholder/example
-            // TBD: call a generic init-function to configure new jobs ??
-        //}
+        if( !lastJob || (wip.job && *(wip.job) != *lastJob) ) {
+            //LOG_DETAIL << "Different job !!!   " + wip.print();
+            wip.job->init();
+            if( lastJob ) {
+                lastJob->cleanup();
+            }
+        } //else LOG_DETAIL << "Same job !!!   " + wip.print();
         LOG_DETAIL << "Got work: " + wip.print();
         return true;
     }

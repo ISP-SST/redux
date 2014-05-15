@@ -31,7 +31,7 @@ namespace redux {
         WorkInProgress(network::Peer::Ptr p=0);
         size_t size( bool includeJob ) const;
         char* pack( char*, bool includeJob) const;
-        const char* unpack( const char*, bool includeJob, bool swap_endian=false );
+        const char* unpack( const char*, bool swap_endian=false );
         std::string print(void);
         std::shared_ptr<Job> job;
         std::vector<Part::Ptr> parts;
