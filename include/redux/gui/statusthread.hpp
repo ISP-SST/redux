@@ -14,6 +14,8 @@ namespace redux {
 
         class StatusThread : public QThread {
 
+            Q_OBJECT
+            
             bool isRunning, isConnected;
             Job::JobSet& jobs;
             //SysConfig *myNet;

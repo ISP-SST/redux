@@ -10,15 +10,15 @@ using namespace redux::gui;
 using namespace redux;
 using namespace std;
 
-StatusThread::StatusThread( Job::JobSet& j ) : jobs(j), isRunning( false ), isConnected( false ) {
+StatusThread::StatusThread( Job::JobSet& j ) : isRunning( false ), isConnected( false ), jobs(j) {
 
 }
 
 void StatusThread::run() {
 
     isRunning = true;
-    uint count = 0;
-    uint8_t cmd;
+    //uint count = 0;
+    //uint8_t cmd;
     while( isRunning ) {
         usleep( 2000 );
 //         if( ! isConnected ) {

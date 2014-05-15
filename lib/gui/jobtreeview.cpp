@@ -22,7 +22,7 @@ void JobTreeView::createActions( void ) {
     //addAct->setShortcut(tr("Ctrl+A"));
     //addAct->setStatusTip ( tr ( "Add Job" ) );
     //connect ( addAct, SIGNAL ( triggered() ), this, SLOT ( adding() ) );
-    ajAction* tmp;
+    //ajAction* tmp;
     /*
         for (int i=1; i<=REDUX::DEBUGJOB; ++i ) {
            tmp = new ajAction ( this, i );

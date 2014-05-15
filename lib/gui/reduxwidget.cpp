@@ -71,7 +71,8 @@ void ReduxWidget::createLayout() {
     masterLayout->addWidget( masterName, 0, 0, 1, 1 );
 
     masterPort = new QSpinBox( this );
-    masterPort->setMaximum( 65536 );
+    masterPort->setMaximum( 65535 );
+    masterPort->setMinimum( 1024 );
     masterPort->setValue( 30000 );
     masterLayout->addWidget( masterPort, 0, 2, 1, 1 );
 
@@ -239,7 +240,7 @@ void ReduxWidget::close() {
 
     QStringList files = QFileDialog::getOpenFileNames( this, tr( "Open File" ), "", tr( "Log Files (*_lg*)" ) );
 
-    int sz = PATH_MAX + 1; // N.B. It is possible to construct a path longer than PATH_MAX on most systems,
+    //int sz = PATH_MAX + 1; // N.B. It is possible to construct a path longer than PATH_MAX on most systems,
     // so this is really not fool-proof...
 //     char buf[sz];
 // 
@@ -311,30 +312,33 @@ void ReduxWidget::tryConnection( void ) {
     TcpConnection::Ptr conn = TcpConnection::newPtr( ioservice );
     conn->connect( masterName->text().toStdString(), to_string( masterPort->value() ) );
 
+cout << "tryConnection() beg" << endl;
     if( *conn ) {
         dumpMsg( string( "Connected to " ) + conn->socket().remote_endpoint().address().to_string() + string( ":" ) + masterPort->text().toStdString(), Qt::blue );
 
-        Command cmd;
+        uint8_t cmd = CMD_CONNECT;
         Peer master;
-        *conn << CMD_CONNECT;
-        *conn >> cmd;
+        boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
         if( cmd == CMD_AUTH ) {
             // implement
         }
         if( cmd == CMD_CFG ) {  // handshake requested
             *conn << myInfo;
             *conn >> master.host;
-            *conn >> cmd;       // ok or err
+            boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
+            //*conn >> cmd;       // ok or err
         }
         if( cmd != CMD_OK ) {
             dumpMsg( string( "Handshake with server failed: server replied " )+to_string((int)cmd), Qt::red );
             return;
         }
+cout << "tryConnection() mid" << endl;
         master.conn = conn;
         mainTabs->addTab( new MasterTab( master, this ), masterName->text() + QString( ":" ) + masterPort->text() );
 
     }
-
+cout << "tryConnection() end" << endl;
 }
 
 void ReduxWidget::closeTab( int ind ) {

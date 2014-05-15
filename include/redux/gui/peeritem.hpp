@@ -10,6 +10,7 @@ namespace redux {
     namespace gui {
 
         class PeerItem {
+            
         public:
             PeerItem( const QList<QVariant> &data, PeerItem *parent = 0, int hi = -1 );
             ~PeerItem();

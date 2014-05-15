@@ -476,8 +476,8 @@ void JobWidget::addHost( void ) {
 void JobWidget::removeHost( void ) {
 
     QModelIndexList selection = peerTree->selectedIndexes();
-    vector<int> indices;
-    int j;
+    vector<uint> indices;
+    uint j;
     for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); i++ ) {
         if( i->column() != 0 ) continue;
         j = i->row();
@@ -487,7 +487,7 @@ void JobWidget::removeHost( void ) {
     }
     std::sort( indices.begin(), indices.end() );
 
-    vector<int>::iterator it;
+    vector<uint>::iterator it;
     for( it = indices.end() - 1; it >= indices.begin(); --it ) {
         //myNet.hosts.erase( myNet.hosts.begin() + *it );
         if( *it < activeHost ) activeHost--;
@@ -523,7 +523,7 @@ void JobWidget::refreshPeerTab( void ) {
 void JobWidget::openJob( const QModelIndex& ind ) {
     activeJob = ind.row();
     //if ( ind.parent().flags() ) activeJob++;
-    int jobInd = mainTabs->indexOf( jobTab );
+    //int jobInd = mainTabs->indexOf( jobTab );
 
     emit jobsChanged();
     jobTree->reset();
@@ -586,8 +586,8 @@ void JobWidget::moveJobDown( void ) {
 void JobWidget::removeJob( void ) {
 
     QModelIndexList selection = jobTree->selectedIndexes();
-    vector<int> indices;
-    int j;
+    vector<uint> indices;
+    uint j;
     for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); i++ ) {
         if( i->column() != 0 ) continue;
         j = i->row();
@@ -596,7 +596,7 @@ void JobWidget::removeJob( void ) {
     }
     std::sort( indices.begin(), indices.end() );
 
-    vector<int>::iterator it;
+    vector<uint>::iterator it;
     for( it = indices.end() - 1; it >= indices.begin(); --it ) {
         cout << "removing job #" << *it << endl;
         //jobs.erase( jobs.begin() + *it );

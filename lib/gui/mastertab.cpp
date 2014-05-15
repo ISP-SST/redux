@@ -81,9 +81,9 @@ MasterTab::MasterTab( Peer& m, QWidget* par ) :
 
     this->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding );
 
-    // cout << "MasterTab::MasterTab() 3" << endl;
+    cout << "MasterTab::MasterTab() 3" << endl;
     getInfo();
-    //cout << "MasterTab::MasterTab() 4" << endl;
+    cout << "MasterTab::MasterTab() 4" << endl;
 }
 
 MasterTab::~MasterTab() {
@@ -154,7 +154,10 @@ bool MasterTab::getJobs( void ) {
         return true;
     }
 
-    *master.conn << CMD_GET_JOBLIST;
+    cout << "getJobs 1" << endl;
+    //*master.conn << CMD_GET_JOBLIST;
+    uint8_t cmd = CMD_GET_JOBLIST;
+    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
     shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
@@ -174,7 +177,7 @@ bool MasterTab::getJobs( void ) {
                 if( !ret.second ) {
                     //jobs.erase(ret.first);
                     //jobs.insert( job );
-                    //cout << "getJobs:  duplicate" << endl;
+                    cout << "getJobs:  duplicate" << endl;
                     //ret.first->stat = job->stat;
                 }
                 else {
@@ -191,6 +194,7 @@ bool MasterTab::getJobs( void ) {
         cout << "addJobs: Parsing of datablock failed, there was a missmatch of " << ( cptr - end ) << " bytes." << endl;
     }
 
+    cout << "getJobs E" << endl;
     return modified;
 
 }
@@ -203,8 +207,12 @@ bool MasterTab::getPeers( void ) {
     if( !master.conn || !*master.conn ) {
         return true;
     }
+    
+    cout << "getPeers 1" << endl;
 
-    *master.conn << CMD_PSTAT;
+    //*master.conn << CMD_PSTAT;
+    uint8_t cmd = CMD_PSTAT;
+    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
     shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
@@ -234,6 +242,7 @@ bool MasterTab::getPeers( void ) {
         return false;
     }
 
+    cout << "getPeers E" << endl;
     return modified;
 
 }
@@ -242,7 +251,7 @@ bool MasterTab::getPeers( void ) {
 
 void MasterTab::getInfo( void ) {
 
-//cout << "MasterTab::getInfo(1)" << endl;
+cout << "MasterTab::getInfo(1)" << endl;
 
     if( !master.conn || !*master.conn ) {
         cout << "broken connection" << endl;
@@ -255,6 +264,7 @@ void MasterTab::getInfo( void ) {
         emit infoChanged();
     }
 
+cout << "MasterTab::getInfo(2)" << endl;
 }
 
 void MasterTab::contextMenuEvent( QContextMenuEvent* event ) {

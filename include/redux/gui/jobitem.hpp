@@ -9,6 +9,7 @@ namespace redux {
     namespace gui {
 
         class JobItem {
+            
         public:
             JobItem( const QList<QVariant> &data, JobItem *parent = 0, int ji = -1 );
             ~JobItem();
