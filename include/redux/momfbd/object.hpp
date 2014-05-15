@@ -50,6 +50,8 @@ namespace redux {
         private:
 
             bool isValid(void);
+            void init(void);
+            void cleanup(void);
             void loadData(boost::asio::io_service&, boost::thread_group&);
             void preprocessData(boost::asio::io_service&, boost::thread_group&);
             void normalize(boost::asio::io_service&, boost::thread_group&);

@@ -578,6 +578,27 @@ void MomfbdJob::returnParts( WorkInProgress& wip ) {
 }
 
 
+void MomfbdJob::init(void) {
+    
+    //redux::image::KL_cfg* coeff = nullptr;
+    if( klMinMode || klMaxMode ) {
+        LOG << "calculating Karhunen-Loeve coefficients";
+        //coeff = legacy::klConfig(klMinMode,klMaxMode);
+    }
+    
+    for( auto& it : objects ) {
+        it->init(); //coeff);
+    }
+}
+
+
+void MomfbdJob::cleanup(void) {
+    for( auto& it : objects ) {
+        it->cleanup();
+    }
+}
+
+
 bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool ) {
     
     uint8_t step = info.step.load();

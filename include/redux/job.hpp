@@ -107,7 +107,9 @@ namespace redux {
         virtual size_t getParts(WorkInProgress&) { return 0; };
         virtual void ungetParts(WorkInProgress&) { };
         virtual void returnParts(WorkInProgress&) { };
-        
+
+        virtual void init(void) {};
+        virtual void cleanup(void) {};
         virtual bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&) = 0;
         
         bool operator<(const Job& rhs);
