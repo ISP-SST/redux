@@ -5,10 +5,12 @@
 #include "redux/image/fouriertransform.hpp"
 #include "redux/util/bitoperations.hpp"
 
+#include <atomic>
 #include <limits>
 
 using namespace redux::image;
 using namespace redux::util;
+using namespace std;
 
 template <typename T>
 void redux::image::Statistics<T>::getStats( const Array<T>& data, int flags ) {
@@ -16,12 +18,74 @@ void redux::image::Statistics<T>::getStats( const Array<T>& data, int flags ) {
     min = std::numeric_limits<T>::max();
     max = std::numeric_limits<T>::min();
     double sum = 0;
+    size_t nElements = data.nElements();
     for( auto & it : data ) {
         if( it > max ) max = it;
         if( it < min ) min = it;
         sum += static_cast<double>( it );
     }
-    mean = sum / data.nElements();
+    mean = sum / nElements;
+    
+    // TODO: median
+    
+    if( flags & ST_RMS ) {
+        rms = stddev = 0;
+        for( auto & it : data ) {
+            rms += static_cast<double>( it * it );
+            double tmp = ( static_cast<double>( it ) - mean );
+            stddev += tmp * tmp;
+        }
+        rms = sqrt( rms / nElements );
+        stddev = sqrt( stddev / nElements );
+    }
+    
+    if( flags & ST_NOISE ) {
+        Array<T> tmpImage = data.copy();    // make a deep copy because "apodize" is destructive.
+        const std::vector<size_t>& dims = tmpImage.dimensions();
+        std::vector<int64_t> first = tmpImage.first();
+        std::vector<int64_t> last = tmpImage.last();
+        size_t nDims = dims.size();
+        for( size_t i = 0; i < nDims; ++i ) {   // take a centered subimage that has "next smaller power of two" size
+            uint32_t dimSize = tmpImage.dimSize( i );
+            uint32_t newSize = nextPowerOfTwo( dimSize ) >> 1;
+            if( newSize < dimSize ) {
+                int diff = dimSize - newSize;
+                first[i] += diff / 2;
+                last[i] -= ( diff - diff / 2 );
+            }
+        }
+        tmpImage.setLimits( first, last );
+        apodize( tmpImage, 8 );                     // edge smoothing to reduce the FFT boundary-artifacts
+
+        // normalize
+        sum = 0;
+        for( auto it : tmpImage ) sum += it;
+        sum /= tmpImage.nElements();
+        tmpImage /= sum;
+
+        FourierTransform ft( tmpImage );
+
+        size_t Ny = ft.dimSize( 0 );
+        size_t Nx = ft.dimSize( 1 );
+        size_t realNx = tmpImage.dimSize( 1 );  // NB: we are using real-to-complex transform from fftw3, so the transform has dimensions (Ny x Nx/2+1)
+        sum = 0;
+        size_t count = 0;
+        double yxRatio = static_cast<double>( Ny ) / realNx;
+        double Nxy4 = realNx * Ny / 4.0;
+        for( size_t x = realNx / 6; x < Nx; ++x ) {         // skip the Nx/6 pixels nearest the edge (fft artifacts)
+            double xx = x * x * yxRatio;
+            for( size_t y = Ny / 6; y < Ny / 2; ++y ) {     // skip the Ny/6 pixels nearest the edge (fft artifacts)
+                if( ( xx + y * y ) > Nxy4 ) {               // skip a region corresponding to the cutoff-frequency (diffraction limit)  TODO: verify the numbers used here
+                    sum += std::norm( ft( y, x ) );         // norm = abs^2
+                    sum += std::norm( ft( Ny-y-1, x ) );
+                    count += 2;
+                }
+            }
+        }
+        noisePower = sqrt( sum / ( count * Ny * Nx ) );
+
+    }
+    //std::cout << "stats0 (" << myID << "):     min = " << min << "  max = " << max << "  mean = " << mean <<  "  rms = " << rms <<  "  stddev = " << stddev << "  pwr = " << noisePower << std::endl;
 
 }
 template void redux::image::Statistics<float>::getStats( const Array<float>&, int );
@@ -39,98 +103,22 @@ void redux::image::Statistics<T>::getStats( uint32_t borderClip, const Array<T>&
     const std::vector<size_t>& dims = data.dimensions();
     size_t nDims = dims.size();
     for( size_t i = 0; i < nDims; ++i ) {
-        if( dims[i] == 1 ) {    // if dimSize == 1 we don't clip it.
+        if( dims[i] == 1 ) {            // if dimSize == 1 we don't clip it.
             first.push_back( data.first()[i] );
             last.push_back( data.last()[i] );
         }
         else {
-            if( 2 * borderClip > dims[i] ) {
+            if( 2 * borderClip > dims[i] ) {    // all data clipped, nothing to do
                 return;
             }
             first.push_back( data.first()[i] + borderClip );
             last.push_back( data.last()[i] - borderClip );
         }
     }
-
     Array<T> clippedImage( data, first, last );
-    min = std::numeric_limits<T>::max();
-    max = std::numeric_limits<T>::min();
-    double sum = 0;
-    for( auto & it : clippedImage ) {
-        if( it > max ) max = it;
-        if( it < min ) min = it;
-        sum += static_cast<double>( it );
-    }
-    // TODO: median
-    mean = sum / clippedImage.nElements();
-
-    if( flags & ST_RMS ) {
-        rms = stddev = 0;
-        for( auto & it : clippedImage ) {
-            rms += static_cast<double>(it*it);
-            double tmp = ( static_cast<double>( it ) - mean );
-            stddev += tmp*tmp;
-        }
-        rms = sqrt( rms / clippedImage.nElements() );
-        stddev = sqrt( stddev / clippedImage.nElements() );
-    }
-    // FIXME: rms gives wrong value ??!!
-    std::cout << "stats2b:   borderClip = " << borderClip << "  min = " << min << "  max = " << max << "  mean = " << mean <<  "  rms = " << rms <<  "  stddev = " << stddev << std::endl;
-    static size_t fcnt=0;
-    redux::file::Ana::write( "statimage_"+std::to_string(++fcnt)+".f0", clippedImage );
-
-    // TODO verify noise statistics, compare with michiels version
-    if( flags & ST_NOISE ) {
-        for( size_t i = 0; i < nDims; ++i ) {
-           uint32_t dimSize = clippedImage.dimSize(i);
-           int diff = dimSize - nextPowerOfTwo(dimSize)/2;
-           if( diff && (dims[i] != 1) ) {    // dimensions of size 1 will be mangled in the .copy() below.
-                first[i] += diff/2;
-                last[i] -= (diff - diff/2);
-            }
-        }
-
-        clippedImage = data;                // restore the input dimensions (don't use resetLimits since the input data might be a sub-array, so resetting would go back to its "parent")
-        clippedImage.setLimits(first,last);
-        Array<T> tmpImage = clippedImage.copy();    // make a deep copy
-        
-        double sum = 0;
-        for( auto it: tmpImage ) sum += it;
-        sum /= tmpImage.nElements();
-        tmpImage /= sum;
-        apodize( tmpImage, 8 );         // edge smoothing to reduce the FFT artifacts near the boundary
-        
-        FourierTransform ft(tmpImage, FT_REORDER);
-        
-        int Ny = ft.dimSize(0);
-        int Nx = ft.dimSize(1);
-        double noisePower = 0;
-        int N=0, yy, xx;
-        double xyRatio = static_cast<double>(Nx)/Ny;
-        double Nxy4 = Nx*Ny/4.0;
-        for( int y=0; y < Ny; ++y ) {
-            if( 6*abs( yy = y-Ny/2 ) > Ny ) {
-                double yyyy = yy*yy*xyRatio;
-                for( int x=0; x < Nx; ++x ) {
-                    if( 6*abs( xx = x - Nx / 2 ) > Nx ) {
-                        if( ( yyyy + xx*xx ) > Nxy4 ) {
-                            //std::complex<double> elem = ft(y,x);
-                            //noisePower += (elem*elem).real();
-                            noisePower += std::abs(ft(y,x));
-                            ++N;
-                        }
-                    }
-                }
-            }
-        }
-
-        noisePower = sqrt( noisePower / (N*Ny*Nx) );
-
- 
-        std::cout << "stats3b:  noisePower = " << noisePower << std::endl;
-
-    }
-
+    getStats(clippedImage,flags);
+    
 }
 template void redux::image::Statistics<float>::getStats( uint32_t, const Array<float>&, int );
 template void redux::image::Statistics<double>::getStats( uint32_t, const Array<double>&, int );
+

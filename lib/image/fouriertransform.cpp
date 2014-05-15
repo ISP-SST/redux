@@ -58,7 +58,7 @@ FourierTransform::FourierTransform( const Array<T>& rhs, int flags ) {
     rhs.copy( tmp );
     vector<size_t> dims = tmp.dimensions();
     if( dims.empty() ) throw logic_error( "FourierTransform called with no non-trivial dimensions: " + printArray(rhs.dimensions(), "dims") );
-    else if( dims.size() > 2 ) logic_error( "FourierTransform only supports 1/2 dimensions at the moment: " + printArray(dimensions(), "dims") );
+    else if( dims.size() > 2 ) throw logic_error( "FourierTransform only supports 1/2 dimensions at the moment: " + printArray(dimensions(), "dims") );
 
     dims[dims.size()-1] = dims[dims.size()-1]/2 + 1; 
     
@@ -76,6 +76,8 @@ FourierTransform::FourierTransform( const Array<T>& rhs, int flags ) {
     fftw_execute_dft_r2c( plan.forward_plan, tmp.ptr(), reinterpret_cast<fftw_complex*>( ptr() ) );
 
 }
+template FourierTransform::FourierTransform( const Array<int16_t>&, int );
+template FourierTransform::FourierTransform( const Array<int32_t>&, int );
 template FourierTransform::FourierTransform( const Array<float>&, int );
 template FourierTransform::FourierTransform( const Array<double>&, int );
 
@@ -113,7 +115,7 @@ template <typename T>
 void FourierTransform::normalize( Array<T>& in ) {
     double sum = 0;
     for( auto it: in ) sum += it;
-    in /= (sum*in.nElements());
+    in /= (sum/in.nElements());
 }
 template void FourierTransform::normalize( Array<float>& );
 template void FourierTransform::normalize( Array<double>& );
@@ -144,6 +146,7 @@ void FourierTransform::reorder( Array<T>& in ) {
         southEast += stride;
         northWest += stride;
     }
+    delete[] buf;
 }
 template void FourierTransform::reorder( Array<float>& );
 template void FourierTransform::reorder( Array<double>& );
