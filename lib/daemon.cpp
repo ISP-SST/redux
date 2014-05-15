@@ -372,24 +372,25 @@ Job::JobPtr Daemon::selectJob( bool localRequest ) {
 
 bool Daemon::getWork( WorkInProgress& wip ) {
 
-    if( wip.job ) {        // job already checked out. lost ??      TODO: deal with it...
+/*    if( wip.job ) {        // job already checked out. lost ??      TODO: deal with it...
         wip.job.reset();
     }
-
+*/
     unique_lock<mutex> lock( jobMutex );
+    Job::JobPtr job;
     bool ret = false;
     if( wip.peer ) {                // remote worker
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
             if( step == Job::JSTEP_QUEUED ) {
-                wip.job = it;
+                job = it;
                 if( it->getParts( wip ) ) {
                     ret = true;
                     break;
                 }
             }
             else if( step == Job::JSTEP_RUNNING ) {
-                wip.job = it;
+                job = it;
                 if( it->getParts( wip ) ) {
                     ret = true;
                     break;
@@ -402,7 +403,7 @@ bool Daemon::getWork( WorkInProgress& wip ) {
         if( nQueuedJobs < 2 ) {     // see if another job can be prepared
             for( auto & it : jobs ) {
                 if( it->info.step.load() < Job::JSTEP_QUEUED ) {
-                    wip.job = it;
+                    job = it;
                     it->getParts( wip );
                     ret = true;
                     break;
@@ -412,7 +413,7 @@ bool Daemon::getWork( WorkInProgress& wip ) {
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
             if( step & ( Job::JSTEP_QUEUED | Job::JSTEP_RUNNING | Job::JSTEP_POSTPROCESS ) ) {
-                wip.job = it;
+                job = it;
                 if( it->getParts( wip ) || ( step != Job::JSTEP_RUNNING ) ) {
                     ret = true;
                     break;
@@ -421,8 +422,9 @@ bool Daemon::getWork( WorkInProgress& wip ) {
         }
         if( !ret ) wip.peer.reset();
     }
-    if( wip.job ) {
-        wip.job->info.state.store( Job::JSTATE_ACTIVE );
+    if( job ) {
+        job->info.state.store( Job::JSTATE_ACTIVE );
+        wip.job = job;
     }
     return ret;
 }
@@ -433,9 +435,11 @@ void Daemon::sendWork( Peer::Ptr& peer ) {
     auto it = peerWIP.insert( std::pair<Peer::Ptr, WorkInProgress>( peer, WorkInProgress( peer ) ) );
     WorkInProgress& wip = it.first->second;
 
+    Job::JobPtr lastJob = wip.job;
     size_t blockSize = 0;
-    bool includeJob = true;
-    if( getWork( wip ) ) {
+    bool includeJob = false;
+    if( getWork( wip ) && (!lastJob || *wip.job != *lastJob)) {
+        includeJob = true;
         blockSize = wip.size( includeJob );
     }
 
@@ -465,7 +469,7 @@ void Daemon::putParts( Peer::Ptr& peer ) {
     if( blockSize ) {
         LOG_DEBUG << "putParts():  blockSize = " << blockSize;
         LOG_DEBUG << "putParts():  wip = " << wip.print();
-        wip.unpack( buf.get(), false );
+        wip.unpack( buf.get(), swap_endian);
         wip.job->returnParts( wip );
         LOG_DEBUG << "putParts(): wip2 = " << wip.print();
     }

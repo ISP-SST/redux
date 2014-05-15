@@ -258,16 +258,16 @@ void DebugJob::preProcess( void ) {
 
     double stepX = ( coordinates[1] - coordinates[0] ) / ( xSize - 1 );
     double stepY = ( coordinates[3] - coordinates[2] ) / ( ySize - 1 );
-    size_t lX, lY, count = 0;
+    size_t count = 0;
     unique_lock<mutex> lock;
     vector<size_t> indices;
     vector<PartPtr> pts;
 
     for( uint32_t i = 0; i < xSize; i += patchSize ) {
-        lX = std::min( i + patchSize - 1, xSize - 1 );
+        size_t lX = std::min( i + patchSize - 1, xSize - 1 );
         double x = coordinates[0] + i * stepX;
         for( uint32_t j = 0; j < ySize; j += patchSize ) {
-            lY = std::min( j + patchSize - 1, ySize - 1 );
+            size_t lY = std::min( j + patchSize - 1, ySize - 1 );
             double y = coordinates[2] + j * stepY;
             PartPtr part( new DebugPart() );
             part->id = ++count;
