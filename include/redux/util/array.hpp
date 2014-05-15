@@ -201,38 +201,39 @@ namespace redux {
                 }
             }
 
-
+            /*! @name Copy constructors
+             *  @note The copy constructors will share the data-block, for a "deep copy" use
+             *  @code
+             *  Array<double> original,deepcopy;
+             *  original.copy(deepcopy);
+             *  @endcode
+             */ 
+            //@{
+            //! @brief Default, plain copy.
+            Array( const Array<T>& rhs ) : dimSizes(rhs.dimSizes), dimStrides(rhs.dimStrides),
+                                          dimFirst(rhs.dimFirst), dimLast(rhs.dimLast),
+                                          datablock(rhs.datablock), nDims_(rhs.nDims_),
+                                          nElements_(rhs.nElements_), dataSize(rhs.dataSize),
+                                          dense_(rhs.dense_), begin_(rhs.begin_), end_(rhs.end_) {}
+            /*! @brief The copy will be a sub-array ranging from "first" to "last"
+             *  @note The dimensions of the vectors must agree with the dimensions of the array.
+             */
             template <typename U>
-            Array( const Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) {
-
-                nDims_ = rhs.nDims_;
-                dimFirst = rhs.dimFirst;
-                dimLast = rhs.dimLast;
-                dimSizes = rhs.dimSizes;
-                dataSize = rhs.dataSize;
-                datablock = rhs.datablock;
-                dimStrides = rhs.dimStrides;
+            Array( const Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) : Array<T>(rhs) {
                 setLimits(first,last);
-
             }
-            //template <typename U>
-            //Array( const Array<T>& rhs, const std::vector<U>& first, const std::vector<U>& last ) : Array(const_cast<Array<T>&>(rhs),first,last) {}
+
+            /*! @brief The copy will be a sub-array.
+             *  @note The dimensions of the vector must be 2x the dimensions of the array. Given as: "first1, last1, first2,...,.lastN"
+             */
             template <typename U>
-            Array( const Array<T>& rhs, const std::vector<U>& indices ) {
+            Array( const Array<T>& rhs, const std::vector<U>& indices ) : Array<T>(rhs) {
 
                 size_t nIndices = indices.size();
-                nDims_ = rhs.nDims_;
                 if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
                     throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices: " + printArray(indices,"indices"));
                 }
 
-                dimFirst = rhs.dimFirst;
-                dimLast = rhs.dimLast;
-                dimSizes = rhs.dimSizes;;
-                dataSize = rhs.dataSize;
-                datablock = rhs.datablock;
-                dimStrides = rhs.dimStrides;
-                dense_ = rhs.dense_;
                 if ( nIndices ) {
                     setLimits(indices);
                 } else {
@@ -241,17 +242,25 @@ namespace redux {
                     end_ = ( ++it ).pos();  // 1 step after last element;
                 }
             }
+            /*! @brief The copy will be a sub-array.
+             *  @note The number of arguments must be 2x the dimensions of the array. Given as: "first1, last1, first2,...,.lastN"
+             */
             template <typename ...S>
             Array( const Array<T>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            //@}
             
-            template <typename U, typename V>
-            Array( const Array<U>& rhs, const std::vector<V>& indices ) : dense_(true) {
-                rhs.copy(this);
-                setLimits(indices);
-            }
-            template <typename U, typename ...S>
-            Array( const Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            /*! @name Copy/convert constructors
+             *  @details Construct an array from an array of different type.
+             */
+            //@{
+            template <typename U> Array( const Array<U>& rhs) { rhs.copy(*this); }
+            template <typename U, typename V> Array( const Array<U>& rhs, const std::vector<V>& indices ) : Array<T>(rhs) { setLimits(indices); }
+            template <typename U, typename ...S> Array( const Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
+            //@}
             
+            /*! Construct from a generic list of dimension-sizes.
+             * @note This has to be last in the header because of it's "catch all" properties.
+             */
             template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
 
             
@@ -446,7 +455,7 @@ namespace redux {
             }
             const T* ptr( const std::vector<int64_t>& indices ) const { return const_cast<Array<T>*>( this )->ptr( indices ); }
 
-            operator bool() const { return static_cast<bool>( datablock ); }
+            bool valid(void) const { return static_cast<bool>( datablock ); }
 
             template <typename ...S> T& operator()( S ...indices ) { return *ptr( indices... ); }
             template <typename ...S> const T& operator()( S ...indices ) const { return *ptr( indices... ); }
@@ -559,6 +568,45 @@ namespace redux {
                 if( this->sameSize( rhs ) ) {
                     typename Array<U>::const_iterator rhsit = rhs.begin();
                     for( auto & it : *this ) it /= *rhsit++;
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            
+            template <typename U, typename V>
+            const Array<T>& set( const Array<U>& rhs, V weight ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it = (*rhsit++ * weight);
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            
+            template <typename U, typename V>
+            const Array<T>& add( const Array<U>& rhs, V weight ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it += (*rhsit++ * weight);
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            
+            template <typename U, typename V>
+            const Array<T>& mult( const Array<U>& rhs, V weight ) {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    for( auto & it : *this ) it *= (*rhsit++ * weight);
                 }
                 else {
                     throw std::invalid_argument( "image dimensions does not match." );
