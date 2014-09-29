@@ -8,11 +8,6 @@ USE_REDUX(redux)    # includes listed thirdparty dependencies and sets up paths 
 set(REDUX_HDR_BASE "${REDUX_DIR}/include/redux")
 add_definitions(-DBOOST_LOG_DYN_LINK)
 
-##### revison info ######
-set(REDUX_REVISION_SRC_FILE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
-SET_SOURCE_FILES_PROPERTIES(${REDUX_REVISION_SRC_FILE} GENERATED)
-CHECK_REVISION(REDUX "${CMAKE_CURRENT_LIST_DIR}/revision.cpp.template" "${REDUX_REVISION_SRC_FILE}")
-
 file(GLOB REDUX_CPP "*.cpp")
 file(GLOB REDUX_HPP "${REDUX_HDR_BASE}/*.hpp")
 

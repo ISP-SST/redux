@@ -14,8 +14,7 @@ include(${REDUX_DIR}/cmake/doxygen.cmake)
 
 include_directories(${REDUX_DIR}/include)
 
-add_subdirectory(lib)
-add_subdirectory(bin)
+add_subdirectory(src)
 add_subdirectory(testsuite)
 
 # Installation (distribution) settings

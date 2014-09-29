@@ -4,14 +4,14 @@
 #include <pwd.h>
 #include <regex>
 #include <unistd.h>
-/*
+
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/regex.hpp>
-
-namespace bf = boost::filesystem;
+/*#include <boost/regex.hpp>
 */
+namespace bf = boost::filesystem;
+
 using namespace redux::util;
 using namespace std;
 
@@ -120,7 +120,7 @@ string expandTilde( string in ) {
     else return tmp + in.substr( cut );
 }
 
-/*
+
 string redux::util::cleanPath( string in, string base ) {
 
 
@@ -156,4 +156,3 @@ string redux::util::cleanPath( string in, string base ) {
 
 }
 
-*/
