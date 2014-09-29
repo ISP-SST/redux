@@ -458,7 +458,7 @@ void endianTest( void ) {
 
 
 void stringTest( void ) {
-
+    
     // checks
     BOOST_CHECK( onlyDigits( "1234567890" ) );
     BOOST_CHECK( !onlyDigits( "1234d567890" ) );
@@ -525,3 +525,4 @@ namespace testsuite {
     }
 
 }
+

@@ -45,7 +45,7 @@ if (NetCDF_FOUND)
     endif()
 endif()
 
-REDUX_ADD_LIBRARY(redux #${REDUX_REVISION_SRC_FILE}
+REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_CPP} ${REDUX_HPP} 
                     ${REDUX_FILE_CPP} ${REDUX_FILE_HPP}
                     ${REDUX_IMAGE_CPP} ${REDUX_IMAGE_HPP}
@@ -55,8 +55,8 @@ REDUX_ADD_LIBRARY(redux #${REDUX_REVISION_SRC_FILE}
                     ${REDUX_UTIL_CPP} ${REDUX_UTIL_HPP}
 )
 
-if(REDUX_AUTO_REVISION AND TARGET GIT_CHECK_REDUX)
-    add_dependencies(redux GIT_CHECK_REDUX)
+if(REDUX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)
+    add_dependencies(redux GIT_CHECK_LIBREDUX)
 endif()
 
 
