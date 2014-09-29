@@ -1,6 +1,9 @@
 #ifndef REDUX_FILE_FILEINFO_HPP
 #define REDUX_FILE_FILEINFO_HPP
 
+#include <iostream>
+#include <exception>
+
 namespace redux {
 
     namespace file {
@@ -15,6 +18,22 @@ namespace redux {
             virtual ~FileInfo(void) = default;
 
         };
+        
+        
+        
+    template <typename T, typename U>
+    inline size_t readOrThrow ( T& strm, U* out, size_t nElements, const std::string& msg = "" ) {
+        size_t nBytes = nElements*sizeof( U );
+        strm.read( reinterpret_cast<char*>( out ), nBytes );
+        if( !strm.good() ) {
+            throw std::ios_base::failure( "Read failed: " + msg );
+        } 
+
+        return nBytes;
+    }
+
+
+
         
         /*! @} */
 

@@ -6,10 +6,6 @@
 #include <future>
 #include <mutex>
 
-#include <boost/filesystem.hpp>
-
-namespace bfs = boost::filesystem;
-
 using namespace redux::file;
 using namespace std;
 
@@ -45,18 +41,17 @@ namespace {
 
 Format redux::file::readFmt( const std::string& filename ) {
 
-    bfs::path fn = bfs::path( filename );
-    if( bfs::exists( fn ) ) {
-        ifstream file( filename, ifstream::binary );
+    ifstream strm( filename, ifstream::binary );
+    if( strm ) {
         uint32_t magic;
-        file.read( reinterpret_cast<char*>( &magic ), sizeof(uint32_t) );
-        if( file.good() ) {
+        strm.read( reinterpret_cast<char*>( &magic ), sizeof(uint32_t) );
+        if( strm.good() ) {
             switch (magic) {
                 case Ana::MAGIC_ANA: ;
                 case Ana::MAGIC_ANAR: return FMT_ANA;
                 //case Fits::MAGIC_FITS: return FMT_FITS;
                 //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-                default: cout << "readFmt needs to be implemented for this file-type: \"" << fn << "\""  << endl; return FMT_NONE; 
+                default: cout << "readFmt needs to be implemented for this file-type: \"" << filename << "\""  << endl; return FMT_NONE; 
             }
         }
     }
@@ -67,9 +62,9 @@ Format redux::file::readFmt( const std::string& filename ) {
 
 Format redux::file::guessFmt( const std::string& filename ) {
 
-    bfs::path fn = bfs::path( filename );
-    string ext = bfs::extension(fn);
-    if( !ext.empty() ) {
+    size_t pos = filename.find_last_of('.');
+    if( pos != string::npos && pos < filename.length() ) {
+        string ext = filename.substr(pos+1);
         if( ext == "f0" || ext == "fz" ) {
             return FMT_ANA;
         }

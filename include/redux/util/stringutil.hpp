@@ -60,7 +60,7 @@ namespace redux {
         std::string alignRight( const std::string& s, size_t n = 20, unsigned char c = ' ' );
 
         std::string getUname( __uid_t id = 0 );
-        std::string cleanPath( std::string path, std::string base = "" );
+        //std::string cleanPath( std::string path, std::string base = "" );
 
         /*! @brief Converts integer types to a hexadecimal std::string
          */

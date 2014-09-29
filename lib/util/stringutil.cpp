@@ -2,46 +2,48 @@
 
 #include <cstdlib>
 #include <pwd.h>
-
+#include <regex>
+#include <unistd.h>
+/*
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/regex.hpp>
 
 namespace bf = boost::filesystem;
-
+*/
 using namespace redux::util;
 using namespace std;
 
 
 bool redux::util::onlyDigits( const string &s ) {
-    static const boost::regex e( "^[[:digit:]]*$" );
+    static const regex e( "^[[:digit:]]*$" );
     return regex_match( s, e );
 }
 
 bool redux::util::onlyAlpha( const string &s ) {
-    static const boost::regex e( "^[[:alpha:]]*$" );
+    static const regex e( "^[[:alpha:]]*$" );
     return regex_match( s, e );
 }
 
 bool redux::util::onlyAlnum( const string &s ) {
-    static const boost::regex e( "^[[:alnum:]]*$" );
+    static const regex e( "^[[:alnum:]]*$" );
     return regex_match( s, e );
 }
 
 bool redux::util::onlyHex( const string &s ) {
-    static const boost::regex e( "^[[:xdigit:]]*$" );
+    static const regex e( "^[[:xdigit:]]*$" );
     return regex_match( s, e );
 }
 
 bool redux::util::isInteger( const string &s ) {
-    static const boost::regex e( "^\\s*(-|0x|0X)?[[:xdigit:]]+\\s*$" );
+    static const regex e( "^\\s*(-|0x|0X)?[[:xdigit:]]+\\s*$" );
     return regex_match( s, e );
 }
 
 
 bool redux::util::isHex( const string &s ) {
-    static const boost::regex e( "^\\s*[[:xdigit:]]+\\s*$" );
+    static const regex e( "^\\s*[[:xdigit:]]+\\s*$" );
     return regex_match( s, e );
 }
 
@@ -118,7 +120,7 @@ string expandTilde( string in ) {
     else return tmp + in.substr( cut );
 }
 
-
+/*
 string redux::util::cleanPath( string in, string base ) {
 
 
@@ -154,3 +156,4 @@ string redux::util::cleanPath( string in, string base ) {
 
 }
 
+*/
