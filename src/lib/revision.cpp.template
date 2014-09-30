@@ -11,6 +11,7 @@ const int redux::reduxVersionMinor = ${${REVNAME}_VERSION_MINOR};
 const int redux::reduxVersionPatch = ${${REVNAME}_VERSION_PATCH};
 const int redux::reduxVersionCommit = ${${REVNAME}_VERSION_COMMIT};
 
-const char* redux::reduxCommitMessage = "${REVISION_DESCRIPTION}";           // label/hash + comment
+// label/hash + comment
+const char* redux::reduxCommitMessage = "${REVISION_DESCRIPTION}";
 const char* redux::reduxCommitTime = "${REVISION_COMMIT_TIME}";
 const char* redux::reduxBuildTime = "${REVISION_BUILD_TIME}";

@@ -105,7 +105,7 @@ namespace redux {
 
             void createLayout( void );
             void createActions( void );
-            std::string dumpXML( bool comments = false );
+            //std::string dumpXML( bool comments = false );
             void startStatusThread( void ) {
                 if( ! statusThread ) {
                     statusThread = new StatusThread( jobs );

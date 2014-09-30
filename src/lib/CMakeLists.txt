@@ -5,7 +5,7 @@
 USE_REDUX(redux)    # includes listed thirdparty dependencies and sets up paths etc.
 #USE_EXTERNAL(fits ncdf)
 
-#set(REDUX_HDR_BASE "${LIBREDUX_DIR}/src")
+set(REDUX_HDR_BASE "${REDUX_DIR}/include/redux")
 add_definitions(-DBOOST_LOG_DYN_LINK)
 
 file(GLOB REDUX_CPP "*.cpp")
@@ -45,6 +45,11 @@ if (NetCDF_FOUND)
     endif()
 endif()
 
+##### revison info ######
+set(REDUX_REVISION_SRC_FILE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
+SET_SOURCE_FILES_PROPERTIES(${REDUX_REVISION_SRC_FILE} GENERATED)
+CHECK_REVISION(LIBREDUX "${CMAKE_CURRENT_LIST_DIR}/revision.cpp.template" "${REDUX_REVISION_SRC_FILE}")
+
 REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_CPP} ${REDUX_HPP} 
                     ${REDUX_FILE_CPP} ${REDUX_FILE_HPP}
@@ -76,10 +81,13 @@ endif()
 file(GLOB REDUX_GUI_CPP "gui/*.cpp")
 file(GLOB REDUX_GUI_HPP "${REDUX_HDR_BASE}/gui/*.hpp")
 
+set(CMAKE_AUTOMOC ON)
 # Work Qt magic to generate files
 #QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP} OPTIONS -DBOOST_TT_HAS_OPERATOR_HPP_INCLUDED)
-QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP})
-
+#QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP})
+message(STATUS "REDUX_HDR_BASE: ${REDUX_HDR_BASE}")
+message(STATUS "REDUX_GUI_HPP: ${REDUX_GUI_HPP}")
+message(STATUS "REDUX_GUI_MOC_SRC: ${REDUX_GUI_MOC_SRC}")
 REDUX_ADD_LIBRARY(reduxgui #${REDUX_REVISION_SRC_FILE}
                     ${REDUX_GUI_CPP} ${REDUX_GUI_HPP} 
                     ${REDUX_GUI_MOC_SRC}

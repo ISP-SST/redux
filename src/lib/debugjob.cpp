@@ -61,7 +61,7 @@ const char* DebugJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& part
 
 
 DebugJob::DebugJob( void ) : maxIterations( 1000 ), gamma( 1 ), xSize( 1920 ), ySize( 1080 ), coordinates { -1.9, 1.9, -0.9, 0.9 } {
-    info.typeString = "debug";
+    info.typeString = "Debug";
 
 }
 

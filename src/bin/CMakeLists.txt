@@ -22,4 +22,6 @@ if (NOT QT4_FOUND)
     return()
 endif()
 
+set(CMAKE_AUTOMOC ON)
 REDUX_ADD_EXECUTABLE( redux-gui redux-gui.cpp )
+#target_link_libraries(redux-gui reduxgui)

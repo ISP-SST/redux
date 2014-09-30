@@ -34,8 +34,9 @@ size_t Job::registerJob( const string& name, JobCreator f ) {
     std::unique_lock<mutex> lock( globalJobMutex );
     auto ret = getMap().insert( { boost::to_upper_copy( name ), {nJobTypes + 1, f}} );
     if( ret.second ) {
+        //LOG_DEBUG << "Job with tag \"" << name << "\" successfully registered.";
         return ret.first->second.first;
-    }
+    } //else LOG_WARN << "Failed to register job with tag \"" << name << "\".";
     return nJobTypes++;
 }
 
@@ -44,13 +45,14 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
     vector<JobPtr> tmp;
     std::unique_lock<mutex> lock( globalJobMutex );
     for( auto & it : tree ) {
-        string nm = it.first;
-        auto it2 = getMap().find( boost::to_upper_copy( nm ) );       // check if the current tag matches a registered (Job-derived) class.
+        string name = it.first;
+        auto it2 = getMap().find( boost::to_upper_copy( name ) );       // check if the current tag matches a registered (Job-derived) class.
         if( it2 != getMap().end() ) {
             Job* tmpJob = it2->second.second();
             tmpJob->parseProperties( vm, it.second );
             tmp.push_back( shared_ptr<Job>( tmpJob ) );
         }
+        //else LOG_WARN << "No job with tag \"" << name << "\" registered.";
     }
     return tmp;
 }

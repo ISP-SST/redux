@@ -433,7 +433,7 @@ void JobWidget::save( void ) {
 
     QTextStream out( &file );
     QApplication::setOverrideCursor( Qt::WaitCursor );
-    out << QString( dumpXML( true ).c_str() );
+    //out << QString( dumpXML( true ).c_str() );
     QApplication::restoreOverrideCursor();
 
     //setCurrentFile(fileName);
