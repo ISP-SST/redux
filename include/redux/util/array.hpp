@@ -438,8 +438,8 @@ namespace redux {
 
             template <typename ...S>
             T* ptr( S ...s ) {
-                int64_t offset = getOffset<int64_t>( {static_cast<int64_t>( s )...}, dimFirst );
-                if( offset < 0 || offset > dataSize ) {
+                uint64_t offset = getOffset<uint64_t>( {static_cast<uint64_t>( s )...}, dimFirst );
+                if( offset > dataSize ) {
                     throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
                 }
                 return ( datablock.get() + offset );

@@ -1,10 +1,7 @@
 #ifndef REDUX_MATH_FUNCTIONS_HPP
 #define REDUX_MATH_FUNCTIONS_HPP
 
-
-#include <boost/numeric/ublas/vector.hpp>
-namespace bu = boost::numeric::ublas;
-
+#include <cstdlib>
 
 namespace redux {
 

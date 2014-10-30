@@ -21,33 +21,31 @@ namespace redux {
         namespace detail {
 
             template <typename T>
-            static void truncate( T& v, const T& min, const T& max ) {
-                if( v < min ) {
+            static void truncate ( T& v, const T& min, const T& max ) {
+                if ( v < min ) {
                     v = min;
-                }
-                else if( v > max ) {
+                } else if ( v > max ) {
                     v = max;
                 }
             }
 
             template <typename T>
-            static void wrap( T& v, const T& min, const T& max ) {
-                T span( max - min );
-                int cnt = static_cast<int>( ( v - min ) / span );
-                if( v < min ) cnt--;
+            static void wrap ( T& v, const T& min, const T& max ) {
+                T span ( max - min );
+                int cnt = static_cast<int> ( ( v - min ) / span );
+                if ( v < min ) cnt--;
                 v = v - cnt * span;
             }
 
             template <typename T>
-            static void reflect( T& v, const T& min, const T& max ) {
-                T span( max - min );
-                int cnt = static_cast<int>( ( v - min ) / span );
-                if( v < min ) cnt--;
+            static void reflect ( T& v, const T& min, const T& max ) {
+                T span ( max - min );
+                int cnt = static_cast<int> ( ( v - min ) / span );
+                if ( v < min ) cnt--;
                 bool reverse = ( cnt & 1 );
-                if( reverse ) {
+                if ( reverse ) {
                     v = max - v + cnt * span + min;
-                }
-                else {
+                } else {
                     v -= cnt * span;
                 }
             }
@@ -63,54 +61,64 @@ namespace redux {
          */
         template<class T, detail::TrimType TT = detail::TRUNCATE>
         class BoundValue {
-            typedef void ( *trimFunction )( T&, const T&, const T& );
+            typedef void ( *trimFunction ) ( T&, const T&, const T& );
 
         public:
-            BoundValue( T val = 0, T minVal = std::numeric_limits<T>::min(), T maxVal = std::numeric_limits<T>::max() ) : trim_( selectTrimFunction( TT ) ) {
-                setLimits( minVal, maxVal );
-                assignWithTruncation( val );
+            BoundValue ( T val = 0, T minVal = std::numeric_limits<T>::min(), T maxVal = std::numeric_limits<T>::max() ) : trim_ ( selectTrimFunction ( TT ) ) {
+                setLimits ( minVal, maxVal );
+                assignWithTruncation ( val );
             }
-            BoundValue( const BoundValue& rhs ) : trim_( selectTrimFunction( TT ) ), val_( rhs.val_ ), minVal_( rhs.minVal_ ), maxVal_( rhs.maxVal_ ) { }
+            BoundValue ( const BoundValue& rhs ) : trim_ ( selectTrimFunction ( TT ) ), val_ ( rhs.val_ ), minVal_ ( rhs.minVal_ ), maxVal_ ( rhs.maxVal_ ) { }
             template<class U, detail::TrimType UU>
-            BoundValue( const BoundValue<U, UU>& rhs ) : trim_( selectTrimFunction( UU ) ) {
+            BoundValue ( const BoundValue<U, UU>& rhs ) : trim_ ( selectTrimFunction ( UU ) ) {
                 T tmpV;
                 try {
-                    minVal_ = boost::numeric_cast<T>( rhs.minVal_ );
-                    maxVal_ = boost::numeric_cast<T>( rhs.maxVal_ );
-                    tmpV    = boost::numeric_cast<T>( rhs.val_ );
-                }
-                catch( const boost::numeric::bad_numeric_cast& ) {
+                    minVal_ = boost::numeric_cast<T> ( rhs.minVal_ );
+                    maxVal_ = boost::numeric_cast<T> ( rhs.maxVal_ );
+                    tmpV    = boost::numeric_cast<T> ( rhs.val_ );
+                } catch ( const boost::numeric::bad_numeric_cast& ) {
                     minVal_ = std::numeric_limits<T>::min();
                     maxVal_ = std::numeric_limits<T>::max();
                     try {
-                        tmpV    = boost::numeric_cast<T>( rhs.val_ );
-                    }
-                    catch( const boost::numeric::bad_numeric_cast& ) {
+                        tmpV    = boost::numeric_cast<T> ( rhs.val_ );
+                    } catch ( const boost::numeric::bad_numeric_cast& ) {
                         tmpV = minVal_;
                     }
                 }
-                assignWithTruncation( tmpV );
+                assignWithTruncation ( tmpV );
             }
 
 
-            void setLimits( T minVal, T maxVal ) {
-                if( minVal > maxVal ) {
-                    std::swap( minVal, maxVal );
+            void setLimits ( T minVal, T maxVal ) {
+                if ( minVal > maxVal ) {
+                    std::swap ( minVal, maxVal );
                 }
                 minVal_ = minVal;
                 maxVal_ = maxVal;
             }
 
-            const T& min( void ) { return minVal_; };
-            void setMin( T minVal ) {
+            const T& min ( void ) {
+                return minVal_;
+            };
+            void setMin ( T minVal ) {
                 minVal_ = minVal;
-                assignWithTruncation( val_ );
+                assignWithTruncation ( val_ );
             }
 
-            const T& max( void ) { return maxVal_; };
+            const T& max( void ) {
+                return maxVal_;
+            };
             void setMax( T maxVal ) {
                 maxVal_ = maxVal;
-                assignWithTruncation( val_ );
+                assignWithTruncation ( val_ );
+            }
+
+            T getRelative( float r ) {
+                return (T)( minVal_ + (T)(maxVal_ - minVal_)*r );
+            }
+
+            T span(void) {
+                return (maxVal_ - minVal_);
             }
 
             BoundValue& operator= ( const BoundValue& rhs ) {
@@ -122,31 +130,33 @@ namespace redux {
             }
 
             BoundValue& operator= ( T val ) {
-                assignWithTruncation( val );
+                assignWithTruncation ( val );
                 return *this;
             }
 
             BoundValue& operator+= ( T val ) {
-                assignWithTruncation( val_ + val );
+                assignWithTruncation ( val_ + val );
                 return *this;
             }
 
             BoundValue& operator-= ( T val ) {
-                assignWithTruncation( val_ - val );
+                assignWithTruncation ( val_ - val );
                 return *this;
             }
 
             BoundValue& operator*= ( T val ) {
-                assignWithTruncation( val_ * val );
+                assignWithTruncation ( val_ * val );
                 return *this;
             }
 
             BoundValue& operator/= ( T val ) {
-                assignWithTruncation( val_ / val );
+                assignWithTruncation ( val_ / val );
                 return *this;
             }
 
-            T& value( void ) { return val_; }
+            T& value ( void ) {
+                return val_;
+            }
 
             operator T() {
                 return val_;
@@ -154,7 +164,7 @@ namespace redux {
 
             template <typename U>
             operator U() {
-                return static_cast<U>( val_ );
+                return static_cast<U> ( val_ );
             }
 
             bool operator== ( T val ) const {
@@ -163,38 +173,42 @@ namespace redux {
 
             // Prefix
             BoundValue& operator++() {
-                assignWithTruncation( static_cast<T>( val_ + 1 ) );
+                assignWithTruncation ( static_cast<T> ( val_ + 1 ) );
                 return *this;
             }
             BoundValue& operator--() {
-                assignWithTruncation( static_cast<T>( val_ - 1 ) );
+                assignWithTruncation ( static_cast<T> ( val_ - 1 ) );
                 return *this;
             }
 
             // Postfix
             BoundValue operator++ ( int ) {
-                BoundValue old( *this );
-                assignWithTruncation( static_cast<T>( val_ + 1 ) );
+                BoundValue old ( *this );
+                assignWithTruncation ( static_cast<T> ( val_ + 1 ) );
                 return old;
             }
             BoundValue operator-- ( int ) {
-                BoundValue old( *this );
-                assignWithTruncation( static_cast<T>( val_ - 1 ) );
+                BoundValue old ( *this );
+                assignWithTruncation ( static_cast<T> ( val_ - 1 ) );
                 return old;
             }
 
         protected:
-            trimFunction selectTrimFunction( detail::TrimType tt ) {
-                switch( tt ) {
-                    case detail::TRUNCATE: return &( detail::truncate<T> );
-                    case detail::WRAP: return &( detail::wrap<T> );
-                    case detail::REFLECT: return &( detail::reflect<T> );
-                    default: throw std::invalid_argument( "Function not defined for this TrimType" );
+            trimFunction selectTrimFunction ( detail::TrimType tt ) {
+                switch ( tt ) {
+                    case detail::TRUNCATE:
+                        return & ( detail::truncate<T> );
+                    case detail::WRAP:
+                        return & ( detail::wrap<T> );
+                    case detail::REFLECT:
+                        return & ( detail::reflect<T> );
+                    default:
+                        throw std::invalid_argument ( "Function not defined for this TrimType" );
                 }
             }
-            inline T assignWithTruncation( T val ) {
+            inline T assignWithTruncation ( T val ) {
                 val_ = val;
-                trim_( val_, minVal_, maxVal_ );
+                trim_ ( val_, minVal_, maxVal_ );
 
                 return val_;
             }
@@ -216,10 +230,10 @@ namespace redux {
         }
 
         template<class T, detail::TrimType TT>
-        std::istream& operator>>( std::istream& in, BoundValue<T, TT>& bv ) {
+        std::istream& operator>> ( std::istream& in, BoundValue<T, TT>& bv ) {
             T tmp;
             in >> tmp;
-            bv.assignWithTruncation( tmp );
+            bv.assignWithTruncation ( tmp );
             return in;
         }
 

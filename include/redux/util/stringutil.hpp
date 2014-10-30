@@ -33,7 +33,8 @@ namespace redux {
         bool onlyHex( const std::string &s );
         bool isInteger( const std::string &s );
         bool isHex( const std::string &s );
-
+        bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false, const std::locale& loc = std::locale());
+        
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )
          *  @brief Append char 'c' to both sides of s, and form a block of width n
@@ -169,32 +170,48 @@ namespace redux {
          */
         template <typename T> inline std::string printBits( T* var, size_t n = 1 ) {
 
+            std::ostringstream oss;
+            oss << "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n";
             std::string tmp( "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n" );
             unsigned char* ptr = reinterpret_cast<unsigned char*>( var );
             unsigned char* end = ptr + n * sizeof( T ) - 1;
-
+            
+            std::ios_base::fmtflags ff = oss.flags();
+            
             while( end >= ptr )  {
                 bool alpha = ( *end > 31 && *end < 126 );
-                tmp += alignRight( "Byte ", 7 ) + alignLeft( std::to_string( ( int )( end - ptr ) ), 5 );
+                oss << "  Byte ";
+                oss.setf ( std::ios::right );
+                oss << std::setw(5) << std::to_string( ( int )( end - ptr ) );
+                oss.flags( ff );
 
                 for( int j = 128; j; j >>= 1 ) {
-                    tmp += alignCenter( ( *end & j ) ? "1" : "0", 3 );
+                    oss << (( *end & j ) ? " 1 " : " 0 ");
+                    //tmp +=  ( *end & j ) ? " 1 " : " 0 ";
                 }
 
-                tmp += alignRight( std::to_string( ( int ) * end ), 4 ) + std::string( " (" );
-                tmp += hexString( ( ( int ) * end ) >> 4, false )
-                       + hexString( ( int )( *end ) & 0xF, false );
+//                 tmp += std::to_string( ( int ) * end ) + std::string( " (" );
+//                 tmp += hexString( ( ( int ) * end ) >> 4, false )
+//                        + hexString( ( int )( *end ) & 0xF, false );
+                oss << " " << std::setw(5) << std::to_string( ( int ) * end );
+                oss << std::string( " (" );
+                oss << hexString( ( ( int ) * end ) >> 4, false ) << hexString( ( int )( *end ) & 0xF, false );
 
                 if( alpha ) {
-                    tmp += std::string( "," ) + std::string( ( char* )end, 1 );
+                    oss << ",'" << std::string( ( char* )end, 1 ) << "'";
+                    //tmp += std::string( "," ) + std::string( ( char* )end, 1 );
                 }
 
-                tmp += std::string( ")\n" );
+                oss << ")\n";
+                //tmp += std::string( ")\n" );
                 end--;
             }
 
-            tmp += alignCenter( std::string( 24, '-' ), 48 ) + std::string( "\n" );
+            //tmp += "            ------------------------            \n";
 
+            oss <<  "            ------------------------            \n";
+
+            return oss.str();
             return tmp;
         }
 
@@ -206,33 +223,42 @@ namespace redux {
          */
         template <typename T> inline std::string printBits( const T& var, size_t n = 1 ) {
 
+            std::ostringstream oss;
+            oss << "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n";
+
             std::string tmp( "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n" );
             unsigned char* ptr = ( unsigned char* )( &var );
             unsigned char* end = ptr + n * sizeof( T ) - 1;
-
+            
+            std::ios_base::fmtflags ff = oss.flags();
+            
             while( end >= ptr )  {
                 bool alpha = ( *end > 31 && *end < 126 );
-                tmp += alignRight( "Byte ", 7 ) + alignLeft( std::to_string( ( int )( end - ptr ) ), 5 );
+                oss << "  Byte ";
+                oss.setf ( std::ios::right );
+                oss << std::setw(5) << std::to_string( ( int )( end - ptr ) );
+                oss.flags ( ff );
+                //tmp += "  Byte " + std::string( pad, ' ' ) + std::to_string( ( int )( end - ptr ) );
 
                 for( int j = 128; j; j >>= 1 ) {
-                    tmp += alignCenter( ( *end & j ) ? "1" : "0", 3 );
+                    oss << (( *end & j ) ? " 1 " : " 0 ");
                 }
 
-                tmp += alignRight( std::to_string( ( int ) * end ), 4 ) + std::string( " (" );
-                tmp += hexString( ( ( int ) * end ) >> 4, false )
-                       + hexString( ( int )( *end ) & 0xF, false );
+                oss << " " << std::setw(5) << std::to_string( ( int ) * end ) << std::string( " (" );
+                oss << hexString( ( ( int ) * end ) >> 4, false ) << hexString( ( int )( *end ) & 0xF, false );
 
                 if( alpha ) {
-                    tmp += std::string( "," ) + std::string( ( char* )end, 1 );
+                    oss << ",'" << std::string( ( char* )end, 1 ) << "'";
                 }
 
-                tmp += std::string( ")\n" );
+                oss << ")\n";
 
                 end--;
             }
 
-            tmp += alignCenter( std::string( 24, '-' ), 48 ) + std::string( "\n" );
+            oss <<  "            ------------------------            \n";
 
+            return oss.str();
             return tmp;
         }
 

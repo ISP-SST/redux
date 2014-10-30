@@ -47,6 +47,22 @@ bool redux::util::isHex(const string &s) {
 }
 
 
+bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase, const std::locale& loc ) {
+
+    auto it = std::search (
+                  haystack.begin(), haystack.end(),
+                  needle.begin(),   needle.end(),
+    [ignoreCase,&loc] ( char ch1, char ch2 ) {
+        if ( ignoreCase ) return std::toupper ( ch1,loc ) == std::toupper ( ch2,loc );
+        return ch1 == ch2;
+    }
+              );
+    if ( it != haystack.end() ) return true;
+    return false;
+
+}
+
+
 string redux::util::alignCenter(const string& s, size_t n, unsigned char c) {
 
     if(s.length() > n) {

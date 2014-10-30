@@ -157,6 +157,263 @@ namespace redux {
         }
         //@}
         
+        
+        
+
+
+        //@{
+        /*!
+         *   @brief Find the median of **begin, **end and their midpoint, move the median to end.
+         *   @details This function is primarily for use with QuickSort/partition.
+         */
+        template <class T>
+        void medianOf3( T** begin, T** end ) {
+
+            if( end < begin + 2 ) {
+                return;
+            }
+
+            T** mid = begin + ( ( end - begin + 1 ) >> 1 );
+
+            if( **mid > **end ) {
+                std::swap( mid, end );  // first sort mid/end
+            }
+
+            if( **end > **begin ) {             // if begin >= end, we want end (i.e. we're done.)
+                if( **mid > **begin ) {
+                    std::swap( mid, end );   // if begin < mid, we want mid
+                }
+                else {
+                    std::swap( begin, end );          // else we want begin
+                }
+            }
+
+        }
+
+        template <class T>
+        void medianOf3( T* begin, T* end ) {
+
+            if( end < begin + 2 ) {
+                return;
+            }
+
+            T* mid = begin + ( ( end - begin + 1 ) >> 1 );
+
+            if( *mid > *end ) {
+                std::swap( mid, end );    // first sort mid/end
+            }
+
+            if( *end > *begin ) {           // if begin >= end, we want end (i.e. we're done.)
+                if( *mid > *begin ) {
+                    std::swap( mid, end ); // if begin < mid, we want mid
+                }
+                else {
+                    std::swap( begin, end );          // else we want begin
+                }
+            }
+
+        }
+        //@}
+
+        //@{
+        /*! @fn void partition( T** begin, T** end, bool descending=false )
+         *  @details Arrange the array from begin to end in two parts, one with elements > **end, and one with the rest.
+         *   I.e. the pivot-element is assumed to be in **end.
+         *   This function is for use with QuickSort.
+         *  @param begin Pointer to the first element of the array to be sorted.
+         *  @param end Pointer to the last element of the array to be sorted.
+         *  @param descending Should the part that is larger than the pivot be first ?
+         *  @author Tomas Hillberg
+         */
+        template <class T>
+        void partition( T** begin, T** end, bool descending = false ) {
+
+            if( end < begin + 1 ) {
+                return;
+            }
+
+            T** iter;
+            T** store = begin;
+
+            if( descending ) {
+                for( iter = begin; iter < end; ++iter ) {
+                    if( **iter > **end ) {
+                        std::swap( iter, store );
+                        store++;
+                    }
+                }
+            }
+            else {
+                for( iter = begin; iter < end; ++iter ) {
+                    if( !( **iter > **end ) ) {
+                        std::swap( iter, store );
+                        store++;
+                    }
+                }
+            }
+
+            std::swap( store, end );    // Move pivot to it's proper place
+
+            if( store == begin || store >= end ) {
+                return;
+            }
+
+            if( store > begin ) {
+                // Pick a new pivot for the first part, and partition it.
+                medianOf3( begin, store );  // stores the median of begin/store/midpoint in store
+                partition( begin, store, descending );
+            }
+
+            if( ++store < end ) {
+                // Pick a new pivot for the second part, and partition it.
+                medianOf3( store, end );    // stores the median of store/end/midpoint in end
+                partition( store, end, descending );
+            }
+
+        }
+
+
+        template <class T>
+        void partition( T* begin, T* end, bool descending = false ) {
+
+            if( end < begin + 1 ) {
+                return;
+            }
+
+            T* iter;
+            T* store = begin;
+
+            if( descending ) {
+                for( iter = begin; iter < end; ++iter ) {
+                    if( *iter > *end ) {
+                        std::swap( iter, store++ );
+                    }
+                }
+            }
+            else {
+                for( iter = begin; iter < end; ++iter ) {
+                    if( !( *iter > *end ) ) {
+                        std::swap( iter, store++ );
+                    }
+                }
+            }
+
+            std::swap( store, end );    // Move pivot to it's proper place
+
+            if( store == begin || store >= end ) {
+                return;
+            }
+
+            if( store > begin ) {
+                // Pick a new pivot for the first part, and partition it.
+                medianOf3( begin, store );  // stores the median of begin/store/midpoint in store
+                partition( begin, store, descending );
+            }
+
+            if( ++store < end ) {
+                // Pick a new pivot for the second part, and partition it.
+                medianOf3( store, end );    // stores the median of store/end/midpoint in end
+                partition( store, end, descending );
+            }
+
+        }
+        //@}
+
+
+        //@{
+        /*!
+         *  @brief Sorting algorithm. Version for an array of pointers.
+         *  @details Template for sorting arbitrary types/classes, it is written in a way that it only depends
+         *   on the ">" operator existing for the class.
+         *  @param data First element in the array to be sorted
+         *  @param n Length of the array
+         *  @param descending Should the largest element be first ?
+         *  @param pivotIndex Select an index to be used as pivot-element, else one will be selected using medianOf3()
+         *  @author Tomas Hillberg
+         *  @todo Optimization: exit partitioning for small arrays (15-20 elements), and use a better sort-method (direct insert?) \n
+         *     Check if array is (almost) sorted, if so use another method.
+         */
+        template <class T>
+        void quickSort( T** data, size_t n, bool descending = false, size_t pivotIndex = -1 ) {
+
+            if( n < 2 ) {
+                return;
+            }
+
+            T** ptr = data;
+            T** end = data + n - 1;
+            size_t nanCount = 0;
+
+            // If pivotIndex is out of range, call medianOf3, else move pivot to end of array.
+            if( pivotIndex < n ) {
+                ptr = data + pivotIndex;
+                std::swap( ptr, end );
+                ptr = data;
+            }
+            else {
+                medianOf3( ptr, end );
+            }
+
+            while( ptr < end ) {
+                if( **ptr > **ptr ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
+                    std::swap( ptr, --end );
+                    nanCount++;
+                }
+                ++ptr;
+            }
+
+            if( nanCount ) {
+                ptr = data + n - 1;
+                std::swap( end, ptr );
+            }
+
+            // recurseviely partition the array
+            partition( data, end, descending );
+
+        }
+
+
+        template <class T>
+        void quickSort( T* data, size_t n, bool descending = false, size_t pivotIndex = -1 ) {
+
+            if( n < 2 ) {
+                return;
+            }
+
+            T* ptr = data;
+            T* end = data + n - 1;
+            size_t nanCount = 0;
+
+            // If pivotIndex is out of range, call medianOf3, else move pivot to end of array.
+            if( pivotIndex < n ) {
+                std::swap( data + pivotIndex, end );
+            }
+            else {
+                medianOf3( ptr, end );
+            }
+
+            while( ptr < end ) {
+                if( *ptr > *ptr ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
+                    std::swap( ptr, --end );
+                    nanCount++;
+                }
+                ++ptr;
+            }
+
+            if( nanCount ) {
+                std::swap( end, data + n - 1 );
+            }
+
+            // recurseviely partition the array
+            partition<T>( data, end, descending );
+
+        }
+
+        //@}
+
+
+        
+        
         /*! @} */
 
 

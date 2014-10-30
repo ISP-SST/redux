@@ -14,15 +14,17 @@ using boost::unit_test_framework::test_suite;
 namespace testsuite {
     namespace file { void fileTest(void); }
     namespace image { void imageTest(void); }
+    namespace math { void mathTest(void); }
     namespace util { void utilTest(void); }
 }
 
 test_suite* init_unit_test_suite(int /*argc*/, char* /*argv*/[]) {
 
-	//test_suite* sstTestSuite = BOOST_TEST_SUITE("REDUX Tests");
+	//test_suite* reduxTestSuite = BOOST_TEST_SUITE("REDUX Tests");
     
     testsuite::file::fileTest();
     testsuite::image::imageTest();
+    testsuite::math::mathTest();
     testsuite::util::utilTest();
 
     return nullptr;
