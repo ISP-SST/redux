@@ -6,7 +6,7 @@ using namespace redux::gui;
 using namespace redux;
 
 
-ReduxMW::ReduxMW() {
+ReduxMW::ReduxMW(QWidget* cw) {
 
     createLayout();
     createActions();
@@ -15,18 +15,14 @@ ReduxMW::ReduxMW() {
     //createStatusBar();
 
     readSettings();
-    cw->readSettings();
 
-    //pool.run();
-
+    setCentralWidget( cw );
 }
 
 void ReduxMW::closeEvent( QCloseEvent *event ) {
 
     if( maybeSave() ) {
         writeSettings();
-        cw->writeSettings();
-
         event->accept();
     }
     else {
@@ -77,15 +73,18 @@ void ReduxMW::about() {
 
 void ReduxMW::createLayout() {
 
-    cw = new ReduxWidget( this );
-    dumper = new QTextEdit( this );
-    dumper->setReadOnly( TRUE );
-    dumper->setMaximumHeight( 80 );
-    dumper->setMinimumHeight( 20 );
-    //dumper->append( QString("Bla") );
-    cw->setInfo( dumper );
+    //cw = new ReduxWidget( this );
+    output = new QTextEdit( this );
+    output->setReadOnly( TRUE );
+    //output->setMaximumHeight( 80 );
+    output->setMinimumHeight( 20 );
+    //output->append( QString("Bla") );
+    //cw->setInfo( output );
 
-    setCentralWidget( cw );
+    outputDW = new QDockWidget(tr("Output"), this);
+    outputDW->setWidget(output);
+
+    //setCentralWidget( cw );
 
 }
 
@@ -99,12 +98,12 @@ void ReduxMW::createActions() {
     openAct = new QAction( QIcon( ":/images/fileopen.xpm" ), tr( "&Open..." ), this );
     openAct->setShortcut( tr( "Ctrl+O" ) );
     openAct->setStatusTip( tr( "Open an existing file" ) );
-    connect( openAct, SIGNAL( triggered() ), cw, SLOT( open() ) );
+    //connect( openAct, SIGNAL( triggered() ), cw, SLOT( open() ) );
 
     saveAct = new QAction( QIcon( ":/images/filesave.xpm" ), tr( "&Save" ), this );
     saveAct->setShortcut( tr( "Ctrl+S" ) );
     saveAct->setStatusTip( tr( "Save the document to disk" ) );
-    connect( saveAct, SIGNAL( triggered() ), cw, SLOT( save() ) );
+    //connect( saveAct, SIGNAL( triggered() ), cw, SLOT( save() ) );
 
     saveAsAct = new QAction( tr( "Save &As..." ), this );
     saveAsAct->setStatusTip( tr( "Save the document under a new name" ) );
@@ -132,10 +131,6 @@ void ReduxMW::createActions() {
     pasteAct->setStatusTip( tr( "Paste the clipboard's contents into the current "
                                 "selection" ) );
     //connect(pasteAct, SIGNAL(triggered()), textEdit, SLOT(paste()));
-    showDumperAct = new QAction( tr( "&Show Messages" ), this );
-    showDumperAct->setStatusTip( tr( "Show output frame" ) );
-    showDumperAct->setCheckable( true );
-    connect( showDumperAct, SIGNAL( toggled( bool ) ), dumper, SLOT( setVisible( bool ) ) );
 
 
     aboutAct = new QAction( tr( "&About" ), this );
@@ -169,12 +164,12 @@ void ReduxMW::createMenus() {
     editMenu->addAction( pasteAct );
 
     viewMenu = menuBar()->addMenu( tr( "&View" ) );
-    viewMenu->addAction( showDumperAct );
-
+    viewMenu->addAction(outputDW->toggleViewAction());
+    
     menuBar()->addSeparator();
 
     helpMenu = menuBar()->addMenu( tr( "&Help" ) );
-    helpMenu->addAction( aboutAct );
+    //helpMenu->addAction( aboutAct );
     helpMenu->addAction( aboutQtAct );
 }
 
@@ -200,28 +195,28 @@ void ReduxMW::readSettings() {
     settings.beginGroup( "ReduxMW" );
     QPoint pos = settings.value( "position", QPoint( 200, 200 ) ).toPoint();
     QSize size = settings.value( "size", QSize( 400, 400 ) ).toSize();
-    bool bl = settings.value( "messagesVisible", true ).toBool();
+    //bool bl = settings.value( "outputVisible", true ).toBool();
     settings.endGroup();
     resize( size );
     move( pos );
-    dumper->setVisible( bl );
-    showDumperAct->setChecked( bl );
+    //output->setVisible( bl );
+    //showOutput->setChecked( bl );
 
-    //settings.beginGroup ( "MessageWindow" );
-    //bool bl = settings.value ( "visible", true ).toBool();
-    //dw->setVisible ( bl );
-    //bl = settings.value ( "floating", false ).toBool();
-    //dw->setFloating ( bl );
-    //pos = settings.value ( "position", QPoint ( 200, 200 ) ).toPoint();
-    //size = settings.value ( "size", QSize ( 400, 400 ) ).toSize();
-    //Qt::DockWidgetArea area =
-    //    ( Qt::DockWidgetArea ) settings.value ( "dockingarea", Qt::BottomDockWidgetArea ).toInt();
-    //settings.endGroup();
+    settings.beginGroup ( "Output" );
+    bool bl = settings.value ( "visible", true ).toBool();
+    outputDW->setVisible ( bl );
+    bl = settings.value ( "floating", false ).toBool();
+    outputDW->setFloating ( bl );
+    Qt::DockWidgetArea dwArea = ( Qt::DockWidgetArea ) settings.value ( "dockingarea", Qt::BottomDockWidgetArea ).toInt();
+    pos = settings.value ( "position", QPoint ( 200, 200 ) ).toPoint();
+    size = settings.value ( "size", QSize ( 400, 400 ) ).toSize();
+    if(~bl) {
+        addDockWidget ( dwArea, outputDW );
+    }
+    outputDW->resize ( size );
+    outputDW->move ( pos );
+    settings.endGroup();
 
-    //dw->resize ( size );
-    //dw->move ( pos );
-
-    //addDockWidget ( area,dw );
 
 }
 
@@ -231,17 +226,16 @@ void ReduxMW::writeSettings() {
     settings.beginGroup( "ReduxMW" );
     settings.setValue( "position", pos() );
     settings.setValue( "size", size() );
-    settings.setValue( "messagesVisible", dumper->isVisible() );
     settings.endGroup();
 
-    //settings.beginGroup ( "MessageWindow" );
-    //  settings.setValue ( "visible", dw->isVisible() );
-    //settings.setValue ( "floating", dw->isFloating() );
-    //settings.setValue ( "dockingarea", dockWidgetArea ( dw ) );
-    //settings.setValue ( "position", dw->pos() );
-    //settings.setValue ( "size", dw->size() );
-    //settings.endGroup();
-
+    settings.beginGroup ( "Output" );
+    settings.setValue ( "visible", outputDW->isVisible() );
+    bool bl = outputDW->isFloating();
+    settings.setValue ( "floating", bl );
+    settings.setValue ( "dockingarea", dockWidgetArea ( outputDW ) );
+    settings.setValue ( "position", outputDW->pos() );
+    settings.setValue ( "size", outputDW->size() );
+    settings.endGroup();
 
 }
 
@@ -262,7 +256,7 @@ bool ReduxMW::maybeSave() {
 }
 
 void ReduxMW::printMsg( const QString &msg, QColor c ) {
-    dumper->setTextColor( c );
-    dumper->append( msg );
+    output->setTextColor( c );
+    output->append( msg );
 }
 

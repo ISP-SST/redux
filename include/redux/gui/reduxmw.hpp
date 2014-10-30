@@ -32,7 +32,7 @@ namespace redux {
             Q_OBJECT
 
         public:
-            ReduxMW();
+            ReduxMW(QWidget* cw=nullptr);
             ~ReduxMW() { };
 
 
@@ -48,9 +48,8 @@ namespace redux {
 
         private:
             
-            ReduxWidget* cw;
-            QTextEdit *dumper;
-            QString curFile;
+            QTextEdit *output;
+            QDockWidget *outputDW;
 
             QMenu *fileMenu, *editMenu, *viewMenu, *helpMenu;
 
@@ -58,7 +57,6 @@ namespace redux {
 
             QAction *newAct, *openAct, *saveAct, *saveAsAct, *exitAct;
             QAction *cutAct, *copyAct, *pasteAct;
-            QAction *showDumperAct;
             QAction *aboutAct, *aboutQtAct;
 
             void createLayout();

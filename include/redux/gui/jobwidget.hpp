@@ -153,7 +153,6 @@ namespace redux {
             //MerlinTask defaultMerlin;
             //GeneticTask defaultGenetic;
 
-            //ROYAC::XMLFile cfgFile;
 
             QAction *addAct, *removeAct;
             //QWidget *specTab,*instrTab;

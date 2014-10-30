@@ -8,7 +8,6 @@ using namespace redux::gui;
 using namespace redux;
 
 PeerItem::PeerItem( const QList<QVariant> &data, PeerItem *parent, int hi ) {
-    //std::cout << "PeerItem::PeerItem()" << ROYAC::hexString(this) << std::endl;
     parentItem = parent;
     itemData = data;
     hostIndex = hi;

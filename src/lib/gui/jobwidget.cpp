@@ -6,17 +6,6 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-using std::string;
-using std::ifstream;
-using std::getline;
-using std::cout;
-using std::endl;
-
-// #include "MainWindow.h"
-//
-// #include <REDUX/Model.h>
-//#include <ROYAC.h>
-//using ROYAC::PI;
 
 using namespace redux::gui;
 using namespace redux;
