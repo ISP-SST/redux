@@ -1,10 +1,8 @@
 #include "rdx.hpp"
 
-#include "redux/util/stringutil.hpp"
-
+#include <iomanip>
 #include <iostream>
 
-using namespace redux::util;
 using namespace std;
 
 
@@ -56,22 +54,20 @@ size_t redux::dumpStruct ( IDL_VPTR data, int current, int indent ) {
 
     size_t sz = 0;
     if ( data->type == IDL_TYP_STRUCT ) {
-
         if ( current < 0 ) {
-            cout << "              TAG        TYPE                     ADDRESS             OFFSET         SIZE           " << endl;
+            cout << "           TAG           TYPE                     OFFSET         SIZE           " << endl;
             sz += dumpStruct ( data, indent, indent );
-            cout << string ( 50, ' ' ) << "Total Size:                        " << to_string ( sz ) << endl;
+                cout << string ( 45, ' ' ) << "Total Size:         " << to_string ( sz ) << endl;
             return sz;
         }
 
 
         IDL_StructDefPtr structDef = data->value.s.sdef;
-        uint8_t *buf = data->value.s.arr->data;
+        //uint8_t *buf = data->value.s.arr->data;
         int nTags = IDL_StructNumTags ( structDef );
         int count;
 
         for ( int t = 0; t < nTags; ++t ) {
-
             char *name = IDL_StructTagNameByIndex ( structDef, t, 0, 0 );
             IDL_VPTR v;
             IDL_MEMINT offset = IDL_StructTagInfoByIndex ( structDef, t, 0, &v );
@@ -87,15 +83,24 @@ size_t redux::dumpStruct ( IDL_VPTR data, int current, int indent ) {
                 type.append ( ")" );
             }
 
+            cout.setf ( std::ios::left );
             if ( v->type == IDL_TYP_STRUCT ) {
-                cout << string ( current, ' ' ) <<alignLeft ( name, 25 - current ) << alignLeft ( type, 25 );
-                cout << alignLeft ( hexString ( buf + offset ), 20 ) << alignLeft ( to_string ( ( size_t ) offset ), 15 ) << endl;
+                cout << std::setw(25) << (string(current, ' ') + name);
+                cout << std::setw(25) << type;
+                //cout.setf ( std::ios::hex );
+                //cout << std::setw(20) << (void*)( buf + offset );
+                //cout.setf ( std::ios::dec );
+                cout << std::setw(15) << to_string ( (size_t)offset ) << endl;
                 sz += count * dumpStruct ( v, current + indent, indent );
             } else {
                 sz += count * var_sizes[v->type];
-                cout << string ( current, ' ' ) << alignLeft ( name, 25 - current ) << alignLeft ( type, 25 );
-                cout << alignLeft ( hexString ( buf + offset ), 20 ) << alignLeft ( to_string ( ( size_t ) offset ), 15 );
-                cout << alignLeft ( to_string ( count * var_sizes[v->type] ), 15 ) << endl;
+                cout << std::setw(25) << (string(current,' ')+name);
+                cout << std::setw(25) << type;
+                //cout.setf ( std::ios::hex );
+                //cout << std::setw(20) << (void*)( buf + offset );
+                //cout.setf ( std::ios::dec );
+                cout << std::setw(15) << to_string ( (size_t)offset );
+                cout << std::setw(15) << to_string ( count * var_sizes[v->type] ) << endl; // << endl;
             }
 
         }

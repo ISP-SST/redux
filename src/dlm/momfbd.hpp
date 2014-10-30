@@ -7,6 +7,7 @@
 namespace redux {
 
     IDL_VPTR momfbd_read( int argc, IDL_VPTR* argv, char* argk );
+    void momfbd_write( int argc, IDL_VPTR* argv, char* argk );
     IDL_VPTR momfbd_mozaic( int argc, IDL_VPTR *argv, char *argk );
 
 }

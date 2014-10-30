@@ -341,7 +341,7 @@ void redux::file::Ana::read( const std::string& filename, char* data, std::share
 
 void redux::file::Ana::write( const std::string& filename, const char* data, const std::shared_ptr<redux::file::Ana> hdr, bool compress, int slice ) {
 
-    ofstream file( filename, ifstream::binary );
+    ofstream file( filename, ofstream::binary );
     if( !file.good() ) {
         throw std::ios_base::failure( "Failed to open file for writing: " + filename );
     }

@@ -2,6 +2,7 @@
 
 #include "redux/file/filemomfbd.hpp"
 #include "redux/math/functions.hpp"
+#include "redux/util/array.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
@@ -32,16 +33,6 @@ using namespace std;
 //setenv IDL_DLM_PATH '/home/hillberg/lib/dlm-old:<IDL_DEFAULT>'
 //http://idlastro.gsfc.nasa.gov/idl_html_help/Structure_Variables.html
 
-#define LOAD_IMG        1
-#define LOAD_PSF        2
-#define LOAD_OBJ        4
-#define LOAD_RES        8
-#define LOAD_ALPHA     16
-#define LOAD_DIV       32
-#define LOAD_PATCH     63       // convenience for flagging any "per-patch" data.
-#define LOAD_MODES     64
-#define LOAD_NAMES    128
-#define LOAD_ALL      255
 
 namespace {
 
@@ -67,15 +58,15 @@ namespace {
         if ( data->type == IDL_TYP_STRUCT ) {
 
             if ( current < 0 ) {
-                cout << "              TAG        TYPE                     ADDRESS             OFFSET         SIZE           " << endl;
+                cout << "           TAG           TYPE                     OFFSET         SIZE           " << endl;
                 sz += dumpStruct ( data, indent, indent );
-                cout << string ( 50, ' ' ) << "Total Size:                        " << to_string ( sz ) << endl;
+                cout << string ( 45, ' ' ) << "Total Size:         " << to_string ( sz ) << endl;
                 return sz;
             }
 
 
             IDL_StructDefPtr structDef = data->value.s.sdef;
-            uint8_t *buf = data->value.s.arr->data;
+            //uint8_t *buf = data->value.s.arr->data;
             int nTags = IDL_StructNumTags ( structDef );
             int count;
 
@@ -96,16 +87,25 @@ namespace {
                     type.append ( ")" );
                 }
 
-                if ( v->type == IDL_TYP_STRUCT ) {
-                    cout << string ( current, ' ' ) <<alignLeft ( name, 25 - current ) << alignLeft ( type, 25 );
-                    cout << alignLeft ( hexString ( buf + offset ), 20 ) << alignLeft ( to_string ( ( size_t ) offset ), 15 ) << endl;
-                    sz += count * dumpStruct ( v, current + indent, indent );
-                } else {
-                    sz += count * var_sizes[v->type];
-                    cout << string ( current, ' ' ) << alignLeft ( name, 25 - current ) << alignLeft ( type, 25 );
-                    cout << alignLeft ( hexString ( buf + offset ), 20 ) << alignLeft ( to_string ( ( size_t ) offset ), 15 );
-                    cout << alignLeft ( to_string ( count * var_sizes[v->type] ), 15 ) << endl;
-                }
+            cout.setf ( std::ios::left );
+            if ( v->type == IDL_TYP_STRUCT ) {
+                cout << std::setw(25) << (string(current, ' ') + name);
+                cout << std::setw(25) << type;
+                //cout.setf ( std::ios::hex );
+                //cout << std::setw(20) << (void*)( buf + offset );
+                //cout.setf ( std::ios::dec );
+                cout << std::setw(15) << to_string ( (size_t)offset ) << endl;
+                sz += count * dumpStruct ( v, current + indent, indent );
+            } else {
+                sz += count * var_sizes[v->type];
+                cout << std::setw(25) << (string(current,' ')+name);
+                cout << std::setw(25) << type;
+                //cout.setf ( std::ios::hex );
+                //cout << std::setw(20) << (void*)( buf + offset );
+                //cout.setf ( std::ios::dec );
+                cout << std::setw(15) << to_string ( (size_t)offset );
+                cout << std::setw(15) << to_string ( count * var_sizes[v->type] ) << endl;
+            }
 
             }
 
@@ -141,8 +141,8 @@ namespace {
         { ( char* ) "CLIP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( clip ) },
         { ( char* ) "DIV",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( div ) },
         { ( char* ) "HELP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( help ) },
-        { ( char* ) "IMG",           IDL_TYP_INT, 1, 0,                           0, ( char* ) IDL_KW_OFFSETOF ( img ) },
-        { ( char* ) "MARGIN",        IDL_TYP_INT, 1, 0,                           0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
+        { ( char* ) "IMG",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( img ) },
+        { ( char* ) "MARGIN",        IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
         { ( char* ) "MODES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( modes ) },
         { ( char* ) "NAMES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( names ) },
         { ( char* ) "OBJ",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( obj ) },
@@ -208,8 +208,8 @@ namespace {
     void momfbd_help ( void ) {
 
         cout << "MOMFBD DLM usage:\n";
-        cout << "    Syntax:          struct = momfbd_read('/path/to/file/data.momfbd',/KEYWORDS)\n";
-        cout << "                     img = momfbg_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip )\n";
+        cout << "    Syntax example:    a = momfbd_read('/path/to/file/data.momfbd',/img,verbose=2)\n";
+        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip )\n";
         cout << "    Accepted Keywords:\n";
         cout << "        /HELP                    Print this info.\n";
         cout << "        /CHECK                   Just parse the file and show the structure, don't load data.\n";
@@ -240,20 +240,24 @@ namespace {
 
     void createPatchTags ( vector<IDL_STRUCT_TAG_DEF>& tags, uint8_t loadMask, const FileMomfbd* const info ) {
 
+        appendTag ( tags, "YL", 0, ( void* ) IDL_TYP_INT );                 // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+        appendTag ( tags, "YH", 0, ( void* ) IDL_TYP_INT );
         appendTag ( tags, "XL", 0, ( void* ) IDL_TYP_INT );
         appendTag ( tags, "XH", 0, ( void* ) IDL_TYP_INT );
-        appendTag ( tags, "YL", 0, ( void* ) IDL_TYP_INT );
-        appendTag ( tags, "YH", 0, ( void* ) IDL_TYP_INT );
-
+        if ( info->version >= 20110714.0) {
+            appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "OFFX", 0, ( void* ) IDL_TYP_INT );
+        }
+        
         IDL_MEMINT* tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
         tmpDims[1] = info->nChannels;
-        appendTag ( tags, "DX", tmpDims, ( void* ) IDL_TYP_INT );
+        appendTag ( tags, "DY", tmpDims, ( void* ) IDL_TYP_INT );           // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names   
 
         tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
         tmpDims[1] = info->nChannels;
-        appendTag ( tags, "DY", tmpDims, ( void* ) IDL_TYP_INT );
+        appendTag ( tags, "DX", tmpDims, ( void* ) IDL_TYP_INT );
 
         tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
@@ -262,49 +266,49 @@ namespace {
 
         const FileMomfbd::PatchInfo& tmpPatch = info->patches ( 0 );
 
-        if ( tmpPatch.imgPos && ( loadMask & LOAD_IMG ) ) {
+        if ( tmpPatch.imgPos && ( loadMask & MOMFBD_IMG ) ) {
             tmpDims = new IDL_MEMINT[3];
             tmpDims[0] = 2;
-            tmpDims[1] = tmpPatch.nPixelsX;
-            tmpDims[2] = tmpPatch.nPixelsY;
+            tmpDims[1] = tmpPatch.nPixelsY;     // fast index first
+            tmpDims[2] = tmpPatch.nPixelsX;
             appendTag ( tags, "IMG", tmpDims, ( void* ) IDL_TYP_FLOAT );
         }
-        if ( tmpPatch.npsf && ( loadMask & LOAD_PSF ) ) {
+        if ( tmpPatch.npsf && ( loadMask & MOMFBD_PSF ) ) {
             tmpDims = new IDL_MEMINT[4];
             tmpDims[0] = 3;
-            tmpDims[1] = tmpPatch.nPixelsX;
-            tmpDims[2] = tmpPatch.nPixelsY;
+            tmpDims[1] = tmpPatch.nPixelsY;     // fast index first
+            tmpDims[2] = tmpPatch.nPixelsX;
             tmpDims[3] = tmpPatch.npsf;
             appendTag ( tags, "PSF", tmpDims, ( void* ) IDL_TYP_FLOAT );
         }
-        if ( tmpPatch.nobj && ( loadMask & LOAD_OBJ ) ) {
+        if ( tmpPatch.nobj && ( loadMask & MOMFBD_OBJ ) ) {
             tmpDims = new IDL_MEMINT[4];
             tmpDims[0] = 3;
-            tmpDims[1] = tmpPatch.nPixelsX;
-            tmpDims[2] = tmpPatch.nPixelsY;
+            tmpDims[1] = tmpPatch.nPixelsY;     // fast index first
+            tmpDims[2] = tmpPatch.nPixelsX;
             tmpDims[3] = tmpPatch.nobj;
             appendTag ( tags, "OBJ", tmpDims, ( void* ) IDL_TYP_FLOAT );
         }
-        if ( tmpPatch.nres && ( loadMask & LOAD_RES ) ) {
+        if ( tmpPatch.nres && ( loadMask & MOMFBD_RES ) ) {
             tmpDims = new IDL_MEMINT[4];
             tmpDims[0] = 3;
-            tmpDims[1] = tmpPatch.nPixelsX;
-            tmpDims[2] = tmpPatch.nPixelsY;
+            tmpDims[1] = tmpPatch.nPixelsY;     // fast index first
+            tmpDims[2] = tmpPatch.nPixelsX;
             tmpDims[3] = tmpPatch.nres;
             appendTag ( tags, "RES", tmpDims, ( void* ) IDL_TYP_FLOAT );
         }
-        if ( tmpPatch.nalpha && ( loadMask & LOAD_ALPHA ) ) {
+        if ( tmpPatch.nalpha && ( loadMask & MOMFBD_ALPHA ) ) {
             tmpDims = new IDL_MEMINT[3];
             tmpDims[0] = 2;
             tmpDims[1] = tmpPatch.nm;
             tmpDims[2] = tmpPatch.nalpha;
             appendTag ( tags, "ALPHA", tmpDims, ( void* ) IDL_TYP_FLOAT );
         }
-        if ( tmpPatch.ndiv && ( loadMask & LOAD_DIV ) ) {
+        if ( tmpPatch.ndiv && ( loadMask & MOMFBD_DIV ) ) {
             tmpDims = new IDL_MEMINT[4];
             tmpDims[0] = 3;
-            tmpDims[1] = tmpPatch.nphx;
-            tmpDims[2] = tmpPatch.nphy;
+            tmpDims[1] = tmpPatch.nphy;     // fast index first
+            tmpDims[2] = tmpPatch.nphx;
             tmpDims[3] = tmpPatch.ndiv;
             appendTag ( tags, "DIV", tmpDims, ( void* ) IDL_TYP_FLOAT );
         }
@@ -321,22 +325,6 @@ namespace {
         appendTag ( tags, "DATE", 0, ( void* ) IDL_TYP_STRING );
 
         IDL_MEMINT* tmpDims;
-        if ( ( loadMask & LOAD_MODES ) && info->nModes ) {
-            if ( info->nPH ) {
-                tmpDims = new IDL_MEMINT[3];
-                tmpDims[0] = 2;
-                tmpDims[1] = info->nPH;
-                tmpDims[2] = info->nPH;
-                appendTag ( tags, "PUPIL", tmpDims, ( void* ) IDL_TYP_FLOAT );
-
-                tmpDims = new IDL_MEMINT[4];
-                tmpDims[0] = 3;
-                tmpDims[1] = info->nPH;
-                tmpDims[2] = info->nPH;
-                tmpDims[3] = info->nModes;
-                appendTag ( tags, "MODE", tmpDims, ( void* ) IDL_TYP_FLOAT );
-            }
-        }
 
         if ( loadMask && info->nChannels ) {
             tmpDims = new IDL_MEMINT[4];
@@ -346,16 +334,40 @@ namespace {
             tmpDims[3] = 2;
             appendTag ( tags, "CLIP", tmpDims, ( void* ) IDL_TYP_INT );
         }
+        
+        if ( loadMask & MOMFBD_MODES ) {
+            if ( info->version >= 20110714.0 ) {
+        cout << "BLÖBLÖ" << endl;
+                appendTag ( tags, "PIX2CF", 0, ( void* ) IDL_TYP_FLOAT );
+                appendTag ( tags, "CF2PIX", 0, ( void* ) IDL_TYP_FLOAT );
+            }
+            if ( info->nPH ) {
+                tmpDims = new IDL_MEMINT[3];
+                tmpDims[0] = 2;
+                tmpDims[1] = info->nPH;
+                tmpDims[2] = info->nPH;
+                appendTag ( tags, "PUPIL", tmpDims, ( void* ) IDL_TYP_FLOAT );
 
-        if ( loadMask & LOAD_PATCH && info->nPatchesX > 0 && info->nPatchesY > 0 ) {
+                if ( info->nModes ) {
+                    tmpDims = new IDL_MEMINT[4];
+                    tmpDims[0] = 3;
+                    tmpDims[1] = info->nPH;
+                    tmpDims[2] = info->nPH;
+                    tmpDims[3] = info->nModes;
+                    appendTag ( tags, "MODE", tmpDims, ( void* ) IDL_TYP_FLOAT );
+                }
+            }
+        }
+
+        if ( loadMask & MOMFBD_PATCH && info->nPatchesX > 0 && info->nPatchesY > 0 ) {
             vector<IDL_STRUCT_TAG_DEF> patchTags;
             createPatchTags ( patchTags, loadMask, info );
             // Append the "patch substructure" to the IDL structure
             IDL_StructDefPtr ds = IDL_MakeStruct ( 0, patchTags.data() );
             tmpDims = new IDL_MEMINT[3];
             tmpDims[0] = 2;
-            tmpDims[1] = info->nPatchesX;
-            tmpDims[2] = info->nPatchesY;
+            tmpDims[1] = info->nPatchesY;       // fast index first
+            tmpDims[2] = info->nPatchesX;
             appendTag ( tags, "PATCH", tmpDims, ( void* ) ds );
             for ( auto & it : patchTags ) { // delete the "dims" array for the tags that has them
                 if ( it.dims ) {
@@ -366,7 +378,7 @@ namespace {
 
         }
         // Append file-names to the IDL structure
-        if ( ( loadMask & LOAD_NAMES ) && info->nFileNames ) {
+        if ( ( loadMask & MOMFBD_NAMES ) && info->nFileNames ) {
             tmpDims = new IDL_MEMINT[2];
             tmpDims[0] = 1;
             tmpDims[1] = info->nFileNames;
@@ -387,22 +399,22 @@ namespace {
         const FileMomfbd::PatchInfo& tmpPatch = info->patches ( 0 );
 
         size_t nFloats = 0;
-        if ( ( loadMask & LOAD_IMG ) && tmpPatch.imgPos ) {
+        if ( ( loadMask & MOMFBD_IMG ) && tmpPatch.imgPos ) {
             nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY;
         }
-        if ( ( loadMask & LOAD_PSF ) && tmpPatch.npsf ) {
+        if ( ( loadMask & MOMFBD_PSF ) && tmpPatch.npsf ) {
             nFloats += tmpPatch.npsf * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
         }
-        if ( ( loadMask & LOAD_OBJ ) && tmpPatch.nobj ) {
+        if ( ( loadMask & MOMFBD_OBJ ) && tmpPatch.nobj ) {
             nFloats += tmpPatch.nobj * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
         }
-        if ( ( loadMask & LOAD_RES ) && tmpPatch.nres ) {
+        if ( ( loadMask & MOMFBD_RES ) && tmpPatch.nres ) {
             nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY * tmpPatch.nres;
         }
-        if ( ( loadMask & LOAD_ALPHA ) && tmpPatch.nalpha &&  tmpPatch.nm ) {
+        if ( ( loadMask & MOMFBD_ALPHA ) && tmpPatch.nalpha &&  tmpPatch.nm ) {
             nFloats += tmpPatch.nm * tmpPatch.nalpha * tmpPatch.nPixelsY;
         }
-        if ( tmpPatch.ndiv && ( loadMask & LOAD_DIV ) ) {
+        if ( tmpPatch.ndiv && ( loadMask & MOMFBD_DIV ) ) {
             nFloats += tmpPatch.nphx * tmpPatch.nphy * tmpPatch.ndiv;
         }
         patchSize += nFloats * sizeof ( float );
@@ -411,16 +423,15 @@ namespace {
 
     }
 
-    void loadData ( ifstream& file, char* data, uint8_t loadMask, const FileMomfbd* const info, int verbosity ) {
+    
+    void loadData ( ifstream& file, char* data, uint8_t loadMask, FileMomfbd* info, int verbosity ) {
 
-        // zero the names-ptr
+        // zero the list of filenames
         MomfdContainer* container = reinterpret_cast<MomfdContainer*> ( data );
         container->nNames = 0;
         container->ptr = nullptr;
 
         char* ptr = data + sizeof ( MomfdContainer );
-        float* fPtr;
-        IDL_INT* tmpInt;
 
         // File version, date, time
         IDL_STRING *str = reinterpret_cast<IDL_STRING*> ( ptr );
@@ -447,199 +458,48 @@ namespace {
         str[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
         
         ptr += 3*sizeof(IDL_STRING);
-
-        file.clear();
-
-        // pupil & modes
-        if ( ( loadMask & LOAD_MODES ) && info->nModes ) {
-
-            // pupil
-            if ( info->phOffset ) {
-                file.seekg ( info->phOffset );
-                fPtr = reinterpret_cast<float*> ( ptr );
-                ptr += readOrThrow ( file, fPtr, info->nPH * info->nPH, "MomfbdData:pupil" );
-                if ( info->swapNeeded ) {
-                    swapEndian ( fPtr, info->nPH * info->nPH );
-                }
-            }
-
-            // modes
-            if ( info->modesOffset ) {
-                // Load data
-                file.seekg ( info->modesOffset );
-                fPtr = reinterpret_cast<float*> ( ptr );
-                ptr += readOrThrow ( file, fPtr, info->nModes * info->nPH * info->nPH, "MomfbdData:modes" );
-                if ( info->swapNeeded ) {
-                    swapEndian ( fPtr, info->nPH * info->nPH );
-                }
-            }
-
-        }
-
+        
+        
         if ( loadMask && info->nChannels ) {
             //NOTE: clipStartY & clipEndX swapped compared to file-order
             for ( int i = 0; i < info->nChannels; ++i ) {
-                ( ( IDL_INT* ) ptr ) [ i + 0 * info->nChannels ] = info->clipStartX.get() [ i ];
-                ( ( IDL_INT* ) ptr ) [ i + 1 * info->nChannels ] = info->clipStartY.get() [ i ];
-                ( ( IDL_INT* ) ptr ) [ i + 2 * info->nChannels ] = info->clipEndX.get() [ i ];
-                ( ( IDL_INT* ) ptr ) [ i + 3 * info->nChannels ] = info->clipEndY.get() [ i ];
+                ( ( IDL_INT* ) ptr ) [ i + 0 * info->nChannels ] = info->clipStartY.get() [ i ];
+                ( ( IDL_INT* ) ptr ) [ i + 1 * info->nChannels ] = info->clipStartX.get() [ i ];
+                ( ( IDL_INT* ) ptr ) [ i + 2 * info->nChannels ] = info->clipEndY.get() [ i ];
+                ( ( IDL_INT* ) ptr ) [ i + 3 * info->nChannels ] = info->clipEndX.get() [ i ];
             }
             ptr += 4 * info->nChannels * sizeof ( IDL_INT );
         }
 
-        if ( loadMask & LOAD_PATCH && info->nPatchesX > 0 && info->nPatchesY > 0 ) {
-            const FileMomfbd::PatchInfo* tmpPatch;
-            size_t tmpSize;
-
-            if ( verbosity > 1 ) {
-                cout << "Total patches: " << info->nPatchesX << " x " << info->nPatchesY << endl;
-            }
-
-            for ( int y = 0; y < info->nPatchesY; ++y ) {
-                for ( int x = 0; x < info->nPatchesX; ++x ) {
-
-                    tmpPatch = info->patches.ptr ( x, y );
-                    size_t nxny;
-                    if ( tmpPatch ) {
-
-                        if ( verbosity > 1 ) {
-                            cout << "Loading patch (" << x << "," << y << ")   \r" << flush;
-                        }
-                        // region
-                        tmpInt = ( IDL_INT* ) ptr;
-                        for ( int i = 0; i < 4; ++i ) {
-                            tmpInt[i] = tmpPatch->region[i];
-                        }
-                        ptr += 4 * sizeof ( IDL_INT );
-
-                        tmpInt = ( IDL_INT* ) ptr;
-                        for ( int i = 0; i < info->nChannels; ++i ) {
-                            tmpInt[ i + 0 * info->nChannels ] = tmpPatch->dx.get() [ i ];
-                            tmpInt[ i + 1 * info->nChannels ] = tmpPatch->dy.get() [ i ];
-                            tmpInt[ i + 2 * info->nChannels ] = tmpPatch->nim.get() [ i ];
-                        }
-                        ptr += 3 * info->nChannels * sizeof ( IDL_INT );
-
-                        while ( ( size_t ) ptr % alignTo ) ptr++;
-
-                        nxny = tmpPatch->nPixelsX * tmpPatch->nPixelsX;
-                        if ( ( loadMask & LOAD_IMG ) && tmpPatch->imgPos ) {
-                            file.seekg ( tmpPatch->imgPos );
-                            fPtr = reinterpret_cast<float*> ( ptr );
-                            ptr += readOrThrow ( file, fPtr, nxny, "MomfbdPatch:img" );
-                            if ( info->swapNeeded ) {
-                                swapEndian ( fPtr, nxny );
-                            }
-                            // file data-order: [x,y]
-                            // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-                            transpose ( fPtr, tmpPatch->nPixelsY, tmpPatch->nPixelsX );
-                        }
-
-                        if ( ( loadMask & LOAD_PSF ) && tmpPatch->npsf ) {
-                            file.seekg ( tmpPatch->psfPos );
-                            fPtr = reinterpret_cast<float*> ( ptr );
-                            ptr += readOrThrow ( file, fPtr, tmpPatch->npsf * nxny, "MomfbdPatch:psf" );
-                            if ( info->swapNeeded ) {
-                                swapEndian ( fPtr, tmpPatch->npsf * nxny );
-                            }
-                            // file data-order: [x,y]
-                            // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-                            for ( int i = 0; i < tmpPatch->npsf; ++i )
-                                transpose ( ( fPtr + i * nxny ), tmpPatch->nPixelsY, tmpPatch->nPixelsX );
-                        }
-
-                        if ( ( loadMask & LOAD_OBJ ) && tmpPatch->nobj ) {
-                            file.seekg ( tmpPatch->objPos );
-                            fPtr = reinterpret_cast<float*> ( ptr );
-                            ptr += readOrThrow ( file, fPtr, tmpPatch->nobj * nxny, "MomfbdPatch:obj" );
-                            if ( info->swapNeeded ) {
-                                swapEndian ( fPtr, tmpPatch->nobj * nxny );
-                            }
-                            // file data-order: [x,y]
-                            // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-                            for ( int i = 0; i < tmpPatch->nobj; ++i )
-                                transpose ( ( fPtr + i * nxny ), tmpPatch->nPixelsY, tmpPatch->nPixelsX );
-                        }
-
-                        if ( ( loadMask & LOAD_RES ) && tmpPatch->nres ) {
-                            file.seekg ( tmpPatch->resPos );
-                            fPtr = reinterpret_cast<float*> ( ptr );
-                            ptr += readOrThrow ( file, fPtr, tmpPatch->nres * nxny, "MomfbdPatch:res" );
-                            if ( info->swapNeeded ) {
-                                swapEndian ( fPtr, tmpPatch->nres * nxny );
-                            }
-                            // file data-order: [x,y]
-                            // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-                            for ( int i = 0; i < tmpPatch->nres; ++i )
-                                transpose ( ( fPtr + i * nxny ), tmpPatch->nPixelsY, tmpPatch->nPixelsX );
-                        }
-
-                        if ( ( loadMask & LOAD_ALPHA ) && tmpPatch->nalpha ) {
-                            tmpSize = tmpPatch->nalpha * tmpPatch->nm;
-                            file.seekg ( tmpPatch->alphaPos );
-                            fPtr = reinterpret_cast<float*> ( ptr );
-                            ptr += readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:alpha" );
-                            if ( info->swapNeeded ) {
-                                swapEndian ( fPtr, tmpSize );
-                            }
-                            // No transpose is needed to get index order [nmodes,nalpha]
-                        }
-
-                        if ( ( loadMask & LOAD_DIV ) && tmpPatch->ndiv ) {
-                            tmpSize = tmpPatch->ndiv * tmpPatch->nphy * tmpPatch->nphx;
-                            file.seekg ( tmpPatch->diversityPos );
-                            fPtr = reinterpret_cast<float*> ( ptr );
-                            ptr += readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:res" );
-                            if ( info->swapNeeded ) {
-                                swapEndian ( fPtr, tmpSize );
-                            }
-                            // file data-order: [x,y]
-                            // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-                            tmpSize = tmpPatch->nphy * tmpPatch->nphx;
-                            for ( int i = 0; i < tmpPatch->ndiv; ++i )
-                                transpose ( ( fPtr + i * tmpSize ), tmpPatch->nphy, tmpPatch->nphx );
-
-                        }
-
-                    }   //  if( tmpPatch )
-
-                }   // x-loop
-
-            }   // y-loop
-
-        }   // if(LOAD_PATCH)
-
-
-        if ( ( loadMask & LOAD_NAMES ) && info->filenameOffset ) {
-            file.seekg ( info->filenameOffset );
-
-            int32_t nameLength;
-            vector<char> tmpStr ( 1024, 0 );
+        if ( ( loadMask & MOMFBD_MODES ) && info->version >= 20110714.0 ) {
+        cout << "BLÄBLÄ" << endl;
+            *((float*)ptr) = info->pix2cf;
+            ptr += sizeof(float);
+            *((float*)ptr) = info->cf2pix;
+            ptr += sizeof(float);
+        }
+        
+        // Load the data
+        ptr = info->load( file, ptr, loadMask, verbosity, 4 );
+        
+        // add list of filenames, if requested
+        if( loadMask & MOMFBD_NAMES ) {
             int i = 0;
             str = reinterpret_cast<IDL_STRING*> ( ptr );
             container->ptr = str;
-
-            while ( i < info->nFileNames ) {
-                readOrThrow ( file, &nameLength, 1, "MomfbdData:namelength #" + to_string ( i ) );
-                if ( info->swapNeeded ) swapEndian ( nameLength );
-                tmpStr.reserve ( nameLength );
-                readOrThrow ( file, & ( tmpStr[0] ), nameLength,  "MomfbdData:name #" + to_string ( i ) );
-                //namesPtr->push_back( string( tmpStr.begin(), tmpStr.begin() + nameLength ) );
+            for(auto &fn: info->fileNames) {
+                size_t nameLength = fn.length();
                 str[i].slen = nameLength;
-                str[i].s = new char[nameLength + 1]; //const_cast<char*>(namesPtr->rbegin()->c_str());
-                memcpy ( str[i].s, tmpStr.data(), nameLength );
+                str[i].s = new char[nameLength + 1];
+                strncpy ( str[i].s, fn.c_str(), nameLength );
                 str[i].s[nameLength] = 0;
-                str[i].stype = 0;
-
-                i++;
+                str[i++].stype = 0;
             }
             container->nNames = i;
-
         }
-
-
     }
 
+    
     Array<float> getWeights ( const Overlaps& overlaps, int margin, int ny, int nx ) {
 
         static std::map<Overlaps, Array<float> > map;
@@ -734,9 +594,9 @@ namespace {
 IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
     if ( argc < 1 ) {
-        cout << "MOMFBD_MOZAIC: takes 1 argument." << endl;
+        cout << "MOMFBD_READ: takes 1 argument." << endl;
         momfbd_help();
-        return IDL_Gettmp();
+        return IDL_GettmpInt(0);    // return a dummy
     }
 
     IDL_VPTR fileName = argv[0];
@@ -744,12 +604,11 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     KW_RESULT kw;
     kw.verbose = 0;
     kw.help = 0;
-    kw.img = 1;
     ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
 
     if ( kw.help ) {
         momfbd_help();
-        return IDL_Gettmp();
+        return IDL_GettmpInt(0);    // return a dummy
     }
 
     IDL_ENSURE_SIMPLE ( fileName );
@@ -758,25 +617,11 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     char *name = IDL_VarGetString ( fileName );
     int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
     int checkData = kw.check;
-    uint8_t loadMask = 0;
-    if ( kw.img )   loadMask |= LOAD_IMG;
-    if ( kw.psf )   loadMask |= LOAD_PSF;
-    if ( kw.obj )   loadMask |= LOAD_OBJ;
-    if ( kw.res )   loadMask |= LOAD_RES;
-    if ( kw.alpha ) loadMask |= LOAD_ALPHA;
-    if ( kw.div )   loadMask |= LOAD_DIV;
-    if ( kw.modes ) loadMask |= LOAD_MODES;
-    if ( kw.names ) loadMask |= LOAD_NAMES;
-    if ( kw.all )   loadMask |= LOAD_ALL;
-
-    IDL_KW_FREE;
-
-    if ( checkData && !verbosity ) verbosity = 1;            // When checking we want some output...
-
+    
     if ( verbosity > 0 ) {
         cout << "Loading file: \"" << name << "\"" << endl;
     }
-
+    
     ifstream file;
     std::shared_ptr<FileMomfbd> info ( new FileMomfbd() );
 
@@ -785,18 +630,51 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         info->read ( file );
     } catch ( exception& e ) {
         cout << "Failed to read info from Momfbd file: " << name << endl << "Reason: " << e.what() << endl;
-        return IDL_Gettmp();
+        return IDL_GettmpInt(-1);    // return a dummy
+    }
+        
+    
+    uint8_t loadMask = 0;
+    
+    if ( kw.img && (info->dataMask & MOMFBD_IMG) )     loadMask |= MOMFBD_IMG;
+    if ( kw.psf && (info->dataMask & MOMFBD_PSF) )     loadMask |= MOMFBD_PSF;
+    if ( kw.obj && (info->dataMask & MOMFBD_OBJ) )     loadMask |= MOMFBD_OBJ;
+    if ( kw.res && (info->dataMask & MOMFBD_RES) )     loadMask |= MOMFBD_RES;
+    if ( kw.alpha && (info->dataMask & MOMFBD_ALPHA) ) loadMask |= MOMFBD_ALPHA;
+    if ( kw.div && (info->dataMask & MOMFBD_DIV) )     loadMask |= MOMFBD_DIV;
+    if ( kw.modes && (info->dataMask & MOMFBD_MODES) ) loadMask |= MOMFBD_MODES;
+    if ( kw.names && (info->dataMask & MOMFBD_NAMES) ) loadMask |= MOMFBD_NAMES;
+    if ( kw.all )   loadMask = info->dataMask;
+
+    IDL_KW_FREE;
+    
+    if( !loadMask && !checkData ) {  // load only IMG by default
+        if ( info->dataMask & MOMFBD_IMG ) loadMask = MOMFBD_IMG;
+    }
+
+    IDL_MEMINT dims[] = {1};
+    IDL_VPTR v;
+    
+    if ( checkData ) {
+        vector<IDL_STRUCT_TAG_DEF> allTags;
+        createTags ( allTags, info->dataMask, info.get() );
+        IDL_StructDefPtr allStruct = IDL_MakeStruct ( 0, allTags.data() );
+        // Clean up the "dims" array for the tags that has them
+        for ( auto & it : allTags ) {
+            if ( it.dims ) {
+                delete[] it.dims;
+                it.dims = 0;
+            }
+        }
+        v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, 0, 0, allStruct );
+        dumpStruct ( v, -1, 2 );
+        return IDL_GettmpInt(-1);    // return a dummy
     }
 
     vector<IDL_STRUCT_TAG_DEF> tags;
-    size_t patchSize;
-    if ( checkData ) {
-        createTags ( tags, LOAD_ALL, info.get() );
-        patchSize = 0;      // no need to allocate a big chunk of memory just to print the structure.
-    } else {
-        createTags ( tags, loadMask, info.get() );
-        patchSize = getPatchSize ( info.get(), loadMask );
-    }
+    size_t patchSize = getPatchSize ( info.get(), loadMask );
+    createTags ( tags, loadMask, info.get() );
+    
     IDL_StructDefPtr myStruct = IDL_MakeStruct ( 0, tags.data() );              // Generate the IDL structure defined above
     // Clean up the "dims" array for the tags that has them
     for ( auto & it : tags ) {
@@ -809,40 +687,334 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     // Calculate size of data to load.
     size_t totalSize = 3 * sizeof ( IDL_STRING );                               // VERSION - TIME - DATE
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );                      // clip-values for each channel
-    if ( ( loadMask & LOAD_MODES ) && info->nModes ) {
+    if ( ( loadMask & MOMFBD_MODES ) && info->nModes ) {
+        if ( info->version >= 20110714.0 ) {
+        cout << "BLUBLU" << endl;
+            totalSize += 2*sizeof ( float );                                    // pix2cf, cf2pix
+        }
         totalSize += info->nPH * info->nPH * sizeof ( float );                  // Pupil Data
         totalSize += info->nModes * info->nPH * info->nPH * sizeof ( float );   // Mode Data
     }
     totalSize += info->nPatchesX * info->nPatchesY * patchSize;
     while ( totalSize % alignTo ) totalSize++;                                  // pad if not on boundary
 
-    if ( info->nFileNames && ( loadMask & LOAD_NAMES ) ) {                          // if filenames are stored and loaded
+    if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                          // if filenames are stored and loaded
         totalSize += info->nFileNames * sizeof ( IDL_STRING );
     }
 
     // Allocate the datablock needed.
     std::unique_ptr<char> data ( new char [ totalSize + sizeof ( MomfdContainer )] ); //, [](char *p) { delete[] p; });
-    loadData ( file, data.get(), loadMask, info.get(), verbosity );
-
-    // Import the datablock to the structure specified above.
-    IDL_MEMINT dims[] = {1};
-    IDL_VPTR v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
-
     
+    v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
+
     // Dump structure layout if requested
     if ( verbosity > 1 ) {
         dumpStruct ( v, -1, 2 );
     }
 
-    if ( checkData ) {
-        return IDL_Gettmp();        // "data" will be freed on return
-    }
+    loadData ( file, data.get(), loadMask, info.get(), verbosity );
 
     // release the datablock from the RAII container to prevent de-allocation on return.
     data.release();
+
     return v;
 
 
+}
+
+
+void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
+
+    if( argc < 2 ) {
+        cout << "MOMFBD_WRITE: needs (at least) 2 arguments." << endl;
+        momfbd_help();
+        return;
+    }
+    
+    IDL_VPTR momfbdStruct  = argv[0];
+    IDL_VPTR fileName  = argv[1];
+
+    KW_RESULT kw;
+    kw.help = 0;
+    kw.verbose = 0;
+    ( void ) IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
+    
+    if( kw.help ) {
+        momfbd_help();
+        return;
+    }
+
+    IDL_ENSURE_STRUCTURE( momfbdStruct );
+
+    IDL_ENSURE_SIMPLE( fileName );
+    IDL_ENSURE_STRING( fileName );
+
+    char *name = IDL_VarGetString ( fileName );
+    int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
+    uint8_t writeMask = 0;
+    bool defaultMask(false);
+    if ( kw.img )   writeMask |= MOMFBD_IMG;
+    if ( kw.psf )   writeMask |= MOMFBD_PSF;
+    if ( kw.obj )   writeMask |= MOMFBD_OBJ;
+    if ( kw.res )   writeMask |= MOMFBD_RES;
+    if ( kw.alpha ) writeMask |= MOMFBD_ALPHA;
+    if ( kw.div )   writeMask |= MOMFBD_DIV;
+    if ( kw.modes ) writeMask |= MOMFBD_MODES;
+    if ( kw.names ) writeMask |= MOMFBD_NAMES;
+    if ( kw.all )   writeMask |= MOMFBD_ALL;
+
+    IDL_KW_FREE;
+    
+    if( !writeMask ) {  // write all by default
+        writeMask |= MOMFBD_ALL;
+        defaultMask = true;
+    }
+
+    if ( verbosity > 0 ) {
+        cout << "Writing file: \"" << name << "\"  writeMask=" << bitString(writeMask) << endl;
+    }
+    
+    FileMomfbd* infoPtr = new FileMomfbd();
+    std::shared_ptr<FileMomfbd> info ( infoPtr );
+    
+    IDL_StructDefPtr structDef = momfbdStruct->value.s.sdef;
+    
+    IDL_VPTR tagPtr;
+    IDL_INT* intPtr;
+    IDL_STRING* stringPtr;
+    IDL_MEMINT tagOffset;
+    string tag,type;
+    int nTags = IDL_StructNumTags ( structDef );
+    for ( int t = 0; t < nTags; ++t ) {
+
+            tag = IDL_StructTagNameByIndex ( structDef, t, 0, 0 );
+            tagOffset = IDL_StructTagInfoByIndex ( structDef, t, 0, &tagPtr );
+
+            //cout << "TAG #" << t << "   " << tag << "    offset = " << tagOffset << "    data = " << (int64_t)momfbdStruct->value.arr->data << endl;
+
+            if(tagOffset < 0) continue;
+            
+            if(tagPtr->type == IDL_TYP_STRING) {
+                stringPtr = (IDL_STRING*)(momfbdStruct->value.arr->data + tagOffset);
+                if(contains("VERSION",tag,true)){
+                    infoPtr->versionString = stringPtr->s;
+                } else if(contains("DATE",tag,true)){
+                    infoPtr->dateString = stringPtr->s;
+                } else if(contains("TIME",tag,true)){
+                    infoPtr->timeString = stringPtr->s;
+                } else if((writeMask & MOMFBD_NAMES) && contains("NAME",tag,true)){
+                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==1) {
+                        for ( int n = 0; n < infoPtr->nFileNames; ++n ) {
+                            infoPtr->fileNames.push_back(string(stringPtr[n].s));
+                        }
+                        infoPtr->nFileNames = infoPtr->fileNames.size();
+                    }
+                } 
+            } else if(tagPtr->type == IDL_TYP_INT) {
+                intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + tagOffset);
+                if((writeMask) && contains("CLIP",tag,true)) {    // dimensions: (nChannels,2,2)
+                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3) {
+                        int32_t nChannels = infoPtr->nChannels = tagPtr->value.arr->dim[0];
+                        infoPtr->clipStartX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
+                        infoPtr->clipEndX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
+                        infoPtr->clipStartY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
+                        infoPtr->clipEndY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
+
+                        // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                        for ( int i = 0; i < nChannels; ++i ) {
+                            infoPtr->clipStartY.get() [ i ] = intPtr[ i + 0 * nChannels ];
+                            infoPtr->clipStartX.get() [ i ] = intPtr[ i + 1 * nChannels ];
+                            infoPtr->clipEndY.get() [ i ] = intPtr[ i + 2 * nChannels ];
+                            infoPtr->clipEndX.get() [ i ] = intPtr[ i + 3 * nChannels ];
+                        }
+                    }
+                }
+            } else if(tagPtr->type == IDL_TYP_FLOAT) {  // pupil, mode
+                if(writeMask & MOMFBD_MODES) {
+                    if(contains("PUPIL",tag,true)) {    // dimensions: (nPH,nPH)
+                        if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2) {
+                            cout << "PUPIL tag exists -> writing" << endl;
+                            infoPtr->nPH = tagPtr->value.arr->dim[0];
+                            infoPtr->phOffset = tagOffset;
+                        }
+                    } else if(contains("MODE",tag,true)) {    // dimensions: (nPH,nPH, nModes)
+                        if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3) {
+                            cout << "MODE tag exists -> writing" << endl;
+                            infoPtr->nModes = tagPtr->value.arr->dim[2];
+                            infoPtr->modesOffset = tagOffset;
+                        }
+                    }
+                }
+            } else if(tagPtr->type == IDL_TYP_STRUCT) { // patches
+                if((writeMask & MOMFBD_PATCH) && contains("PATCH",tag,true)){
+                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2) {
+                        infoPtr->nPatchesY = tagPtr->value.arr->dim[0];     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                        infoPtr->nPatchesX = tagPtr->value.arr->dim[1];
+                        int64_t offset = 0;
+                        infoPtr->patches.resize(infoPtr->nPatchesX,infoPtr->nPatchesY);
+                        for ( int x = 0; x < infoPtr->nPatchesX; ++x ) {
+                            for ( int y = 0; y < infoPtr->nPatchesY; ++y ) {
+                                //cout << "patch:  offset = " << offset << endl;
+                                FileMomfbd::PatchInfo* patch = infoPtr->patches.ptr ( x, y );
+                                patch->offset = tagOffset + offset;
+                                IDL_StructDefPtr subStruct = tagPtr->value.s.sdef;
+                                int64_t subOffset = IDL_StructTagInfoByName(subStruct, (char*)"YL", 0, 0);     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                                if( subOffset >= 0 ) {
+                                    patch->region[0] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
+                                } else cout << "patch (" << x << "," << y << ")  has no YL tag." << endl;
+                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"YH", 0, 0);
+                                if( subOffset >= 0 ) {
+                                    patch->region[1] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
+                                } else cout << "patch (" << x << "," << y << ")  has no YH tag." << endl;
+                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"XL", 0, 0);             // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                                if( subOffset >= 0 ) {
+                                    patch->region[2] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
+                                } else cout << "patch (" << x << "," << y << ")  has no XL tag." << endl;
+                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"XH", 0, 0);
+                                if( subOffset >= 0 ) {
+                                    patch->region[3] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
+                                } else cout << "patch (" << x << "," << y << ")  has no XH tag." << endl;
+                                
+                                patch->nPixelsX = patch->region[1] - patch->region[0] + 1;
+                                patch->nPixelsY = patch->region[3] - patch->region[2] + 1;
+
+                                IDL_VPTR tmpPtr;
+                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"DY", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);   // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                                if( subOffset >= 0 ) {
+                                    int32_t nChannels = tmpPtr->value.arr->dim[0];
+                                    intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset);
+                                    if( nChannels > 0 ) {
+                                        patch->dx.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) { delete[] p; } );
+                                        for ( int i = 0; i < nChannels; ++i ) {
+                                            patch->dx.get() [ i ] = intPtr[ i ];
+                                        }
+                                        if( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
+                                        else {
+                                            if( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
+                                        }
+                                    }
+                                }
+                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"DX", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                if( subOffset >= 0 ) {
+                                    int32_t nChannels = tmpPtr->value.arr->dim[0];
+                                    intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset);
+                                    if( nChannels > 0 ) {
+                                        patch->dy.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) { delete[] p; } );
+                                        for ( int i = 0; i < nChannels; ++i ) {
+                                            patch->dy.get() [ i ] = intPtr[ i ];
+                                        }
+                                        if( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
+                                        else {
+                                            if( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
+                                        }
+                                    }
+                                }
+                                
+                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"NIMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                if( subOffset >= 0 ) {
+                                    int32_t nChannels = tmpPtr->value.arr->dim[0];
+                                    intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset);
+                                    if( nChannels > 0 ) {
+                                        patch->nim.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) { delete[] p; } );
+                                        for ( int i = 0; i < nChannels; ++i ) {
+                                            patch->nim.get() [ i ] = intPtr[ i ];
+                                        }
+                                        if( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
+                                        else {
+                                            if( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
+                                        }
+                                    }
+                                }
+                                
+                                if(writeMask & MOMFBD_IMG) {
+                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"IMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                    if( subOffset >= 0 ) {
+                                        patch->imgPos = patch->offset + subOffset;
+                                    } else if ( defaultMask ) {
+                                        writeMask &= ~MOMFBD_IMG;   // no data, so don't try to write it later
+                                    } else {
+                                        cout << "Attempting to write IMG data without it being present in the structure." << endl;
+                                    }
+                                }
+
+                                if(writeMask & MOMFBD_PSF) {
+                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"PSF", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                    if( subOffset >= 0 ) {    // dimensions: (xPixels,yPixels,nPSF(=nFiles) )
+                                        patch->psfPos = patch->offset + subOffset;
+                                        patch->npsf = tmpPtr->value.arr->dim[2];
+                                    } else if ( defaultMask ) {
+                                        writeMask &= ~MOMFBD_PSF;   // no data, so don't try to write it later
+                                    } else {
+                                        cout << "Attempting to write PSF data without it being present in the structure." << endl;
+                                    }
+                                }
+
+                                if(writeMask & MOMFBD_OBJ) {
+                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"OBJ", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                    if( subOffset >= 0 ) {    // dimensions: (xPixels,yPixels,nOBJ(=nFiles) )
+                                        patch->objPos = patch->offset + subOffset;
+                                        patch->nobj = tmpPtr->value.arr->dim[2];
+                                    } else if ( defaultMask ) {
+                                        writeMask &= ~MOMFBD_OBJ;   // no data, so don't try to write it later
+                                    } else {
+                                        cout << "Attempting to write OBJ data without it being present in the structure." << endl;
+                                    }
+                                }
+
+                                if(writeMask & MOMFBD_RES) {
+                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"RES", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                    if( subOffset >= 0 ) {    // dimensions: (xPixels,yPixels,nRES(=nFiles) )
+                                        cout << "RES tag exists -> writing" << endl;
+                                        patch->resPos = patch->offset + subOffset;
+                                        patch->nres = tmpPtr->value.arr->dim[2];
+                                    } else if ( defaultMask ) {
+                                        writeMask &= ~MOMFBD_RES;   // no data, so don't try to write it later
+                                    } else {
+                                        cout << "Attempting to write RES data without it being present in the structure." << endl;
+                                    }
+                                }
+
+                                if(writeMask & MOMFBD_ALPHA) {
+                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"ALPHA", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                    if( subOffset >= 0 ) {    // dimensions: (nModes,nALPHA(=nFiles) )
+                                        patch->alphaPos = patch->offset + subOffset;
+                                        patch->nm = tmpPtr->value.arr->dim[0];
+                                        patch->nalpha = tmpPtr->value.arr->dim[1];
+                                    } else if ( defaultMask ) {
+                                        writeMask &= ~MOMFBD_ALPHA;   // no data, so don't try to write it later
+                                    } else {
+                                        cout << "Attempting to write ALPHA data without it being present in the structure." << endl;
+                                    }
+                                }
+
+                                if(writeMask & MOMFBD_DIV) {
+                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"DIV", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
+                                    if( subOffset >= 0 ) {    // dimensions: (nModes,nDIV(=nFiles) )
+                                        patch->diversityPos = patch->offset + subOffset;
+                                        patch->nphx = tmpPtr->value.arr->dim[0];
+                                        patch->nphy = tmpPtr->value.arr->dim[1];
+                                        patch->ndiv = tmpPtr->value.arr->dim[2];
+                                    } else if ( defaultMask ) {
+                                        writeMask &= ~MOMFBD_DIV;   // no data, so don't try to write it later
+                                    } else {
+                                        cout << "Attempting to write DIV data without it being present in the structure." << endl;
+                                    }
+                                }
+                                patch-> nChannels = infoPtr->nChannels;
+                                offset += tagPtr->value.arr->elt_len;
+                                
+                            }   // patches x-loop
+                        }       // patches y-loop
+
+                    }           // if nDims == 2
+                }               // PATCH
+                
+            }                   // struct
+
+        }       // loop over tags
+    
+    infoPtr->write(name, (const char*)momfbdStruct->value.arr->data, writeMask, verbosity);
+    
 }
 
 
@@ -876,6 +1048,7 @@ void img_clip ( Array<float>& img ) {
 
 }
 
+
 IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
 
     if ( argc < 5 ) {
@@ -905,6 +1078,9 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     if ( verbosity > 0 ) {
         cout << "Mozaic:  nPatches = (" << nPatchesX << "," << nPatchesY << ")" << endl;
         cout << "        patchSize = (" << patchSizeX << "," << patchSizeY << ")" << endl;
+        cout << "             clip = " << (do_clip?"YES":"NO") << endl;
+        cout << "           margin = " << margin << endl;
+        cout << "        transpose = " << (transpose?"YES":"NO") << endl;
     }
 
     
@@ -1020,15 +1196,13 @@ extern "C" {
             { { ( IDL_VPTR ( * ) () ) redux::momfbd_mozaic}, ( char* ) "MOMFBD_MOZAIC", 0, 5, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
 
-        // static IDL_SYSFUN_DEF2 procedure_addr[] = {
-        //    { { ( IDL_SYSRTN_GENERIC ) redux::fzread}, ( char* ) "FZREAD", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-        //    { { ( IDL_SYSRTN_GENERIC ) redux::fzwrite}, ( char* ) "FZWRITE", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-        //    { { ( IDL_SYSRTN_GENERIC ) redux::fcwrite}, ( char* ) "FCWRITE", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-        //   };
+        static IDL_SYSFUN_DEF2 procedure_addr[] = {
+            { {( IDL_SYSRTN_GENERIC )redux::momfbd_write}, ( char* )"MOMFBD_WRITE", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+        };
 
         /* Register our routine. The routines must be specified exactly the same as in testmodule.dlm. */
-        return IDL_SysRtnAdd ( function_addr, TRUE, IDL_CARRAY_ELTS ( function_addr ) );
-        // &&  IDL_SysRtnAdd ( procedure_addr, FALSE, IDL_CARRAY_ELTS ( procedure_addr ) );
+        return IDL_SysRtnAdd ( function_addr, TRUE, IDL_CARRAY_ELTS ( function_addr )) &&
+               IDL_SysRtnAdd ( procedure_addr, FALSE, IDL_CARRAY_ELTS ( procedure_addr ));
 
     }
 

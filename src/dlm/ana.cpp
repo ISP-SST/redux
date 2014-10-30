@@ -65,7 +65,7 @@ IDL_VPTR redux::fzhead( int argc, IDL_VPTR* argv ) {
     if( argc < 1 ) {
         cout << "FZHEAD: needs 1 argument." << endl;
         ana_help();
-        return IDL_Gettmp();
+        return IDL_GettmpInt(0);    // return a dummy
     }
     IDL_VPTR name_raw = argv[0];
 
@@ -103,7 +103,7 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
     if( argc < 1 ) {
         cout << "F0: needs 1 argument." << endl;
         ana_help();
-        return IDL_Gettmp();
+        return IDL_GettmpInt(0);    // return a dummy
     }
     
     IDL_VPTR name_raw = argv[0];
@@ -115,7 +115,7 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
 
     if( kw.help ) {
         ana_help();
-        return IDL_Gettmp();
+        return IDL_GettmpInt(0);    // return a dummy
     }
     
     IDL_KW_FREE;
@@ -166,7 +166,7 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
         return IDL_ImportArray( nDims, dim, header->m_Header.datyp + 1, ( UCHAR* )data, cleanupChar, NULL );
     } catch (exception& e) {
         cout << "Failed to read Ana file: " << name << endl << "Reason: " << e.what() << endl;
-        return IDL_Gettmp();
+        return IDL_GettmpInt(-1);    // return a dummy
     }
     
 
