@@ -208,8 +208,9 @@ namespace {
     void momfbd_help ( void ) {
 
         cout << "MOMFBD DLM usage:\n";
-        cout << "    Syntax example:    a = momfbd_read('/path/to/file/data.momfbd',/img,verbose=2)\n";
-        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip )\n";
+        cout << "    Syntax example:    a = momfbd_read('/path/to/file/data.momfbd',/img,/psf verbose=2)\n";
+        cout << "    Syntax example:        momfbd_write,a,'/path/to/file/data_new.momfbd',/all\n";
+        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip /transpose)\n";
         cout << "    Accepted Keywords:\n";
         cout << "        /HELP                    Print this info.\n";
         cout << "        /CHECK                   Just parse the file and show the structure, don't load data.\n";
@@ -222,6 +223,7 @@ namespace {
         cout << "        /MODES                   Load Modes. (if present in file)\n";
         cout << "        /NAMES                   Load Filenames used in reconstruction. (if present in file)\n";
         cout << "        /ALL                     Load all data from file.\n";
+        cout << "        /TRANSPOSE               Do transpose after mozaic.\n";
         cout << "        VERBOSE={0,1,2}          Verbosity, default is 0 (no output)." << endl;
 
     }
@@ -337,7 +339,6 @@ namespace {
         
         if ( loadMask & MOMFBD_MODES ) {
             if ( info->version >= 20110714.0 ) {
-        cout << "BLÖBLÖ" << endl;
                 appendTag ( tags, "PIX2CF", 0, ( void* ) IDL_TYP_FLOAT );
                 appendTag ( tags, "CF2PIX", 0, ( void* ) IDL_TYP_FLOAT );
             }
@@ -472,7 +473,6 @@ namespace {
         }
 
         if ( ( loadMask & MOMFBD_MODES ) && info->version >= 20110714.0 ) {
-        cout << "BLÄBLÄ" << endl;
             *((float*)ptr) = info->pix2cf;
             ptr += sizeof(float);
             *((float*)ptr) = info->cf2pix;
@@ -689,7 +689,6 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );                      // clip-values for each channel
     if ( ( loadMask & MOMFBD_MODES ) && info->nModes ) {
         if ( info->version >= 20110714.0 ) {
-        cout << "BLUBLU" << endl;
             totalSize += 2*sizeof ( float );                                    // pix2cf, cf2pix
         }
         totalSize += info->nPH * info->nPH * sizeof ( float );                  // Pupil Data
@@ -790,8 +789,6 @@ void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
             tag = IDL_StructTagNameByIndex ( structDef, t, 0, 0 );
             tagOffset = IDL_StructTagInfoByIndex ( structDef, t, 0, &tagPtr );
 
-            //cout << "TAG #" << t << "   " << tag << "    offset = " << tagOffset << "    data = " << (int64_t)momfbdStruct->value.arr->data << endl;
-
             if(tagOffset < 0) continue;
             
             if(tagPtr->type == IDL_TYP_STRING) {
@@ -833,13 +830,11 @@ void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
                 if(writeMask & MOMFBD_MODES) {
                     if(contains("PUPIL",tag,true)) {    // dimensions: (nPH,nPH)
                         if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2) {
-                            cout << "PUPIL tag exists -> writing" << endl;
                             infoPtr->nPH = tagPtr->value.arr->dim[0];
                             infoPtr->phOffset = tagOffset;
                         }
                     } else if(contains("MODE",tag,true)) {    // dimensions: (nPH,nPH, nModes)
                         if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3) {
-                            cout << "MODE tag exists -> writing" << endl;
                             infoPtr->nModes = tagPtr->value.arr->dim[2];
                             infoPtr->modesOffset = tagOffset;
                         }
@@ -854,7 +849,6 @@ void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
                         infoPtr->patches.resize(infoPtr->nPatchesX,infoPtr->nPatchesY);
                         for ( int x = 0; x < infoPtr->nPatchesX; ++x ) {
                             for ( int y = 0; y < infoPtr->nPatchesY; ++y ) {
-                                //cout << "patch:  offset = " << offset << endl;
                                 FileMomfbd::PatchInfo* patch = infoPtr->patches.ptr ( x, y );
                                 patch->offset = tagOffset + offset;
                                 IDL_StructDefPtr subStruct = tagPtr->value.s.sdef;
@@ -1094,7 +1088,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     int16_t* patchesFirstY = ( int16_t* ) ( argv[3]->value.s.arr->data );
     int16_t* patchesLastY = ( int16_t* ) ( argv[4]->value.s.arr->data );
     
-    if ( verbosity > 0 ) {
+    if ( verbosity > 1 ) {
         cout << "      " << printArray(patchesFirstX,nPatchesX,"firstPixelX") << endl;
         cout << "       " << printArray(patchesLastX,nPatchesX,"lastPixelX") << endl;
         cout << "      " << printArray(patchesFirstY,nPatchesY,"firstPixelY") << endl;
@@ -1162,7 +1156,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     }
 
     if ( transpose ) {
-        if ( verbosity > 0 ) {
+        if ( verbosity > 1 ) {
             cout << "       Transposing image." << endl;
         }
         redux::util::transpose( pic.ptr(0), pic.dimSize(0), pic.dimSize(1) );
@@ -1171,7 +1165,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     }
 
     if ( do_clip ) {
-        if ( verbosity > 0 ) {
+        if ( verbosity > 1 ) {
             cout << "       Clipping image." << endl;
         }
         img_clip ( pic );
