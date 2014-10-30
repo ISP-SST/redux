@@ -648,8 +648,8 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
     IDL_KW_FREE;
     
-    if( !loadMask && !checkData ) {  // load only IMG by default
-        if ( info->dataMask & MOMFBD_IMG ) loadMask = MOMFBD_IMG;
+    if( !loadMask && !checkData ) {
+        if ( info->dataMask & MOMFBD_IMG ) loadMask = info->dataMask;
     }
 
     IDL_MEMINT dims[] = {1};
