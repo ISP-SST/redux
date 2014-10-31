@@ -180,11 +180,10 @@ size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swap
     }
     count += 3 * nChannels * sizeof ( short int );
 
-    while ( ( size_t ) (ptr+count) % alignTo ) count++;
+    while ( count % alignTo ) count++;
 
     nxny = nPixelsX * nPixelsY;
     if ( ( loadMask & MOMFBD_IMG ) && imgPos ) {
-//cout << "BLA:  nPixelsX " << nPixelsX <<  "   nPixelsX " << nPixelsY << "   imgPos " << imgPos << "   mask = " << bitString(loadMask) << endl;
         file.seekg ( imgPos );
         fPtr = reinterpret_cast<float*> ( ptr+count );
         count += readOrThrow ( file, fPtr, nxny, "MomfbdPatch:img" );
@@ -192,24 +191,15 @@ size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swap
         if ( swapNeeded ) {
             swapEndian ( fPtr, nxny );
         }
-        // file data-order: [x,y]
-        // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-        //transpose ( fPtr, nPixelsY, nPixelsX );
     }
-    //return ptr;
 
     if ( ( loadMask & MOMFBD_PSF ) && npsf ) {
-//cout << "BLA:  nPixelsX " << nPixelsX <<  "   nPixelsX " << nPixelsY << "   psfPos " << psfPos << "   mask = " << bitString(loadMask) << endl;
         file.seekg ( psfPos );
         fPtr = reinterpret_cast<float*> ( ptr+count );
         count += readOrThrow ( file, fPtr, npsf * nxny, "MomfbdPatch:psf" );
         if ( swapNeeded ) {
             swapEndian ( fPtr, npsf * nxny );
         }
-        // file data-order: [x,y]
-        // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-        //for ( int i = 0; i < npsf; ++i )
-        //    transpose ( ( fPtr + i * nxny ), nPixelsY, nPixelsX );
     }
 
     if ( ( loadMask & MOMFBD_OBJ ) && nobj ) {
@@ -219,10 +209,6 @@ size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swap
         if ( swapNeeded ) {
             swapEndian ( fPtr, nobj * nxny );
         }
-        // file data-order: [x,y]
-        // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-        //for ( int i = 0; i < nobj; ++i )
-        //    transpose ( ( fPtr + i * nxny ), nPixelsY, nPixelsX );
     }
 
     if ( ( loadMask & MOMFBD_RES ) && nres ) {
@@ -232,22 +218,16 @@ size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swap
         if ( swapNeeded ) {
             swapEndian ( fPtr, nres * nxny );
         }
-        // file data-order: [x,y]
-        // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-        //for ( int i = 0; i < nres; ++i )
-        //    transpose ( ( fPtr + i * nxny ), nPixelsY, nPixelsX );
     }
     if ( ( loadMask & MOMFBD_ALPHA ) && nalpha ) {
         tmpSize = nalpha * nm;
         file.seekg ( alphaPos );
         fPtr = reinterpret_cast<float*> ( ptr+count );
         size_t cnt = readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:alpha" );
-//cout << "  nA = " << nalpha << "   nm = " << nm << "  cnt = " << cnt << endl;
         count += cnt;
         if ( swapNeeded ) {
             swapEndian ( fPtr, tmpSize );
         }
-        // No transpose is needed to get index order [nmodes,nalpha]
     }
 
     if ( ( loadMask & MOMFBD_DIV ) && ndiv ) {
@@ -266,11 +246,6 @@ size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swap
         if ( swapNeeded ) {
             swapEndian ( fPtr, tmpSize );
         }
-        // file data-order: [x,y]
-        // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
-        //tmpSize = nphy * nphx;
-        //for ( int i = 0; i < ndiv; ++i )
-        //    transpose ( ( fPtr + i * tmpSize ), nphy, nphx );
 
     }
 

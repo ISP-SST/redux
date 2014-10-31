@@ -184,14 +184,12 @@ namespace {
         // The actual datablock allocated for the data begins at (arg - sizeof(struct MomfdContainer))
         // The preceeding structure just serves to point to the filename-array.
         char *data = (char*)arg - sizeof ( struct MomfdContainer );
-        //cout << "cleanupMomfbd  data = " << hexString(data) << " arg = " << hexString(arg) << endl;
       
         struct MomfdContainer* info = ( struct MomfdContainer* ) data;
 
         // free the name-array, if present.
         if ( info->nNames ) {
             for ( int i = 0; i < info->nNames; ++i ) {
-
                 delete[] info->ptr[ i ].s;
                 info->ptr[ i ].s = nullptr;
             }
@@ -199,9 +197,6 @@ namespace {
 
         // delete version/date/time strings
         IDL_STRING *str = reinterpret_cast<IDL_STRING*> ( arg );
-        //cout << "cleanupMomfbd  vs = " << hexString(str[0].s) << endl;
-        //cout << "cleanupMomfbd  ts = " << hexString(str[1].s) << endl;
-        //cout << "cleanupMomfbd  ds = " << hexString(str[2].s) << endl;
         delete[] str[0].s;
         delete[] str[1].s;
         delete[] str[2].s;
@@ -498,10 +493,10 @@ namespace {
 
         // Load the data
         count += info->load( file, data+count , loadMask, verbosity, 4 );
-        //cout << "after load:   mask = " << bitString(loadMask) << endl;
-        
+
         // add list of filenames, if requested
         if( loadMask & MOMFBD_NAMES ) {
+            while ( count % 8 ) count++;        // pad struct to 8-byte boundary.
             int i = 0;
             strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
             container->ptr = strPtr;
@@ -509,8 +504,7 @@ namespace {
                 size_t nameLength = fn.length();
                 strPtr[i].slen = nameLength;
                 strPtr[i].s = new char[nameLength + 1];
-       // cout << "alloc  fn[" << i << "] = " << hexString(strPtr[i].s) << endl;
-                 strncpy ( strPtr[i].s, fn.c_str(), nameLength );
+                strncpy ( strPtr[i].s, fn.c_str(), nameLength );
                 strPtr[i].s[nameLength] = 0;
                 strPtr[i++].stype = 0;
             }
@@ -676,7 +670,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         loadMask &= info->dataMask;
     }
 
-    loadMask &= ~MOMFBD_NAMES;       // BUG: disable name-loading until it is fixed.
+    //loadMask &= ~MOMFBD_NAMES;       // BUG: disable name-loading until it is fixed.
     
     IDL_MEMINT dims[] = {1};
     IDL_VPTR v;
@@ -723,7 +717,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nModes * info->nPH * info->nPH * sizeof ( float );   // Mode Data
     }
     totalSize += info->nPatchesX * info->nPatchesY * patchSize;
-    while ( totalSize % alignTo ) {
+    while ( totalSize % 8 ) { //alignTo ) {
         totalSize++;                                  // pad if not on boundary
     }
     
@@ -749,11 +743,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         cout << "Load mismatch:  totalSize = " << totalSize << "  count = " << count <<  "  diff = " << ((int64_t)totalSize-(int64_t)count) << endl;
     }
     
-#if 0
-    cleanupMomfbd(dPtr);
-    return IDL_GettmpInt(-1);
-#endif
-    
+   
     v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, dPtr, cleanupMomfbd, myStruct );
 
     // Dump structure layout if requested
