@@ -152,8 +152,9 @@ uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, c
 }
 
 
-void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapNeeded, const float& version, uint8_t loadMask, int verbosity, uint8_t alignTo ) const {
+size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask, int verbosity, uint8_t alignTo ) const {
 
+    size_t count(0);
     float* fPtr;
     short int* tmpInt;
 
@@ -167,25 +168,26 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
     if ( version >= 20110714.0 ) {
         tmpInt[4] = offx;
         tmpInt[5] = offy;
-        ptr += 2 * sizeof ( short int );
+        count += 2 * sizeof ( short int );
     }
-    ptr += 4 * sizeof ( short int );
-    
-    tmpInt = ( short int* ) ptr;
+    count += 4 * sizeof ( short int );
+
+    tmpInt = ( short int* ) (ptr+count);
     for ( int i = 0; i < nChannels; ++i ) {
         tmpInt[ i + 0 * nChannels ] = dx.get() [ i ];
         tmpInt[ i + 1 * nChannels ] = dy.get() [ i ];
         tmpInt[ i + 2 * nChannels ] = nim.get() [ i ];
     }
-    ptr += 3 * nChannels * sizeof ( short int );
+    count += 3 * nChannels * sizeof ( short int );
 
-    while ( ( size_t ) ptr % alignTo ) ptr++;
+    while ( ( size_t ) (ptr+count) % alignTo ) count++;
 
     nxny = nPixelsX * nPixelsY;
     if ( ( loadMask & MOMFBD_IMG ) && imgPos ) {
+//cout << "BLA:  nPixelsX " << nPixelsX <<  "   nPixelsX " << nPixelsY << "   imgPos " << imgPos << "   mask = " << bitString(loadMask) << endl;
         file.seekg ( imgPos );
-        fPtr = reinterpret_cast<float*> ( ptr );
-        ptr += readOrThrow ( file, fPtr, nxny, "MomfbdPatch:img" );
+        fPtr = reinterpret_cast<float*> ( ptr+count );
+        count += readOrThrow ( file, fPtr, nxny, "MomfbdPatch:img" );
 
         if ( swapNeeded ) {
             swapEndian ( fPtr, nxny );
@@ -194,11 +196,13 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
         // IDL has fast-index to the left, so a transpose is needed to keep index order [x,y]
         //transpose ( fPtr, nPixelsY, nPixelsX );
     }
+    //return ptr;
 
     if ( ( loadMask & MOMFBD_PSF ) && npsf ) {
+//cout << "BLA:  nPixelsX " << nPixelsX <<  "   nPixelsX " << nPixelsY << "   psfPos " << psfPos << "   mask = " << bitString(loadMask) << endl;
         file.seekg ( psfPos );
-        fPtr = reinterpret_cast<float*> ( ptr );
-        ptr += readOrThrow ( file, fPtr, npsf * nxny, "MomfbdPatch:psf" );
+        fPtr = reinterpret_cast<float*> ( ptr+count );
+        count += readOrThrow ( file, fPtr, npsf * nxny, "MomfbdPatch:psf" );
         if ( swapNeeded ) {
             swapEndian ( fPtr, npsf * nxny );
         }
@@ -210,8 +214,8 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
 
     if ( ( loadMask & MOMFBD_OBJ ) && nobj ) {
         file.seekg ( objPos );
-        fPtr = reinterpret_cast<float*> ( ptr );
-        ptr += readOrThrow ( file, fPtr, nobj * nxny, "MomfbdPatch:obj" );
+        fPtr = reinterpret_cast<float*> ( ptr+count );
+        count += readOrThrow ( file, fPtr, nobj * nxny, "MomfbdPatch:obj" );
         if ( swapNeeded ) {
             swapEndian ( fPtr, nobj * nxny );
         }
@@ -223,8 +227,8 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
 
     if ( ( loadMask & MOMFBD_RES ) && nres ) {
         file.seekg ( resPos );
-        fPtr = reinterpret_cast<float*> ( ptr );
-        ptr += readOrThrow ( file, fPtr, nres * nxny, "MomfbdPatch:res" );
+        fPtr = reinterpret_cast<float*> ( ptr+count );
+        count += readOrThrow ( file, fPtr, nres * nxny, "MomfbdPatch:res" );
         if ( swapNeeded ) {
             swapEndian ( fPtr, nres * nxny );
         }
@@ -233,12 +237,13 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
         //for ( int i = 0; i < nres; ++i )
         //    transpose ( ( fPtr + i * nxny ), nPixelsY, nPixelsX );
     }
-
     if ( ( loadMask & MOMFBD_ALPHA ) && nalpha ) {
         tmpSize = nalpha * nm;
         file.seekg ( alphaPos );
-        fPtr = reinterpret_cast<float*> ( ptr );
-        ptr += readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:alpha" );
+        fPtr = reinterpret_cast<float*> ( ptr+count );
+        size_t cnt = readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:alpha" );
+//cout << "  nA = " << nalpha << "   nm = " << nm << "  cnt = " << cnt << endl;
+        count += cnt;
         if ( swapNeeded ) {
             swapEndian ( fPtr, tmpSize );
         }
@@ -248,19 +253,15 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
     if ( ( loadMask & MOMFBD_DIV ) && ndiv ) {
         tmpSize = ndiv * nphy * nphx;
         file.seekg ( diversityPos );
-        fPtr = reinterpret_cast<float*> ( ptr );
+        fPtr = reinterpret_cast<float*> ( ptr+count );
         if( version >= 20110916.0 ) {           // + byte with diversity-type.
             for( int d=0; d<ndiv; ++d ) {
-                tmpSize = nphy * nphx;
                 char typ;
-                readOrThrow ( file, &typ, 1, "MomfbdPatch:div-typ" );
-                readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:div" );
-                fPtr += tmpSize;
+                readOrThrow ( file, &typ, 1, "MomfbdPatch:div-typ" );   // just discard div-type for now.
+                count += readOrThrow ( file, ptr+count, nphy*nphx*sizeof(float), "MomfbdPatch:div" );
             }
-            ptr = reinterpret_cast<char*> ( fPtr );
         } else {
-            tmpSize = ndiv * nphy * nphx;
-            ptr += readOrThrow ( file, fPtr, tmpSize, "MomfbdPatch:div" );
+            count += readOrThrow ( file, ptr+count, tmpSize*sizeof(float), "MomfbdPatch:div" );
         }
         if ( swapNeeded ) {
             swapEndian ( fPtr, tmpSize );
@@ -273,7 +274,7 @@ void FileMomfbd::PatchInfo::load ( ifstream& file, char*& ptr, const bool& swapN
 
     }
 
-
+    return count;
 }
 
 void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, uint8_t writeMask ) {
@@ -432,7 +433,6 @@ void FileMomfbd::read ( std::ifstream& file ) {
     if ( tmp8 ) {
         dataMask |= MOMFBD_MODES;
         if ( version >= 20110714.0 ) {
-            cout << "BLABLA" << endl;
             readOrThrow ( file, &pix2cf, 1, "FileMomfbd:pix2cf" );
             readOrThrow ( file, &cf2pix, 1, "FileMomfbd:cf2pix" );
             if ( swapNeeded ) {
@@ -487,7 +487,7 @@ void FileMomfbd::read ( std::ifstream& file ) {
         swapEndian ( nPoints );
     }
 
-cout << "nPatchesX = " << nPatchesX << "  nPatchesY = " << nPatchesY << endl;
+//cout << "nPatchesX = " << nPatchesX << "  nPatchesY = " << nPatchesY << endl;
     patches.resize ( nPatchesX, nPatchesY );
     for ( int x = 0; x < nPatchesX; ++x ) {
         for ( int y = 0; y < nPatchesY; ++y ) {
@@ -548,7 +548,6 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     tmp8 = ( nPH && ( writeMask&MOMFBD_MODES ) );
     writeOrThrow ( file, &tmp8, 1, "FileMomfbd:hasModes" );
     if ( tmp8 ) {
-        cout << " nPH > 0 && nModes > 0 -> writing" << endl;
         writeOrThrow ( file, &nPH, 1, "FileMomfbd:nPH" );
         writeOrThrow ( file, &nModes, 1, "FileMomfbd:nModes" );
         fPtr = reinterpret_cast<const float*> ( data + phOffset );
@@ -573,7 +572,7 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     writeOrThrow ( file, &nPatchesY, 1, "FileMomfbd:nPatchesY" );
     writeOrThrow ( file, &nPoints, 1, "FileMomfbd:nPoints" );
     
-cout << "nChannels = " << nChannels << " nPatchesX = " << nPatchesX << " nPatchesY = " << nPatchesY << " nPoints = " << nPoints << endl;
+//cout << "nChannels = " << nChannels << " nPatchesX = " << nPatchesX << " nPatchesY = " << nPatchesY << " nPoints = " << nPoints << endl;
 
     for ( int x = 0; x < nPatchesX; ++x ) {
         for ( int y = 0; y < nPatchesY; ++y ) {
@@ -603,10 +602,10 @@ void FileMomfbd::write ( const std::string& filename, const char* data, uint8_t 
 
 
 
-char* FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbosity, uint8_t alignTo ) {
+size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbosity, uint8_t alignTo ) {
 
+    size_t count(0);
     float* fPtr;
-
     file.clear();
 
     // pupil & modes
@@ -615,22 +614,30 @@ char* FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbos
         // pupil
         if ( phOffset ) {
             file.seekg ( phOffset );
-            fPtr = reinterpret_cast<float*> ( ptr );
-            ptr += readOrThrow ( file, fPtr, nPH * nPH, "MomfbdData:pupil" );
+            fPtr = reinterpret_cast<float*> ( ptr+count );
+            size_t n = readOrThrow ( file, fPtr, nPH * nPH, "MomfbdData:pupil" );
+            if( n != (nPH * nPH * sizeof(float))) {
+                cout << "MomfbdData:pupil:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
+            }
             if ( swapNeeded ) {
                 swapEndian ( fPtr, nPH * nPH );
             }
+            count += nPH * nPH * sizeof(float);
         }
 
         // modes
         if ( nModes & modesOffset ) {
             // Load data
             file.seekg ( modesOffset );
-            fPtr = reinterpret_cast<float*> ( ptr );
-            ptr += readOrThrow ( file, fPtr, nModes * nPH * nPH, "MomfbdData:modes" );
-            if ( swapNeeded ) {
-                swapEndian ( fPtr, nPH * nPH );
+            fPtr = reinterpret_cast<float*> ( ptr+count );
+            size_t n = readOrThrow ( file, fPtr, nModes * nPH * nPH, "MomfbdData:modes" );
+            if( n != (nModes * nPH * nPH * sizeof(float))) {
+                cout << "MomfbdData:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
             }
+            if ( swapNeeded ) {
+                swapEndian ( fPtr, nModes * nPH * nPH );
+            }
+            count += nModes * nPH * nPH * sizeof(float);
         }
 
     }
@@ -649,8 +656,8 @@ char* FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbos
                     if ( verbosity > 1 ) {
                         cout << "Loading patch (" << x << "," << y << ")   \r" << flush;
                     }
-                    patch->load ( file, ptr, swapNeeded, version, loadMask, verbosity, alignTo );
-
+                    count += patch->load ( file, ptr+count, swapNeeded, version, loadMask, verbosity, alignTo );
+                    //cout << "ptr = " << hexString(ptr) << "   ptr2 = " << hexString(ptr2) << "   diff = " << (ptrdiff_t)(ptr2-ptr0)<< endl;
                 }   //  if( patch )
 
             }   // x-loop
@@ -679,7 +686,7 @@ char* FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbos
         }
     } else fileNames.clear();
 
-    return ptr;
+    return count;
 }
 
 

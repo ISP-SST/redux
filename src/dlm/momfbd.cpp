@@ -165,7 +165,7 @@ namespace {
 
     struct Overlaps {
         Overlaps ( int16_t n = 0, int16_t e = 0, int16_t s = 0, int16_t w = 0 ) : north ( n ), east ( e ), south ( s ), west ( w ) {}
-        int16_t xPixels, yPixels, north, east, south, west;
+        int16_t north, east, south, west;
         bool operator< ( const Overlaps& rhs ) const {
             return north < rhs.north || east < rhs.east || south < rhs.south || west < rhs.west;
         }
@@ -183,21 +183,31 @@ namespace {
     void cleanupMomfbd ( UCHAR *arg ) {
         // The actual datablock allocated for the data begins at (arg - sizeof(struct MomfdContainer))
         // The preceeding structure just serves to point to the filename-array.
-        uint8_t *data = ( uint8_t* ) ( arg - sizeof ( struct MomfdContainer ) );
+        char *data = (char*)arg - sizeof ( struct MomfdContainer );
+        //cout << "cleanupMomfbd  data = " << hexString(data) << " arg = " << hexString(arg) << endl;
+      
         struct MomfdContainer* info = ( struct MomfdContainer* ) data;
 
         // free the name-array, if present.
         if ( info->nNames ) {
             for ( int i = 0; i < info->nNames; ++i ) {
+
                 delete[] info->ptr[ i ].s;
+                info->ptr[ i ].s = nullptr;
             }
         }
 
         // delete version/date/time strings
         IDL_STRING *str = reinterpret_cast<IDL_STRING*> ( arg );
+        //cout << "cleanupMomfbd  vs = " << hexString(str[0].s) << endl;
+        //cout << "cleanupMomfbd  ts = " << hexString(str[1].s) << endl;
+        //cout << "cleanupMomfbd  ds = " << hexString(str[2].s) << endl;
         delete[] str[0].s;
         delete[] str[1].s;
         delete[] str[2].s;
+        str[0].s = nullptr;
+        str[1].s = nullptr;
+        str[2].s = nullptr;
 
         // free the data-block
         delete[] data;
@@ -247,7 +257,7 @@ namespace {
         appendTag ( tags, "XL", 0, ( void* ) IDL_TYP_INT );
         appendTag ( tags, "XH", 0, ( void* ) IDL_TYP_INT );
         if ( info->version >= 20110714.0) {
-            appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );           // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
             appendTag ( tags, "OFFX", 0, ( void* ) IDL_TYP_INT );
         }
         
@@ -391,31 +401,34 @@ namespace {
     }
 
 
-    size_t getPatchSize ( const FileMomfbd* const info, uint8_t loadMask ) {
+    size_t getPatchSize ( const FileMomfbd* const info, uint8_t loadMask, const float& version ) {
 
-        size_t patchSize  = 4 * sizeof ( IDL_INT );                                 // xl,yl,xh,yl
-        patchSize += 3 * info->nChannels * sizeof ( IDL_INT );                      // dx,dy,nim
-        while ( patchSize % alignTo ) patchSize++;                                  // pad if not on boundary
+        size_t patchSize  = 4 * sizeof ( IDL_INT );                                 // xl, yl, xh, yl
+        if ( version >= 20110714.0 ) {
+            patchSize += 2 * sizeof ( IDL_INT );                                    // off, offy
+        }
+        patchSize += 3 * info->nChannels * sizeof ( IDL_INT );                      // dx, dy, nim
+        while ( patchSize % alignTo ) patchSize++;                                  // pad if not on boundary (needed if nChannels is odd)
 
         const FileMomfbd::PatchInfo& tmpPatch = info->patches ( 0 );
 
         size_t nFloats = 0;
-        if ( ( loadMask & MOMFBD_IMG ) && tmpPatch.imgPos ) {
+        if ( loadMask & MOMFBD_IMG ) {
             nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY;
         }
-        if ( ( loadMask & MOMFBD_PSF ) && tmpPatch.npsf ) {
+        if ( loadMask & MOMFBD_PSF ) {
             nFloats += tmpPatch.npsf * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
         }
-        if ( ( loadMask & MOMFBD_OBJ ) && tmpPatch.nobj ) {
+        if ( loadMask & MOMFBD_OBJ ) {
             nFloats += tmpPatch.nobj * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
         }
-        if ( ( loadMask & MOMFBD_RES ) && tmpPatch.nres ) {
+        if ( loadMask & MOMFBD_RES ) {
             nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY * tmpPatch.nres;
         }
-        if ( ( loadMask & MOMFBD_ALPHA ) && tmpPatch.nalpha &&  tmpPatch.nm ) {
-            nFloats += tmpPatch.nm * tmpPatch.nalpha * tmpPatch.nPixelsY;
+        if ( loadMask & MOMFBD_ALPHA ) {
+            nFloats += tmpPatch.nm * tmpPatch.nalpha;
         }
-        if ( tmpPatch.ndiv && ( loadMask & MOMFBD_DIV ) ) {
+        if ( loadMask & MOMFBD_DIV ) {
             nFloats += tmpPatch.nphx * tmpPatch.nphy * tmpPatch.ndiv;
         }
         patchSize += nFloats * sizeof ( float );
@@ -425,78 +438,87 @@ namespace {
     }
 
     
-    void loadData ( ifstream& file, char* data, uint8_t loadMask, FileMomfbd* info, int verbosity ) {
+    size_t loadData ( ifstream& file, char* data, uint8_t loadMask, FileMomfbd* info, int verbosity ) {
 
         // zero the list of filenames
         MomfdContainer* container = reinterpret_cast<MomfdContainer*> ( data );
         container->nNames = 0;
         container->ptr = nullptr;
 
-        char* ptr = data + sizeof ( MomfdContainer );
+        size_t count = sizeof ( MomfdContainer );
 
-        // File version, date, time
-        IDL_STRING *str = reinterpret_cast<IDL_STRING*> ( ptr );
-
+        IDL_STRING *strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
+        IDL_INT* intPtr;
+        float* fPtr;
+        
         // Version string
-        str[0].slen = info->versionString.length();
-        str[0].s = new char[str->slen + 1];
-        str[0].s[str[0].slen] = '\0';
-        info->versionString.copy ( str[0].s, str[0].slen );
-        str[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        strPtr[0].slen = info->versionString.length();
+        strPtr[0].s = new char[strPtr->slen + 1];
+        //cout << "alloc  vs = " << hexString(strPtr[0].s) << endl;
+        strPtr[0].s[strPtr[0].slen] = '\0';
+        info->versionString.copy ( strPtr[0].s, strPtr[0].slen );
+        strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
 
         // Time string
-        str[1].slen = info->timeString.length();
-        str[1].s = new char[str[1].slen + 1];
-        str[1].s[str[1].slen] = '\0';
-        info->timeString.copy ( str[1].s, str[1].slen );
-        str[1].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        strPtr[1].slen = info->timeString.length();
+        strPtr[1].s = new char[strPtr[1].slen + 1];
+        //cout << "alloc  ts = " << hexString(strPtr[1].s) << endl;
+        strPtr[1].s[strPtr[1].slen] = '\0';
+        info->timeString.copy ( strPtr[1].s, strPtr[1].slen );
+        strPtr[1].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
 
         // Date string
-        str[2].slen = info->dateString.length();
-        str[2].s = new char[str[2].slen + 1];
-        str[2].s[str[2].slen] = '\0';
-        info->dateString.copy ( str[2].s, str[2].slen );
-        str[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        strPtr[2].slen = info->dateString.length();
+        strPtr[2].s = new char[strPtr[2].slen + 1];
+        //cout << "alloc  ds = " << hexString(strPtr[2].s) << endl;
+        strPtr[2].s[strPtr[2].slen] = '\0';
+        info->dateString.copy ( strPtr[2].s, strPtr[2].slen );
+        strPtr[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
         
-        ptr += 3*sizeof(IDL_STRING);
-        
+        count += 3*sizeof(IDL_STRING);
         
         if ( loadMask && info->nChannels ) {
+            intPtr = reinterpret_cast<IDL_INT*> ( data+count );
             //NOTE: clipStartY & clipEndX swapped compared to file-order
             for ( int i = 0; i < info->nChannels; ++i ) {
-                ( ( IDL_INT* ) ptr ) [ i + 0 * info->nChannels ] = info->clipStartY.get() [ i ];
-                ( ( IDL_INT* ) ptr ) [ i + 1 * info->nChannels ] = info->clipStartX.get() [ i ];
-                ( ( IDL_INT* ) ptr ) [ i + 2 * info->nChannels ] = info->clipEndY.get() [ i ];
-                ( ( IDL_INT* ) ptr ) [ i + 3 * info->nChannels ] = info->clipEndX.get() [ i ];
+                intPtr[ i + 0 * info->nChannels ] = info->clipStartY.get() [ i ];
+                intPtr[ i + 1 * info->nChannels ] = info->clipStartX.get() [ i ];
+                intPtr[ i + 2 * info->nChannels ] = info->clipEndY.get() [ i ];
+                intPtr[ i + 3 * info->nChannels ] = info->clipEndX.get() [ i ];
             }
-            ptr += 4 * info->nChannels * sizeof ( IDL_INT );
+            count += 4 * info->nChannels * sizeof ( IDL_INT );
         }
 
         if ( ( loadMask & MOMFBD_MODES ) && info->version >= 20110714.0 ) {
-            *((float*)ptr) = info->pix2cf;
-            ptr += sizeof(float);
-            *((float*)ptr) = info->cf2pix;
-            ptr += sizeof(float);
+            fPtr = reinterpret_cast<float*> ( data+count );
+            fPtr[0] = info->pix2cf;
+            fPtr[1] = info->cf2pix;
+            count += 2 * sizeof(float);
         }
-        
+
         // Load the data
-        ptr = info->load( file, ptr, loadMask, verbosity, 4 );
+        count += info->load( file, data+count , loadMask, verbosity, 4 );
+        //cout << "after load:   mask = " << bitString(loadMask) << endl;
         
         // add list of filenames, if requested
         if( loadMask & MOMFBD_NAMES ) {
             int i = 0;
-            str = reinterpret_cast<IDL_STRING*> ( ptr );
-            container->ptr = str;
+            strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
+            container->ptr = strPtr;
             for(auto &fn: info->fileNames) {
                 size_t nameLength = fn.length();
-                str[i].slen = nameLength;
-                str[i].s = new char[nameLength + 1];
-                strncpy ( str[i].s, fn.c_str(), nameLength );
-                str[i].s[nameLength] = 0;
-                str[i++].stype = 0;
+                strPtr[i].slen = nameLength;
+                strPtr[i].s = new char[nameLength + 1];
+       // cout << "alloc  fn[" << i << "] = " << hexString(strPtr[i].s) << endl;
+                 strncpy ( strPtr[i].s, fn.c_str(), nameLength );
+                strPtr[i].s[nameLength] = 0;
+                strPtr[i++].stype = 0;
             }
             container->nNames = i;
+            count += i * sizeof(IDL_STRING);
         }
+        
+        return count;
     }
 
     
@@ -636,25 +658,30 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     
     uint8_t loadMask = 0;
     
-    if ( kw.img && (info->dataMask & MOMFBD_IMG) )     loadMask |= MOMFBD_IMG;
-    if ( kw.psf && (info->dataMask & MOMFBD_PSF) )     loadMask |= MOMFBD_PSF;
-    if ( kw.obj && (info->dataMask & MOMFBD_OBJ) )     loadMask |= MOMFBD_OBJ;
-    if ( kw.res && (info->dataMask & MOMFBD_RES) )     loadMask |= MOMFBD_RES;
-    if ( kw.alpha && (info->dataMask & MOMFBD_ALPHA) ) loadMask |= MOMFBD_ALPHA;
-    if ( kw.div && (info->dataMask & MOMFBD_DIV) )     loadMask |= MOMFBD_DIV;
-    if ( kw.modes && (info->dataMask & MOMFBD_MODES) ) loadMask |= MOMFBD_MODES;
-    if ( kw.names && (info->dataMask & MOMFBD_NAMES) ) loadMask |= MOMFBD_NAMES;
-    if ( kw.all )   loadMask = info->dataMask;
+    if ( kw.img )     loadMask |= MOMFBD_IMG;
+    if ( kw.psf )     loadMask |= MOMFBD_PSF;
+    if ( kw.obj )     loadMask |= MOMFBD_OBJ;
+    if ( kw.res )     loadMask |= MOMFBD_RES;
+    if ( kw.alpha )   loadMask |= MOMFBD_ALPHA;
+    if ( kw.div )     loadMask |= MOMFBD_DIV;
+    if ( kw.modes )   loadMask |= MOMFBD_MODES;
+    if ( kw.names )   loadMask |= MOMFBD_NAMES;
+    if ( kw.all )     loadMask = info->dataMask;
 
     IDL_KW_FREE;
     
     if( !loadMask && !checkData ) {
-        if ( info->dataMask & MOMFBD_IMG ) loadMask = info->dataMask;
+        loadMask = info->dataMask;
+    } else {
+        loadMask &= info->dataMask;
     }
 
+    loadMask &= ~MOMFBD_NAMES;       // BUG: disable name-loading until it is fixed.
+    
     IDL_MEMINT dims[] = {1};
     IDL_VPTR v;
     
+      //  cout << "after params:   mask = " << bitString(loadMask) << endl;
     if ( checkData ) {
         vector<IDL_STRUCT_TAG_DEF> allTags;
         createTags ( allTags, info->dataMask, info.get() );
@@ -672,9 +699,10 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     vector<IDL_STRUCT_TAG_DEF> tags;
-    size_t patchSize = getPatchSize ( info.get(), loadMask );
+    size_t patchSize = getPatchSize ( info.get(), loadMask, info->version );
     createTags ( tags, loadMask, info.get() );
     
+      //  cout << "after tags:   mask = " << bitString(loadMask) << endl;
     IDL_StructDefPtr myStruct = IDL_MakeStruct ( 0, tags.data() );              // Generate the IDL structure defined above
     // Clean up the "dims" array for the tags that has them
     for ( auto & it : tags ) {
@@ -687,7 +715,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     // Calculate size of data to load.
     size_t totalSize = 3 * sizeof ( IDL_STRING );                               // VERSION - TIME - DATE
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );                      // clip-values for each channel
-    if ( ( loadMask & MOMFBD_MODES ) && info->nModes ) {
+    if ( loadMask & MOMFBD_MODES) {
         if ( info->version >= 20110714.0 ) {
             totalSize += 2*sizeof ( float );                                    // pix2cf, cf2pix
         }
@@ -695,27 +723,49 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nModes * info->nPH * info->nPH * sizeof ( float );   // Mode Data
     }
     totalSize += info->nPatchesX * info->nPatchesY * patchSize;
-    while ( totalSize % alignTo ) totalSize++;                                  // pad if not on boundary
-
-    if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                          // if filenames are stored and loaded
+    while ( totalSize % alignTo ) {
+        totalSize++;                                  // pad if not on boundary
+    }
+    
+    if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                    // if filenames are stored and loaded
         totalSize += info->nFileNames * sizeof ( IDL_STRING );
     }
 
+    totalSize += sizeof ( MomfdContainer );
+    //cout << "before alloc:  totalSize = " << totalSize << "  alignTo = " << (int)alignTo << endl;
+
     // Allocate the datablock needed.
-    std::unique_ptr<char> data ( new char [ totalSize + sizeof ( MomfdContainer )] ); //, [](char *p) { delete[] p; });
+    //std::unique_ptr<char> data ( new char [ totalSize ] ); //, [](char *p) { delete[] p; });
+    char* data = new char [ totalSize ]; //, [](char *p) { delete[] p; });
+    //cout << "after alloc:  totalSize = " << totalSize << "  alignTo = " << (int)alignTo << "  data = " << hexString(data) << "  dataEnd = " << hexString(data+totalSize)<< endl;
+
     
-    v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
+    //v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
+    UCHAR* dPtr = ( UCHAR* ) (data + sizeof ( MomfdContainer ));
+
+
+    size_t count = loadData ( file, data, loadMask, info.get(), verbosity );
+    if( count != totalSize ) {
+        cout << "Load mismatch:  totalSize = " << totalSize << "  count = " << count <<  "  diff = " << ((int64_t)totalSize-(int64_t)count) << endl;
+    }
+    
+#if 0
+    cleanupMomfbd(dPtr);
+    return IDL_GettmpInt(-1);
+#endif
+    
+    v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, dPtr, cleanupMomfbd, myStruct );
 
     // Dump structure layout if requested
     if ( verbosity > 1 ) {
         dumpStruct ( v, -1, 2 );
     }
 
-    loadData ( file, data.get(), loadMask, info.get(), verbosity );
+    //loadData ( file, data.get(), loadMask, info.get(), verbosity );
 
     // release the datablock from the RAII container to prevent de-allocation on return.
-    data.release();
-
+    //data.release();
+    //cout << "read_momfbd: END" << endl;
     return v;
 
 
@@ -782,7 +832,7 @@ void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_INT* intPtr;
     IDL_STRING* stringPtr;
     IDL_MEMINT tagOffset;
-    string tag,type;
+    string tag;
     int nTags = IDL_StructNumTags ( structDef );
     for ( int t = 0; t < nTags; ++t ) {
 

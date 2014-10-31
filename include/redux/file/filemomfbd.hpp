@@ -45,7 +45,7 @@ namespace redux {
                 int64_t offset, imgPos, psfPos, objPos, resPos, alphaPos, diversityPos;
 
                 uint8_t parse( std::ifstream& file, const bool& swapNeeded, const float& version );
-                void load ( std::ifstream& file, char*& ptr, const bool& swapNeeded, const float& version, uint8_t loadMask=MOMFBD_ALL, int verbosity=0, uint8_t alignTo=4 ) const;
+                size_t load ( std::ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask=MOMFBD_ALL, int verbosity=0, uint8_t alignTo=4 ) const;
                 void write( std::ofstream& file, const char* data, uint8_t writeMask=MOMFBD_ALL );
 
             };
@@ -61,7 +61,7 @@ namespace redux {
             void write( std::ofstream&, const char* data, uint8_t writeMask=MOMFBD_ALL, int verbosity=0 );
             void write( const std::string&, const char* data, uint8_t writeMask=MOMFBD_ALL, int verbosity=0 );
             
-            char* load ( std::ifstream& file, char* data, uint8_t loadMask, int verbosity=0, uint8_t alignTo=4 );
+            size_t load ( std::ifstream& file, char* data, uint8_t loadMask, int verbosity=0, uint8_t alignTo=4 );
             
             std::string getText( void ) {
                 return "";

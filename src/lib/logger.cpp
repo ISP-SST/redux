@@ -60,10 +60,9 @@ Logger::Logger( bpo::variables_map& vm ) {
     boost::log::add_common_attributes();
 
     if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, used it.
-        cout << "verbosity specified." << endl;
         defaultSeverity = vm["verbosity"].as<int>();
     }
-
+        
     if( vm.count( "log-stdout" ) ) {
         boost::shared_ptr<LogSink> sink( new StreamSink( cout, defaultSeverity ) );
         logSinks.push_back( sink );

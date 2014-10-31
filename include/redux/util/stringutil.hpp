@@ -172,7 +172,6 @@ namespace redux {
 
             std::ostringstream oss;
             oss << "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n";
-            std::string tmp( "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n" );
             unsigned char* ptr = reinterpret_cast<unsigned char*>( var );
             unsigned char* end = ptr + n * sizeof( T ) - 1;
             
@@ -187,32 +186,24 @@ namespace redux {
 
                 for( int j = 128; j; j >>= 1 ) {
                     oss << (( *end & j ) ? " 1 " : " 0 ");
-                    //tmp +=  ( *end & j ) ? " 1 " : " 0 ";
                 }
 
-//                 tmp += std::to_string( ( int ) * end ) + std::string( " (" );
-//                 tmp += hexString( ( ( int ) * end ) >> 4, false )
-//                        + hexString( ( int )( *end ) & 0xF, false );
                 oss << " " << std::setw(5) << std::to_string( ( int ) * end );
                 oss << std::string( " (" );
                 oss << hexString( ( ( int ) * end ) >> 4, false ) << hexString( ( int )( *end ) & 0xF, false );
 
                 if( alpha ) {
                     oss << ",'" << std::string( ( char* )end, 1 ) << "'";
-                    //tmp += std::string( "," ) + std::string( ( char* )end, 1 );
                 }
 
                 oss << ")\n";
-                //tmp += std::string( ")\n" );
                 end--;
             }
-
-            //tmp += "            ------------------------            \n";
 
             oss <<  "            ------------------------            \n";
 
             return oss.str();
-            return tmp;
+
         }
 
 
@@ -226,7 +217,6 @@ namespace redux {
             std::ostringstream oss;
             oss << "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n";
 
-            std::string tmp( "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n" );
             unsigned char* ptr = ( unsigned char* )( &var );
             unsigned char* end = ptr + n * sizeof( T ) - 1;
             
@@ -238,7 +228,6 @@ namespace redux {
                 oss.setf ( std::ios::right );
                 oss << std::setw(5) << std::to_string( ( int )( end - ptr ) );
                 oss.flags ( ff );
-                //tmp += "  Byte " + std::string( pad, ' ' ) + std::to_string( ( int )( end - ptr ) );
 
                 for( int j = 128; j; j >>= 1 ) {
                     oss << (( *end & j ) ? " 1 " : " 0 ");
@@ -259,7 +248,7 @@ namespace redux {
             oss <<  "            ------------------------            \n";
 
             return oss.str();
-            return tmp;
+
         }
 
 
