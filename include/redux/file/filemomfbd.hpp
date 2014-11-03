@@ -46,7 +46,7 @@ namespace redux {
 
                 uint8_t parse( std::ifstream& file, const bool& swapNeeded, const float& version );
                 size_t load ( std::ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask=MOMFBD_ALL, int verbosity=0, uint8_t alignTo=4 ) const;
-                void write( std::ofstream& file, const char* data, uint8_t writeMask=MOMFBD_ALL );
+                void write( std::ofstream& file, const char* data, const float& version, uint8_t writeMask=MOMFBD_ALL );
 
             };
 

@@ -87,25 +87,25 @@ namespace {
                     type.append ( ")" );
                 }
 
-            cout.setf ( std::ios::left );
-            if ( v->type == IDL_TYP_STRUCT ) {
-                cout << std::setw(25) << (string(current, ' ') + name);
-                cout << std::setw(25) << type;
-                //cout.setf ( std::ios::hex );
-                //cout << std::setw(20) << (void*)( buf + offset );
-                //cout.setf ( std::ios::dec );
-                cout << std::setw(15) << to_string ( (size_t)offset ) << endl;
-                sz += count * dumpStruct ( v, current + indent, indent );
-            } else {
-                sz += count * var_sizes[v->type];
-                cout << std::setw(25) << (string(current,' ')+name);
-                cout << std::setw(25) << type;
-                //cout.setf ( std::ios::hex );
-                //cout << std::setw(20) << (void*)( buf + offset );
-                //cout.setf ( std::ios::dec );
-                cout << std::setw(15) << to_string ( (size_t)offset );
-                cout << std::setw(15) << to_string ( count * var_sizes[v->type] ) << endl;
-            }
+                cout.setf ( std::ios::left );
+                if ( v->type == IDL_TYP_STRUCT ) {
+                    cout << std::setw ( 25 ) << ( string ( current, ' ' ) + name );
+                    cout << std::setw ( 25 ) << type;
+                    //cout.setf ( std::ios::hex );
+                    //cout << std::setw(20) << (void*)( buf + offset );
+                    //cout.setf ( std::ios::dec );
+                    cout << std::setw ( 15 ) << to_string ( ( size_t ) offset ) << endl;
+                    sz += count * dumpStruct ( v, current + indent, indent );
+                } else {
+                    sz += count * var_sizes[v->type];
+                    cout << std::setw ( 25 ) << ( string ( current,' ' ) +name );
+                    cout << std::setw ( 25 ) << type;
+                    //cout.setf ( std::ios::hex );
+                    //cout << std::setw(20) << (void*)( buf + offset );
+                    //cout.setf ( std::ios::dec );
+                    cout << std::setw ( 15 ) << to_string ( ( size_t ) offset );
+                    cout << std::setw ( 15 ) << to_string ( count * var_sizes[v->type] ) << endl;
+                }
 
             }
 
@@ -114,7 +114,7 @@ namespace {
         return sz;
     }
 
-    
+
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_INT all;
@@ -183,8 +183,8 @@ namespace {
     void cleanupMomfbd ( UCHAR *arg ) {
         // The actual datablock allocated for the data begins at (arg - sizeof(struct MomfdContainer))
         // The preceeding structure just serves to point to the filename-array.
-        char *data = (char*)arg - sizeof ( struct MomfdContainer );
-      
+        char *data = ( char* ) arg - sizeof ( struct MomfdContainer );
+
         struct MomfdContainer* info = ( struct MomfdContainer* ) data;
 
         // free the name-array, if present.
@@ -251,15 +251,15 @@ namespace {
         appendTag ( tags, "YH", 0, ( void* ) IDL_TYP_INT );
         appendTag ( tags, "XL", 0, ( void* ) IDL_TYP_INT );
         appendTag ( tags, "XH", 0, ( void* ) IDL_TYP_INT );
-        if ( info->version >= 20110714.0) {
+        if ( info->version >= 20110714.0 ) {
             appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );           // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
             appendTag ( tags, "OFFX", 0, ( void* ) IDL_TYP_INT );
         }
-        
+
         IDL_MEMINT* tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
         tmpDims[1] = info->nChannels;
-        appendTag ( tags, "DY", tmpDims, ( void* ) IDL_TYP_INT );           // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names   
+        appendTag ( tags, "DY", tmpDims, ( void* ) IDL_TYP_INT );           // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
 
         tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
@@ -341,7 +341,7 @@ namespace {
             tmpDims[3] = 2;
             appendTag ( tags, "CLIP", tmpDims, ( void* ) IDL_TYP_INT );
         }
-        
+
         if ( loadMask & MOMFBD_MODES ) {
             if ( info->version >= 20110714.0 ) {
                 appendTag ( tags, "PIX2CF", 0, ( void* ) IDL_TYP_FLOAT );
@@ -432,7 +432,7 @@ namespace {
 
     }
 
-    
+
     size_t loadData ( ifstream& file, char* data, uint8_t loadMask, FileMomfbd* info, int verbosity ) {
 
         // zero the list of filenames
@@ -445,7 +445,7 @@ namespace {
         IDL_STRING *strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
         IDL_INT* intPtr;
         float* fPtr;
-        
+
         // Version string
         strPtr[0].slen = info->versionString.length();
         strPtr[0].s = new char[strPtr->slen + 1];
@@ -469,9 +469,9 @@ namespace {
         strPtr[2].s[strPtr[2].slen] = '\0';
         info->dateString.copy ( strPtr[2].s, strPtr[2].slen );
         strPtr[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
-        
-        count += 3*sizeof(IDL_STRING);
-        
+
+        count += 3*sizeof ( IDL_STRING );
+
         if ( loadMask && info->nChannels ) {
             intPtr = reinterpret_cast<IDL_INT*> ( data+count );
             //NOTE: clipStartY & clipEndX swapped compared to file-order
@@ -488,19 +488,19 @@ namespace {
             fPtr = reinterpret_cast<float*> ( data+count );
             fPtr[0] = info->pix2cf;
             fPtr[1] = info->cf2pix;
-            count += 2 * sizeof(float);
+            count += 2 * sizeof ( float );
         }
 
         // Load the data
-        count += info->load( file, data+count , loadMask, verbosity, 4 );
+        count += info->load ( file, data+count , loadMask, verbosity, 4 );
 
         // add list of filenames, if requested
-        if( loadMask & MOMFBD_NAMES ) {
+        if ( loadMask & MOMFBD_NAMES ) {
             while ( count % 8 ) count++;        // pad struct to 8-byte boundary.
             int i = 0;
             strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
             container->ptr = strPtr;
-            for(auto &fn: info->fileNames) {
+            for ( auto &fn: info->fileNames ) {
                 size_t nameLength = fn.length();
                 strPtr[i].slen = nameLength;
                 strPtr[i].s = new char[nameLength + 1];
@@ -509,13 +509,13 @@ namespace {
                 strPtr[i++].stype = 0;
             }
             container->nNames = i;
-            count += i * sizeof(IDL_STRING);
+            count += i * sizeof ( IDL_STRING );
         }
-        
+
         return count;
     }
 
-    
+
     Array<float> getWeights ( const Overlaps& overlaps, int margin, int ny, int nx ) {
 
         static std::map<Overlaps, Array<float> > map;
@@ -612,7 +612,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     if ( argc < 1 ) {
         cout << "MOMFBD_READ: takes 1 argument." << endl;
         momfbd_help();
-        return IDL_GettmpInt(0);    // return a dummy
+        return IDL_GettmpInt ( 0 ); // return a dummy
     }
 
     IDL_VPTR fileName = argv[0];
@@ -624,7 +624,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
     if ( kw.help ) {
         momfbd_help();
-        return IDL_GettmpInt(0);    // return a dummy
+        return IDL_GettmpInt ( 0 ); // return a dummy
     }
 
     IDL_ENSURE_SIMPLE ( fileName );
@@ -633,11 +633,11 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     char *name = IDL_VarGetString ( fileName );
     int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
     int checkData = kw.check;
-    
+
     if ( verbosity > 0 ) {
         cout << "Loading file: \"" << name << "\"" << endl;
     }
-    
+
     ifstream file;
     std::shared_ptr<FileMomfbd> info ( new FileMomfbd() );
 
@@ -646,12 +646,12 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         info->read ( file );
     } catch ( exception& e ) {
         cout << "Failed to read info from Momfbd file: " << name << endl << "Reason: " << e.what() << endl;
-        return IDL_GettmpInt(-1);    // return a dummy
+        return IDL_GettmpInt ( -1 ); // return a dummy
     }
-        
-    
+
+
     uint8_t loadMask = 0;
-    
+
     if ( kw.img )     loadMask |= MOMFBD_IMG;
     if ( kw.psf )     loadMask |= MOMFBD_PSF;
     if ( kw.obj )     loadMask |= MOMFBD_OBJ;
@@ -663,19 +663,19 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     if ( kw.all )     loadMask = info->dataMask;
 
     IDL_KW_FREE;
-    
-    if( !loadMask && !checkData ) {
+
+    if ( !loadMask && !checkData ) {
         loadMask = info->dataMask;
     } else {
         loadMask &= info->dataMask;
     }
 
     //loadMask &= ~MOMFBD_NAMES;       // BUG: disable name-loading until it is fixed.
-    
+
     IDL_MEMINT dims[] = {1};
     IDL_VPTR v;
-    
-      //  cout << "after params:   mask = " << bitString(loadMask) << endl;
+
+    //  cout << "after params:   mask = " << bitString(loadMask) << endl;
     if ( checkData ) {
         vector<IDL_STRUCT_TAG_DEF> allTags;
         createTags ( allTags, info->dataMask, info.get() );
@@ -689,14 +689,13 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         }
         v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, 0, 0, allStruct );
         dumpStruct ( v, -1, 2 );
-        return IDL_GettmpInt(-1);    // return a dummy
+        return IDL_GettmpInt ( -1 ); // return a dummy
     }
 
     vector<IDL_STRUCT_TAG_DEF> tags;
     size_t patchSize = getPatchSize ( info.get(), loadMask, info->version );
     createTags ( tags, loadMask, info.get() );
-    
-      //  cout << "after tags:   mask = " << bitString(loadMask) << endl;
+
     IDL_StructDefPtr myStruct = IDL_MakeStruct ( 0, tags.data() );              // Generate the IDL structure defined above
     // Clean up the "dims" array for the tags that has them
     for ( auto & it : tags ) {
@@ -709,7 +708,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     // Calculate size of data to load.
     size_t totalSize = 3 * sizeof ( IDL_STRING );                               // VERSION - TIME - DATE
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );                      // clip-values for each channel
-    if ( loadMask & MOMFBD_MODES) {
+    if ( loadMask & MOMFBD_MODES ) {
         if ( info->version >= 20110714.0 ) {
             totalSize += 2*sizeof ( float );                                    // pix2cf, cf2pix
         }
@@ -720,78 +719,66 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     while ( totalSize % 8 ) { //alignTo ) {
         totalSize++;                                  // pad if not on boundary
     }
-    
+
     if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                    // if filenames are stored and loaded
         totalSize += info->nFileNames * sizeof ( IDL_STRING );
     }
 
     totalSize += sizeof ( MomfdContainer );
-    //cout << "before alloc:  totalSize = " << totalSize << "  alignTo = " << (int)alignTo << endl;
 
     // Allocate the datablock needed.
-    //std::unique_ptr<char> data ( new char [ totalSize ] ); //, [](char *p) { delete[] p; });
-    char* data = new char [ totalSize ]; //, [](char *p) { delete[] p; });
-    //cout << "after alloc:  totalSize = " << totalSize << "  alignTo = " << (int)alignTo << "  data = " << hexString(data) << "  dataEnd = " << hexString(data+totalSize)<< endl;
+    std::unique_ptr<char> data ( new char [ totalSize ] );
 
-    
-    //v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
-    UCHAR* dPtr = ( UCHAR* ) (data + sizeof ( MomfdContainer ));
+    v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
 
-
-    size_t count = loadData ( file, data, loadMask, info.get(), verbosity );
-    if( count != totalSize ) {
-        cout << "Load mismatch:  totalSize = " << totalSize << "  count = " << count <<  "  diff = " << ((int64_t)totalSize-(int64_t)count) << endl;
+    size_t count = loadData ( file, data.get(), loadMask, info.get(), verbosity );
+    if ( count != totalSize ) {
+        cout << "Load mismatch:  totalSize = " << totalSize << "  count = " << count <<  "  diff = " << ( ( int64_t ) totalSize- ( int64_t ) count ) << endl;
     }
-    
-   
-    v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, dPtr, cleanupMomfbd, myStruct );
 
     // Dump structure layout if requested
     if ( verbosity > 1 ) {
         dumpStruct ( v, -1, 2 );
     }
 
-    //loadData ( file, data.get(), loadMask, info.get(), verbosity );
-
     // release the datablock from the RAII container to prevent de-allocation on return.
-    //data.release();
-    //cout << "read_momfbd: END" << endl;
+    data.release();
+
     return v;
 
 
 }
 
 
-void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
+void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if( argc < 2 ) {
+    if ( argc < 2 ) {
         cout << "MOMFBD_WRITE: needs (at least) 2 arguments." << endl;
         momfbd_help();
         return;
     }
-    
+
     IDL_VPTR momfbdStruct  = argv[0];
     IDL_VPTR fileName  = argv[1];
 
     KW_RESULT kw;
     kw.help = 0;
     kw.verbose = 0;
-    ( void ) IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
-    
-    if( kw.help ) {
+    ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
+
+    if ( kw.help ) {
         momfbd_help();
         return;
     }
 
-    IDL_ENSURE_STRUCTURE( momfbdStruct );
+    IDL_ENSURE_STRUCTURE ( momfbdStruct );
 
-    IDL_ENSURE_SIMPLE( fileName );
-    IDL_ENSURE_STRING( fileName );
+    IDL_ENSURE_SIMPLE ( fileName );
+    IDL_ENSURE_STRING ( fileName );
 
     char *name = IDL_VarGetString ( fileName );
     int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
     uint8_t writeMask = 0;
-    bool defaultMask(false);
     if ( kw.img )   writeMask |= MOMFBD_IMG;
     if ( kw.psf )   writeMask |= MOMFBD_PSF;
     if ( kw.obj )   writeMask |= MOMFBD_OBJ;
@@ -803,21 +790,20 @@ void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
     if ( kw.all )   writeMask |= MOMFBD_ALL;
 
     IDL_KW_FREE;
-    
-    if( !writeMask ) {  // write all by default
+
+    if ( !writeMask ) { // write all by default
         writeMask |= MOMFBD_ALL;
-        defaultMask = true;
     }
 
     if ( verbosity > 0 ) {
-        cout << "Writing file: \"" << name << "\"  writeMask=" << bitString(writeMask) << endl;
+        cout << "Writing file: \"" << name << "\"" << endl;
     }
-    
+
     FileMomfbd* infoPtr = new FileMomfbd();
     std::shared_ptr<FileMomfbd> info ( infoPtr );
-    
+
     IDL_StructDefPtr structDef = momfbdStruct->value.s.sdef;
-    
+
     IDL_VPTR tagPtr;
     IDL_INT* intPtr;
     IDL_STRING* stringPtr;
@@ -826,257 +812,276 @@ void redux::momfbd_write( int argc, IDL_VPTR* argv, char* argk ) {
     int nTags = IDL_StructNumTags ( structDef );
     for ( int t = 0; t < nTags; ++t ) {
 
-            tag = IDL_StructTagNameByIndex ( structDef, t, 0, 0 );
-            tagOffset = IDL_StructTagInfoByIndex ( structDef, t, 0, &tagPtr );
+        tag = IDL_StructTagNameByIndex ( structDef, t, 0, 0 );
+        tagOffset = IDL_StructTagInfoByIndex ( structDef, t, 0, &tagPtr );
 
-            if(tagOffset < 0) continue;
-            
-            if(tagPtr->type == IDL_TYP_STRING) {
-                stringPtr = (IDL_STRING*)(momfbdStruct->value.arr->data + tagOffset);
-                if(contains("VERSION",tag,true)){
-                    infoPtr->versionString = stringPtr->s;
-                } else if(contains("DATE",tag,true)){
-                    infoPtr->dateString = stringPtr->s;
-                } else if(contains("TIME",tag,true)){
-                    infoPtr->timeString = stringPtr->s;
-                } else if((writeMask & MOMFBD_NAMES) && contains("NAME",tag,true)){
-                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==1) {
-                        for ( int n = 0; n < infoPtr->nFileNames; ++n ) {
-                            infoPtr->fileNames.push_back(string(stringPtr[n].s));
-                        }
-                        infoPtr->nFileNames = infoPtr->fileNames.size();
+        if ( tagOffset < 0 ) continue;
+
+        if ( tagPtr->type == IDL_TYP_STRING ) {
+            stringPtr = ( IDL_STRING* ) ( momfbdStruct->value.arr->data + tagOffset );
+            if ( contains ( "VERSION",tag,true ) ) {
+                infoPtr->versionString = stringPtr->s;
+                infoPtr->version = atof ( stringPtr->s );
+            } else if ( contains ( "DATE",tag,true ) ) {
+                infoPtr->dateString = stringPtr->s;
+            } else if ( contains ( "TIME",tag,true ) ) {
+                infoPtr->timeString = stringPtr->s;
+            } else if ( ( writeMask & MOMFBD_NAMES ) && contains ( "NAME",tag,true ) ) {
+                if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==1 ) {
+                    for ( int n = 0; n < tagPtr->value.arr->dim[0]; ++n ) {
+                        infoPtr->fileNames.push_back ( string ( stringPtr[n].s ) );
                     }
-                } 
-            } else if(tagPtr->type == IDL_TYP_INT) {
-                intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + tagOffset);
-                if((writeMask) && contains("CLIP",tag,true)) {    // dimensions: (nChannels,2,2)
-                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3) {
-                        int32_t nChannels = infoPtr->nChannels = tagPtr->value.arr->dim[0];
-                        infoPtr->clipStartX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
-                        infoPtr->clipEndX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
-                        infoPtr->clipStartY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
-                        infoPtr->clipEndY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) { delete[] p; } );
+                    infoPtr->nFileNames = infoPtr->fileNames.size();
+                    infoPtr->dataMask |= MOMFBD_NAMES;
+                }
+            }
+        } else if ( tagPtr->type == IDL_TYP_INT ) {
+            intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + tagOffset );
+            if ( ( writeMask ) && contains ( "CLIP",tag,true ) ) { // dimensions: (nChannels,2,2)
+                if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3 ) {
+                    int32_t nChannels = infoPtr->nChannels = tagPtr->value.arr->dim[0];
+                    infoPtr->clipStartX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
+                        delete[] p;
+                    } );
+                    infoPtr->clipEndX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
+                        delete[] p;
+                    } );
+                    infoPtr->clipStartY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
+                        delete[] p;
+                    } );
+                    infoPtr->clipEndY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
+                        delete[] p;
+                    } );
 
-                        // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                        for ( int i = 0; i < nChannels; ++i ) {
-                            infoPtr->clipStartY.get() [ i ] = intPtr[ i + 0 * nChannels ];
-                            infoPtr->clipStartX.get() [ i ] = intPtr[ i + 1 * nChannels ];
-                            infoPtr->clipEndY.get() [ i ] = intPtr[ i + 2 * nChannels ];
-                            infoPtr->clipEndX.get() [ i ] = intPtr[ i + 3 * nChannels ];
-                        }
+                    // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                    for ( int i = 0; i < nChannels; ++i ) {
+                        infoPtr->clipStartY.get() [ i ] = intPtr[ i + 0 * nChannels ];
+                        infoPtr->clipStartX.get() [ i ] = intPtr[ i + 1 * nChannels ];
+                        infoPtr->clipEndY.get() [ i ] = intPtr[ i + 2 * nChannels ];
+                        infoPtr->clipEndX.get() [ i ] = intPtr[ i + 3 * nChannels ];
                     }
                 }
-            } else if(tagPtr->type == IDL_TYP_FLOAT) {  // pupil, mode
-                if(writeMask & MOMFBD_MODES) {
-                    if(contains("PUPIL",tag,true)) {    // dimensions: (nPH,nPH)
-                        if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2) {
-                            infoPtr->nPH = tagPtr->value.arr->dim[0];
-                            infoPtr->phOffset = tagOffset;
-                        }
-                    } else if(contains("MODE",tag,true)) {    // dimensions: (nPH,nPH, nModes)
-                        if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3) {
-                            infoPtr->nModes = tagPtr->value.arr->dim[2];
-                            infoPtr->modesOffset = tagOffset;
-                        }
+            }
+        } else if ( tagPtr->type == IDL_TYP_FLOAT ) { // pupil, mode, pix2cf, cf2pix
+            if ( writeMask & MOMFBD_MODES ) {
+                if ( contains ( "PUPIL",tag,true ) ) { // dimensions: (nPH,nPH)
+                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2 ) {
+                        infoPtr->nPH = tagPtr->value.arr->dim[0];
+                        infoPtr->phOffset = tagOffset;
                     }
+                } else if ( contains ( "MODE",tag,true ) ) { // dimensions: (nPH,nPH, nModes)
+                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3 ) {
+                        infoPtr->nModes = tagPtr->value.arr->dim[2];
+                        infoPtr->modesOffset = tagOffset;
+                    }
+                } else if ( contains ( "PIX2CF",tag,true ) ) { // scalar
+                    infoPtr->pix2cf = * ( ( float* ) ( momfbdStruct->value.arr->data + tagOffset ) );
+                } else if ( contains ( "CF2PIX",tag,true ) ) { // scalar
+                    infoPtr->cf2pix = * ( ( float* ) ( momfbdStruct->value.arr->data + tagOffset ) );
                 }
-            } else if(tagPtr->type == IDL_TYP_STRUCT) { // patches
-                if((writeMask & MOMFBD_PATCH) && contains("PATCH",tag,true)){
-                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2) {
-                        infoPtr->nPatchesY = tagPtr->value.arr->dim[0];     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                        infoPtr->nPatchesX = tagPtr->value.arr->dim[1];
-                        int64_t offset = 0;
-                        infoPtr->patches.resize(infoPtr->nPatchesX,infoPtr->nPatchesY);
-                        for ( int x = 0; x < infoPtr->nPatchesX; ++x ) {
-                            for ( int y = 0; y < infoPtr->nPatchesY; ++y ) {
-                                FileMomfbd::PatchInfo* patch = infoPtr->patches.ptr ( x, y );
-                                patch->offset = tagOffset + offset;
-                                IDL_StructDefPtr subStruct = tagPtr->value.s.sdef;
-                                int64_t subOffset = IDL_StructTagInfoByName(subStruct, (char*)"YL", 0, 0);     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                                if( subOffset >= 0 ) {
-                                    patch->region[0] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
-                                } else cout << "patch (" << x << "," << y << ")  has no YL tag." << endl;
-                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"YH", 0, 0);
-                                if( subOffset >= 0 ) {
-                                    patch->region[1] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
-                                } else cout << "patch (" << x << "," << y << ")  has no YH tag." << endl;
-                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"XL", 0, 0);             // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                                if( subOffset >= 0 ) {
-                                    patch->region[2] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
-                                } else cout << "patch (" << x << "," << y << ")  has no XL tag." << endl;
-                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"XH", 0, 0);
-                                if( subOffset >= 0 ) {
-                                    patch->region[3] = *((IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset));
-                                } else cout << "patch (" << x << "," << y << ")  has no XH tag." << endl;
-                                
-                                patch->nPixelsX = patch->region[1] - patch->region[0] + 1;
-                                patch->nPixelsY = patch->region[3] - patch->region[2] + 1;
+                if ( infoPtr->nPH && infoPtr->nModes ) infoPtr->dataMask |= MOMFBD_MODES;
+            }
+        } else if ( tagPtr->type == IDL_TYP_STRUCT ) { // patches
+            if ( ( writeMask & MOMFBD_PATCH ) && contains ( "PATCH",tag,true ) ) {
+                if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2 ) {
+                    infoPtr->nPatchesY = tagPtr->value.arr->dim[0];     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                    infoPtr->nPatchesX = tagPtr->value.arr->dim[1];
+                    int64_t offset = 0;
+                    infoPtr->patches.resize ( infoPtr->nPatchesX,infoPtr->nPatchesY );
+                    for ( int x = 0; x < infoPtr->nPatchesX; ++x ) {
+                        for ( int y = 0; y < infoPtr->nPatchesY; ++y ) {
+                            FileMomfbd::PatchInfo* patch = infoPtr->patches.ptr ( x, y );
+                            patch->offset = tagOffset + offset;
+                            IDL_StructDefPtr subStruct = tagPtr->value.s.sdef;
+                            int64_t subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "YL", 0, 0 ); // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                            if ( subOffset >= 0 ) {
+                                patch->region[0] = * ( ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset ) );
+                            } else cout << "patch (" << x << "," << y << ")  has no YL tag." << endl;
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "YH", 0, 0 );
+                            if ( subOffset >= 0 ) {
+                                patch->region[1] = * ( ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset ) );
+                            } else cout << "patch (" << x << "," << y << ")  has no YH tag." << endl;
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "XL", 0, 0 );       // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                            if ( subOffset >= 0 ) {
+                                patch->region[2] = * ( ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset ) );
+                            } else cout << "patch (" << x << "," << y << ")  has no XL tag." << endl;
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "XH", 0, 0 );
+                            if ( subOffset >= 0 ) {
+                                patch->region[3] = * ( ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset ) );
+                            } else cout << "patch (" << x << "," << y << ")  has no XH tag." << endl;
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "OFFY", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, 0 ); // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                            if ( subOffset >= 0 ) {
+                                patch->offx = * ( ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset ) );
+                            }
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "OFFX", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, 0 );
+                            if ( subOffset >= 0 ) {
+                                patch->offy = * ( ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset ) );
+                            }
 
-                                IDL_VPTR tmpPtr;
-                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"DY", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);   // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                                if( subOffset >= 0 ) {
-                                    int32_t nChannels = tmpPtr->value.arr->dim[0];
-                                    intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset);
-                                    if( nChannels > 0 ) {
-                                        patch->dx.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) { delete[] p; } );
-                                        for ( int i = 0; i < nChannels; ++i ) {
-                                            patch->dx.get() [ i ] = intPtr[ i ];
-                                        }
-                                        if( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
-                                        else {
-                                            if( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
-                                        }
-                                    }
-                                }
-                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"DX", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                if( subOffset >= 0 ) {
-                                    int32_t nChannels = tmpPtr->value.arr->dim[0];
-                                    intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset);
-                                    if( nChannels > 0 ) {
-                                        patch->dy.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) { delete[] p; } );
-                                        for ( int i = 0; i < nChannels; ++i ) {
-                                            patch->dy.get() [ i ] = intPtr[ i ];
-                                        }
-                                        if( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
-                                        else {
-                                            if( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
-                                        }
-                                    }
-                                }
-                                
-                                subOffset = IDL_StructTagInfoByName(subStruct, (char*)"NIMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                if( subOffset >= 0 ) {
-                                    int32_t nChannels = tmpPtr->value.arr->dim[0];
-                                    intPtr = (IDL_INT*)(momfbdStruct->value.arr->data + patch->offset + subOffset);
-                                    if( nChannels > 0 ) {
-                                        patch->nim.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) { delete[] p; } );
-                                        for ( int i = 0; i < nChannels; ++i ) {
-                                            patch->nim.get() [ i ] = intPtr[ i ];
-                                        }
-                                        if( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
-                                        else {
-                                            if( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
-                                        }
-                                    }
-                                }
-                                
-                                if(writeMask & MOMFBD_IMG) {
-                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"IMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                    if( subOffset >= 0 ) {
-                                        patch->imgPos = patch->offset + subOffset;
-                                    } else if ( defaultMask ) {
-                                        writeMask &= ~MOMFBD_IMG;   // no data, so don't try to write it later
-                                    } else {
-                                        cout << "Attempting to write IMG data without it being present in the structure." << endl;
-                                    }
-                                }
+                            patch->nPixelsX = patch->region[1] - patch->region[0] + 1;
+                            patch->nPixelsY = patch->region[3] - patch->region[2] + 1;
 
-                                if(writeMask & MOMFBD_PSF) {
-                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"PSF", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                    if( subOffset >= 0 ) {    // dimensions: (xPixels,yPixels,nPSF(=nFiles) )
-                                        patch->psfPos = patch->offset + subOffset;
-                                        patch->npsf = tmpPtr->value.arr->dim[2];
-                                    } else if ( defaultMask ) {
-                                        writeMask &= ~MOMFBD_PSF;   // no data, so don't try to write it later
-                                    } else {
-                                        cout << "Attempting to write PSF data without it being present in the structure." << endl;
+                            IDL_VPTR tmpPtr;
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DY", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr ); // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                            if ( subOffset >= 0 ) {
+                                int32_t nChannels = tmpPtr->value.arr->dim[0];
+                                intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
+                                if ( nChannels > 0 ) {
+                                    patch->dx.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) {
+                                        delete[] p;
+                                    } );
+                                    for ( int i = 0; i < nChannels; ++i ) {
+                                        patch->dx.get() [ i ] = intPtr[ i ];
+                                    }
+                                    if ( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
+                                    else {
+                                        if ( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
                                     }
                                 }
-
-                                if(writeMask & MOMFBD_OBJ) {
-                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"OBJ", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                    if( subOffset >= 0 ) {    // dimensions: (xPixels,yPixels,nOBJ(=nFiles) )
-                                        patch->objPos = patch->offset + subOffset;
-                                        patch->nobj = tmpPtr->value.arr->dim[2];
-                                    } else if ( defaultMask ) {
-                                        writeMask &= ~MOMFBD_OBJ;   // no data, so don't try to write it later
-                                    } else {
-                                        cout << "Attempting to write OBJ data without it being present in the structure." << endl;
+                            }
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DX", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                            if ( subOffset >= 0 ) {
+                                int32_t nChannels = tmpPtr->value.arr->dim[0];
+                                intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
+                                if ( nChannels > 0 ) {
+                                    patch->dy.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) {
+                                        delete[] p;
+                                    } );
+                                    for ( int i = 0; i < nChannels; ++i ) {
+                                        patch->dy.get() [ i ] = intPtr[ i ];
+                                    }
+                                    if ( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
+                                    else {
+                                        if ( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
                                     }
                                 }
+                            }
 
-                                if(writeMask & MOMFBD_RES) {
-                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"RES", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                    if( subOffset >= 0 ) {    // dimensions: (xPixels,yPixels,nRES(=nFiles) )
-                                        cout << "RES tag exists -> writing" << endl;
-                                        patch->resPos = patch->offset + subOffset;
-                                        patch->nres = tmpPtr->value.arr->dim[2];
-                                    } else if ( defaultMask ) {
-                                        writeMask &= ~MOMFBD_RES;   // no data, so don't try to write it later
-                                    } else {
-                                        cout << "Attempting to write RES data without it being present in the structure." << endl;
+                            subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "NIMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                            if ( subOffset >= 0 ) {
+                                int32_t nChannels = tmpPtr->value.arr->dim[0];
+                                intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
+                                if ( nChannels > 0 ) {
+                                    patch->nim.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) {
+                                        delete[] p;
+                                    } );
+                                    for ( int i = 0; i < nChannels; ++i ) {
+                                        patch->nim.get() [ i ] = intPtr[ i ];
+                                    }
+                                    if ( !infoPtr->nChannels ) infoPtr->nChannels = nChannels;
+                                    else {
+                                        if ( nChannels != infoPtr->nChannels ) cout << "patch (" << x << "," << y << ")  nC mismatch !!!" << endl;
                                     }
                                 }
+                            }
 
-                                if(writeMask & MOMFBD_ALPHA) {
-                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"ALPHA", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                    if( subOffset >= 0 ) {    // dimensions: (nModes,nALPHA(=nFiles) )
-                                        patch->alphaPos = patch->offset + subOffset;
-                                        patch->nm = tmpPtr->value.arr->dim[0];
-                                        patch->nalpha = tmpPtr->value.arr->dim[1];
-                                    } else if ( defaultMask ) {
-                                        writeMask &= ~MOMFBD_ALPHA;   // no data, so don't try to write it later
-                                    } else {
-                                        cout << "Attempting to write ALPHA data without it being present in the structure." << endl;
+                            if ( writeMask & MOMFBD_IMG ) {
+                                subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "IMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                                if ( subOffset >= 0 && tmpPtr->value.arr->n_dim==2 ) {
+                                    int32_t nPixelsX = tmpPtr->value.arr->dim[0];
+                                    int32_t nPixelsY = tmpPtr->value.arr->dim[1];
+                                    if ( !infoPtr->nPoints && ( nPixelsX == nPixelsY ) ) infoPtr->nPoints = nPixelsX;
+                                    else {
+                                        if ( ( nPixelsX != infoPtr->nPoints ) || ( nPixelsX != nPixelsY ) ) cout << "patch (" << x << "," << y << ")  nPixels mismatch !!!" << endl;
                                     }
+                                    patch->imgPos = patch->offset + subOffset;
+                                    infoPtr->dataMask |= MOMFBD_IMG;
                                 }
+                            }
 
-                                if(writeMask & MOMFBD_DIV) {
-                                    subOffset = IDL_StructTagInfoByName(subStruct, (char*)"DIV", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr);
-                                    if( subOffset >= 0 ) {    // dimensions: (nModes,nDIV(=nFiles) )
-                                        patch->diversityPos = patch->offset + subOffset;
-                                        patch->nphx = tmpPtr->value.arr->dim[0];
-                                        patch->nphy = tmpPtr->value.arr->dim[1];
-                                        patch->ndiv = tmpPtr->value.arr->dim[2];
-                                    } else if ( defaultMask ) {
-                                        writeMask &= ~MOMFBD_DIV;   // no data, so don't try to write it later
-                                    } else {
-                                        cout << "Attempting to write DIV data without it being present in the structure." << endl;
-                                    }
+                            if ( writeMask & MOMFBD_PSF ) {
+                                subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "PSF", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                                if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nPSF(=nFiles) )
+                                    patch->psfPos = patch->offset + subOffset;
+                                    patch->npsf = tmpPtr->value.arr->dim[2];
+                                    infoPtr->dataMask |= MOMFBD_PSF;
                                 }
-                                patch-> nChannels = infoPtr->nChannels;
-                                offset += tagPtr->value.arr->elt_len;
-                                
-                            }   // patches x-loop
-                        }       // patches y-loop
+                            }
 
-                    }           // if nDims == 2
-                }               // PATCH
-                
-            }                   // struct
+                            if ( writeMask & MOMFBD_OBJ ) {
+                                subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "OBJ", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                                if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nOBJ(=nFiles) )
+                                    patch->objPos = patch->offset + subOffset;
+                                    patch->nobj = tmpPtr->value.arr->dim[2];
+                                    infoPtr->dataMask |= MOMFBD_OBJ;
+                                }
+                            }
 
-        }       // loop over tags
-    
-    infoPtr->write(name, (const char*)momfbdStruct->value.arr->data, writeMask, verbosity);
-    
+                            if ( writeMask & MOMFBD_RES ) {
+                                subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "RES", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                                if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nRES(=nFiles) )
+                                    patch->resPos = patch->offset + subOffset;
+                                    patch->nres = tmpPtr->value.arr->dim[2];
+                                    infoPtr->dataMask |= MOMFBD_RES;
+                                }
+                            }
+
+                            if ( writeMask & MOMFBD_ALPHA ) {
+                                subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "ALPHA", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                                if ( subOffset >= 0 ) {   // dimensions: (nModes,nALPHA(=nFiles) )
+                                    patch->alphaPos = patch->offset + subOffset;
+                                    patch->nm = tmpPtr->value.arr->dim[0];
+                                    patch->nalpha = tmpPtr->value.arr->dim[1];
+                                    infoPtr->dataMask |= MOMFBD_ALPHA;
+                                }
+                            }
+
+                            if ( writeMask & MOMFBD_DIV ) {
+                                subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DIV", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
+                                if ( subOffset >= 0 ) {   // dimensions: (nModes,nDIV(=nFiles) )
+                                    patch->diversityPos = patch->offset + subOffset;
+                                    patch->nphx = tmpPtr->value.arr->dim[0];
+                                    patch->nphy = tmpPtr->value.arr->dim[1];
+                                    patch->ndiv = tmpPtr->value.arr->dim[2];
+                                    infoPtr->dataMask |= MOMFBD_MODES;
+                                }
+                            }
+                            patch-> nChannels = infoPtr->nChannels;
+                            offset += tagPtr->value.arr->elt_len;
+
+                        }   // patches x-loop
+                    }       // patches y-loop
+
+                }           // if nDims == 2
+            }               // PATCH
+
+        }                   // struct
+
+    }       // loop over tags
+
+
+    writeMask &= infoPtr->dataMask;
+
+    infoPtr->write ( name, ( const char* ) momfbdStruct->value.arr->data, writeMask, verbosity );
+
 }
 
 
 void img_clip ( Array<float>& img ) {
 
-    int imgSizeY = img.dimSize(0);
-    int imgSizeX = img.dimSize(1);
+    int imgSizeY = img.dimSize ( 0 );
+    int imgSizeX = img.dimSize ( 1 );
 
-    vector<double> colSums(imgSizeX,0);
-    vector<double> rowSums(imgSizeY,0);
-    
-    size_t firstX(0), lastX(imgSizeX-1), firstY(0), lastY(imgSizeY-1);
+    vector<double> colSums ( imgSizeX,0 );
+    vector<double> rowSums ( imgSizeY,0 );
 
-    for( int x=0; x < imgSizeX; ++x ) {
-        for( int y=0; y < imgSizeY; ++y ) {
-            colSums[x] += img(y,x);
-            rowSums[y] += img(y,x);
+    size_t firstX ( 0 ), lastX ( imgSizeX-1 ), firstY ( 0 ), lastY ( imgSizeY-1 );
+
+    for ( int x=0; x < imgSizeX; ++x ) {
+        for ( int y=0; y < imgSizeY; ++y ) {
+            colSums[x] += img ( y,x );
+            rowSums[y] += img ( y,x );
         }
     }
-    
-    while(firstX < lastX && !colSums[firstX]) ++firstX;
-    while(lastX && !colSums[lastX]) --lastX;
-    while(firstY < lastY && !rowSums[firstY]) ++firstY;
-    while(lastY && !rowSums[lastY]) --lastY;
-    
-    if(firstX < lastX && firstY < lastY) {
-        img.setLimits(firstY,lastY,firstX,lastX);
-        Array<float> tmp(img,firstY,lastY,firstX,lastX);
+
+    while ( firstX < lastX && !colSums[firstX] ) ++firstX;
+    while ( lastX && !colSums[lastX] ) --lastX;
+    while ( firstY < lastY && !rowSums[firstY] ) ++firstY;
+    while ( lastY && !rowSums[lastY] ) --lastY;
+
+    if ( firstX < lastX && firstY < lastY ) {
+        img.setLimits ( firstY,lastY,firstX,lastX );
+        Array<float> tmp ( img,firstY,lastY,firstX,lastX );
         img = tmp;
     }
 
@@ -1100,24 +1105,24 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
 
     KW_RESULT kw;
     kw.margin = std::max ( patchSizeX, patchSizeY ) / 8; // number of pixels to cut from the edges of each path,
-                                                         // default is 12.5% (to conform with the old version)
+    // default is 12.5% (to conform with the old version)
     kw.verbose = 0;
     ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 1, &kw );
     int do_clip = kw.clip;
     int margin = kw.margin;
     int transpose = kw.transpose;
-    int verbosity = std::min ( std::max ( (int)kw.verbose, 0 ), 8 );
+    int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
     IDL_KW_FREE;
 
     if ( verbosity > 0 ) {
         cout << "Mozaic:  nPatches = (" << nPatchesX << "," << nPatchesY << ")" << endl;
         cout << "        patchSize = (" << patchSizeX << "," << patchSizeY << ")" << endl;
-        cout << "             clip = " << (do_clip?"YES":"NO") << endl;
+        cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         cout << "           margin = " << margin << endl;
-        cout << "        transpose = " << (transpose?"YES":"NO") << endl;
+        cout << "        transpose = " << ( transpose?"YES":"NO" ) << endl;
     }
 
-    
+
     if ( margin > patchSizeX >> 1 || margin > patchSizeY >> 1 ) {
         cout << "Margin is too big, nothing will be left." << endl;
         return IDL_Gettmp();
@@ -1127,12 +1132,12 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     int16_t* patchesLastX = ( int16_t* ) ( argv[2]->value.s.arr->data );
     int16_t* patchesFirstY = ( int16_t* ) ( argv[3]->value.s.arr->data );
     int16_t* patchesLastY = ( int16_t* ) ( argv[4]->value.s.arr->data );
-    
+
     if ( verbosity > 1 ) {
-        cout << "      " << printArray(patchesFirstX,nPatchesX,"firstPixelX") << endl;
-        cout << "       " << printArray(patchesLastX,nPatchesX,"lastPixelX") << endl;
-        cout << "      " << printArray(patchesFirstY,nPatchesY,"firstPixelY") << endl;
-        cout << "       " << printArray(patchesLastY,nPatchesY,"lastPixelY") << endl;
+        cout << "      " << printArray ( patchesFirstX,nPatchesX,"firstPixelX" ) << endl;
+        cout << "       " << printArray ( patchesLastX,nPatchesX,"lastPixelX" ) << endl;
+        cout << "      " << printArray ( patchesFirstY,nPatchesY,"firstPixelY" ) << endl;
+        cout << "       " << printArray ( patchesLastY,nPatchesY,"lastPixelY" ) << endl;
     }
 
     Array<struct Overlaps> overlaps ( nPatchesY, nPatchesX ); // How many pixels of overlap between the patches, in order N,E,S,W
@@ -1199,9 +1204,8 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         if ( verbosity > 1 ) {
             cout << "       Transposing image." << endl;
         }
-        redux::util::transpose( pic.ptr(0), pic.dimSize(0), pic.dimSize(1) );
-        pic.permuteDimensions({0,1});
-       // std::swap(dims[0],dims[1]);
+        redux::util::transpose ( pic.ptr ( 0 ), pic.dimSize ( 0 ), pic.dimSize ( 1 ) );
+        pic.permuteDimensions ( {0,1} );
     }
 
     if ( do_clip ) {
@@ -1211,7 +1215,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         img_clip ( pic );
     }
 
-    IDL_MEMINT dims[] = { (int)pic.dimSize(1), (int)pic.dimSize(0) };
+    IDL_MEMINT dims[] = { ( int ) pic.dimSize ( 1 ), ( int ) pic.dimSize ( 0 ) };
     IDL_VPTR v = IDL_ImportArray ( 2, dims, IDL_TYP_FLOAT, ( UCHAR* ) ( pic.cloneData() ), cleanupFloat, 0 );
 
     return v;
@@ -1231,12 +1235,12 @@ extern "C" {
         };
 
         static IDL_SYSFUN_DEF2 procedure_addr[] = {
-            { {( IDL_SYSRTN_GENERIC )redux::momfbd_write}, ( char* )"MOMFBD_WRITE", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { ( IDL_SYSRTN_GENERIC ) redux::momfbd_write}, ( char* ) "MOMFBD_WRITE", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
 
         /* Register our routine. The routines must be specified exactly the same as in testmodule.dlm. */
-        return IDL_SysRtnAdd ( function_addr, TRUE, IDL_CARRAY_ELTS ( function_addr )) &&
-               IDL_SysRtnAdd ( procedure_addr, FALSE, IDL_CARRAY_ELTS ( procedure_addr ));
+        return IDL_SysRtnAdd ( function_addr, TRUE, IDL_CARRAY_ELTS ( function_addr ) ) &&
+               IDL_SysRtnAdd ( procedure_addr, FALSE, IDL_CARRAY_ELTS ( procedure_addr ) );
 
     }
 
