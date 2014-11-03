@@ -142,7 +142,7 @@ namespace {
         { ( char* ) "DIV",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( div ) },
         { ( char* ) "HELP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( help ) },
         { ( char* ) "IMG",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( img ) },
-        { ( char* ) "MARGIN",        IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
+        { ( char* ) "MARGIN",        IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
         { ( char* ) "MODES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( modes ) },
         { ( char* ) "NAMES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( names ) },
         { ( char* ) "OBJ",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( obj ) },
@@ -213,9 +213,12 @@ namespace {
     void momfbd_help ( void ) {
 
         cout << "MOMFBD DLM usage:\n";
-        cout << "    Syntax example:    a = momfbd_read('/path/to/file/data.momfbd',/img,/psf verbose=2)\n";
-        cout << "    Syntax example:        momfbd_write,a,'/path/to/file/data_new.momfbd',/all\n";
-        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip /transpose)\n";
+        cout << "    Syntax example:    a = momfbd_read('/path/to/file/data.momfbd',/img,/psf, verbose=2)\n";
+        cout << "                           Read only img/psf data into struct (geometry in always loaded), printout progress and struct_info.\n";
+        cout << "    Syntax example:        momfbd_write,a,'/path/to/file/data_new.momfbd',/img,/names,\n";
+        cout << "                           Write only img data, and file-names used by momfbd,  (geometry in always written)\n";
+        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip /transpose, margin=20)\n";
+        cout << "                           Form mozaic from patches, using a margin of 20 pixels, transpose and clip afterwards.\n\n";
         cout << "    Accepted Keywords:\n";
         cout << "        /HELP                    Print this info.\n";
         cout << "        /CHECK                   Just parse the file and show the structure, don't load data.\n";
@@ -228,6 +231,8 @@ namespace {
         cout << "        /MODES                   Load Modes. (if present in file)\n";
         cout << "        /NAMES                   Load Filenames used in reconstruction. (if present in file)\n";
         cout << "        /ALL                     Load all data from file.\n";
+        cout << "        /CLIP                    Remove dark rows/columns along edges after mozaic.\n";
+        cout << "        MARGIN=m                 Ignore outermost m pixels in each patch (default = patchSize/8)\n";
         cout << "        /TRANSPOSE               Do transpose after mozaic.\n";
         cout << "        VERBOSE={0,1,2}          Verbosity, default is 0 (no output)." << endl;
 
