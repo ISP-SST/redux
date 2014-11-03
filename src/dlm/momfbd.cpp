@@ -1239,6 +1239,7 @@ extern "C" {
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { ( IDL_VPTR ( * ) () ) redux::momfbd_read}, ( char* ) "MOMFBD_READ", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { ( IDL_VPTR ( * ) () ) redux::momfbd_mozaic}, ( char* ) "MOMFBD_MOZAIC", 0, 5, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { ( IDL_VPTR ( * ) () ) redux::momfbd_mozaic}, ( char* ) "MOZAIC", 0, 5, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
 
         static IDL_SYSFUN_DEF2 procedure_addr[] = {

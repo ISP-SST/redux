@@ -5,4 +5,5 @@ SOURCE Redux Pipeline - ${LIBREDUX_COMMIT_INFO}
 BUILD_DATE ${LIBREDUX_COMMIT_TIME}
 FUNCTION        MOMFBD_READ     0       1          KEYWORDS
 FUNCTION        MOMFBD_MOZAIC   0       5          KEYWORDS
+FUNCTION        MOZAIC          0       5          KEYWORDS
 PROCEDURE       MOMFBD_WRITE    0       3          KEYWORDS
