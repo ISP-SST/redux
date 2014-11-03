@@ -127,6 +127,7 @@ namespace {
         IDL_INT margin;
         IDL_INT modes;
         IDL_INT names;
+        IDL_INT notranspose;
         IDL_INT obj;
         IDL_INT psf;
         IDL_INT res;
@@ -145,6 +146,7 @@ namespace {
         { ( char* ) "MARGIN",        IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
         { ( char* ) "MODES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( modes ) },
         { ( char* ) "NAMES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( names ) },
+        { ( char* ) "NOTRANSPOSE",   IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( notranspose ) },
         { ( char* ) "OBJ",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( obj ) },
         { ( char* ) "PSF",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( psf ) },
         { ( char* ) "RES",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( res ) },
@@ -217,23 +219,23 @@ namespace {
         cout << "                           Read only img/psf data into struct (geometry in always loaded), printout progress and struct_info.\n";
         cout << "    Syntax example:        momfbd_write,a,'/path/to/file/data_new.momfbd',/img,/names,\n";
         cout << "                           Write only img data, and file-names used by momfbd,  (geometry in always written)\n";
-        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip /transpose, margin=20)\n";
-        cout << "                           Form mozaic from patches, using a margin of 20 pixels, transpose and clip afterwards.\n\n";
+        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip, /notranspose, margin=20)\n";
+        cout << "                           Form mozaic from patches, using a margin of 20 pixels, don't transpose, clip afterwards.\n\n";
         cout << "    Accepted Keywords:\n";
         cout << "        /HELP                    Print this info.\n";
         cout << "        /CHECK                   Just parse the file and show the structure, don't load data.\n";
-        cout << "        /IMG                     Load Image data. (set by default)\n";
-        cout << "        /PSF                     Load PSF. (if present in file)\n";
-        cout << "        /OBJ                     Load convolved object data. (if present in file)\n";
-        cout << "        /RES                     Load residuals. (if present in file)\n";
-        cout << "        /ALPHA                   Load Alpha. (if present in file)\n";
-        cout << "        /DIV                     Load Phase diversity data. (if present in file)\n";
-        cout << "        /MODES                   Load Modes. (if present in file)\n";
-        cout << "        /NAMES                   Load Filenames used in reconstruction. (if present in file)\n";
-        cout << "        /ALL                     Load all data from file.\n";
+        cout << "        /IMG                     Read/write Image data. (if present in file/struct)\n";
+        cout << "        /PSF                     Read/write PSF. (if present in file/struct)\n";
+        cout << "        /OBJ                     Read/write convolved object data. (if present in file/struct)\n";
+        cout << "        /RES                     Read/write residuals. (if present in file/struct)\n";
+        cout << "        /ALPHA                   Read/write Alpha. (if present in file/struct)\n";
+        cout << "        /DIV                     Read/write Phase diversity data. (if present in file/struct)\n";
+        cout << "        /MODES                   Read/write Modes. (if present in file/struct)\n";
+        cout << "        /NAMES                   Read/write Filenames used in reconstruction. (if present in file/struct)\n";
+        cout << "        /ALL                     Read/write all data from file.\n";
         cout << "        /CLIP                    Remove dark rows/columns along edges after mozaic.\n";
-        cout << "        MARGIN=m                 Ignore outermost m pixels in each patch (default = patchSize/8)\n";
-        cout << "        /TRANSPOSE               Do transpose after mozaic.\n";
+        cout << "        MARGIN=m                 Ignore outermost m pixels in each patch (default = PatchSize/8)\n";
+        cout << "        /NOTRANSPOSE             Do not transpose after mozaic. (transposing is default for backwards compatibility with old momfbd DLM)\n";
         cout << "        VERBOSE={0,1,2}          Verbosity, default is 0 (no output)." << endl;
 
     }
@@ -1115,7 +1117,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 1, &kw );
     int do_clip = kw.clip;
     int margin = kw.margin;
-    int transpose = kw.transpose;
+    int notranspose = kw.notranspose;
     int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
     IDL_KW_FREE;
 
@@ -1124,7 +1126,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         cout << "        patchSize = (" << patchSizeX << "," << patchSizeY << ")" << endl;
         cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         cout << "           margin = " << margin << endl;
-        cout << "        transpose = " << ( transpose?"YES":"NO" ) << endl;
+        cout << "        transpose = " << ( notranspose?"NO":"YES" ) << endl;
     }
 
 
@@ -1205,7 +1207,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         }
     }
 
-    if ( transpose ) {
+    if ( !notranspose ) {
         if ( verbosity > 1 ) {
             cout << "       Transposing image." << endl;
         }
