@@ -26,8 +26,8 @@ namespace redux {
             void setIndex(uint32_t yid, uint32_t xid);
             size_t nPixels(void);
             size_t size( void ) const;
-            char* pack( char* ) const;
-            const char* unpack( const char*, bool );
+            uint64_t pack( char* ) const;
+            uint64_t unpack( const char*, bool );
         };
 
         /*! @} */

@@ -262,15 +262,15 @@ void Daemon::addJobs( Peer::Ptr& peer ) {
         return;
     }
 
-    const char* cptr = buf.get();
-    char* end = buf.get() + blockSize;
+    const char* ptr = buf.get();
+    uint64_t count(0);
     vector<size_t> ids( 1, 0 );
     try {
-        while( cptr < end ) {
-            string tmpS = string( cptr );
+        while( count < blockSize ) {
+            string tmpS = string( ptr+count );
             Job::JobPtr job = Job::newJob( tmpS );
             if( job ) {
-                cptr = job->unpack( cptr, swap_endian );
+                count += job->unpack( ptr+count, swap_endian );
                 unique_lock<mutex> lock( jobMutex );
                 job->info.id = ++jobCounter;
                 job->info.step.store( Job::JSTEP_RECEIVED );
@@ -287,14 +287,14 @@ void Daemon::addJobs( Peer::Ptr& peer ) {
         LOG_ERR << "addJobs: Exception caught while parsing block: " << e.what();
     }
 
-    if( cptr == end ) {
+    if( count == blockSize ) {
         LOG << "Received " << ids[0] << " jobs.";
         *peer->conn << CMD_OK;           // all ok, return IDs
         if( swap_endian ) swapEndian( ids.data(), ids.size() );
         peer->conn->writeAndCheck( ids );
     }
     else {
-        LOG_ERR << "addJobs: Parsing of datablock failed, there was a missmatch of " << ( cptr - end ) << " bytes.";
+        LOG_ERR << "addJobs: Parsing of datablock failed, count = " << count << "   blockSize = " << blockSize << "  bytes.";
         *peer->conn << CMD_ERR;
     }
 
@@ -444,13 +444,13 @@ void Daemon::sendWork( Peer::Ptr& peer ) {
     }
 
     auto buf = sharedArray<char>( blockSize + sizeof( size_t ) );
-    char* ptr = buf.get() + sizeof( size_t );
-
+    char* ptr = buf.get();
+    uint64_t count = sizeof( size_t );
     if( blockSize > 0 ) {
-        ptr = wip.pack( ptr, includeJob );
+        count += wip.pack( ptr+count, includeJob );
         if( wip.job ) wip.job->info.step.store( Job::JSTEP_RUNNING );
     }
-    blockSize = std::min(blockSize,ptr-buf.get()-sizeof(size_t));       // if something is compressed, we don't send the whole allocated block.
+    blockSize = std::min(blockSize,count);       // if something is compressed, we don't send the whole allocated block.
     pack( buf.get(), blockSize );
 
     peer->conn->writeAndCheck( buf, blockSize + sizeof( size_t ) );
@@ -489,12 +489,13 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
-    char* ptr = pack( buf.get(), blockSize );
+    char* ptr = buf.get();
+    uint64_t count = pack( ptr, blockSize );
     for( auto & it : jobs ) {
-        ptr = it->pack( ptr );
+        count += it->pack( ptr+count );
     }
-    if( buf.get() + totalSize != ptr ) {
-        LOG_ERR << "Packing of job infos failed:  there is a mismatch of " << ( ptr - buf.get() - totalSize ) << " bytes.";
+    if( count != totalSize ) {
+        LOG_ERR << "sendJobList(): Packing of job infos failed:  count = " << count << "   totalSize = " << totalSize << "  bytes.";
         return;
     }
 
@@ -530,12 +531,13 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
-    char* ptr = pack( buf.get(), blockSize );
+    char* ptr = buf.get();
+    uint64_t count = pack( ptr, blockSize );
     for( auto & it : jobs ) {
-        ptr = it->info.pack( ptr );
+        count += it->info.pack( ptr+count );
     }
-    if( buf.get() + totalSize != ptr ) {
-        LOG_ERR << "Packing of job infos failed:  there is a mismatch of " << ( ptr - buf.get() - totalSize ) << " bytes.";
+    if( count != totalSize ) {
+        LOG_ERR << "sendJobStats(): Packing of job infos failed:  count = " << count << "  totalSize = " << totalSize << " bytes.";
         return;
     }
 
@@ -552,13 +554,14 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
-    char* ptr = pack( buf.get(), blockSize );
-    ptr = myInfo->pack( ptr );
+    char* ptr =  buf.get();
+    uint64_t count = pack(ptr, blockSize );
+    count += myInfo->pack( ptr+count );
     for( auto & it : peers ) {
-        ptr = it.second->pack( ptr );
+        count += it.second->pack( ptr+count );
     }
-    if( buf.get() + totalSize != ptr ) {
-        LOG_ERR << "Packing of peers infos failed:  there is a mismatch of " << ( ptr - buf.get() - totalSize ) << " bytes.";
+    if( count != totalSize ) {
+        LOG_ERR << "Packing of peers infos failed:  count = " << count << "   totalSize = " << totalSize << "  bytes.";
         return;
     }
 

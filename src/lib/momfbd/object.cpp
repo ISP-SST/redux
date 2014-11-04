@@ -265,69 +265,69 @@ size_t Object::size(void) const {
 }
 
 
-char* Object::pack(char* ptr) const {
+uint64_t Object::pack(char* ptr) const {
     using redux::util::pack;
 
-    ptr = pack(ptr, fillpix_method);
-    ptr = pack(ptr, output_data_type);
-    ptr = pack(ptr, nPoints);
-    ptr = pack(ptr, sequenceNumber);
-    ptr = pack(ptr, nph);
-    ptr = pack(ptr, flags);
-    ptr = pack(ptr, reg_gamma);
-    ptr = pack(ptr, weight);
-    ptr = pack(ptr, angle);
-    ptr = pack(ptr, lambda);
-    ptr = pack(ptr, lim_freq);
-    ptr = pack(ptr, r_c);
-    ptr = pack(ptr, imageNumbers);
-    ptr = pack(ptr, sequenceNumbers);
-    ptr = pack(ptr, darkNumbers);
-    ptr = pack(ptr, wf_num);
-    ptr = pack(ptr, stokesWeights);
-    ptr = pack(ptr, imageDataDir);
-    ptr = pack(ptr, outputFileName);
-    ptr = pack(ptr, channels.size());
+    uint64_t count = pack(ptr, fillpix_method);
+    count += pack(ptr+count, output_data_type);
+    count += pack(ptr+count, nPoints);
+    count += pack(ptr+count, sequenceNumber);
+    count += pack(ptr+count, nph);
+    count += pack(ptr+count, flags);
+    count += pack(ptr+count, reg_gamma);
+    count += pack(ptr+count, weight);
+    count += pack(ptr+count, angle);
+    count += pack(ptr+count, lambda);
+    count += pack(ptr+count, lim_freq);
+    count += pack(ptr+count, r_c);
+    count += pack(ptr+count, imageNumbers);
+    count += pack(ptr+count, sequenceNumbers);
+    count += pack(ptr+count, darkNumbers);
+    count += pack(ptr+count, wf_num);
+    count += pack(ptr+count, stokesWeights);
+    count += pack(ptr+count, imageDataDir);
+    count += pack(ptr+count, outputFileName);
+    count += pack(ptr+count, channels.size());
     for(auto& it: channels) {
-        ptr = it->pack(ptr);
+        count += it->pack(ptr+count);
     }
-    ptr = pupil.pack(ptr);
-    return ptr;
+    count += pupil.pack(ptr+count);
+    return count;
 }
 
 
-const char* Object::unpack(const char* ptr, bool swap_endian) {
+uint64_t Object::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
 
-    ptr = unpack(ptr, fillpix_method);
-    ptr = unpack(ptr, output_data_type);
-    ptr = unpack(ptr, nPoints, swap_endian);
-    ptr = unpack(ptr, sequenceNumber, swap_endian);
-    ptr = unpack(ptr, nph, swap_endian);
-    ptr = unpack(ptr, flags, swap_endian);
-    ptr = unpack(ptr, reg_gamma, swap_endian);
-    ptr = unpack(ptr, weight, swap_endian);
-    ptr = unpack(ptr, angle, swap_endian);
-    ptr = unpack(ptr, lambda, swap_endian);
-    ptr = unpack(ptr, lim_freq, swap_endian);
-    ptr = unpack(ptr, r_c, swap_endian);
-    ptr = unpack(ptr, imageNumbers, swap_endian);
-    ptr = unpack(ptr, sequenceNumbers, swap_endian);
-    ptr = unpack(ptr, darkNumbers, swap_endian);
-    ptr = unpack(ptr, wf_num, swap_endian);
-    ptr = unpack(ptr, stokesWeights, swap_endian);
-    ptr = unpack(ptr, imageDataDir);
-    ptr = unpack(ptr, outputFileName);
+    uint64_t count = unpack(ptr, fillpix_method);
+    count += unpack(ptr+count, output_data_type);
+    count += unpack(ptr+count, nPoints, swap_endian);
+    count += unpack(ptr+count, sequenceNumber, swap_endian);
+    count += unpack(ptr+count, nph, swap_endian);
+    count += unpack(ptr+count, flags, swap_endian);
+    count += unpack(ptr+count, reg_gamma, swap_endian);
+    count += unpack(ptr+count, weight, swap_endian);
+    count += unpack(ptr+count, angle, swap_endian);
+    count += unpack(ptr+count, lambda, swap_endian);
+    count += unpack(ptr+count, lim_freq, swap_endian);
+    count += unpack(ptr+count, r_c, swap_endian);
+    count += unpack(ptr+count, imageNumbers, swap_endian);
+    count += unpack(ptr+count, sequenceNumbers, swap_endian);
+    count += unpack(ptr+count, darkNumbers, swap_endian);
+    count += unpack(ptr+count, wf_num, swap_endian);
+    count += unpack(ptr+count, stokesWeights, swap_endian);
+    count += unpack(ptr+count, imageDataDir);
+    count += unpack(ptr+count, outputFileName);
     size_t tmp;
-    ptr = unpack(ptr, tmp, swap_endian);
+    count += unpack(ptr+count, tmp, swap_endian);
     channels.resize(tmp);
     for(auto& it: channels) {
         it.reset(new Channel(*this,myJob));
-        ptr = it->unpack(ptr, swap_endian);
+        count += it->unpack(ptr+count, swap_endian);
     }
-    ptr = pupil.unpack(ptr, swap_endian);
+    count += pupil.unpack(ptr+count, swap_endian);
     
-   return ptr;
+   return count;
 }
 
 
@@ -401,12 +401,13 @@ size_t Object::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-char* Object::packPatch( Patch::Ptr patch, char* ptr ) const {
+uint64_t Object::packPatch( Patch::Ptr patch, char* ptr ) const {
     
+    uint64_t count(0);
     for( auto & it : channels ) {
-        ptr = it->packPatch(patch,ptr);
+        count += it->packPatch(patch,ptr);
     }
-    return ptr;
+    return count;
 }
  
 

@@ -83,6 +83,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     uint8_t cmd = CMD_CONNECT;
     boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
+
     if( cmd == CMD_AUTH ) {
         // implement
     }
@@ -107,7 +108,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
  */   
     
     
-    
+   
     // all ok, upload jobs.
     size_t sz = 0;
     for( auto &it: jobs ) {
@@ -116,14 +117,15 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     
     auto buf = sharedArray<char>( sz+sizeof(size_t)+1 );
     char* ptr = buf.get();
-    ptr = pack(ptr,CMD_ADD_JOB);
-    ptr = pack(ptr,sz);
+    uint64_t packedBytes = pack(ptr,CMD_ADD_JOB);
+    packedBytes += pack(ptr+packedBytes,sz);
+         LOG << "uploadJobs(5)  packedBytes = " << packedBytes;
     sz += sizeof(size_t)+1;
     for( auto &it: jobs ) {
-        ptr = it->pack(ptr);
+        packedBytes += it->pack(ptr+packedBytes);
     }
-    if( buf.get() + sz != ptr ) {
-        LOG_ERR << "Packing of jobs failed:  there is a mismatch of " << (ptr-buf.get()-sz) << " bytes.";
+    if( packedBytes != sz ) {
+        LOG_ERR << "Packing of jobs failed:  sz = " << sz << "  packedBytes = " << packedBytes;
         return;
     }
 
@@ -133,7 +135,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
    // *conn >> cmd;
     if( cmd != CMD_OK ) {
-        LOG_ERR << "Failure while sending jobs  (server reply = " << cmd << ")";
+        LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")";
         return;
     }
     ptr = buf.get();

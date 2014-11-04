@@ -27,13 +27,15 @@ namespace redux {
         template<class T> struct PointType {
             PointType ( T yy=0, T xx=0 ) : x ( xx ), y ( yy ) {}
             static size_t size(void) { return 2*sizeof(T); };
-            char* pack(char* ptr) const {
-                ptr = redux::util::pack(ptr,x);
-                return redux::util::pack(ptr,y);
+            uint64_t pack(char* ptr) const {
+                uint64_t count = redux::util::pack(ptr,x);
+                count += redux::util::pack(ptr+count,y);
+                return count;
             }
-            const char* unpack(const char* ptr, bool swap_endian=false) {
-                ptr = redux::util::unpack(ptr,x,swap_endian);
-                return redux::util::unpack(ptr,y,swap_endian);
+            uint64_t unpack(const char* ptr, bool swap_endian=false) {
+                uint64_t count = redux::util::unpack(ptr,x,swap_endian);
+                count += redux::util::unpack(ptr+count,y,swap_endian);
+                return count;
             }
             template <typename U> bool operator==(const PointType<U>& rhs) { return (x == rhs.x && y == rhs.y); }
             template <typename U> bool operator!=(const PointType<U>& rhs) { return !(*this == rhs); }
@@ -50,13 +52,15 @@ namespace redux {
         template<class T> struct RegionType {
             RegionType ( T y1=0, T x1=0, T y2=0, T x2=0 ) : first(x1,y1), last(x2,y2) {}
             static size_t size(void) { return 4*sizeof(T); };
-            char* pack(char* ptr) const {
-                ptr = first.pack(ptr);
-                return ptr = last.pack(ptr);
+            uint64_t pack(char* ptr) const {
+                uint64_t count = first.pack(ptr);
+                count += last.pack(ptr+count);
+                return count;
             }
-            const char* unpack(const char* ptr, bool swap_endian=false) {
-                ptr = first.unpack(ptr,swap_endian);
-                return ptr = last.unpack(ptr,swap_endian);
+            uint64_t unpack(const char* ptr, bool swap_endian=false) {
+                uint64_t count = first.unpack(ptr,swap_endian);
+                count += last.unpack(ptr+count,swap_endian);
+                return count;
             }
             PointType<T> first,last;
         };

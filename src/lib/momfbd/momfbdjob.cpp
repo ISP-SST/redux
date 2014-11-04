@@ -107,17 +107,17 @@ MomfbdJob::~MomfbdJob( void ) {
     //LOG_DEBUG << "MomfbdJob::~MomfbdJob()";
 }
 
-const char* MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
+uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
 
     using redux::util::unpack;
     size_t nParts;
-    ptr = unpack( ptr, nParts, swap_endian );
+    uint64_t count = unpack( ptr, nParts, swap_endian );
     parts.resize( nParts );
     for( auto & it : parts ) {
         it.reset( new Patch );
-        ptr = it->unpack( ptr, swap_endian );
+        count += it->unpack( ptr+count, swap_endian );
     }
-    return ptr;
+    return count;
 }
 
 void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
@@ -396,117 +396,125 @@ size_t MomfbdJob::size( void ) const {
     return sz;
 }
 
-char* MomfbdJob::pack( char* ptr ) const {
+uint64_t MomfbdJob::pack( char* ptr ) const {
+    
     using redux::util::pack;
-    ptr = Job::pack( ptr );
-    ptr = pack( ptr, basis );
-    ptr = pack( ptr, fillpix_method );
-    ptr = pack( ptr, output_data_type );
-    ptr = pack( ptr, flags );
-    ptr = pack( ptr, patchSize );
-    ptr = pack( ptr, sequenceNumber );
-    ptr = pack( ptr, klMinMode );
-    ptr = pack( ptr, klMaxMode );
-    ptr = pack( ptr, borderClip );
-    ptr = pack( ptr, minIterations );
-    ptr = pack( ptr, maxIterations );
-    ptr = pack( ptr, nDoneMask );
-    ptr = pack( ptr, gradient_method );
-    ptr = pack( ptr, getstep_method );
-    ptr = pack( ptr, max_local_shift );
-    ptr = pack( ptr, mstart );
-    ptr = pack( ptr, mstep );
-    ptr = pack( ptr, pupilSize );
-    ptr = pack( ptr, nPatchesX );
-    ptr = pack( ptr, nPatchesY );
-    ptr = pack( ptr, ncal );
-    ptr = pack( ptr, telescopeFocalLength );
-    ptr = pack( ptr, telescopeDiameter );
-    ptr = pack( ptr, arcSecsPerPixel );
-    ptr = pack( ptr, pixelSize );
-    ptr = pack( ptr, reg_gamma );
-    ptr = pack( ptr, FTOL );
-    ptr = pack( ptr, EPS );
-    ptr = pack( ptr, svd_reg );
-    ptr = pack( ptr, modes );
-    ptr = pack( ptr, imageNumbers );
-    ptr = pack( ptr, darkNumbers );
-    ptr = pack( ptr, subImagePosX );
-    ptr = pack( ptr, subImagePosY );
-    ptr = pack( ptr, stokesWeights );
-    ptr = pack( ptr, imageDataDir );
-    ptr = pack( ptr, programDataDir );
-    ptr = pack( ptr, time_obs );
-    ptr = pack( ptr, date_obs );
-    ptr = pack( ptr, outputFiles.size() );
+    
+    uint64_t count = Job::pack( ptr );
+    count += pack( ptr+count, basis );
+    count += pack( ptr+count, fillpix_method );
+    count += pack( ptr+count, output_data_type );
+    count += pack( ptr+count, flags );
+    count += pack( ptr+count, patchSize );
+    count += pack( ptr+count, sequenceNumber );
+    count += pack( ptr+count, klMinMode );
+    count += pack( ptr+count, klMaxMode );
+    count += pack( ptr+count, borderClip );
+    count += pack( ptr+count, minIterations );
+    count += pack( ptr+count, maxIterations );
+    count += pack( ptr+count, nDoneMask );
+    count += pack( ptr+count, gradient_method );
+    count += pack( ptr+count, getstep_method );
+    count += pack( ptr+count, max_local_shift );
+    count += pack( ptr+count, mstart );
+    count += pack( ptr+count, mstep );
+    count += pack( ptr+count, pupilSize );
+    count += pack( ptr+count, nPatchesX );
+    count += pack( ptr+count, nPatchesY );
+    count += pack( ptr+count, ncal );
+    count += pack( ptr+count, telescopeFocalLength );
+    count += pack( ptr+count, telescopeDiameter );
+    count += pack( ptr+count, arcSecsPerPixel );
+    count += pack( ptr+count, pixelSize );
+    count += pack( ptr+count, reg_gamma );
+    count += pack( ptr+count, FTOL );
+    count += pack( ptr+count, EPS );
+    count += pack( ptr+count, svd_reg );
+    count += pack( ptr+count, modes );
+    count += pack( ptr+count, imageNumbers );
+    count += pack( ptr+count, darkNumbers );
+    count += pack( ptr+count, subImagePosX );
+    count += pack( ptr+count, subImagePosY );
+    count += pack( ptr+count, stokesWeights );
+    count += pack( ptr+count, imageDataDir );
+    count += pack( ptr+count, programDataDir );
+    count += pack( ptr+count, time_obs );
+    count += pack( ptr+count, date_obs );
+    count += pack( ptr+count, outputFiles.size() );
     for( auto & it : outputFiles ) {
-        ptr = pack( ptr, it );
+        count += pack( ptr+count, it );
     }
-    ptr = pack( ptr, objects.size() );
+    count += pack( ptr+count, objects.size() );
     for( auto & it : objects ) {
-        ptr = it->pack( ptr );
+        count += it->pack( ptr+count );
     }
-    ptr = pupil.pack( ptr );
-    return ptr;
+    count += pupil.pack( ptr+count);
+    
+    return count;
+    
 }
 
-const char* MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
+uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
+    
     using redux::util::unpack;
-    ptr = Job::unpack( ptr, swap_endian );
-    ptr = unpack( ptr, basis );
-    ptr = unpack( ptr, fillpix_method );
-    ptr = unpack( ptr, output_data_type );
-    ptr = unpack( ptr, flags, swap_endian );
-    ptr = unpack( ptr, patchSize, swap_endian );
-    ptr = unpack( ptr, sequenceNumber, swap_endian );
-    ptr = unpack( ptr, klMinMode, swap_endian );
-    ptr = unpack( ptr, klMaxMode, swap_endian );
-    ptr = unpack( ptr, borderClip, swap_endian );
-    ptr = unpack( ptr, minIterations, swap_endian );
-    ptr = unpack( ptr, maxIterations, swap_endian );
-    ptr = unpack( ptr, nDoneMask, swap_endian );
-    ptr = unpack( ptr, gradient_method, swap_endian );
-    ptr = unpack( ptr, getstep_method, swap_endian );
-    ptr = unpack( ptr, max_local_shift, swap_endian );
-    ptr = unpack( ptr, mstart, swap_endian );
-    ptr = unpack( ptr, mstep, swap_endian );
-    ptr = unpack( ptr, pupilSize, swap_endian );
-    ptr = unpack( ptr, nPatchesX, swap_endian );
-    ptr = unpack( ptr, nPatchesY, swap_endian );
-    ptr = unpack( ptr, ncal, swap_endian );
-    ptr = unpack( ptr, telescopeFocalLength, swap_endian );
-    ptr = unpack( ptr, telescopeDiameter, swap_endian );
-    ptr = unpack( ptr, arcSecsPerPixel, swap_endian );
-    ptr = unpack( ptr, pixelSize, swap_endian );
-    ptr = unpack( ptr, reg_gamma, swap_endian );
-    ptr = unpack( ptr, FTOL, swap_endian );
-    ptr = unpack( ptr, EPS, swap_endian );
-    ptr = unpack( ptr, svd_reg, swap_endian );
-    ptr = unpack( ptr, modes, swap_endian );
-    ptr = unpack( ptr, imageNumbers, swap_endian );
-    ptr = unpack( ptr, darkNumbers, swap_endian );
-    ptr = unpack( ptr, subImagePosX, swap_endian );
-    ptr = unpack( ptr, subImagePosY, swap_endian );
-    ptr = unpack( ptr, stokesWeights, swap_endian );
-    ptr = unpack( ptr, imageDataDir );
-    ptr = unpack( ptr, programDataDir );
-    ptr = unpack( ptr, time_obs );
-    ptr = unpack( ptr, date_obs );
+    
+    uint64_t count = Job::unpack( ptr, swap_endian );
+    count += unpack( ptr+count, basis );
+    count += unpack( ptr+count, fillpix_method );
+    count += unpack( ptr+count, output_data_type );
+    count += unpack( ptr+count, flags, swap_endian );
+    count += unpack( ptr+count, patchSize, swap_endian );
+    count += unpack( ptr+count, sequenceNumber, swap_endian );
+    count += unpack( ptr+count, klMinMode, swap_endian );
+    count += unpack( ptr+count, klMaxMode, swap_endian );
+    count += unpack( ptr+count, borderClip, swap_endian );
+    count += unpack( ptr+count, minIterations, swap_endian );
+    count += unpack( ptr+count, maxIterations, swap_endian );
+    count += unpack( ptr+count, nDoneMask, swap_endian );
+    count += unpack( ptr+count, gradient_method, swap_endian );
+    count += unpack( ptr+count, getstep_method, swap_endian );
+    count += unpack( ptr+count, max_local_shift, swap_endian );
+    count += unpack( ptr+count, mstart, swap_endian );
+    count += unpack( ptr+count, mstep, swap_endian );
+    count += unpack( ptr+count, pupilSize, swap_endian );
+    count += unpack( ptr+count, nPatchesX, swap_endian );
+    count += unpack( ptr+count, nPatchesY, swap_endian );
+    count += unpack( ptr+count, ncal, swap_endian );
+    count += unpack( ptr+count, telescopeFocalLength, swap_endian );
+    count += unpack( ptr+count, telescopeDiameter, swap_endian );
+    count += unpack( ptr+count, arcSecsPerPixel, swap_endian );
+    count += unpack( ptr+count, pixelSize, swap_endian );
+    count += unpack( ptr+count, reg_gamma, swap_endian );
+    count += unpack( ptr+count, FTOL, swap_endian );
+    count += unpack( ptr+count, EPS, swap_endian );
+    count += unpack( ptr+count, svd_reg, swap_endian );
+    count += unpack( ptr+count, modes, swap_endian );
+    count += unpack( ptr+count, imageNumbers, swap_endian );
+    count += unpack( ptr+count, darkNumbers, swap_endian );
+    count += unpack( ptr+count, subImagePosX, swap_endian );
+    count += unpack( ptr+count, subImagePosY, swap_endian );
+    count += unpack( ptr+count, stokesWeights, swap_endian );
+    count += unpack( ptr+count, imageDataDir );
+    count += unpack( ptr+count, programDataDir );
+    count += unpack( ptr+count, time_obs );
+    count += unpack( ptr+count, date_obs );
     size_t tmp;
-    ptr = unpack( ptr, tmp, swap_endian );
+    count += unpack( ptr+count, tmp, swap_endian );
     outputFiles.resize( tmp );
     for( auto & it : outputFiles ) {
-        ptr = unpack( ptr, it, swap_endian );
+        count += unpack( ptr+count, it, swap_endian );
     }
-    ptr = unpack( ptr, tmp, swap_endian );
+    count += unpack( ptr+count, tmp, swap_endian );
     objects.resize( tmp );
     for( auto & it : objects ) {
         it.reset(new Object(*this));
-        ptr = it->unpack( ptr, swap_endian );
+        count += it->unpack( ptr+count, swap_endian );
     }
-    ptr = pupil.unpack( ptr, swap_endian );
+    count += pupil.unpack( ptr+count, swap_endian );
     LOG_ERR << "MomfbdJob::unpack():  nPatches = " << patches.size() ;
-    return ptr;
+    
+    return count;
+    
 }
 
 
@@ -790,11 +798,12 @@ void MomfbdJob::packPatch( Patch::Ptr patch ) {
     patch->dataSize = totalPatchSize;
     patch->data = sharedArray<char>(totalPatchSize);
     char* ptr = patch->data.get();
+    uint64_t count(0);
     for( auto & it : objects ) {
-        ptr = it->packPatch(patch,ptr);
+        count += it->packPatch(patch,ptr+count);
     }
     
-    if(ptr != patch->data.get()+totalPatchSize) {
+    if(count != totalPatchSize) {
         LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());
     }
     // TODO: compress and store in swapfile

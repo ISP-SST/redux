@@ -129,9 +129,9 @@ int main( int argc, char *argv[] ) {
             size_t totalSize = stringSize + sizeof( size_t ) + 1;
             auto buf = sharedArray<char>( totalSize );
             char* ptr = buf.get();
-            ptr = pack(ptr,CMD_DEL_JOB);
-            ptr = pack(ptr,stringSize);
-            ptr = pack(ptr,jobString);
+            uint64_t count = pack(ptr,CMD_DEL_JOB);
+            count += pack(ptr+count,stringSize);
+            count += pack(ptr+count,jobString);
             boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),totalSize));
         }
     }

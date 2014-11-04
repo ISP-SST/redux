@@ -46,17 +46,17 @@ namespace {
 size_t DebugJob::jobType = Job::registerJob( "DebugJob", createDebugJob );
 
 
-const char* DebugJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
+uint64_t DebugJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
 
     using redux::util::unpack;
     size_t nParts;
-    ptr = unpack( ptr, nParts, swap_endian );
+    uint64_t count = unpack( ptr, nParts, swap_endian );
     parts.resize( nParts );
     for( auto & it : parts ) {
         it.reset( new DebugPart() );
-        ptr = it->unpack( ptr, swap_endian );
+        count += it->unpack( ptr+count, swap_endian );
     }
-    return ptr;
+    return count;
 }
 
 
@@ -117,36 +117,36 @@ size_t DebugJob::size( void ) const {
 }
 
 
-char* DebugJob::pack( char* ptr ) const {
+uint64_t DebugJob::pack( char* ptr ) const {
 
     using redux::util::pack;
 
-    ptr = Job::pack( ptr );
-    ptr = pack( ptr, maxIterations );
-    ptr = pack( ptr, patchSize );
-    ptr = pack( ptr, gamma );
-    ptr = pack( ptr, xSize );
-    ptr = pack( ptr, ySize );
-    ptr = pack( ptr, coordinates, 4 );
+    uint64_t count = Job::pack( ptr );
+    count += pack( ptr+count, maxIterations );
+    count += pack( ptr+count, patchSize );
+    count += pack( ptr+count, gamma );
+    count += pack( ptr+count, xSize );
+    count += pack( ptr+count, ySize );
+    count += pack( ptr+count, coordinates, 4 );
 
-    return ptr;
+    return count;
 
 }
 
 
-const char* DebugJob::unpack( const char* ptr, bool swap_endian ) {
+uint64_t DebugJob::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
 
-    ptr = Job::unpack( ptr, swap_endian );
-    ptr = unpack( ptr, maxIterations, swap_endian );
-    ptr = unpack( ptr, patchSize, swap_endian );
-    ptr = unpack( ptr, gamma, swap_endian );
-    ptr = unpack( ptr, xSize, swap_endian );
-    ptr = unpack( ptr, ySize, swap_endian );
-    ptr = unpack( ptr, coordinates, 4, swap_endian );
+    uint64_t count = Job::unpack( ptr, swap_endian );
+    count += unpack( ptr+count, maxIterations, swap_endian );
+    count += unpack( ptr+count, patchSize, swap_endian );
+    count += unpack( ptr+count, gamma, swap_endian );
+    count += unpack( ptr+count, xSize, swap_endian );
+    count += unpack( ptr+count, ySize, swap_endian );
+    count += unpack( ptr+count, coordinates, 4, swap_endian );
 
-    return ptr;
+    return count;
 
 }
 
@@ -446,42 +446,43 @@ size_t DebugJob::DebugPart::size( void ) const {
 }
 
 
-char* DebugJob::DebugPart::pack( char* ptr ) const {
+uint64_t DebugJob::DebugPart::pack( char* ptr ) const {
 
     using redux::util::pack;
 
-    ptr = Part::pack( ptr );
-    ptr = pack( ptr, xPixelL );
-    ptr = pack( ptr, xPixelH );
-    ptr = pack( ptr, yPixelL );
-    ptr = pack( ptr, yPixelH );
-    ptr = pack( ptr, beginX );
-    ptr = pack( ptr, endX );
-    ptr = pack( ptr, beginY );
-    ptr = pack( ptr, endY );
-    ptr = pack( ptr, sortedID );
-    ptr = result.pack( ptr );
+    uint64_t count = Part::pack( ptr );
+    count += pack( ptr+count, xPixelL );
+    count += pack( ptr+count, xPixelH );
+    count += pack( ptr+count, yPixelL );
+    count += pack( ptr+count, yPixelH );
+    count += pack( ptr+count, beginX );
+    count += pack( ptr+count, endX );
+    count += pack( ptr+count, beginY );
+    count += pack( ptr+count, endY );
+    count += pack( ptr+count, sortedID );
+    count += result.pack( ptr+count );
 
-    return ptr;
+    return count;
+    
 }
 
 
-const char* DebugJob::DebugPart::unpack( const char* ptr, bool swap_endian ) {
+uint64_t DebugJob::DebugPart::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
 
-    ptr = Part::unpack( ptr, swap_endian );
-    ptr = unpack( ptr, xPixelL, swap_endian );
-    ptr = unpack( ptr, xPixelH, swap_endian );
-    ptr = unpack( ptr, yPixelL, swap_endian );
-    ptr = unpack( ptr, yPixelH, swap_endian );
-    ptr = unpack( ptr, beginX, swap_endian );
-    ptr = unpack( ptr, endX, swap_endian );
-    ptr = unpack( ptr, beginY, swap_endian );
-    ptr = unpack( ptr, endY, swap_endian );
-    ptr = unpack( ptr, sortedID, swap_endian );
-    ptr = result.unpack( ptr, swap_endian );
+    uint64_t count = Part::unpack( ptr, swap_endian );
+    count += unpack( ptr+count, xPixelL, swap_endian );
+    count += unpack( ptr+count, xPixelH, swap_endian );
+    count += unpack( ptr+count, yPixelL, swap_endian );
+    count += unpack( ptr+count, yPixelH, swap_endian );
+    count += unpack( ptr+count, beginX, swap_endian );
+    count += unpack( ptr+count, endX, swap_endian );
+    count += unpack( ptr+count, beginY, swap_endian );
+    count += unpack( ptr+count, endY, swap_endian );
+    count += unpack( ptr+count, sortedID, swap_endian );
+    count += result.unpack( ptr+count, swap_endian );
 
-    return ptr;
+    return count;
 
 }

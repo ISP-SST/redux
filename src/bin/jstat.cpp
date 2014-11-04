@@ -64,20 +64,20 @@ void printJobList( Peer& master ) {
 
     if ( !blockSize ) return;
 
-    const char* cptr = buf.get();
-    char* end = buf.get() + blockSize;
+    const char* ptr = buf.get();
+    uint64_t count(0);
     try {
         Job::Info info;
         cout << info.printHeader() << endl;
-        while( cptr < end ) {
-            cptr = info.unpack(cptr,swap_endian);
+        while( count < blockSize ) {
+            count += info.unpack(ptr+count,swap_endian);
             cout << info.print() << endl;
         }
     } catch ( const exception& e) {
         LOG_ERR << "printJobList: Exception caught while parsing block: " << e.what();
     }
-    if( cptr != end ) {
-        LOG_ERR << "printJobList: Parsing of datablock failed, there was a missmatch of " << (cptr-end) << " bytes.";
+    if( count != blockSize ) {
+        LOG_ERR << "printJobList: Parsing of datablock failed,  count = " << count << "   blockSize = " << blockSize << "  bytes.";
     }
 
 }
@@ -93,20 +93,20 @@ void printPeerList( Peer& master ) {
 
     if ( !blockSize ) return;
 
-    const char* cptr = buf.get();
-    char* end = buf.get() + blockSize;
+    const char* ptr = buf.get();
+    uint64_t count(0);
     try {
         Peer peer;
         cout << peer.printHeader() << endl;
-        while( cptr < end ) {
-            cptr = peer.unpack(cptr,swap_endian);
+        while( count < blockSize ) {
+            count += peer.unpack(ptr+count,swap_endian);
             cout << peer.print() << endl;
         }
     } catch ( const exception& e) {
         LOG_ERR << "printPeerList: Exception caught while parsing block: " << e.what();
     }
-    if( cptr != end ) {
-        LOG_ERR << "printPeerList: Parsing of datablock failed, there was a missmatch of " << (cptr-end) << " bytes.";
+    if( count != blockSize ) {
+        LOG_ERR << "printPeerList: Parsing of datablock failed, count = " << count << "  blockSize = " << blockSize << "  bytes.";
     }
 }
 

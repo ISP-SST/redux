@@ -164,15 +164,15 @@ bool MasterTab::getJobs( void ) {
    
     if( !blockSize ) return true;
 
-    const char* cptr = buf.get();
-    char* end = buf.get() + blockSize;
+    const char* ptr = buf.get();
+    uint64_t count(0);
     bool modified = false;
     try {
-        while( cptr < end ) {
-            string tmpS = string( cptr );
+        while( count < blockSize ) {
+            string tmpS = string( ptr );
             Job::JobPtr job = Job::newJob( tmpS );
             if( job ) {
-                cptr = job->unpack( cptr, swap_endian );
+                count += job->unpack( ptr+count, swap_endian );
                 auto ret = jobs.insert( job );
                 if( !ret.second ) {
                     //jobs.erase(ret.first);
@@ -190,8 +190,8 @@ bool MasterTab::getJobs( void ) {
     catch( const exception& e ) {
         cout << "addJobs: Exception caught while parsing block: " << e.what() << endl;
     }
-    if( cptr != end ) {
-        cout << "addJobs: Parsing of datablock failed, there was a missmatch of " << ( cptr - end ) << " bytes." << endl;
+    if( count != blockSize ) {
+        cout << "addJobs: Parsing of datablock failed,  count = " << count << "  blockSize = " << blockSize << " bytes." << endl;
     }
 
     cout << "getJobs E" << endl;
@@ -215,17 +215,17 @@ bool MasterTab::getPeers( void ) {
     boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
+    uint64_t count(0);
     shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
     
     if( !blockSize ) return true;
 
-    const char* cptr = buf.get();
-    char* end = buf.get() + blockSize;
+    const char* ptr = buf.get();
     bool modified = false;
     try {
         Peer peer;
-        while( cptr < end ) {
-            cptr = peer.unpack( cptr, swap_endian );
+        while( count < blockSize ) {
+            count += peer.unpack( ptr+count, swap_endian );
             auto ret = peers.insert( peer );
             if( !ret.second ) { // already in the set, replace with new version
                 peers.erase( ret.first );
@@ -237,8 +237,8 @@ bool MasterTab::getPeers( void ) {
     catch( const exception& e ) {
         cout << "getPeers: Exception caught while parsing block: " << e.what() << endl;
     }
-    if( cptr != end ) {
-        cout << "getPeers: Parsing of datablock failed, there was a missmatch of " << ( cptr - end ) << " bytes." << endl;
+    if( count != blockSize ) {
+        cout << "getPeers: Parsing of datablock failed,  count = " << count << "  blockSize = " << blockSize << " bytes." << endl;
         return false;
     }
 

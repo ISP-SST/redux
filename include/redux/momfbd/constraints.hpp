@@ -48,8 +48,8 @@ namespace redux {
             ~Constraints();
 
             size_t size(void) const;
-            char* pack( char* ) const;
-            const char* unpack( const char*, bool );
+            uint64_t pack( char* ) const;
+            uint64_t unpack( const char*, bool );
 
             void sort(void) { std::sort(rv.begin(),rv.end()); };
 

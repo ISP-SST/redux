@@ -66,7 +66,7 @@ namespace {
 
     template <typename T>
     void writeAndVerifyCompressedAna( const Image<T>& indata ) {
-        for(int sliceSize=1; sliceSize<8*sizeof(T); ++sliceSize) {       // test all values of sliceSize
+        for(uint8_t sliceSize=1; sliceSize<8*sizeof(T); ++sliceSize) {       // test all values of sliceSize
             redux::file::Ana::write(testFileAna,indata,sliceSize);
             Image<T> data;
             readFile( testFileAna, data );

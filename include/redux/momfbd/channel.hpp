@@ -40,8 +40,8 @@ namespace redux {
             bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
             size_t size(void) const;
-            char* pack(char*) const;
-            const char* unpack(const char*, bool);
+            uint64_t pack(char*) const;
+            uint64_t unpack(const char*, bool);
             double getMaxMean(void);
         
         private:
@@ -56,7 +56,7 @@ namespace redux {
             void normalizeImage(size_t index, double value);
             
             size_t sizeOfPatch(uint32_t) const;
-            char* packPatch( Patch::Ptr, char* ) const;
+            uint64_t packPatch( Patch::Ptr, char* ) const;
             
             Point clipImages(void);
 

@@ -16,28 +16,25 @@ size_t Part::size( void ) const {
 }
 
 
-char* Part::pack( char* ptr ) const {
+uint64_t Part::pack( char* ptr ) const {
 
     using redux::util::pack;
+    uint64_t count = pack( ptr, id );
+    count += pack( ptr+count, step );
+    count += pack( ptr+count, nRetries );
 
-    ptr = pack( ptr, id );
-    ptr = pack( ptr, step );
-    ptr = pack( ptr, nRetries );
-
-    return ptr;
+    return count;
 
 }
 
 
-const char* Part::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
-
-    ptr = unpack( ptr, id, swap_endian );
-    ptr = unpack( ptr, step, swap_endian );
-    ptr = unpack( ptr, nRetries, swap_endian );
-
-    return ptr;
+    uint64_t count = unpack( ptr, id, swap_endian );
+    count += unpack( ptr+count, step, swap_endian );
+    count += unpack( ptr+count, nRetries, swap_endian );
+    return count;
 }
 
 
@@ -60,40 +57,41 @@ size_t WorkInProgress::size( bool includeJob ) const {
 }
 
 
-char* WorkInProgress::pack( char* ptr, bool includeJob ) const {
+uint64_t WorkInProgress::pack( char* ptr, bool includeJob ) const {
 
+    uint64_t count(0);
     if( includeJob ) {
-        ptr = redux::util::pack( ptr, uint8_t(1) );
-        ptr = job->pack( ptr );
-    } else ptr = redux::util::pack( ptr, uint8_t(0) );
+        count += redux::util::pack( ptr, uint8_t(1) );
+        count += job->pack( ptr+count );
+    } else count += redux::util::pack( ptr, uint8_t(0) );
 
-    ptr = pack( ptr, parts.size() );
+    count += pack( ptr+count, parts.size() );
     for( auto & it : parts ) {
         if( it ) {
-            ptr = it->pack( ptr );
+            count += it->pack( ptr+count );
         }
     }
-    return ptr;
+    return count;
 }
 
 
-const char* WorkInProgress::unpack( const char* cptr, bool swap_endian ) {
+uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
 
     uint8_t hasJob;
-    cptr = redux::util::unpack( cptr, hasJob );
+    uint64_t count = redux::util::unpack( ptr, hasJob );
     if( hasJob ) {
-        string tmpS = string( cptr );
+        string tmpS = string( ptr+count );
         job = Job::newJob( tmpS );
         if( job ) {
-            cptr = job->unpack( cptr, swap_endian );
+            count += job->unpack( ptr+count, swap_endian );
         }
         else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
     }
     if( job ) {
-        cptr = job->unpackParts( cptr, parts, swap_endian );
+        count += job->unpackParts( ptr+count, parts, swap_endian );
     }
     else throw invalid_argument( "Can't unpack parts without a job instance..." );
-    return cptr;
+    return count;
 }
 
 

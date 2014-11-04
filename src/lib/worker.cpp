@@ -92,9 +92,9 @@ void Worker::updateStatus( void ) {
         char* ptr = buf.get();
         memset( ptr, 0, totSize );
 
-        ptr = pack( ptr, CMD_STAT );
-        ptr = pack( ptr, blockSize );
-        ptr = daemon.myInfo->stat.pack( ptr );
+        uint64_t count = pack( ptr, CMD_STAT );
+        count += pack( ptr+count, blockSize );
+        count += daemon.myInfo->stat.pack( ptr+count );
 
         master->conn->writeAndCheck( buf, totSize );
     }
@@ -125,13 +125,12 @@ bool Worker::fetchWork( void ) {
 
         if( !blockSize ) return false;
 
-        const char* cptr = buf.get();
-        char* end = buf.get() + blockSize;
+        const char* ptr = buf.get();
 
-        cptr = wip.unpack( cptr, swap_endian );
+        uint64_t count = wip.unpack( ptr, swap_endian );
 
-        if( cptr != end ) {
-            throw invalid_argument( "Parsing of datablock failed, there was a missmatch of " + to_string( cptr - end ) + " bytes." );
+        if( count != blockSize ) {
+            throw invalid_argument( "Parsing of datablock failed, there was a missmatch of " + to_string( count - blockSize ) + " bytes." );
 
         }
 
@@ -198,10 +197,11 @@ void Worker::returnWork( void ) {
             size_t totalSize = blockSize + sizeof( size_t ) + 1;
             auto buf = sharedArray<char>( totalSize );        // + blocksize + cmd
 
-            char* ptr = pack( buf.get(), CMD_PUT_PARTS );
-            ptr = pack( ptr, blockSize );
+            char* ptr = buf.get();
+            uint64_t count = pack( ptr, CMD_PUT_PARTS );
+            count += pack( ptr+count, blockSize );
             if(blockSize) {
-                ptr = wip.pack( ptr, includeJob );
+                count += wip.pack( ptr+count, includeJob );
 
             }
 
@@ -209,7 +209,7 @@ void Worker::returnWork( void ) {
 
             Command cmd = CMD_ERR;
 
-        *(master->conn) >> cmd;
+            *(master->conn) >> cmd;
 
         }
         catch( const exception& e ) {

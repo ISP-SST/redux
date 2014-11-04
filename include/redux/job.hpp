@@ -76,13 +76,13 @@ namespace redux {
             boost::posix_time::ptime submitTime;
             Info();
             size_t size(void) const;
-            char* pack(char*) const;
-            const char* unpack(const char*, bool);
+            uint64_t pack(char*) const;
+            uint64_t unpack(const char*, bool);
             static std::string printHeader(void);
             std::string print(void);
         } info;
         
-        virtual const char* unpackParts(const char* ptr, std::vector<Part::Ptr>& p, bool) { p.clear(); return ptr; };
+        virtual uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>& p, bool) { p.clear(); return 0; };
         
         virtual void parseProperties( po::variables_map&, bpt::ptree& );
         /*! @brief Returns a boost::property_tree containing the settings for this job.
@@ -101,8 +101,8 @@ namespace redux {
         virtual ~Job(void);
 
         virtual size_t size(void) const;
-        virtual char* pack(char*) const;
-        virtual const char* unpack(const char*, bool);
+        virtual uint64_t pack(char*) const;
+        virtual uint64_t unpack(const char*, bool);
         
         virtual size_t getParts(WorkInProgress&) { return 0; };
         virtual void ungetParts(WorkInProgress&) { };

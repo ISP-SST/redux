@@ -44,33 +44,32 @@ size_t Patch::size( void ) const {
 }
 
 
-char* Patch::pack( char* ptr ) const {
+uint64_t Patch::pack( char* ptr ) const {
 
     using redux::util::pack;
-
-    ptr = Part::pack( ptr );
-    ptr = index.pack( ptr );
-    ptr = first.pack( ptr );
-    ptr = last.pack( ptr );
-    ptr = residualTilts.pack( ptr );
-    ptr = pack(ptr,dataSize);
-    memcpy(ptr,data.get(),dataSize);
-    return ptr+dataSize;
+    
+    uint64_t count = Part::pack( ptr );
+    count += index.pack( ptr+count );
+    count += first.pack( ptr+count );
+    count += last.pack( ptr+count );
+    count += residualTilts.pack( ptr+count );
+    count += pack(ptr+count,dataSize);
+    memcpy(ptr+count,data.get(),dataSize);
+    return count+dataSize;
 }
 
 
-const char* Patch::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Patch::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
-
-    ptr = Part::unpack( ptr, swap_endian );
-    ptr = index.unpack( ptr, swap_endian );
-    ptr = first.unpack( ptr, swap_endian );
-    ptr = last.unpack( ptr, swap_endian );
-    ptr = residualTilts.unpack( ptr, swap_endian );
-    ptr = unpack(ptr,dataSize,swap_endian);
+    uint64_t count = Part::unpack( ptr, swap_endian );
+    count += index.unpack( ptr+count, swap_endian );
+    count += first.unpack( ptr+count, swap_endian );
+    count += last.unpack( ptr+count, swap_endian );
+    count += residualTilts.unpack( ptr+count, swap_endian );
+    count += unpack(ptr+count,dataSize,swap_endian);
     data = sharedArray<char>(dataSize);
-    memcpy(data.get(),ptr,dataSize);
-    return ptr+dataSize;
+    memcpy(data.get(),ptr+count,dataSize);
+    return count+dataSize;
 
 }

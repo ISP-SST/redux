@@ -333,73 +333,73 @@ size_t Channel::size( void ) const {
 }
 
 
-char* Channel::pack( char* ptr ) const {
+uint64_t Channel::pack( char* ptr ) const {
     using redux::util::pack;
 
-    ptr = pack( ptr, fillpix_method );
-    ptr = pack( ptr, mmRow );
-    ptr = pack( ptr, mmWidth );
-    ptr = pack( ptr, sequenceNumber );
-    ptr = pack( ptr, image_num_offs );
-    ptr = pack( ptr, flags );
-    ptr = pack( ptr, nf );
-    ptr = pack( ptr, imageNumbers );
-    ptr = pack( ptr, darkNumbers );
-    ptr = pack( ptr, alignClip );
-    ptr = pack( ptr, wf_num );
-    ptr = pack( ptr, stokesWeights );
-    ptr = pack( ptr, diversity );
-    ptr = pack( ptr, diversityOrders );
-    ptr = pack( ptr, diversityTypes );
-    ptr = pack( ptr, imageDataDir );
-    ptr = pack( ptr, imageTemplate );
-    ptr = pack( ptr, darkTemplate );
-    ptr = pack( ptr, gainFile );
-    ptr = pack( ptr, responseFile );
-    ptr = pack( ptr, backgainFile );
-    ptr = pack( ptr, psfFile );
-    ptr = pack( ptr, mmFile );
-    ptr = pack( ptr, offxFile );
-    ptr = pack( ptr, offyFile );
+    uint64_t count = pack( ptr, fillpix_method );
+    count += pack( ptr+count, mmRow );
+    count += pack( ptr+count, mmWidth );
+    count += pack( ptr+count, sequenceNumber );
+    count += pack( ptr+count, image_num_offs );
+    count += pack( ptr+count, flags );
+    count += pack( ptr+count, nf );
+    count += pack( ptr+count, imageNumbers );
+    count += pack( ptr+count, darkNumbers );
+    count += pack( ptr+count, alignClip );
+    count += pack( ptr+count, wf_num );
+    count += pack( ptr+count, stokesWeights );
+    count += pack( ptr+count, diversity );
+    count += pack( ptr+count, diversityOrders );
+    count += pack( ptr+count, diversityTypes );
+    count += pack( ptr+count, imageDataDir );
+    count += pack( ptr+count, imageTemplate );
+    count += pack( ptr+count, darkTemplate );
+    count += pack( ptr+count, gainFile );
+    count += pack( ptr+count, responseFile );
+    count += pack( ptr+count, backgainFile );
+    count += pack( ptr+count, psfFile );
+    count += pack( ptr+count, mmFile );
+    count += pack( ptr+count, offxFile );
+    count += pack( ptr+count, offyFile );
 
-    ptr = dark.pack( ptr );
+    count += dark.pack( ptr+count );
 
-    return ptr;
+    return count;
 }
 
 
-const char* Channel::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
 
-    ptr = unpack( ptr, fillpix_method );
-    ptr = unpack( ptr, mmRow );
-    ptr = unpack( ptr, mmWidth );
-    ptr = unpack( ptr, sequenceNumber, swap_endian );
-    ptr = unpack( ptr, image_num_offs, swap_endian );
-    ptr = unpack( ptr, flags, swap_endian );
-    ptr = unpack( ptr, nf, swap_endian );
-    ptr = unpack( ptr, imageNumbers, swap_endian );
-    ptr = unpack( ptr, darkNumbers, swap_endian );
-    ptr = unpack( ptr, alignClip, swap_endian );
-    ptr = unpack( ptr, wf_num, swap_endian );
-    ptr = unpack( ptr, stokesWeights, swap_endian );
-    ptr = unpack( ptr, diversity, swap_endian );
-    ptr = unpack( ptr, diversityOrders, swap_endian );
-    ptr = unpack( ptr, diversityTypes, swap_endian );
-    ptr = unpack( ptr, imageDataDir );
-    ptr = unpack( ptr, imageTemplate );
-    ptr = unpack( ptr, darkTemplate );
-    ptr = unpack( ptr, gainFile );
-    ptr = unpack( ptr, responseFile );
-    ptr = unpack( ptr, backgainFile );
-    ptr = unpack( ptr, psfFile );
-    ptr = unpack( ptr, mmFile );
-    ptr = unpack( ptr, offxFile );
-    ptr = unpack( ptr, offyFile );
+    uint64_t count = unpack( ptr, fillpix_method );
+    count += unpack( ptr+count, mmRow );
+    count += unpack( ptr+count, mmWidth );
+    count += unpack( ptr+count, sequenceNumber, swap_endian );
+    count += unpack( ptr+count, image_num_offs, swap_endian );
+    count += unpack( ptr+count, flags, swap_endian );
+    count += unpack( ptr+count, nf, swap_endian );
+    count += unpack( ptr+count, imageNumbers, swap_endian );
+    count += unpack( ptr+count, darkNumbers, swap_endian );
+    count += unpack( ptr+count, alignClip, swap_endian );
+    count += unpack( ptr+count, wf_num, swap_endian );
+    count += unpack( ptr+count, stokesWeights, swap_endian );
+    count += unpack( ptr+count, diversity, swap_endian );
+    count += unpack( ptr+count, diversityOrders, swap_endian );
+    count += unpack( ptr+count, diversityTypes, swap_endian );
+    count += unpack( ptr+count, imageDataDir );
+    count += unpack( ptr+count, imageTemplate );
+    count += unpack( ptr+count, darkTemplate );
+    count += unpack( ptr+count, gainFile );
+    count += unpack( ptr+count, responseFile );
+    count += unpack( ptr+count, backgainFile );
+    count += unpack( ptr+count, psfFile );
+    count += unpack( ptr+count, mmFile );
+    count += unpack( ptr+count, offxFile );
+    count += unpack( ptr+count, offyFile );
 
-    ptr = dark.unpack( ptr, swap_endian );
+    count += dark.unpack( ptr+count, swap_endian );
 
-    return ptr;
+    return count;
 }
 
 
@@ -797,7 +797,7 @@ size_t Channel::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-char* Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
+uint64_t Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
     
     int localTiltX = 0;
     int localTiltY = 0;
@@ -820,15 +820,15 @@ char* Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
 
     vector<float> noise;
     for(auto it: imageStats) noise.push_back(it->noisePower);
-    ptr = redux::util::pack( ptr, noise );
+    uint64_t count = redux::util::pack( ptr, noise );
     
     Image<float> tmp = Image<float>( images, 0, images.dimSize(0),
                                      patch->first.y+localTiltY, patch->last.y+localTiltY,
                                      patch->first.x+localTiltX, patch->last.x+localTiltX ).copy();
-    ptr = redux::util::pack( ptr, tmp.ptr(), tmp.nElements() );
+    count += redux::util::pack( ptr+count, tmp.ptr(), tmp.nElements() );
     
     
-    return ptr;
+    return count;
 }
  
 

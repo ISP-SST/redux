@@ -24,12 +24,12 @@ namespace redux {
             size_t sortedID;
             redux::util::Array<int64_t> result;      // use int64_t as temporary storage, cast to int16_t in post-processing
             size_t size(void) const;
-            char* pack(char*) const;
-            const char* unpack(const char*, bool);
+            uint64_t pack(char*) const;
+            uint64_t unpack(const char*, bool);
         };
         typedef std::shared_ptr<DebugPart> PartPtr;
         
-        const char* unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
+        uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
 
     public:
 
@@ -42,8 +42,8 @@ namespace redux {
         bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
         
         size_t size(void) const;
-        char* pack(char*) const;
-        const char* unpack(const char*, bool);
+        uint64_t pack(char*) const;
+        uint64_t unpack(const char*, bool);
         
         size_t getParts(WorkInProgress&);
         void ungetParts(WorkInProgress&);

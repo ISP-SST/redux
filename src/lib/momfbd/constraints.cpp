@@ -38,21 +38,21 @@ size_t Constraints::size( void ) const {
 }
 
 
-char* Constraints::pack( char* ptr ) const {
+uint64_t Constraints::pack( char* ptr ) const {
 
     using redux::util::pack;
 
-    ptr = pack( ptr, nGroups );
-    ptr = pack( ptr, nVerticals );
-    ptr = pack( ptr, nHorizontals );
-    for( uint32_t g = 0; g < nGroups; ++g ) ptr = pack( ptr, *( groups[g].get() ), nVerticals[g] * nHorizontals[g] );
-    ptr = pack( ptr, n_omap );
-    ptr = pack( ptr, omap_n );
-    for( uint32_t o = 0; o < n_omap; ++o ) ptr = pack( ptr, o_map[o] );
-    ptr = pack( ptr, n_imap );
-    ptr = pack( ptr, imap_n );
-    for( uint32_t i = 0; i < n_imap; ++i ) ptr = pack( ptr, i_map[i] );
-    ptr = pack( ptr, nrv );
+    uint64_t count = pack( ptr, nGroups );
+    count += pack( ptr+count, nVerticals );
+    count += pack( ptr+count, nHorizontals );
+    for( uint32_t g = 0; g < nGroups; ++g ) count += pack( ptr+count, *( groups[g].get() ), nVerticals[g] * nHorizontals[g] );
+    count += pack( ptr+count, n_omap );
+    count += pack( ptr+count, omap_n );
+    for( uint32_t o = 0; o < n_omap; ++o ) count += pack( ptr+count, o_map[o] );
+    count += pack( ptr+count, n_imap );
+    count += pack( ptr+count, imap_n );
+    for( uint32_t i = 0; i < n_imap; ++i ) count += pack( ptr+count, i_map[i] );
+    count += pack( ptr+count, nrv );
     uint32_t gvoi[4];
     for( uint32_t k = 0; k < nrv; ++k ) {
         memset(gvoi,0,4*sizeof(int32_t));
@@ -74,58 +74,58 @@ char* Constraints::pack( char* ptr ) const {
                 gvoi[3] = ii;
                 ii = n_imap; // break;
             }
-        ptr = pack( ptr, gvoi, 4 );
-        ptr = pack( ptr, rv[k].m );
+        count += pack( ptr+count, gvoi, 4 );
+        count += pack( ptr+count, rv[k].m );
     }
     
-    return ptr;
+    return count;
 
 }
 
-const char* Constraints::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
 
-    ptr = unpack( ptr, nGroups, swap_endian );
+    uint64_t count = unpack( ptr, nGroups, swap_endian );
     nVerticals.resize( nGroups );
     nHorizontals.resize( nGroups );
     groups.resize( nGroups );
-    ptr = unpack( ptr, nVerticals, swap_endian );
-    ptr = unpack( ptr, nHorizontals, swap_endian );
+    count += unpack( ptr+count, nVerticals, swap_endian );
+    count += unpack( ptr+count, nHorizontals, swap_endian );
     for( uint32_t g = 0; g < nGroups; ++g ) {
         groups[g] = sharedArray<double>( nVerticals[g], nHorizontals[g] );
-        ptr = unpack( ptr, *( groups[g].get() ), nVerticals[g] * nHorizontals[g], swap_endian );
+        count += unpack( ptr+count, *( groups[g].get() ), nVerticals[g] * nHorizontals[g], swap_endian );
     }
-    ptr = unpack( ptr, n_omap, swap_endian );
+    count += unpack( ptr+count, n_omap, swap_endian );
     omap_n.resize( n_omap );
     o_map.resize( n_omap );
-    ptr = unpack( ptr, omap_n, swap_endian );
+    count += unpack( ptr+count, omap_n, swap_endian );
     for( uint32_t o = 0; o < n_omap; ++o ) {
         o_map[o].resize( omap_n[o] );
-        ptr = unpack( ptr, o_map[o], swap_endian );
+        count += unpack( ptr+count, o_map[o], swap_endian );
     }
-    ptr = unpack( ptr, n_imap, swap_endian );
+    count += unpack( ptr+count, n_imap, swap_endian );
     imap_n.resize( n_imap );
     i_map.resize( n_imap );
-    ptr = unpack( ptr, imap_n, swap_endian );
+    count += unpack( ptr+count, imap_n, swap_endian );
     for( uint32_t i = 0; i < n_imap; ++i ) {
         i_map[i].resize( imap_n[i] );
-        ptr = unpack( ptr, i_map[i], swap_endian );
+        count += unpack( ptr+count, i_map[i], swap_endian );
     }
-    ptr = unpack( ptr, nrv, swap_endian );
+    count += unpack( ptr+count, nrv, swap_endian );
     rv.resize( nrv );
     for( uint32_t k = 0; k < nrv; ++k ) {
         uint32_t g, v, o, i;
-        ptr = unpack( ptr, g, swap_endian );
-        ptr = unpack( ptr, v, swap_endian );
-        ptr = unpack( ptr, o, swap_endian );
-        ptr = unpack( ptr, i, swap_endian );
-        ptr = unpack( ptr, rv[k].m, swap_endian );
+        count += unpack( ptr+count, g, swap_endian );
+        count += unpack( ptr+count, v, swap_endian );
+        count += unpack( ptr+count, o, swap_endian );
+        count += unpack( ptr+count, i, swap_endian );
+        count += unpack( ptr+count, rv[k].m, swap_endian );
         rv[k].o_map = o_map[o].data();
         rv[k].i_map = i_map[i].data();
         rv[k].k = groups[g].get()[v];
         rv[k].nk = nHorizontals[g];
     }
-    return ptr;
+    return count;
 
 }

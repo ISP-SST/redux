@@ -32,8 +32,8 @@ namespace redux {
                 std::string name, os, arch;
                 HostInfo( void );
                 size_t size(void) const;
-                char* pack( char* ) const;
-                const char* unpack( const char*, bool );
+                uint64_t pack( char* ) const;
+                uint64_t unpack( const char*, bool );
                 bool operator==(const HostInfo&) const;
             } host;
 
@@ -45,16 +45,16 @@ namespace redux {
                 float progress;
                 PeerStatus( void );
                 size_t size(void) const;
-                char* pack( char* ) const;
-                const char* unpack( const char*, bool );
+                uint64_t pack( char* ) const;
+                uint64_t unpack( const char*, bool );
             } stat;
             
             Peer(void);
             Peer(const HostInfo&, TcpConnection::Ptr c=nullptr, size_t i=0);
 
             size_t size(void) const;
-            char* pack( char* ) const;
-            const char* unpack( const char*, bool );
+            uint64_t pack( char* ) const;
+            uint64_t unpack( const char*, bool );
             static std::string printHeader(void);
             std::string print(void);
             

@@ -70,31 +70,29 @@ size_t Peer::size(void) const {
 }
 
 
-char* Peer::pack( char* ptr ) const {
+uint64_t Peer::pack( char* ptr ) const {
     
     using redux::util::pack;
+    uint64_t count = pack(ptr,id);
+    count += pack(ptr+count,to_time_t( lastSeen ));
+    count += host.pack(ptr+count);
+    count += stat.pack(ptr+count);
     
-    ptr = pack(ptr,id);
-    ptr = pack(ptr,to_time_t( lastSeen ));
-    ptr = host.pack(ptr);
-    ptr = stat.pack(ptr);
-    
-    return ptr;
+    return count;
 }
 
-const char* Peer::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Peer::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
-    
-    ptr = unpack(ptr,id,swap_endian);
+    uint64_t count = unpack(ptr,id,swap_endian);
     time_t timestamp;
-    ptr = unpack(ptr,timestamp,swap_endian);
-    ptr = host.unpack(ptr,swap_endian);
-    ptr = stat.unpack(ptr,swap_endian);
+    count += unpack(ptr+count,timestamp,swap_endian);
+    count += host.unpack(ptr+count,swap_endian);
+    count += stat.unpack(ptr+count,swap_endian);
     
     lastSeen = boost::posix_time::from_time_t( timestamp );
     
-    return ptr;
+    return count;
 }
 
 
@@ -191,40 +189,44 @@ size_t Peer::HostInfo::size(void) const {
 }
 
 
-char* Peer::HostInfo::pack( char* ptr ) const {
+uint64_t Peer::HostInfo::pack( char* ptr ) const {
     
     using redux::util::pack;
     
-    *ptr++ = littleEndian;
-    ptr = pack(ptr,reduxVersion);
-    ptr = pack(ptr,pid);
-    ptr = pack(ptr,peerType);
-    ptr = pack(ptr,nCores);
-    ptr = pack(ptr,to_time_t( startedAt ));
-    ptr = pack(ptr,name);
-    ptr = pack(ptr,os);
-    ptr = pack(ptr,arch);
+    *ptr = littleEndian;
+    uint64_t count = 1;     // endianflag
+    count += pack(ptr+count,reduxVersion);
+    count += pack(ptr+count,pid);
+    count += pack(ptr+count,peerType);
+    count += pack(ptr+count,nCores);
+    count += pack(ptr+count,to_time_t( startedAt ));
+    count += pack(ptr+count,name);
+    count += pack(ptr+count,os);
+    count += pack(ptr+count,arch);
     
-    return ptr;
+    return count;
+    
 }
 
-const char* Peer::HostInfo::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Peer::HostInfo::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
-    littleEndian = *ptr++;
-    ptr = unpack(ptr,reduxVersion, swap_endian);
-    ptr = unpack(ptr,pid,swap_endian);
-    ptr = unpack(ptr,peerType, swap_endian);
-    ptr = unpack(ptr,nCores, swap_endian);
+    littleEndian = *ptr;
+    uint64_t count = 1;     // endianflag
+    count += unpack(ptr+count,reduxVersion, swap_endian);
+    count += unpack(ptr+count,pid,swap_endian);
+    count += unpack(ptr+count,peerType, swap_endian);
+    count += unpack(ptr+count,nCores, swap_endian);
     time_t timestamp;
-    ptr = unpack(ptr,timestamp,swap_endian);
+    count += unpack(ptr+count,timestamp,swap_endian);
     startedAt = boost::posix_time::from_time_t( timestamp );
-    ptr = unpack(ptr,name);
-    ptr = unpack(ptr,os);
-    ptr = unpack(ptr,arch);
+    count += unpack(ptr+count,name);
+    count += unpack(ptr+count,os);
+    count += unpack(ptr+count,arch);
     
-    return ptr;
+    return count;
+    
 }
 
 
@@ -239,33 +241,34 @@ size_t Peer::PeerStatus::size(void) const {
 }
 
 
-char* Peer::PeerStatus::pack( char* ptr ) const {
+uint64_t Peer::PeerStatus::pack( char* ptr ) const {
     
     using redux::util::pack;
     
-    ptr = pack(ptr,nThreads);
-    ptr = pack(ptr,maxThreads);
-    ptr = pack(ptr,state);
-    ptr = pack(ptr,currentJob);
-    ptr = pack(ptr,loadAvg);
-    ptr = pack(ptr,progress);
+    uint64_t count = pack(ptr,nThreads);
+    count += pack(ptr+count,maxThreads);
+    count += pack(ptr+count,state);
+    count += pack(ptr+count,currentJob);
+    count += pack(ptr+count,loadAvg);
+    count += pack(ptr+count,progress);
     
-    return ptr;
+    return count;
+    
 }
 
 
-const char* Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
+    uint64_t count = unpack(ptr,nThreads);
+    count += unpack(ptr+count,maxThreads);
+    count += unpack(ptr+count,state, swap_endian);
+    count += unpack(ptr+count,currentJob, swap_endian);
+    count += unpack(ptr+count,loadAvg, swap_endian);
+    count += unpack(ptr+count,progress, swap_endian);
     
-    ptr = unpack(ptr,nThreads);
-    ptr = unpack(ptr,maxThreads);
-    ptr = unpack(ptr,state, swap_endian);
-    ptr = unpack(ptr,currentJob, swap_endian);
-    ptr = unpack(ptr,loadAvg, swap_endian);
-    ptr = unpack(ptr,progress, swap_endian);
+    return count;
     
-    return ptr;
 }
 
 
@@ -276,34 +279,36 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Peer::HostI
     char* ptr = buf.get();
     memset(ptr,0,sz);
     
-    ptr = pack(ptr,out.littleEndian);
-    ptr = pack(ptr,out.size());
+    uint64_t count = pack(ptr,out.littleEndian);
+    count += pack(ptr+count,out.size());
     
-    out.pack(ptr);
+    out.pack(ptr+count);
     
-    size_t count = boost::asio::write( conn.socket(), boost::asio::buffer(buf.get(), sz) );
-    if( count != sz ) {
+    size_t written = boost::asio::write( conn.socket(), boost::asio::buffer(buf.get(), sz) );
+    if( written != sz ) {
         LOG_ERR << "TcpConnection << HostInfo: Failed to write buffer.";
     }
     
     return conn;
     
 }
+
+
 TcpConnection& redux::network::operator>>(TcpConnection& conn, Peer::HostInfo& in) {
     
     size_t sz = sizeof(size_t)+1;
     auto buf = sharedArray<char>(sz);
 
-    size_t count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
-    if( count != sz ) {
+    size_t readBytes = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
+    if( readBytes != sz ) {
         LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
     int one = 1;
     char* ptr = buf.get();
-    bool swap_endian = *((char*)&one) != *ptr++;
+    bool swap_endian = *((char*)&one) != *ptr;
     
-    unpack(ptr,sz,swap_endian);
+    uint64_t count = unpack(ptr+1,sz,swap_endian);
     
     buf = sharedArray<char>(sz);
 

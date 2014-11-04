@@ -123,53 +123,53 @@ size_t Job::Info::size( void ) const {
 }
 
 
-char* Job::Info::pack( char* ptr ) const {
+uint64_t Job::Info::pack( char* ptr ) const {
 
     using redux::util::pack;
+    
+    uint64_t count = pack( ptr, typeString );    // NB: the type-string has to be first in the packed block,
+    count += pack( ptr+count, name );            //   it is used to identify which job-class to instantiate on the receiving side.
+    count += pack( ptr+count, user );
+    count += pack( ptr+count, host );
+    count += pack( ptr+count, logFile );
+    count += pack( ptr+count, id );
+    count += pack( ptr+count, priority );
+    count += pack( ptr+count, verbosity );
+    count += pack( ptr+count, nThreads );
+    count += pack( ptr+count, maxPartRetries );
+    count += pack( ptr+count, step.load() );
+    count += pack( ptr+count, state.load() );
+    count += pack( ptr+count, to_time_t( submitTime ) );
 
-    ptr = pack( ptr, typeString );      // NB: the type-string has to be first in the packed block,
-    ptr = pack( ptr, name );            //   it is used to identify which job-class to instantiate on the receiving side.
-    ptr = pack( ptr, user );
-    ptr = pack( ptr, host );
-    ptr = pack( ptr, logFile );
-    ptr = pack( ptr, id );
-    ptr = pack( ptr, priority );
-    ptr = pack( ptr, verbosity );
-    ptr = pack( ptr, nThreads );
-    ptr = pack( ptr, maxPartRetries );
-    ptr = pack( ptr, step.load() );
-    ptr = pack( ptr, state.load() );
-    ptr = pack( ptr, to_time_t( submitTime ) );
-
-    return ptr;
+    return count;
 
 }
 
 
-const char* Job::Info::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Job::Info::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
-
-    ptr = unpack( ptr, typeString );
-    ptr = unpack( ptr, name );
-    ptr = unpack( ptr, user );
-    ptr = unpack( ptr, host );
-    ptr = unpack( ptr, logFile );
-    ptr = unpack( ptr, id, swap_endian );
-    ptr = unpack( ptr, priority );
-    ptr = unpack( ptr, verbosity );
-    ptr = unpack( ptr, nThreads );
-    ptr = unpack( ptr, maxPartRetries );
+    
+    uint64_t count = unpack( ptr, typeString );
+    count += unpack( ptr+count, name );
+    count += unpack( ptr+count, user );
+    count += unpack( ptr+count, host );
+    count += unpack( ptr+count, logFile );
+    count += unpack( ptr+count, id, swap_endian );
+    count += unpack( ptr+count, priority );
+    count += unpack( ptr+count, verbosity );
+    count += unpack( ptr+count, nThreads );
+    count += unpack( ptr+count, maxPartRetries );
     uint8_t tmp;
-    ptr = unpack( ptr, tmp );
+    count += unpack( ptr+count, tmp );
     step.store( tmp );
-    ptr = unpack( ptr, tmp );
+    count += unpack( ptr+count, tmp );
     state.store( tmp );
     time_t timestamp;
-    ptr = unpack( ptr, timestamp, swap_endian );
+    count += unpack( ptr+count, timestamp, swap_endian );
     submitTime = boost::posix_time::from_time_t( timestamp );
 
-    return ptr;
+    return count;
 }
 
 
@@ -233,15 +233,13 @@ size_t Job::size( void ) const {
 }
 
 
-char* Job::pack( char* ptr ) const {
-    ptr = info.pack( ptr );
-    return ptr;
+uint64_t Job::pack( char* ptr ) const {
+    return info.pack( ptr );
 }
 
 
-const char* Job::unpack( const char* ptr, bool swap_endian ) {
-    ptr = info.unpack( ptr, swap_endian );
-    return ptr;
+uint64_t Job::unpack( const char* ptr, bool swap_endian ) {
+    return info.unpack( ptr, swap_endian );
 }
 
 

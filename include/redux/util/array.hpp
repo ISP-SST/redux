@@ -279,34 +279,34 @@ namespace redux {
              *  @details For sub-arrays, only the accessed region is packed, so the receiving end will unpack it into a dense array
              *  of the same dimensions as the sub-array.
              */
-            char* pack( char* ptr ) const {
+            uint64_t pack( char* ptr ) const {
                 using redux::util::pack;
-                ptr = pack( ptr, size() );
+                uint64_t count = pack( ptr, size() );
                 if( uint8_t ndims = dimSizes.size() ) {
-                    ptr = pack( ptr, ndims );
-                    ptr = pack( ptr, dimSizes );
-                    ptr = pack( ptr, datablock.get(), nElements_ );
+                    count += pack( ptr+count, ndims );
+                    count += pack( ptr+count, dimSizes );
+                    count += pack( ptr+count, datablock.get(), nElements_ );
                 }
-                return ptr;
+                return count;
 
             }
 
             /*! @brief Unpack an array from a string of characters, swapping endianess if necessary.
              *  @details It is always the receiving/unpacking side which checks/fixes the endianess.
              */
-            const char* unpack( const char* ptr, bool swap_endian ) {
+            uint64_t unpack( const char* ptr, bool swap_endian ) {
                 using redux::util::unpack;
                 size_t sz;
-                ptr = unpack( ptr, sz, swap_endian );
+                uint64_t count = unpack( ptr, sz, swap_endian );
                 if( sz > 8 ) {
                     uint8_t ndims;
-                    ptr = unpack( ptr, ndims );
+                    count += unpack( ptr+count, ndims );
                     std::vector<size_t> tmp( ndims );
-                    ptr = unpack( ptr, tmp, swap_endian );
+                    count += unpack( ptr+count, tmp, swap_endian );
                     resize( tmp );
-                    ptr = unpack( ptr, datablock.get(), nElements_, swap_endian );
+                    count += unpack( ptr+count, datablock.get(), nElements_, swap_endian );
                 }
-                return ptr;
+                return count;
             }
 
 

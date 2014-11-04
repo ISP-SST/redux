@@ -34,14 +34,14 @@ namespace redux {
             MomfbdJob( void );
             ~MomfbdJob( void );
 
-            const char* unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
+            uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
             
             void parseProperties( po::variables_map& vm, bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
 
             size_t size( void ) const;
-            char* pack( char* ) const;
-            const char* unpack( const char*, bool );
+            uint64_t pack( char* ) const;
+            uint64_t unpack( const char*, bool );
 
             size_t getParts( WorkInProgress& );
             void ungetParts( WorkInProgress& );

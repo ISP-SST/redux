@@ -19,8 +19,8 @@ namespace redux {
         typedef std::shared_ptr<Part> Ptr;
         Part();
         virtual size_t size( void ) const;
-        virtual char* pack( char* ) const;
-        virtual const char* unpack( const char*, bool swap_endian=false  );
+        virtual uint64_t pack( char* ) const;
+        virtual uint64_t unpack( const char*, bool swap_endian=false  );
         size_t id;
         uint8_t step, nRetries;
     };
@@ -30,8 +30,8 @@ namespace redux {
         typedef std::shared_ptr<WorkInProgress> Ptr;
         WorkInProgress(network::Peer::Ptr p=0);
         size_t size( bool includeJob ) const;
-        char* pack( char*, bool includeJob) const;
-        const char* unpack( const char*, bool swap_endian=false );
+        uint64_t pack( char*, bool includeJob) const;
+        uint64_t unpack( const char*, bool swap_endian=false );
         std::string print(void);
         std::shared_ptr<Job> job;
         std::vector<Part::Ptr> parts;
