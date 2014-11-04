@@ -30,7 +30,7 @@ namespace redux {
             void call(F& f, T& to) { f(); if(--m_Count) post(f,to);  }
             template <class F, typename T>
             void post(F& f, T& to) {
-                 if(m_Async>0) {
+                 if(m_Async) {
                     std::thread([this,&f,&to]() {
                         std::this_thread::sleep_for(to);
                         call(f,to);
@@ -48,7 +48,7 @@ namespace redux {
             void post(F f, T to, bool async, int64_t count=1) {
                 m_Count = count;
                 m_Async = async;
-                 if(m_Async>0) {
+                 if(m_Async) {
                     std::thread([this,&f,&to]() {
                         std::this_thread::sleep_for(to);
                         call(f,to);

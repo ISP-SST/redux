@@ -515,7 +515,6 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
 
     char tmp8;
     int32_t tmp32;
-    const float* fPtr;
     vector<char> tmpStr ( 1024, 0 );
 
     // first byte = endian-flag
@@ -546,7 +545,7 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
         }
         writeOrThrow ( file, &nPH, 1, "FileMomfbd:nPH" );
         writeOrThrow ( file, &nModes, 1, "FileMomfbd:nModes" );
-        fPtr = reinterpret_cast<const float*> ( data + phOffset );
+        const float* fPtr = reinterpret_cast<const float*> ( data + phOffset );
         writeOrThrow ( file, fPtr, nPH * nPH, "FileMomfbd:PH-data" );
         if ( nModes ) {
             fPtr = reinterpret_cast<const float*> ( data + modesOffset );
@@ -597,7 +596,6 @@ void FileMomfbd::write ( const std::string& filename, const char* data, uint8_t 
 size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbosity, uint8_t alignTo ) {
 
     size_t count(0);
-    float* fPtr;
     file.clear();
 
     // pupil & modes
@@ -606,7 +604,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
         // pupil
         if ( phOffset ) {
             file.seekg ( phOffset );
-            fPtr = reinterpret_cast<float*> ( ptr+count );
+            float* fPtr = reinterpret_cast<float*> ( ptr+count );
             size_t n = readOrThrow ( file, fPtr, nPH * nPH, "MomfbdData:pupil" );
             if( n != (nPH * nPH * sizeof(float))) {
                 cout << "MomfbdData:pupil:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
@@ -621,7 +619,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
         if ( nModes & modesOffset ) {
             // Load data
             file.seekg ( modesOffset );
-            fPtr = reinterpret_cast<float*> ( ptr+count );
+            float* fPtr = reinterpret_cast<float*> ( ptr+count );
             size_t n = readOrThrow ( file, fPtr, nModes * nPH * nPH, "MomfbdData:modes" );
             if( n != (nModes * nPH * nPH * sizeof(float))) {
                 cout << "MomfbdData:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;

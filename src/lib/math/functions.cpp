@@ -162,13 +162,12 @@ void redux::math::hann( double* data, size_t n ) {
     }
 
     double arg = ( PI / ( n - 1 ) );
-    double cai;
     if( n & 1 ) {
         data[n >> 1] = 0.5;
     }
     n--;
     for( size_t i=0; i<n; ++i,--n ) {
-        cai =  0.5 * cos( arg * i );
+        double cai =  0.5 * cos( arg * i );
         data[i] = 0.5 - cai;
         data[n] = 0.5 + cai;
     }
@@ -183,13 +182,12 @@ void redux::math::hann( T& data, size_t n ) {
     }
     data.resize( n );
     double arg = PI / (n-1);
-    double cai;
     if( n & 1 ) {
         data[n >> 1] = 0.5;
     }
     n--;
     for( size_t i=0; i<n; ++i,--n ) {
-        cai =  0.5 * cos( arg * i );
+        double cai =  0.5 * cos( arg * i );
         data[i] = static_cast<typename T::value_type>(0.5 - cai);
         data[n] = static_cast<typename T::value_type>(0.5 + cai);
     }

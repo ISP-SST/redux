@@ -472,7 +472,7 @@ template <typename T>
 void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image ) {
     auto hdr = static_pointer_cast<redux::file::Ana>( image.hdr );
     read( filename, image, hdr );
-    string txt = hdr->getText();
+   // string txt = hdr->getText();
 //     boost::regex re( "(\\d+)[ .]+SUM[= ]+" );
 //     boost::smatch match;
 //     if( boost::regex_search( txt, match, re ) ) {

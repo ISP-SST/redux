@@ -17,11 +17,10 @@ namespace {
     float distanceCache[maxDistance*maxDistance];
 
     bool calculateCache( void ) {
-        double i2, j2;
         for( int i = 0; i < maxDistance; ++i ) {
-            i2 = i * i;
+            double i2 = i * i;
             for( int j = 0; j < maxDistance; ++j ) {
-                j2 = j * j;
+                double j2 = j * j;
                 distanceCache[i * maxDistance + j] = pow( sqrt( i2 + j2 + deltasqr ), -beta );
             }
         }

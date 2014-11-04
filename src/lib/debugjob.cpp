@@ -313,11 +313,11 @@ void DebugJob::runMain( Part::Ptr& part ) {
 
     auto tmp = sharedArray<int64_t>( sizeY, sizeX );
     auto ptr = tmp.get();
-    double x, y;
+
     for( uint32_t ix = 0; ix < sizeX; ++ix ) {
-        x = beginX + ix * stepX;
+        double x = beginX + ix * stepX;
         for( uint32_t iy = 0; iy < sizeY; ++iy ) {
-            y = beginY + iy * stepY;
+            double y = beginY + iy * stepY;
 
             ptr[iy][ix] = mandelbrot( complex<double>( x, y ), max_iters );
 
