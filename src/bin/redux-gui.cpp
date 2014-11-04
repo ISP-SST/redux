@@ -1,6 +1,7 @@
 #include "redux/application.hpp"
 
 #include "redux/gui/reduxmw.hpp"
+#include "redux/gui/reduxwidget.hpp"
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 
@@ -72,6 +73,8 @@ int main( int argc, char *argv[] ) {
 
         ReduxMW mw;
         mw.setWindowTitle( "redux-gui" );
+        ReduxWidget* w = new ReduxWidget(&mw);
+        mw.setCentralWidget ( w );
         mw.show();
         return app.exec();
 

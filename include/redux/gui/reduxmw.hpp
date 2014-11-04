@@ -1,7 +1,6 @@
 #ifndef REDUX_GUI_REDUXMW_HPP
 #define REDUX_GUI_REDUXMW_HPP
 
-#include "redux/gui/reduxwidget.hpp"
 //#include <iostream>
 
 #include <QMainWindow>

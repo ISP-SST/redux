@@ -10,7 +10,9 @@ namespace redux {
         
         /*!
          * 
-         * @class Simplex Implementation of the Simplex Algorithm for solving linear programs
+         * @class Simplex
+         *
+         *  \brief Implementation of the Simplex Algorithm for solving linear programs
          * 
          *  Given an M-by-N matrix A, an M-length vector b, and an
          *  N-length vector c, solve the  LP { max cx : Ax <= b, x >= 0 }.

@@ -4,7 +4,7 @@
 
 using namespace boost::unit_test_framework;
 
-#include "redux/math/constants.hpp"
+#include "redux/constants.hpp"
 #include "redux/math/differentiate.hpp"
 #include "redux/math/interval.hpp"
 #include "redux/util/bitoperations.hpp"

@@ -354,7 +354,7 @@ namespace redux {
 
 
 
-//             /*! @fn void Genetic<T>::setGenomeSize(const uint& n)
+//             /*-! @fn void Genetic<T>::setGenomeSize(const uint& n)
 //              *  @brief Set the genome size, i.e. how many parameters we want to fit.
 //              */
 //             template <class T>
