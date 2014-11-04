@@ -30,6 +30,25 @@ namespace redux {
         
      
         
+        template<typename T>
+        void svd(T* data, int rows, int cols, T* sigma, T* u, T* v) {
+            
+            cv::Mat data_(rows, cols, cv::DataType<T>::type, data); // does not copy or free
+            cv::Mat sigma_(rows, cols, cv::DataType<T>::type, sigma);
+            cv::Mat u_(rows, rows, cv::DataType<T>::type, u);
+            cv::Mat v_(cols, cols, cv::DataType<T>::type, v);
+            
+//             cv::Mat data_(rows, cols, CV_64F, data); // does not copy or free
+//             cv::Mat sigma_(std::min(rows, cols), 1, CV_64F, sigma, CV_AUTOSTEP);
+//             cv::Mat u_(rows, rows, CV_64F, u, CV_AUTOSTEP);
+//             cv::Mat v_(cols, cols, CV_64F, v, CV_AUTOSTEP);
+//             
+            //cvSVD( &data_, &sigma_, &u_, &v_ );
+            cv::SVD::compute( data_, sigma_, u_, v_ );
+            //cvSVD( &data_, &sigma_, &u_, &v_ );
+
+        }
+
 
     }
 
