@@ -11,6 +11,9 @@ add_definitions(-DBOOST_LOG_DYN_LINK)
 file(GLOB REDUX_CPP "*.cpp")
 file(GLOB REDUX_HPP "${REDUX_HDR_BASE}/*.hpp")
 
+file(GLOB REDUX_ALGO_CPP "algo/*.cpp")
+file(GLOB REDUX_ALGO_HPP "${REDUX_HDR_BASE}/algo/*.hpp")
+
 file(GLOB REDUX_FILE_CPP "file/*.cpp")
 file(GLOB REDUX_FILE_HPP "${REDUX_HDR_BASE}/file/*.hpp")
 
@@ -52,6 +55,7 @@ CHECK_REVISION(LIBREDUX "${CMAKE_CURRENT_LIST_DIR}/revision.cpp.template" "${RED
 
 REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_CPP} ${REDUX_HPP} 
+                    ${REDUX_ALGO_CPP} ${REDUX_ALGO_HPP}
                     ${REDUX_FILE_CPP} ${REDUX_FILE_HPP}
                     ${REDUX_IMAGE_CPP} ${REDUX_IMAGE_HPP}
                     ${REDUX_MATH_CPP} ${REDUX_MATH_HPP}
@@ -82,12 +86,7 @@ file(GLOB REDUX_GUI_CPP "gui/*.cpp")
 file(GLOB REDUX_GUI_HPP "${REDUX_HDR_BASE}/gui/*.hpp")
 
 set(CMAKE_AUTOMOC ON)
-# Work Qt magic to generate files
-#QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP} OPTIONS -DBOOST_TT_HAS_OPERATOR_HPP_INCLUDED)
-#QT4_WRAP_CPP(REDUX_GUI_MOC_SRC ${REDUX_GUI_HPP})
-message(STATUS "REDUX_HDR_BASE: ${REDUX_HDR_BASE}")
-message(STATUS "REDUX_GUI_HPP: ${REDUX_GUI_HPP}")
-message(STATUS "REDUX_GUI_MOC_SRC: ${REDUX_GUI_MOC_SRC}")
+
 REDUX_ADD_LIBRARY(reduxgui #${REDUX_REVISION_SRC_FILE}
                     ${REDUX_GUI_CPP} ${REDUX_GUI_HPP} 
                     ${REDUX_GUI_MOC_SRC}
