@@ -1,6 +1,6 @@
 #include "redux/daemon.hpp"
 
-#include "redux/network/peer.hpp"
+
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
@@ -37,7 +37,7 @@ namespace {
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master( "" ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ), timer( ioService ), worker( *this ) {
 
-    myInfo.reset( new Peer() );
+    myInfo.reset( new Host() );
 
     if( params["master"].as<string>() == "" ) {
         server.reset( new TcpServer( ioService, params["port"].as<uint16_t>() ) );
@@ -58,7 +58,7 @@ void Daemon::serverInit( void ) {
     if( server ) {
         server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
         server->accept();
-        myInfo->host.peerType |= Peer::PEER_MASTER;
+        myInfo->info.peerType |= Host::TP_MASTER;
         LOG_DEBUG << "Starting server on port " << params["port"].as<uint16_t>() << ".";
     }
 }
@@ -78,10 +78,10 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-    LOG_TRACE << "Maintenance";
+    //LOG_TRACE << "Maintenance";
 
     updateLoadAvg();
-    cleanupPeers();
+    cleanup();
     worker.updateStatus();
 
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
@@ -113,7 +113,7 @@ bool Daemon::doWork( void ) {
         for( auto & it : threads ) {
             it->join();
         }
-        myInfo->host.peerType = 0;
+        myInfo->info.peerType = 0;
         threads.clear();
         worker.stop();
     }
@@ -131,13 +131,12 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
 
     try {
         *conn << CMD_CFG;           // request handshake
-        Peer::HostInfo peerhi;
-        *conn >> peerhi;
-        *conn << myInfo->host;
+        Host::HostInfo remote_info;
+        *conn >> remote_info;
+        *conn << myInfo->info;
 
         LOG_DEBUG << "connected()  Handshake successful.";
-        Peer::Ptr& peer = addOrGetPeer( peerhi, conn );
-        peer->lastSeen = boost::posix_time::second_clock::local_time();
+        addConnection( remote_info, conn );
 
         conn->setCallback( bind( &Daemon::activity, this, std::placeholders::_1 ) );
         *conn << CMD_OK;           // all ok
@@ -161,19 +160,19 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
         return;
     }
 
-    LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")";
+    //LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")";
 
     try {
-        Peer::Ptr peer = getPeer( conn );
-        peer->lastSeen = boost::posix_time::second_clock::local_time();
+        
+        connections[conn]->touch();
 
         switch( cmd ) {
-            case CMD_ADD_JOB: conn->strand.post( boost::bind( &Daemon::addJobs, this, peer ) ); break;
-            case CMD_DEL_JOB: conn->strand.post( boost::bind( &Daemon::removeJobs, this, peer ) ); break;
-            case CMD_GET_WORK: conn->strand.post( boost::bind( &Daemon::sendWork, this, peer ) ); break;
+            case CMD_ADD_JOB: conn->strand.post( boost::bind( &Daemon::addJobs, this, conn ) ); break;
+            case CMD_DEL_JOB: conn->strand.post( boost::bind( &Daemon::removeJobs, this, conn ) ); break;
+            case CMD_GET_WORK: conn->strand.post( boost::bind( &Daemon::sendWork, this, conn ) ); break;
             case CMD_GET_JOBLIST: conn->strand.post( boost::bind( &Daemon::sendJobList, this, conn ) ); break;
-            case CMD_PUT_PARTS: conn->strand.post( boost::bind( &Daemon::putParts, this, peer ) ); break;
-            case CMD_STAT: conn->strand.post( boost::bind( &Daemon::updatePeerStatus, this, peer ) ); break;
+            case CMD_PUT_PARTS: conn->strand.post( boost::bind( &Daemon::putParts, this, conn ) ); break;
+            case CMD_STAT: conn->strand.post( boost::bind( &Daemon::updateHostStatus, this, conn ) ); break;
             case CMD_JSTAT: conn->strand.post( boost::bind( &Daemon::sendJobStats, this, conn ) ); break;
             case CMD_PSTAT: conn->strand.post( boost::bind( &Daemon::sendPeerList, this, conn ) ); break;
             case CMD_DISCONNECT: conn->socket().close(); break;
@@ -190,81 +189,74 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
 }
 
 
-Peer::Ptr& Daemon::addOrGetPeer( const Peer::HostInfo& phi, TcpConnection::Ptr& conn ) {
+void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Ptr& conn ) {
+    
     unique_lock<mutex> lock( peerMutex );
-    if( myInfo->host == phi ) {
-        myInfo->host.peerType |= phi.peerType;
-        myInfo->conn = conn;
-        return myInfo;
+    if( myInfo->info == remote_info ) {
+        myInfo->info.peerType |= remote_info.peerType;
+        connections[conn] = myInfo;
+        return;
     }
-    for( auto & it : peers ) {
-        if( it.second->host == phi ) {
-            myInfo->host.peerType = phi.peerType;
-            it.second->conn = conn;      // re-connect, replace connection
-            return it.second;
-        }
+    
+    Host::Ptr& host = connections[conn];
+    if( host == nullptr ) { // not found
+        uint64_t id = 1; // start indexing peers with 1
+        while( peers.find( id ) != peers.end() ) id++;
+        host.reset( new Host( remote_info, id ) );
+        host->nConnections++;
+        peers.insert( make_pair( id, host ) );
+        conn->setSwapEndian(remote_info.littleEndian != myInfo->info.littleEndian);
+    } else {
+        host->touch();
     }
-    // not found
-    size_t id = 1; // start indexing peers with 1
-    while( peers.find( id ) != peers.end() ) id++;
-    Peer::Ptr p( new Peer( phi, conn, id ) );
-    auto ret = peers.insert( make_pair( id, p ) );
-    if( !ret.second ) {
-        throw invalid_argument( "Failed to insert peer." );
-    }
-    return ret.first->second;
+
+
 }
 
 
-Peer::Ptr& Daemon::getPeer( const TcpConnection::Ptr& conn ) {
+
+
+// TODO a timeout to allow a peer to reconnect before removing it (which would clear stats/id when/if it reconnects).
+void Daemon::cleanup( void ) {
+
     unique_lock<mutex> lock( peerMutex );
-    if( myInfo->conn == conn ) {
-        return myInfo;
-    }
-    for( auto & it : peers ) {
-        if( it.second->conn == conn ) {
-            return it.second;
+
+    for( auto & it : connections ) {
+        if( it.first && !it.first->socket().is_open() ) {
+            it.second->nConnections--;
+            connections.erase( it.first );
         }
     }
-    // not found
-    throw invalid_argument( "Failed to get peer." );
 
-}
-
-// TODO a timeout to allow a peer to reconnect before "hard-dropping" it.
-void Daemon::cleanupPeers( void ) {
-
-    unique_lock<mutex> lock( peerMutex );
-
-    for( auto & it : peers ) {
-        if( it.second && it.second->conn && !it.second->conn->socket().is_open() ) {
-            auto wip = peerWIP.find( it.second );
+    for( auto & pit : peers ) {
+        if( pit.second->nConnections < 1 ) {
+            auto wip = peerWIP.find( pit.second );
             if( wip != peerWIP.end() ) {
                 if( wip->second.job ) {
                     LOG_DETAIL << "Peer disconnected, returning work to queue: " << wip->second.print();
                     wip->second.job->ungetParts( wip->second );
                 }
             }
-            peers.erase( it.first );
+            peers.erase( pit.first );
         }
     }
 
 }
 
 
-void Daemon::addJobs( Peer::Ptr& peer ) {
+void Daemon::addJobs( TcpConnection::Ptr& conn ) {
 
     size_t blockSize;
-    bool swap_endian;
-    shared_ptr<char> buf = peer->receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
     if( !blockSize ) {
-        *peer->conn << CMD_ERR;
+        *conn << CMD_ERR;
         return;
     }
 
     const char* ptr = buf.get();
     uint64_t count(0);
     vector<size_t> ids( 1, 0 );
+    bool swap_endian = conn->getSwapEndian();
     try {
         while( count < blockSize ) {
             string tmpS = string( ptr+count );
@@ -289,23 +281,22 @@ void Daemon::addJobs( Peer::Ptr& peer ) {
 
     if( count == blockSize ) {
         LOG << "Received " << ids[0] << " jobs.";
-        *peer->conn << CMD_OK;           // all ok, return IDs
+        *conn << CMD_OK;           // all ok, return IDs
         if( swap_endian ) swapEndian( ids.data(), ids.size() );
-        peer->conn->writeAndCheck( ids );
+        conn->writeAndCheck( ids );
     }
     else {
         LOG_ERR << "addJobs: Parsing of datablock failed, count = " << count << "   blockSize = " << blockSize << "  bytes.";
-        *peer->conn << CMD_ERR;
+        *conn << CMD_ERR;
     }
 
 }
 
 
-void Daemon::removeJobs( Peer::Ptr& peer ) {
+void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
     size_t blockSize;
-    bool swap_endian;
-    shared_ptr<char> buf = peer->receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if( blockSize ) {
 
@@ -370,7 +361,11 @@ Job::JobPtr Daemon::selectJob( bool localRequest ) {
     return job;
 }
 
-bool Daemon::getWork( WorkInProgress& wip ) {
+bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
+
+#ifdef DEBUG_
+    LOG_TRACE << "Daemon::getWork("<<(int)nThreads<<")";
+#endif
 
 /*    if( wip.job ) {        // job already checked out. lost ??      TODO: deal with it...
         wip.job.reset();
@@ -379,19 +374,19 @@ bool Daemon::getWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     Job::JobPtr job;
     bool ret = false;
-    if( wip.peer ) {                // remote worker
+    if( wip.connection ) {                // remote worker
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
             if( step == Job::JSTEP_QUEUED ) {
                 job = it;
-                if( it->getParts( wip ) ) {
+                if( it->getParts( wip, nThreads ) ) {
                     ret = true;
                     break;
                 }
             }
             else if( step == Job::JSTEP_RUNNING ) {
                 job = it;
-                if( it->getParts( wip ) ) {
+                if( it->getParts( wip, nThreads ) ) {
                     ret = true;
                     break;
                 }
@@ -399,12 +394,11 @@ bool Daemon::getWork( WorkInProgress& wip ) {
         }
     }
     else {                          // local worker
-        wip.peer = myInfo;
         if( nQueuedJobs < 2 ) {     // see if another job can be prepared
             for( auto & it : jobs ) {
                 if( it->info.step.load() < Job::JSTEP_QUEUED ) {
                     job = it;
-                    it->getParts( wip );
+                    it->getParts( wip, nThreads );
                     ret = true;
                     break;
                 }
@@ -414,13 +408,12 @@ bool Daemon::getWork( WorkInProgress& wip ) {
             uint8_t step = it->info.step.load();
             if( step & ( Job::JSTEP_QUEUED | Job::JSTEP_RUNNING | Job::JSTEP_POSTPROCESS ) ) {
                 job = it;
-                if( it->getParts( wip ) || ( step != Job::JSTEP_RUNNING ) ) {
+                if( it->getParts( wip, nThreads ) || ( step != Job::JSTEP_RUNNING ) ) {
                     ret = true;
                     break;
                 }
             }
         }
-        if( !ret ) wip.peer.reset();
     }
     if( job ) {
         job->info.state.store( Job::JSTATE_ACTIVE );
@@ -430,15 +423,16 @@ bool Daemon::getWork( WorkInProgress& wip ) {
 }
 
 
-void Daemon::sendWork( Peer::Ptr& peer ) {
+void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
-    auto it = peerWIP.insert( std::pair<Peer::Ptr, WorkInProgress>( peer, WorkInProgress( peer ) ) );
+    auto it = peerWIP.insert( make_pair( connections[conn], WorkInProgress( conn ) ) );
     WorkInProgress& wip = it.first->second;
+    Host::Ptr host = it.first->first;
 
     Job::JobPtr lastJob = wip.job;
     size_t blockSize = 0;
     bool includeJob = false;
-    if( getWork( wip ) && (!lastJob || *wip.job != *lastJob)) {
+    if( getWork( wip, host->status.nThreads ) && (!lastJob || *wip.job != *lastJob)) {
         includeJob = true;
         blockSize = wip.size( includeJob );
     }
@@ -453,70 +447,67 @@ void Daemon::sendWork( Peer::Ptr& peer ) {
     blockSize = std::min(blockSize,count);       // if something is compressed, we don't send the whole allocated block.
     pack( buf.get(), blockSize );
 
-    peer->conn->writeAndCheck( buf, blockSize + sizeof( size_t ) );
+    conn->writeAndCheck( buf, blockSize + sizeof( size_t ) );
 
 }
 
 
-void Daemon::putParts( Peer::Ptr& peer ) {
+void Daemon::putParts( TcpConnection::Ptr& conn ) {
 
     size_t blockSize;
-    bool swap_endian;
-    shared_ptr<char> buf = peer->receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    auto it = peerWIP.insert( std::pair<Peer::Ptr, WorkInProgress>( peer, WorkInProgress( peer ) ) );
+    auto it = peerWIP.insert( make_pair( connections[conn], WorkInProgress( conn ) ) );
     WorkInProgress& wip = it.first->second;
     if( blockSize ) {
         LOG_DEBUG << "putParts():  blockSize = " << blockSize;
         LOG_DEBUG << "putParts():  wip = " << wip.print();
-        wip.unpack( buf.get(), swap_endian);
+        wip.unpack( buf.get(), conn->getSwapEndian() );
         wip.job->returnParts( wip );
         LOG_DEBUG << "putParts(): wip2 = " << wip.print();
     }
     else LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
 
-    *( peer->conn ) << CMD_OK;         // all ok
+    *conn << CMD_OK;         // all ok
 
 }
 
 
 void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
 
-    size_t blockSize = 0;
+    uint64_t blockSize = 0;
     unique_lock<mutex>( jobMutex );
     for( auto & it : jobs ) {
         blockSize += it->size();
     }
-    size_t totalSize = blockSize + sizeof( size_t );
-    auto buf = sharedArray<char>( totalSize );
+    auto buf = sharedArray<char>( blockSize + sizeof( uint64_t ) );         // blockSize will be sent before block
     char* ptr = buf.get();
-    uint64_t count = pack( ptr, blockSize );
+    uint64_t count = pack( ptr, blockSize );                                // store blockSize
+    blockSize += sizeof( uint64_t );                                        // ...and add sizeof(blockSize) to make verification & write correct below.
     for( auto & it : jobs ) {
         count += it->pack( ptr+count );
     }
-    if( count != totalSize ) {
-        LOG_ERR << "sendJobList(): Packing of job infos failed:  count = " << count << "   totalSize = " << totalSize << "  bytes.";
+    if( count != blockSize ) {
+        LOG_ERR << "sendJobList(): Mismatch when packing joblist:  count = " << count << "   blockSize = " << blockSize << "  bytes.";
         return;
     }
-
-    conn->writeAndCheck( buf, totalSize );
+    conn->writeAndCheck( buf, blockSize );
 
 }
 
 
-void Daemon::updatePeerStatus( Peer::Ptr& peer ) {
+void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
 
     size_t blockSize;
-    bool swap_endian;
-    shared_ptr<char> buf = peer->receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    if( !blockSize ) return;
-
-    try {
-        peer->stat.unpack( buf.get(), swap_endian );
-    }
-    catch( const exception& e ) {
-        LOG_ERR << "updateStatus: Exception caught while parsing block: " << e.what();
+    if( blockSize ) {
+        try {
+            connections[conn]->status.unpack( buf.get(), conn->getSwapEndian() );
+        }
+        catch( const exception& e ) {
+            LOG_ERR << "updateStatus: Exception caught while parsing block: " << e.what();
+        }
     }
 
 }
@@ -571,16 +562,16 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
 
 
 void Daemon::updateLoadAvg( void ) {
-    LOG_TRACE << "updateLoadAvg()";
+    //LOG_TRACE << "updateLoadAvg()";
 
     static double loadAvg[3];
 
     int ret = getloadavg( loadAvg, 3 );
     if( ret != 3 ) {
         LOG_ERR << "updateLoadAvg(): failed to get loadavg.";
-        myInfo->stat.loadAvg = 0;
+        myInfo->status.loadAvg = 0;
         return;
     }
 
-    myInfo->stat.loadAvg = loadAvg[0] / myInfo->host.nCores * 100.0;
+    myInfo->status.loadAvg = loadAvg[0] / myInfo->info.nCores * 100.0;
 }

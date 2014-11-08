@@ -128,7 +128,7 @@ uint32_t ParPort::read_registers ( void ) {
 void ParPort::write_register ( uint8_t regnum, uint8_t value ) {
     if( status != PAR_OK ) return;
     std::unique_lock<std::mutex> lock(mutex);
-#ifdef _DEBUG
+#ifdef DEBUG_
     cout << "write_register(" << (int)regnum << "," << bitString(value) << ")" << endl;
 #endif
     registers.b[regnum] = value;
@@ -140,7 +140,7 @@ void ParPort::write_register ( uint8_t regnum, uint8_t value ) {
 void ParPort::write_registers ( uint32_t value ) {
     if( status != PAR_OK ) return;
     std::unique_lock<std::mutex> lock(mutex);
-#ifdef _DEBUG
+#ifdef DEBUG_
     cout << "write_registers(" << bitString(value) << ")" << endl;
 #endif
     registers.i = value;

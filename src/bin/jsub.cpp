@@ -3,7 +3,7 @@
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/tcpconnection.hpp"
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/stringutil.hpp"
 
@@ -79,7 +79,7 @@ namespace {
 
 void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     
-    Peer::HostInfo me, master;
+    Host::HostInfo me, master;
     uint8_t cmd = CMD_CONNECT;
     boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));

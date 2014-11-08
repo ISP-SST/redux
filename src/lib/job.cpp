@@ -135,7 +135,7 @@ uint64_t Job::Info::pack( char* ptr ) const {
     count += pack( ptr+count, id );
     count += pack( ptr+count, priority );
     count += pack( ptr+count, verbosity );
-    count += pack( ptr+count, nThreads );
+    count += pack( ptr+count, maxThreads );
     count += pack( ptr+count, maxPartRetries );
     count += pack( ptr+count, step.load() );
     count += pack( ptr+count, state.load() );
@@ -158,7 +158,7 @@ uint64_t Job::Info::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, id, swap_endian );
     count += unpack( ptr+count, priority );
     count += unpack( ptr+count, verbosity );
-    count += unpack( ptr+count, nThreads );
+    count += unpack( ptr+count, maxThreads );
     count += unpack( ptr+count, maxPartRetries );
     uint8_t tmp;
     count += unpack( ptr+count, tmp );
@@ -189,11 +189,15 @@ std::string Job::Info::print( void ) {
 
 
 void Job::parseProperties( po::variables_map&, bpt::ptree& tree ) {
+    
+    //LOG_TRACE << "Job::parseProperties()";
+    
     info.priority = tree.get<uint8_t>( "PRIORITY", 10 );
     info.logFile = tree.get<string>( "LOGFILE", "" );
     info.verbosity = tree.get<uint8_t>( "VERBOSITY", 0 );
-    info.nThreads = tree.get<uint8_t>( "MAX_THREADS", 255 );
+    info.maxThreads = tree.get<uint8_t>( "MAX_THREADS", 255 );
     info.maxPartRetries = tree.get<uint8_t>( "MAX_PART_RETRIES", 0 );
+    
 }
 
 
@@ -204,7 +208,7 @@ bpt::ptree Job::getPropertyTree( bpt::ptree* root ) {
     tree.put( "PRIORITY", info.priority );
     tree.put( "LOGFILE", info.logFile );
     tree.put( "VERBOSITY", info.verbosity );
-    tree.put( "MAX_THREADS", info.nThreads );
+    tree.put( "MAX_THREADS", info.maxThreads );
     tree.put( "MAX_PART_RETRIES", info.maxPartRetries );
 
     if( root ) {

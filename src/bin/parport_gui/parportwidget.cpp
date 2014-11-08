@@ -158,7 +158,7 @@ void ParPortWidget::poll ( void ) {
 
     uint32_t diff = registers.i ^ cachedRegisters.i;
     if ( diff ) {
-#ifdef _DEBUG
+#ifdef DEBUG_
         printMsg ( "Poll: (status=" + QString::number ( status ) + ")  newval=" + QString::number ( registers.i, 2 ), Qt::blue );
 #endif
         cachedRegisters = registers;
@@ -331,7 +331,7 @@ void ParPortWidget::createActions ( void ) {
 
 void ParPortWidget::readSettings() {
 
-#ifdef _DEBUG
+#ifdef DEBUG_
     print ( "ParportWidget: Loading saved settings" );
 #endif
 
@@ -347,7 +347,7 @@ void ParPortWidget::readSettings() {
 
 void ParPortWidget::writeSettings() {
 
-#ifdef _DEBUG
+#ifdef DEBUG_
     print ( "ParportWidget: Saving settings" );
 #endif
 

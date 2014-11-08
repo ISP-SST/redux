@@ -1,7 +1,7 @@
 #ifndef REDUX_GUI_PEERTAB_HPP
 #define REDUX_GUI_PEERTAB_HPP
 
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 
 #include <QWidget>
 #include <QAction>

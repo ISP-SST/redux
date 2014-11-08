@@ -2,7 +2,7 @@
 #include "redux/job.hpp"
 #include "redux/logger.hpp"
 #include "redux/network/tcpconnection.hpp"
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 #include "redux/util/endian.hpp"
 
 #include <boost/program_options.hpp>
@@ -53,14 +53,13 @@ namespace {
     }
 }
 
-void printJobList( Peer& master ) {
+void printJobList( TcpConnection::Ptr conn ) {
 
     uint8_t cmd = CMD_JSTAT;
-    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
+    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
-    bool swap_endian;
-    shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if ( !blockSize ) return;
 
@@ -70,7 +69,7 @@ void printJobList( Peer& master ) {
         Job::Info info;
         cout << info.printHeader() << endl;
         while( count < blockSize ) {
-            count += info.unpack(ptr+count,swap_endian);
+            count += info.unpack(ptr+count,conn->getSwapEndian());
             cout << info.print() << endl;
         }
     } catch ( const exception& e) {
@@ -82,24 +81,23 @@ void printJobList( Peer& master ) {
 
 }
 
-void printPeerList( Peer& master ) {
+void printPeerList( TcpConnection::Ptr conn ) {
 
     uint8_t cmd = CMD_PSTAT;
-    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
+    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
-    bool swap_endian;
-    shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if ( !blockSize ) return;
 
     const char* ptr = buf.get();
     uint64_t count(0);
     try {
-        Peer peer;
+        Host peer;
         cout << peer.printHeader() << endl;
         while( count < blockSize ) {
-            count += peer.unpack(ptr+count,swap_endian);
+            count += peer.unpack(ptr+count,conn->getSwapEndian());
             cout << peer.print() << endl;
         }
     } catch ( const exception& e) {
@@ -134,8 +132,8 @@ int main( int argc, char *argv[] ) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            Peer::HostInfo me;
-            Peer master;
+            Host::HostInfo me;
+            Host master;
             uint8_t cmd = CMD_CONNECT;
             boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
             boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
@@ -144,7 +142,7 @@ int main( int argc, char *argv[] ) {
             }
             if( cmd == CMD_CFG ) {  // handshake requested
                 *conn << me;
-                *conn >> master.host;
+                *conn >> master.info;
                 boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             }
             if( cmd != CMD_OK ) {
@@ -152,13 +150,12 @@ int main( int argc, char *argv[] ) {
                 return EXIT_FAILURE;
             }
 
-            master.conn = conn;
-            if( vm.count( "jobs" ) ) printJobList( master );
-            if( vm.count( "slaves" ) ) printPeerList( master );
+            if( vm.count( "jobs" ) ) printJobList( conn );
+            if( vm.count( "slaves" ) ) printPeerList( conn );
             while( loop ) {
                 sleep(vm["time"].as<int>());
-                if( vm.count( "jobs" ) ) printJobList( master );
-                if( vm.count( "slaves" ) ) printPeerList( master );
+                if( vm.count( "jobs" ) ) printJobList( conn );
+                if( vm.count( "slaves" ) ) printPeerList( conn );
             }
         }
     }

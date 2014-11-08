@@ -5,7 +5,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/translators.hpp"
 #include "redux/network/tcpconnection.hpp"
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
@@ -107,7 +107,7 @@ int main( int argc, char *argv[] ) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            Peer::HostInfo me, master;
+            Host::HostInfo me, master;
             
             uint8_t cmd = CMD_CONNECT;
             boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));

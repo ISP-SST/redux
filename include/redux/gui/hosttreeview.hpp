@@ -10,7 +10,7 @@ namespace redux {
 
     namespace gui {
 
-        class PeerTreeView : public QTreeView {
+        class HostTreeView : public QTreeView {
             Q_OBJECT
 
             void createActions( void );
@@ -33,11 +33,11 @@ namespace redux {
             void killHost( void );
 
         public:
-            PeerTreeView( QWidget *parent = 0 );
-            ~PeerTreeView() {};
+            HostTreeView( QWidget *parent = 0 );
+            ~HostTreeView() {};
 
             QModelIndexList selectedIndexes( void ) const { return QTreeView::selectedIndexes(); };
-            virtual void reset( void ) { QTreeView::reset(); for( int i = 0; i < 5; ++i ) resizeColumnToContents( i ); }; //expandAll(); };
+            //virtual void reset( void ) { QTreeView::reset(); for( int i = 0; i < 5; ++i ) resizeColumnToContents( i ); }; //expandAll(); };
 
         };
 

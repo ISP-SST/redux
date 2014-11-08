@@ -68,7 +68,7 @@ namespace redux {
         
         struct Info {
             size_t id;
-            uint8_t priority, verbosity, nThreads, maxPartRetries;
+            uint8_t priority, verbosity, maxThreads, maxPartRetries;
             std::atomic<uint8_t> step;
             std::atomic<uint8_t> state;
             std::string typeString, name, user, host;
@@ -104,13 +104,13 @@ namespace redux {
         virtual uint64_t pack(char*) const;
         virtual uint64_t unpack(const char*, bool);
         
-        virtual size_t getParts(WorkInProgress&) { return 0; };
+        virtual size_t getParts(WorkInProgress&, uint8_t) { return 0; };
         virtual void ungetParts(WorkInProgress&) { };
         virtual void returnParts(WorkInProgress&) { };
 
         virtual void init(void) {};
         virtual void cleanup(void) {};
-        virtual bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&) = 0;
+        virtual bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&, uint8_t) = 0;
         
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);

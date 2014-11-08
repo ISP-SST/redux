@@ -122,6 +122,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts,
 
 void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
 
+    Job::parseProperties( vm, tree );
     LOG_DEBUG << "MomfbdJob::parseProperties()";
 
     bpt::ptree cmdTree;      // just to be able to use the VectorTranslator
@@ -511,7 +512,6 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
         count += it->unpack( ptr+count, swap_endian );
     }
     count += pupil.unpack( ptr+count, swap_endian );
-    LOG_ERR << "MomfbdJob::unpack():  nPatches = " << patches.size() ;
     
     return count;
     
@@ -541,14 +541,14 @@ void MomfbdJob::checkParts( void ) {
 }
 
 
-size_t MomfbdJob::getParts( WorkInProgress& wip ) {
+size_t MomfbdJob::getParts( WorkInProgress& wip, uint8_t nThreads ) {
 
     uint8_t step = info.step.load();
     wip.parts.clear();
     if( step == JSTEP_QUEUED || step == JSTEP_RUNNING ) {
         unique_lock<mutex> lock( jobMutex );
-//         size_t nParts = wip.peer->stat.nThreads;
-//         if( info.nThreads ) nParts = std::min( wip.peer->stat.nThreads, info.nThreads );
+//         size_t nParts = wip.peer->status.nThreads;
+//         if( info.nThreads ) nParts = std::min( wip.peer->status.nThreads, info.nThreads );
         for( auto & it : patches ) {
             if( it.second->step == JSTEP_QUEUED ) {
                 it.second->step = JSTEP_RUNNING;
@@ -607,7 +607,7 @@ void MomfbdJob::cleanup(void) {
 }
 
 
-bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool ) {
+bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool, uint8_t maxThreads ) {
     
     uint8_t step = info.step.load();
     if( step < JSTEP_SUBMIT ) {
@@ -618,14 +618,13 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
         preProcess(service, pool);                           // preprocess on master: load, flatfield, split in patches
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
-        size_t nThreads = wip.peer->stat.nThreads;
-        if( info.nThreads ) nThreads = std::min( wip.peer->stat.nThreads, info.nThreads );
+        size_t nThreads = std::min( maxThreads, info.maxThreads);
         service.reset();
 
         for( auto & it : wip.parts ) {
             service.post( boost::bind( &MomfbdJob::runMain, this, boost::ref( it ) ) );
         }
-        for( size_t t = 0; t < nThreads * 2; ++t ) {
+        for( size_t t = 0; t < nThreads; ++t ) {
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
         }
 
@@ -661,9 +660,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         it->loadData(service, pool);
     }
 
-    info.nThreads = 12;
+    info.maxThreads = 12;
     // load remaining files asynchronously  (images)
-    for( size_t t = 0; t < info.nThreads; ++t ) {
+    for( size_t t = 0; t < info.maxThreads; ++t ) {
         cout << "Adding load-thread #" << (t+1) << endl;
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
@@ -683,7 +682,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         it->preprocessData(service, pool);
     }
 
-    for( size_t t = 0; t < info.nThreads; ++t ) {
+    for( size_t t = 0; t < info.maxThreads; ++t ) {
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
     pool.join_all();
@@ -695,7 +694,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         it->normalize(service, pool);
     }
 
-    for( size_t t = 0; t < info.nThreads; ++t ) {
+    for( size_t t = 0; t < info.maxThreads; ++t ) {
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
     pool.join_all();

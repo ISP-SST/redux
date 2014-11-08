@@ -1,10 +1,8 @@
-#include "redux/gui/mastertab.hpp"
+#include "redux/gui/hosttab.hpp"
 
 #include "redux/job.hpp"
 #include "redux/network/protocol.hpp"
 #include "redux/util/endian.hpp"
-
-//#include <unistd.h>
 
 using namespace redux::gui;
 using namespace redux::network;
@@ -12,177 +10,78 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-MasterTab::MasterTab( Peer& m, QWidget* par ) :
-    QWidget( par ),
-    master( m ),
+HostTab::HostTab( Host& m, TcpConnection::Ptr ptr, QWidget* par ) :
+    QWidget( par ), Host(m.info), connection(ptr),
     parent( par ),
-    modified( false ),
     jobModel( jobs ),
-    peerModel( peers ) {
+    hostModel( hosts ) {
 
-    static Peer::HostInfo myInfo;
-    swap_endian = ( myInfo.littleEndian != master.host.littleEndian );
-
-//     size_t blockSize = 2 + sizeof( size_t ) + myInfo.size();
-//     char* tmp = new char[ blockSize ];
-//     memset( tmp, 0 , blockSize );
-//
-//     char* ptr = tmp;
-//     *ptr++ = CMD_CONNECT;
-//     // *ptr++ = myEndian;
-//     *( ( size_t* )ptr ) = blockSize - 1;
-//     ptr += sizeof( size_t );
-//     ptr = myInfo.pack( ptr );
-//     int ret2 = 0;//sock->send( tmp, blockSize );
-//     //if ( ret != blockSize )
-//     //cout << "reduxd::conf() " << ret2 << " - " << blockSize << endl;
-//
-//
-//     if( ret2 != blockSize ) {
-//         cout << ( string( "MasterTab::MasterTab(1): Sending " ) + std::to_string( blockSize ) + string( " bytes, but only " ) + std::to_string( ret2 ) + string( " verified." ) ) << endl;
-//     }
-//
-//     bool differentEndian = false;
-//     blockSize = 1 + sizeof( size_t );
-//     tmp = new char[ blockSize ];
-//     ret2 = 0; //sock->peek( tmp, blockSize );
-//     if( ret2 != blockSize ) {
-//         cout << ( string( "MasterTab::MasterTab(2): Expected " ) + std::to_string( blockSize ) + string( " bytes, but received " ) + std::to_string( ret2 ) + string( "." ) ) << endl;
-//         delete[] tmp;
-//         return;
-//     }
-//
-//     if( *tmp != 0 ) { //myEndian ) {
-//         differentEndian = true;
-//         //swapEndian( ( size_t* )( tmp + 1 ) );
-//     }
-//     blockSize = *( ( size_t* )( tmp + 1 ) );
-//     delete[] tmp;
-//     tmp = new char[ blockSize ];
-//     memset( tmp, 0 , blockSize );
-//     ret2 = 0; //sock->recv( tmp, blockSize );
-//     if( ret2 != blockSize ) {
-//         cout << ( string( "MasterTab::MasterTab(3): Expected " ) + std::to_string( blockSize ) + string( " bytes, but received " ) + std::to_string( ret2 ) + string( "." ) ) << endl;
-//     }
-//
-//     ptr = tmp + 1 + sizeof( size_t );
-//     //ptr = masterInfo.unpack( ptr, differentEndian );
-//     delete[] tmp;
-// //     if( ptr != ( tmp + blockSize ) ) {
-// //         cout << ( string( "MasterTab::MasterTab(4): Unpacking of received HostInfo failed." ) ) << endl;
-// //     }
-//
-//     //masterInfo.IP = sock->getPeerIP();
+    static Host::HostInfo myInfo;
+    swap_endian = ( myInfo.littleEndian != info.littleEndian );
 
     createLayout();
     createActions();
-    //cout << "MasterTab::MasterTab() 2" << endl;
+
     connect( this, SIGNAL( infoChanged() ), this, SLOT( updateInfo() ), Qt::AutoConnection );
 
     this->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding );
 
-    cout << "MasterTab::MasterTab() 3" << endl;
     getInfo();
-    cout << "MasterTab::MasterTab() 4" << endl;
-}
-
-MasterTab::~MasterTab() {
-    //cout << "MasterTab::~MasterTab()" << endl;
-    //myTimer.exit();
-//     if( conn ) {
-//         *conn << CMD_DISCONNECT;
-//         //cout << "MasterTab::~MasterTab() 2" << endl;
-//     }
-//     //cout << "MasterTab::~MasterTab() 3" << endl;
-
-    //if ( pool ) myTimer.exit();
 
 }
 
 
+HostTab::~HostTab() {
 
-void MasterTab::init( void ) {
-
-
-}
-
-void MasterTab::loadHost( int active ) {
-
-    activeHost = active;
-    loadValues();
 
 }
 
-void MasterTab::updateInfo( void ) {
 
-    //cout << "MasterTab::updateInfo()" << endl;
+void HostTab::updateInfo( void ) {
+
     laValueLabel->setText( "" );
-//     if( masterInfo.loadAvg > masterInfo.nThreads[0] ) laValueLabel->setForegroundRole( QPalette::LinkVisited );
-//     else laValueLabel->setForegroundRole( QPalette::WindowText );
 
-    //updateInterval->setValue( myTimer.getInterval() );
-    string tmp = ""; // toString( ( int )masterInfo.nThreads[1] ) + string( "/" ) + toString( ( int )masterInfo.nThreads[2] ) + string( "/" )
-    //+ toString( ( int )masterInfo.nThreads[3] ) + string( "/" ) + toString( ( int )masterInfo.nThreads[0] );
+    string tmp = "";
+
     tcLabel->setText( tmp.c_str() );
 
     struct timespec ts;
     clock_gettime( CLOCK_REALTIME, &ts );
-    //gettimeofday ( &ts, NULL );
-    //uptime->setText( tsToString( tsSubtract( ts, masterInfo.startTime ) ).c_str() );
 
-    // globalLognameLabel->setText( sysConfig.sysLog.file.name().c_str() );
-
-    //cout << "MasterTab::updateInfo(5)" << endl;
-    peerModel.refreshTree();
-    peerList->reset();
-
-    //if ( !sysConfig.hosts.size() ) hostList->hide();
-    //else hostList->show();
-    //cout << "MasterTab::updateInfo(7)" << endl;
+    hostModel.refreshTree();
+    hostList->reset();
 
     jobModel.refreshTree();
     jobList->reset();
 
-
 }
 
-bool MasterTab::getJobs( void ) {
 
-    jobs.clear();   // TODO do something smarter...
+void HostTab::getJobs( void ) {
 
-    if( !master.conn || !*master.conn ) {
-        return true;
+    jobs.clear();
+
+    if( !connection || !*connection ) {
+        return;
     }
 
-    cout << "getJobs 1" << endl;
-    //*master.conn << CMD_GET_JOBLIST;
     uint8_t cmd = CMD_GET_JOBLIST;
-    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
+    boost::asio::write(connection->socket(),boost::asio::buffer(&cmd,1));
 
-    size_t blockSize;
-    shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
-   
-    if( !blockSize ) return true;
+    uint64_t blockSize;
+    shared_ptr<char> buf = connection->receiveBlock( blockSize );
+    
+    if( !blockSize ) return;
 
     const char* ptr = buf.get();
     uint64_t count(0);
-    bool modified = false;
     try {
         while( count < blockSize ) {
-            string tmpS = string( ptr );
+            string tmpS = string( ptr+count );
             Job::JobPtr job = Job::newJob( tmpS );
             if( job ) {
                 count += job->unpack( ptr+count, swap_endian );
-                auto ret = jobs.insert( job );
-                if( !ret.second ) {
-                    //jobs.erase(ret.first);
-                    //jobs.insert( job );
-                    cout << "getJobs:  duplicate" << endl;
-                    //ret.first->stat = job->stat;
-                }
-                else {
-                    modified = true;
-                }
+                jobs.insert( job );
             }
             else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
         }
@@ -194,80 +93,62 @@ bool MasterTab::getJobs( void ) {
         cout << "addJobs: Parsing of datablock failed,  count = " << count << "  blockSize = " << blockSize << " bytes." << endl;
     }
 
-    cout << "getJobs E" << endl;
-    return modified;
-
 }
 
 
-bool MasterTab::getPeers( void ) {
+void HostTab::getHosts( void ) {
 
-    peers.clear();   // TODO do something smarter...
+    hosts.clear();
 
-    if( !master.conn || !*master.conn ) {
-        return true;
+    if( !connection || !*connection ) {
+        return;
     }
-    
-    cout << "getPeers 1" << endl;
 
-    //*master.conn << CMD_PSTAT;
     uint8_t cmd = CMD_PSTAT;
-    boost::asio::write(master.conn->socket(),boost::asio::buffer(&cmd,1));
+    boost::asio::write(connection->socket(),boost::asio::buffer(&cmd,1));
 
     size_t blockSize;
     uint64_t count(0);
-    shared_ptr<char> buf = master.receiveBlock( blockSize, swap_endian );
+    shared_ptr<char> buf = connection->receiveBlock( blockSize );
     
-    if( !blockSize ) return true;
+    if( !blockSize ) return;
 
     const char* ptr = buf.get();
-    bool modified = false;
     try {
-        Peer peer;
+        Host host;
         while( count < blockSize ) {
-            count += peer.unpack( ptr+count, swap_endian );
-            auto ret = peers.insert( peer );
-            if( !ret.second ) { // already in the set, replace with new version
-                peers.erase( ret.first );
-                peers.insert( peer );
-            }
-            modified = true;
+            count += host.unpack( ptr+count, swap_endian );
+            hosts.insert( Host::Ptr(new Host(host.info)) );
         }
     }
     catch( const exception& e ) {
         cout << "getPeers: Exception caught while parsing block: " << e.what() << endl;
     }
+    
     if( count != blockSize ) {
         cout << "getPeers: Parsing of datablock failed,  count = " << count << "  blockSize = " << blockSize << " bytes." << endl;
-        return false;
     }
 
-    cout << "getPeers E" << endl;
-    return modified;
 
 }
 
 
+void HostTab::getInfo( void ) {
 
-void MasterTab::getInfo( void ) {
-
-cout << "MasterTab::getInfo(1)" << endl;
-
-    if( !master.conn || !*master.conn ) {
+    if( !connection || !*connection ) {
         cout << "broken connection" << endl;
         return;
     }
 
-    bool modified = getJobs() | getPeers();
+    getJobs();
+    getHosts();
 
-    if( modified ) {
-        emit infoChanged();
-    }
+    emit infoChanged();
 
-cout << "MasterTab::getInfo(2)" << endl;
 }
 
-void MasterTab::contextMenuEvent( QContextMenuEvent* event ) {
+
+void HostTab::contextMenuEvent( QContextMenuEvent* event ) {
 
     QMenu menu( this );
     menu.addAction( addAct );
@@ -278,7 +159,8 @@ void MasterTab::contextMenuEvent( QContextMenuEvent* event ) {
 
 }
 
-void MasterTab::createLayout( void ) {
+
+void HostTab::createLayout( void ) {
 
     tabLayout = new QGridLayout( this );
 
@@ -364,11 +246,11 @@ void MasterTab::createLayout( void ) {
     //hostsLabel->setText ( tr ( "No Slaves" ) );
     //hostsLayout->addWidget ( hostsLabel, 0, 0, 1, 1 );
 
-    peerList = new PeerTreeView( hostsFrame );
-    hostsLayout->addWidget( peerList, 1, 0, 1, 5 );
+    hostList = new HostTreeView( hostsFrame );
+    hostsLayout->addWidget( hostList, 1, 0, 1, 5 );
     //hostModel.setRootObject( &( sysConfig.hosts ) );
-    peerList->setModel( &peerModel );
-    peerList->setSelectionBehavior( QAbstractItemView::SelectRows );
+    hostList->setModel( &hostModel );
+    hostList->setSelectionBehavior( QAbstractItemView::SelectRows );
     //connect( hostList, SIGNAL ( addLog() ), this, SLOT ( open() ) );
 
     jobList = new JobTreeView( hostsFrame );
@@ -378,38 +260,16 @@ void MasterTab::createLayout( void ) {
     jobList->setSelectionBehavior( QAbstractItemView::SelectRows );
     //connect( hostList, SIGNAL ( addLog() ), this, SLOT ( open() ) );
 
-    //hostList->hide();
-
     jobsFrame = new QFrame( statFrame );
     jobsFrame->setFrameShape( QFrame::Box );  //StyledPanel);
     jobsLayout = new QGridLayout( jobsFrame );
 
-    //jobsLabel = new QLabel ( jobsFrame );
-    //jobsLabel->setText ( tr ( "No Jobs" ) );
-    //jobsLayout->addWidget ( jobsLabel, 0, 0, 1, 1 );
-
-
     statLayout->addWidget( hostsFrame, 6, 0, 1, 5 );
     statLayout->addWidget( jobsFrame, 7, 0, 1, 5 );
 
-    //globalLayout->addWidget ( globalVerbLabel, 1, 3, 1, 1 );
-    //globalLayout->addWidget ( globalVerbCombo, 1, 4, 1, 1 );
     statLayout->setRowStretch( 1, 10 );
     statLayout->setColumnStretch( 1, 10 );
 
-    //masterLogLabel = new QLabel( netWidget );
-    //masterLogLabel->setText(tr("SysLog"));
-    //masterLabel->setFixedHeight ( 10 );
-    //slavesLabel = new QLabel( netWidget );
-    //slavesLabel->setText(tr("Slave List"));
-    //jobsLabel = new QLabel( netWidget );
-    //jobsLabel->setText(tr("Job List"));
-    //masterLayout->addWidget( masterLabel, 0, 0, 1, 1 );
-
-
-    //slaveFrame->hide();
-
-    //tabLayout->addWidget( globalLabel, 0, 0, 1, 1 );
     tabLayout->addWidget( statFrame, 0, 0, 1, 3 );
 
     tabLayout->setRowStretch( 3, 10 );
@@ -418,7 +278,7 @@ void MasterTab::createLayout( void ) {
 }
 
 
-void MasterTab::createActions( void ) {
+void HostTab::createActions( void ) {
 
     addAct = new QAction( tr( "&Add" ), this );
     addAct->setShortcut( tr( "Ctrl+A" ) );
@@ -442,15 +302,4 @@ void MasterTab::createActions( void ) {
 
 }
 
-void MasterTab::loadValues( void ) {
-
-    laLabel->setTextFormat( Qt::RichText );
-    laLabel->setText( tr( "Testing something <font color=\"lime\">ONLINE</font> different..." ) );
-    //globalStatusLabel->setForegroundRole ( QPalette::Highlight );
-    //globalLognameLabel->setText ( (myNet->logFile.hostName + string(":") + myNet->logFile.fileName).c_str() );
-    //globalLognameLabel->setForegroundRole ( QPalette::Highlight );
-
-    //globalVerbCombo->setCurrentIndex( myNet->logVerbosity );
-
-}
 

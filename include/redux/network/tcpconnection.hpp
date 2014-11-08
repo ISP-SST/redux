@@ -68,6 +68,8 @@ namespace redux {
                 return Ptr( new TcpConnection( io_service ) );
             }
 
+            std::shared_ptr<char> receiveBlock( uint64_t& blockSize );
+            
             template <class T>
             void writeAndCheck( const std::shared_ptr<T>& data, size_t sz ) {
                   strand.post( boost::bind( &TcpConnection::strandWrite<T>, this, data, sz ) );
@@ -95,19 +97,22 @@ namespace redux {
             void setCallback( callback cb = nullptr ) { activityCallback = cb; };
             void idle( void );
             void onActivity( Ptr conn, const boost::system::error_code& error );
+            void setSwapEndian(bool se) { swapEndian = se; };
+            bool getSwapEndian(void) { return swapEndian; };
 
             TcpConnection& operator<<( const Command& );
             TcpConnection& operator>>( Command& );
 
        private:
             TcpConnection( boost::asio::io_service& io_service )
-                : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), strand( myService ) {
+                : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand( myService ) {
 
             }
 
             callback activityCallback;
             tcp::socket mySocket;
             boost::asio::io_service& myService;
+            bool swapEndian;
 
        public:
             boost::asio::strand strand;

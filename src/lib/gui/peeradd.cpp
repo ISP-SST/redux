@@ -5,7 +5,7 @@
 using namespace redux::gui;
 using namespace redux;
 
-HostAdd::HostAdd( Peer::HostInfo* host, bool mst, QWidget* par ) : QDialog( par ) {
+HostAdd::HostAdd( Host::HostInfo* host, bool mst, QWidget* par ) : QDialog( par ) {
 
     newHost = host;
     parent = par;

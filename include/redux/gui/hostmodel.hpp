@@ -1,26 +1,24 @@
-#ifndef REDUX_GUI_JOBMODEL_HPP
-#define REDUX_GUI_JOBMODEL_HPP
+#ifndef REDUX_GUI_PEERMODEL_HPP
+#define REDUX_GUI_PEERMODEL_HPP
 
-#include "redux/gui/jobitem.hpp"
-
-#include <vector>
+#include "redux/gui/hostitem.hpp"
 
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVariant>
 
+using redux::network::Host;
 
 namespace redux {
 
     namespace gui {
 
-        class JobModel : public QAbstractItemModel {
+        class HostModel : public QAbstractItemModel {
             Q_OBJECT
 
         public:
-            JobModel( const Job::JobSet&, QObject *parent = 0 );
-            ~JobModel();
-
+            HostModel( const Host::Set&, QObject *parent = 0 );
+            ~HostModel();
 
             QVariant data( const QModelIndex &index, int role ) const;
             Qt::ItemFlags flags( const QModelIndex &index ) const;
@@ -34,13 +32,15 @@ namespace redux {
             void refreshTree( void );
 
         private:
-            const Job::JobSet& jobs;
-            JobItem::Ptr rootItem;
-            
+            const Host::Set& hosts;
+
+            HostItem::Ptr rootItem;
+
         };
 
     }   // gui
 
 }   // redux
 
-#endif // REDUX_GUI_JOBMODEL_HPP
+
+#endif // REDUX_GUI_PEERMODEL_HPP

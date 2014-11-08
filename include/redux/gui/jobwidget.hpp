@@ -1,9 +1,9 @@
 #ifndef REDUX_GUI_JOBWIDGET_HPP
 #define REDUX_GUI_JOBWIDGET_HPP
 
-#include "redux/gui/peermodel.hpp"
+#include "redux/gui/hostmodel.hpp"
 #include "redux/gui/peertab.hpp"
-#include "redux/gui/peertreeview.hpp"
+#include "redux/gui/hosttreeview.hpp"
 #include "redux/gui/peeradd.hpp"
 #include "redux/gui/jobmodel.hpp"
 #include "redux/gui/jobtab.hpp"
@@ -139,10 +139,10 @@ namespace redux {
             JobTab *jobTab;
             Job::JobSet jobs;
 
-            PeerTreeView *peerTree;
-            PeerModel peerModel;
+            HostTreeView *peerTree;
+            HostModel peerModel;
             PeerTab *peerTab;
-            std::set<Peer> peers;
+            Host::Set hosts;
             
             QTabWidget *mainTabs;
             QMainWindow *myMainWindow;

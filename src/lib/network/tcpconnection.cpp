@@ -1,13 +1,14 @@
 #include "redux/network/tcpconnection.hpp"
 
 #include "redux/logger.hpp"
+#include "redux/util/datautil.hpp"
 
 namespace ba = boost::asio;
 
 using namespace redux::network;
 using namespace std;
 
-#define lg Logger::lg
+#define lg Logger::mlg
 namespace {
     const std::string thisChannel = "net";
 
@@ -15,6 +16,41 @@ namespace {
 
 TcpConnection::~TcpConnection( void ) {
     mySocket.close();
+}
+
+
+shared_ptr<char> TcpConnection::receiveBlock( uint64_t& blockSize ) {
+
+    using redux::util::unpack;
+    shared_ptr<char> buf;
+    
+    try {
+        char sz[sizeof( uint64_t )];
+        size_t count = boost::asio::read( socket(), boost::asio::buffer( sz, sizeof( size_t ) ) );
+
+        if( count != sizeof( uint64_t ) ) {
+            throw ios_base::failure( "blockSize: Only received " + to_string( count ) + "/" + to_string( sizeof( uint64_t ) ) + " bytes." );
+        }
+        
+        unpack( sz, blockSize, swapEndian );
+
+        if(blockSize > 0) {
+            buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
+            count = boost::asio::read( socket(), boost::asio::buffer( buf.get(), blockSize ) );
+
+            if( count != blockSize ) {
+                throw ios_base::failure( "Only received " + to_string( count ) + "/" + to_string( blockSize ) + " bytes." );
+            }
+        }
+    }
+    catch( const exception& e ) {
+        cerr << "Failed to receive datablock: " << e.what() << endl;
+        //LOG_ERR << "Failed to receive datablock: " << e.what();
+        blockSize = 0;
+        buf.reset();
+    }
+    return buf;
+
 }
 
 

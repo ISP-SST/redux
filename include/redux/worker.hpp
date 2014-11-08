@@ -1,7 +1,7 @@
 #ifndef REDUX_WORKER_HPP
 #define REDUX_WORKER_HPP
 
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 #include "redux/job.hpp"
 #include "redux/work.hpp"
 
@@ -52,7 +52,9 @@ namespace redux {
         WorkInProgress wip;
 
         Daemon& daemon;
-        network::Peer::Ptr master;
+        network::Host::Ptr peer;
+        network::TcpConnection::Ptr connection;
+        
     };
 
 

@@ -61,7 +61,7 @@ uint64_t DebugJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, 
 
 
 DebugJob::DebugJob( void ) : maxIterations( 1000 ), gamma( 1 ), xSize( 1920 ), ySize( 1080 ), coordinates { -1.9, 1.9, -0.9, 0.9 } {
-    info.typeString = "DebugJob";
+    info.typeString = "debugjob";
 
 }
 
@@ -72,20 +72,26 @@ DebugJob::~DebugJob( void ) {
 
 
 void DebugJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
+    
+    Job::parseProperties( vm, tree );
+    
     maxIterations = tree.get<uint32_t>( "MAX_ITERATIONS", 1000 );
     patchSize = tree.get<uint32_t>( "PATCH_SIZE", 200 );
     gamma = tree.get<double>( "GAMMA", 1.0 );
+    
     vector<uint32_t> tmp = tree.get<vector<uint32_t>>( "IMAGE_SIZE", {1920, 1080} );
-    cout << printArray( tmp, "parsed sizes" ) << endl;
     if( tmp.size() == 2 ) {
         xSize = tmp[0];
         ySize = tmp[1];
     }
+    
     vector<double> tmpD = tree.get<vector<double>>( "COORDINATES", { -1.9, 1.9, -0.9, 0.9 } );
     if( tmpD.size() != 4 ) {
         tmpD = { -1.9, 1.9, -0.9, 0.9 };
     }
+    
     for( size_t i = 0; i < 4; ++i ) coordinates[i] = tmpD[i];
+    
 }
 
 
@@ -103,7 +109,7 @@ bpt::ptree DebugJob::getPropertyTree( bpt::ptree* root ) {
     tree.put( "IMAGE_SIZE", tmp );
 
     if( root ) {
-        root->push_back( bpt::ptree::value_type( "debug", tree ) );
+        root->push_back( bpt::ptree::value_type( "debugjob", tree ) );
     }
 
     return tree;
@@ -172,14 +178,17 @@ void DebugJob::checkParts( void ) {
 
 }
 
-size_t DebugJob::getParts( WorkInProgress& wip ) {
+size_t DebugJob::getParts( WorkInProgress& wip, uint8_t nThreads ) {
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::getParts("<<(int)nThreads<<")";
+#endif
+    
     uint8_t step = info.step.load();
     wip.parts.clear();
     if( step == JSTEP_QUEUED || step == JSTEP_RUNNING ) {
         unique_lock<mutex> lock( jobMutex );
-        size_t nParts = wip.peer->stat.nThreads;
-        if( info.nThreads ) nParts = std::min( wip.peer->stat.nThreads, info.nThreads );
+        size_t nParts = std::min( nThreads, info.maxThreads) * 2;
         for( auto & it : jobParts ) {
             if( it.second->step == JSTEP_QUEUED ) {
                 it.second->step = JSTEP_RUNNING;
@@ -203,6 +212,7 @@ void DebugJob::ungetParts( WorkInProgress& wip ) {
     wip.parts.clear();
 }
 
+
 void DebugJob::returnParts( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
@@ -216,7 +226,11 @@ void DebugJob::returnParts( WorkInProgress& wip ) {
 }
 
 
-bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool ) {
+bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool, uint8_t maxThreads ) {
+
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::run("<<(int)maxThreads<<") ";
+#endif
 
     uint8_t step = info.step.load();
     if( step < JSTEP_SUBMIT ) {
@@ -227,14 +241,13 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost
         preProcess();                           // preprocess on master, split job in parts
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
-        size_t nThreads = wip.peer->stat.nThreads;
-        if( info.nThreads ) nThreads = std::min( wip.peer->stat.nThreads, info.nThreads );
+        size_t nThreads = std::min( maxThreads, info.maxThreads)*2;
         service.reset();
 
         for( auto & it : wip.parts ) {
             service.post( boost::bind( &DebugJob::runMain, this, boost::ref( it ) ) );
         }
-        for( size_t t = 0; t < nThreads * 2; ++t ) {
+        for( size_t t = 0; t < nThreads; ++t ) {
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
         }
 

@@ -12,7 +12,7 @@ using namespace redux;
 using namespace std;
 
 JobWidget::JobWidget( QMainWindow* parent, const char* name )
-    : QWidget( parent ), activeHost( 0 ), jobModel(jobs), peerModel(peers), statusThread( NULL ) {
+    : QWidget( parent ), activeHost( 0 ), jobModel(jobs), peerModel(hosts), statusThread( NULL ) {
         
     myMainWindow = parent;
 
@@ -119,7 +119,7 @@ void JobWidget::createLayout() {
     masterLayout->addWidget( masterButton, 2, 3, 1, 1 );
 
     //hostModel.setRootObject( &myNet );
-    peerTree = new PeerTreeView( this );
+    peerTree = new HostTreeView( this );
     peerTree->setModel( &peerModel );
     peerTree->setSelectionBehavior( QAbstractItemView::SelectRows );
 

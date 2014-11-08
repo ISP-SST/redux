@@ -4,7 +4,7 @@
 #include "redux/application.hpp"
 #include "redux/job.hpp"
 #include "redux/worker.hpp"
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 #include "redux/network/tcpserver.hpp"
 
 #include <mutex>
@@ -35,17 +35,16 @@ namespace redux {
         
         void connected(network::TcpConnection::Ptr);
         void activity( network::TcpConnection::Ptr );
-        network::Peer::Ptr& addOrGetPeer(const network::Peer::HostInfo&, network::TcpConnection::Ptr&);
-        network::Peer::Ptr& getPeer(const network::TcpConnection::Ptr&);
-        void cleanupPeers(void);
-        void addJobs( network::Peer::Ptr& );
-        void removeJobs( network::Peer::Ptr& );
+        void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
+        void cleanup(void);
+        void addJobs( network::TcpConnection::Ptr& );
+        void removeJobs( network::TcpConnection::Ptr& );
         Job::JobPtr selectJob(bool);
-        bool getWork( WorkInProgress& );
-        void sendWork( network::Peer::Ptr& );
-        void putParts( network::Peer::Ptr& );
+        bool getWork( WorkInProgress&, uint8_t nThreads = 1);
+        void sendWork( network::TcpConnection::Ptr& );
+        void putParts( network::TcpConnection::Ptr& );
         void sendJobList( network::TcpConnection::Ptr& );
-        void updatePeerStatus( network::Peer::Ptr& );
+        void updateHostStatus( network::TcpConnection::Ptr& );
         void sendJobStats( network::TcpConnection::Ptr& );
         void sendPeerList( network::TcpConnection::Ptr& );
         void updateLoadAvg( void );
@@ -61,9 +60,10 @@ namespace redux {
         uint8_t nQueuedJobs;
         
         std::mutex peerMutex;
-        network::Peer::Ptr myInfo;
-        std::map<size_t, network::Peer::Ptr> peers;
-        std::map<network::Peer::Ptr, WorkInProgress> peerWIP;
+        network::Host::Ptr myInfo;
+        std::map<network::TcpConnection::Ptr, network::Host::Ptr> connections;
+        std::map<size_t, network::Host::Ptr> peers;
+        std::map<network::Host::Ptr, WorkInProgress> peerWIP;
         
         boost::asio::io_service ioService;
         boost::asio::deadline_timer timer;

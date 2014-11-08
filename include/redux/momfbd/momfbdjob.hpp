@@ -43,13 +43,13 @@ namespace redux {
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
 
-            size_t getParts( WorkInProgress& );
+            size_t getParts( WorkInProgress&, uint8_t );
             void ungetParts( WorkInProgress& );
             void returnParts( WorkInProgress& );
 
             void init(void);
             void cleanup(void);
-            bool run( WorkInProgress&, boost::asio::io_service&, boost::thread_group& );
+            bool run( WorkInProgress&, boost::asio::io_service&, boost::thread_group&, uint8_t );
 
         private:
 

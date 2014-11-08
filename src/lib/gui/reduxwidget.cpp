@@ -312,12 +312,11 @@ void ReduxWidget::tryConnection( void ) {
     TcpConnection::Ptr conn = TcpConnection::newPtr( ioservice );
     conn->connect( masterName->text().toStdString(), to_string( masterPort->value() ) );
 
-cout << "tryConnection() beg" << endl;
     if( *conn ) {
         dumpMsg( string( "Connected to " ) + conn->socket().remote_endpoint().address().to_string() + string( ":" ) + masterPort->text().toStdString(), Qt::blue );
 
         uint8_t cmd = CMD_CONNECT;
-        Peer master;
+        Host host;
         boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
         boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
         if( cmd == CMD_AUTH ) {
@@ -325,7 +324,7 @@ cout << "tryConnection() beg" << endl;
         }
         if( cmd == CMD_CFG ) {  // handshake requested
             *conn << myInfo;
-            *conn >> master.host;
+            *conn >> host.info;
             boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             //*conn >> cmd;       // ok or err
         }
@@ -333,12 +332,11 @@ cout << "tryConnection() beg" << endl;
             dumpMsg( string( "Handshake with server failed: server replied " )+to_string((int)cmd), Qt::red );
             return;
         }
-cout << "tryConnection() mid" << endl;
-        master.conn = conn;
-        mainTabs->addTab( new MasterTab( master, this ), masterName->text() + QString( ":" ) + masterPort->text() );
+
+        mainTabs->addTab( new HostTab( host, conn, this ), masterName->text() + QString( ":" ) + masterPort->text() );
 
     }
-cout << "tryConnection() end" << endl;
+
 }
 
 void ReduxWidget::closeTab( int ind ) {

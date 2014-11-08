@@ -1,29 +1,29 @@
-#include "redux/gui/jobitem.hpp"
+#include "redux/gui/hostitem.hpp"
 
-#include <QStringList>
+#include <boost/date_time/posix_time/time_formatters.hpp>
+#include <boost/format.hpp>
 
 using namespace redux::gui;
-using namespace redux;
 using namespace std;
 
-JobItem::JobItem(const QList<QVariant> &data) : itemData(data), jobIndex(-1) {}
+HostItem::HostItem(const QList<QVariant> &data) : itemData(data), hostIndex(-1) {}
 
 
-JobItem::JobItem(const Job::JobPtr& j, Ptr parent, int ji) : job(j), parentItem(parent), jobIndex(ji) {
+HostItem::HostItem(const Host::Ptr& h, Ptr parent, int hi) : host(h), parentItem(parent), hostIndex(hi) {
     reset();
 }
 
 
-JobItem::~JobItem() {
-
+HostItem::~HostItem() {
+    
 }
 
 
-void JobItem::reset(Job::JobPtr j) {
+void HostItem::reset(Host::Ptr h) {
 
-    if(j && j != job) job = j;
+    if(h && h != host) host = h;
 
-    if(!job) return;
+    if(!host) return;
 
     using namespace boost::posix_time;
     
@@ -31,16 +31,6 @@ void JobItem::reset(Job::JobPtr j) {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     
-        itemData.clear();
-        itemData << std::to_string( 0 ).c_str();           // rownumber+1 = jobnumber
-        itemData << std::to_string( job->info.id ).c_str(); // job ID
-        itemData << job->info.name.c_str();             // job-label
-        itemData << job->info.typeString.c_str();        // job-type
-        itemData << std::to_string( job->info.priority ).c_str(); // priority
-        itemData << job->info.user.c_str();              // username
-        tmp = Job::stateString( job->info.state ) + " - " + Job::stepString( job->info.step );
-        itemData << tmp.c_str();     // current state
-/*
     itemData.clear();
     tmp = host->info.name; // + string( " (" ) + ipString( ( *rootObject )[i]->IP ) + string( ":" );
     itemData << tmp.c_str();
@@ -55,36 +45,34 @@ void JobItem::reset(Job::JobPtr j) {
 
     itemData << Host::TypeNames[host->info.peerType].c_str();
 
-*/
+
 }
 
 
-void JobItem::appendChild( const Job::JobPtr& j ) {
+void HostItem::appendChild(const Host::Ptr& h) {
     
     for( auto& it: children ) {
-        if (!(*(it->job) != *j)) {
-            it->job = j;
-            //it->job->info = h->info;
-            //it->job->status = h->status;
+        if (*(it->host) == *h) {
+            it->host->info = h->info;
+            it->host->status = h->status;
             it->reset();
             return;
         }
     }
     
-    children.push_back( newItem(j,shared()) );
+    children.push_back( newItem(h,shared()) );
     
 }
 
 
-void JobItem::removeChild( const Job::JobPtr& j ) {
+void HostItem::removeChild( const Host::Ptr& h ) {
  
-    children.remove_if( [this,&j](const JobItem::Ptr& item){ return !(*(item->job) != *j); });
+    children.remove_if( [this,&h](const HostItem::Ptr& item){ return (*(item->host) == *h); });
 
 }
 
 
-
-JobItem::Ptr JobItem::child( int row ) {
+HostItem::Ptr HostItem::child(int row) {
     
     if( row < 0 || row > (int)children.size() ) {
         return nullptr;
@@ -98,17 +86,17 @@ JobItem::Ptr JobItem::child( int row ) {
 }
 
 
-int JobItem::childCount() const {
+int HostItem::childCount() const {
     return children.size();
 }
 
 
-int JobItem::columnCount() const {
+int HostItem::columnCount() const {
     return itemData.count();
 }
 
 
-int JobItem::indexOf( const Ptr& child ) {
+int HostItem::indexOf( const Ptr& child ) {
     
     int i(-1);
     for( auto& it: children ) {
@@ -123,11 +111,12 @@ int JobItem::indexOf( const Ptr& child ) {
 }
 
 
-QVariant JobItem::data( int column ) const {
-    return itemData.value( column );
+QVariant HostItem::data(int column) const {
+    return itemData.value(column);
 }
 
 
-JobItem::Ptr JobItem::parent() {
+HostItem::Ptr HostItem::parent() {
     return parentItem;
 }
+

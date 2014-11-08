@@ -1,4 +1,4 @@
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
@@ -21,15 +21,15 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-const std::string Peer::StateNames[] = { "offline", "idle", "active", "error" };
-const std::string Peer::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
+const std::string Host::StateNames[] = { "offline", "idle", "active", "error" };
+const std::string Host::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
 
 #define lg Logger::lg
 namespace {
     const std::string thisChannel = "net";
 }
 
-Peer::HostInfo::HostInfo( void ) : peerType(0) {
+Host::HostInfo::HostInfo( void ) : peerType(0) {
 
     int one = 1;
     littleEndian = *(char*)&one;
@@ -50,146 +50,108 @@ Peer::HostInfo::HostInfo( void ) : peerType(0) {
 }
 
 
-Peer::PeerStatus::PeerStatus( void ) : currentJob( 0 ), nThreads( std::thread::hardware_concurrency() ), state( PEER_IDLE ),
+Host::HostStatus::HostStatus( void ) : currentJob( 0 ), nThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
     loadAvg( 0 ), progress( 0 ) {
 
 }
 
-Peer::Peer() : id(0) {
+Host::Host() : id(0), nConnections(0) {
 
 }
 
-Peer::Peer(const HostInfo& hi, TcpConnection::Ptr c, size_t i) : host(hi), id(i), conn(c) {
+Host::Host(const HostInfo& hi, uint64_t i) : info(hi), id(i), nConnections(0) {
 
 }
 
 
-size_t Peer::size(void) const {
-    size_t sz = sizeof(size_t) + sizeof(time_t) + host.size() + stat.size();
+size_t Host::size(void) const {
+    size_t sz = sizeof(uint64_t) + info.size() + status.size();
     return sz;
 }
 
 
-uint64_t Peer::pack( char* ptr ) const {
+uint64_t Host::pack( char* ptr ) const {
     
     using redux::util::pack;
     uint64_t count = pack(ptr,id);
-    count += pack(ptr+count,to_time_t( lastSeen ));
-    count += host.pack(ptr+count);
-    count += stat.pack(ptr+count);
+    count += info.pack(ptr+count);
+    count += status.pack(ptr+count);
     
     return count;
 }
 
-uint64_t Peer::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Host::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     uint64_t count = unpack(ptr,id,swap_endian);
-    time_t timestamp;
-    count += unpack(ptr+count,timestamp,swap_endian);
-    count += host.unpack(ptr+count,swap_endian);
-    count += stat.unpack(ptr+count,swap_endian);
-    
-    lastSeen = boost::posix_time::from_time_t( timestamp );
+    count += info.unpack(ptr+count,swap_endian);
+    count += status.unpack(ptr+count,swap_endian);
     
     return count;
 }
 
 
-std::string Peer::printHeader(void) {
+void Host::touch(void) {
+    status.lastSeen = boost::posix_time::second_clock::local_time();
+}
+
+std::string Host::printHeader(void) {
     string hdr = alignRight("ID",5) + alignCenter("HOST",15) + alignCenter("PID",7) + alignCenter("STATE",9);
     hdr += alignLeft("VERSION",9) + alignCenter("ARCH",8) + alignCenter("OS",25) + alignCenter("GFLOPS",8);
     return hdr;
 }
 
-std::string Peer::print(void) {
-    string info = alignRight(std::to_string(id),5) + alignCenter(host.name,15) + alignCenter(to_string(host.pid),7);
-    info += alignCenter(StateNames[stat.state],9) + alignCenter(getVersionString(host.reduxVersion),9);
-    info += alignCenter(host.arch,8) + alignCenter(host.os,25) + alignCenter("-",8);
-    return info;
+std::string Host::print(void) {
+    string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,15) + alignCenter(to_string(info.pid),7);
+    ret += alignCenter(StateNames[status.state],9) + alignCenter(getVersionString(info.reduxVersion),9);
+    ret += alignCenter(info.arch,8) + alignCenter(info.os,25) + alignCenter("-",8);
+    return ret;
+}
+
+bool Host::operator>( const Host& rhs ) const {
+//    if( info.peerType == rhs.info.peerType ) {
+        if( iequals( info.name, rhs.info.name ) ) {
+            return (info.pid > rhs.info.pid);
+        } else return ( info.name.compare( rhs.info.name ) < 0 );
+//    } else return (info.peerType > rhs.info.peerType);
 }
 
 
-shared_ptr<char> Peer::receiveBlock( size_t& blockSize, bool& swap_endian ) {
-
-    using redux::util::unpack;
-    shared_ptr<char> buf;
-    
-    try {
-        char sz[sizeof( size_t )];
-        size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( sz, sizeof( size_t ) ) );
-
-        if( count != sizeof( size_t ) ) {
-            throw ios_base::failure( "blockSize: Only received " + to_string( count ) + "/" + to_string( sizeof( size_t ) ) + " bytes." );
-        }
-        
-        int one = 1;
-        char littleEndian = *(char*)&one;
-        swap_endian = ( host.littleEndian != littleEndian );
-        unpack( sz, blockSize, swap_endian );
-
-        if(blockSize > 0) {
-            buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
-            count = boost::asio::read( conn->socket(), boost::asio::buffer( buf.get(), blockSize ) );
-
-            if( count != blockSize ) {
-                throw ios_base::failure( "Only received " + to_string( count ) + "/" + to_string( blockSize ) + " bytes." );
-            }
-        }
-    }
-    catch( const exception& e ) {
-        LOG_ERR << "Failed to receive datablock: " << e.what();
-        blockSize = 0;
-        buf.reset();
-    }
-    return buf;
-
+bool Host::operator<( const Host& rhs ) const {
+//    if( info.peerType == rhs.info.peerType ) {
+        if( iequals( info.name, rhs.info.name ) ) {
+            return (info.pid < rhs.info.pid);
+        } else return ( info.name.compare( rhs.info.name ) > 0 );
+//    } else return (info.peerType < rhs.info.peerType);
 }
 
 
-bool Peer::operator>( const Peer& rhs ) const {
-    if( host.peerType == rhs.host.peerType ) {
-        if( iequals( host.name, rhs.host.name ) ) {
-            return (host.pid > rhs.host.pid);
-        } else return ( host.name.compare( rhs.host.name ) < 0 );
-    } else return (host.peerType > rhs.host.peerType);
+bool Host::operator==( const Host& rhs ) const {
+    return (info == rhs.info);
 }
 
+/*
+Host& Host::operator=( const Host& rhs ) {
 
-bool Peer::operator<( const Peer& rhs ) const {
-    if( host.peerType == rhs.host.peerType ) {
-        if( iequals( host.name, rhs.host.name ) ) {
-            return (host.pid < rhs.host.pid);
-        } else return ( host.name.compare( rhs.host.name ) > 0 );
-    } else return (host.peerType < rhs.host.peerType);
-}
+   if( &rhs == this ) return *this;
 
-
-bool Peer::operator==( const Peer& rhs ) const {
-    return (host == rhs.host);
-}
-
-
-Peer& Peer::operator=( const Peer& rhs ) {
-    if( &rhs == this ) return *this;
-
-    host.name = rhs.host.name;
-    stat.state = rhs.stat.state;
-
+    info.name = rhs.info.name;
+    status.state = rhs.status.state;
 
     return *this;
 
 }
+*/
 
-
-size_t Peer::HostInfo::size(void) const {
-    size_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(uint16_t) + sizeof(time_t);
-    sz += name.length() + os.length() + arch.length() + 4;
+size_t Host::HostInfo::size(void) const {
+    size_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(peerType) + sizeof(nCores);
+    sz += sizeof(time_t);   // startedAt is converted and transferred as time_t
+    sz += name.length() + os.length() + arch.length() + 3;
     return sz;
 }
 
 
-uint64_t Peer::HostInfo::pack( char* ptr ) const {
+uint64_t Host::HostInfo::pack( char* ptr ) const {
     
     using redux::util::pack;
     
@@ -208,7 +170,7 @@ uint64_t Peer::HostInfo::pack( char* ptr ) const {
     
 }
 
-uint64_t Peer::HostInfo::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Host::HostInfo::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
@@ -230,18 +192,19 @@ uint64_t Peer::HostInfo::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-bool Peer::HostInfo::operator==(const HostInfo& rhs) const {
+bool Host::HostInfo::operator==(const HostInfo& rhs) const {
     return (name == rhs.name && pid == rhs.pid);
 }
 
 
-size_t Peer::PeerStatus::size(void) const {
-    size_t sz = sizeof(size_t) + sizeof(State) + 2*sizeof(float) + 2;
+size_t Host::HostStatus::size(void) const {
+    size_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads);
+    sz += sizeof(state) + sizeof(loadAvg) + sizeof(progress) + sizeof(time_t);
     return sz;
 }
 
 
-uint64_t Peer::PeerStatus::pack( char* ptr ) const {
+uint64_t Host::HostStatus::pack( char* ptr ) const {
     
     using redux::util::pack;
     
@@ -251,28 +214,33 @@ uint64_t Peer::PeerStatus::pack( char* ptr ) const {
     count += pack(ptr+count,currentJob);
     count += pack(ptr+count,loadAvg);
     count += pack(ptr+count,progress);
+    count += pack(ptr+count,to_time_t( lastSeen ));
     
     return count;
     
 }
 
 
-uint64_t Peer::PeerStatus::unpack( const char* ptr, bool swap_endian ) {
+uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
+    
     uint64_t count = unpack(ptr,nThreads);
     count += unpack(ptr+count,maxThreads);
     count += unpack(ptr+count,state, swap_endian);
     count += unpack(ptr+count,currentJob, swap_endian);
     count += unpack(ptr+count,loadAvg, swap_endian);
     count += unpack(ptr+count,progress, swap_endian);
+    time_t timestamp;
+    count += unpack(ptr+count,timestamp,swap_endian);
+    lastSeen = boost::posix_time::from_time_t( timestamp );
     
     return count;
     
 }
 
 
-TcpConnection& redux::network::operator<<(TcpConnection& conn, const Peer::HostInfo& out) {
+TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostInfo& out) {
     
     size_t sz = out.size() + sizeof(size_t) + 1;
     auto buf = sharedArray<char>(sz);
@@ -294,7 +262,7 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Peer::HostI
 }
 
 
-TcpConnection& redux::network::operator>>(TcpConnection& conn, Peer::HostInfo& in) {
+TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& in) {
     
     size_t sz = sizeof(size_t)+1;
     auto buf = sharedArray<char>(sz);

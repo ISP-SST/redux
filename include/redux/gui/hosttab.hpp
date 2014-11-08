@@ -1,11 +1,11 @@
-#ifndef REDUX_GUI_MASTERTAB_HPP
-#define REDUX_GUI_MASTERTAB_HPP
+#ifndef REDUX_GUI_HOSTTAB_HPP
+#define REDUX_GUI_HOSTTAB_HPP
 
-#include "redux/gui/peertreeview.hpp"
-#include "redux/gui/peermodel.hpp"
+#include "redux/gui/hosttreeview.hpp"
+#include "redux/gui/hostmodel.hpp"
 #include "redux/gui/jobtreeview.hpp"
 #include "redux/gui/jobmodel.hpp"
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 
 #include <mutex>
 
@@ -38,38 +38,40 @@ class QMenu;
 QT_END_NAMESPACE
 */
 
-using redux::network::Peer;
+using redux::network::Host;
+using redux::network::TcpConnection;
 
 namespace redux {
 
     namespace gui {
 
-        class MasterTab : public QWidget {
+        class HostTab : public QWidget, public redux::network::Host {
+            
             Q_OBJECT
 
-            Peer master;
+            TcpConnection::Ptr connection;
 
             QTimer timer;
+            
+            struct classcomp {
+                bool operator() (const int& lhs, const int& rhs) const
+                {return lhs<rhs;}
+            };
 
             Job::JobSet jobs;
-            std::set<Peer> peers;
+            Host::Set hosts;
 
         public:
-            MasterTab( Peer&, QWidget* par=0 );
-            virtual ~MasterTab();
+            HostTab( Host&, TcpConnection::Ptr, QWidget* par=0 );
+            virtual ~HostTab();
 
-            void init( void );
-            void loadHost( int );
-
-            //void setPool( ThreadPool* p ) { if( true || pool || !p ) return; pool = p; };  // pool->addTask( &myTimer ); };
-            bool getJobs( void );
-            bool getPeers( void );
+            void getJobs( void );
+            void getHosts( void );
 
         signals:
             void infoChanged( void );
 
         private slots:
-            void hostEdited( void ) { modified = true; };
             void updateModified( int i ) { if( i ) { timer.setInterval( i * 1000 ); timer.start(); } else timer.stop(); };
             void updateInfo( void );
             void getInfo( void );
@@ -85,9 +87,6 @@ namespace redux {
         private:
             
             bool swap_endian;
-            
-            bool modified;
-            int activeHost;
 
             void createLayout( void );
             void createActions( void );
@@ -110,8 +109,8 @@ namespace redux {
             JobTreeView* jobList;
             JobModel jobModel;
 
-            PeerTreeView* peerList;
-            PeerModel peerModel;
+            HostTreeView* hostList;
+            HostModel hostModel;
 
         };
 
@@ -120,4 +119,4 @@ namespace redux {
 }   // redux
 
 
-#endif // REDUX_GUI_MASTERTAB_HPP
+#endif // REDUX_GUI_HOSTTAB_HPP

@@ -1,10 +1,10 @@
-#include "redux/gui/peertreeview.hpp"
+#include "redux/gui/hosttreeview.hpp"
 
 using namespace redux::gui;
 using namespace redux;
 
 
-PeerTreeView::PeerTreeView( QWidget *parent ) : QTreeView( parent ) {
+HostTreeView::HostTreeView( QWidget *parent ) : QTreeView( parent ) {
     createActions();
     setExpandsOnDoubleClick( false );
     setRootIsDecorated( false );
@@ -13,7 +13,7 @@ PeerTreeView::PeerTreeView( QWidget *parent ) : QTreeView( parent ) {
 }
 
 
-void PeerTreeView::createActions( void ) {
+void HostTreeView::createActions( void ) {
 
     addAct = new QAction( tr( "&Add Host" ), this );
     //addAct->setShortcut(tr("Ctrl+A"));
@@ -38,7 +38,7 @@ void PeerTreeView::createActions( void ) {
 }
 
 
-void PeerTreeView::contextMenuEvent( QContextMenuEvent* event ) {
+void HostTreeView::contextMenuEvent( QContextMenuEvent* event ) {
 
     QMenu menu( this );
     menu.addAction( addAct );

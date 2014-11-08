@@ -1,7 +1,7 @@
 #ifndef REDUX_GUI_REDUXWIDGET_HPP
 #define REDUX_GUI_REDUXWIDGET_HPP
 
-#include "redux/gui/mastertab.hpp"
+#include "redux/gui/hosttab.hpp"
 
 #include <string>
 
@@ -66,7 +66,7 @@ namespace redux {
         private:
 
             boost::asio::io_service ioservice;
-            Peer::HostInfo myInfo;
+            Host::HostInfo myInfo;
             
             uint activeHost, activeJob;
 
@@ -87,7 +87,7 @@ namespace redux {
             QCheckBox *masterCB;
             QGridLayout *masterLayout, *netLayout;
 
-            MasterTab *masterTab;
+            HostTab *masterTab;
 
             QTabWidget *mainTabs;
             QMainWindow *parent;

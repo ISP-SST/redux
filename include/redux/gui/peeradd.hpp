@@ -1,7 +1,7 @@
 #ifndef REDUX_GUI_PEERADD_HPP
 #define REDUX_GUI_PEERADD_HPP
 
-#include "redux/network/peer.hpp"
+#include "redux/network/host.hpp"
 
 #include <QDialog>
 #include <QAction>
@@ -18,7 +18,7 @@ class QLabel;
 class QMenu;
 QT_END_NAMESPACE
 */
-using redux::network::Peer;
+using redux::network::Host;
 
 namespace redux {
 
@@ -28,7 +28,7 @@ namespace redux {
             Q_OBJECT
 
         public:
-            HostAdd( Peer::HostInfo* host, bool mst = false, QWidget* par = 0 );
+            HostAdd( Host::HostInfo* host, bool mst = false, QWidget* par = 0 );
             virtual ~HostAdd();
 
             void init( void );
@@ -50,7 +50,7 @@ namespace redux {
             void createSlaveLayout( void );
             void createActions( void );
 
-            Peer::HostInfo* newHost;
+            Host::HostInfo* newHost;
 
             QAction *addAct, *removeAct, *moveUpAct, *moveDownAct;
 
