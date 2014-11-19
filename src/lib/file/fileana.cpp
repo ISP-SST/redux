@@ -1,6 +1,7 @@
 #include "redux/file/fileana.hpp"
 
 #include "redux/util/endian.hpp"
+#include "redux/types.hpp"
 
 #include "redux/file/anacompress.hpp"
 #include "redux/file/anadecompress.hpp"
@@ -9,6 +10,7 @@
 
 using namespace redux::file;
 using namespace redux::util;
+using namespace redux;
 using namespace std;
 
 #if REDUX_BYTE_ORDER == REDUX_LITTLE_ENDIAN
@@ -19,7 +21,7 @@ static const int system_is_big_endian = 1;
 #error REDUX_BYTE_ORDER not set
 #endif
 
-const uint8_t Ana::typeSizes[] = { 1, 2, 4, 4, 8, 8 };
+const uint8_t Ana::typeSizes[] = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
 
 namespace {
     template <typename T> Ana::TypeIndex getDatyp( void ) { return Ana::ANA_UNDEF; }
@@ -29,6 +31,7 @@ namespace {
     template <> Ana::TypeIndex getDatyp<float  >( void ) { return Ana::ANA_FLOAT; }
     template <> Ana::TypeIndex getDatyp<double >( void ) { return Ana::ANA_DOUBLE; }
     template <> Ana::TypeIndex getDatyp<int64_t>( void ) { return Ana::ANA_LONGLONG; }
+    template <> Ana::TypeIndex getDatyp<complex_t>( void ) { return Ana::ANA_COMPLEX; }
 }
 
 Ana::Ana( void ) : hdrSize( 0 ) {
@@ -466,6 +469,7 @@ template void redux::file::Ana::read( const string& filename, redux::util::Array
 template void redux::file::Ana::read( const string& filename, redux::util::Array<int64_t>& data, std::shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<float  >& data, std::shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<double >& data, std::shared_ptr<redux::file::Ana>& hdr );
+template void redux::file::Ana::read( const string& filename, redux::util::Array<complex_t >& data, std::shared_ptr<redux::file::Ana>& hdr );
 
 
 template <typename T>
@@ -489,6 +493,7 @@ template void redux::file::Ana::read( const string & filename, redux::image::Ima
 template void redux::file::Ana::read( const string & filename, redux::image::Image<int64_t>& image );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<float  >& image );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<double >& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<complex_t >& image );
 
 
 template <typename T>
@@ -582,6 +587,7 @@ template void redux::file::Ana::write( const string&, const redux::util::Array<i
 template void redux::file::Ana::write( const string&, const redux::util::Array<int64_t>&, std::shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<float  >&, std::shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<double >&, std::shared_ptr<redux::file::Ana>, int );
+template void redux::file::Ana::write( const string&, const redux::util::Array<complex_t >&, std::shared_ptr<redux::file::Ana>, int );
 
 
 template <typename T>
@@ -594,4 +600,5 @@ template void redux::file::Ana::write( const string&, const redux::image::Image<
 template void redux::file::Ana::write( const string&, const redux::image::Image<int64_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<float  >&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<double >&, int );
+template void redux::file::Ana::write( const string&, const redux::image::Image<complex_t >&, int );
 

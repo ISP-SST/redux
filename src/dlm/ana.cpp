@@ -18,8 +18,8 @@ using namespace std;
 
 namespace {
 
-    static const uint8_t ana_sizes[] = { 1, 2, 4, 4, 8, 8 };
-    static const string ana_type_names[] = {"uint8_t", "int16_t", "int32_t", "float", "double", "long"};
+    static const uint8_t ana_sizes[] = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
+    static const string ana_type_names[] = {"uint8_t", "int16_t", "int32_t", "float", "double", "long", "undef", "undef", "complex"};
 
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */

@@ -23,8 +23,15 @@ namespace redux {
         struct Ana : public redux::file::FileInfo {
 
             enum Magic { MAGIC_ANA = 0x5555aaaa, MAGIC_ANAR = 0xaaaa5555 };
-            enum TypeIndex { ANA_BYTE = 0/*uint8*/, ANA_WORD/*int16*/, ANA_LONG/*int32*/, ANA_FLOAT, ANA_DOUBLE, ANA_LONGLONG/*int64_t unsupported*/, ANA_UNDEF=255 };
-            static const uint8_t typeSizes[]; // = { 1, 2, 4, 4, 8, 8 };
+            enum TypeIndex { ANA_BYTE = 0,      // uint8
+                             ANA_WORD,          // int16
+                             ANA_LONG,          // int32
+                             ANA_FLOAT,
+                             ANA_DOUBLE,
+                             ANA_LONGLONG,      // int64_t unsupported
+                             ANA_COMPLEX=8,     // experimental support (=8 to match IDL's DCOMPLEX)
+                             ANA_UNDEF=255 };
+            static const uint8_t typeSizes[];   // = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
 
             typedef std::shared_ptr<Ana> Ptr;
             
