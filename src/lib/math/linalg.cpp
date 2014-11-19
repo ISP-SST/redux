@@ -1,14 +1,43 @@
-#include "redux/math/svd.hpp"
+#include "redux/math/linalg.hpp"
 
 #include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_matrix_double.h>
+
 #include <iostream>
 using namespace redux::math;
 using namespace redux::util;
 using namespace std;
+
+
+void redux::math::qr_decomp(double* A, int rows, int cols, double* Q, double* R) {
+    
+    gsl_matrix* a = gsl_matrix_alloc(rows, cols);
+    gsl_vector* tau = gsl_vector_alloc(std::min(rows,cols));
+    
+    memcpy(a->data,A,rows*cols*sizeof(double));
+
+    gsl_linalg_QR_decomp(a, tau);
+    
+    gsl_matrix q,r;
+    q.data = Q;
+    r.data = R;
+    q.size1 = r.size1 = rows;
+    q.tda = q.size2 = rows;
+    r.tda = r.size2 = cols;
+
+    gsl_linalg_QR_unpack (a, tau, &q, &r);
+
+    
+    gsl_vector_free(tau);
+    gsl_matrix_free(a);
+    
+}
+   
+   
 void redux::math::svd(double* A_U, int rows, int cols, double* S, double* V) {
  
     if( rows < cols ) {

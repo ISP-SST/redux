@@ -1,5 +1,5 @@
-#ifndef REDUX_MATH_SVD_HPP
-#define REDUX_MATH_SVD_HPP
+#ifndef REDUX_MATH_LINALG_HPP
+#define REDUX_MATH_LINALG_HPP
 
 #include <opencv/cv.h>
 
@@ -26,6 +26,7 @@ namespace redux {
 
         }
         
+        void qr_decomp(double* A, int rows, int cols, double* Q, double* R);
         void svd(double* A_U, int rows, int cols, double* S, double* V);
         
      
@@ -54,4 +55,4 @@ namespace redux {
 
 }
 
-#endif      //  REDUX_MATH_SVD_HPP
+#endif      //  REDUX_MATH_LINALG_HPP
