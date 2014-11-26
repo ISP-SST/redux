@@ -13,11 +13,11 @@
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <functional>
 #include <math.h>
 #include <string>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/bind.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
@@ -671,10 +671,9 @@ void Channel::preprocessData( boost::asio::io_service& service, boost::thread_gr
     avgMean /= static_cast<double>( nImages );
 
     for( size_t i = 0; i < nImages; ++i ) {
-        service.post( boost::bind( &Channel::preprocessImage, this, i, avgMean ) );
+        service.post( std::bind( &Channel::preprocessImage, this, i, avgMean ) );
     }
 
-    srand(time(0));
 }
 
 
@@ -690,7 +689,7 @@ double Channel::getMaxMean(void) {
 void Channel::normalizeData(boost::asio::io_service& service, boost::thread_group& pool, double value) {
     size_t nImages = imageNumbers.size();
     for( size_t i = 0; i < nImages; ++i ) {
-        service.post( boost::bind( &Channel::normalizeImage, this, i, value ) );
+        service.post( std::bind( &Channel::normalizeImage, this, i, value ) );
     }
 }
 

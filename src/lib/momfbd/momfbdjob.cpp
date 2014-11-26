@@ -621,7 +621,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
         service.reset();
 
         for( auto & it : wip.parts ) {
-            service.post( boost::bind( &MomfbdJob::runMain, this, boost::ref( it ) ) );
+            service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( it ) ) );
         }
         for( size_t t = 0; t < nThreads; ++t ) {
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
@@ -771,7 +771,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
             //cout << "  posX = " << posX << "  posY = " << posY << "  trimmedPosX = " << trimmedPosX;
             //cout << "  trimmedPosY = " << trimmedPosY << "  span = " << span << "  patchSize = " << patchSize << endl;
             patch->setIndex( yid, xid++ );
-            service.post( boost::bind( &MomfbdJob::packPatch, this, patch ) );
+            service.post( std::bind( &MomfbdJob::packPatch, this, patch ) );
             patches.insert( make_pair( patch->id, patch ) );
         }
         yid++;
