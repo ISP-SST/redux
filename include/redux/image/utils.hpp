@@ -172,6 +172,17 @@ namespace redux {
         template <typename T>
         void checkIfMultiFrames( redux::image::Image<T>& img );
         
+        /*! Fit and subtract the backscatter patter for semi-transparent CCDs 
+         *  @param data Image to be cleaned
+         *  @param ccdGain Image containing the backscatter pattern
+         *  @param psf PSF for the system
+         *  @param maxIterations Exit condition
+         *  @param minImprovement Exit if the improvement in one step is less than this factor (1 means no improvement)
+         *  @param epsilon Exit if the metric reaches this value.
+         */
+        template <typename T, typename U>
+        void descatter(redux::util::Array<T>& data, const redux::util::Array<U>& ccdgain, const redux::util::Array<U>& psf,
+                       int maxIterations=50, double minImprovement=1, double epsilon=1E-10 );
 
     }   // image
 

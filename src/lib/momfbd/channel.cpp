@@ -753,8 +753,8 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 
         if( ccdScattering.valid() && psf.valid() ) {          // apply backscatter correction
             if( subimg.sameSize( ccdScattering ) && subimg.sameSize( psf ) ) {
-                LOG_DETAIL << "Applying correction for CCD transparency.";
-                // TODO:  descatter(data,psf,bgain,io);
+                LOG_TRACE << "Applying correction for CCD transparency.";
+                redux::image::descatter( subimg, ccdScattering, psf);
             }
             else {
                 LOG_ERR << boost::format( "Dimensions of ccdScattering (%s) or psf (%s) does not match this image (%s), skipping flatfielding !!" )
