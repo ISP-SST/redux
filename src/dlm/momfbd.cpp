@@ -546,9 +546,7 @@ namespace {
         int sz = 0;
 
         if ( overlaps.north > 0 ) {
-            blend.reset ( new double[overlaps.north], [] ( double * p ) {
-                delete[] p;
-            } );
+            blend = sharedArray<double>(overlaps.north);
             sz = overlaps.north;
             hann ( blend.get(), overlaps.north );
             for ( int x = margin; x < nx - margin; ++x ) {
@@ -560,9 +558,7 @@ namespace {
 
         if ( overlaps.south > 0 ) {
             if ( overlaps.south != sz ) {
-                blend.reset ( new double[overlaps.south], [] ( double * p ) {
-                    delete[] p;
-                } );
+                blend = sharedArray<double>(overlaps.south);
                 sz = overlaps.south;
                 hann ( blend.get(), overlaps.south );
             }
@@ -575,9 +571,7 @@ namespace {
 
         if ( overlaps.east > 0 ) {
             if ( overlaps.east != overlaps.south ) {
-                blend.reset ( new double[overlaps.east], [] ( double * p ) {
-                    delete[] p;
-                } );
+                blend = sharedArray<double>(overlaps.east);
                 sz = overlaps.east;
                 hann ( blend.get(), overlaps.east );
             }
@@ -590,9 +584,7 @@ namespace {
 
         if ( overlaps.west > 0 ) {
             if ( overlaps.west != sz ) {
-                blend.reset ( new double[overlaps.west], [] ( double * p ) {
-                    delete[] p;
-                } );
+                blend = sharedArray<double>(overlaps.west);
                 hann ( blend.get(), overlaps.west );
             }
             for ( int y = margin; y < ny - margin; ++y ) {
@@ -847,18 +839,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
             if ( ( writeMask ) && contains ( "CLIP",tag,true ) ) { // dimensions: (nChannels,2,2)
                 if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3 ) {
                     int32_t nChannels = infoPtr->nChannels = tagPtr->value.arr->dim[0];
-                    infoPtr->clipStartX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
-                        delete[] p;
-                    } );
-                    infoPtr->clipEndX.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
-                        delete[] p;
-                    } );
-                    infoPtr->clipStartY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
-                        delete[] p;
-                    } );
-                    infoPtr->clipEndY.reset ( new int16_t[ nChannels ], [] ( int16_t * p ) {
-                        delete[] p;
-                    } );
+                    infoPtr->clipStartX = sharedArray<int16_t>(nChannels);
+                    infoPtr->clipEndX = sharedArray<int16_t>(nChannels);
+                    infoPtr->clipStartY = sharedArray<int16_t>(nChannels);
+                    infoPtr->clipEndY = sharedArray<int16_t>(nChannels);
 
                     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
                     for ( int i = 0; i < nChannels; ++i ) {
@@ -934,9 +918,7 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                                 int32_t nChannels = tmpPtr->value.arr->dim[0];
                                 intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
                                 if ( nChannels > 0 ) {
-                                    patch->dx.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) {
-                                        delete[] p;
-                                    } );
+                                    patch->dx = sharedArray<int32_t>(nChannels);
                                     for ( int i = 0; i < nChannels; ++i ) {
                                         patch->dx.get() [ i ] = intPtr[ i ];
                                     }
@@ -951,9 +933,7 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                                 int32_t nChannels = tmpPtr->value.arr->dim[0];
                                 intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
                                 if ( nChannels > 0 ) {
-                                    patch->dy.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) {
-                                        delete[] p;
-                                    } );
+                                    patch->dy = sharedArray<int32_t>(nChannels);
                                     for ( int i = 0; i < nChannels; ++i ) {
                                         patch->dy.get() [ i ] = intPtr[ i ];
                                     }
@@ -969,9 +949,7 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                                 int32_t nChannels = tmpPtr->value.arr->dim[0];
                                 intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
                                 if ( nChannels > 0 ) {
-                                    patch->nim.reset ( new int32_t[ nChannels ], [] ( int32_t * p ) {
-                                        delete[] p;
-                                    } );
+                                    patch->nim = sharedArray<int32_t>(nChannels);
                                     for ( int i = 0; i < nChannels; ++i ) {
                                         patch->nim.get() [ i ] = intPtr[ i ];
                                     }
