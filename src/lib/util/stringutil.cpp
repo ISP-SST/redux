@@ -139,18 +139,17 @@ string expandTilde(string in) {
 
 string redux::util::cleanPath(string in, string base) {
 
-
     if(in.empty()) return in;
     if(!base.empty() && base[0] == '~') base = expandTilde(base);
     if(in[0] == '~') in = expandTilde(in);
 
     bf::path fn, result, ain(in);
-    if(!bf::is_directory(ain)) {
+    if(exists(ain) && !bf::is_directory(ain)) {
         fn = ain.filename();
         ain = ain.parent_path();
     }
     bf::path::iterator it = ain.begin();
-    if(!base.empty()) {
+    if(in[0] != '/' && !base.empty()) {
         result = bf::absolute(base);
         if(!bf::is_directory(result)) return in;
     }
