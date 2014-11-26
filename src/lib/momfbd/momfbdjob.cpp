@@ -86,10 +86,9 @@ int MomfbdJob::getFromMap( string str, const map<string, int>& m ) {
     return 0;
 }
 
-void MomfbdJob::maybeOverride( bool value, uint32_t& set, uint32_t flag ) {
-    // BUG: this doesn't seem to work (test with setting SAVE_FFDATA globally and the value is mangled in the Object class)
-    if( value != ( set & flag ) ) {
-        set ^= flag;
+void MomfbdJob::maybeOverride( bool value, uint32_t& flagset, uint32_t flag ) {
+    if( value != bool( flagset & flag ) ) {
+        flagset ^= flag;
     }
 }
 
@@ -663,7 +662,6 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     info.maxThreads = 12;
     // load remaining files asynchronously  (images)
     for( size_t t = 0; t < info.maxThreads; ++t ) {
-        cout << "Adding load-thread #" << (t+1) << endl;
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
     pool.join_all();
