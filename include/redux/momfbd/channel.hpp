@@ -79,6 +79,7 @@ namespace redux {
             uint8_t fillpix_method;
             uint32_t image_num_offs, sequenceNumber;
             double nf;
+            uint8_t incomplete;
 
             redux::image::Image<float> images, dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;

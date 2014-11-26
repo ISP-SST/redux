@@ -1,6 +1,7 @@
 #ifndef REDUX_IMAGE_UTIL_HPP
 #define REDUX_IMAGE_UTIL_HPP
 
+#include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 
 #include <algorithm>
@@ -167,6 +168,10 @@ namespace redux {
 
         template <typename T>
         void apodize( redux::util::Array<T>& array, size_t blendRegion );
+        
+        template <typename T>
+        void checkIfMultiFrames( redux::image::Image<T>& img );
+        
 
     }   // image
 

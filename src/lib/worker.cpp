@@ -167,7 +167,7 @@ bool Worker::getWork( void ) {
                 lastJob->cleanup();
             }
         } //else LOG_DETAIL << "Same job !!!   " + wip.print();
-        LOG_DETAIL << "Got work: " + wip.print();
+        //LOG_DETAIL << "Got work: " + wip.print();
         return true;
     }
     //else LOG_TRACE << "No work";

@@ -10,30 +10,36 @@
 #include <cstring>
 #include <memory>
 
-
+#include "redux/util/stringutil.hpp"
+using namespace redux::util;
 namespace redux {
 
     namespace image {
 
         template <typename T>
         class Image : public redux::util::Array<T> {
-
         public:
             typedef typename std::shared_ptr<Image> Ptr;
 
-            Image( void ) : weight( 1 ) {};
-
+            Image( void ) : nFrames( 1 ) {};
             template <typename U>
-            Image( const Image<T>& rhs, const std::vector<U>& indices ) : redux::util::Array<T>( reinterpret_cast<const redux::util::Array<T>&>( rhs ), indices ), weight( rhs.weight ) {}
+            Image( const Image<T>& rhs, const std::vector<U>& indices ) : redux::util::Array<T>( reinterpret_cast<const redux::util::Array<T>&>( rhs ), indices ), nFrames( rhs.nFrames ) {}
             template <typename ...S>
             Image( const Image<T>& rhs, S ...s ) : Image<T>( rhs, std::vector<int64_t>( {static_cast<int64_t>( s )...} ) ) {}
             template <typename ...S>
-            Image( S ...s ) : redux::util::Array<T>( s... ), weight( 1 ) {}
+            Image( S ...s ) : redux::util::Array<T>( s... ), nFrames( 1 ) {}
 
 
             template <typename U>
             const Image<T>& operator=( const U& rhs ) {
                 redux::util::Array<T>::operator=( rhs );
+                return *this;
+            }
+
+            template <typename U>
+            const Image<T>& operator+=( const Image<U> rhs ) {
+                redux::util::Array<T>::operator+=( rhs );
+                nFrames += rhs.nFrames;
                 return *this;
             }
 
@@ -68,8 +74,8 @@ namespace redux {
               template <typename U> const Image<T>& operator*=( const U& rhs ) { for( auto & it : *this ) it *= rhs; return *this; }
               template <typename U> const Image<T>& operator/=( const U& rhs ) { for( auto & it : *this ) it /= rhs; return *this; }
               */
-            template <typename U> void setWeight( const U& w ) { weight = w; }
-            void normalize( void ) { *this /= weight; weight = 1; };
+
+            void normalize( void ) { if(nFrames) *this /= static_cast<double>(nFrames); nFrames = 1; };
             double mean( void ) const {
                 double sum( 0 );
                 size_t cnt = 0;
@@ -132,9 +138,7 @@ namespace redux {
 
             std::shared_ptr<redux::file::FileInfo> hdr;
 
-        protected:
-
-            double weight;      // TODO: decide if this should be used at all, or always normalize on read ?
+            uint32_t nFrames;      //! Set this if the image consists of multiple frames (for normalization purposes)
 
         private:
             template<typename U> friend class Image;

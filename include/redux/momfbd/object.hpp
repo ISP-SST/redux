@@ -43,8 +43,8 @@ namespace redux {
             uint64_t unpack(const char*, bool);
         
             std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
-            double reg_gamma, weight, angle, lambda;
-            uint32_t nPoints, sequenceNumber, nph;
+            double reg_gamma, weight, angle, wavelength;
+            uint32_t objectSize, sequenceNumber, objectPupilSize;
             std::vector<double> stokesWeights;
 
         private:

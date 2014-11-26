@@ -75,7 +75,7 @@ namespace {
 
 
 Channel::Channel( const Object& o, const MomfbdJob& j ) : flags( o.flags ), mmRow( 0 ), mmWidth( 0 ), fillpix_method( o.fillpix_method ),
-    image_num_offs( 0 ), sequenceNumber( o.sequenceNumber ), nf( 0 ), myObject( o ), myJob( j ) {
+    image_num_offs( 0 ), sequenceNumber( o.sequenceNumber ), nf( 0 ), incomplete(0), myObject( o ), myJob( j ) {
 
 }
 
@@ -232,37 +232,14 @@ void Channel::parseProperties( bpt::ptree& tree ) {
                 tmpString = boost::str( boost::format( imageTemplate.substr( 0, q ) ) % sequenceNumber );
                 imageTemplate = tmpString + imageTemplate.substr( q );
             }
-            else  LOG_WARN << boost::format( "file name template \"%s\" does not contain a 2nd format specifier (needs 2)" ) % imageTemplate;
+            else  LOG_WARN << boost::format( "file name template %s does not contain a 2nd format specifier (needs 2)" ) % imageTemplate;
         }
     }
     else {
-        LOG_WARN << boost::format( "file name template \"%s\" does not contain a format specifier (needs %d)" ) % imageTemplate % ( 1 + ( sequenceNumber >= 0 ) );
+        LOG_WARN << boost::format( "file name template %s does not contain a format specifier (needs %d)" ) % imageTemplate % ( 1 + ( sequenceNumber >= 0 ) );
     }
 
-    if( tree.get<bool>( "INCOMPLETE", false ) ) {
-        for( size_t i( 0 ); i < imageNumbers.size(); ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % ( image_num_offs + imageNumbers[i] ) ) );
-            if( !bfs::exists( fn ) ) {
-                imageNumbers.erase( imageNumbers.begin() + i );
-                continue;
-            }
-            ++i;
-        }
-        if( imageNumbers.empty() ) {
-            LOG_CRITICAL << boost::format( "no files found for incomplete object with filename template \"%s\" in directory \"%s\"" ) % imageTemplate % imageDataDir;
-        }
-    }
-    else {
-        for( size_t i( 0 ); i < imageNumbers.size(); ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % ( image_num_offs + imageNumbers[i] ) ) );
-            if( !bfs::exists( fn ) ) {
-                LOG_CRITICAL << boost::format( "file %s not found!" ) % fn;
-            }
-            ++i;
-        }
-
-    }
-
+    incomplete = tree.get<bool>( "INCOMPLETE", false );
 
     LOG_DEBUG << "Channel::parseProperties() done.";
 
@@ -313,7 +290,7 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
 
 size_t Channel::size( void ) const {
 
-    size_t sz = 3;
+    size_t sz = 4;
     sz += 3 * sizeof( uint32_t );
     sz += sizeof( double );
     sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
@@ -339,6 +316,7 @@ uint64_t Channel::pack( char* ptr ) const {
     uint64_t count = pack( ptr, fillpix_method );
     count += pack( ptr+count, mmRow );
     count += pack( ptr+count, mmWidth );
+    count += pack( ptr+count, incomplete );
     count += pack( ptr+count, sequenceNumber );
     count += pack( ptr+count, image_num_offs );
     count += pack( ptr+count, flags );
@@ -374,6 +352,7 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = unpack( ptr, fillpix_method );
     count += unpack( ptr+count, mmRow );
     count += unpack( ptr+count, mmWidth );
+    count += unpack( ptr+count, incomplete );
     count += unpack( ptr+count, sequenceNumber, swap_endian );
     count += unpack( ptr+count, image_num_offs, swap_endian );
     count += unpack( ptr+count, flags, swap_endian );
@@ -585,79 +564,75 @@ bool Channel::checkData(void) {
 }
 
 
+namespace {
+    template <typename T>
+    void loadWrapper(const string& fn, T& img) {
+        redux::file::readFile( fn, img );
+        LOG_DETAIL << boost::format( "Loaded file \"%s\"" ) % fn;
+    }
 }
 
 
 void Channel::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
 
+    LOG_TRACE << "Channel::loadData()";
     // TODO: absolute/relative paths
     // TODO: cache files and just fetch shared_ptr
 
-    if( !darkTemplate.empty() ) {
-        if( darkNumbers.empty() ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( darkTemplate );
-            LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-            redux::file::readFile( fn.string(), dark );
-            dark.normalize();
+    if( !darkTemplate.empty() ) {       // needs to be read synchronously because of adding/normalization
+        size_t nWild = std::count(darkTemplate.begin(), darkTemplate.end(), '%');
+        if( nWild == 0 || darkNumbers.empty() ) {
+            LOG_DETAIL << boost::format( "Loading file %s" ) % darkTemplate;
+            redux::file::readFile( darkTemplate, dark );
+            checkIfMultiFrames(dark);
         }
         else {
             Image<float> tmp;
             for( size_t di = 0; di < darkNumbers.size(); ++di ) {
-                bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( darkTemplate ) % darkNumbers[di] ) );
+                bfs::path fn = bfs::path( boost::str( boost::format( darkTemplate ) % darkNumbers[di] ) );
                 LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
                 if( !di ) {
                     redux::file::readFile( fn.string(), dark );
+                    checkIfMultiFrames(dark);
                 }
                 else {
                     redux::file::readFile( fn.string(), tmp );
+                    checkIfMultiFrames(tmp);
                     dark += tmp;
                 }
             }
-            dark.normalize();
         }
+        dark.normalize();
     }
 
 
     if( !gainFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( gainFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), gain );
+        service.post( std::bind( loadWrapper< Image<float> >, gainFile, std::ref(gain) ) );
     }
 
+
     if( !responseFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( responseFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), ccdResponse );
+        service.post( std::bind( loadWrapper< Image<float> >, responseFile, std::ref(ccdResponse) ) );
     }
 
     if( !backgainFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( backgainFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), ccdScattering );
+        service.post( std::bind( loadWrapper< Image<float> >, backgainFile, std::ref(ccdScattering) ) );
     }
 
     if( !psfFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( psfFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), psf );
+        service.post( std::bind( loadWrapper< Image<float> >, psfFile, std::ref(psf) ) );
     }
 
     if( !mmFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( mmFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), modulationMatrix );
+        service.post( std::bind( loadWrapper< Image<float> >, mmFile, std::ref(modulationMatrix) ) );
     }
 
     if( !offxFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offxFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), xOffset );
+        service.post( std::bind( loadWrapper< Image<int16_t> >, offxFile, std::ref(xOffset) ) );
     }
 
     if( !offyFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offyFile );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), yOffset );
+        service.post( std::bind( loadWrapper< Image<int16_t> >, offyFile, std::ref(yOffset) ) );
     }
 
 
@@ -665,6 +640,7 @@ void Channel::loadData( boost::asio::io_service& service, boost::thread_group& p
         bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
         LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
         redux::file::readFile( fn.string(), images );
+        service.post( std::bind( loadWrapper< Image<float> >, fn.string(), std::ref(images) ) );
     }
     else {
         Image<float> tmp;
@@ -675,7 +651,7 @@ void Channel::loadData( boost::asio::io_service& service, boost::thread_group& p
         images.resize( nImages, tmp.dimSize( 0 ), tmp.dimSize( 1 ) );
 
         for( size_t i = 0; i < nImages; ++i ) {
-            service.post( boost::bind( &Channel::loadImage, this, i ) );
+            service.post( std::bind( &Channel::loadImage, this, i ) );
 
         }
 
@@ -722,8 +698,8 @@ void Channel::normalizeData(boost::asio::io_service& service, boost::thread_grou
 void Channel::loadImage( size_t index ) {
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
     bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
-    LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
     redux::file::readFile( fn.string(), subimg );
+    LOG_DETAIL << boost::format( "Loaded file %s" ) % fn;
     imageStats[index].reset(new Statistics<float>());
     imageStats[index]->getStats(myJob.borderClip,subimg,ST_VALUES);                          // only get min/max/mean
 }
@@ -796,6 +772,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
         float badPixelThreshold = 1E-5;     // TODO: configurable threshold.
         switch(fillpix_method) {
             case CFG_FPM_HORINT: {
+                LOG_TRACE << "Filling bad pixels using horizontal interpolation.";
                 function<float(size_t,size_t)> func = bind(horizontalInterpolation<float>, arrayPtr[index], sy, sx, sp::_1, sp::_2);
                 fillPixels(arrayPtr[index], sy, sx, func, std::bind2nd(std::less_equal<float>(),badPixelThreshold) );
                 break;
@@ -820,7 +797,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
         //string fnT = fn.leaf().string();
         fn = bfs::path( fn.leaf().string() + ".cor" );
 
-        LOG_DETAIL << boost::format( "Saving file \"%s\"" ) % fn.string();
+        LOG_DETAIL << boost::format( "Saving flat/dark corrected file %s" ) % fn.string();
         redux::file::Ana::write( fn.string(), subimg );
         
       /*  
@@ -863,7 +840,7 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 
 void Channel::normalizeImage( size_t index, double value ) {
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
-    LOG_DETAIL << boost::format( "Normalizing image %d" ) % index;
+    LOG_TRACE << boost::format( "Normalizing image %d" ) % index;
     subimg *= (value/imageStats[index]->mean);
 }
 
@@ -918,7 +895,7 @@ Point Channel::clipImages(void) {
     }
 
     bool flipX=false,flipY=false;
-    if( alignClip[0] > alignClip[1]) {     // we have the y (row) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
+    if( alignClip[0] > alignClip[1]) {     // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
         std::swap(alignClip[0], alignClip[1]);
         flipX = true;
     }
@@ -927,31 +904,33 @@ Point Channel::clipImages(void) {
         flipY = true;
     }
     for( auto& it: alignClip ) --it;        // NOTE: momfbd uses 1-based indexes, we start with 0...
-    LOG_DETAIL << "Clipping: " << printArray(alignClip,"alignClip");
-    LOG_DETAIL << "Clipping image stack: " << printArray(images.dimensions(),"original size");
+    
+    LOG_DETAIL << "Clipping images using " << printArray(alignClip,"alignClip");
+    string tmp =  printArray(images.dimensions(),"original");
     images.setLimits( 0, imageNumbers.size()-1, alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
     images.trim(false);
+    LOG_DEBUG << "          image stack: " << tmp << printArray(images.dimensions(),"  clipped");
     
     if( dark.valid() ) {
-        LOG_DETAIL << "Clipping dark: " << printArray(dark.dimensions(),"original size");
+        LOG_DEBUG << "                 dark: " << printArray(dark.dimensions(),"original");
         dark.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         dark.trim();
     }
 
     if( gain.valid() ) {
-        LOG_DETAIL << "Clipping gain: " << printArray(gain.dimensions(),"original size");
+        LOG_DEBUG << "                 gain: " << printArray(gain.dimensions(),"original");
         gain.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         gain.trim();
     }
 
     if( ccdResponse.valid() ) {
-        LOG_DETAIL << "Clipping ccdResponse: " << printArray(ccdResponse.dimensions(),"original size");
+        LOG_DEBUG << "          ccdResponse: " << printArray(ccdResponse.dimensions(),"original");
         ccdResponse.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         dark.trim();
     }
 
     if( ccdScattering.valid() ) {
-        LOG_DETAIL << "Clipping ccdScattering: " << printArray(ccdScattering.dimensions(),"original size");
+        LOG_DEBUG << "        ccdScattering: " << printArray(ccdScattering.dimensions(),"original");
         ccdScattering.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         ccdScattering.trim();
     }
@@ -962,20 +941,19 @@ Point Channel::clipImages(void) {
         size_t sy = alignClip[3] - alignClip[2] + 1;
         size_t sx = alignClip[1] - alignClip[0] + 1;
         if (dims.size() != 2 || dims[0] < sy || dims[1] < sx) throw std::logic_error("PSF has wrong dimensions: " + printArray(dims,"dims"));
-        LOG_DETAIL << "Clipping psf: " << printArray(dims,"original size");
         int skewY = (dims[0] - sy)/2  - alignClip[2];
         int skewX = (dims[1] - sx)/2  - alignClip[0];
         tmp[0] += skewX;
         tmp[1] += skewX;
         tmp[2] += skewY;
         tmp[3] += skewY;
-        LOG_DETAIL << "Clipping psf: " << printArray(tmp,"clip");
+        LOG_DEBUG << "                  psf: " << printArray(dims,"original") << printArray(tmp,"  symmetric clip");
         psf.setLimits( tmp[2], tmp[3], tmp[0], tmp[1] );
         psf.trim();
     }
 
     if( flipX || flipY ) {
-        LOG_DETAIL << "Flipping data.";
+        LOG_DETAIL << "Flipping data for this channel.";
         size_t sy = alignClip[3] - alignClip[2] + 1;
         size_t sx = alignClip[1] - alignClip[0] + 1;
         size_t ni = imageNumbers.size();

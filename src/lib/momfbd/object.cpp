@@ -26,28 +26,29 @@ using boost::algorithm::iequals;
 
 #define lg Logger::mlg
 namespace {
+
     const string thisChannel = "momfbdobj";
 
-    void pupcfg( double &lim_freq, double &r_c, uint32_t &nph, double lambda, uint32_t np, double telescope_d, double telescope_f, double arcsecperpix ) {
-        double rad2deg = 360.0 / ( 2.0 * redux::PI );
-        double scale_angle2CCD = arcsecperpix / ( rad2deg * 3600.0 );
-        double q_number = lambda / ( scale_angle2CCD * telescope_d );
-        lim_freq = ( double )np / q_number;
-        nph = np>>2;
-        r_c = lim_freq / 2.0;       // telescope radius in pupil pixels...
-        if( nph < r_c ) {           // this should only be needed for oversampled images
+    void getObjectPupilSize( double &lim_freq, double &r_c, uint32_t &objectPupilSize, double wavelength, uint32_t objectSize, double telescopeDiameter, double arcSecsPerPixel ) {
+        double radians_per_arcsec = redux::PI/(180.0*3600.0);             // (2.0*redux::PI)/(360.0*3600.0)
+        double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
+        double q_number = wavelength / ( radians_per_pixel * telescopeDiameter );
+        lim_freq = ( double )objectSize / q_number;
+        objectPupilSize = objectSize>>2;
+        r_c = lim_freq / 2.0;                   // telescope radius in pupil pixels...
+        if( objectPupilSize < r_c ) {           // this should only be needed for oversampled images
             uint32_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
-            for( int i = 0; ( nph = max( goodsizes[i], nph ) ) < r_c; ++i ); // find right size
+            for( int i = 0; ( objectPupilSize = max( goodsizes[i], objectPupilSize ) ) < r_c; ++i ); // find right size
         }
-        nph <<= 1;
+        objectPupilSize <<= 1;
     }
 
 }
 
 
 Object::Object( const MomfbdJob& j ) : imageNumbers(j.imageNumbers), darkNumbers(j.darkNumbers), reg_gamma(j.reg_gamma),
-                                 weight(1), angle(0), lambda(0), nPoints(j.patchSize), sequenceNumber(j.sequenceNumber),
-                                 nph(0), stokesWeights(j.stokesWeights), flags(j.flags), imageDataDir(j.imageDataDir),
+                                 weight(1), angle(0), wavelength(0), objectSize(j.patchSize), sequenceNumber(j.sequenceNumber),
+                                 objectPupilSize(0), stokesWeights(j.stokesWeights), flags(j.flags), imageDataDir(j.imageDataDir),
                                  fillpix_method(j.fillpix_method), output_data_type(j.output_data_type),
                                  lim_freq(), r_c(), myJob( j ), pupil(j.pupil) {
     
@@ -59,14 +60,11 @@ Object::~Object() {
 
 void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
 
-    LOG_DEBUG << "Object::parseProperties()";
-
 
     reg_gamma = tree.get<double>( "REG_GAMMA", myJob.reg_gamma );
     weight = tree.get<double>( "WEIGHT", DEF_WEIGHT );
     angle = tree.get<double>( "ANGLE", DEF_ANGLE );
-    lambda = tree.get<double>( "WAVELENGTH" );
-
+    wavelength = tree.get<double>( "WAVELENGTH" );
     imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", myJob.imageNumbers );
     sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", myJob.sequenceNumber );
     darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", myJob.darkNumbers );
@@ -84,15 +82,15 @@ void Object::parseProperties( bpt::ptree& tree, const string& fn ) {
         fillpix_method = myJob.fillpix_method;
     }
 
-    pupcfg( lim_freq, r_c, nph, lambda, nPoints, myJob.telescopeDiameter, myJob.telescopeFocalLength, myJob.arcSecsPerPixel );
+    getObjectPupilSize( lim_freq, r_c, objectPupilSize, wavelength, objectSize, myJob.telescopeDiameter, myJob.arcSecsPerPixel );
 
     if( myJob.pupil.get() ) { // pupil?
-        if( myJob.pupilSize > nph ) {
+        if( myJob.pupilSize > objectPupilSize ) {
             LOG_WARN << "MomfbdObject: the pupil image needs to be rebinned...";
             // pupil=rebin(myJob.pupil,1,myJob.pupilSize,1,myJob.pupilSize,r_c,1,nph,1,nph);
         }
-        else if( myJob.pupilSize < nph ) {
-            LOG_WARN << "MomfbdObject: the pupil image is " << myJob.pupilSize << " but nph is " << nph;
+        else if( myJob.pupilSize < objectPupilSize ) {
+            LOG_WARN << "MomfbdObject: the pupil image is " << myJob.pupilSize << " but objectPupilSize is " << objectPupilSize;
             LOG_WARN << "MomfbdObject: the pupil image needs to be interpolated, this is probably not very accurate.";
             // pupil=resample(myJob.pupil,1,myJob.pupilSize,1,myJob.pupilSize,r_c,1,nph,1,nph);
         }
@@ -211,7 +209,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree* root ) {
     if( reg_gamma != myJob.reg_gamma ) tree.put( "REG_GAMMA", reg_gamma );
     if( weight != DEF_WEIGHT ) tree.put( "WEIGHT", weight );
     if( angle != DEF_ANGLE ) tree.put( "ANGLE", angle );
-    tree.put( "WAVELENGTH", lambda );
+    tree.put( "WAVELENGTH", wavelength );
     if( imageNumbers != myJob.imageNumbers ) tree.put( "IMAGE_NUM", imageNumbers );
     if( sequenceNumber != myJob.sequenceNumber ) tree.put( "SEQUENCE_NUM", sequenceNumber );
     if( darkNumbers != myJob.darkNumbers ) tree.put( "DARK_NUM", darkNumbers );
@@ -270,14 +268,14 @@ uint64_t Object::pack(char* ptr) const {
 
     uint64_t count = pack(ptr, fillpix_method);
     count += pack(ptr+count, output_data_type);
-    count += pack(ptr+count, nPoints);
+    count += pack(ptr+count, objectSize);
     count += pack(ptr+count, sequenceNumber);
-    count += pack(ptr+count, nph);
+    count += pack(ptr+count, objectPupilSize);
     count += pack(ptr+count, flags);
     count += pack(ptr+count, reg_gamma);
     count += pack(ptr+count, weight);
     count += pack(ptr+count, angle);
-    count += pack(ptr+count, lambda);
+    count += pack(ptr+count, wavelength);
     count += pack(ptr+count, lim_freq);
     count += pack(ptr+count, r_c);
     count += pack(ptr+count, imageNumbers);
@@ -301,14 +299,14 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 
     uint64_t count = unpack(ptr, fillpix_method);
     count += unpack(ptr+count, output_data_type);
-    count += unpack(ptr+count, nPoints, swap_endian);
+    count += unpack(ptr+count, objectSize, swap_endian);
     count += unpack(ptr+count, sequenceNumber, swap_endian);
-    count += unpack(ptr+count, nph, swap_endian);
+    count += unpack(ptr+count, objectPupilSize, swap_endian);
     count += unpack(ptr+count, flags, swap_endian);
     count += unpack(ptr+count, reg_gamma, swap_endian);
     count += unpack(ptr+count, weight, swap_endian);
     count += unpack(ptr+count, angle, swap_endian);
-    count += unpack(ptr+count, lambda, swap_endian);
+    count += unpack(ptr+count, wavelength, swap_endian);
     count += unpack(ptr+count, lim_freq, swap_endian);
     count += unpack(ptr+count, r_c, swap_endian);
     count += unpack(ptr+count, imageNumbers, swap_endian);

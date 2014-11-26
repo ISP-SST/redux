@@ -16,7 +16,9 @@ namespace redux {
 
             FileInfo ( void ) {}
             virtual ~FileInfo ( void ) = default;
-
+            
+            virtual std::string getText( void ) { return ""; }
+            
         };
 
 
