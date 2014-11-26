@@ -266,9 +266,10 @@ void redux::file::Ana::readUncompressed( ifstream& file, char* data, size_t nEle
 
     if( hdr->m_Header.subf & 128 ) { // saved on big endian system.
         switch( typeSizes[hdr->m_Header.datyp] ) {
-            case 2: swapEndian( reinterpret_cast<int16_t*>( data ), nElements ); break;
-            case 4: swapEndian( reinterpret_cast<int32_t*>( data ), nElements ); break;
-            case 8: swapEndian( reinterpret_cast<int64_t*>( data ), nElements ); break;
+            case  2: swapEndian( reinterpret_cast<int16_t*>( data ), nElements ); break;
+            case  4: swapEndian( reinterpret_cast<int32_t*>( data ), nElements ); break;
+            case  8: swapEndian( reinterpret_cast<int64_t*>( data ), nElements ); break;
+            case 16: swapEndian( reinterpret_cast<int64_t*>( data ), 2*nElements ); break;
             default: ;
         }
     }
@@ -455,8 +456,8 @@ void redux::file::Ana::read( const string& filename, redux::util::Array<T>& data
 
     switch( hdr->m_Header.datyp ) {
         case( ANA_BYTE ):   data.template copyFrom<char>( tmp.get() ); break;
-        case( ANA_WORD ):   data.template copyFrom<uint16_t>( tmp.get() ); break;
-        case( ANA_LONG ):   data.template copyFrom<uint32_t>( tmp.get() ); break;
+        case( ANA_WORD ):   data.template copyFrom<int16_t>( tmp.get() ); break;
+        case( ANA_LONG ):   data.template copyFrom<int32_t>( tmp.get() ); break;
         case( ANA_FLOAT ):  data.template copyFrom<float>( tmp.get() ); break;
         case( ANA_DOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
         default: ;
@@ -474,17 +475,9 @@ template void redux::file::Ana::read( const string& filename, redux::util::Array
 
 template <typename T>
 void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image ) {
-    auto hdr = static_pointer_cast<redux::file::Ana>( image.hdr );
+    std::shared_ptr<Ana> hdr = static_pointer_cast<Ana>( image.hdr );
     read( filename, image, hdr );
-   // string txt = hdr->getText();
-//     boost::regex re( "(\\d+)[ .]+SUM[= ]+" );
-//     boost::smatch match;
-//     if( boost::regex_search( txt, match, re ) ) {
-//         int nFrames = boost::lexical_cast<int>( match[1] );
-//         if( nFrames > 1) {
-//             image.setWeight(nFrames);
-//         } else image.setWeight(1);
-//     }
+    string txt = hdr->getText();
     image.hdr = hdr;
 }
 template void redux::file::Ana::read( const string & filename, redux::image::Image<uint8_t>& image );
