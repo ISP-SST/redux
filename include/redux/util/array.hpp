@@ -415,13 +415,16 @@ namespace redux {
 
             template <typename U>
             void copy( Array<U>& arr ) const {
-                std::vector<size_t> newDimSizes;
-                for( auto & it : dimSizes ) {
-                    if( it > 1 ) {
-                        newDimSizes.push_back( it );
+                if( this == reinterpret_cast<Array<T>*>(&arr) ) return;     // check for self-assignment
+                if( !sameSize( arr ) ) {
+                    std::vector<size_t> newDimSizes;
+                    for( auto & it : dimSizes ) {
+                        if( it > 1 ) {
+                            newDimSizes.push_back( it );
+                        }
                     }
+                    arr.resize( newDimSizes );
                 }
-                arr.resize( newDimSizes );
                 const_iterator cit = begin();
                 for( auto & it : arr ) {
                     it = static_cast<U>( *cit );
@@ -510,7 +513,7 @@ namespace redux {
             void set( S ...values ) {   set( {static_cast<T>( values )...} ); }
 
             void set( Array<T>& rhs ) {
-                if( ( this != &rhs ) && sameSizes( rhs ) ) {
+                if( ( this != &rhs ) && sameSize( rhs ) ) {
                     iterator it = begin();
                     for( auto & rhsit : rhs ) {
                         *it++ = rhsit;
@@ -618,15 +621,35 @@ namespace redux {
             
             template <typename U>
             const Array<T>& operator=( const Array<U>& rhs ) {
-                if( !sameSizes( rhs ) ) this->resize( rhs.dimSizes );
+                if( !sameSize( rhs ) ) this->resize( rhs.dimSizes );
                 typename Array<U>::const_iterator rhsit = rhs.begin();
                 for( auto & it : *this ) it = *rhsit++;
                 return *this;
             }
 
+            template <typename U>
+            Array<T> operator+( const Array<U>& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                if( !sameSize( rhs ) ) tmp.resize( rhs.dimSizes );
+                typename Array<U>::const_iterator rhsit = rhs.begin();
+                for( auto & it : tmp ) it += *rhsit++;
+                return tmp;
+            }
+
+           template <typename U>
+            Array<T> operator-( const Array<U>& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                if( !sameSize( rhs ) ) tmp.resize( rhs.dimSizes );
+                typename Array<U>::const_iterator rhsit = rhs.begin();
+                for( auto & it : tmp ) it -= *rhsit++;
+                return tmp;
+            }
+
             
             bool operator==( const Array<T>& rhs ) const {
-                if( ! sameSizes( rhs ) ) {
+                if( ! sameSize( rhs ) ) {
                     return false;
                 }
                 if( ptr() == rhs.ptr() ) {      // shared data, check if it is the same sub-array.
@@ -752,7 +775,7 @@ namespace redux {
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
                 end_ = ( ++it ).pos();  // 1 step after last element;
             }
-            
+
         private:
             void setSizes( const std::vector<size_t>& sizes ) {
                 begin_ = end_ = dataSize = 0;
@@ -833,7 +856,7 @@ namespace redux {
 
             std::vector<int64_t> dimFirst;
             std::vector<int64_t> dimLast;
-
+        protected:
             std::shared_ptr<T> datablock;
             size_t nDims_;
             size_t nElements_;
