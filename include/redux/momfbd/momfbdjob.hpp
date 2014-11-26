@@ -50,6 +50,10 @@ namespace redux {
             void init(void);
             void cleanup(void);
             bool run( WorkInProgress&, boost::asio::io_service&, boost::thread_group&, uint8_t );
+            
+            bool checkCfg(void);
+            bool checkData(void);
+        
 
         private:
 
@@ -58,7 +62,6 @@ namespace redux {
             void packPatch( Patch::Ptr );
             void runMain( Part::Ptr& );
             void postProcess( boost::asio::io_service&, boost::thread_group& );
-            bool isValid(void);
 
             uint8_t basis, fillpix_method, output_data_type;
 

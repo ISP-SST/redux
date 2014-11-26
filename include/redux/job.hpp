@@ -103,6 +103,9 @@ namespace redux {
         virtual size_t size(void) const;
         virtual uint64_t pack(char*) const;
         virtual uint64_t unpack(const char*, bool);
+
+        virtual bool checkCfg(void) { return false; };      //! will be called before a job is uploaded for processing, should return true if all is ok.
+        virtual bool checkData(void) { return false; };     //! will be called before a job is (pre)processed, should return true if all is ok.
         
         virtual size_t getParts(WorkInProgress&, uint8_t) { return 0; };
         virtual void ungetParts(WorkInProgress&) { };

@@ -645,8 +645,11 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
 
 void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_group& pool ) {
 
-    // TODO: start logging
-    if ( !isValid() ) {
+    // TODO: start logging (to file)
+
+    LOG_TRACE << "MomfbdJob::preProcess()";
+    
+    if ( !checkData() ) {
         LOG_ERR << "MomfbdJob::preProcess(): sanity check failed.";
         info.step.store( JSTEP_ERR );
         info.state.store( JSTATE_IDLE );
@@ -662,6 +665,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     info.maxThreads = 12;
     // load remaining files asynchronously  (images)
     for( size_t t = 0; t < info.maxThreads; ++t ) {
+        LOG_TRACE << "Adding load-thread #" << (t+1);
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
     pool.join_all();
@@ -752,10 +756,10 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     uint32_t span = patchSize/2 + max_local_shift;
     for( auto posY : subImagePosY ) {
         uint32_t trimmedPosY = std::min(std::max(span,posY),imageSizes.y-span);
-        if( trimmedPosY != posY ) cout << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << posY << " -> " << trimmedPosY << endl;
+        if( trimmedPosY != posY ) LOG_WARN << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << posY << " -> " << trimmedPosY;
         for( auto posX : subImagePosX ) {
             uint32_t trimmedPosX = std::min(std::max(span,posX),imageSizes.x);
-            if( trimmedPosX != posX ) cout << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX << endl;
+            if( trimmedPosX != posX ) LOG_WARN << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX;
             Patch::Ptr patch( new Patch() );
             patch->first.x = trimmedPosX-span;
             patch->first.y = trimmedPosY-span;
@@ -812,7 +816,7 @@ void MomfbdJob::runMain( Part::Ptr& part ) {
     auto pptr = static_pointer_cast<Patch>( part );
 
 
-    LOG << "MomfbdJob::runMain()";
+//    LOG << "MomfbdJob::runMain()";
 //     // temporaries, to avoid cache collisions.
 //     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
 //     uint32_t sizeY = pptr->yPixelH - pptr->yPixelL + 1;
@@ -960,11 +964,26 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, boost::thread_gro
 }
 
 
-bool MomfbdJob::isValid(void) {
-    bool allOk(true);
+bool MomfbdJob::checkCfg(void) {
+    
+    if( objects.empty() ) return false;     // nothing to do
+    
     for( auto & it : objects ) {
-        allOk &= it->isValid();
+        if( !it->checkCfg() ) return false;
     }
-    return allOk;
+    
+    return true;
 }
+
+
+bool MomfbdJob::checkData(void) {
+
+    for( auto & it : objects ) {
+        if( !it->checkData() ) return false;
+    }
+    
+    return true;
+}
+        
+
 

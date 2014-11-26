@@ -331,12 +331,25 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 }
 
 
-bool Object::isValid(void) {
-    bool allOk(true);
+bool Object::checkCfg(void) {
+    
+    if( channels.empty() ) return false;     // need at least 1 channel
+    
     for( auto & it : channels ) {
-        allOk &= it->isValid();
+        if( !it->checkCfg() ) return false;
     }
-    return allOk;
+    
+    return true;
+}
+
+
+bool Object::checkData(void) {
+
+    for( auto & it : channels ) {
+        if( !it->checkData() ) return false;
+    }
+    
+    return true;
 }
 
 
@@ -366,6 +379,7 @@ void Object::cleanup( void ) {
 
 
 void Object::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
+    LOG << "Object::loadData()";
     for( auto & it : channels ) {
         it->loadData( service, pool );
     }
@@ -374,6 +388,7 @@ void Object::loadData( boost::asio::io_service& service, boost::thread_group& po
 
 
 void Object::preprocessData(boost::asio::io_service& service, boost::thread_group& pool) {
+    LOG << "Object::preprocessData()";
     for(auto& it: channels) {
         it->preprocessData(service, pool);
     }
@@ -381,6 +396,7 @@ void Object::preprocessData(boost::asio::io_service& service, boost::thread_grou
 
 
 void Object::normalize(boost::asio::io_service& service, boost::thread_group& pool) {
+    LOG << "Object::normalize()";
     double maxMean = std::numeric_limits<double>::min();
     for(auto it: channels) {
         double mM = it->getMaxMean();

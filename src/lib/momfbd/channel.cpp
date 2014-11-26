@@ -403,109 +403,187 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-bool Channel::isValid( void ) {
+bool Channel::checkCfg(void) {
+    
+    LOG_TRACE << "Channel::checkCfg()";
 
-    bool allOk( true );
-
+    // Do we have a correct filename template ?
     if( imageTemplate.empty() ) {
-        LOG_ERR << "No images specified.";
+        LOG_ERR << "No filename template specified.";
+        return false;
     }
-    else {
-        if( imageNumbers.empty() ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
-            if( ! bfs::exists( fn ) ) {
-                LOG_ERR << boost::format( "file %s not found!" ) % fn;
-                allOk = false;
-            }
-        }
-        else {
-            for( auto & it : imageNumbers ) {
-                bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % it ) );
+    size_t nWild = std::count(imageTemplate.begin(), imageTemplate.end(), '%');
+    if( nWild > 2 ) {
+        LOG_ERR << "Filename template contains too many wildcards: \"" << imageTemplate << "\"";
+        return false;
+    } else if( nWild == 1 && imageNumbers.empty() ) {
+        LOG_ERR << "Filename template contains wildcard and no image-numbers given (with IMAGE_NUM)";
+        return false;
+    } else if( nWild == 2 && sequenceNumber == 0 ) {
+        LOG_ERR << "Filename template contains 2 wildcards and no sequence-number given (with SEQUENCE_NUM)";
+        return false;
+    }
+    
+    // Do we have a correct dark template ?
+    if( darkTemplate.empty() ) {
+        LOG_ERR << "No filename template specified.";
+        return false;
+    }
+    nWild = std::count(darkTemplate.begin(), darkTemplate.end(), '%');
+    if( nWild > 1 ) {
+        LOG_ERR << "Dark template contains too many wildcards: \"" << darkTemplate << "\"";
+        return false;
+    } else if( nWild == 1 && darkNumbers.empty() ) {
+        LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)";
+        return false;
+    } else if( nWild == 0 && darkNumbers.size() ) {
+        LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename.";
+        darkNumbers.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
+    }
+
+    return true;
+    
+}
+
+
+bool Channel::checkData(void) {
+    
+    LOG_TRACE << "Channel::checkData()";
+    
+    // Images
+    if( incomplete ) {  // check if files are present
+        for( size_t i( 0 ); i < imageNumbers.size(); ) {
+            bfs::path fn = bfs::path( boost::str( boost::format( imageTemplate ) % (image_num_offs + imageNumbers[i]) ) );
+            if( !bfs::exists( fn ) ) {
+                fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % (image_num_offs + imageNumbers[i]) ) );
                 if( !bfs::exists( fn ) ) {
-                    LOG_ERR << boost::format( "file %s not found!" ) % fn;
-                    allOk = false;
+                    LOG_CRITICAL << "Not found !!! \"" << fn.string() << "\"";
+                    imageNumbers.erase( imageNumbers.begin() + i );
+                    continue;
                 }
             }
+            ++i;
+        }
+        if( imageNumbers.empty() ) {
+            LOG_CRITICAL << boost::format( "No files found for incomplete object with filename template \"%s\" in directory \"%s\"" ) % imageTemplate % imageDataDir;
+            return false;
         }
     }
+    if( imageNumbers.empty() ) {        // single file
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
+        if( ! bfs::exists( fn ) ) {
+            LOG_ERR << boost::format( "Image-file %s not found!" ) % fn;
+            return false;
+        }
+    } else {                            // template + numbers 
+        for( auto & it : imageNumbers ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % (image_num_offs + it) ) );
+            if( !bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Image-file %s not found!" ) % boost::str( boost::format( imageTemplate ) % (image_num_offs + it) );
+                return false;
+            }
+        }
+    }
+    
 
-    if( !darkTemplate.empty() ) {
-        if( darkNumbers.empty() ) {
+    // Dark(s)
+    size_t nWild = std::count(darkTemplate.begin(), darkTemplate.end(), '%');
+    if( nWild == 0 || darkNumbers.empty() ) {         // single file, DARK_NUM will be ignored if no wildcard in the template
+        if( ! bfs::exists( bfs::path( darkTemplate ) ) ) {
             bfs::path fn = bfs::path( imageDataDir ) / bfs::path( darkTemplate );
             if( ! bfs::exists( fn ) ) {
-                LOG_ERR << boost::format( "file %s not found!" ) % fn;
-                allOk = false;
-            }
+               LOG_ERR << boost::format( "Dark-file %s not found!" ) % darkTemplate;
+                return false;
+            } else darkTemplate = fn.c_str();
         }
-        else {
-            for( auto & it : darkNumbers ) {
-                bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
+    } else {                            // template
+        for( auto & it : darkNumbers ) {
+            bfs::path fn = bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
+            if( !bfs::exists( fn ) ) {
+                fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
                 if( !bfs::exists( fn ) ) {
-                    LOG_ERR << boost::format( "file %s not found!" ) % fn;
-                    allOk = false;
-                }
+                    LOG_ERR << boost::format( "Dark-file %s not found!" ) % boost::str( boost::format( darkTemplate ) % it );
+                    return false;
+                } else darkTemplate = fn.c_str();
             }
         }
     }
+    
 
+    // Gain
     if( !gainFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( gainFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( gainFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( gainFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Gain-file %s not found!" ) % gainFile;
+                return false;
+            } else gainFile = fn.c_str();
         }
     }
 
     if( !responseFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( responseFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( responseFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( responseFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Response-file %s not found!" ) % responseFile;
+                return false;
+            } else responseFile = fn.c_str();
         }
     }
 
     if( !backgainFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( backgainFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( backgainFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( backgainFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Backgain-file %s not found!" ) % backgainFile;
+                return false;
+            } else backgainFile = fn.c_str();
         }
     }
 
     if( !psfFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( psfFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( psfFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( psfFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "PSF-file %s not found!" ) % psfFile;
+                return false;
+            } else psfFile = fn.c_str();
         }
     }
 
     if( !mmFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( mmFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( mmFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( mmFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Modulation-matrix file %s not found!" ) % mmFile;
+                return false;
+            } else mmFile = fn.c_str();
         }
     }
 
     if( !offxFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offxFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( offxFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offxFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Offset-file %s not found!" ) % offxFile;
+                return false;
+            } else offxFile = fn.c_str();
         }
     }
 
     if( !offyFile.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offyFile );
-        if( ! bfs::exists( fn ) ) {
-            LOG_ERR << boost::format( "file %s not found!" ) % fn;
-            allOk = false;
+        if( ! bfs::exists( bfs::path( offyFile ) ) ) {
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( offyFile );
+            if( ! bfs::exists( fn ) ) {
+                LOG_ERR << boost::format( "Offset-file %s not found!" ) % offyFile;
+                return false;
+            } else offyFile = fn.c_str();
         }
     }
+    
+    return true;
+}
 
-
-    return allOk;
 
 }
 

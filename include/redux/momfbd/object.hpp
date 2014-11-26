@@ -49,7 +49,10 @@ namespace redux {
 
         private:
 
-            bool isValid(void);
+            
+            bool checkCfg(void);
+            bool checkData(void);
+
             void init(void);
             void cleanup(void);
             void loadData(boost::asio::io_service&, boost::thread_group&);

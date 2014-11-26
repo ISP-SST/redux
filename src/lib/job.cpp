@@ -50,7 +50,9 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
         if( it2 != getMap().end() ) {
             Job* tmpJob = it2->second.second();
             tmpJob->parseProperties( vm, it.second );
-            tmp.push_back( shared_ptr<Job>( tmpJob ) );
+            if( tmpJob->checkCfg() ) {
+                tmp.push_back( shared_ptr<Job>( tmpJob ) );
+            } else LOG_WARN << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
         }
         //else LOG_WARN << "No job with tag \"" << name << "\" registered.";
     }
