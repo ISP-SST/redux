@@ -277,15 +277,17 @@ namespace redux {
 
             /*! @brief Pack the array into a dense string of characters, suitable for sending across the network or write to file.
              *  @details For sub-arrays, only the accessed region is packed, so the receiving end will unpack it into a dense array
-             *  of the same dimensions as the sub-array.
+             *  of the same dimensions as the sub-array. Trivial dimensions (size=1) will be stripped in the packing.
              */
             uint64_t pack( char* ptr ) const {
                 using redux::util::pack;
                 uint64_t count = pack( ptr, size() );
-                if( uint8_t ndims = dimSizes.size() ) {
+                if( nElements_ ) {
+                    Array<T> tmp = this->copy(true);
+                    uint8_t ndims = tmp.nDimensions();
                     count += pack( ptr+count, ndims );
-                    count += pack( ptr+count, dimSizes );
-                    count += pack( ptr+count, datablock.get(), nElements_ );
+                    count += pack( ptr+count, tmp.dimensions() );
+                    count += pack( ptr+count, tmp.ptr(), tmp.nElements() );
                 }
                 return count;
 
@@ -298,7 +300,7 @@ namespace redux {
                 using redux::util::unpack;
                 size_t sz;
                 uint64_t count = unpack( ptr, sz, swap_endian );
-                if( sz > 8 ) {
+                if( sz > 8 ) {          // 8 means an empty array was transferred
                     uint8_t ndims;
                     count += unpack( ptr+count, ndims );
                     std::vector<size_t> tmp( ndims );
