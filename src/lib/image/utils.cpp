@@ -196,7 +196,7 @@ void redux::image::descatter ( Array<T>& data, const Array<U>& ccdgain, const Ar
 
     vector<size_t> dims = data.dimensions ( true );
 
-    if ( dims.size() != 2 || dims != ccdgain.dimensions() || dims != ccdgain.dimensions() ) {
+    if ( dims.size() != 2 || dims != ccdgain.dimensions() || dims != psf_in.dimensions() ) {
         cout << "descatter(): dimensions of gain/psf does not match image." << endl;
         return;
     }
