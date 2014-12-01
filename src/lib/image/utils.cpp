@@ -92,6 +92,128 @@ void Grid::init(void) {
 }
 
 
+float redux::image::makePupil( util::Array<float>& aperture, uint32_t nPoints, float radius, bool normalize ) {
+    
+    double area = 0.0, origin = 0.0;
+    
+    uint32_t mid = nPoints/2;
+    bool odd = nPoints%2;       // N.B: Don't use odd number of points for pupils!! Implemented just for completion.
+    
+    odd = true;                 // Pupil should be centered ON pixel (mid,mid), to match the location of the origin for Fourier-transforms. 
+                                // Forcing "odd" will center pupil on (mid,mid) rather than making it symmetric around a point between pixels. 
+    
+    if( odd ) origin = 0.5;
+                                
+    Grid grid(mid+1,origin,origin);
+    float** distPtr = grid.distance.get();
+    float** anglePtr = grid.angle.get();
+    aperture.resize(nPoints,nPoints);
+    aperture.zero();
+    
+    for(int x = 0; x < mid; ++x) {
+        for(int y = 0; y <=x; ++y) {
+            double val = 0;
+            if(distPtr[y+1][x+1] < radius) {
+                val = 1;
+                //val = distPtr[y+1][x+1];
+            } else if(distPtr[y][x] < radius) {
+                val = (radius-distPtr[y][x])/(distPtr[y+1][x+1]-distPtr[y][x]); // linear fill-factor from radial ratio
+                // TODO: better approximation of pixel fill-factor.
+            }
+            if(odd) {
+                if( x == 0 && y == 0 ) {    // central pixel = 1 for all practical cases
+                                            // a pupil of size < sqrt(2) pixel is a bit absurd, this is just for completeness/fun :-)
+                    if( radius > sqrt(2)/2.0 ) val = 1;
+                    else if( radius < 0.5 ) val = redux::PI*radius*radius;
+                    else val = redux::PI*radius*radius + (radius-0.5)/(sqrt(2)/2.0-0.5)*(1-redux::PI*radius*radius);
+                    aperture(mid,mid) = val;
+                    area += val;
+                } else {
+                    aperture(mid+y,mid+x) = val;
+                    area += val;
+                    if ( x != 0 ) {
+                        aperture(mid+y,mid-x) = val;
+                        area += val;
+                        if ( y != 0 ) {
+                            aperture(mid-y,mid-x) = val;
+                            area += val;
+                        }
+                    }
+                    if ( y != 0 ) {
+                        aperture(mid-y,mid+x) = val;
+                        area += val;
+                    }
+                    if( x != y ) {
+                        aperture(mid+x,mid+y) = val;
+                        area += val;
+                        if ( x != 0 ) {
+                            aperture(mid-x,mid+y) = val;
+                            area += val;
+                            if ( y != 0 ) {
+                                aperture(mid-x,mid-y) = val;
+                                area += val;
+                            }
+                        }
+                        if ( y != 0 ) {
+                            aperture(mid+x,mid-y) = val;
+                            area += val;
+                        }
+                    }
+                }
+            } else {
+                aperture(mid+y,mid+x) = val;
+                aperture(mid+y,mid-x-1) = aperture(mid-y-1,mid+x) = aperture(mid-y-1,mid-x-1) = val;
+                area += 4*val;
+                if(x != y) {
+                    aperture(mid+x,mid+y) = val;  // Use symmetry to fill quadrants (if off-diagonal)
+                    aperture(mid+x,mid-y-1) = aperture(mid-x-1,mid+y) = aperture(mid-x-1,mid-y-1) = val;
+                    area += 4*val;
+                }
+            }
+        }
+    }   
+    
+    return area;
+    
+}
+
+
+float redux::image::makePupil_mvn( float** pupil, uint32_t nph, float r_c ) {
+    
+    double area = 0.0, origin=0.0;
+    memset(*pupil,0,(nph+1)*(nph+1)*sizeof(float));
+    int xo = 1 + nph / 2, yo = 1 + nph / 2;
+    double dx = 0.5 / r_c, dy = 0.5 / r_c;
+    for(int x = 1; x <= nph; ++x) {
+        double xl = fabs((double)(x - xo)) / r_c - dx, xh = fabs((double)(x - xo)) / r_c + dx;
+        double xhs = sqr(xh);
+        for(int y = 1; y <= nph; ++y) {
+            double yl = fabs((double)(y - yo)) / r_c - dy, yh = fabs((double)(y - yo)) / r_c + dy;
+            double yhs = sqr(yh);
+            double rsl = sqr(xl) + sqr(yl), rsh = xhs + yhs;
+            if(rsl <= 1.0) {   // inside pixel
+                if(rsh < 1.0) {   // full pixel
+                    pupil[x][y] = 1.0;
+                    //pupil[x][y] = sqrt(rsh*r_c*r_c);
+                } else {           // partial pixel
+                    double x2 = sqrt(max(1.0 - yhs, (double)0.0));
+                    double y3 = sqrt(max(1.0 - xhs, (double)0.0));
+                    double f = (xh > yh) ? (yh - yl) * (min(xh, max(xl, x2)) - xl) / (4 * dx * dy) :
+                             (xh - xl) * (min(yh, max(yl, y3)) - yl) / (4 * dx * dy);
+                    pupil[x][y] = f;
+                }
+                area += pupil[x][y];
+            }
+            else pupil[x][y] = 0.0; // outside pixel
+        }
+    }
+
+    return area;
+    
+}
+
+
+
 // nverseDistanceWeight( T** array, size_t sizeY, size_t sizeX, size_t posY, size_t posX ) {
 
 //double inv_dist_wght(double **a,int xl,int xh,int yl,int yh,int xb,int yb)
@@ -299,4 +421,5 @@ void redux::image::descatter ( Array<T>& data, const Array<U>& ccdgain, const Ar
 template void redux::image::descatter ( Array<float>&, const Array<float>&, const Array<float>&, int, double, double );
 template void redux::image::descatter ( Array<double>&, const Array<float>&, const Array<float>&, int, double, double );
 template void redux::image::descatter ( Array<float>&, const Array<double>&, const Array<double>&, int, double, double );
+
 

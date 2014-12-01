@@ -3,6 +3,7 @@
 
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
+#include "redux/types.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -28,6 +29,8 @@ namespace redux {
             bool operator<( const Grid& rhs ) const { if(size == rhs.size ) return (origin < rhs.origin); return ( size < rhs.size ); }
         };
         
+        float makePupil( util::Array<float>& aperture, uint32_t nPoints, float radius, bool normalize=false);
+        float makePupil_mvn( float** data, uint32_t nPoints, float radius );
 
         template <typename T>
         void reverseX( T** data, size_t sizeY, size_t sizeX ) {
@@ -35,6 +38,7 @@ namespace redux {
                 std::reverse( data[y], data[y] + sizeX );
             }
         }
+        
 
         template <typename T>
         void reverseY( T** data, size_t sizeY, size_t sizeX ) {
