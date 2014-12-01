@@ -37,7 +37,7 @@ namespace redux {
 
             Modes();
             Modes ( KL_cfg*, double, double, int, int, int, int*, int, int*, int**, int**, int, int, double, double, double** );
-            ~Modes ( void );
+            virtual ~Modes ( void );
 
             void init ( KL_cfg*, double, double, int, int, int, int*, int, int*, int**, int**, int, int, double, double, double** );
 

@@ -18,14 +18,18 @@ namespace {
 
 void imageTests( void ) {
 
-    size_t xSize = 7;
+    // size of test image
+    size_t xSize = 9;
     size_t ySize = 7;
-    size_t firstX = 1;
-    size_t lastX = 5;
-    size_t firstY = 1;
-    size_t lastY = 4;
-    size_t xs = lastX - firstX + 1;
-    size_t ys = lastY - firstY + 1;
+    
+    // location of subimage
+    size_t subFirstX = 2;
+    size_t subLastX = 5;
+    size_t subFirstY = 3;
+    size_t subLastY = 4;
+    
+    size_t subXSize = subLastX - subFirstX + 1;
+    size_t subYSize = subLastY - subFirstY + 1;
 
     // create/resize
     Image<int> image( 10, 15 );
@@ -75,9 +79,9 @@ void imageTests( void ) {
 
         image.resize( ySize, xSize );
         image = 1;
-        Image<int> subimage( image, firstY, lastY, firstX, lastX );
-        BOOST_CHECK_EQUAL( subimage.dimSize(0), lastY-firstY+1 );
-        BOOST_CHECK_EQUAL( subimage.dimSize(1), lastX-firstX+1 );
+        Image<int> subimage( image, subFirstY, subLastY, subFirstX, subLastX );
+        BOOST_CHECK_EQUAL( subimage.dimSize(0), subLastY-subFirstY+1 );
+        BOOST_CHECK_EQUAL( subimage.dimSize(1), subLastX-subFirstX+1 );
         for( size_t y = 0; y < ySize; ++y ) {
             for( size_t x = 0; x < xSize; ++x ) {
                 image( y, x ) = y * xSize + x + 1;        // set some values: 1,2,3...
@@ -146,34 +150,63 @@ void imageTests( void ) {
     /**************************/
 
     image.resize( ySize, xSize );
-
-    Image<int> subimage( image, firstY/*1*/, lastY/*4*/, firstX/*1*/, lastX/*5*/ );
+    Image<int> subimage( image, subFirstY, subLastY, subFirstX, subLastX );
 
     // compare pointers to verify that the data is shared
     BOOST_CHECK( subimage.ptr() == image.ptr() );
+    
+    // check that original is dense, and subimage not
+    BOOST_CHECK( image.dense() );
+    BOOST_CHECK( !subimage.dense() );
 
-    image = 2;
-    for( size_t y = 0; y < ys; ++y ) {
-        for( size_t x = 0; x < xs; ++x ) {
-            int val = image( firstY + y, firstX + x );
-            BOOST_CHECK_EQUAL( subimage( y, x ), val );
-            subimage( y, x ) *= 2;
-            BOOST_CHECK_EQUAL( image( firstY + y, firstX + x ), 2 * val );  // verify that the shared data has been modified
-        }
-    }
-
-    // assign to subimage
+    // global assign to subimage
     image = 2;
     subimage = 13;
     for( size_t y = 0; y < ySize; ++y ) {
         for( size_t x = 0; x < xSize; ++x ) {
-            if( y >= firstY && y <= lastY && x >= firstX && x <= lastX ) {
+            if( y >= subFirstY && y <= subLastY && x >= subFirstX && x <= subLastX ) {
                 BOOST_CHECK_EQUAL( image( y, x ), 13 );
             }
             else {
                 BOOST_CHECK_EQUAL( image( y, x ), 2 );
             }
         }
+    }
+
+    // elementwise modification
+    image = 2;
+    for( size_t y = 0; y < subYSize; ++y ) {
+        for( size_t x = 0; x < subXSize; ++x ) {
+            int val = image( subFirstY + y, subFirstX + x );
+            BOOST_CHECK_EQUAL( subimage( y, x ), val );
+            subimage( y, x ) *= 2;
+            BOOST_CHECK_EQUAL( image( subFirstY + y, subFirstX + x ), 2 * val );  // verify that the shared data has been modified
+        }
+    }
+    
+    
+    // shift subimage
+    {
+        int cnt=1;
+        for( size_t y = 0; y < ySize; ++y ) {
+            for( size_t x = 0; x < xSize; ++x ) {
+                image( y, x ) = cnt++;
+            }
+        }
+        
+        // check that the shift is limited by the borders of the underlying array.
+        BOOST_CHECK_EQUAL( subimage.shift(0,-1000), -subFirstY);
+        BOOST_CHECK_EQUAL( subimage.shift(1,-1000), -subFirstX);
+        // now the subimage should start at (0,0) and end at (subYSize-1,subYSize-1)
+        BOOST_CHECK_EQUAL( subimage( 0, 0 ), image( 0, 0 ) );
+        BOOST_CHECK_EQUAL( subimage( subYSize-1, subXSize-1 ), image( subYSize-1, subXSize-1) );
+        
+        BOOST_CHECK_EQUAL( subimage.shift(0,1000), ySize-subYSize);
+        BOOST_CHECK_EQUAL( subimage.shift(1,1000), xSize-subXSize);
+        // now the subimage should start at (ySize-subYSize,xSize-subXSize) and end at (ySize-1,xSize-1)
+        BOOST_CHECK_EQUAL( subimage( 0, 0 ), image( ySize-subYSize, xSize-subXSize ) );
+        BOOST_CHECK_EQUAL( subimage( subYSize-1, subXSize-1 ), image( ySize-1, xSize-1) );
+        
     }
 
     image = 5;
@@ -197,6 +230,30 @@ void imageTests( void ) {
     image /= image2;
     for( auto ait : image ) {
         BOOST_CHECK_EQUAL( ait, 6 );
+    }
+    
+    
+    // Grids
+    // TODO: Better testcase, this is basically the same math as int the Grid-constructor.
+    {
+        size_t nPoints = 50;
+        float originX = 11;
+        float originY = 11.5;
+        Grid grid(nPoints,originY,originX);
+        float** distPtr = grid.distance.get();
+        float** anglePtr = grid.angle.get();
+        for( size_t i = 0; i < nPoints; ++i ) {
+            double yDist = i - originY;
+            for( size_t j = 0; j < nPoints; ++j ) {
+                double xDist = j - originX;
+                BOOST_CHECK_CLOSE( distPtr[i][j], (float)sqrt(yDist*yDist+xDist*xDist), 1E-10);
+                if(yDist || xDist) {
+                    BOOST_CHECK_CLOSE( anglePtr[i][j], (float)atan2(yDist, xDist), 1E-5 );
+                } else  BOOST_CHECK_EQUAL( anglePtr[i][j], 0.0 );
+            }
+        }
+
+        
     }
 
 }

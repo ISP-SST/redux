@@ -2,13 +2,13 @@
 
 #include "redux/constants.hpp"
 #include "redux/math/linalg.hpp"
-#include "redux/momfbd/legacy.hpp"
+//#include "redux/momfbd/legacy.hpp"
 #include "redux/util/arrayutil.hpp"
 
 #include <cmath>
 
 using namespace redux::momfbd;
-using namespace redux::momfbd::legacy;
+//using namespace redux::momfbd::legacy;
 using namespace redux::util;
 using namespace redux;
 
@@ -52,25 +52,6 @@ namespace {
 
     }
 
-}
-
-ModeCache::Grid::Grid(int sz) : size(sz) {
-    int half = sz / 2;
-    distance = sharedArray<float>(sz, sz);
-    float** distPtr = distance.get();
-    angle = sharedArray<float>(sz, sz);
-    float** anglePtr = angle.get();
-    for(int i = 0; i < sz; ++i) {
-        int ii = (i - half) * (i - half);
-        for(int j = 0; j < sz; ++j) {
-            if((i != half) || (j != half)) {
-                int jj = (j - half) * (j - half);
-                distPtr[i][j] = sqrt(ii + jj);
-                anglePtr[i][j] = atan2(i - half, j - half);     // note: slow index is Y, fast is X
-            }
-        }
-    }
-    distPtr[half][half] = anglePtr[half][half] = 0;
 }
 
 
@@ -124,12 +105,12 @@ void ModeCache::clear(void) {
 }
 
 
-const ModeCache::Grid& ModeCache::grid(int sz) {
+const redux::image::Grid& ModeCache::grid(int sz) {
 
     unique_lock<mutex> lock(mtx);
     auto it = grids.find(sz);
     if(it != grids.end()) return it->second;
-    return grids.emplace(sz, Grid(sz)).first->second;
+    return grids.emplace(sz, redux::image::Grid(sz)).first->second;
 
 }
 
@@ -280,7 +261,8 @@ const std::map<int, Modes::KL_cfg>& ModeCache::karhunenLoeveExpansion(int first_
 }
 
 
-const ModeCache::ModePtr ModeCache::mode(int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
+#include "redux/file/fileana.hpp"
+const ModeCache::ModePtr& ModeCache::mode(int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
 
     index idx(modeNumber, nPoints, r_c, wavelength, angle);
     {
@@ -290,15 +272,13 @@ const ModeCache::ModePtr ModeCache::mode(int modeNumber, int nPoints, double r_c
     }
 
     ModePtr ptr(new Modes::PupilMode(modeNumber, nPoints, r_c, wavelength, angle));
-    auto it = modes.emplace(idx, ptr);
-//cout << endl << "MDE: "<< hexString(ptr.get()) << "   " <<  hexString(it.first->second.get()) << printArray(ptr->dimensions(),"   dims")<< endl;
     unique_lock<mutex> lock(mtx);
-    return it.first->second;
+    return modes.emplace(idx, ptr).first->second;
 
 }
 
 
-const ModeCache::ModePtr ModeCache::mode(int firstMode, int lastMode, int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
+const ModeCache::ModePtr& ModeCache::mode(int firstMode, int lastMode, int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
 
     index idx(firstMode, lastMode, modeNumber, nPoints, r_c, wavelength, angle);
     {

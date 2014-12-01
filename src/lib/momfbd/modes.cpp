@@ -2,14 +2,14 @@
 
 #include "redux/constants.hpp"
 #include "redux/momfbd/modecache.hpp"
-#include "redux/momfbd/legacy.hpp"
+//#include "redux/momfbd/legacy.hpp"
 #include "redux/util/arrayutil.hpp"
 
 #include <cmath>
 #include <iostream>
 
 using namespace redux::momfbd;
-using namespace redux::momfbd::legacy;
+//using namespace redux::momfbd::legacy;
 using namespace redux::util;
 using namespace std;
 
@@ -100,7 +100,7 @@ Modes::PupilMode::PupilMode(int modeNumber, int nPoints, double r_c, double lamb
         noll_to_mn(modeNumber, m, n);
 
         const vector<double>& coeff = cache.zernikeRadialPolynomial(m, n);
-        const ModeCache::Grid& grid = cache.grid(nPoints);
+        const redux::image::Grid& grid = cache.grid(nPoints);
         float** distPtr = grid.distance.get();
         float** aPtr = grid.angle.get();
 

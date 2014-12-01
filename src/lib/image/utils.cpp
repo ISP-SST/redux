@@ -3,6 +3,7 @@
 #include "redux/image/fouriertransform.hpp"
 
 #include "redux/math/functions.hpp"
+#include <redux/constants.hpp>
 
 #include <map>
 
@@ -47,10 +48,49 @@ namespace {
 
 }
 
-
-static __inline int sqr ( int x ) {
+template <typename T>
+static __inline T sqr ( T x ) {
     return x * x;
 }
+
+
+Grid::Grid( uint32_t nPoints ) : size(nPoints,nPoints), origin(nPoints/2,nPoints/2) {
+    if( !(nPoints%2) ) {    // for nPoints even, place origin between mid-points
+        origin.x += 0.5;
+        origin.y += 0.5;
+    }
+    init();
+}
+
+Grid::Grid( uint32_t nPoints, float originY, float originX ) : size(nPoints,nPoints), origin(originY,originX) {
+    init();
+}
+
+Grid::Grid( uint32_t nPointsY, uint32_t nPointsX, float originY, float originX ) : size(nPointsY, nPointsX), origin(originY,originX) {
+    init();
+}
+
+void Grid::init(void) {
+    
+    distance = sharedArray<float>(size.y, size.x);
+    angle = sharedArray<float>(size.y, size.x);
+    float** distPtr = distance.get();
+    float** anglePtr = angle.get();
+    for(int i = 0; i < size.y; ++i) {
+        double yDist = i - origin.y;
+        double y2 = sqr(yDist);
+        for(int j = 0; j < size.x; ++j) {
+            double xDist = j - origin.x;
+            if(yDist || xDist) {
+                double x2 = sqr(xDist);
+                distPtr[i][j] = sqrt(y2 + x2);
+                anglePtr[i][j] = atan2(yDist, xDist);       // note: slow index is Y, fast is X
+            } else distPtr[i][j] = anglePtr[i][j] = 0;      // this pixel is at the origin -> set the angle to 0. 
+        }
+    }   
+
+}
+
 
 // nverseDistanceWeight( T** array, size_t sizeY, size_t sizeX, size_t posY, size_t posX ) {
 

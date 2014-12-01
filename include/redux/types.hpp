@@ -37,8 +37,9 @@ namespace redux {
                 count += redux::util::unpack(ptr+count,y,swap_endian);
                 return count;
             }
-            template <typename U> bool operator==(const PointType<U>& rhs) { return (x == rhs.x && y == rhs.y); }
-            template <typename U> bool operator!=(const PointType<U>& rhs) { return !(*this == rhs); }
+            template <typename U> bool operator==(const PointType<U>& rhs) const { return (x == rhs.x && y == rhs.y); }
+            template <typename U> bool operator!=(const PointType<U>& rhs) const { return !(*this == rhs); }
+            template <typename U> bool operator<(const PointType<U>& rhs) const { if (x==rhs.x) return (y < rhs.y); return (x < rhs.x); }
             T x,y;
         };
         typedef PointType<double> PointD;
