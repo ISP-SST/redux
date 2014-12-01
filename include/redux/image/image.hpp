@@ -108,6 +108,13 @@ namespace redux {
 //                 return tmp.mean();
 //             }
 
+            template <typename U>
+            void copy( Array<U>& rhs ) const {
+                Array<T>::copy(rhs);
+            }
+
+
+
             template <typename U = T>
             Image<U> copy( void ) const {
                 std::vector<size_t> newDimSizes;
