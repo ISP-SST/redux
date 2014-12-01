@@ -155,6 +155,8 @@ bool Worker::getWork( void ) {
 
     if( wip.connection ) {            // remote work: return parts.
         returnWork();
+    } else if ( wip.parts.size() ) {
+        wip.job->returnParts( wip );
     }
 
     wip.connection.reset();
