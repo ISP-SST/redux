@@ -113,7 +113,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts,
     uint64_t count = unpack( ptr, nParts, swap_endian );
     parts.resize( nParts );
     for( auto & it : parts ) {
-        it.reset( new Patch );
+        it.reset( new PatchData );
         count += it->unpack( ptr+count, swap_endian );
     }
     return count;
@@ -576,7 +576,7 @@ void MomfbdJob::returnParts( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
     for( auto & it : wip.parts ) {
-        auto patch = static_pointer_cast<Patch>( it );
+        auto patch = static_pointer_cast<PatchData>( it );
         patches[it->id]->step = patch->step;
         //patches[it->id]->result = patch->result;
     }
@@ -618,16 +618,34 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
         size_t nThreads = std::min( maxThreads, info.maxThreads);
-        service.reset();
 
         for( auto & it : wip.parts ) {
-            service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( it ) ) );
+            
+            // Prepare
+            WorkSpace ws( static_pointer_cast<PatchData>(it) );
+            ws.modes.resize( objects.size(), modes.size() );
+            ModeCache& cache = ModeCache::getCache();
+            for( int o=0; o<objects.size(); ++o ) {
+                for(int m=0; m<modes.size(); ++m ) {
+                    if( basis == CFG_KARHUNEN_LOEVE ) ws.modes(o,m) = cache.mode(klMinMode,klMaxMode,modes[m],pupilSize,objects[o]->r_c,objects[o]->wavelength,objects[o]->angle);
+                    else ws.modes(o,m) = cache.mode(modes[m],pupilSize,objects[o]->r_c,objects[o]->wavelength,objects[o]->angle);
+                }
+                objects[o]->initWorkSpace(ws);
+            }
+            
+            
+            // Run
+            service.reset();
+            service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( ws ) ) );
+            for( size_t t = 0; t < nThreads; ++t ) {
+                pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+            }
+            pool.join_all();
+            
+            
+            // Get/return results and cleanup.
+            
         }
-        for( size_t t = 0; t < nThreads; ++t ) {
-            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-        }
-
-        pool.join_all();
 
     }
     else if( step == JSTEP_POSTPROCESS ) {
@@ -692,8 +710,10 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     // Done pre-processing -> normalize within each object
     
     service.reset();
+    size_t nTotalImages(0);
     for( auto & it : objects ) {
         it->normalize(service, pool);
+        nTotalImages += it->nImages();
     }
 
     for( size_t t = 0; t < info.maxThreads; ++t ) {
@@ -701,6 +721,15 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     }
     pool.join_all();
 
+    // Done normalizing -> collect images to master-stack
+    size_t imageOffset(0);
+    imageStack.resize(nTotalImages,imageSizes.y,imageSizes.x);
+    for( auto & it : objects ) {
+        imageOffset += it->collectImages(imageStack, imageOffset);
+    }
+    if( imageOffset != nTotalImages) {
+        LOG_ERR << "MomfbdJob::preProcess(): Failed to collect \"nTotalImages\" images from the objects/channels.";
+    }
     // Done normalizing -> split in patches
     
     int minimumOverlap = 16;                // desired width of blending zone in pixels
@@ -751,27 +780,25 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
 
    
     size_t count = 0;
-    uint32_t yid=0,xid=0;
+    uint32_t yid=0;
     service.reset();
     uint32_t span = patchSize/2 + max_local_shift;
     for( auto posY : subImagePosY ) {
+        uint32_t xid=0;
         uint32_t trimmedPosY = std::min(std::max(span,posY),imageSizes.y-span);
         if( trimmedPosY != posY ) LOG_WARN << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << posY << " -> " << trimmedPosY;
         for( auto posX : subImagePosX ) {
             uint32_t trimmedPosX = std::min(std::max(span,posX),imageSizes.x);
             if( trimmedPosX != posX ) LOG_WARN << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX;
-            Patch::Ptr patch( new Patch() );
+            PatchData::Ptr patch( new PatchData() );
             patch->first.x = trimmedPosX-span;
             patch->first.y = trimmedPosY-span;
             patch->last.x = patch->first.x+2*span-1;
             patch->last.y = patch->first.y+2*span-1;
             patch->id = ++count;
-            //cout << "PATCH: " << count << "  first.x = " << patch->first.x << "  first.y = " << patch->first.y << "  last.x = " << patch->last.x << "  last.y. = " << patch->last.y;
-            //cout << "  szX = " << (patch->last.x-patch->first.x+1) << "  szY = " << (patch->last.y-patch->first.y+1) << "  npix = " << patch->nPixels()  << endl;
-            //cout << "  posX = " << posX << "  posY = " << posY << "  trimmedPosX = " << trimmedPosX;
-            //cout << "  trimmedPosY = " << trimmedPosY << "  span = " << span << "  patchSize = " << patchSize << endl;
+            patch->images = Array<float>(imageStack,0,nTotalImages-1,patch->first.y, patch->last.y, patch->first.x, patch->last.x);
             patch->setIndex( yid, xid++ );
-            service.post( std::bind( &MomfbdJob::packPatch, this, patch ) );
+            service.post( std::bind( &MomfbdJob::applyLocalOffsets, this, patch ) );
             patches.insert( make_pair( patch->id, patch ) );
         }
         yid++;
@@ -788,35 +815,34 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
 
 }
 
-void MomfbdJob::packPatch( Patch::Ptr patch ) {
+void MomfbdJob::applyLocalOffsets( PatchData::Ptr patch ) {
     
-    LOG_TRACE << "MomfbdJob::packPatch() #" << patch->id;
-    size_t totalPatchSize(0);
+//    LOG_TRACE << "MomfbdJob::applyLocalOffsets() #" << patch->id;
+//     size_t totalPatchSize(0);
+//     for( auto & it : objects ) {
+//         totalPatchSize += it->sizeOfPatch(patch->nPixels());
+//     }
+// 
+//     patch->dataSize = totalPatchSize;
+//     patch->data = sharedArray<char>(totalPatchSize);
+//     char* ptr = patch->data.get();
+//     uint64_t count(0);
     for( auto & it : objects ) {
-        totalPatchSize += it->sizeOfPatch(patch->nPixels());
+        it->applyLocalOffsets(patch);
     }
-
-    patch->dataSize = totalPatchSize;
-    patch->data = sharedArray<char>(totalPatchSize);
-    char* ptr = patch->data.get();
-    uint64_t count(0);
-    for( auto & it : objects ) {
-        count += it->packPatch(patch,ptr+count);
-    }
-    
-    if(count != totalPatchSize) {
-        LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());
-    }
+//     
+//     if(count != totalPatchSize) {
+//         LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());
+//     }
     // TODO: compress and store in swapfile
 }
  
 
-void MomfbdJob::runMain( Part::Ptr& part ) {
-
-    auto pptr = static_pointer_cast<Patch>( part );
+void MomfbdJob::runMain( WorkSpace& ws ) {
 
 
-//    LOG << "MomfbdJob::runMain()";
+
+//    LOG << "MomfbdJob::runMain()  patch#" << part->id << "  x1=" << pptr->first.x << "  y1=" << pptr->first.y << printArray(pptr->images.dimensions(),"  dims") ;
 //     // temporaries, to avoid cache collisions.
 //     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
 //     uint32_t sizeY = pptr->yPixelH - pptr->yPixelL + 1;
@@ -859,7 +885,7 @@ void MomfbdJob::runMain( Part::Ptr& part ) {
 //     memcpy( pptr->result.ptr(), tmp.get()[0], sizeY * sizeX * sizeof( int64_t ) );
 
     //sleep(1);
-    part->step = JSTEP_POSTPROCESS;
+    ws.data->step = JSTEP_POSTPROCESS;
 
 }
 

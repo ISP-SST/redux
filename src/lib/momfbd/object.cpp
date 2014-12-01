@@ -329,6 +329,25 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 }
 
 
+size_t Object::nImages(void) {
+    size_t n(0);
+    for( auto & it : channels ) n += it->nImages();
+    return n;
+}
+
+
+size_t Object::collectImages(redux::util::Array<float>& stack, size_t offset) {
+    size_t n(0);
+    for( auto & it : channels ) n += it->collectImages(stack, offset+n);
+    return n;
+}
+
+
+void Object::initWorkSpace( WorkSpace& ws ) {
+    for( auto & it : channels ) it->initWorkSpace(ws);
+}
+
+
 bool Object::checkCfg(void) {
     
     if( channels.empty() ) return false;     // need at least 1 channel
@@ -415,13 +434,10 @@ size_t Object::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-uint64_t Object::packPatch( Patch::Ptr patch, char* ptr ) const {
-    
-    uint64_t count(0);
+void  Object::applyLocalOffsets(PatchData::Ptr patch) const {
     for( auto & it : channels ) {
-        count += it->packPatch(patch,ptr);
+        it->applyLocalOffsets(patch);
     }
-    return count;
 }
  
 

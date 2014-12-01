@@ -85,9 +85,9 @@ Channel::~Channel() {
 
 void Channel::parseProperties( bpt::ptree& tree ) {
 
-    LOG_DEBUG << "Channel::parseProperties()";
-
+    LOG_ERR << "myObject." << printArray(myObject.imageNumbers,"imageNumbers" );
     imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", myObject.imageNumbers );
+    LOG_ERR << "channel." << printArray(myObject.imageNumbers,"imageNumbers" );
 
     if( imageNumbers.size() == 0 ) LOG_CRITICAL << "Still no image sequence numbers at channel level.";
     sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", myObject.sequenceNumber );
@@ -685,6 +685,19 @@ double Channel::getMaxMean(void) {
     return maxMean;
 }
 
+size_t Channel::collectImages(redux::util::Array<float>& stack, size_t offset) {
+    size_t n = nImages();
+    imageOffset = offset;
+    Array<float> block( stack, imageOffset, imageOffset+n-1, 0, images.dimSize(1)-1, 0, images.dimSize(2)-1 );       // sub-array of stack, starting at offset.
+    images.copy(block);
+    return n;
+}
+
+            
+void Channel::initWorkSpace( WorkSpace& ws ) {
+    
+}
+
 
 void Channel::normalizeData(boost::asio::io_service& service, boost::thread_group& pool, double value) {
     size_t nImages = imageNumbers.size();
@@ -851,38 +864,46 @@ size_t Channel::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-uint64_t Channel::packPatch( Patch::Ptr patch, char* ptr ) const {
+void Channel::applyLocalOffsets(PatchData::Ptr patch) const {
+   
+    int patchOffsetX, patchOffsetY;
+    float residualOffsetX, residualOffsetY;
+    residualOffsetX = residualOffsetY = patchOffsetX = patchOffsetY = 0;
     
-    int localTiltX = 0;
-    int localTiltY = 0;
     if(xOffset.valid()) {
         Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
         Statistics<int16_t> stats;
         stats.getStats(tmpOff,ST_VALUES);
         double tmp;
-        patch->residualTilts.x = modf(stats.mean/100 , &tmp);
-        localTiltX = lrint(tmp);
+        residualOffsetX = modf(stats.mean/100 , &tmp);
+        patchOffsetX = lrint(tmp);
     }
+    
     if(yOffset.valid()) {
         Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
         Statistics<int16_t> stats;
         stats.getStats(Image<int16_t>(yOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x),ST_VALUES);
         double tmp;
-        patch->residualTilts.y = modf(stats.mean/100 , &tmp);
-        localTiltY = lrint(tmp);
+        residualOffsetY = modf(stats.mean/100 , &tmp);
+        patchOffsetY = lrint(tmp);
+    }
+   
+    if( patchOffsetX ) {
+        int shift = patch->images.shift(2,patchOffsetX);
+        if( shift != patchOffsetX) {
+            residualOffsetX += (patchOffsetX-shift);
+        }
     }
 
-    vector<float> noise;
-    for(auto it: imageStats) noise.push_back(it->noisePower);
-    uint64_t count = redux::util::pack( ptr, noise );
+    if( patchOffsetY ) {
+        int shift = patch->images.shift(1,patchOffsetY);
+        if( shift != patchOffsetY) {
+            residualOffsetY += (patchOffsetY-shift);
+        }
+    }
     
-    Image<float> tmp = Image<float>( images, 0, images.dimSize(0),
-                                     patch->first.y+localTiltY, patch->last.y+localTiltY,
-                                     patch->first.x+localTiltX, patch->last.x+localTiltX ).copy();
-    count += redux::util::pack( ptr+count, tmp.ptr(), tmp.nElements() );
-    
-    
-    return count;
+    patch->residualOffsets.push_back({residualOffsetY,residualOffsetX});
+
 }
  
 

@@ -59,8 +59,8 @@ namespace redux {
 
             void checkParts( void );
             void preProcess( boost::asio::io_service&, boost::thread_group& );
-            void packPatch( Patch::Ptr );
-            void runMain( Part::Ptr& );
+            void applyLocalOffsets( PatchData::Ptr );
+            void runMain( WorkSpace& );
             void postProcess( boost::asio::io_service&, boost::thread_group& );
 
             uint8_t basis, fillpix_method, output_data_type;
@@ -86,8 +86,9 @@ namespace redux {
             std::vector<std::shared_ptr<Object>> objects;
 
             redux::util::Array<double> pupil;
+            redux::util::Array<float> imageStack;
 
-            std::map<size_t,Patch::Ptr> patches;
+            std::map<size_t,PatchData::Ptr> patches;
         
             friend class Object;
             friend class Channel;

@@ -41,6 +41,11 @@ namespace redux {
             size_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
+            
+            size_t nImages(void);
+            size_t collectImages(redux::util::Array<float>&,size_t);
+            
+            void initWorkSpace( WorkSpace& ws );
         
             std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
             double reg_gamma, weight, angle, wavelength;
@@ -60,7 +65,7 @@ namespace redux {
             void normalize(boost::asio::io_service&, boost::thread_group&);
             
             size_t sizeOfPatch(uint32_t) const;
-            uint64_t packPatch( Patch::Ptr, char* ) const;
+            void applyLocalOffsets(PatchData::Ptr) const;
             
             Point clipImages(void);
             

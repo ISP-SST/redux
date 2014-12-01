@@ -25,26 +25,36 @@ Patch::Patch(int y, int x, uint32_t sz) : index(), first(), last() {
 }
 */
 
-void Patch::setIndex(uint32_t yid, uint32_t xid) {
+void PatchData::setIndex(uint32_t yid, uint32_t xid) {
     index.x = xid;
     index.y = yid;
 }
 
 
-size_t Patch::nPixels(void) {
+size_t PatchData::nPixels(void) {
     return (last.x-first.x+1)*(last.y-first.y+1);
 }
 
 
-size_t Patch::size( void ) const {
+size_t PatchData::nPixelsX(void) {
+    return (last.x-first.x+1);
+}
+
+
+size_t PatchData::nPixelsY(void) {
+    return (last.y-first.y+1);
+}
+
+
+size_t PatchData::size( void ) const {
     size_t sz = Part::size();
-    sz += 3*Point::size() + PointF::size();
-    sz += sizeof(size_t) + dataSize;
+    sz += 3*Point::size() + residualOffsets.size()*PointF::size() + sizeof(uint64_t);
+    sz += images.size();
     return sz;
 }
 
 
-uint64_t Patch::pack( char* ptr ) const {
+uint64_t PatchData::pack( char* ptr ) const {
 
     using redux::util::pack;
     
@@ -52,24 +62,60 @@ uint64_t Patch::pack( char* ptr ) const {
     count += index.pack( ptr+count );
     count += first.pack( ptr+count );
     count += last.pack( ptr+count );
-    count += residualTilts.pack( ptr+count );
-    count += pack(ptr+count,dataSize);
-    memcpy(ptr+count,data.get(),dataSize);
-    return count+dataSize;
+    count += pack(ptr+count,residualOffsets );
+    count += images.pack(ptr);
+    return count;
 }
 
 
-uint64_t Patch::unpack( const char* ptr, bool swap_endian ) {
+uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
 
     using redux::util::unpack;
     uint64_t count = Part::unpack( ptr, swap_endian );
     count += index.unpack( ptr+count, swap_endian );
     count += first.unpack( ptr+count, swap_endian );
     count += last.unpack( ptr+count, swap_endian );
-    count += residualTilts.unpack( ptr+count, swap_endian );
-    count += unpack(ptr+count,dataSize,swap_endian);
-    data = sharedArray<char>(dataSize);
-    memcpy(data.get(),ptr+count,dataSize);
-    return count+dataSize;
+    count += unpack(ptr+count,residualOffsets, swap_endian );
+    count += images.unpack(ptr+count, swap_endian);
+    return count;
 
 }
+
+
+size_t PatchResult::size( void ) const {
+    size_t sz = Part::size();
+    sz += restoredObjects.size();
+    sz += modeCoefficients.size();
+    sz += PSFs.size();
+    return sz;
+}
+
+
+uint64_t PatchResult::pack( char* ptr ) const {
+    using redux::util::pack;
+    uint64_t count = Part::pack( ptr );
+    count += restoredObjects.pack(ptr+count);
+    count += modeCoefficients.pack(ptr+count);
+    count += PSFs.pack(ptr);
+    return count;
+}
+
+
+uint64_t PatchResult::unpack( const char* ptr, bool swap_endian ) {
+    using redux::util::unpack;
+    uint64_t count = Part::unpack( ptr, swap_endian );
+    count += restoredObjects.unpack( ptr+count, swap_endian );
+    count += modeCoefficients.unpack( ptr+count, swap_endian );
+    count += PSFs.unpack( ptr+count, swap_endian );
+    return count;
+}
+
+WorkSpace::objectSpecific::objectSpecific() {
+}
+
+
+WorkSpace::WorkSpace(PatchData::Ptr d) : data(d) {
+    imgFTs.resize(d->images.dimSize(0),d->nPixelsY(),d->nPixelsX());
+}
+
+

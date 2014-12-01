@@ -43,7 +43,11 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             double getMaxMean(void);
-        
+            size_t nImages(void) { return images.dimSize(0); }
+            size_t collectImages(redux::util::Array<float>&, size_t);
+            
+            void initWorkSpace( WorkSpace& ws );
+
         private:
             
             bool checkCfg(void);
@@ -58,7 +62,7 @@ namespace redux {
             void normalizeImage(size_t index, double value);
             
             size_t sizeOfPatch(uint32_t) const;
-            uint64_t packPatch( Patch::Ptr, char* ) const;
+            void applyLocalOffsets(PatchData::Ptr) const;
             
             Point clipImages(void);
 
@@ -80,6 +84,7 @@ namespace redux {
             uint32_t image_num_offs, sequenceNumber;
             double nf;
             uint8_t incomplete;
+            size_t imageOffset;         // where the images are located in the imagestack
 
             redux::image::Image<float> images, dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;
