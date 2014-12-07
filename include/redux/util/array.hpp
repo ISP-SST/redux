@@ -195,6 +195,7 @@ namespace redux {
             template <typename ...S>
             Array( T* ptr, S ...sizes ) : begin_(0) {
                 setSizes( sizes... );
+                setStrides();
                 countElements();
                 if( dataSize ) {
                     datablock.reset( ptr, []( T * p ) {} );
@@ -837,7 +838,7 @@ namespace redux {
                 if( nDims_ > 0 ) {
                     dimStrides.resize( nDims_, 1 );
                     for( int i = nDims_-1; i > 0; --i ) {
-                        dimStrides[i - 1] = currentSizes[i] * dimStrides[i];
+                        dimStrides[i - 1] = dimSizes[i] * dimStrides[i];
                     }
                 }
             }
@@ -914,26 +915,9 @@ namespace redux {
 
         /*! @} */
 
-/*
-        template <> template <>
-        void Array<float>::copy( Array<float>& arr ) const {
-            if( this == &arr ) return;     // check for self-assignment
-            if( !sameSize( arr ) ) {
-                arr.resize( dimensions(true) );
-            }
-            if( dense_ && arr.dense() ) {
-                memcpy(arr.get(),datablock.get(),nElements_*sizeof(float));
-            } else {
-                const_iterator cit = begin();
-                for( auto & it : arr ) {
-                    it = *cit++;
-                }
-            }
-        }
-*/
 
     }
-    
+
 }
 
 #endif // REDUX_UTIL_ARRAY_HPP
