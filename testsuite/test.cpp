@@ -15,6 +15,7 @@ namespace testsuite {
     namespace file { void fileTest(void); }
     namespace image { void imageTest(void); }
     namespace math { void mathTest(void); }
+    namespace momfbd { void momfbdTest(void); }
     namespace util { void utilTest(void); }
 }
 
@@ -25,6 +26,7 @@ test_suite* init_unit_test_suite(int /*argc*/, char* /*argv*/[]) {
     testsuite::file::fileTest();
     testsuite::image::imageTest();
     testsuite::math::mathTest();
+    testsuite::momfbd::momfbdTest();
     testsuite::util::utilTest();
 
     return nullptr;
