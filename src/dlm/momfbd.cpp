@@ -715,8 +715,9 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nModes * info->nPH * info->nPH * sizeof ( float );   // Mode Data
     }
     totalSize += info->nPatchesX * info->nPatchesY * patchSize;
-    while ( totalSize % 8 ) { //alignTo ) {
-        totalSize++;                                  // pad if not on boundary
+    size_t padding(0);
+    while ( (totalSize+padding) % 8 ) {  // pad if not on 8-byte boundary
+        padding++;
     }
 
     if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                    // if filenames are stored and loaded
@@ -726,7 +727,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     totalSize += sizeof ( MomfdContainer );
 
     // Allocate the datablock needed.
-    std::unique_ptr<char> data ( new char [ totalSize ] );
+    std::unique_ptr<char> data ( new char [ totalSize+padding ] );
 
     v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
 
@@ -1013,7 +1014,7 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
                             if ( writeMask & MOMFBD_DIV ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DIV", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
-                                if ( subOffset >= 0 ) {   // dimensions: (nModes,nDIV(=nFiles) )
+                                if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nDIV(=nFiles) )
                                     patch->diversityPos = patch->offset + subOffset;
                                     patch->nphx = tmpPtr->value.arr->dim[0];
                                     patch->nphy = tmpPtr->value.arr->dim[1];
