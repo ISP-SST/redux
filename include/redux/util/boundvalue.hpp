@@ -64,7 +64,7 @@ namespace redux {
             typedef void ( *trimFunction ) ( T&, const T&, const T& );
 
         public:
-            BoundValue ( T val = 0, T minVal = std::numeric_limits<T>::min(), T maxVal = std::numeric_limits<T>::max() ) : trim_ ( selectTrimFunction ( TT ) ) {
+            BoundValue ( T val = 0, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max() ) : trim_ ( selectTrimFunction ( TT ) ) {
                 setLimits ( minVal, maxVal );
                 assignWithTruncation ( val );
             }
@@ -77,7 +77,7 @@ namespace redux {
                     maxVal_ = boost::numeric_cast<T> ( rhs.maxVal_ );
                     tmpV    = boost::numeric_cast<T> ( rhs.val_ );
                 } catch ( const boost::numeric::bad_numeric_cast& ) {
-                    minVal_ = std::numeric_limits<T>::min();
+                    minVal_ = std::numeric_limits<T>::lowest();
                     maxVal_ = std::numeric_limits<T>::max();
                     try {
                         tmpV    = boost::numeric_cast<T> ( rhs.val_ );

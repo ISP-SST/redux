@@ -32,7 +32,7 @@ namespace redux {
          */
         template<typename Target, typename Source>
         Target bound_cast( Source src,
-                           Target min = std::numeric_limits<Target>::min(),
+                           Target min = std::numeric_limits<Target>::lowest(),
                            Target max = std::numeric_limits<Target>::max() ) {
 
             if( min > max ) {

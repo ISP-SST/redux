@@ -35,7 +35,7 @@ namespace redux {
         public:
             typedef T value_type;
 
-            Interval(T minVal = std::numeric_limits<T>::min(), T maxVal = std::numeric_limits<T>::max()) {
+            Interval(T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
                 set(minVal, maxVal);
             };
 
