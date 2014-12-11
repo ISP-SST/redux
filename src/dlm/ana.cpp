@@ -3,6 +3,7 @@
 #include "redux/file/fileana.hpp"
 
 #include <iostream>
+#include <stdexcept>
 
 /*   Examples
     a=f0('/scratch/Data/6302_pf-scan/camXXV_ff21Sep2008.fp3.2447.2943.lc0.0347263')
