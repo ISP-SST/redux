@@ -5,7 +5,7 @@
 #include "redux/momfbd/modes.hpp"
 #include "redux/momfbd/modecache.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
-#include "redux/momfbd/legacy.hpp"
+//#include "redux/momfbd/legacy.hpp"
 #include "redux/math/linalg.hpp"
 #include "redux/util/arrayutil.hpp"
 
@@ -44,7 +44,7 @@ namespace {
         Array<float> awrapper(*aPtr, nPixels, nPixels);
         redux::file::Ana::write("modetest_angle.f0", awrapper);
 
-        PupilMode::KL_cfg* m_new_cfg = legacy::klConfig(first_mode, last_mode);
+        //PupilMode::KL_cfg* m_new_cfg = legacy::klConfig(first_mode, last_mode);
         //klmc* m_cfg = kl_cfg(first_mode, last_mode);
 
         //const std::map<int, Modes::KL_cfg>& kle = cache.karhunenLoeveExpansion( first_mode, last_mode );
