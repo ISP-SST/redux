@@ -267,10 +267,11 @@ namespace redux {
             /*! @brief Get the @e packed size of this array
              *  @details This is only for getting the size needed to store the packed array.
              */
-            size_t size( void ) const {
-                size_t sz = sizeof( size_t );                                                          // blockSize
-                if( currentSizes.size() ) {
-                    sz += 1 + currentSizes.size() * sizeof( size_t ) + nElements_ * sizeof( T );            // nDims + dimensions + dataSize
+            uint64_t size( void ) const {
+                uint64_t sz = sizeof( uint64_t );                                                          // blockSize
+                if( nElements_ ) {
+                    std::vector<size_t> tmp = dimensions(true);
+                    sz += sizeof( uint64_t ) + tmp.size() * sizeof( size_t ) + nElements_ * sizeof( T );            // nDims + dimensions + dataSize
                 }
                 return sz;
             }
@@ -284,10 +285,8 @@ namespace redux {
                 uint64_t count = pack( ptr, size() );
                 if( nElements_ ) {
                     Array<T> tmp = this->copy(true);
-                    uint8_t ndims = tmp.nDimensions();
-                    count += pack( ptr+count, ndims );
                     count += pack( ptr+count, tmp.dimensions() );
-                    count += pack( ptr+count, tmp.ptr(), tmp.nElements() );
+                    count += pack( ptr+count, tmp.get(), tmp.nElements() );
                 }
                 return count;
 
@@ -300,14 +299,12 @@ namespace redux {
                 using redux::util::unpack;
                 size_t sz;
                 uint64_t count = unpack( ptr, sz, swap_endian );
-                if( sz > 8 ) {          // 8 means an empty array was transferred
-                    uint8_t ndims;
-                    count += unpack( ptr+count, ndims );
-                    std::vector<size_t> tmp( ndims );
+                if( sz > sizeof(uint64_t) ) {          // 8 means an empty array was transferred
+                    std::vector<size_t> tmp;
                     count += unpack( ptr+count, tmp, swap_endian );
                     resize( tmp );
                     count += unpack( ptr+count, datablock.get(), nElements_, swap_endian );
-                }
+                } else resize();
                 return count;
             }
 
@@ -336,12 +333,14 @@ namespace redux {
                     return;
                 }
                 size_t tmp = dims[dims.size()-1];
-                size_t tmpSize = currentSizes[tmp];
+                size_t tmpCurrent = currentSizes[tmp];
+                size_t tmpSize = dimSizes[tmp];
                 int64_t tmpFirst = dimFirst[tmp];
                 int64_t tmpLast = dimLast[tmp];
                 for(size_t i=0; i<dims.size(); ++i) {
                     if( dims[i] >= nDims_ ) throw std::out_of_range("permuteDimensions: Supplied dimension is out of range: " + printArray(dims,"dims"));
-                    std::swap(currentSizes[dims[i]],tmpSize);
+                    std::swap(dimSizes[dims[i]],tmpSize);
+                    std::swap(currentSizes[dims[i]],tmpCurrent);
                     std::swap(dimFirst[dims[i]],tmpFirst);
                     std::swap(dimLast[dims[i]],tmpLast);
                 }
@@ -357,6 +356,7 @@ namespace redux {
             const std::vector<int64_t>& first( void ) const { return dimFirst; }
             const std::vector<int64_t>& last( void ) const { return dimLast; }
             const std::vector<size_t>& dimensions(void) const { return currentSizes; }
+            const std::vector<size_t>& strides(void) const { return dimStrides; }
             const std::vector<size_t> dimensions( bool skipTrivialDims ) const {
                 if(skipTrivialDims) {
                     std::vector<size_t> newDimSizes;
@@ -392,8 +392,8 @@ namespace redux {
             }
 
             template <typename U>
-            void copyFrom( void* data ) {
-                U* ptr = reinterpret_cast<U*>( data );
+            void copyFrom( const void* data ) {
+                const U* ptr = reinterpret_cast<const U*>( data );
                 for( auto & it : *this ) {
                     it = static_cast<T>( *ptr++ );
                 }
@@ -401,17 +401,11 @@ namespace redux {
 
             template <typename U = T>
             Array<U> copy( bool skipTrivialDims=true ) const {
-                std::vector<size_t> newDimSizes;
-                for( auto & it : currentSizes ) {
-                    if( it > 1 || !skipTrivialDims) {
-                        newDimSizes.push_back( it );
-                    }
-                }
+                std::vector<size_t> newDimSizes = dimensions(skipTrivialDims);
                 Array<U> tmp( newDimSizes );
                 const_iterator cit = begin();
                 for( auto & it : tmp ) {
-                    it = static_cast<U>( *cit );
-                    ++cit;
+                    it = static_cast<U>( *cit++ );
                 }
                 return tmp;
             }
@@ -442,6 +436,16 @@ namespace redux {
                 return *this;
             }
 
+            template <typename U> 
+            T* ptr( const std::vector<U>& indices ) {
+                int64_t offset = getOffset( indices, dimFirst );
+                if( offset < 0 || offset > dataSize ) {
+                    throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
+                }
+                return ( datablock.get() + offset );
+            }
+            template <typename U> const T* ptr( const std::vector<U>& indices ) const { return const_cast<Array<T>*>( this )->ptr( indices ); }
+
             template <typename ...S>
             T* ptr( S ...s ) {
                 uint64_t offset = getOffset<uint64_t>( {static_cast<uint64_t>( s )...}, dimFirst );
@@ -452,17 +456,10 @@ namespace redux {
             }
             template <typename ...S> const T* ptr( S ...s ) const { return const_cast<Array<T>*>( this )->ptr( s... ); }
 
-            T* ptr( const std::vector<int64_t>& indices ) {
-                int64_t offset = getOffset( indices, dimFirst );
-                if( offset < 0 || offset > dataSize ) {
-                    throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
-                }
-                return ( datablock.get() + offset );
-            }
-            const T* ptr( const std::vector<int64_t>& indices ) const { return const_cast<Array<T>*>( this )->ptr( indices ); }
-
             bool valid(void) const { return static_cast<bool>( datablock ); }
 
+            template <typename U> T& operator()( const std::vector<U>& indices ) { return *ptr( indices ); }
+            template <typename U> const T& operator()( const std::vector<U>& indices ) const { return *const_cast<Array<T>*>( this )->ptr( indices ); }
             template <typename ...S> T& operator()( S ...indices ) { return *ptr( indices... ); }
             template <typename ...S> const T& operator()( S ...indices ) const { return *ptr( indices... ); }
 
@@ -596,6 +593,19 @@ namespace redux {
 
             
             template <typename U, typename V>
+            const Array<T>& add( const Array<U>& rhs, const Array<V>& weight ) {
+                if( this->sameSize( rhs ) && this->sameSize( weight )) {
+                    typename Array<U>::const_iterator rhsit = rhs.begin();
+                    typename Array<V>::const_iterator wit = weight.begin();
+                    for( auto & it : *this ) it += (*rhsit++ * *wit++);
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
+                return *this;
+            }
+
+            template <typename U, typename V>
             const Array<T>& add( const Array<U>& rhs, V weight ) {
                 if( this->sameSize( rhs ) ) {
                     typename Array<U>::const_iterator rhsit = rhs.begin();
@@ -605,6 +615,17 @@ namespace redux {
                     throw std::invalid_argument( "image dimensions does not match." );
                 }
                 return *this;
+            }
+
+            template <typename U, typename V>
+            void addTo( Array<U>& rhs, V weight ) const {
+                if( this->sameSize( rhs ) ) {
+                    typename Array<U>::const_iterator it = begin();
+                    for( auto & rhsit : rhs ) rhsit += (*it++ * weight);
+                }
+                else {
+                    throw std::invalid_argument( "image dimensions does not match." );
+                }
             }
 
             
@@ -650,6 +671,26 @@ namespace redux {
                 return tmp;
             }
 
+            template <typename U>
+            Array<T> operator*( const Array<U>& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                if( !sameSize( rhs ) ) tmp.resize( rhs.currentSizes );
+                typename Array<U>::const_iterator rhsit = rhs.begin();
+                for( auto & it : tmp ) it *= *rhsit++;
+                return tmp;
+            }
+
+           template <typename U>
+            Array<T> operator/( const Array<U>& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                if( !sameSize( rhs ) ) tmp.resize( rhs.currentSizes );
+                typename Array<U>::const_iterator rhsit = rhs.begin();
+                for( auto & it : tmp ) it /= *rhsit++;
+                return tmp;
+            }
+
             
             bool operator==( const Array<T>& rhs ) const {
                 if( ! sameSize( rhs ) ) {
@@ -670,6 +711,10 @@ namespace redux {
             }
             bool operator!=( const Array<T>& rhs ) const { return !( *this == rhs ); }
 
+            template <typename U>
+            iterator pos( const std::vector<U>& indices ) {
+                return iterator( *this, getOffset<U>( indices, dimFirst ), begin_, end_ );
+            }
             template <typename ...S>
             iterator pos( S ...indices ) {
                 return iterator( *this, getOffset<int64_t>( {static_cast<int64_t>( indices )...}, dimFirst ), begin_, end_ );
@@ -702,6 +747,10 @@ namespace redux {
             const T* get( void ) const { return datablock.get(); };
             template <typename ...S>
             auto get(S ...s) -> std::shared_ptr<typename redux::util::detail::Dummy<T,S...>::dataType> {
+                return redux::util::reshapeArray(datablock.get(),s...);
+            }
+            template <typename ...S>
+            auto get(S ...s) const -> std::shared_ptr<const typename redux::util::detail::Dummy<T,S...>::dataType> {
                 return redux::util::reshapeArray(datablock.get(),s...);
             }
             //@}
@@ -806,54 +855,6 @@ namespace redux {
                 return n;   // return 
             }
 
-        private:
-            void setSizes( const std::vector<size_t>& sizes ) {
-                begin_ = end_ = nElements_ = dataSize = 0;
-                currentSizes = dimSizes = sizes;
-                nDims_ = dimSizes.size();
-                dimFirst.resize( nDims_, 0 );
-                dimLast.assign(dimSizes.begin(), dimSizes.end());
-                dense_ = true;
-                if( nDims_ > 0 ) {
-                    dataSize = 1;
-                    for( auto & it : dimLast ) {
-                        dataSize *= it;
-                        it--;
-                    }
-                    end_ = nElements_ = dataSize;
-                }
-            }
-            template <typename ...S> void setSizes( S ...sizes ) { setSizes( {static_cast<size_t>( sizes )...} );  }
-
-            void create( void ) {
-                if( dataSize ) {
-                    datablock = sharedArray<T>(dataSize);
-                }
-                else {
-                    datablock.reset();
-                }
-            }
-            
-            void setStrides(void) {
-                if( nDims_ > 0 ) {
-                    dimStrides.resize( nDims_, 1 );
-                    for( int i = nDims_-1; i > 0; --i ) {
-                        dimStrides[i - 1] = dimSizes[i] * dimStrides[i];
-                    }
-                }
-            }
-
-            void countElements( void ) {
-                nElements_ = 0;
-                if( currentSizes.size() > 0 ) {
-                    nElements_ = 1;
-                    for( int i = currentSizes.size() - 1; i > 0; --i ) {
-                        nElements_ *= ( dimLast[i] - dimFirst[i] + 1 );
-                    }
-                    nElements_ *= ( dimLast[0] - dimFirst[0] + 1 );
-                }
-            }
-
             template <typename U>
             int64_t getOffset( const std::vector<U>& indices, const std::vector<int64_t>& offsets ) const {
                 int64_t offset = 0;
@@ -887,7 +888,57 @@ namespace redux {
                 }
                 return offset;
             }
+            
 
+        private:
+            void setSizes( const std::vector<size_t>& sizes ) {
+                begin_ = end_ = nElements_ = dataSize = 0;
+                currentSizes = dimSizes = sizes;
+                nDims_ = dimSizes.size();
+                dimFirst.resize( nDims_, 0 );
+                dimLast.assign(dimSizes.begin(), dimSizes.end());
+                dense_ = true;
+                if( nDims_ > 0 ) {
+                    dataSize = 1;
+                    for( auto & it : dimLast ) {
+                        dataSize *= it;
+                        it--;
+                    }
+                    end_ = nElements_ = dataSize;
+                }
+            }
+            template <typename ...S> void setSizes( S ...sizes ) { setSizes( {static_cast<size_t>( sizes )...} );  }
+
+            void create( void ) {
+                if( dataSize ) {
+                    datablock = sharedArray<T>(dataSize);
+                }
+                else {
+                    datablock.reset();
+                }
+            }
+            
+            void setStrides(void) {
+                if( nDims_ > 0 ) {
+                    dimStrides.resize( nDims_ );
+                    dimStrides.back() = 1;
+                    for( int i = nDims_-1; i > 0; --i ) {
+                        dimStrides[i - 1] = dimSizes[i] * dimStrides[i];
+                    }
+                }
+            }
+
+            void countElements( void ) {
+                nElements_ = 0;
+                if( currentSizes.size() > 0 ) {
+                    nElements_ = 1;
+                    for( int i = currentSizes.size() - 1; i > 0; --i ) {
+                        nElements_ *= ( dimLast[i] - dimFirst[i] + 1 );
+                    }
+                    nElements_ *= ( dimLast[0] - dimFirst[0] + 1 );
+                }
+            }
+            
             // These are modified on construct/resize and then constant
             std::vector<size_t> dimSizes;
             std::vector<size_t> dimStrides;
