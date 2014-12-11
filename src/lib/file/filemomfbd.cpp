@@ -262,6 +262,20 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
 
     nPixelsX = region[1] - region[0] + 1;
     nPixelsY = region[3] - region[2] + 1;
+    
+    int32_t dummySize(0);
+    shared_ptr<float> dummy;
+    if(!imgPos && writeMask&MOMFBD_IMG) dummySize = nPixelsX*nPixelsY;
+    if(!psfPos && writeMask&MOMFBD_PSF) dummySize = npsf*nPixelsX*nPixelsY;
+    if(!objPos && writeMask&MOMFBD_OBJ) dummySize = std::max(nobj*nPixelsX*nPixelsY, dummySize);
+    if(!resPos && writeMask&MOMFBD_RES) dummySize = std::max(nres*nPixelsX*nPixelsY, dummySize);
+    if(!alphaPos && writeMask&MOMFBD_ALPHA) dummySize = std::max(nalpha*nm, dummySize);
+    if(!diversityPos && writeMask&MOMFBD_DIV) dummySize = std::max((ndiv*nPixelsX*nPixelsY)/4, dummySize);
+    if(dummySize) {
+        dummy = sharedArray<float>(dummySize);
+        memset(dummy.get(),0,dummySize*sizeof(float));
+        for(int i=0; i<dummySize; ++i) dummy.get()[i] = i+1;
+    }
 
     writeOrThrow ( file, region, 4, "PatchInfo:region" );
     
@@ -276,63 +290,77 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
     writeOrThrow ( file, dx.get(), nChannels, "PatchInfo:dx" );
     writeOrThrow ( file, dy.get(), nChannels, "PatchInfo:dy" );
     
-    tmp8 = ( ( writeMask&MOMFBD_IMG ) && imgPos );
+    tmp8 = ( writeMask&MOMFBD_IMG );
     writeOrThrow ( file, &tmp8, 1, "FileMomfbd:withImage" );
     if ( tmp8 ) {
-        fPtr = reinterpret_cast<const float*> ( data + imgPos );
+       if(imgPos) {
+            fPtr = reinterpret_cast<const float*> ( data + imgPos );
+        } else fPtr = dummy.get();
         writeOrThrow ( file, fPtr, nPixelsX*nPixelsY, "FileMomfbd:IMG" );
     }
     
-    if ( !(( writeMask&MOMFBD_PSF ) && psfPos) ) npsf = 0;
+    if ( !(writeMask&MOMFBD_PSF) ) npsf = 0;
     writeOrThrow ( file, &npsf, 1, "FileMomfbd:npsf" );
     if ( npsf ) {
-        fPtr = reinterpret_cast<const float*> ( data + psfPos );
+        if(psfPos) {
+            fPtr = reinterpret_cast<const float*> ( data + psfPos );
+        } else fPtr = dummy.get();
         writeOrThrow ( file, fPtr, npsf*nPixelsX*nPixelsY, "FileMomfbd:PSF" );
     }
     
-    if ( !(( writeMask&MOMFBD_OBJ ) && objPos) ) nobj = 0;
+    if ( !(writeMask&MOMFBD_OBJ) ) nobj = 0;
     writeOrThrow ( file, &nobj, 1, "FileMomfbd:nobj" );
     if ( nobj ) {
-        fPtr = reinterpret_cast<const float*> ( data + objPos );
+        if(objPos) {
+            fPtr = reinterpret_cast<const float*> ( data + objPos );
+        } else fPtr = dummy.get();
         writeOrThrow ( file, fPtr, nobj*nPixelsX*nPixelsY, "FileMomfbd:OBJ" );
     }
     
-    if ( !(( writeMask&MOMFBD_RES ) && resPos )) nres = 0;
+    if ( !(writeMask&MOMFBD_RES) ) nres = 0;
     writeOrThrow ( file, &nres, 1, "FileMomfbd:nres" );
     if ( nres ) {
-        fPtr = reinterpret_cast<const float*> ( data + resPos );
+        if(resPos) {
+            fPtr = reinterpret_cast<const float*> ( data + resPos );
+        } else fPtr = dummy.get();
         writeOrThrow ( file, fPtr, nres*nPixelsX*nPixelsY, "FileMomfbd:RES" );
     }
     
-    if( !(( writeMask&MOMFBD_ALPHA ) && alphaPos)) nalpha = 0;
+    if( !(writeMask&MOMFBD_ALPHA) ) nalpha = 0;
     writeOrThrow ( file, &nalpha, 1, "FileMomfbd:nalpha" );
     if ( nalpha ) {
         writeOrThrow ( file, &nm, 1, "FileMomfbd:nm" );
         if(nm) {
-            fPtr = reinterpret_cast<const float*> ( data + alphaPos );
+            if(alphaPos) {
+                fPtr = reinterpret_cast<const float*> ( data + alphaPos );
+            } else fPtr = dummy.get();
             writeOrThrow ( file, fPtr, nalpha*nm, "FileMomfbd:ALPHA" );
         }
     }
     
     nphx = nPixelsX / 2;
     nphy = nPixelsY / 2;
-    if( !(( writeMask&MOMFBD_DIV ) && diversityPos)) ndiv = 0;
-    writeOrThrow ( file, &ndiv, 1, "FileMomfbd:ndiv" );
-    if ( ndiv ) {
-        if ( version >= 20110708.0 ) {
-            writeOrThrow ( file, &nphx, 1, "PatchInfo:nphx" );
-            writeOrThrow ( file, &nphy, 1, "PatchInfo:nphy" );
-        }
-        fPtr = reinterpret_cast<const float*> ( data + diversityPos );
-        if( version >= 20110916.0 ) {           // + byte with diversity-type.
-            for( int d=0; d<ndiv; ++d ) {
-                char typ=0;             // TODO: "real" type
-                writeOrThrow ( file, &typ, 1, "MomfbdPatch:div-typ" );   // just discard div-type for now.
-                writeOrThrow ( file, fPtr, nphy*nphx*sizeof(float), "MomfbdPatch:div" );
-                fPtr += nphy*nphx;
+    if( !(writeMask&MOMFBD_DIV) ) ndiv = 0;
+    if ( version >= 20100726.0 ) {  // check if this is a version that can have div info...
+        writeOrThrow ( file, &ndiv, 1, "FileMomfbd:ndiv" );
+        if ( ndiv ) {
+            if ( version >= 20110708.0 ) {
+                writeOrThrow ( file, &nphx, 1, "PatchInfo:nphx" );
+                writeOrThrow ( file, &nphy, 1, "PatchInfo:nphy" );
             }
-        } else {
-            writeOrThrow ( file, fPtr, ndiv * nphy *  nphx, "MomfbdPatch:div" );
+            if(diversityPos) {
+                fPtr = reinterpret_cast<const float*> ( data + diversityPos );
+            } else fPtr = dummy.get();
+            if( version >= 20110916.0 ) {           // + byte with diversity-type.
+                for( int d=0; d<ndiv; ++d ) {
+                    char typ=0;             // TODO: "real" type
+                    writeOrThrow ( file, &typ, 1, "MomfbdPatch:div-typ" );   // just discard div-type for now.
+                    writeOrThrow ( file, fPtr, nphy*nphx*sizeof(float), "MomfbdPatch:div" );
+                    fPtr += nphy*nphx;
+                }
+            } else {
+                writeOrThrow ( file, fPtr, ndiv * nphy *  nphx, "MomfbdPatch:div" );
+            }
         }
     }
 
@@ -347,8 +375,8 @@ FileMomfbd::FileMomfbd ( void ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), start
 
 
 FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), startX ( 0 ), endX ( 0 ), startY ( 0 ), endY ( 0 ),
-    nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( 0 ),
-    modesOffset ( 0 ), filenameOffset ( 0 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false ) {
+    nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( -1 ),
+    modesOffset ( -1 ), filenameOffset ( -1 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false ) {
 
     read ( filename );
     
@@ -364,7 +392,7 @@ void FileMomfbd::clear(void) {
     nPH = 0;
     nModes = 0;
     nPatchesX = nPatchesY = nPoints = 0;
-    phOffset = modesOffset = filenameOffset = 0;
+    phOffset = modesOffset = filenameOffset = -1;
     patchDataSize = 0;
     headerSize = 0;
     swapNeeded = false;
@@ -507,7 +535,7 @@ void FileMomfbd::read ( const std::string& filename ) {
     ifstream file ( filename );
     read ( file );
 }
-
+#include "redux/file/fileana.hpp"
 void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMask, int verbosity ) {
 
     headerSize = 0;
@@ -516,6 +544,16 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     char tmp8;
     int32_t tmp32;
     vector<char> tmpStr ( 1024, 0 );
+    int32_t dummySize(0);
+    shared_ptr<float> dummy;
+    if((phOffset<0) && writeMask&MOMFBD_MODES) dummySize = nPH*nPH;
+    if((modesOffset<0) && writeMask&MOMFBD_MODES) dummySize = std::max(nModes*nPH*nPH, dummySize);
+
+    if(dummySize) {
+        dummy = sharedArray<float>(dummySize);
+        memset(dummy.get(),0,dummySize*sizeof(float));
+    }
+
 
     // first byte = endian-flag
     tmp8 = system_is_big_endian;
@@ -536,7 +574,7 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:date-length" );
     writeOrThrow ( file, dateString.c_str(), tmp32, "FileMomfbd:date-string" );
 
-    tmp8 = ( nPH && ( writeMask&MOMFBD_MODES ) );
+    tmp8 = (writeMask&MOMFBD_MODES);
     writeOrThrow ( file, &tmp8, 1, "FileMomfbd:hasModes" );
     if ( tmp8 ) {
         if ( version >= 20110714.0 ) {
@@ -545,10 +583,15 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
         }
         writeOrThrow ( file, &nPH, 1, "FileMomfbd:nPH" );
         writeOrThrow ( file, &nModes, 1, "FileMomfbd:nModes" );
-        const float* fPtr = reinterpret_cast<const float*> ( data + phOffset );
+        const float* fPtr;
+        if(phOffset>=0) {
+            fPtr = reinterpret_cast<const float*> ( data + phOffset );
+        } else fPtr = dummy.get();
         writeOrThrow ( file, fPtr, nPH * nPH, "FileMomfbd:PH-data" );
         if ( nModes ) {
-            fPtr = reinterpret_cast<const float*> ( data + modesOffset );
+            if( modesOffset>=0 ) {
+                fPtr = reinterpret_cast<const float*> ( data + modesOffset );
+            } else fPtr = dummy.get();
             writeOrThrow ( file, fPtr, nModes * nPH * nPH, "FileMomfbd:Mode-data" );
         }
     }
@@ -602,9 +645,12 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
     if ( ( loadMask & MOMFBD_MODES ) && nPH ) {
 
         // pupil
-        if ( phOffset ) {
+        if ( phOffset > 0 ) {
             file.seekg ( phOffset );
             float* fPtr = reinterpret_cast<float*> ( ptr+count );
+            if( verbosity > 2 ) {
+                cout << "FileMomfbd::loading pupil.    size = (" << nPH << "," << nPH << ")" << endl;
+            }
             size_t n = readOrThrow ( file, fPtr, nPH * nPH, "MomfbdData:pupil" );
             if( n != (nPH * nPH * sizeof(float))) {
                 cout << "MomfbdData:pupil:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
@@ -616,10 +662,13 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
         }
 
         // modes
-        if ( nModes & modesOffset ) {
+        if ( nModes & (modesOffset>0) ) {
             // Load data
             file.seekg ( modesOffset );
             float* fPtr = reinterpret_cast<float*> ( ptr+count );
+            if( verbosity > 2 ) {
+                cout << "FileMomfbd::loading modes.    size = (" << nModes << "," << nPH << "," << nPH << ")  modesOffset = " << modesOffset << endl;
+            }
             size_t n = readOrThrow ( file, fPtr, nModes * nPH * nPH, "MomfbdData:modes" );
             if( n != (nModes * nPH * nPH * sizeof(float))) {
                 cout << "MomfbdData:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
@@ -661,7 +710,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
     }   // if(MOMFBD_PATCH)
 
 
-    if ( ( loadMask & MOMFBD_NAMES ) && filenameOffset ) {
+    if ( ( loadMask & MOMFBD_NAMES ) && (filenameOffset>0) ) {
         file.seekg ( filenameOffset );
         int32_t nameLength;
         vector<char> tmpStr ( 1024, 0 );
