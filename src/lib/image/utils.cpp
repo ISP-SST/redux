@@ -3,7 +3,8 @@
 #include "redux/image/fouriertransform.hpp"
 
 #include "redux/math/functions.hpp"
-#include <redux/constants.hpp>
+#include "redux/constants.hpp"
+#include "redux/types.hpp"
 
 #include <map>
 
@@ -12,6 +13,7 @@
 
 using namespace redux::image;
 using namespace redux::util;
+using namespace redux;
 using namespace std;
 
 namespace {
@@ -76,10 +78,10 @@ void Grid::init(void) {
     angle = sharedArray<float>(size.y, size.x);
     float** distPtr = distance.get();
     float** anglePtr = angle.get();
-    for(int i = 0; i < size.y; ++i) {
+    for(uint i = 0; i < size.y; ++i) {
         double yDist = i - origin.y;
         double y2 = sqr(yDist);
-        for(int j = 0; j < size.x; ++j) {
+        for(uint j = 0; j < size.x; ++j) {
             double xDist = j - origin.x;
             if(yDist || xDist) {
                 double x2 = sqr(xDist);
@@ -92,7 +94,7 @@ void Grid::init(void) {
 }
 
 
-float redux::image::makePupil( util::Array<float>& aperture, uint32_t nPoints, float radius, bool normalize ) {
+double redux::image::makePupil( util::Array<double>& aperture, uint32_t nPoints, float radius, bool normalize ) {
     
     double area = 0.0, origin = 0.0;
     
@@ -106,12 +108,11 @@ float redux::image::makePupil( util::Array<float>& aperture, uint32_t nPoints, f
                                 
     Grid grid(mid+1,origin,origin);
     float** distPtr = grid.distance.get();
-    float** anglePtr = grid.angle.get();
     aperture.resize(nPoints,nPoints);
     aperture.zero();
     
-    for(int x = 0; x < mid; ++x) {
-        for(int y = 0; y <=x; ++y) {
+    for(uint x = 0; x < mid; ++x) {
+        for(uint y = 0; y <=x; ++y) {
             double val = 0;
             if(distPtr[y+1][x+1] < radius) {
                 val = 1;
@@ -178,16 +179,16 @@ float redux::image::makePupil( util::Array<float>& aperture, uint32_t nPoints, f
 }
 
 
-float redux::image::makePupil_mvn( float** pupil, uint32_t nph, float r_c ) {
+double redux::image::makePupil_mvn( double** pupil, uint32_t nph, float r_c ) {
     
-    double area = 0.0, origin=0.0;
-    memset(*pupil,0,(nph+1)*(nph+1)*sizeof(float));
+    double area = 0.0;
+    memset(*pupil,0,(nph+1)*(nph+1)*sizeof(double));
     int xo = 1 + nph / 2, yo = 1 + nph / 2;
     double dx = 0.5 / r_c, dy = 0.5 / r_c;
-    for(int x = 1; x <= nph; ++x) {
+    for(uint x = 1; x <= nph; ++x) {
         double xl = fabs((double)(x - xo)) / r_c - dx, xh = fabs((double)(x - xo)) / r_c + dx;
         double xhs = sqr(xh);
-        for(int y = 1; y <= nph; ++y) {
+        for(uint y = 1; y <= nph; ++y) {
             double yl = fabs((double)(y - yo)) / r_c - dy, yh = fabs((double)(y - yo)) / r_c + dy;
             double yhs = sqr(yh);
             double rsl = sqr(xl) + sqr(yl), rsh = xhs + yhs;
@@ -300,16 +301,18 @@ template double redux::image::horizontalInterpolation ( double**, size_t, size_t
 
 
 template <typename T>
-void redux::image::apodize ( Array<T>& array, size_t blendRegion ) {
-    if ( !blendRegion ) return;     // nothing to do
+Array<T> redux::image::apodize ( const Array<T>& in, size_t blendRegion ) {
+    if ( !blendRegion ) return in;     // nothing to do
+    Array<T> array;
+    in.copy(array);
     const vector<int64_t>& first = array.first();
     size_t sizeY = array.last() [0]-first[0]+1;
     size_t sizeX = array.last() [1]-first[1]+1;
     blendRegion = std::min ( std::min ( blendRegion,sizeY ),sizeX );
 
-    T* tmp = new T[blendRegion+1];
+    double* tmp = new double[blendRegion+1];
     tmp[0] = 0;
-    redux::math::apodize ( tmp, blendRegion, T ( 1 ) );
+    redux::math::apodize ( tmp, blendRegion, 1.0 );
 //     auto sharedPtrs = array.get(sizeY,sizeX);
 //     T** data = sharedPtrs.get();
     for ( size_t y=0,yy=sizeY-1; y<sizeY; ++y,--yy ) {
@@ -327,11 +330,13 @@ void redux::image::apodize ( Array<T>& array, size_t blendRegion ) {
         }
     }
     delete[] tmp;
+    return array;
 }
-template void redux::image::apodize ( Array<int16_t>&, size_t );
-template void redux::image::apodize ( Array<int32_t>&, size_t );
-template void redux::image::apodize ( Array<double>&, size_t );
-template void redux::image::apodize ( Array<float>&, size_t );
+template Array<int16_t> redux::image::apodize ( const Array<int16_t>&, size_t );
+template Array<int32_t> redux::image::apodize ( const Array<int32_t>&, size_t );
+template Array<double> redux::image::apodize ( const Array<double>&, size_t );
+template Array<float> redux::image::apodize ( const Array<float>&, size_t );
+template Array<complex_t> redux::image::apodize ( const Array<complex_t>&, size_t );
 
 template <typename T>
 void redux::image::checkIfMultiFrames( redux::image::Image<T>& img ) {

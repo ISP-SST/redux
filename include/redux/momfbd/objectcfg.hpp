@@ -1,8 +1,9 @@
-#ifndef REDUX_MOMFBD_OBJECT_HPP
-#define REDUX_MOMFBD_OBJECT_HPP
+#ifndef REDUX_MOMFBD_OBJECTCFG_HPP
+#define REDUX_MOMFBD_OBJECTCFG_HPP
 
-#include "redux/momfbd/channel.hpp"
+#include "redux/momfbd/channelcfg.hpp"
 #include "redux/momfbd/patch.hpp"
+#include "redux/momfbd/workspace.hpp"
 #include "redux/util/array.hpp"
 #include "redux/types.hpp"
 
@@ -28,12 +29,12 @@ namespace redux {
         /*! @brief Class containing the object-specific configuration a MOMFBD job
          * 
          */
-        class Object {
+        class ObjectCfg {
 
         public:
 
-            Object( const MomfbdJob& );
-            ~Object();
+            ObjectCfg( const MomfbdJob& );
+            ~ObjectCfg();
 
             void parseProperties( bpt::ptree& tree, const std::string& fn );
             bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
@@ -42,16 +43,32 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             
-            size_t nImages(void);
-            size_t collectImages(redux::util::Array<float>&,size_t);
+            size_t nImages(size_t offset=0);
+            void collectImages(redux::util::Array<float>&) const;
+            
+            const std::vector<std::shared_ptr<ChannelCfg>>& getChannels(void) const { return channels; };
+            const MomfbdJob& getJob(void) const { return myJob; };
             
             void initWorkSpace( WorkSpace& ws );
         
-            std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
-            double reg_gamma, weight, angle, wavelength;
+            uint8_t fillpix_method, output_data_type;
             uint32_t objectSize, sequenceNumber, objectPupilSize;
-            std::vector<double> stokesWeights;
+            uint32_t flags;
+            double reg_gamma, weight, angle, wavelength;
+            double lim_freq, r_c, cf2pix, pix2cf, cf2def;
 
+            std::vector<uint32_t> imageNumbers, sequenceNumbers, darkNumbers;
+            std::vector<uint32_t> wf_num;
+            std::vector<double> stokesWeights;
+            
+            std::string imageDataDir, outputFileName, pupilFile;
+
+            redux::util::Array<double> pupil;
+            std::map<uint32_t, const ModeCache::ModePtr> modes;
+
+            const MomfbdJob& myJob;
+            std::vector<std::shared_ptr<ChannelCfg>> channels;
+            
         private:
 
             
@@ -63,24 +80,15 @@ namespace redux {
             void loadData(boost::asio::io_service&, boost::thread_group&);
             void preprocessData(boost::asio::io_service&, boost::thread_group&);
             void normalize(boost::asio::io_service&, boost::thread_group&);
+            void prepareStorage(void);
             
             size_t sizeOfPatch(uint32_t) const;
             void applyLocalOffsets(PatchData::Ptr) const;
             
             Point clipImages(void);
-            
-            uint32_t flags;
-
-            std::vector<std::shared_ptr<Channel>> channels;
-            std::vector<uint32_t> wf_num;
-            std::string imageDataDir, outputFileName;
-            uint8_t fillpix_method, output_data_type;
-            double lim_freq, r_c;
-            const MomfbdJob& myJob;
-            redux::util::Array<double> pupil;
 
             friend class MomfbdJob;
-            friend class Channel;
+            friend class ChannelCfg;
 
         };
 
@@ -91,4 +99,4 @@ namespace redux {
 
 }
 
-#endif  // REDUX_MOMFBD_OBJECT_HPP
+#endif  // REDUX_MOMFBD_OBJECTCFG_HPP

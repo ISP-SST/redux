@@ -105,12 +105,24 @@ void ModeCache::clear(void) {
 }
 
 
-const redux::image::Grid& ModeCache::grid(int sz) {
+const redux::image::Grid& ModeCache::grid(uint32_t sz, PointF origin) {
 
     unique_lock<mutex> lock(mtx);
-    auto it = grids.find(sz);
+    auto it = grids.find(make_pair(sz,origin));
     if(it != grids.end()) return it->second;
-    return grids.emplace(sz, redux::image::Grid(sz)).first->second;
+    return grids.emplace(make_pair(sz,origin), redux::image::Grid(sz,origin)).first->second;
+
+}
+
+
+const std::pair<Array<double>, double>& ModeCache::pupil(uint32_t nPoints, float radius) {
+
+    unique_lock<mutex> lock(mtx);
+    auto it = pupils.find( make_pair(nPoints,radius) );
+    if(it != pupils.end()) return it->second;
+    Array<double> pup;
+    double area = redux::image::makePupil(pup,nPoints,radius);
+    return pupils.emplace(make_pair(nPoints,radius), make_pair(pup,area)).first->second;
 
 }
 
@@ -156,7 +168,7 @@ const vector<double>& ModeCache::zernikeRadialPolynomial(int m, int n) {
 }
 
 
-const std::map<int, Modes::KL_cfg>& ModeCache::karhunenLoeveExpansion(int first_mode, int last_mode) {
+const std::map<int, PupilMode::KL_cfg>& ModeCache::karhunenLoeveExpansion(int first_mode, int last_mode) {
 
 
     {
@@ -234,16 +246,18 @@ const std::map<int, Modes::KL_cfg>& ModeCache::karhunenLoeveExpansion(int first_
         offset += blockSize;
     }
 
-    std::map<int, Modes::KL_cfg> res;
+    std::map<int, PupilMode::KL_cfg> res;
     for(int i = first_mode; i <= last_mode; ++i) {
-        Modes::KL_cfg &cfg = res[i];      // will insert a new element and return a reference if it doesn't exist
+        PupilMode::KL_cfg &cfg = res[i];      // will insert a new element and return a reference if it doesn't exist
         int im = reverse_mapping.at(i), s;
         for(s = 0; (first_in_block[s] > im) || (last_in_block[s] < im); ++s);
         int n = last_in_block[s] - first_in_block[s] + 1;
         cfg.covariance = values[im - first_mode];
         for(int m = 0; m < n; ++m) {
             int j = m + first_in_block[s];
-            cfg.zernikeWeights.push_back(make_pair(mapping.at(j), blockMatrix[s][m][im - first_in_block[s]]));
+            // N.B. minus-sign for the coefficients below is arbitrary. Depending on the SVD solver used, the result might vary in sign.
+            // This minus was added just to get the KL modes as close as possible to the Zernikes (i.e. the principal component has weight ~ 1 rather that ~ -1)
+            cfg.zernikeWeights.push_back(make_pair(mapping.at(j), - blockMatrix[s][m][im - first_in_block[s]]));
         }
     }
 
@@ -260,8 +274,20 @@ const std::map<int, Modes::KL_cfg>& ModeCache::karhunenLoeveExpansion(int first_
 
 }
 
-
 #include "redux/file/fileana.hpp"
+const ModeCache::ModePtr& ModeCache::addMode(int modeNumber, int nPoints, double r_c, double wavelength, double angle,  ModeCache::ModePtr& m) {
+
+    index idx(modeNumber, nPoints, r_c, wavelength, angle);
+
+    unique_lock<mutex> lock(mtx);
+    auto it = modes.find(idx);
+    if(it != modes.end()) return it->second;
+
+    return modes.emplace(idx, m).first->second;
+
+}
+
+
 const ModeCache::ModePtr& ModeCache::mode(int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
 
     index idx(modeNumber, nPoints, r_c, wavelength, angle);
@@ -271,7 +297,7 @@ const ModeCache::ModePtr& ModeCache::mode(int modeNumber, int nPoints, double r_
         if(it != modes.end()) return it->second;
     }
 
-    ModePtr ptr(new Modes::PupilMode(modeNumber, nPoints, r_c, wavelength, angle));
+    ModePtr ptr(new PupilMode(modeNumber, nPoints, r_c, wavelength, angle));
     unique_lock<mutex> lock(mtx);
     return modes.emplace(idx, ptr).first->second;
 
@@ -280,6 +306,10 @@ const ModeCache::ModePtr& ModeCache::mode(int modeNumber, int nPoints, double r_
 
 const ModeCache::ModePtr& ModeCache::mode(int firstMode, int lastMode, int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
 
+    if( modeNumber == 2 || modeNumber == 3) {   // Always use Zernike modes for the tilts
+        return mode( modeNumber, nPoints, r_c, wavelength, angle);
+    }
+    
     index idx(firstMode, lastMode, modeNumber, nPoints, r_c, wavelength, angle);
     {
         unique_lock<mutex> lock(mtx);
@@ -287,11 +317,10 @@ const ModeCache::ModePtr& ModeCache::mode(int firstMode, int lastMode, int modeN
         if(it != modes.end()) return it->second;
     }
 
-    ModePtr ptr(new Modes::PupilMode(firstMode, lastMode, modeNumber, nPoints, r_c, wavelength, angle));
-
+    ModePtr ptr(new PupilMode(firstMode, lastMode, modeNumber, nPoints, r_c, wavelength, angle));
+    
     unique_lock<mutex> lock(mtx);
     return modes.emplace(idx, ptr).first->second;
-
 
 }
 

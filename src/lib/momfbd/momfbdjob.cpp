@@ -1,7 +1,8 @@
 #include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/momfbd/defines.hpp"
-#include "redux/momfbd/object.hpp"
+#include "redux/momfbd/objectcfg.hpp"
+#include "redux/momfbd/util.hpp"
 
 #include "redux/translators.hpp"
 #include "redux/file/fileio.hpp"
@@ -94,7 +95,7 @@ void MomfbdJob::maybeOverride( bool value, uint32_t& flagset, uint32_t flag ) {
 
 MomfbdJob::MomfbdJob( void ) : basis( 0 ), fillpix_method( 0 ), output_data_type( 0 ), flags( 0 ), patchSize( 0 ), sequenceNumber( 0 ),
     klMinMode( 0 ), klMaxMode( 0 ), borderClip( 0 ), minIterations( 0 ), maxIterations( 0 ), nDoneMask( 0 ),
-    gradient_method( 0 ), getstep_method( 0 ), max_local_shift( 0 ), mstart( 0 ), mstep( 0 ), pupilSize( 0 ),
+    gradient_method( 0 ), getstep_method( 0 ), max_local_shift( 0 ), nInitialModes( 0 ), nModesIncrement( 0 ), pupilSize( 0 ),
     nPatchesX( 0 ), nPatchesY( 0 ), ncal( 0 ), telescopeFocalLength( 0 ), telescopeDiameter( 0 ), arcSecsPerPixel( 0 ),
     pixelSize( 0 ), reg_gamma( 0 ), FTOL( 0 ), EPS( 0 ), svd_reg( 0 ) {
 
@@ -195,25 +196,18 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     date_obs = tree.get<string>( "DATE_OBS", DEF_DATE_OBS );
 
     max_local_shift = tree.get<uint32_t>( "MAX_LOCAL_SHIFT", DEF_MAX_LOCAL_SHIFT );
-    mstart = tree.get<uint32_t>( "MODE_START", DEF_MODE_START );
-    mstep = tree.get<uint32_t>( "MODE_STEP", DEF_MODE_STEP );
+    nInitialModes = tree.get<uint32_t>( "MODE_START", DEF_MODE_START );
+    nModesIncrement = tree.get<uint32_t>( "MODE_STEP", DEF_MODE_STEP );
 
     if( tree.get<bool>( "FLATFIELD", false ) && tree.get<bool>( "CALIBRATE", false ) ) {
         LOG_ERR << "both FLATFIELD and CALIBRATE mode requested";
     }
 
-    tmpString = cleanPath( tree.get<string>( "PUPIL", "" ), imageDataDir );
-    if( tmpString != "" ) {
-        readFile( tmpString, pupil );
-        if( pupil.nDimensions() != 2 ) {
-            LOG_ERR << "pupil file \"" << tmpString << "\" not 2 dimensional.";
-        }
-        pupilSize = pupil.dimSize(0);
-        uint32_t tmpInt = pupil.dimSize(1);
-        if( pupilSize != tmpInt ) {
-            LOG_ERR << "pupil file \"" << tmpString << "\" not square (" << pupilSize << "x" << tmpInt << ")";
-        }
-        pupil = Array<double>( pupilSize, pupilSize );
+    pupilFile = cleanPath( tree.get<string>( "PUPIL", "" ), imageDataDir );
+    if( pupilFile != "" ) {
+        util::loadPupil( pupilFile, pupil );
+        pupil.resize();
+        if(pupil.nDimensions()>0) pupilFile.clear();    // pupil already loaded, master doesn't need to look for it.
     }
 
     flags = 0;
@@ -285,15 +279,16 @@ void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
     }
 
     tmpString = tree.get<string>( "OUTPUT_FILES", "" );
-    boost::split( outputFiles, tmpString, boost::is_any_of( "," ) );
-
+    if( tmpString != "" ) {
+        boost::split( outputFiles, tmpString, boost::is_any_of( "," ) );
+    }
     size_t nObj( 0 );
     for( auto & it : tree ) {
         if( iequals( it.first, "OBJECT" ) ) {
             tmpString = ( nObj >= outputFiles.size() ) ? "" : outputFiles[nObj++];
-            Object* tmpObj = new Object( *this );
+            ObjectCfg* tmpObj = new ObjectCfg( *this );
             tmpObj->parseProperties( it.second, tmpString );
-            objects.push_back( shared_ptr<Object>( tmpObj ) );
+            objects.push_back( shared_ptr<ObjectCfg>( tmpObj ) );
         }
     }
     if( outputFiles.size() > objects.size() ) {
@@ -340,8 +335,8 @@ bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
     if( !time_obs.empty() ) tree.put( "TIME_OBS", time_obs );
     if( date_obs != DEF_DATE_OBS ) tree.put( "DATE_OBS", date_obs );
     if( max_local_shift != DEF_MAX_LOCAL_SHIFT ) tree.put( "MAX_LOCAL_SHIFT", max_local_shift );
-    if( mstart != DEF_MODE_START ) tree.put( "MODE_START", mstart );
-    if( mstep != DEF_MODE_STEP ) tree.put( "MODE_STEP", mstep );
+    if( nInitialModes != DEF_MODE_START ) tree.put( "MODE_START", nInitialModes );
+    if( nModesIncrement != DEF_MODE_STEP ) tree.put( "MODE_STEP", nModesIncrement );
     if( !outputFiles.empty() ) tree.put( "OUTPUT_FILES", outputFiles );
     // TODO PUPIL/SIM_X/SIM_Y/CAL_X/CAL_Y/FILE_TYPE/DATA_TYPE
 
@@ -378,14 +373,14 @@ size_t MomfbdJob::size( void ) const {
     sz += 3;                                    // basis, fillpix_method, output_data_type;
     sz += 18 * sizeof( uint32_t );
     sz += 8 * sizeof( double );
-    sz += modes.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += darkNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += subImagePosX.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += subImagePosY.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += stokesWeights.size() * sizeof( double ) + sizeof( size_t );
-    sz += imageDataDir.length() + programDataDir.length() + time_obs.length() + date_obs.length() + 4;        // strings + \0
-    sz += 2 * sizeof( size_t );           // outputFiles.size() + objects.size()
+    sz += modes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += darkNumbers.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += subImagePosX.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += subImagePosY.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += stokesWeights.size() * sizeof( double ) + sizeof( uint64_t );
+    sz += imageDataDir.length() + programDataDir.length() + time_obs.length() + date_obs.length() + pupilFile.length() + 5;        // strings + \0
+    sz += 2 * sizeof( uint32_t );           // outputFiles.size() + objects.size()
     for( auto & it : outputFiles ) {
         sz += it.length() + 1;
     }
@@ -416,8 +411,8 @@ uint64_t MomfbdJob::pack( char* ptr ) const {
     count += pack( ptr+count, gradient_method );
     count += pack( ptr+count, getstep_method );
     count += pack( ptr+count, max_local_shift );
-    count += pack( ptr+count, mstart );
-    count += pack( ptr+count, mstep );
+    count += pack( ptr+count, nInitialModes );
+    count += pack( ptr+count, nModesIncrement );
     count += pack( ptr+count, pupilSize );
     count += pack( ptr+count, nPatchesX );
     count += pack( ptr+count, nPatchesY );
@@ -440,11 +435,12 @@ uint64_t MomfbdJob::pack( char* ptr ) const {
     count += pack( ptr+count, programDataDir );
     count += pack( ptr+count, time_obs );
     count += pack( ptr+count, date_obs );
-    count += pack( ptr+count, outputFiles.size() );
+    count += pack( ptr+count, pupilFile );
+    count += pack( ptr+count, (uint32_t)outputFiles.size() );
     for( auto & it : outputFiles ) {
         count += pack( ptr+count, it );
     }
-    count += pack( ptr+count, objects.size() );
+    count += pack( ptr+count, (uint32_t)objects.size() );
     for( auto & it : objects ) {
         count += it->pack( ptr+count );
     }
@@ -474,8 +470,8 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, gradient_method, swap_endian );
     count += unpack( ptr+count, getstep_method, swap_endian );
     count += unpack( ptr+count, max_local_shift, swap_endian );
-    count += unpack( ptr+count, mstart, swap_endian );
-    count += unpack( ptr+count, mstep, swap_endian );
+    count += unpack( ptr+count, nInitialModes, swap_endian );
+    count += unpack( ptr+count, nModesIncrement, swap_endian );
     count += unpack( ptr+count, pupilSize, swap_endian );
     count += unpack( ptr+count, nPatchesX, swap_endian );
     count += unpack( ptr+count, nPatchesY, swap_endian );
@@ -498,7 +494,8 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, programDataDir );
     count += unpack( ptr+count, time_obs );
     count += unpack( ptr+count, date_obs );
-    size_t tmp;
+    count += unpack( ptr+count, pupilFile );
+    uint32_t tmp;
     count += unpack( ptr+count, tmp, swap_endian );
     outputFiles.resize( tmp );
     for( auto & it : outputFiles ) {
@@ -507,9 +504,10 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, tmp, swap_endian );
     objects.resize( tmp );
     for( auto & it : objects ) {
-        it.reset(new Object(*this));
+        it.reset(new ObjectCfg(*this));
         count += it->unpack( ptr+count, swap_endian );
     }
+    
     count += pupil.unpack( ptr+count, swap_endian );
     
     return count;
@@ -572,6 +570,8 @@ void MomfbdJob::ungetParts( WorkInProgress& wip ) {
 }
 
 
+#include "redux/file/fileana.hpp"
+
 void MomfbdJob::returnParts( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
@@ -579,6 +579,7 @@ void MomfbdJob::returnParts( WorkInProgress& wip ) {
         auto patch = static_pointer_cast<PatchData>( it );
         patches[it->id]->step = patch->step;
         //patches[it->id]->result = patch->result;
+    redux::file::Ana::write( "patch_" + to_string(patch->index.x) + "_" + to_string(patch->index.y) + ".f0", patch->images );
     }
     wip.parts.clear();
     checkParts();
@@ -619,22 +620,19 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
         size_t nThreads = std::min( maxThreads, info.maxThreads);
 
-        for( auto & it : wip.parts ) {
-            
-            // Prepare
-            WorkSpace ws( static_pointer_cast<PatchData>(it) );
-            ws.modes.resize( objects.size(), modes.size() );
-            ModeCache& cache = ModeCache::getCache();
-            for( int o=0; o<objects.size(); ++o ) {
-                for(int m=0; m<modes.size(); ++m ) {
-                    if( basis == CFG_KARHUNEN_LOEVE ) ws.modes(o,m) = cache.mode(klMinMode,klMaxMode,modes[m],pupilSize,objects[o]->r_c,objects[o]->wavelength,objects[o]->angle);
-                    else ws.modes(o,m) = cache.mode(modes[m],pupilSize,objects[o]->r_c,objects[o]->wavelength,objects[o]->angle);
-                }
-                objects[o]->initWorkSpace(ws);
+        for( auto & it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
+
+            //LOG_DETAIL << "Configuring slave";
+            WorkSpace ws( *this, static_pointer_cast<PatchData>(it) );
+            service.reset();
+            ws.init(service);            // Global setup, allocations, etc.
+            for( size_t t = 0; t < nThreads; ++t ) {
+                pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
             }
-            
+            pool.join_all();
             
             // Run
+            //LOG_DETAIL << "Start main processing routine...";
             service.reset();
             service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( ws ) ) );
             for( size_t t = 0; t < nThreads; ++t ) {
@@ -642,11 +640,11 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
             }
             pool.join_all();
             
+            //LOG_DETAIL << "Main processing completed";
             
             // Get/return results and cleanup.
             
         }
-
     }
     else if( step == JSTEP_POSTPROCESS ) {
         postProcess(service, pool);                          // postprocess on master, collect results, save...
@@ -658,8 +656,6 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
     return false;
     
 }
-
-
 
 void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_group& pool ) {
 
@@ -673,9 +669,12 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         info.state.store( JSTATE_IDLE );
         return;
     }
-    
+
     // load shared files synchronously (dark,gain,psf,offset...)
     service.reset();
+    if( pupil.nDimensions() < 2 && pupilFile != "" ) {
+        service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), 0 ) );
+    }
     for( auto & it : objects ) {
         it->loadData(service, pool);
     }
@@ -713,7 +712,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     size_t nTotalImages(0);
     for( auto & it : objects ) {
         it->normalize(service, pool);
-        nTotalImages += it->nImages();
+        nTotalImages += it->nImages(nTotalImages);
     }
 
     for( size_t t = 0; t < info.maxThreads; ++t ) {
@@ -722,14 +721,12 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     pool.join_all();
 
     // Done normalizing -> collect images to master-stack
-    size_t imageOffset(0);
     imageStack.resize(nTotalImages,imageSizes.y,imageSizes.x);
     for( auto & it : objects ) {
-        imageOffset += it->collectImages(imageStack, imageOffset);
+        it->collectImages(imageStack);
     }
-    if( imageOffset != nTotalImages) {
-        LOG_ERR << "MomfbdJob::preProcess(): Failed to collect \"nTotalImages\" images from the objects/channels.";
-    }
+
+    redux::file::Ana::write( "masterstack.f0", imageStack );
     // Done normalizing -> split in patches
     
     int minimumOverlap = 16;                // desired width of blending zone in pixels
@@ -776,27 +773,34 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         info.state.store( JSTATE_IDLE );
         return;
     }
-    
 
-   
+    service.reset();
+    for( uint i=0; i<objects.size(); ++i ) {
+        service.post( std::bind( &ObjectCfg::prepareStorage, objects[i].get() ) );
+    }
+    for( size_t t = 0; t < 1/*objects.size()*/; ++t ) {
+        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    }
+    pool.join_all();
+    
     size_t count = 0;
     uint32_t yid=0;
     service.reset();
-    uint32_t span = patchSize/2 + max_local_shift;
-    for( auto posY : subImagePosY ) {
+    uint32_t halfBlockSize = patchSize/2 + max_local_shift;
+    for( auto posY : subImagePosY ) {       // y-coordinate of patch-centre
         uint32_t xid=0;
-        uint32_t trimmedPosY = std::min(std::max(span,posY),imageSizes.y-span);
+        uint32_t trimmedPosY = std::min(std::max(halfBlockSize,posY),imageSizes.y-halfBlockSize);       // stay inside borders
         if( trimmedPosY != posY ) LOG_WARN << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << posY << " -> " << trimmedPosY;
-        for( auto posX : subImagePosX ) {
-            uint32_t trimmedPosX = std::min(std::max(span,posX),imageSizes.x);
+        for( auto posX : subImagePosX ) {   // x-coordinate of patch-centre
+            uint32_t trimmedPosX = std::min(std::max(halfBlockSize,posX),imageSizes.x-halfBlockSize);   // stay inside borders
             if( trimmedPosX != posX ) LOG_WARN << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX;
             PatchData::Ptr patch( new PatchData() );
-            patch->first.x = trimmedPosX-span;
-            patch->first.y = trimmedPosY-span;
-            patch->last.x = patch->first.x+2*span-1;
-            patch->last.y = patch->first.y+2*span-1;
+            patch->first.x = max_local_shift;
+            patch->first.y = max_local_shift;
+            patch->last.x = patch->first.x+patchSize-1;
+            patch->last.y = patch->first.y+patchSize-1;
             patch->id = ++count;
-            patch->images = Array<float>(imageStack,0,nTotalImages-1,patch->first.y, patch->last.y, patch->first.x, patch->last.x);
+            patch->images = Array<float>(imageStack,0,nTotalImages-1,trimmedPosY-halfBlockSize, trimmedPosY+halfBlockSize-1, trimmedPosX-halfBlockSize, trimmedPosX+halfBlockSize-1);
             patch->setIndex( yid, xid++ );
             service.post( std::bind( &MomfbdJob::applyLocalOffsets, this, patch ) );
             patches.insert( make_pair( patch->id, patch ) );
@@ -806,13 +810,14 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
 
     LOG_DETAIL << "MomfbdJob::preProcess()  nPatches = " << patches.size();
 
-    for( size_t t = 0; t < 1/*info.nThreads*/; ++t ) {
+    for( size_t t = 0; t < 1/*info.maxThreads*/; ++t ) {
         pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
     }
     pool.join_all();
 
     info.step.store( JSTEP_QUEUED );
 
+    LOG_DETAIL << "MomfbdJob::preProcess()  Done.";
 }
 
 void MomfbdJob::applyLocalOffsets( PatchData::Ptr patch ) {
@@ -835,6 +840,7 @@ void MomfbdJob::applyLocalOffsets( PatchData::Ptr patch ) {
 //         LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());
 //     }
     // TODO: compress and store in swapfile
+ //   LOG_TRACE << "MomfbdJob::applyLocalOffsets() #" << patch->id << "  All done !!";
 }
  
 
@@ -842,8 +848,9 @@ void MomfbdJob::runMain( WorkSpace& ws ) {
 
 
 
-//    LOG << "MomfbdJob::runMain()  patch#" << part->id << "  x1=" << pptr->first.x << "  y1=" << pptr->first.y << printArray(pptr->images.dimensions(),"  dims") ;
-//     // temporaries, to avoid cache collisions.
+    LOG << "MomfbdJob::runMain()  patch#" << ws.data->id << "  x1=" << ws.data->first.x << "  y1=" << ws.data->first.y;
+usleep(10000);
+    //     // temporaries, to avoid cache collisions.
 //     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
 //     uint32_t sizeY = pptr->yPixelH - pptr->yPixelL + 1;
 //     double stepX = ( pptr->endX - pptr->beginX ) / ( sizeX - 1 );

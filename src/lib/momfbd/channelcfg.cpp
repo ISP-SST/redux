@@ -1,8 +1,8 @@
-#include "redux/momfbd/channel.hpp"
+#include "redux/momfbd/channelcfg.hpp"
 
 #include "redux/momfbd/defines.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
-#include "redux/momfbd/object.hpp"
+#include "redux/momfbd/objectcfg.hpp"
 
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
@@ -74,16 +74,16 @@ namespace {
 }
 
 
-Channel::Channel( const Object& o, const MomfbdJob& j ) : flags( o.flags ), mmRow( 0 ), mmWidth( 0 ), fillpix_method( o.fillpix_method ),
-    image_num_offs( 0 ), sequenceNumber( o.sequenceNumber ), nf( 0 ), incomplete(0), myObject( o ), myJob( j ) {
+ChannelCfg::ChannelCfg( const ObjectCfg& o, const MomfbdJob& j ) : fillpix_method( o.fillpix_method ), mmRow( 0 ), mmWidth( 0 ), incomplete(0), flags( o.flags ),
+    image_num_offs( 0 ), sequenceNumber( o.sequenceNumber ), noiseFudge( 0 ), myObject( o ), myJob( j ) {
 
 }
 
-Channel::~Channel() {
+ChannelCfg::~ChannelCfg() {
 
 }
 
-void Channel::parseProperties( bpt::ptree& tree ) {
+void ChannelCfg::parseProperties( bpt::ptree& tree ) {
 
     LOG_ERR << "myObject." << printArray(myObject.imageNumbers,"imageNumbers" );
     imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", myObject.imageNumbers );
@@ -217,7 +217,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
         fillpix_method = myObject.fillpix_method;
     }
 
-    nf = tree.get<double>( "NF", DEF_NF );
+    noiseFudge = tree.get<double>( "NF", DEF_NF );
     image_num_offs = tree.get<int>( "DT", 0 );
 
     flags = myObject.flags;
@@ -247,7 +247,7 @@ void Channel::parseProperties( bpt::ptree& tree ) {
 
 
 
-bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
+bpt::ptree ChannelCfg::getPropertyTree( bpt::ptree* root ) {
 
     bpt::ptree tree;
 
@@ -272,7 +272,7 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
     if( !diversity.empty() ) tree.put( "DIVERSITY", diversity );
     if( !diversityOrders.empty() ) tree.put( "DIV_ORDERS", diversityOrders ); // TODO types missing
     if( fillpix_method != myObject.fillpix_method ) tree.put( "FPMETHOD", fillpix_method );
-    if( nf != DEF_NF ) tree.put( "NF", nf );
+    if( noiseFudge != DEF_NF ) tree.put( "NF", noiseFudge );
     if( image_num_offs != 0 ) tree.put( "DT", image_num_offs );
     uint32_t dflags = flags ^ myObject.flags;
     if( dflags & MFBD_NO_RESTORE ) tree.put( "NO_RESTORE", ( bool )( flags & MFBD_NO_RESTORE ) );
@@ -288,47 +288,49 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree* root ) {
 }
 
 
-size_t Channel::size( void ) const {
+size_t ChannelCfg::size( void ) const {
 
-    size_t sz = 4;
-    sz += 3 * sizeof( uint32_t );
-    sz += sizeof( double );
-    sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += darkNumbers.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += alignClip.size() * sizeof( int16_t ) + sizeof( size_t );
-    sz += wf_num.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += stokesWeights.size() * sizeof( double ) + sizeof( size_t );
-    sz += diversity.size() * sizeof( double ) + sizeof( size_t );
-    sz += diversityOrders.size() * sizeof( uint32_t ) + sizeof( size_t );
-    sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( size_t );
+    size_t sz = 4;                      // fillpix_method, mmRow, mmWidth, incomplete;
+    sz += 4 * sizeof( uint32_t );       // flags, image_num_offs, sequenceNumber, imageOffset;
+    sz += sizeof( double );             // noiseFudge
+    sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += wf_num.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += stokesWeights.size() * sizeof( double ) + sizeof( uint64_t );
+    sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
+    sz += diversityOrders.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += darkNumbers.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += alignClip.size() * sizeof( int16_t ) + sizeof( uint64_t );
     sz += imageDataDir.length() + imageTemplate.length() + darkTemplate.length() + gainFile.length() + 4;
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
     sz += offxFile.length() + offyFile.length() + 2;
     sz += dark.size();
+    sz += imageStats.size() * Statistics::size() + sizeof(uint32_t);
 
     return sz;
 }
 
 
-uint64_t Channel::pack( char* ptr ) const {
+uint64_t ChannelCfg::pack( char* ptr ) const {
     using redux::util::pack;
 
     uint64_t count = pack( ptr, fillpix_method );
     count += pack( ptr+count, mmRow );
     count += pack( ptr+count, mmWidth );
     count += pack( ptr+count, incomplete );
-    count += pack( ptr+count, sequenceNumber );
-    count += pack( ptr+count, image_num_offs );
     count += pack( ptr+count, flags );
-    count += pack( ptr+count, nf );
+    count += pack( ptr+count, image_num_offs );
+    count += pack( ptr+count, sequenceNumber );
+    count += pack( ptr+count, imageOffset );
+    count += pack( ptr+count, noiseFudge );
     count += pack( ptr+count, imageNumbers );
-    count += pack( ptr+count, darkNumbers );
-    count += pack( ptr+count, alignClip );
     count += pack( ptr+count, wf_num );
     count += pack( ptr+count, stokesWeights );
     count += pack( ptr+count, diversity );
     count += pack( ptr+count, diversityOrders );
     count += pack( ptr+count, diversityTypes );
+    count += pack( ptr+count, darkNumbers );
+    count += pack( ptr+count, alignClip );
     count += pack( ptr+count, imageDataDir );
     count += pack( ptr+count, imageTemplate );
     count += pack( ptr+count, darkTemplate );
@@ -339,32 +341,39 @@ uint64_t Channel::pack( char* ptr ) const {
     count += pack( ptr+count, mmFile );
     count += pack( ptr+count, offxFile );
     count += pack( ptr+count, offyFile );
-
+    
     count += dark.pack( ptr+count );
+    
+    uint32_t statSize = imageStats.size();
+    count += pack( ptr+count, statSize );
+    for( auto &it : imageStats ) count += it->pack(ptr+count);
+    
 
+    if(count != size()) cout << "Ch " << hexString(this) << " has a size mismatch: " << count << "  sz = " << size() << "  diff = " << (size()-count) <<endl;
     return count;
 }
 
 
-uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
+uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
 
     uint64_t count = unpack( ptr, fillpix_method );
     count += unpack( ptr+count, mmRow );
     count += unpack( ptr+count, mmWidth );
     count += unpack( ptr+count, incomplete );
-    count += unpack( ptr+count, sequenceNumber, swap_endian );
-    count += unpack( ptr+count, image_num_offs, swap_endian );
     count += unpack( ptr+count, flags, swap_endian );
-    count += unpack( ptr+count, nf, swap_endian );
+    count += unpack( ptr+count, image_num_offs, swap_endian );
+    count += unpack( ptr+count, sequenceNumber, swap_endian );
+    count += unpack( ptr+count, imageOffset, swap_endian );
+    count += unpack( ptr+count, noiseFudge, swap_endian );
     count += unpack( ptr+count, imageNumbers, swap_endian );
-    count += unpack( ptr+count, darkNumbers, swap_endian );
-    count += unpack( ptr+count, alignClip, swap_endian );
     count += unpack( ptr+count, wf_num, swap_endian );
     count += unpack( ptr+count, stokesWeights, swap_endian );
     count += unpack( ptr+count, diversity, swap_endian );
     count += unpack( ptr+count, diversityOrders, swap_endian );
     count += unpack( ptr+count, diversityTypes, swap_endian );
+    count += unpack( ptr+count, darkNumbers, swap_endian );
+    count += unpack( ptr+count, alignClip, swap_endian );
     count += unpack( ptr+count, imageDataDir );
     count += unpack( ptr+count, imageTemplate );
     count += unpack( ptr+count, darkTemplate );
@@ -378,11 +387,20 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
 
     count += dark.unpack( ptr+count, swap_endian );
 
+    uint32_t statSize;
+    count += unpack( ptr+count, statSize, swap_endian);
+    imageStats.resize(statSize);
+    for( auto &it : imageStats ) {
+        it.reset( new Statistics() );
+        count += it->unpack(ptr+count, swap_endian);
+        //cout << "STATS: " << it->noise << endl; 
+    }
+
     return count;
 }
 
 
-bool Channel::checkCfg(void) {
+bool ChannelCfg::checkCfg(void) {
     
     LOG_TRACE << "Channel::checkCfg()";
 
@@ -425,7 +443,7 @@ bool Channel::checkCfg(void) {
 }
 
 
-bool Channel::checkData(void) {
+bool ChannelCfg::checkData(void) {
     
     LOG_TRACE << "Channel::checkData()";
     
@@ -573,7 +591,7 @@ namespace {
 }
 
 
-void Channel::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
+void ChannelCfg::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
 
     LOG_TRACE << "Channel::loadData()";
     // TODO: absolute/relative paths
@@ -635,33 +653,31 @@ void Channel::loadData( boost::asio::io_service& service, boost::thread_group& p
         service.post( std::bind( loadWrapper< Image<int16_t> >, offyFile, std::ref(yOffset) ) );
     }
 
-
-    if( imageNumbers.empty() ) {
-        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
-        LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
-        redux::file::readFile( fn.string(), images );
-        service.post( std::bind( loadWrapper< Image<float> >, fn.string(), std::ref(images) ) );
-    }
-    else {
+    size_t nImages = imageNumbers.size();
+    if( nImages ) {
+        imageStats.resize( nImages );
         Image<float> tmp;
-        size_t nImages = imageNumbers.size();
         bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[0] ) );
         redux::file::readFile( fn.string(), tmp );
-        imageStats.resize( nImages );
         images.resize( nImages, tmp.dimSize( 0 ), tmp.dimSize( 1 ) );
-
         for( size_t i = 0; i < nImages; ++i ) {
-            service.post( std::bind( &Channel::loadImage, this, i ) );
-
+            imageStats[i].reset(new Statistics());
+            service.post( std::bind( &ChannelCfg::loadImage, this, i ) );
         }
-
+    } else  {
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
+        redux::file::readFile( fn.string(), images );
+        loadWrapper(fn.string(), images );                              // Single image read synchronously so stats can be done below
+        imageStats.resize( 1 );
+        imageStats[0].reset(new Statistics());
+        imageStats[0]->getStats(myJob.borderClip, images, ST_VALUES);   // only get min/max/mean
     }
 
 
 }
 
 
-void Channel::preprocessData( boost::asio::io_service& service, boost::thread_group& pool ) {
+void ChannelCfg::preprocessData( boost::asio::io_service& service, boost::thread_group& pool ) {
 
     size_t nImages = imageNumbers.size();
     double avgMean = 0.0;
@@ -671,53 +687,53 @@ void Channel::preprocessData( boost::asio::io_service& service, boost::thread_gr
     avgMean /= static_cast<double>( nImages );
 
     for( size_t i = 0; i < nImages; ++i ) {
-        service.post( std::bind( &Channel::preprocessImage, this, i, avgMean ) );
+        service.post( std::bind( &ChannelCfg::preprocessImage, this, i, avgMean ) );
     }
 
 }
 
 
-double Channel::getMaxMean(void) {
-    double maxMean = std::numeric_limits<double>::min();
+double ChannelCfg::getMaxMean(void) const {
+    double maxMean = std::numeric_limits<double>::lowest();
     for(auto it: imageStats ) {
         if( it->mean > maxMean ) maxMean = it->mean;
     }
     return maxMean;
 }
 
-size_t Channel::collectImages(redux::util::Array<float>& stack, size_t offset) {
-    size_t n = nImages();
-    imageOffset = offset;
-    Array<float> block( stack, imageOffset, imageOffset+n-1, 0, images.dimSize(1)-1, 0, images.dimSize(2)-1 );       // sub-array of stack, starting at offset.
-    images.copy(block);
-    return n;
+
+void ChannelCfg::collectImages(redux::util::Array<float>& stack) const {
+    size_t n = images.dimSize(0);
+    if ( n ) {
+        Array<float> block( stack, imageOffset, imageOffset+n-1, 0, images.dimSize(1)-1, 0, images.dimSize(2)-1 );       // sub-array of stack, starting at offset.
+        images.copy(block);
+    }
 }
 
             
-void Channel::initWorkSpace( WorkSpace& ws ) {
+void ChannelCfg::initWorkSpace( WorkSpace& ws ) {
     
 }
 
 
-void Channel::normalizeData(boost::asio::io_service& service, boost::thread_group& pool, double value) {
+void ChannelCfg::normalizeData(boost::asio::io_service& service, boost::thread_group& pool, double value) {
     size_t nImages = imageNumbers.size();
     for( size_t i = 0; i < nImages; ++i ) {
-        service.post( std::bind( &Channel::normalizeImage, this, i, value ) );
+        service.post( std::bind( &ChannelCfg::normalizeImage, this, i, value ) );
     }
 }
 
 
-void Channel::loadImage( size_t index ) {
+void ChannelCfg::loadImage( size_t index ) {
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
     bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
     redux::file::readFile( fn.string(), subimg );
     LOG_DETAIL << boost::format( "Loaded file %s" ) % fn;
-    imageStats[index].reset(new Statistics<float>());
     imageStats[index]->getStats(myJob.borderClip,subimg,ST_VALUES);                          // only get min/max/mean
 }
 
 
-void Channel::preprocessImage( size_t index, double avgMean ) {
+void ChannelCfg::preprocessImage( size_t index, double avgMean ) {
 
     double& mean = imageStats[index]->mean;
     bool modified = false;
@@ -725,6 +741,12 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
     bfs::path fn = bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
     LOG_DETAIL << boost::format( "Pre-processing image %s" ) % fn;
+    
+    
+    bfs::path fn2 = bfs::path( fn.leaf().string() + ".orig" );
+    LOG_DETAIL << boost::format( "Saving RAW file %s" ) % fn2.string();
+    redux::file::Ana::write( fn2.string(), subimg );
+
     
     // Michiel's method for detecting bitshifted Sarnoff images.
     if( mean > 4 * avgMean ) {
@@ -737,10 +759,9 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
         subimg *= 16;
         modified = true;
     }
-
-    LOG_WARN << boost::format( "Dimensions of simg (%s)." ) % printArray( subimg.dimensions(), "" );
-    LOG_WARN << boost::format( "Dimensions of dark (%s)." ) % printArray( dark.dimensions(), "" );
-    LOG_WARN << boost::format( "Dimensions of gain (%s)." ) % printArray( gain.dimensions(), "" );
+    
+    fn2 = bfs::path( fn.leaf().string() + ".1.orig" );
+    redux::file::Ana::write( fn2.string(), subimg );
 
     if( dark.valid() && gain.valid() ) {
         if( ! subimg.sameSize( dark ) ) {
@@ -758,10 +779,14 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 
         subimg -= dark;
         modified = true;
+    fn2 = bfs::path( fn.leaf().string() + ".2.orig" );
+    redux::file::Ana::write( fn2.string(), subimg );
 
         if( ccdResponse.valid() ) {  // correct for the detector response (this should not contain the gain correction and must be done before descattering)
             subimg *= ccdResponse;
         }
+    fn2 = bfs::path( fn.leaf().string() + ".3.orig" );
+    redux::file::Ana::write( fn2.string(), subimg );
 
         if( ccdScattering.valid() && psf.valid() ) {          // apply backscatter correction
             if( subimg.sameSize( ccdScattering ) && subimg.sameSize( psf ) ) {
@@ -774,6 +799,8 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
             }
         }
 
+    fn2 = bfs::path( fn.leaf().string() + ".4.orig" );
+    redux::file::Ana::write( fn2.string(), subimg );
         subimg *= gain;
         namespace sp = std::placeholders;
         size_t ni = images.dimSize(0);
@@ -801,6 +828,8 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
             }
         }
 
+    fn2 = bfs::path( fn.leaf().string() + ".5.orig" );
+    redux::file::Ana::write( fn2.string(), subimg );
     }
 
     imageStats[index]->getStats(myJob.borderClip, subimg);      // get all stats for the cleaned up data
@@ -850,29 +879,33 @@ void Channel::preprocessImage( size_t index, double avgMean ) {
 }
 
 
-void Channel::normalizeImage( size_t index, double value ) {
+void ChannelCfg::normalizeImage( size_t index, double value ) {
+    LOG_TRACE << boost::format( "Normalizing image %d" ) % (imageOffset+index);
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
-    LOG_TRACE << boost::format( "Normalizing image %d" ) % index;
     subimg *= (value/imageStats[index]->mean);
+    double noise1 = imageStats[index]->noise;
+    imageStats[index]->getStats(subimg);
+    LOG_TRACE << "  image #" << (imageOffset+index) << "  noise1 = " << noise1 << "  noise2 = " << imageStats[index]->noise;
 }
 
 
-size_t Channel::sizeOfPatch(uint32_t npixels) const {
+size_t ChannelCfg::sizeOfPatch(uint32_t npixels) const {
     size_t sz = sizeof(size_t) + imageStats.size()*sizeof(float);
     sz += npixels*images.dimSize(0)*sizeof(float);
     return sz;
 }
 
 
-void Channel::applyLocalOffsets(PatchData::Ptr patch) const {
+void ChannelCfg::applyLocalOffsets(PatchData::Ptr patch) const {
    
+    //LOG_TRACE << "ChannelCfg::applyLocalOffsets #" << patch->id;
     int patchOffsetX, patchOffsetY;
     float residualOffsetX, residualOffsetY;
     residualOffsetX = residualOffsetY = patchOffsetX = patchOffsetY = 0;
     
     if(xOffset.valid()) {
         Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
-        Statistics<int16_t> stats;
+        Statistics stats;
         stats.getStats(tmpOff,ST_VALUES);
         double tmp;
         residualOffsetX = modf(stats.mean/100 , &tmp);
@@ -881,7 +914,7 @@ void Channel::applyLocalOffsets(PatchData::Ptr patch) const {
     
     if(yOffset.valid()) {
         Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
-        Statistics<int16_t> stats;
+        Statistics stats;
         stats.getStats(Image<int16_t>(yOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x),ST_VALUES);
         double tmp;
         residualOffsetY = modf(stats.mean/100 , &tmp);
@@ -902,30 +935,34 @@ void Channel::applyLocalOffsets(PatchData::Ptr patch) const {
         }
     }
     
-    patch->residualOffsets.push_back({residualOffsetY,residualOffsetX});
+    patch->residualOffset.y = residualOffsetY;
+    patch->residualOffset.x = residualOffsetX;
+   // LOG_TRACE << "ChannelCfg::applyLocalOffsets #" << patch->id << "  ...end";
 
 }
  
 
-Point Channel::clipImages(void) {
+Point ChannelCfg::clipImages(void) {
 
     if( alignClip.size() != 4 ) {
         LOG_WARN << "No (or faulty) align-clip supplied, using full images: " << printArray(alignClip,"clip"); 
         return Point(images.dimSize(1),images.dimSize(2));
     }
 
+    LOG_DETAIL << "Clipping images using " << printArray(alignClip,"alignClip");
     bool flipX=false,flipY=false;
     if( alignClip[0] > alignClip[1]) {     // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
         std::swap(alignClip[0], alignClip[1]);
         flipX = true;
+        LOG_DETAIL << "Reversing x-coordinate for this channel.";
     }
     if( alignClip[2] > alignClip[3]) {
         std::swap(alignClip[2], alignClip[3]);
         flipY = true;
+        LOG_DETAIL << "Reversing y-coordinate for this channel.";
     }
     for( auto& it: alignClip ) --it;        // NOTE: momfbd uses 1-based indexes, we start with 0...
     
-    LOG_DETAIL << "Clipping images using " << printArray(alignClip,"alignClip");
     string tmp =  printArray(images.dimensions(),"original");
     images.setLimits( 0, imageNumbers.size()-1, alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
     images.trim(false);
@@ -973,7 +1010,6 @@ Point Channel::clipImages(void) {
     }
 
     if( flipX || flipY ) {
-        LOG_DETAIL << "Flipping data for this channel.";
         size_t sy = alignClip[3] - alignClip[2] + 1;
         size_t sx = alignClip[1] - alignClip[0] + 1;
         size_t ni = imageNumbers.size();

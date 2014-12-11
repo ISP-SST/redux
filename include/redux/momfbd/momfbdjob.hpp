@@ -1,7 +1,7 @@
 #ifndef REDUX_MOMFBD_MOMFBDJOB_HPP
 #define REDUX_MOMFBD_MOMFBDJOB_HPP
 
-#include "redux/momfbd/object.hpp"
+#include "redux/momfbd/objectcfg.hpp"
 #include "redux/momfbd/patch.hpp"
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
@@ -20,7 +20,7 @@ namespace redux {
         extern const std::map<std::string, int> gradientMap;
         extern const std::map<std::string, int> fillpixMap;
 
-        class Channel;
+        class ChannelCfg;
         /*! @brief Class containing the configuration settings for a MOMFBD job.
          *
          */
@@ -53,7 +53,23 @@ namespace redux {
             
             bool checkCfg(void);
             bool checkData(void);
+            const std::vector<std::shared_ptr<ObjectCfg>>& getObjects(void) const { return objects; };
         
+            uint8_t basis, fillpix_method, output_data_type;
+
+            uint32_t flags, patchSize, sequenceNumber;
+            uint32_t klMinMode, klMaxMode, borderClip;
+            uint32_t minIterations , maxIterations, nDoneMask;
+            uint32_t gradient_method, getstep_method;
+            uint32_t max_local_shift, nInitialModes, nModesIncrement;
+            uint32_t pupilSize, nPatchesX, nPatchesY, ncal;
+
+            double telescopeFocalLength, telescopeDiameter, arcSecsPerPixel, pixelSize;
+            double reg_gamma, FTOL, EPS, svd_reg;
+
+            std::vector<uint32_t> modes, imageNumbers, darkNumbers;
+            std::vector<uint32_t> subImagePosX,subImagePosY;
+            std::vector<double> stokesWeights;
 
         private:
 
@@ -63,35 +79,23 @@ namespace redux {
             void runMain( WorkSpace& );
             void postProcess( boost::asio::io_service&, boost::thread_group& );
 
-            uint8_t basis, fillpix_method, output_data_type;
-
-            uint32_t flags, patchSize, sequenceNumber;
-            uint32_t klMinMode, klMaxMode, borderClip;
-            uint32_t minIterations , maxIterations, nDoneMask;
-            uint32_t gradient_method, getstep_method;
-            uint32_t max_local_shift, mstart, mstep;
-            uint32_t pupilSize, nPatchesX, nPatchesY, ncal;
-            std::vector<uint32_t> modes, imageNumbers, darkNumbers;
-            std::vector<uint32_t> subImagePosX,subImagePosY;
-
-            double telescopeFocalLength, telescopeDiameter, arcSecsPerPixel, pixelSize;
-            double reg_gamma, FTOL, EPS, svd_reg;
-            std::vector<double> stokesWeights;
 
             std::string imageDataDir;
             std::string programDataDir;
             std::string time_obs, date_obs;
+            std::string pupilFile;
             std::vector<std::string> outputFiles;
 
-            std::vector<std::shared_ptr<Object>> objects;
+            std::vector<std::shared_ptr<ObjectCfg>> objects;
 
             redux::util::Array<double> pupil;
             redux::util::Array<float> imageStack;
 
             std::map<size_t,PatchData::Ptr> patches;
         
-            friend class Object;
-            friend class Channel;
+            friend class ObjectCfg;
+            friend class ChannelCfg;
+
 
         };
 

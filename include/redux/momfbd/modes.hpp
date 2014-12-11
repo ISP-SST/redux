@@ -11,30 +11,33 @@ namespace redux {
 
     namespace momfbd {
 
-        class Modes {
+/*        class Modes {
 
         public:
             
-            enum Base { MB_NONE=0, MB_ZERNIKE, MB_KARHUNEN_LOEVE, MB_END };
-
-            struct KL_cfg {
-                // zernike mode numbers and corresponding weights
-                std::vector< std::pair<int, double> > zernikeWeights; 
-                double covariance;
-            };
 
 
-            class PupilMode : public redux::util::Array<double> {
+*/
+            struct PupilMode : public redux::util::Array<double> {
 
-            public:
                 typedef std::shared_ptr<PupilMode> Ptr;
+                
+                enum Basis { MB_NONE=0, MB_ZERNIKE, MB_KARHUNEN_LOEVE };
+
+                struct KL_cfg {
+                    // zernike mode numbers and corresponding weights
+                    std::vector< std::pair<int, double> > zernikeWeights; 
+                    double covariance;
+                };
+
+                PupilMode() {};
                 PupilMode ( int modeNumber, int nPoints, double r_c = 1.0, double lambda = 1.0, double angle = 0.0 ); // Zernike
                 PupilMode ( int firstMode, int lastMode, int klModeNumber, int nPoints, double r_c = 1.0, double lambda = 1.0, double angle = 0.0, double cutoff=0.0 ); // KL
 
-                Base base;
+                Basis base;
             };
 
-
+/*
             Modes();
             Modes ( KL_cfg*, double, double, int, int, int, int*, int, int*, int**, int**, int, int, double, double, double** );
             virtual ~Modes ( void );
@@ -50,7 +53,7 @@ namespace redux {
             double **covar;
             int32_t nph, zmin, zmax, kmin, kmax, first_mode, last_mode;
         };
-
+*/
     }
 
 }

@@ -1,5 +1,5 @@
-#ifndef REDUX_MOMFBD_CHANNEL_HPP
-#define REDUX_MOMFBD_CHANNEL_HPP
+#ifndef REDUX_MOMFBD_CHANNELCFG_HPP
+#define REDUX_MOMFBD_CHANNELCFG_HPP
 
 #include "redux/momfbd/patch.hpp"
 
@@ -24,17 +24,18 @@ namespace redux {
          *  @{
          */
         
-        class Object;
         class MomfbdJob;
+        class ObjectCfg;
+        class WorkSpace;
         /*! @brief Class containing the channel-specific configuration for a MomfbdJob/Object
          * 
          */
-        class Channel {
+        class ChannelCfg {
 
         public:
 
-            Channel( const Object&, const MomfbdJob& );
-            ~Channel();
+            ChannelCfg( const ObjectCfg&, const MomfbdJob& );
+            ~ChannelCfg();
 
             void parseProperties( bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
@@ -42,16 +43,27 @@ namespace redux {
             size_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
-            double getMaxMean(void);
-            size_t nImages(void) { return images.dimSize(0); }
-            size_t collectImages(redux::util::Array<float>&, size_t);
+            double getMaxMean(void) const;
+            void collectImages(redux::util::Array<float>&) const;
             
             void initWorkSpace( WorkSpace& ws );
 
+            std::vector<uint32_t> imageNumbers;
+            std::vector<uint32_t> wf_num;
+            std::vector<double> stokesWeights;
+            std::vector<double> diversity;
+            std::vector<uint32_t> diversityOrders;
+            std::vector<uint32_t> diversityTypes;
+
+            uint8_t fillpix_method, mmRow, mmWidth, incomplete;
+            uint32_t flags, image_num_offs, sequenceNumber, imageOffset;
+            double noiseFudge;
+            
         private:
             
             bool checkCfg(void);
             bool checkData(void);
+            size_t nImages(size_t offset=0) { imageOffset=offset; return images.dimSize(0); } 
 
             void loadData(boost::asio::io_service&, boost::thread_group&);
             void preprocessData(boost::asio::io_service&, boost::thread_group&);
@@ -66,35 +78,23 @@ namespace redux {
             
             Point clipImages(void);
 
-            std::vector<uint32_t> imageNumbers, darkNumbers;
+            std::vector<uint32_t> darkNumbers;
             std::vector<int16_t> alignClip;     // {firstX,lastX,firstY,lastY}
-            std::vector<uint32_t> wf_num;
             std::string imageDataDir, imageTemplate, darkTemplate, gainFile;
             std::string responseFile, backgainFile, psfFile, mmFile;
             std::string offxFile, offyFile;
-            std::vector<redux::image::Statistics<float>::Ptr> imageStats;
-            std::vector<double> stokesWeights;
-            std::vector<double> diversity;
-            std::vector<uint32_t> diversityOrders;
-            std::vector<uint32_t> diversityTypes;
-
-            uint32_t flags;
-            uint8_t mmRow, mmWidth;
-            uint8_t fillpix_method;
-            uint32_t image_num_offs, sequenceNumber;
-            double nf;
-            uint8_t incomplete;
-            size_t imageOffset;         // where the images are located in the imagestack
+            std::vector<redux::image::Statistics::Ptr> imageStats;
 
             redux::image::Image<float> images, dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
             
-            const Object& myObject;
+            const ObjectCfg& myObject;
             const MomfbdJob& myJob;
 
-            friend class Object;
+            friend class ObjectCfg;
+            
         };
 
         /*! @} */
@@ -103,4 +103,4 @@ namespace redux {
 
 }   // redux
 
-#endif  // REDUX_MOMFBD_CHANNEL_HPP
+#endif  // REDUX_MOMFBD_CHANNELCFG_HPP

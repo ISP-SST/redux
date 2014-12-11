@@ -24,13 +24,14 @@ namespace redux {
             std::shared_ptr<float*> angle;
             Grid( uint32_t nPoints );
             Grid( uint32_t nPoints, float originY, float originX );
+            Grid( uint32_t nPoints, PointF origin ) : Grid(nPoints,origin.y,origin.x) {};
             Grid( uint32_t nPointsY, uint32_t nPointsX, float originY, float originX );
             void init(void);
-            bool operator<( const Grid& rhs ) const { if(size == rhs.size ) return (origin < rhs.origin); return ( size < rhs.size ); }
+            bool operator<( const Grid& rhs ) const { if( size == rhs.size ) return (origin < rhs.origin); return ( size < rhs.size ); }
         };
         
-        float makePupil( util::Array<float>& aperture, uint32_t nPoints, float radius, bool normalize=false);
-        float makePupil_mvn( float** data, uint32_t nPoints, float radius );
+        double makePupil( util::Array<double>& aperture, uint32_t nPoints, float radius, bool normalize=false);
+        double makePupil_mvn( double** data, uint32_t nPoints, float radius );
 
         template <typename T>
         void reverseX( T** data, size_t sizeY, size_t sizeX ) {
@@ -188,7 +189,7 @@ namespace redux {
         }
 
         template <typename T>
-        void apodize( redux::util::Array<T>& array, size_t blendRegion );
+        Array<T> apodize( const redux::util::Array<T>& array, size_t blendRegion );
         
         template <typename T>
         void checkIfMultiFrames( redux::image::Image<T>& img );

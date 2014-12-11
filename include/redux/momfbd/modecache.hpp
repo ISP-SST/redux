@@ -17,7 +17,7 @@ namespace redux {
             
         public:
             
-            typedef std::shared_ptr<Modes::PupilMode> ModePtr;
+            typedef std::shared_ptr<PupilMode> ModePtr;
             
             struct index {
                 index ( int modeNumber, int nPoints, double r_c, double wavelength, double angle );
@@ -33,10 +33,12 @@ namespace redux {
              */
             void clear( void );
 
-            const redux::image::Grid& grid( int sz );
+            const redux::image::Grid& grid( uint32_t sz, PointF=0 );
+            const std::pair<Array<double>, double>& pupil( uint32_t nPoints, float radius );
             double zernikeCovariance( int m, int n );
             const std::vector<double>& zernikeRadialPolynomial( int m, int n );
-            const std::map<int, Modes::KL_cfg>& karhunenLoeveExpansion( int first_mode, int last_mode );
+            const std::map<int, PupilMode::KL_cfg>& karhunenLoeveExpansion( int first_mode, int last_mode );
+            const ModePtr& addMode ( int modeNumber, int nPoints, double r_c, double wavelength, double angle, ModePtr& m);
             const ModePtr& mode ( int modeNumber, int nPoints, double r_c, double wavelength, double angle );
             const ModePtr& mode ( int firstMode, int lastMode, int modeNumber, int nPoints, double r_c, double wavelength, double angle );
             
@@ -49,8 +51,9 @@ namespace redux {
             std::vector<double> factorials;
             std::map<std::pair<int, int>, const double> zernikeCovariances;
             std::map<std::pair<int, int>, const std::vector<double> > zernikeRadialPolynomials;
-            std::map<std::pair<int, int>, const std::map<int, Modes::KL_cfg> > karhunenLoeveExpansions;
-            std::map<int, const redux::image::Grid> grids;
+            std::map<std::pair<int, int>, const std::map<int, PupilMode::KL_cfg> > karhunenLoeveExpansions;
+            std::map<std::pair<uint32_t, PointF>, const redux::image::Grid> grids;
+            std::map<std::pair<uint32_t, float>, const std::pair<Array<double>, double>> pupils;
             std::map<index, const ModePtr> modes;
 
         };

@@ -1,6 +1,10 @@
 #include "redux/momfbd/patch.hpp"
 
+#include "redux/momfbd/momfbdjob.hpp"
+
 #include "redux/util/datautil.hpp"
+
+#include "redux/momfbd/defines.hpp"
 
 using namespace redux::momfbd;
 using namespace redux::util;
@@ -48,7 +52,7 @@ size_t PatchData::nPixelsY(void) {
 
 size_t PatchData::size( void ) const {
     size_t sz = Part::size();
-    sz += 3*Point::size() + residualOffsets.size()*PointF::size() + sizeof(uint64_t);
+    sz += 3*Point::size() + PointF::size();
     sz += images.size();
     return sz;
 }
@@ -62,7 +66,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += index.pack( ptr+count );
     count += first.pack( ptr+count );
     count += last.pack( ptr+count );
-    count += pack(ptr+count,residualOffsets );
+    count += residualOffset.pack(ptr+count );
     count += images.pack(ptr);
     return count;
 }
@@ -75,7 +79,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += index.unpack( ptr+count, swap_endian );
     count += first.unpack( ptr+count, swap_endian );
     count += last.unpack( ptr+count, swap_endian );
-    count += unpack(ptr+count,residualOffsets, swap_endian );
+    count += residualOffset.unpack( ptr+count, swap_endian );
     count += images.unpack(ptr+count, swap_endian);
     return count;
 
@@ -108,14 +112,6 @@ uint64_t PatchResult::unpack( const char* ptr, bool swap_endian ) {
     count += modeCoefficients.unpack( ptr+count, swap_endian );
     count += PSFs.unpack( ptr+count, swap_endian );
     return count;
-}
-
-WorkSpace::objectSpecific::objectSpecific() {
-}
-
-
-WorkSpace::WorkSpace(PatchData::Ptr d) : data(d) {
-    imgFTs.resize(d->images.dimSize(0),d->nPixelsY(),d->nPixelsX());
 }
 
 
