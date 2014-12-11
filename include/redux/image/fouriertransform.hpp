@@ -43,6 +43,9 @@ namespace redux {
             FourierTransform( const redux::util::Array<T>&, int flags=0);
             
             template <typename T>
+            void reset( const redux::util::Array<T>&, int flags=0);
+            
+            template <typename T>
             void inv( redux::util::Array<T>& );
             
             template <typename T>
@@ -50,6 +53,7 @@ namespace redux {
             
             void autocorrelate( void );
             redux::util::Array<double> power( void ) const;
+            double noise(int mask=0, double cutoff=0) const;
             
             void convolveInPlace( redux::util::Array<double>& in, int flags=0 ) const;
             void convolveInPlace( redux::util::Array<complex_t>& in, int flags=0 ) const;
@@ -61,7 +65,8 @@ namespace redux {
             //template <typename T> redux::util::Array<T> convolve( const redux::util::Array<T>&, int flags=0 ) const;
             
             static void normalize( FourierTransform& );
-            void normalize() { normalize(*this); };
+            void normalize(void) { normalize(*this); };
+            double nInputElements(void) const { return nInputElements_; };
 
             template <typename T>
             static void reorder( redux::util::Array<T>& );
@@ -78,7 +83,7 @@ namespace redux {
             bool halfComplex;
             bool normalized;
             bool reOrdered;
-            double nInputElements;
+            double nInputElements_;                  // stored as double because it is commonly used for normalization purposes.
             
         };
        
