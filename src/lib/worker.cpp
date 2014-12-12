@@ -35,16 +35,27 @@ void Worker::init( void ) {
 
     peer.reset( new Host() );
     connection = TcpConnection::newPtr( daemon.ioService );
-    connect();
+    if( daemon.port < 1024 ) {
+        LOG_DEBUG << "Running local worker only.";
+    } else {
+        connect();
+    }
     runTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 1 ) );
     runTimer.async_wait(strand.wrap(boost::bind(&Worker::run, this)));
 
 }
 
 void Worker::connect( void ) {
+    
+    if( daemon.port < 1024 ) {
+        return;
+    }
+    
+    LOG_DEBUG << "Attempting to connect to master at " << daemon.master << ":" << daemon.port;
 
     connection->connect( daemon.params["master"].as<string>(), to_string( daemon.params["port"].as<uint16_t>() ) );
     if( connection->socket().is_open() ) {
+
         Command cmd;
 
         daemon.myInfo->info.peerType |= Host::TP_WORKER;
@@ -62,7 +73,7 @@ void Worker::connect( void ) {
             LOG_ERR << "Handshake with master failed  (server replied: " << cmd << ")";
             connection->socket().close();
             daemon.myInfo->info.peerType &= ~Host::TP_WORKER;
-        }
+        } else LOG_DEBUG << "Connected.";
 
     }
 
@@ -86,6 +97,9 @@ void Worker::updateStatus( void ) {
     }
 
     if( connection->socket().is_open() ) {
+#ifdef DEBUG_
+        LOG_TRACE << "Sending statusupdate to server";
+#endif
         size_t blockSize = daemon.myInfo->status.size();
         size_t totSize = blockSize + sizeof( size_t ) + 1;
         auto buf = sharedArray<char>(totSize);
@@ -99,13 +113,15 @@ void Worker::updateStatus( void ) {
         connection->writeAndCheck( buf, totSize );
     }
     else {
-        LOG_WARN << "No connection to master.";
+        if( daemon.port > 1024 ) {
+            LOG_WARN << "No connection to master:  " << daemon.master << ":" << daemon.port;
+        }
     }
 
 }
 
 bool Worker::fetchWork( void ) {
-    //LOG_DEBUG << "fetchWork() ";
+
     try {
 
         if( !connection->socket().is_open() ) {
@@ -113,14 +129,18 @@ bool Worker::fetchWork( void ) {
         }
 
         if( !connection->socket().is_open() ) {
-            LOG_DEBUG << "fetchWork()  no socket, returning.";
+#ifdef DEBUG_
+            LOG_TRACE << "fetchWork()  no socket, can't fetch.";
+#endif
             return false;
         }
 
+        LOG_DEBUG << "Requesting remote work.";
         *connection << CMD_GET_WORK;
 
         size_t blockSize;
         auto buf = connection->receiveBlock( blockSize );               // reply
+        LOG_TRACE << "Received " << blockSize << " bytes.";
 
         if( !blockSize ) return false;
 
@@ -163,17 +183,21 @@ bool Worker::getWork( void ) {
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( !lastJob || (wip.job && *(wip.job) != *lastJob) ) {
-            //LOG_DETAIL << "Different job !!!   " + wip.print();
+            LOG_DEBUG << "Initializing new job: " + wip.print();
             wip.job->init();
             if( lastJob ) {
                 lastJob->cleanup();
             }
-        } //else LOG_DETAIL << "Same job !!!   " + wip.print();
-        //LOG_DETAIL << "Got work: " + wip.print();
+        } else LOG_DEBUG << "Starting new part of the same job: " + wip.print();
         return true;
     }
-    //else LOG_TRACE << "No work";
+    
+#ifdef DEBUG_
+    LOG_TRACE << "No work available.";
+#endif
 
+    wip.connection.reset();
+    wip.parts.clear();
     return false;
 
 }
@@ -233,7 +257,7 @@ void Worker::run( void ) {
         sleepS = 1;
         while( wip.job && wip.job->run( wip, ioService, threadPool, daemon.myInfo->status.nThreads ) ) ;
     }
-    
+
     runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(sleepS));
     runTimer.async_wait( strand.wrap(boost::bind( &Worker::run, this )) );
     

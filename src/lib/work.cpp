@@ -65,12 +65,13 @@ size_t WorkInProgress::size( bool includeJob ) const {
 
 uint64_t WorkInProgress::pack( char* ptr, bool includeJob ) const {
 
+    using redux::util::pack;
+    
     uint64_t count(0);
     if( includeJob ) {
-        count += redux::util::pack( ptr, uint8_t(1) );
+        count += pack( ptr, uint8_t(1) );
         count += job->pack( ptr+count );
-    } else count += redux::util::pack( ptr, uint8_t(0) );
-
+    } else count += pack( ptr, uint8_t(0) );
     count += pack( ptr+count, parts.size() );
     for( auto & it : parts ) {
         if( it ) {
@@ -80,13 +81,16 @@ uint64_t WorkInProgress::pack( char* ptr, bool includeJob ) const {
     count += pack( ptr+count, nCompleted );
     
     return count;
+    
 }
 
 
 uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
 
+    using redux::util::unpack;
+    
     uint8_t hasJob;
-    uint64_t count = redux::util::unpack( ptr, hasJob );
+    uint64_t count = unpack( ptr, hasJob );
     if( hasJob ) {
         string tmpS = string( ptr+count );
         job = Job::newJob( tmpS );
@@ -100,9 +104,10 @@ uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
     }
     else throw invalid_argument( "Can't unpack parts without a job instance..." );
     
-    count += redux::util::unpack( ptr+count, nCompleted, swap_endian );
+    count += unpack( ptr+count, nCompleted, swap_endian );
     
     return count;
+    
 }
 
 

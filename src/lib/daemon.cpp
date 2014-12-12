@@ -35,12 +35,15 @@ namespace {
 }
 
 
-Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master( "" ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ), timer( ioService ), worker( *this ) {
+Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
     if( params["master"].as<string>() == "" ) {
         server.reset( new TcpServer( ioService, params["port"].as<uint16_t>() ) );
+    } else {    // we are connecting to a remote host
+        master = params["master"].as<string>();
+        port = params["port"].as<uint16_t>();
     }
 
 
@@ -54,12 +57,12 @@ Daemon::~Daemon( void ) {
 
 void Daemon::serverInit( void ) {
 
-    LOG << "serverInit()";
+    LOG_TRACE << "serverInit()";
     if( server ) {
         server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
         server->accept();
         myInfo->info.peerType |= Host::TP_MASTER;
-        LOG_DEBUG << "Starting server on port " << params["port"].as<uint16_t>() << ".";
+        LOG_DETAIL << "Starting server on port " << params["port"].as<uint16_t>() << ".";
     }
 }
 
@@ -314,15 +317,17 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
             int cnt = 0;
             unique_lock<mutex> lock( jobMutex );
+            vector<size_t> ids; 
             for( auto & it : jobList ) {
                 for( auto it2 = jobs.begin(); it2 < jobs.end(); ++it2 ) {
                     if( ( *it2 )->info.id == it ) {
+                        ids.push_back(it);
                         jobs.erase( it2 );
                         cnt++;
                     }
                 }
             }
-            if( cnt ) LOG << "Removed jobs: " << cnt << " jobs by id.";
+            if( cnt ) LOG << "Removed " << printArray(ids,"jobs");
             return;
         }
         catch( ... ) {}      // catch and ignore bad_lexical_cast
@@ -332,15 +337,17 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             boost::split( jobList, jobString, boost::is_any_of( "," ) );
             int cnt = 0;
             unique_lock<mutex> lock( jobMutex );
+            vector<string> deletedList;
             for( auto & it : jobList ) {
                 for( auto it2 = jobs.begin(); it2 < jobs.end(); ++it2 ) {
                     if( ( *it2 )->info.name == it ) {
+                        deletedList.push_back(it);
                         jobs.erase( it2 );
                         cnt++;
                     }
                 }
             }
-            if( cnt ) LOG << "Removed " << cnt << " jobs by name";
+            if( cnt ) LOG << "Removed " << printArray(deletedList,"jobs");
             return;
         }
         catch( ... ) {}      // catch and ignore bad_lexical_cast
@@ -363,10 +370,6 @@ Job::JobPtr Daemon::selectJob( bool localRequest ) {
 
 bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
-#ifdef DEBUG_
-    LOG_TRACE << "Daemon::getWork("<<(int)nThreads<<")";
-#endif
-
 /*    if( wip.job ) {        // job already checked out. lost ??      TODO: deal with it...
         wip.job.reset();
     }
@@ -375,6 +378,7 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     Job::JobPtr job;
     bool ret = false;
     if( wip.connection ) {                // remote worker
+        LOG_TRACE << "getWork("<<(int)nThreads<<"): Remote job-request";
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
             if( step == Job::JSTEP_QUEUED ) {
@@ -416,6 +420,7 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         }
     }
     if( job ) {
+        LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << job->info.id;
         job->info.state.store( Job::JSTATE_ACTIVE );
         wip.job = job;
     }
@@ -432,8 +437,11 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     Job::JobPtr lastJob = wip.job;
     size_t blockSize = 0;
     bool includeJob = false;
-    if( getWork( wip, host->status.nThreads ) && (!lastJob || *wip.job != *lastJob)) {
-        includeJob = true;
+    if( getWork( wip, host->status.nThreads ) ) {
+        if(!lastJob || *wip.job != *lastJob) {
+            includeJob = true;
+        }
+        LOG_DEBUG << (includeJob?"(new job) ":"") << " to host: " << host->print();
         blockSize = wip.size( includeJob );
     }
 
