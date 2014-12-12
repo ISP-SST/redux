@@ -332,7 +332,7 @@ void ParPortWidget::createActions ( void ) {
 void ParPortWidget::readSettings() {
 
 #ifdef DEBUG_
-    print ( "ParportWidget: Loading saved settings" );
+    cout << "ParportWidget: Loading saved settings" << endl;
 #endif
 
     QSettings settings;
@@ -348,7 +348,7 @@ void ParPortWidget::readSettings() {
 void ParPortWidget::writeSettings() {
 
 #ifdef DEBUG_
-    print ( "ParportWidget: Saving settings" );
+    cout << "ParPortWidget: Saving settings" << endl;
 #endif
 
     QSettings settings;
