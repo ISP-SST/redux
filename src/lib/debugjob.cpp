@@ -135,6 +135,10 @@ uint64_t DebugJob::pack( char* ptr ) const {
     count += pack( ptr+count, ySize );
     count += pack( ptr+count, coordinates, 4 );
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::pack():  count=" << count << " sz=" << size();
+#endif
+    
     return count;
 
 }
@@ -152,13 +156,17 @@ uint64_t DebugJob::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, ySize, swap_endian );
     count += unpack( ptr+count, coordinates, 4, swap_endian );
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::unpack():  swap_endian=" << swap_endian << "  count=" << count << " sz=" << size();
+#endif
+
     return count;
 
 }
 
 
 void DebugJob::checkParts( void ) {
-
+    
     uint8_t mask = 0;
     for( auto & it : jobParts ) {
         /*if( it.second->step & JSTEP_ERR && (it.second->nRetries<info.maxPartRetries)) {    // TODO: handle failed parts.
@@ -168,6 +176,10 @@ void DebugJob::checkParts( void ) {
         mask |= it.second->step;
     }
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::checkParts():   nParts=" << jobParts.size() << "   state=" << bitString(mask);
+#endif
+    
     if( mask & JSTEP_ERR ) {    // TODO: handle failed parts.
 
     }
@@ -267,6 +279,10 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost
 
 void DebugJob::preProcess( void ) {
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::preProcess()";
+#endif
+
     if( xSize < 2 || ySize < 2 ) return;
 
     double stepX = ( coordinates[1] - coordinates[0] ) / ( xSize - 1 );
@@ -308,6 +324,10 @@ void DebugJob::preProcess( void ) {
 
 void DebugJob::runMain( Part::Ptr& part ) {
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::runMain()";
+#endif
+    
     auto pptr = static_pointer_cast<DebugPart>( part );
 
     // temporaries, to avoid cache collisions.
@@ -359,6 +379,10 @@ void DebugJob::runMain( Part::Ptr& part ) {
 
 void DebugJob::postProcess( void ) {
 
+#ifdef DEBUG_
+    LOG_TRACE << "DebugJob::postProcess()";
+#endif
+    
     auto image = sharedArray<int16_t>( ySize, xSize );
     int16_t** img = image.get();
 

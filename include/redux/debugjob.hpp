@@ -45,6 +45,9 @@ namespace redux {
         uint64_t pack(char*) const;
         uint64_t unpack(const char*, bool);
         
+        bool checkCfg(void) { return true; };
+        bool checkData(void) { return true; };
+        
         size_t getParts(WorkInProgress&, uint8_t);
         void ungetParts(WorkInProgress&);
         void returnParts(WorkInProgress&);
