@@ -42,14 +42,7 @@ size_t Job::registerJob( const string& name, JobCreator f ) {
     std::unique_lock<mutex> lock( globalJobMutex );
     auto ret = getMap().insert( { boost::to_upper_copy( name ), {nJobTypes + 1, f}} );
     if( ret.second ) {
-#ifdef DEBUG__
-        LOG_DEBUG << "Job with tag \"" << name << "\" successfully registered.";
-#endif
         return ret.first->second.first;
-    } else {
-#ifdef DEBUG__
-        LOG_WARN << "Failed to register job with tag \"" << name << "\".";
-#endif
     }
     return nJobTypes++;
 }
