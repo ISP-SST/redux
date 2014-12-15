@@ -81,7 +81,7 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-    //LOG_TRACE << "Maintenance";
+    LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size() << "  nPeers = " << peers.size() << " nPeerWIP = " << peerWIP.size();
 
     updateLoadAvg();
     cleanup();

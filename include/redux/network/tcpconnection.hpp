@@ -104,10 +104,8 @@ namespace redux {
             TcpConnection& operator>>( Command& );
 
        private:
-            TcpConnection( boost::asio::io_service& io_service )
-                : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand( myService ) {
-
-            }
+            TcpConnection( boost::asio::io_service& io_service );
+            TcpConnection( const TcpConnection& ) = delete;
 
             callback activityCallback;
             tcp::socket mySocket;

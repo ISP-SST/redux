@@ -36,6 +36,7 @@ namespace redux {
         static size_t jobType;
 
         DebugJob(void);
+        DebugJob( const DebugJob& ) = delete;
         ~DebugJob(void);
 
         void parseProperties( po::variables_map& vm, bpt::ptree& tree );

@@ -98,6 +98,7 @@ namespace redux {
         virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
 
         Job(void);
+        Job(const Job&) = delete;
         virtual ~Job(void);
 
         virtual size_t size(void) const;

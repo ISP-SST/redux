@@ -1,13 +1,42 @@
 #include "redux/work.hpp"
 
 #include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 #include "redux/job.hpp"
+#include "redux/logger.hpp"
 
+using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-Part::Part() : id( 0 ), step( Job::JSTEP_QUEUED ), nRetries( 0 ) {
+#ifdef DEBUG_
+#define DBG_PART_
+#define DBG_WIP_
+#define lg Logger::mlg
+#endif
 
+namespace {
+
+    const string thisChannel = "work";
+    
+#ifdef DBG_PART_
+    static atomic<int> partCounter(0);
+#endif
+#ifdef DBG_WIP_
+    static atomic<int> wipCounter(0);
+#endif
+    
+}
+Part::Part() : id( 0 ), step( Job::JSTEP_QUEUED ), nRetries( 0 ) {
+#ifdef DBG_PART_
+    LOG_DEBUG << "Constructing Part: (" << hexString(this) << ") new instance count = " << (partCounter.fetch_add(1)+1);
+#endif
+}
+
+Part::~Part() {
+#ifdef DBG_PART_
+    LOG_DEBUG << "Destructing Part: (" << hexString(this) << ") new instance count = " << (partCounter.fetch_sub(1)-1);
+#endif
 }
 
 size_t Part::size( void ) const {
@@ -41,7 +70,21 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 
 
 WorkInProgress::WorkInProgress( network::TcpConnection::Ptr c ) : connection( c ), nCompleted(0) {
+#ifdef DBG_WIP_
+    LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
+#endif
+}
 
+WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), parts(rhs.parts), connection(rhs.connection), nCompleted(rhs.nCompleted) {
+#ifdef DBG_WIP_
+    LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
+#endif
+}
+
+WorkInProgress::~WorkInProgress() {
+#ifdef DBG_WIP_
+    LOG_DEBUG << "Destructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_sub(1)-1);
+#endif
 }
 
 

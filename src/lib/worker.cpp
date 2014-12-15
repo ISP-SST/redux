@@ -253,6 +253,7 @@ void Worker::run( void ) {
 
     static int sleepS(1);
 
+    LOG_TRACE << "run:   nWipParts = " << wip.parts.size() << "  conn = " << hexString(wip.connection.get()) << "  job = " << hexString(wip.job.get());
     while( getWork() ) {
         sleepS = 1;
         while( wip.job && wip.job->run( wip, ioService, threadPool, daemon.myInfo->status.nThreads ) ) ;

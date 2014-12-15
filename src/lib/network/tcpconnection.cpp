@@ -2,20 +2,43 @@
 
 #include "redux/logger.hpp"
 #include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 namespace ba = boost::asio;
 
+using namespace redux::util;
 using namespace redux::network;
 using namespace std;
+
+
+#ifdef DEBUG_
+#define DBG_NET_
+#endif
 
 #define lg Logger::mlg
 namespace {
     const std::string thisChannel = "net";
 
+#ifdef DBG_NET_
+    static atomic<int> connCounter(0);
+#endif
+
 }
 
+
+TcpConnection::TcpConnection( boost::asio::io_service& io_service )
+    : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand( myService ) {
+#ifdef DBG_NET_
+    LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
+#endif
+}
+
+            
 TcpConnection::~TcpConnection( void ) {
     mySocket.close();
+#ifdef DBG_NET_
+    LOG_DEBUG << "Destructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_sub(1)-1);
+#endif
 }
 
 

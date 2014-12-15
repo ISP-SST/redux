@@ -15,7 +15,7 @@ namespace {
 TcpServer::TcpServer( boost::asio::io_service& io_service, uint16_t port )
     : acceptor( io_service, tcp::endpoint( tcp::v4(), port ) ), onConnected(nullptr) {
     acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-    LOG_TRACE << "Binding to port: " << port;
+    LOG_DEBUG << "Binding to port: " << port;
 }
 
 void TcpServer::accept(void) {

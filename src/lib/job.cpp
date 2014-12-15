@@ -16,6 +16,10 @@ using namespace redux;
 using namespace std;
 
 
+#ifdef DEBUG_
+#define DBG_JOB_
+#endif
+
 #define lg Logger::lg
 namespace {
 
@@ -25,6 +29,10 @@ namespace {
     const std::string StateTags[10] = { "-", "Pre", "Q", "D", "C", "Post", "I", "A", "P", "E" };
 
     mutex globalJobMutex;
+    
+#ifdef DBG_JOB_
+    static atomic<int> jobCounter(0);
+#endif
 
 }
 
@@ -34,9 +42,15 @@ size_t Job::registerJob( const string& name, JobCreator f ) {
     std::unique_lock<mutex> lock( globalJobMutex );
     auto ret = getMap().insert( { boost::to_upper_copy( name ), {nJobTypes + 1, f}} );
     if( ret.second ) {
-        //LOG_DEBUG << "Job with tag \"" << name << "\" successfully registered.";
+#ifdef DEBUG__
+        LOG_DEBUG << "Job with tag \"" << name << "\" successfully registered.";
+#endif
         return ret.first->second.first;
-    } //else LOG_WARN << "Failed to register job with tag \"" << name << "\".";
+    } else {
+#ifdef DEBUG__
+        LOG_WARN << "Failed to register job with tag \"" << name << "\".";
+#endif
+    }
     return nJobTypes++;
 }
 
@@ -53,8 +67,11 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
             if( tmpJob->checkCfg() ) {
                 tmp.push_back( shared_ptr<Job>( tmpJob ) );
             } else LOG_WARN << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
+        } else {
+#ifdef DEBUG_
+            LOG_WARN << "No job-class with tag \"" << name << "\" registered.";
+#endif
         }
-        //else LOG_WARN << "No job with tag \"" << name << "\" registered.";
     }
     return tmp;
 }
@@ -66,9 +83,11 @@ Job::JobPtr Job::newJob( const string& name ) {
     auto it = getMap().find( boost::to_upper_copy( name ) );
     if( it != getMap().end() ) {
         tmp.reset( it->second.second() );
+    } else {
+#ifdef DEBUG__
+        LOG_WARN << "No job with tag \"" << name << "\" registered.";
+#endif
     }
-    else LOG_WARN << "No job with tag \"" << name << "\" registered.";
-
     return tmp;
 }
 
@@ -225,11 +244,16 @@ bpt::ptree Job::getPropertyTree( bpt::ptree* root ) {
 Job::Job( void ) {
     info.user = getUname();
     info.host = boost::asio::ip::host_name();
+#ifdef DBG_JOB_
+    LOG_DEBUG << "Constructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_add(1)+1);
+#endif
 }
 
 
 Job::~Job( void ) {
-
+#ifdef DBG_JOB_
+    LOG_DEBUG << "Destructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1);
+#endif
 }
 
 
