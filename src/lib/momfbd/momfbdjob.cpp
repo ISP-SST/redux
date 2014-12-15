@@ -607,7 +607,7 @@ void MomfbdJob::cleanup(void) {
 }
 
 
-bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool, uint8_t maxThreads ) {
+bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8_t maxThreads ) {
     
     uint8_t step = info.step.load();
     if( step < JSTEP_SUBMIT ) {
@@ -615,11 +615,11 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
         return true;                            // run again
     }
     else if( step == JSTEP_RECEIVED ) {
-        preProcess(service, pool);                           // preprocess on master: load, flatfield, split in patches
+        preProcess(service);                           // preprocess on master: load, flatfield, split in patches
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
         size_t nThreads = std::min( maxThreads, info.maxThreads);
-
+        boost::thread_group pool;
         for( auto & it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
 
             //LOG_DETAIL << "Configuring slave";
@@ -647,7 +647,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
         }
     }
     else if( step == JSTEP_POSTPROCESS ) {
-        postProcess(service, pool);                          // postprocess on master, collect results, save...
+        postProcess(service);                          // postprocess on master, collect results, save...
     }
     else {
         LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load();
@@ -657,7 +657,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, boos
     
 }
 
-void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_group& pool ) {
+void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
     // TODO: start logging (to file)
 
@@ -676,17 +676,19 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), 0 ) );
     }
     for( auto & it : objects ) {
-        it->loadData(service, pool);
+        it->loadData(service);
     }
 
     info.maxThreads = 12;
-    // load remaining files asynchronously  (images)
-    for( size_t t = 0; t < info.maxThreads; ++t ) {
-        LOG_TRACE << "Adding load-thread #" << (t+1);
-        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    {
+        boost::thread_group pool;
+        // load remaining files asynchronously  (images)
+        for( size_t t = 0; t < info.maxThreads; ++t ) {
+            LOG_TRACE << "Adding load-thread #" << (t+1);
+            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+        }
+        pool.join_all();
     }
-    pool.join_all();
-
     // Done loading files -> start the preprocessing (flatfielding etc.)
     
     service.reset();
@@ -698,27 +700,32 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
         } else if( tmp != imageSizes ) {
             throw std::logic_error("The clipped images have different sizes for the different objects, please verify the ALIGN_CLIP values.");
         }
-        it->preprocessData(service, pool);
+        it->preprocessData(service);
     }
 
-    for( size_t t = 0; t < info.maxThreads; ++t ) {
-        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    {
+        boost::thread_group pool;
+        for( size_t t = 0; t < info.maxThreads; ++t ) {
+            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+        }
+        pool.join_all();
     }
-    pool.join_all();
-
     // Done pre-processing -> normalize within each object
     
     service.reset();
     size_t nTotalImages(0);
     for( auto & it : objects ) {
-        it->normalize(service, pool);
+        it->normalize(service);
         nTotalImages += it->nImages(nTotalImages);
     }
 
-    for( size_t t = 0; t < info.maxThreads; ++t ) {
-        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    {
+        boost::thread_group pool;
+        for( size_t t = 0; t < info.maxThreads; ++t ) {
+            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+        }
+        pool.join_all();
     }
-    pool.join_all();
 
     // Done normalizing -> collect images to master-stack
     imageStack.resize(nTotalImages,imageSizes.y,imageSizes.x);
@@ -778,11 +785,13 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
     for( uint i=0; i<objects.size(); ++i ) {
         service.post( std::bind( &ObjectCfg::prepareStorage, objects[i].get() ) );
     }
-    for( size_t t = 0; t < 1/*objects.size()*/; ++t ) {
-        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    {
+        boost::thread_group pool;
+        for( size_t t = 0; t < 1/*objects.size()*/; ++t ) {
+            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+        }
+        pool.join_all();
     }
-    pool.join_all();
-    
     size_t count = 0;
     uint32_t yid=0;
     service.reset();
@@ -810,10 +819,13 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, boost::thread_grou
 
     LOG_DETAIL << "MomfbdJob::preProcess()  nPatches = " << patches.size();
 
-    for( size_t t = 0; t < 1/*info.maxThreads*/; ++t ) {
-        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+    {
+        boost::thread_group pool;
+        for( size_t t = 0; t < 1/*info.maxThreads*/; ++t ) {
+            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+        }
+        pool.join_all();
     }
-    pool.join_all();
 
     info.step.store( JSTEP_QUEUED );
 
@@ -898,7 +910,7 @@ usleep(10000);
 
 
 
-void MomfbdJob::postProcess( boost::asio::io_service& service, boost::thread_group& pool ) {
+void MomfbdJob::postProcess( boost::asio::io_service& service ) {
 
     LOG << "MomfbdJob::postProcess()";
     

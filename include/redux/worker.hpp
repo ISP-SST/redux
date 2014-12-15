@@ -44,10 +44,9 @@ namespace redux {
         void run(void);
         
         boost::asio::io_service ioService;
-        boost::thread_group threadPool;
+
         boost::asio::strand strand;
         boost::asio::deadline_timer runTimer;
-
         
         WorkInProgress wip;
 

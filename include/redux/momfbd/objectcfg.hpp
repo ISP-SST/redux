@@ -77,9 +77,9 @@ namespace redux {
 
             void init(void);
             void cleanup(void);
-            void loadData(boost::asio::io_service&, boost::thread_group&);
-            void preprocessData(boost::asio::io_service&, boost::thread_group&);
-            void normalize(boost::asio::io_service&, boost::thread_group&);
+            void loadData(boost::asio::io_service&);
+            void preprocessData(boost::asio::io_service&);
+            void normalize(boost::asio::io_service&);
             void prepareStorage(void);
             
             size_t sizeOfPatch(uint32_t) const;

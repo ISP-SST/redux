@@ -49,7 +49,7 @@ namespace redux {
 
             void init(void);
             void cleanup(void);
-            bool run( WorkInProgress&, boost::asio::io_service&, boost::thread_group&, uint8_t );
+            bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
             
             bool checkCfg(void);
             bool checkData(void);
@@ -74,10 +74,10 @@ namespace redux {
         private:
 
             void checkParts( void );
-            void preProcess( boost::asio::io_service&, boost::thread_group& );
+            void preProcess( boost::asio::io_service& );
             void applyLocalOffsets( PatchData::Ptr );
             void runMain( WorkSpace& );
-            void postProcess( boost::asio::io_service&, boost::thread_group& );
+            void postProcess( boost::asio::io_service& );
 
 
             std::string imageDataDir;

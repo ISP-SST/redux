@@ -256,7 +256,7 @@ void Worker::run( void ) {
     LOG_TRACE << "run:   nWipParts = " << wip.parts.size() << "  conn = " << hexString(wip.connection.get()) << "  job = " << hexString(wip.job.get());
     while( getWork() ) {
         sleepS = 1;
-        while( wip.job && wip.job->run( wip, ioService, threadPool, daemon.myInfo->status.nThreads ) ) ;
+        while( wip.job && wip.job->run( wip, ioService, daemon.myInfo->status.nThreads ) ) ;
     }
 
     runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(sleepS));

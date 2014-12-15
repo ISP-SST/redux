@@ -591,7 +591,7 @@ namespace {
 }
 
 
-void ChannelCfg::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
+void ChannelCfg::loadData( boost::asio::io_service& service ) {
 
     LOG_TRACE << "Channel::loadData()";
     // TODO: absolute/relative paths
@@ -677,7 +677,7 @@ void ChannelCfg::loadData( boost::asio::io_service& service, boost::thread_group
 }
 
 
-void ChannelCfg::preprocessData( boost::asio::io_service& service, boost::thread_group& pool ) {
+void ChannelCfg::preprocessData( boost::asio::io_service& service ) {
 
     size_t nImages = imageNumbers.size();
     double avgMean = 0.0;
@@ -716,7 +716,7 @@ void ChannelCfg::initWorkSpace( WorkSpace& ws ) {
 }
 
 
-void ChannelCfg::normalizeData(boost::asio::io_service& service, boost::thread_group& pool, double value) {
+void ChannelCfg::normalizeData(boost::asio::io_service& service, double value) {
     size_t nImages = imageNumbers.size();
     for( size_t i = 0; i < nImages; ++i ) {
         service.post( std::bind( &ChannelCfg::normalizeImage, this, i, value ) );

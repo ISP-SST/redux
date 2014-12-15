@@ -53,7 +53,7 @@ namespace redux {
         void ungetParts(WorkInProgress&);
         void returnParts(WorkInProgress&);
         
-        bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&,uint8_t);
+        bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
 
     private:
 

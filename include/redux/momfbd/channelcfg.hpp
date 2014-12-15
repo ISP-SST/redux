@@ -65,9 +65,9 @@ namespace redux {
             bool checkData(void);
             size_t nImages(size_t offset=0) { imageOffset=offset; return images.dimSize(0); } 
 
-            void loadData(boost::asio::io_service&, boost::thread_group&);
-            void preprocessData(boost::asio::io_service&, boost::thread_group&);
-            void normalizeData(boost::asio::io_service&, boost::thread_group&, double value);
+            void loadData(boost::asio::io_service&);
+            void preprocessData(boost::asio::io_service&);
+            void normalizeData(boost::asio::io_service&, double value);
 
             void loadImage(size_t index);
             void preprocessImage(size_t index, double avgMean);

@@ -238,7 +238,7 @@ void DebugJob::returnParts( WorkInProgress& wip ) {
 }
 
 
-bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost::thread_group& pool, uint8_t maxThreads ) {
+bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8_t maxThreads ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::run("<<(int)maxThreads<<") ";
@@ -259,6 +259,8 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, boost
         for( auto & it : wip.parts ) {
             service.post( boost::bind( &DebugJob::runMain, this, boost::ref( it ) ) );
         }
+        boost::thread_group pool;
+        size_t nThreads = std::min( maxThreads, info.maxThreads)*2;
         for( size_t t = 0; t < nThreads; ++t ) {
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
         }

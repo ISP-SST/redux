@@ -426,25 +426,23 @@ void ObjectCfg::cleanup( void ) {
 }
 
 
-void ObjectCfg::loadData( boost::asio::io_service& service, boost::thread_group& pool ) {
+void ObjectCfg::loadData( boost::asio::io_service& service ) {
     
     LOG << "Object::loadData()";
-    
     if( pupil.nDimensions() < 2 && pupilFile != "" ) {
         service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), objectPupilSize ) );
     }
 
     for( auto & it : channels ) {
-        it->loadData( service, pool );
+        it->loadData( service );
     }
     
 }
 
 
-void ObjectCfg::preprocessData(boost::asio::io_service& service, boost::thread_group& pool) {
+void ObjectCfg::preprocessData(boost::asio::io_service& service ) {
     
     LOG_TRACE << "Object::preprocessData()";
-    
     ModeCache& cache = ModeCache::getCache();
     if( pupil.nDimensions() < 2 ) {
         LOG_DETAIL << "Object::preprocessData()  Generating pupil.";
@@ -475,22 +473,21 @@ void ObjectCfg::preprocessData(boost::asio::io_service& service, boost::thread_g
     pix2cf = 1.0/cf2pix;
     
     for(auto& it: channels) {
-        it->preprocessData(service, pool);
+        it->preprocessData(service);
     }
 }
 
 
-void ObjectCfg::normalize(boost::asio::io_service& service, boost::thread_group& pool) {
+void ObjectCfg::normalize(boost::asio::io_service& service ) {
     
     LOG_TRACE << "Object::normalize()";
-    
     double maxMean = std::numeric_limits<double>::lowest();
     for(auto it: channels) {
         double mM = it->getMaxMean();
         if( mM > maxMean ) maxMean = mM;
     }
     for(auto it: channels) {
-        it->normalizeData(service, pool, maxMean);
+        it->normalizeData(service, maxMean);
     }
 }
 

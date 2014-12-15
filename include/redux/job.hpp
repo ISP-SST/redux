@@ -114,7 +114,7 @@ namespace redux {
 
         virtual void init(void) {};
         virtual void cleanup(void) {};
-        virtual bool run(WorkInProgress&,boost::asio::io_service&,boost::thread_group&, uint8_t) = 0;
+        virtual bool run(WorkInProgress&, boost::asio::io_service&, uint8_t) = 0;
         
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);
