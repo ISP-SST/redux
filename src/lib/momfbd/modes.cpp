@@ -28,45 +28,6 @@ namespace {
         m = 2 * ((dl + (n % 2)) / 2) + !(n % 2) - 1;
     }
 
-
-    double zernikeCovariance(int j) {
-        if(j < 2) return 0.0;
-        int m, n;
-        noll_to_mn(j, m, n);
-        int n1 = n;
-        //  ; Now deal with the numerical terms: Dai
-        double k = pow(4.8 * exp(lgamma_r(6.0 / 5.0, nullptr)), 5.0 / 6.0) * exp(lgamma_r(14.0 / 3.0, nullptr) + 2.0 * lgamma_r(11.0 / 6.0, nullptr)) / (pow(2.0, (8.0 / 3.0)) * redux::PI);
-        k *= pow(-1.0, (double)((n + n1 - 2 * m) / 2)) * sqrt((double)(n + 1) * (n1 + 1));
-        int g1_sgn, g2_sgn, g3_sgn, g4_sgn;
-        double g1 = lgamma_r(((double)(n + n1) -  5.0 / 3.0) / 2.0, &g1_sgn);
-        double g2 = lgamma_r(((double)(n - n1) + 17.0 / 3.0) / 2.0, &g2_sgn);
-        double g3 = lgamma_r(((double)(n1 - n) + 17.0 / 3.0) / 2.0, &g3_sgn);
-        double g4 = lgamma_r(((double)(n + n1) + 23.0 / 3.0) / 2.0, &g4_sgn);
-        return k * exp(g1 - g2 - g3 - g4) * g1_sgn * g2_sgn * g3_sgn * g4_sgn;
-    }
-
-    double zernikeCovariance(int i, int j) {
-        
-        if((i < 2) || (j < 2)) return 0.0;
-        int m, n, o, p;
-        noll_to_mn(i, m, n);
-        noll_to_mn(j, o, p);
-        if(m != o) return 0.0;
-        if(m) if((i + j) % 2) return 0.0;
-
-        //  ; Now deal with the numerical terms: Dai
-        double k = pow(4.8 * exp(lgamma_r(6.0 / 5.0, nullptr)), 5.0 / 6.0) * exp(lgamma_r(14.0 / 3.0, nullptr) + 2.0 * lgamma_r(11.0 / 6.0, nullptr)) / (pow(2.0, (8.0 / 3.0)) * redux::PI);
-        k *= pow(-1.0, (double)((n + p - 2 * m) / 2)) * sqrt((double)((n + 1) * (p + 1)));
-        int g1_sgn, g2_sgn, g3_sgn, g4_sgn;
-        double g1 = lgamma_r(((double)(n + p) -  5.0 / 3.0) / 2.0, &g1_sgn);
-        double g2 = lgamma_r(((double)(n - p) + 17.0 / 3.0) / 2.0, &g2_sgn);
-        double g3 = lgamma_r(((double)(p - n) + 17.0 / 3.0) / 2.0, &g3_sgn);
-        double g4 = lgamma_r(((double)(n + p) + 23.0 / 3.0) / 2.0, &g4_sgn);
-
-        return k * exp(g1 - g2 - g3 - g4) * g1_sgn * g2_sgn * g3_sgn * g4_sgn;
-
-    }
-
 }
 
 

@@ -51,6 +51,7 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), p
 
 
 Daemon::~Daemon( void ) {
+    cleanup();
     stop();
 }
 
@@ -224,24 +225,24 @@ void Daemon::cleanup( void ) {
 
     unique_lock<mutex> lock( peerMutex );
 
-    for( auto & it : connections ) {
-        if( it.first && !it.first->socket().is_open() ) {
-            it.second->nConnections--;
-            connections.erase( it.first );
-        }
+    for( auto it=connections.begin(); it != connections.end(); ) {
+        if( it->first && !it->first->socket().is_open() ) {
+            it->second->nConnections--;
+            connections.erase( it++ );          // N.B iterator is invalidated on erase, to the postfix increment is necessary.
+        } else ++it;
     }
 
-    for( auto & pit : peers ) {
-        if( pit.second->nConnections < 1 ) {
-            auto wip = peerWIP.find( pit.second );
+    for( auto it=peers.begin(); it != peers.end(); ) {
+        if( it->second->nConnections < 1 ) {
+            auto wip = peerWIP.find( it->second );
             if( wip != peerWIP.end() ) {
                 if( wip->second.job ) {
                     LOG_DETAIL << "Peer disconnected, returning work to queue: " << wip->second.print();
                     wip->second.job->ungetParts( wip->second );
                 }
             }
-            peers.erase( pit.first );
-        }
+            peers.erase( it++ );
+        } else ++it;
     }
 
 }
@@ -382,48 +383,46 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
             if( step == Job::JSTEP_QUEUED ) {
-                job = it;
                 if( it->getParts( wip, nThreads ) ) {
                     ret = true;
-                    break;
                 }
             }
             else if( step == Job::JSTEP_RUNNING ) {
                 job = it;
                 if( it->getParts( wip, nThreads ) ) {
                     ret = true;
-                    break;
                 }
+            }
+            if ( ret ) {
+                job = it;
+                break;
             }
         }
     }
     else {                          // local worker
-        if( nQueuedJobs < 2 ) {     // see if another job can be prepared
-            for( auto & it : jobs ) {
-                if( it->info.step.load() < Job::JSTEP_QUEUED ) {
-                    job = it;
-                    it->getParts( wip, nThreads );
-                    ret = true;
-                    break;
-                }
-            }
-        }
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
-            if( step & ( Job::JSTEP_QUEUED | Job::JSTEP_RUNNING | Job::JSTEP_POSTPROCESS ) ) {
-                job = it;
+            if( (nQueuedJobs < 2) && (it->info.step.load() < Job::JSTEP_QUEUED) ) {
+                it->getParts( wip, nThreads );
+                ret = true;
+            } else if( step & ( Job::JSTEP_QUEUED | Job::JSTEP_RUNNING | Job::JSTEP_POSTPROCESS ) ) {
                 if( it->getParts( wip, nThreads ) || ( step != Job::JSTEP_RUNNING ) ) {
                     ret = true;
-                    break;
                 }
+            }
+            if ( ret ) {
+                job = it;
+                break;
             }
         }
     }
-    if( job ) {
+    
+    if( ret ) {
         LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << job->info.id;
         job->info.state.store( Job::JSTATE_ACTIVE );
         wip.job = job;
-    }
+    } else wip.job.reset();
+    
     return ret;
 }
 

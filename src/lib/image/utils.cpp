@@ -22,20 +22,6 @@ namespace {
     const double deltasqr = 4;
     const double beta = 2;
 
-    float distanceCache[maxDistance*maxDistance];
-
-    bool calculateCache ( void ) {
-        for ( int i = 0; i < maxDistance; ++i ) {
-            double i2 = i * i;
-            for ( int j = 0; j < maxDistance; ++j ) {
-                double j2 = j * j;
-                distanceCache[i * maxDistance + j] = pow ( sqrt ( i2 + j2 + deltasqr ), -beta );
-            }
-        }
-
-        return true;
-    }
-
     map<int, double> getDistanceMap ( void ) {
         map<int, double> tmp;
         for ( int i = 0; i <= maxDistance; ++i ) {
@@ -245,10 +231,10 @@ double redux::image::inverseDistanceWeight ( T** array, size_t sizeY, size_t siz
 
     // TODO: verify this function, results look weird
 
-    size_t beginX = std::max ( 0L, static_cast<int64_t> ( posX - maxDistance ) );
-    size_t endX = std::min ( sizeX, posX + maxDistance + 1 );
-    size_t beginY = std::max ( 0L, static_cast<int64_t> ( posY - maxDistance ) );
-    size_t endY = std::min ( sizeY, posY + maxDistance + 1 );
+    int64_t beginX = std::max ( 0L, static_cast<int64_t> ( posX - maxDistance ) );
+    int64_t endX = std::min ( sizeX, posX + maxDistance + 1 );
+    int64_t beginY = std::max ( 0L, static_cast<int64_t> ( posY - maxDistance ) );
+    int64_t endY = std::min ( sizeY, posY + maxDistance + 1 );
 
     double normalization = 0.0, weightedSum = 0.0;
     for ( int y = beginY; y < endY; ++y ) {
