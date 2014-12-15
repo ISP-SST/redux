@@ -33,7 +33,7 @@ namespace redux {
         template <typename T> double mean(const T* data, size_t n=2) {
             if (n<1) return NAN;
             double ret(static_cast<double>( *data ));
-            for( int i=1; i<n; ++i ) ret += static_cast<double>( *++data );
+            for( uint i=1; i<n; ++i ) ret += static_cast<double>( *++data );
             return ret/n;
         }
         template <typename T> void minMaxMean(const T* data, size_t n, T& min, T& max, double& mean) {
@@ -41,7 +41,7 @@ namespace redux {
                 min = *data;
                 max = *data;
                 mean = static_cast<double>( *data );
-                for( int i=1; i<n; ++i ) {
+                for( uint i=1; i<n; ++i ) {
                     data++;
                     min = std::min(*data,min);
                     max = std::max(*data,max);
@@ -55,7 +55,7 @@ namespace redux {
         void rmsStddev(const T* data, size_t n, double mean, double& rms, double& stddev) {
             if ( n > 1 ) {
                 rms = stddev = 0;
-                for( int i=0; i<n; ++i ) {
+                for( uint i=0; i<n; ++i ) {
                     rms += static_cast<double>( *data * *data );
                     double tmp = ( static_cast<double>( *data ) - mean );
                     stddev += tmp * tmp;
@@ -74,7 +74,7 @@ namespace redux {
             if ( n > 1 ) {
                 rms = stddev = 0;
                 double mn = mean(data,n);
-                for( int i=0; i<n; ++i ) {
+                for( uint i=0; i<n; ++i ) {
                     double tmp = static_cast<double>( *data );
                     rms += tmp * tmp;
                     tmp -= mn;
