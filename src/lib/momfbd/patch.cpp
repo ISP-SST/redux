@@ -67,7 +67,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += first.pack( ptr+count );
     count += last.pack( ptr+count );
     count += residualOffset.pack(ptr+count );
-    count += images.pack(ptr);
+    count += images.pack(ptr+count);
     return count;
 }
 
@@ -83,6 +83,14 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += images.unpack(ptr+count, swap_endian);
     return count;
 
+}
+
+
+bool PatchData::operator==(const PatchData& rhs) {
+    if( Part::operator==(rhs) ) {
+        return (index == rhs.index) && (images == rhs.images);
+    }
+    return false;
 }
 
 

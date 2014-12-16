@@ -1,10 +1,12 @@
 #include <boost/test/unit_test.hpp>
 
 #include "redux/constants.hpp"
+#include "redux/logger.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/momfbd/modes.hpp"
 #include "redux/momfbd/modecache.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
+#include "redux/momfbd/patch.hpp"
 //#include "redux/momfbd/legacy.hpp"
 #include "redux/math/linalg.hpp"
 #include "redux/util/arrayutil.hpp"
@@ -12,6 +14,11 @@
 //#include "modes.h"
 #include "redux/image/utils.hpp"
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/info_parser.hpp>
+#include <boost/program_options.hpp>
+namespace bpo = boost::program_options;
+namespace bpt = boost::property_tree;
 
 using namespace redux::momfbd;
 using namespace redux::math;
@@ -22,10 +29,105 @@ using namespace std;
 using namespace boost::unit_test_framework;
 
 namespace {
+    
+        
+    void cfgTest( void ) {
+return;
+        bpo::variables_map vm;
+        bpt::ptree tree;
+        
+//         boost::any v(0);
+//         bpo::variable_value vv(v,false);
+//         vv.value() = 8;
+//         vm.insert( std::make_pair(std::string("verbosity"), vv ) );
+//         //vm.at("verbosity") = bpo::variable_value(0);
+//        redux::Logger logger( vm );
+//        logger.addNullLog();
+
+        MomfbdJob mjob;
+        
+        stringstream cfg;
+        cfg << "object { }";
+        
+        bpt::read_info( cfg, tree );
+        mjob.parseProperties( vm, tree );
+        
+        bpt::write_info( cout<<endl, tree );
+        
+    }
+
+    
+    
+     void packTest( void ) {
+        //return;
+        MomfbdJob mjob;
+        {   // default-constructed job
+            auto buf = sharedArray<char>( mjob.size() );
+            char* ptr = buf.get();
+            uint64_t count = mjob.pack( ptr );
+            BOOST_CHECK_EQUAL( count, mjob.size() );
+            string tmpS = string( ptr );
+            redux::Job::JobPtr job = redux::Job::newJob( tmpS );
+            BOOST_CHECK( job );
+            count = job->unpack( ptr, false );
+            BOOST_CHECK_EQUAL( count, mjob.size() );
+            BOOST_CHECK_EQUAL( count, job->size() );
+    //             job->info.id = ++jobCounter;
+    //             job->info.step.store( Job::JSTEP_PREPROCESS );
+    //             job->info.name = "job_" + to_string( job->info.id );
+    //             job->info.submitTime = boost::posix_time::second_clock::local_time();
+    //             ids.push_back( jobCounter );
+    //             ids[0]++;
+    //             jobs.push_back( job );
+
+        }
+
+        {   // no image data
+            PatchData pd,pd2;
+            pd.id = 123;
+            pd.index = {1,2};
+            auto buf = sharedArray<char>( pd.size() );
+            char* ptr = buf.get();
+            uint64_t count = pd.pack( ptr );
+            BOOST_CHECK_EQUAL( count, pd.size() );
+            count = pd2.unpack( ptr, false );
+            BOOST_CHECK_EQUAL( count, pd.size() );
+            BOOST_CHECK_EQUAL( count, pd2.size() );
+            BOOST_CHECK( pd == pd2 );
+            
+            // with images
+            pd.images.resize(10,100,120);
+            float cnt(0.3);
+            for(auto& it: pd.images) it = (cnt += 1);
+            buf = sharedArray<char>( pd.size() );
+            ptr = buf.get();
+            count = pd.pack( ptr );
+            BOOST_CHECK_EQUAL( count, pd.size() );
+            count = pd2.unpack( ptr, false );
+            BOOST_CHECK_EQUAL( count, pd.size() );
+            BOOST_CHECK_EQUAL( count, pd2.size() );
+            BOOST_CHECK( pd == pd2 );
+            
+        }
+/*
+
+
+
+
+        Array<T> tmp;
+        count = tmp.unpack( ptr,false );
+        BOOST_CHECK_EQUAL( count, array.size() );
+
+        BOOST_CHECK( tmp == array );*/
+
+    }
+
+    
+       
         
     void modeTest(void) {
 
-
+return;
        // io_class bla;
 
         double lambda = 100;
@@ -117,45 +219,14 @@ namespace {
 
     }
     
-    void packTest( void ) {
-        
-        MomfbdJob mjob;
-        
-        //mjob.
-        
-        auto buf = sharedArray<char>( mjob.size() );
-        char* ptr = buf.get();
-        uint64_t count = mjob.pack( ptr );
-        BOOST_CHECK_EQUAL( count, mjob.size() );
 
-        string tmpS = string( ptr );
-        redux::Job::JobPtr job = redux::Job::newJob( tmpS );
-        if( job ) {
-            count = job->unpack( ptr, false );
-            BOOST_CHECK_EQUAL( count, mjob.size() );
-            BOOST_CHECK_EQUAL( count, job->size() );
-//             job->info.id = ++jobCounter;
-//             job->info.step.store( Job::JSTEP_RECEIVED );
-//             job->info.name = "job_" + to_string( job->info.id );
-//             job->info.submitTime = boost::posix_time::second_clock::local_time();
-//             ids.push_back( jobCounter );
-//             ids[0]++;
-//             jobs.push_back( job );
-        }
-
-/*
-
-
-
-
-        Array<T> tmp;
-        count = tmp.unpack( ptr,false );
-        BOOST_CHECK_EQUAL( count, array.size() );
-
-        BOOST_CHECK( tmp == array );*/
-
-    }
-
+    
+    
+    
+    
+    
+    
+    
 //     #define ROWS 512
 //     #define COLS 512
 //     #include <boost/timer/timer.hpp>
@@ -442,8 +513,9 @@ namespace testsuite {
 
             test_suite* ts = BOOST_TEST_SUITE("MOMFBD");
 
-            ts->add(BOOST_TEST_CASE(&modeTest));
+            ts->add(BOOST_TEST_CASE(&cfgTest));
             ts->add(BOOST_TEST_CASE(&packTest));
+            ts->add(BOOST_TEST_CASE(&modeTest));
             //ts->add(BOOST_TEST_CASE(&qrTest));
             //ts->add(BOOST_TEST_CASE(&ftTest));
 

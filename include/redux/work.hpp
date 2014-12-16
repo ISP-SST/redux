@@ -22,7 +22,8 @@ namespace redux {
         virtual ~Part();
         virtual size_t size( void ) const;
         virtual uint64_t pack( char* ) const;
-        virtual uint64_t unpack( const char*, bool swap_endian=false  );
+        virtual uint64_t unpack( const char*, bool swap_endian=false );
+        bool operator==(const Part& rhs) const { return (id == rhs.id); }
         uint64_t id;
         uint8_t step, nRetries;
     };

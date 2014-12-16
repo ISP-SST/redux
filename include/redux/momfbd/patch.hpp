@@ -33,6 +33,7 @@ namespace redux {
             size_t size( void ) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
+            bool operator==(const PatchData&);
         };
 
         /*! Datastructure to contain the result/info sent back from the slaves after processing.

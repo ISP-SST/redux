@@ -69,7 +69,7 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, const string& fn ) {
     reg_gamma = tree.get<double>( "REG_GAMMA", myJob.reg_gamma );
     weight = tree.get<double>( "WEIGHT", DEF_WEIGHT );
     angle = tree.get<double>( "ANGLE", DEF_ANGLE );
-    wavelength = tree.get<double>( "WAVELENGTH" );
+    wavelength = tree.get<double>( "WAVELENGTH", -1 );
     imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", myJob.imageNumbers );
     sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", myJob.sequenceNumber );
     darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", myJob.darkNumbers );
