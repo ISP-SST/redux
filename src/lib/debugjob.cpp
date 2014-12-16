@@ -190,17 +190,17 @@ void DebugJob::checkParts( void ) {
 
 }
 
-size_t DebugJob::getParts( WorkInProgress& wip, uint8_t nThreads ) {
+bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::getParts("<<(int)nThreads<<")";
+    LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")";
 #endif
     
     uint8_t step = info.step.load();
     wip.parts.clear();
     if( step == JSTEP_QUEUED || step == JSTEP_RUNNING ) {
         unique_lock<mutex> lock( jobMutex );
-        size_t nParts = std::min( nThreads, info.maxThreads) * 2;
+        size_t nParts = 1; //std::min( nThreads, info.maxThreads) * 2;
         for( auto & it : jobParts ) {
             if( it.second->step == JSTEP_QUEUED ) {
                 it.second->step = JSTEP_RUNNING;
@@ -216,7 +216,7 @@ size_t DebugJob::getParts( WorkInProgress& wip, uint8_t nThreads ) {
 }
 
 
-void DebugJob::ungetParts( WorkInProgress& wip ) {
+void DebugJob::ungetWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     for( auto & it : wip.parts ) {
         it->step = JSTEP_QUEUED;
@@ -225,7 +225,7 @@ void DebugJob::ungetParts( WorkInProgress& wip ) {
 }
 
 
-void DebugJob::returnParts( WorkInProgress& wip ) {
+void DebugJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
     for( auto & it : wip.parts ) {
@@ -249,22 +249,22 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8
         info.step.store( JSTEP_SUBMIT );        // do nothing before submitting
         return true;                            // run again
     }
-    else if( step == JSTEP_RECEIVED ) {
+    else if( step == JSTEP_PREPROCESS ) {
         preProcess();                           // preprocess on master, split job in parts
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
-        size_t nThreads = std::min( maxThreads, info.maxThreads)*2;
         service.reset();
-
         for( auto & it : wip.parts ) {
             service.post( boost::bind( &DebugJob::runMain, this, boost::ref( it ) ) );
         }
+        
         boost::thread_group pool;
         size_t nThreads = std::min( maxThreads, info.maxThreads)*2;
         for( size_t t = 0; t < nThreads; ++t ) {
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
         }
 
+        LOG_DEBUG << "DebugJob::run ThreadCount = "<<(int)pool.size();
         pool.join_all();
 
     }

@@ -228,7 +228,7 @@ void Daemon::cleanup( void ) {
     for( auto it=connections.begin(); it != connections.end(); ) {
         if( it->first && !it->first->socket().is_open() ) {
             it->second->nConnections--;
-            connections.erase( it++ );          // N.B iterator is invalidated on erase, to the postfix increment is necessary.
+            connections.erase( it++ );          // N.B iterator is invalidated on erase, so the postfix increment is necessary.
         } else ++it;
     }
 
@@ -238,8 +238,9 @@ void Daemon::cleanup( void ) {
             if( wip != peerWIP.end() ) {
                 if( wip->second.job ) {
                     LOG_DETAIL << "Peer disconnected, returning work to queue: " << wip->second.print();
-                    wip->second.job->ungetParts( wip->second );
+                    wip->second.job->ungetWork( wip->second );
                 }
+                peerWIP.erase(wip);
             }
             peers.erase( it++ );
         } else ++it;
@@ -267,9 +268,9 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
             Job::JobPtr job = Job::newJob( tmpS );
             if( job ) {
                 count += job->unpack( ptr+count, swap_endian );
+                if( !job->check() ) throw invalid_argument( "Sanity check failed for Job: \"" + tmpS + "\"" );
                 unique_lock<mutex> lock( jobMutex );
                 job->info.id = ++jobCounter;
-                job->info.step.store( Job::JSTEP_RECEIVED );
                 job->info.name = "job_" + to_string( job->info.id );
                 job->info.submitTime = boost::posix_time::second_clock::local_time();
                 ids.push_back( jobCounter );
@@ -371,25 +372,29 @@ Job::JobPtr Daemon::selectJob( bool localRequest ) {
 
 bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
-/*    if( wip.job ) {        // job already checked out. lost ??      TODO: deal with it...
-        wip.job.reset();
-    }
-*/
     unique_lock<mutex> lock( jobMutex );
-    Job::JobPtr job;
+    Job::JobPtr nextjob;
     bool ret = false;
-    if( wip.connection ) {                // remote worker
-        LOG_TRACE << "getWork("<<(int)nThreads<<"): Remote job-request";
+    // TODO: sort by priority
+    for( Job::JobPtr& job : jobs ) {
+        if( job->check() && job->getWork( wip, nThreads ) ) {
+            ret = true;
+        }
+        if ( ret ) {
+            nextjob = job;
+            break;
+        }
+    }
+    /*if( wip.connection ) {                // remote worker
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
             if( step == Job::JSTEP_QUEUED ) {
-                if( it->getParts( wip, nThreads ) ) {
+                if( it->getWork( wip, nThreads ) ) {
                     ret = true;
                 }
             }
             else if( step == Job::JSTEP_RUNNING ) {
-                job = it;
-                if( it->getParts( wip, nThreads ) ) {
+                if( it->getWork( wip, nThreads ) ) {
                     ret = true;
                 }
             }
@@ -402,11 +407,11 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     else {                          // local worker
         for( auto & it : jobs ) {
             uint8_t step = it->info.step.load();
-            if( (nQueuedJobs < 2) && (it->info.step.load() < Job::JSTEP_QUEUED) ) {
-                it->getParts( wip, nThreads );
+            if( (nQueuedJobs < 2) && (step < Job::JSTEP_QUEUED) ) {
+                it->getWork( wip, nThreads );
                 ret = true;
             } else if( step & ( Job::JSTEP_QUEUED | Job::JSTEP_RUNNING | Job::JSTEP_POSTPROCESS ) ) {
-                if( it->getParts( wip, nThreads ) || ( step != Job::JSTEP_RUNNING ) ) {
+                if( it->getWork( wip, nThreads ) || ( step != Job::JSTEP_RUNNING ) ) {
                     ret = true;
                 }
             }
@@ -415,13 +420,13 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
                 break;
             }
         }
-    }
+    }*/
     
     if( ret ) {
-        LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << job->info.id;
-        job->info.state.store( Job::JSTATE_ACTIVE );
-        wip.job = job;
-    } else wip.job.reset();
+        LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << nextjob->info.id;
+        nextjob->info.state.store( Job::JSTATE_ACTIVE );
+        wip.job = nextjob;
+    }
     
     return ret;
 }
@@ -429,9 +434,18 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
 void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
-    auto it = peerWIP.insert( make_pair( connections[conn], WorkInProgress( conn ) ) );
-    WorkInProgress& wip = it.first->second;
-    Host::Ptr host = it.first->first;
+    Host::Ptr h = connections[conn];
+    
+    map<Host::Ptr, WorkInProgress>::iterator it = peerWIP.find(h);
+    if( it == peerWIP.end() ) {
+        auto rit = peerWIP.emplace( connections[conn], WorkInProgress( conn ) );
+        if( !rit.second ) {
+            LOG_ERR << "Failed to insert new connection into peerWIP";
+        }
+        it = rit.first;
+    }
+    WorkInProgress& wip = it->second;
+    Host::Ptr host = it->first;
 
     Job::JobPtr lastJob = wip.job;
     size_t blockSize = 0;
@@ -440,7 +454,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         if(!lastJob || *wip.job != *lastJob) {
             includeJob = true;
         }
-        LOG_DEBUG << (includeJob?"(new job) ":"") << " to host: " << host->print();
+        LOG_DEBUG << (includeJob?"(new job) ":"") << " to host: " << host->info.name << ":" << host->info.pid;
         blockSize = wip.size( includeJob );
     }
 
@@ -449,7 +463,6 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     uint64_t count = sizeof( size_t );
     if( blockSize > 0 ) {
         count += wip.pack( ptr+count, includeJob );
-        if( wip.job ) wip.job->info.step.store( Job::JSTEP_RUNNING );
     }
     blockSize = std::min(blockSize,count);       // if something is compressed, we don't send the whole allocated block.
     pack( buf.get(), blockSize );
@@ -464,14 +477,18 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     size_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    auto it = peerWIP.insert( make_pair( connections[conn], WorkInProgress( conn ) ) );
-    WorkInProgress& wip = it.first->second;
+    map<Host::Ptr, WorkInProgress>::iterator it = peerWIP.find(connections[conn]);
+    if( it == peerWIP.end() ) {
+        LOG_ERR << "Received results from unknown host.";
+    }
+    
+    WorkInProgress& wip = it->second;
     if( blockSize ) {
         LOG_DEBUG << "putParts():  blockSize = " << blockSize;
         LOG_DEBUG << "putParts():  wip = " << wip.print();
         wip.unpack( buf.get(), conn->getSwapEndian() );
-        wip.job->returnParts( wip );
         LOG_DEBUG << "putParts(): wip2 = " << wip.print();
+        wip.job->returnResults( wip );
     }
     else LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
 

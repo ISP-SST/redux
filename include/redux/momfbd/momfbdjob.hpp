@@ -26,6 +26,14 @@ namespace redux {
          */
         class MomfbdJob : public Job {
 
+        enum Step { JSTEP_SUBMIT = 1,
+                    JSTEP_PREPROCESS = 2,
+                    JSTEP_QUEUED = 4,
+                    JSTEP_RUNNING = 8,
+                    JSTEP_POSTPROCESS = 16,
+                    JSTEP_COMPLETED = 32,
+                    JSTEP_ERR = 128 };
+        
         public:
             static size_t jobType;
             static int getFromMap( std::string str, const std::map<std::string, int>& m );
@@ -43,14 +51,15 @@ namespace redux {
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
 
-            size_t getParts( WorkInProgress&, uint8_t );
-            void ungetParts( WorkInProgress& );
-            void returnParts( WorkInProgress& );
+            bool getWork( WorkInProgress&, uint8_t );
+            void ungetWork( WorkInProgress& );
+            void returnResults( WorkInProgress& );
 
             void init(void);
             void cleanup(void);
             bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
             
+            bool check(void);
             bool checkCfg(void);
             bool checkData(void);
             const std::vector<std::shared_ptr<ObjectCfg>>& getObjects(void) const { return objects; };

@@ -57,7 +57,7 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
         if( it2 != getMap().end() ) {
             Job* tmpJob = it2->second.second();
             tmpJob->parseProperties( vm, it.second );
-            if( tmpJob->checkCfg() ) {
+            if( tmpJob->check() ) {
                 tmp.push_back( shared_ptr<Job>( tmpJob ) );
             } else LOG_WARN << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
         } else {
@@ -84,19 +84,6 @@ Job::JobPtr Job::newJob( const string& name ) {
     return tmp;
 }
 
-string Job::stepString( uint8_t step ) {
-    switch( step ) {
-        case JSTEP_SUBMIT: return "submit";
-        case JSTEP_RECEIVED: return "received";
-        case JSTEP_QUEUED: return "queued";
-        case JSTEP_RUNNING: return "running";
-        case JSTEP_POSTPROCESS: return "postprocess";
-        case JSTEP_COMPLETED: return "completed";
-        case JSTEP_ERR: return "error";
-        default: return "-";
-    }
-}
-
 
 string Job::stateString( uint8_t state ) {
 
@@ -110,6 +97,7 @@ string Job::stateString( uint8_t state ) {
     }
 
 }
+
 
 string Job::stateTag( uint8_t state ) {
 
@@ -125,7 +113,7 @@ string Job::stateTag( uint8_t state ) {
 }
 
 
-Job::Info::Info( void ) : id( 0 ), priority( 0 ), verbosity( 0 ), step( JSTEP_PRE_SUBMIT ), state( JSTATE_IDLE ) {
+Job::Info::Info( void ) : id( 0 ), priority( 0 ), verbosity( 0 ), step( 0 ), state( JSTATE_IDLE ) {
 
 }
 
@@ -197,7 +185,8 @@ std::string Job::Info::printHeader( void ) {
 std::string Job::Info::print( void ) {
     string info = alignRight( std::to_string( id ), 5 ) + alignCenter( typeString, 10 );
     info += alignCenter( to_iso_extended_string( submitTime ), 20 );
-    info += alignCenter( name, 15 ) + alignLeft( user + "@" + host, 15 ) + alignCenter( std::to_string( priority ), 8 ) + alignCenter( stateTag( state ), 3 ) + alignLeft( stepString( step ), 15 );
+    info += alignCenter( name, 15 ) + alignLeft( user + "@" + host, 15 ) + alignCenter( std::to_string( priority ), 8 )
+    + alignCenter( stateTag( state ), 3 ); // + alignLeft( stepString( step ), 15 );
     return info;
 }
 

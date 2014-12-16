@@ -538,30 +538,46 @@ void MomfbdJob::checkParts( void ) {
 }
 
 
-size_t MomfbdJob::getParts( WorkInProgress& wip, uint8_t nThreads ) {
+bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
+    bool ret(false);
     uint8_t step = info.step.load();
     wip.parts.clear();
-    if( step == JSTEP_QUEUED || step == JSTEP_RUNNING ) {
+
+     // run pre-/postprocessing if local
+    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip.connection ) {
+        ret = true;
+    }
+    
+    if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
+        info.step = step = JSTEP_RUNNING;
+    }
+
+    if ( !ret && (step == JSTEP_RUNNING) ) {                      // running
         unique_lock<mutex> lock( jobMutex );
 //         size_t nParts = wip.peer->status.nThreads;
 //         if( info.nThreads ) nParts = std::min( wip.peer->status.nThreads, info.nThreads );
+        if(wip.connection)
         for( auto & it : patches ) {
             if( it.second->step == JSTEP_QUEUED ) {
                 it.second->step = JSTEP_RUNNING;
                 wip.parts.push_back( it.second );
-                info.step.store( JSTEP_RUNNING );
-                info.state.store( JSTATE_ACTIVE );
-                if( wip.parts.size() > 0 ) break;
+                ret = true;
+                break;// only 1 part at a time for MomfbdJob
             }
         }
+    }
+    
+    if( ret ) {
+        LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
+        unique_lock<mutex> lock( jobMutex );
         checkParts();
     }
-    return wip.parts.size();
+    return ret;
 }
 
 
-void MomfbdJob::ungetParts( WorkInProgress& wip ) {
+void MomfbdJob::ungetWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     for( auto & it : wip.parts ) {
         it->step = JSTEP_QUEUED;
@@ -572,7 +588,7 @@ void MomfbdJob::ungetParts( WorkInProgress& wip ) {
 
 #include "redux/file/fileana.hpp"
 
-void MomfbdJob::returnParts( WorkInProgress& wip ) {
+void MomfbdJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
     for( auto & it : wip.parts ) {
@@ -610,11 +626,7 @@ void MomfbdJob::cleanup(void) {
 bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8_t maxThreads ) {
     
     uint8_t step = info.step.load();
-    if( step < JSTEP_SUBMIT ) {
-        info.step.store( JSTEP_SUBMIT );        // do nothing before submitting
-        return true;                            // run again
-    }
-    else if( step == JSTEP_RECEIVED ) {
+    if( step == JSTEP_PREPROCESS ) {
         preProcess(service);                           // preprocess on master: load, flatfield, split in patches
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
@@ -804,6 +816,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
             uint32_t trimmedPosX = std::min(std::max(halfBlockSize,posX),imageSizes.x-halfBlockSize);   // stay inside borders
             if( trimmedPosX != posX ) LOG_WARN << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX;
             PatchData::Ptr patch( new PatchData() );
+            patch->step = JSTEP_QUEUED;
             patch->first.x = max_local_shift;
             patch->first.y = max_local_shift;
             patch->last.x = patch->first.x+patchSize-1;
@@ -1006,6 +1019,23 @@ void MomfbdJob::postProcess( boost::asio::io_service& service ) {
     info.step.store( JSTEP_COMPLETED );
     info.state.store( JSTATE_IDLE );
 
+}
+
+
+bool MomfbdJob::check(void) {
+    bool ret(false);
+    unique_lock<mutex> lock(jobMutex);
+    switch (info.step) {
+        case 0:                 ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;
+        case JSTEP_SUBMIT:      ret = checkData(); if(ret) info.step = JSTEP_PREPROCESS; break;
+        case JSTEP_PREPROCESS: ;                  // no checks at these steps, just fall through and return true
+        case JSTEP_QUEUED: ;
+        case JSTEP_RUNNING: ;
+        case JSTEP_POSTPROCESS: ;
+        case JSTEP_COMPLETED: ret = true; break;
+        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << " (" << stepString(info.step) << ")";
+    }
+    return ret;
 }
 
 

@@ -33,13 +33,11 @@ namespace redux {
     private:
 
         bool fetchWork(void);
-        bool getWork(void);
         
-        bool getJob(void);
-        bool getParts(void);
+        bool getWork(void);
         void returnWork(void);
         void returnJob(void);
-        void returnParts(void);
+        void returnResults(void);
         
         void run(void);
         

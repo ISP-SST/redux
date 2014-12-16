@@ -18,6 +18,8 @@ namespace redux {
      */
     class DebugJob : public Job {
         
+        enum Step { JSTEP_SUBMIT=1, JSTEP_PREPROCESS=2, JSTEP_QUEUED=4, JSTEP_RUNNING=8, JSTEP_POSTPROCESS=16, JSTEP_COMPLETED=32, JSTEP_ERR=255 };
+        
         struct DebugPart : public Part {
             uint32_t xPixelL, xPixelH, yPixelL, yPixelH;
             double beginX, endX, beginY, endY;
@@ -46,12 +48,11 @@ namespace redux {
         uint64_t pack(char*) const;
         uint64_t unpack(const char*, bool);
         
-        bool checkCfg(void) { return true; };
-        bool checkData(void) { return true; };
+        bool check(void) { return true; };
         
-        size_t getParts(WorkInProgress&, uint8_t);
-        void ungetParts(WorkInProgress&);
-        void returnParts(WorkInProgress&);
+        bool getWork(WorkInProgress&, uint8_t);
+        void ungetWork(WorkInProgress&);
+        void returnResults(WorkInProgress&);
         
         bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
 

@@ -176,10 +176,8 @@ bool Worker::getWork( void ) {
     if( wip.connection ) {            // remote work: return parts.
         returnWork();
     } else if ( wip.parts.size() ) {
-        wip.job->returnParts( wip );
+        wip.job->returnResults( wip );
     }
-
-    wip.connection.reset();
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( !lastJob || (wip.job && *(wip.job) != *lastJob) ) {
@@ -196,6 +194,7 @@ bool Worker::getWork( void ) {
     LOG_TRACE << "No work available.";
 #endif
 
+    wip.job.reset();
     wip.connection.reset();
     wip.parts.clear();
     return false;

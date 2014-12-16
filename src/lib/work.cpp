@@ -27,7 +27,7 @@ namespace {
 #endif
     
 }
-Part::Part() : id( 0 ), step( Job::JSTEP_QUEUED ), nRetries( 0 ) {
+Part::Part() : id( 0 ), step( 0 ), nRetries( 0 ) {
 #ifdef DBG_PART_
     LOG_DEBUG << "Constructing Part: (" << hexString(this) << ") new instance count = " << (partCounter.fetch_add(1)+1);
 #endif

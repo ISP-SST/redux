@@ -32,17 +32,7 @@ namespace redux {
     class Job {
         
     public:
-        
-        enum Step : uint8_t { JSTEP_PRE_SUBMIT  = 0,            //!< Pristine job, prepare stuff for submission
-                              JSTEP_SUBMIT      = 1,            //!< Job will be sent to master.
-                              JSTEP_RECEIVED    = 2,            //!< Received by master, waiting for pre-processing 
-                              JSTEP_QUEUED      = 4,            //!< Queued for main processing
-                              JSTEP_RUNNING     = 8,            //!< Job is active on the cluster
-                              JSTEP_POSTPROCESS = 16,           //!< Done, waiting for post-processing on master.
-                              JSTEP_COMPLETED   = 32,           //!< Job waits in queue until marked for removal
-                              JSTEP_REMOVE      = 64,
-                              JSTEP_ERR         = 128           //!< Error flag. Should not be used, dynamic error handling is better...
-                            };
+
         enum State : uint8_t { JSTATE_IDLE      = 1,
                                JSTATE_ACTIVE    = 2,    
                                JSTATE_PAUSED    = 4,
@@ -62,7 +52,7 @@ namespace redux {
         static std::vector<JobPtr> parseTree( po::variables_map& vm, bpt::ptree& tree );
         static JobPtr newJob( const std::string& );
         
-        static std::string stepString(uint8_t);
+        virtual std::string stepString(uint8_t) { return "-"; };
         static std::string stateString(uint8_t);
         static std::string stateTag(uint8_t);
         
@@ -105,12 +95,11 @@ namespace redux {
         virtual uint64_t pack(char*) const;
         virtual uint64_t unpack(const char*, bool);
 
-        virtual bool checkCfg(void) { return false; };      //! will be called before a job is uploaded for processing, should return true if all is ok.
-        virtual bool checkData(void) { return false; };     //! will be called before a job is (pre)processed, should return true if all is ok.
+        virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
         
-        virtual size_t getParts(WorkInProgress&, uint8_t) { return 0; };
-        virtual void ungetParts(WorkInProgress&) { };
-        virtual void returnParts(WorkInProgress&) { };
+        virtual bool getWork(WorkInProgress&, uint8_t) { return false; };
+        virtual void ungetWork(WorkInProgress&) { };
+        virtual void returnResults(WorkInProgress&) { };
 
         virtual void init(void) {};
         virtual void cleanup(void) {};
