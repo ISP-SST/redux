@@ -5,12 +5,19 @@
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/logger.hpp"
 
+#include <mutex>
 #include <stdexcept>
 #include <memory>
 #include <cstring>
 #include <vector>
 #include <iostream>
+
+#ifdef DEBUG_
+//#define DBG_ARRAY_
+//#define lg Logger::mlg
+#endif
 
 namespace redux {
 
@@ -20,6 +27,12 @@ namespace redux {
          *  @{
          */
 
+        namespace debug {
+#ifdef DBG_ARRAY_
+            static int arrCounter(0);
+            static std::mutex mtx;
+#endif
+        }
 
         /*! @brief A wrapper class for a data-block of arbitrary dimensions/type
          *  @details The data is stored in a shared_ptr and accessed via iterators or some (variadic template) methods
@@ -194,6 +207,10 @@ namespace redux {
 
             template <typename ...S>
             Array( T* ptr, S ...sizes ) : begin_(0) {
+#ifdef DBG_ARRAY_
+                std::unique_lock<std::mutex> lock(debug::mtx);
+                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
+#endif
                 setSizes( sizes... );
                 setStrides();
                 countElements();
@@ -213,7 +230,20 @@ namespace redux {
             //! @brief Default, plain copy.
             Array( const Array<T>& rhs ) : dimSizes(rhs.dimSizes), dimStrides(rhs.dimStrides), nDims_(rhs.nDims_), dataSize(rhs.dataSize),
                                           dimFirst(rhs.dimFirst), dimLast(rhs.dimLast), currentSizes(rhs.currentSizes), nElements_(rhs.nElements_),
-                                          dense_(rhs.dense_), begin_(rhs.begin_), end_(rhs.end_), datablock(rhs.datablock) {}
+                                          dense_(rhs.dense_), begin_(rhs.begin_), end_(rhs.end_), datablock(rhs.datablock) {
+#ifdef DBG_ARRAY_
+                std::unique_lock<std::mutex> lock(debug::mtx);
+                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
+#endif
+            }
+
+            virtual ~Array() {
+#ifdef DBG_ARRAY_
+                std::unique_lock<std::mutex> lock(debug::mtx);
+                LOGC_DEBUG("arr") << "Destructing Array: (" << hexString(this) << ") new instance count = " << (--debug::arrCounter)
+                << " UC = " << (datablock.use_count()) << " data = " << redux::util::hexString(datablock.get());
+#endif
+            }
                                           
             /*! @brief The copy will be a sub-array ranging from "first" to "last"
              *  @note The dimensions of the vectors must agree with the dimensions of the array.
@@ -228,7 +258,6 @@ namespace redux {
              */
             template <typename U>
             Array( const Array<T>& rhs, const std::vector<U>& indices ) : Array<T>(rhs) {
-
                 size_t nIndices = indices.size();
                 if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
                     throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices: " + printArray(indices,"indices"));
@@ -253,7 +282,13 @@ namespace redux {
              *  @details Construct an array from an array of different type.
              */
             //@{
-            template <typename U> Array( const Array<U>& rhs) { rhs.copy(*this); }
+            template <typename U> Array( const Array<U>& rhs) {
+#ifdef DBG_ARRAY_
+                std::unique_lock<std::mutex> lock(debug::mtx);
+                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
+#endif
+                rhs.copy(*this);
+            }
             template <typename U, typename V> Array( const Array<U>& rhs, const std::vector<V>& indices ) : Array<T>(rhs) { setLimits(indices); }
             template <typename U, typename ...S> Array( const Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
             //@}
@@ -261,7 +296,14 @@ namespace redux {
             /*! Construct from a generic list of dimension-sizes.
              * @note This has to be last in the header because of it's "catch all" properties.
              */
-            template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
+            template <typename ...S> Array( S ...sizes ) : begin_(0) {
+#ifdef DBG_ARRAY_
+                std::unique_lock<std::mutex> lock(debug::mtx);
+                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
+#endif
+                resize( sizes... );
+                
+            }
 
             
             /*! @brief Get the @e packed size of this array
@@ -297,7 +339,7 @@ namespace redux {
              */
             uint64_t unpack( const char* ptr, bool swap_endian ) {
                 using redux::util::unpack;
-                size_t sz;
+                uint64_t sz;
                 uint64_t count = unpack( ptr, sz, swap_endian );
                 if( sz > sizeof(uint64_t) ) {          // 8 means an empty array was transferred
                     std::vector<size_t> tmp;

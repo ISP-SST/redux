@@ -27,7 +27,8 @@ namespace redux {
         ~Logger( void );
 
         void addFileLog( const std::string& file );
-
+        void addNullLog( void );
+        
         static std::pair<std::string, std::string> customParser( const std::string& s );
         static bpo::options_description getOptions( const std::string& application_name );
 

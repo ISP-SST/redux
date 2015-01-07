@@ -96,3 +96,10 @@ void Logger::addFileLog( const string& file ) {
     logSinks.push_back( sink );
 
 }
+
+void Logger::addNullLog( void ) {
+
+    boost::shared_ptr<LogSink> sink( new LogSink(sev_none) );
+    logSinks.push_back( sink );
+
+}
