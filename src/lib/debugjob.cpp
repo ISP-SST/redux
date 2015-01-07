@@ -189,6 +189,22 @@ void DebugJob::checkParts( void ) {
 
 }
 
+bool DebugJob::check(void) {
+    bool ret(false);
+    unique_lock<mutex> lock(jobMutex);
+    switch (info.step) {
+        case 0:                 ret = true; if(ret) info.step = JSTEP_SUBMIT; break;
+        case JSTEP_SUBMIT:      ret = true; if(ret) info.step = JSTEP_PREPROCESS; break;
+        case JSTEP_PREPROCESS: ;                  // no checks at these steps, just fall through and return true
+        case JSTEP_QUEUED: ;
+        case JSTEP_RUNNING: ;
+        case JSTEP_POSTPROCESS: ;
+        case JSTEP_COMPLETED: ret = true; break;
+        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << " (" << stepString(info.step) << ")";
+    }
+    return ret;
+}
+
 bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
 #ifdef DEBUG_
@@ -197,14 +213,22 @@ bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     
     uint8_t step = info.step.load();
     wip.parts.clear();
-    if( step == JSTEP_QUEUED || step == JSTEP_RUNNING ) {
+     // run pre-/postprocessing if local
+    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip.connection ) {
+        return true;
+    }
+    
+    if ( step == JSTEP_QUEUED ) {                       // starting processing
+        info.step = step = JSTEP_RUNNING;
+    }
+    
+    if( step == JSTEP_RUNNING ) {
         unique_lock<mutex> lock( jobMutex );
-        size_t nParts = 1; //std::min( nThreads, info.maxThreads) * 2;
+        size_t nParts = std::min( nThreads, info.maxThreads) * 2;
         for( auto & it : jobParts ) {
             if( it.second->step == JSTEP_QUEUED ) {
                 it.second->step = JSTEP_RUNNING;
                 wip.parts.push_back( it.second );
-                info.step.store( JSTEP_RUNNING );
                 info.state.store( JSTATE_ACTIVE );
                 if( wip.parts.size() == nParts ) break;
             }
@@ -301,6 +325,7 @@ void DebugJob::preProcess( void ) {
             double y = coordinates[2] + j * stepY;
             PartPtr part( new DebugPart() );
             part->id = ++count;
+            part->step = JSTEP_QUEUED;
             part->sortedID = part->id;
             part->xPixelL = i; part->xPixelH = lX;
             part->yPixelL = j; part->yPixelH = lY;

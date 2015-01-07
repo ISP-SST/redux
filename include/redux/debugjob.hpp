@@ -48,7 +48,7 @@ namespace redux {
         uint64_t pack(char*) const;
         uint64_t unpack(const char*, bool);
         
-        bool check(void) { return true; };
+        bool check(void);
         
         bool getWork(WorkInProgress&, uint8_t);
         void ungetWork(WorkInProgress&);
