@@ -43,12 +43,13 @@ namespace {
         ( "force,f", "Overwrite output file if exists" )
         ( "swap,s", "swap mode: write compressed data to swap file instead of keeping it in memory (useful for large problems)" )
         ( "config,c", bpo::value<string>()->default_value( "momfbd.cfg" ), "Configuration file to process." )
-        ( "simx", "x coordinate[s] of subimages to restore" )
-        ( "simy", "y coordinate[s] of subimages to restore" )
-        ( "nimages,n", bpo::value<int>(), "Image numbers" )
-        ( "sequence", "sequence number to insert in filename template." )
+        ( "simx", bpo::value<string>(), "x coordinate[s] of subimages to restore" )
+        ( "simy", bpo::value<string>(), "y coordinate[s] of subimages to restore" )
+        ( "imgn,n", bpo::value<string>(), "Image numbers" )
+        ( "sequence", bpo::value<string>(), "sequence number to insert in filename template." )
         ( "print,P", "(debug) print the parsed configuration to console and exit without uploading." )
-        ( "output-files,o", "Comma separated list of output file base names."
+        ( "no-check", "Don't verify the configuration." )
+        ( "output-file,o", "Comma separated list of output file base names."
           "File names are applied to the objects in the order they are found in the config file."
           "If insufficient names are provided, a default name will be created for the remaining objects."
           "Excess names will generate a warning but are ignored otherwise. The names are base names only,"
@@ -96,18 +97,6 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
         LOG_ERR << "Handshake with server failed.";
         return;
     }
-    
- /*   
-    
-    cmd = 222;//CMD_RESET;
-    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
-  // conn->writeAndCheck( cmd );
-    
-    return;
-    
- */   
-    
-    
    
     // all ok, upload jobs.
     size_t sz = 0;
@@ -131,20 +120,16 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
 
     conn->writeAndCheck( buf, sz );
     boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),sz));
-    LOG << "Waiting for 1 byte.";
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
-   // *conn >> cmd;
     if( cmd != CMD_OK ) {
         LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")";
         return;
     }
     ptr = buf.get();
-    LOG << "Waiting for 8 bytes.";
     size_t idSize;
     size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(size_t) ) );
     if( count == sizeof(size_t) ) {
         unpack(ptr, idSize);     // TBD: server swaps now, should the receiver always swap ?
-        LOG << "Waiting for " << (idSize) << " values.";
         count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, (idSize)*sizeof(size_t) ) );
         if( count != sz ) {
             LOG << "Upload of " << idSize << " jobs completed successfully";
@@ -167,17 +152,25 @@ int main( int argc, char *argv[] ) {
     bpo::variables_map vm;
     bpo::options_description programOptions = getOptions();
 
-    bpo::options_description& allOptions = Application::parseCmdLine( argc, argv, vm, &programOptions );
+    try {
+        bpo::options_description& allOptions = Application::parseCmdLine( argc, argv, vm, &programOptions );
 
-    // load matched environment variables according to the getOptionName() above.
-    bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
-    vm.notify();
+        // load matched environment variables according to the environmentMap() above.
+        bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
+        vm.notify();
+    }
+    catch( const exception &e ) {
+        cerr << "Error parsing commandline: " << e.what() << endl;// << programOptions << endl;
+        return EXIT_FAILURE;
+    }
+
 
     try {
         Logger logger( vm );
         bpt::ptree momfbd;
         bpt::read_info( vm["config"].as<string>(), momfbd );
-        vector<Job::JobPtr> jobs = Job::parseTree( vm, momfbd );
+        bool check = (vm.count( "no-check" )+vm.count( "print" )) == 0;
+        vector<Job::JobPtr> jobs = Job::parseTree( vm, momfbd, check );
 
         if( vm.count( "print" ) ) {     // dump configuration to console and exit
             bpt::ptree dump;
@@ -198,8 +191,8 @@ int main( int argc, char *argv[] ) {
                 shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioservice ) ) );
                 threads.push_back( t );
             }
-                shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs) ) );
-                threads.push_back( t );
+            shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs) ) );
+            threads.push_back( t );
             //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
             //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
             //uploadJobs(conn, jobs);
