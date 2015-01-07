@@ -3,6 +3,7 @@
 
 #include "redux/util/array.hpp"
 
+#include <cmath>
 #include <string>
 
 namespace redux {

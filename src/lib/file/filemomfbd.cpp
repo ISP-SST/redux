@@ -1,6 +1,7 @@
 #include "redux/file/filemomfbd.hpp"
 
 #include <iostream>
+#include <cmath>     // NAN
 #include <cstdlib>     // atof
 
 

@@ -6,14 +6,9 @@
 
 #include <redux/image/image.hpp>
 #include <redux/image/statistics.hpp>
-#include <redux/types.hpp>
 
 #include <boost/asio.hpp>
-#include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
-#include <boost/thread.hpp>
-
-namespace po = boost::program_options;
 namespace bpt = boost::property_tree;
 
 

@@ -4,18 +4,11 @@
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/channel.hpp"
 #include "redux/momfbd/modecache.hpp"
-#include "redux/momfbd/patch.hpp"
-#include "redux/momfbd/workspace.hpp"
 
 #include "redux/util/array.hpp"
-#include "redux/types.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
-#include <boost/thread.hpp>
-
-namespace po = boost::program_options;
 namespace bpt = boost::property_tree;
 
 

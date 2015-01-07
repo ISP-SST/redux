@@ -1,4 +1,4 @@
-USE_REDUX(redux)
+USE_REDUX("")
 USE_EXTERNAL(idl)
 
 
@@ -29,7 +29,6 @@ if (DEFINED IDL_FOUND)
                               ${RDX_SRC}/file/anacompress.cpp
                               ${RDX_SRC}/file/anadecompress.cpp
                               ${RDX_SRC}/file/fileana.cpp
-                             # ${RDX_SRC}/util/stringutil.cpp
                )
     SET(ANA_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libana.dlm")
     configure_file("libana.dlm.in" "${ANA_DLM_FILE_LOCATION}")
@@ -37,7 +36,6 @@ if (DEFINED IDL_FOUND)
     add_library(momfbd SHARED momfbd.cpp
                            ${RDX_SRC}/file/filemomfbd.cpp
                            ${RDX_SRC}/math/functions.cpp
-                           ${RDX_SRC}/util/stringutil.cpp
                )
     SET(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
     configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")

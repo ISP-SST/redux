@@ -1,16 +1,12 @@
 #include "redux/math/functions.hpp"
 
 #include "redux/constants.hpp"
-#include "redux/util/convert.hpp"
 
+#include <cmath>
 #include <complex>
-#include <math.h>
-
-#include <boost/numeric/ublas/vector.hpp>
-namespace bu = boost::numeric::ublas;
+#include <vector>
 
 using namespace redux::math;
-using namespace redux::util;
 using namespace redux;
 
 namespace {
@@ -45,7 +41,7 @@ void redux::math::apodize( T* data, size_t n, const T& target ) {
     double step = PI / ( n + 1 );
 
     for( size_t i = 1; i <= n; ++i ) {
-        *(data + i) = bound_cast<T>(mean + amplitude * cos( i * step ));
+        *(data + i) = static_cast<T>(mean + amplitude * cos( i * step ));
     }
 
 }
@@ -192,8 +188,6 @@ void redux::math::hann( T& data, size_t n ) {
         data[n] = static_cast<typename T::value_type>(0.5 + cai);
     }
 }
-template void redux::math::hann( bu::vector<double>&, size_t n );
-template void redux::math::hann( bu::vector<float>&, size_t n );
 template void redux::math::hann( std::vector<double>&, size_t n );
 template void redux::math::hann( std::vector<float>&, size_t n );
 
@@ -301,8 +295,6 @@ void redux::math::faraday_voigt( T& vgt, T& far, double dispersion, double dampi
     }
 
 }
-template void redux::math::faraday_voigt( bu::vector<double>&, bu::vector<double>&, double dispersion, double damping );
-template void redux::math::faraday_voigt( bu::vector<float>&, bu::vector<float>&, double dispersion, double damping );
 template void redux::math::faraday_voigt( std::vector<double>&, std::vector<double>&, double dispersion, double damping );
 template void redux::math::faraday_voigt( std::vector<float>&, std::vector<float>&, double dispersion, double damping );
 
@@ -354,8 +346,6 @@ void redux::math::faraday_voigt( T& vgt, T& far, T& lambda, double dispersion, d
     }
 
 }
-template void redux::math::faraday_voigt( bu::vector<double>&, bu::vector<double>&, bu::vector<double>&, double dispersion, double damping );
-template void redux::math::faraday_voigt( bu::vector<float>&, bu::vector<float>&, bu::vector<float>&, double dispersion, double damping );
 template void redux::math::faraday_voigt( std::vector<double>&, std::vector<double>&, std::vector<double>&, double dispersion, double damping );
 template void redux::math::faraday_voigt( std::vector<float>&, std::vector<float>&, std::vector<float>&, double dispersion, double damping );
 

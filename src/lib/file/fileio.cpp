@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <future>
+#include <map>
 #include <mutex>
 
 using namespace redux::file;

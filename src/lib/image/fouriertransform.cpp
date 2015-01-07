@@ -1,5 +1,6 @@
 #include "redux/image/fouriertransform.hpp"
 
+#include <map>
 #include <mutex>
 #include <set>
 

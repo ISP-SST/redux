@@ -2,22 +2,14 @@
 #define REDUX_UTIL_ARRAY_HPP
 
 #include "redux/util/arrayutil.hpp"
-#include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
-#include "redux/util/stringutil.hpp"
-#include "redux/logger.hpp"
 
-#include <mutex>
 #include <stdexcept>
 #include <memory>
+#include <cstddef>
 #include <cstring>
 #include <vector>
 #include <iostream>
-
-#ifdef DEBUG_
-//#define DBG_ARRAY_
-//#define lg Logger::mlg
-#endif
 
 namespace redux {
 
@@ -26,13 +18,6 @@ namespace redux {
         /*! @defgroup util Util
          *  @{
          */
-
-        namespace debug {
-#ifdef DBG_ARRAY_
-            static int arrCounter(0);
-            static std::mutex mtx;
-#endif
-        }
 
         /*! @brief A wrapper class for a data-block of arbitrary dimensions/type
          *  @details The data is stored in a shared_ptr and accessed via iterators or some (variadic template) methods
@@ -207,10 +192,6 @@ namespace redux {
 
             template <typename ...S>
             Array( T* ptr, S ...sizes ) : begin_(0) {
-#ifdef DBG_ARRAY_
-                std::unique_lock<std::mutex> lock(debug::mtx);
-                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
-#endif
                 setSizes( sizes... );
                 setStrides();
                 countElements();
@@ -230,20 +211,7 @@ namespace redux {
             //! @brief Default, plain copy.
             Array( const Array<T>& rhs ) : dimSizes(rhs.dimSizes), dimStrides(rhs.dimStrides), nDims_(rhs.nDims_), dataSize(rhs.dataSize),
                                           dimFirst(rhs.dimFirst), dimLast(rhs.dimLast), currentSizes(rhs.currentSizes), nElements_(rhs.nElements_),
-                                          dense_(rhs.dense_), begin_(rhs.begin_), end_(rhs.end_), datablock(rhs.datablock) {
-#ifdef DBG_ARRAY_
-                std::unique_lock<std::mutex> lock(debug::mtx);
-                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
-#endif
-            }
-
-            virtual ~Array() {
-#ifdef DBG_ARRAY_
-                std::unique_lock<std::mutex> lock(debug::mtx);
-                LOGC_DEBUG("arr") << "Destructing Array: (" << hexString(this) << ") new instance count = " << (--debug::arrCounter)
-                << " UC = " << (datablock.use_count()) << " data = " << redux::util::hexString(datablock.get());
-#endif
-            }
+                                          dense_(rhs.dense_), begin_(rhs.begin_), end_(rhs.end_), datablock(rhs.datablock) { }
                                           
             /*! @brief The copy will be a sub-array ranging from "first" to "last"
              *  @note The dimensions of the vectors must agree with the dimensions of the array.
@@ -260,7 +228,7 @@ namespace redux {
             Array( const Array<T>& rhs, const std::vector<U>& indices ) : Array<T>(rhs) {
                 size_t nIndices = indices.size();
                 if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
-                    throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices: " + printArray(indices,"indices"));
+                    throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices.");
                 }
 
                 if ( nIndices ) {
@@ -282,13 +250,7 @@ namespace redux {
              *  @details Construct an array from an array of different type.
              */
             //@{
-            template <typename U> Array( const Array<U>& rhs) {
-#ifdef DBG_ARRAY_
-                std::unique_lock<std::mutex> lock(debug::mtx);
-                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
-#endif
-                rhs.copy(*this);
-            }
+            template <typename U> Array( const Array<U>& rhs) { rhs.copy(*this); }
             template <typename U, typename V> Array( const Array<U>& rhs, const std::vector<V>& indices ) : Array<T>(rhs) { setLimits(indices); }
             template <typename U, typename ...S> Array( const Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
             //@}
@@ -296,14 +258,7 @@ namespace redux {
             /*! Construct from a generic list of dimension-sizes.
              * @note This has to be last in the header because of it's "catch all" properties.
              */
-            template <typename ...S> Array( S ...sizes ) : begin_(0) {
-#ifdef DBG_ARRAY_
-                std::unique_lock<std::mutex> lock(debug::mtx);
-                LOGC_DEBUG("arr") << "Constructing Array: (" << hexString(this) << ") new instance count = " << (++debug::arrCounter);
-#endif
-                resize( sizes... );
-                
-            }
+            template <typename ...S> Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
 
             
             /*! @brief Get the @e packed size of this array
@@ -380,7 +335,7 @@ namespace redux {
                 int64_t tmpFirst = dimFirst[tmp];
                 int64_t tmpLast = dimLast[tmp];
                 for(size_t i=0; i<dims.size(); ++i) {
-                    if( dims[i] >= nDims_ ) throw std::out_of_range("permuteDimensions: Supplied dimension is out of range: " + printArray(dims,"dims"));
+                    if( dims[i] >= nDims_ ) throw std::out_of_range("permuteDimensions: Supplied dimension is out of range.");
                     std::swap(dimSizes[dims[i]],tmpSize);
                     std::swap(currentSizes[dims[i]],tmpCurrent);
                     std::swap(dimFirst[dims[i]],tmpFirst);
@@ -517,7 +472,7 @@ namespace redux {
                 }
                 for( size_t i = 0; i < sz; ++i ) {
                     if( tmp[i] >= currentSizes[nDims_ - i - 1] ) {
-                        throw std::out_of_range( "Array::at() Index out of range: " + printArray(tmp,"indices") );
+                        throw std::out_of_range( "Array::at() Index out of range." );
                     }
                 }
                 int64_t offset = getOffset( tmp, dimFirst );
@@ -819,12 +774,14 @@ namespace redux {
             template <typename U>
             void setLimits( const std::vector<U>& first, const std::vector<U>& last) {
                 if( first.size() != nDims_ || last.size() != nDims_ ) {
-                    throw std::logic_error("Array::setLimits: Dimensions does not match:  " + printArray(first,"first") + printArray(last,"  last"));
+                    throw std::logic_error("Array::setLimits: Dimensions does not match." );
                 }
                 nElements_ = 1;
                 for( size_t i = 0; i < nDims_; ++i ) {
-                    int64_t tmpLast = redux::util::bound_cast<int64_t>( dimFirst[i] + last[i], 0, dimLast[i] );
-                    int64_t tmpFirst = redux::util::bound_cast<int64_t>( dimFirst[i] + first[i], 0, dimLast[i] );
+                    //int64_t tmpLast = redux::util::bound_cast<int64_t>( dimFirst[i] + last[i], 0, dimLast[i] );
+                    //int64_t tmpFirst = redux::util::bound_cast<int64_t>( dimFirst[i] + first[i], 0, dimLast[i] );
+                    int64_t tmpLast  = std::min( std::max(int64_t(dimFirst[i] + last[i]), 0L), dimLast[i] );
+                    int64_t tmpFirst = std::min( std::max(int64_t(dimFirst[i] + first[i]), 0L), dimLast[i] );
                     dimLast[i] = tmpLast;
                     dimFirst[i] = tmpFirst;
                     if( dimFirst[i] > dimLast[i] ) std::swap( dimFirst[i], dimLast[i] );
@@ -839,7 +796,7 @@ namespace redux {
             template <typename U>
             void setLimits( const std::vector<U>& limits ) {
                 if( limits.size() != 2*nDims_ )  {  // odd number of indices, or too many indices
-                    throw std::logic_error("Array::setLimits: Dimensions does not match:  " + printArray(limits,"limits"));
+                    throw std::logic_error("Array::setLimits: Dimensions does not match.");
                 }
                 std::vector<U> first(nDims_);
                 std::vector<U> last(nDims_);
@@ -904,7 +861,7 @@ namespace redux {
                     return getOffset( indices );
                 }
                 else if( indices.size() > currentSizes.size() ) {
-                    throw std::logic_error( "Array::getOffset() called with more indices than dimensions: " + printArray( indices, "indices" ) );
+                    throw std::logic_error( "Array::getOffset() called with more indices than dimensions." );
                 }
                 else {
                     size_t dimDiff = nDims_ - indices.size();
@@ -920,7 +877,7 @@ namespace redux {
             int64_t getOffset( const std::vector<U>& indices ) const {
                 int64_t offset = 0;
                 if( indices.size() > currentSizes.size() ) {
-                    throw std::logic_error( "Array::getOffset() called with more indices than dimensions: " + printArray( indices, "indices" ) );
+                    throw std::logic_error( "Array::getOffset() called with more indices than dimensions." );
                 }
                 else {
                     size_t dimDiff = nDims_ - indices.size();

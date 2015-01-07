@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <map>
 
 namespace redux {
 
@@ -189,7 +190,7 @@ namespace redux {
         }
 
         template <typename T>
-        Array<T> apodize( const redux::util::Array<T>& array, size_t blendRegion );
+        redux::util::Array<T> apodize( const redux::util::Array<T>& array, size_t blendRegion );
         
         template <typename T>
         void checkIfMultiFrames( redux::image::Image<T>& img );

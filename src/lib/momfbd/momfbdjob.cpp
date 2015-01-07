@@ -1,22 +1,19 @@
 #include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/momfbd/util.hpp"
+#include "redux/momfbd/workspace.hpp"
 
-#include "redux/translators.hpp"
-#include "redux/file/fileio.hpp"
-#include "redux/constants.hpp"
 #include "redux/logger.hpp"
 #include "redux/util/bitoperations.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <boost/algorithm/string.hpp>
+using boost::algorithm::iequals;
 
 using namespace redux::momfbd;
-using namespace redux::file;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
-using boost::algorithm::iequals;
-
 
 #define lg Logger::mlg
 namespace {
@@ -52,7 +49,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts,
 }
 
 
-void MomfbdJob::parsePropertyTree( po::variables_map& vm, bpt::ptree& tree ) {
+void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
 
     Job::parsePropertyTree( vm, tree );
     LOG_DEBUG << "MomfbdJob::parsePropertyTree()";
@@ -192,7 +189,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         if(!wip.connection) {   // local worker, check if there are results to write
             LOG_DEBUG << "getWork(): LOCAL " << (bool)wip.connection;
             for( auto & it : patches ) {
-                //    LOG_DEBUG << "getWork(): patch " << it.second->id <<  "  step = " << bitString(it.second->step);
+                //LOG_DEBUG << "getWork(): patch " << it.second->id <<  "  step = " << bitString(it.second->step);
                 if( it.second->step & JSTEP_POSTPROCESS ) {
                     LOG_DEBUG << "getWork(): PP-patch   step = " << bitString(it.second->step);
                     wip.parts.push_back( it.second );
@@ -635,7 +632,7 @@ void MomfbdJob::postProcess( boost::asio::io_service& service ) {
 //     Ana::write( file, reinterpret_cast<char*>( *img ), hdr );
 
     info.step.store( JSTEP_COMPLETED );
-    info.state.store( JSTATE_IDLE );
+    info.state.store( 0 );
 
 }
 

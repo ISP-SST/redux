@@ -1,17 +1,12 @@
 #ifndef REDUX_IMAGE_IMAGE_HPP
 #define REDUX_IMAGE_IMAGE_HPP
 
-#include "redux/file/fileinfo.hpp"
 #include "redux/util/array.hpp"
-#include "redux/util/arrayutil.hpp"
-#include "redux/util/convert.hpp"
-#include "redux/util/datautil.hpp"
+#include "redux/file/fileinfo.hpp"
 
 #include <cstring>
 #include <memory>
 
-#include "redux/util/stringutil.hpp"
-using namespace redux::util;
 namespace redux {
 
     namespace image {
@@ -109,8 +104,8 @@ namespace redux {
 //             }
 
             template <typename U>
-            void copy( Array<U>& rhs ) const {
-                Array<T>::copy(rhs);
+            void copy( redux::util::Array<U>& rhs ) const {
+                redux::util::Array<T>::copy(rhs);
             }
 
 

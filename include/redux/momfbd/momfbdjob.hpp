@@ -9,6 +9,9 @@
 
 #include <map>
 
+#include <boost/program_options.hpp>
+namespace bpo = boost::program_options;
+
 namespace redux {
 
     namespace momfbd {
@@ -39,7 +42,7 @@ namespace redux {
 
             uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
             
-            void parsePropertyTree( po::variables_map& vm, bpt::ptree& tree );
+            void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
 
             uint64_t size( void ) const;

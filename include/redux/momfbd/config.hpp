@@ -1,12 +1,9 @@
 #ifndef REDUX_MOMFBD_CONFIG_HPP
 #define REDUX_MOMFBD_CONFIG_HPP
 
-#include <boost/asio.hpp>
-#include <boost/program_options.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/thread.hpp>
+#include <map>
 
-namespace po = boost::program_options;
+#include <boost/property_tree/ptree.hpp>
 namespace bpt = boost::property_tree;
 
 
