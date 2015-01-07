@@ -44,20 +44,20 @@ namespace redux {
 }
 
 
-#define LOG_TRACE BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_trace)
-#define LOG_DEBUG BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_debug)
-#define LOG_DETAIL BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_detail)
-#define LOG BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_normal)
-#define LOG_WARN BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_warning)
-#define LOG_ERR BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_error)
-#define LOG_CRITICAL BOOST_LOG_CHANNEL_SEV(lg, thisChannel, sev_critical)
+#define LOG_TRACE BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_trace)
+#define LOG_DEBUG BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_debug)
+#define LOG_DETAIL BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_detail)
+#define LOG BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_normal)
+#define LOG_WARN BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_warning)
+#define LOG_ERR BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_error)
+#define LOG_CRITICAL BOOST_LOG_CHANNEL_SEV(lg, thisChannel, redux::sev_critical)
 
-#define LOGC_TRACE(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_trace)
-#define LOGC_DEBUG(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_debug)
-#define LOGC_DETAIL(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_detail)
-#define LOGC(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_normal)
-#define LOGC_WARN(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_warning)
-#define LOGC_ERR(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_error)
-#define LOGC_CRITICAL(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, sev_critical)
+#define LOGC_TRACE(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_trace)
+#define LOGC_DEBUG(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_debug)
+#define LOGC_DETAIL(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_detail)
+#define LOGC(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_normal)
+#define LOGC_WARN(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_warning)
+#define LOGC_ERR(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_error)
+#define LOGC_CRITICAL(chan) BOOST_LOG_CHANNEL_SEV(lg, chan, redux::sev_critical)
 
 #endif  // REDUX_LOGGER_HPP
