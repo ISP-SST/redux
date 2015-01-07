@@ -334,7 +334,16 @@ namespace {
             BOOST_CHECK_EQUAL( count, tmp.size() );
             BOOST_CHECK( tmp == tmp2 );
 
+            Array<T> tmp3;
+            buf = sharedArray<char>( tmp3.size() );
+            ptr = buf.get();
+            count = tmp3.pack(ptr);
+            BOOST_CHECK_EQUAL( count, tmp3.size() );
             
+            count = tmp.unpack(ptr,false);
+            BOOST_CHECK_EQUAL( count, tmp3.size() );
+            BOOST_CHECK_EQUAL( count, tmp.size() );
+            BOOST_CHECK( tmp == tmp3 );
         }
         
     }

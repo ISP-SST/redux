@@ -29,12 +29,156 @@ using namespace std;
 using namespace boost::unit_test_framework;
 
 namespace {
-    
-        
+
     void cfgTest( void ) {
-return;
-        bpo::variables_map vm;
+        
         bpt::ptree tree;
+        stringstream cfg;
+
+        ChannelCfg ccfg;
+        {
+            ccfg.arcSecsPerPixel = ccfg.pixelSize = ccfg.rotationAngle = ccfg.weight = ccfg.borderClip = ccfg.maxLocalShift = 137; // just some non-default values
+            ccfg.imageDataDirl = "path/to/data/";
+            ccfg.imageNumbers = {23,45};
+            ccfg.darkNumbersl = {145,88};
+            // export settings as config file and parse/compare
+            tree.clear();
+            ccfg.getProperties(tree);
+            cfg.clear();
+            bpt::write_info( cfg, tree );   // basically just to test that the ptree is valid
+            bpt::read_info( cfg, tree );
+            ChannelCfg tmp;
+            BOOST_CHECK( !(ccfg == tmp) );
+            tmp.parseProperties( tree );
+            BOOST_CHECK( ccfg == tmp );
+            // pack/unpack and compare
+            auto buf = sharedArray<char>( ccfg.size() );
+            char* ptr = buf.get();
+            uint64_t count = ccfg.pack( ptr );
+            BOOST_CHECK_EQUAL( count, ccfg.size() );
+            tmp = ChannelCfg();
+            count = tmp.unpack( ptr, false );
+            BOOST_CHECK_EQUAL( count, ccfg.size() );
+            BOOST_CHECK_EQUAL( count, tmp.size() );
+            BOOST_CHECK( ccfg == tmp );
+            tmp.arcSecsPerPixel = 15;       // modify
+            BOOST_CHECK( !(ccfg == tmp) );
+            tmp = ccfg;                     // assign
+            BOOST_CHECK( ccfg == tmp );
+        }
+    /*      return (saveMask == rhs.saveMask) &&
+           (patchSize == rhs.patchSize) &&
+           (pupilSize == rhs.pupilSize) &&
+           (wavelength == rhs.wavelength) &&
+           (outputFileName == rhs.outputFileName) &&
+           (pupilFile == rhs.pupilFile) &&
+           ChannelCfg::operator==(rhs);
+  */
+        ObjectCfg ocfg;
+        {
+            ocfg.saveMask = ocfg.patchSize = ocfg.pupilSize = ocfg.wavelength = 122; // just some non-default values
+            ocfg.outputFileName = "filename.ext";
+            ocfg.pupilFile = "pupilfile.ext";
+            // export settings as config file and parse/compare
+            tree.clear();
+            ocfg.getProperties(tree);
+            cfg.clear();
+            bpt::write_info( cfg, tree );   // basically just to test that the ptree is valid
+            bpt::read_info( cfg, tree );
+            ObjectCfg tmp;
+            BOOST_CHECK( !(ocfg == tmp) );
+            tmp.parseProperties( tree );
+            BOOST_CHECK( ocfg == tmp );
+            // pack/unpack and compare
+            auto buf = sharedArray<char>( ocfg.size() );
+            char* ptr = buf.get();
+            uint64_t count = ocfg.pack( ptr );
+            BOOST_CHECK_EQUAL( count, ocfg.size() );
+            tmp = ObjectCfg();
+            count = tmp.unpack( ptr, false );
+            BOOST_CHECK_EQUAL( count, ocfg.size() );
+            BOOST_CHECK_EQUAL( count, tmp.size() );
+            BOOST_CHECK( ocfg == tmp );
+            BOOST_CHECK( ChannelCfg() == tmp );
+            tmp.patchSize = 15;              // modify
+            BOOST_CHECK( !(ocfg == tmp) );
+            tmp = ocfg;                     // assign
+            BOOST_CHECK( ocfg == tmp );
+            tmp.arcSecsPerPixel = 15;       // modify ChannelCfg
+            BOOST_CHECK( !(ocfg == tmp) );
+            tmp = ChannelCfg();             // assign default ChannelCfg
+            BOOST_CHECK( ocfg == tmp );
+        }
+
+        GlobalCfg gcfg;
+        {
+            gcfg.runFlags = 4095;
+            gcfg.modeBasis = 2;
+            gcfg.klMinMode = gcfg.klMaxMode = gcfg.klCutoff = gcfg.nInitialModes = gcfg.nModeIncrement = 118;
+            gcfg.telescopeD = gcfg.telescopeF = gcfg.minIterations = gcfg.maxIterations = 119;
+            gcfg.fillpixMethod = gcfg.getstepMethod = 3;
+            gcfg.gradientMethod = 2;
+            gcfg.badPixelThreshold = gcfg.FTOL = gcfg.EPS = gcfg.reg_gamma = gcfg.sequenceNumber = 117;
+            gcfg.outputFileType = gcfg.outputDataType = 1;
+            gcfg.modeNumbers = {2,56};
+            gcfg.observationTime = "time";
+            gcfg.observationDate = "date";
+            gcfg.tmpDataDir = "/datadir/";
+            gcfg.outputFiles = {"file1","file2"};
+            // export settings as config file and parse/compare
+            tree.clear();
+            gcfg.getProperties(tree);
+            cfg.clear();
+            bpt::write_info( cfg, tree );   // basically just to test that the ptree is valid
+            bpt::read_info( cfg, tree );
+            GlobalCfg tmp;
+            BOOST_CHECK( !(gcfg == tmp) );
+            tmp.parseProperties( tree );
+            BOOST_CHECK( gcfg == tmp );
+            // pack/unpack and compare
+            auto buf = sharedArray<char>( gcfg.size() );
+            char* ptr = buf.get();
+            uint64_t count = gcfg.pack( ptr );
+            BOOST_CHECK_EQUAL( count, gcfg.size() );
+            tmp = GlobalCfg();
+            count = tmp.unpack( ptr, false );
+            BOOST_CHECK_EQUAL( count, gcfg.size() );
+            BOOST_CHECK_EQUAL( count, tmp.size() );
+            BOOST_CHECK( gcfg == tmp );
+            BOOST_CHECK( ObjectCfg() == tmp );
+            BOOST_CHECK( ChannelCfg() == tmp );
+            tmp.telescopeD = 15;             // modify
+            BOOST_CHECK( !(gcfg == tmp) );
+            tmp = gcfg;                     // assign
+            tmp.saveMask = 15;              // modify ObjectCfg
+            BOOST_CHECK( !(gcfg == tmp) );
+            tmp = ObjectCfg();              // assign default ObjectCfg
+            BOOST_CHECK( gcfg == tmp );
+            tmp.arcSecsPerPixel = 15;       // modify ChannelCfg
+            BOOST_CHECK( !(gcfg == tmp) );
+            tmp = ChannelCfg();             // assign default ChannelCfg
+            BOOST_CHECK( gcfg == tmp );
+        }
+        
+        BOOST_CHECK( !(ccfg == ocfg) );     // using ChannelCfg::operator==() ->  should not be equal
+        ocfg = ccfg;
+        BOOST_CHECK( ccfg == ocfg );        // now they are equal
+ 
+        BOOST_CHECK( !(ocfg == gcfg) );     // using ObjectCfg::operator==()  ->  should not be equal
+        gcfg = ocfg;
+        BOOST_CHECK( ocfg == gcfg );        // now they are equal
+        
+        MomfbdJob mjob;
+        mjob = gcfg;                        // assign cfg to job-class
+        BOOST_CHECK( gcfg == mjob );        // using GlobalCfg::operator==()  ->  should be equal
+        
+//         gcfg.getProperties(tree);
+//         bpt::write_info( cout<<endl, tree );
+
+
+return;
+//         bpo::variables_map vm;
+//         bpt::ptree tree;
         
 //         boost::any v(0);
 //         bpo::variable_value vv(v,false);
@@ -44,15 +188,14 @@ return;
 //        redux::Logger logger( vm );
 //        logger.addNullLog();
 
-        MomfbdJob mjob;
-        
+/*        
         stringstream cfg;
         cfg << "object { }";
         
         bpt::read_info( cfg, tree );
-        mjob.parseProperties( vm, tree );
+        mjob.parsePropertyTree( vm, tree );
         
-        bpt::write_info( cout<<endl, tree );
+        bpt::write_info( cout<<endl, tree );*/
         
     }
 
