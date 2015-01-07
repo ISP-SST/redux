@@ -30,7 +30,7 @@ namespace redux {
             size_t nPixels(void);
             size_t nPixelsX(void);
             size_t nPixelsY(void);
-            size_t size( void ) const;
+            uint64_t size( void ) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
             bool operator==(const PatchData&);
@@ -39,8 +39,9 @@ namespace redux {
         /*! Datastructure to contain the result/info sent back from the slaves after processing.
          */
         struct PatchResult : public Part {
+            PatchResult(const PatchData&);
             redux::util::Array<float> restoredObjects, modeCoefficients, PSFs;
-            size_t size( void ) const;
+            uint64_t size( void ) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
  

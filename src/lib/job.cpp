@@ -29,6 +29,7 @@ namespace {
     const std::string StateTags[10] = { "-", "Pre", "Q", "D", "C", "Post", "I", "A", "P", "E" };
 
     mutex globalJobMutex;
+    /*const*/ Job::Info defaults;
     
 #ifdef DBG_JOB_
     static atomic<int> jobCounter(0);
@@ -37,28 +38,38 @@ namespace {
 }
 
 
-size_t Job::registerJob( const string& name, JobCreator f ) {
-    static size_t nJobTypes( 0 );
-    std::unique_lock<mutex> lock( globalJobMutex );
-    auto ret = getMap().insert( { boost::to_upper_copy( name ), {nJobTypes + 1, f}} );
-    if( ret.second ) {
+void redux::runThreadsAndWait(boost::asio::io_service& service, uint8_t nThreads) {
+    boost::thread_group pool;
+    for(size_t t = 0; t < nThreads; ++t) {
+        pool.create_thread(boost::bind(&boost::asio::io_service::run, &service));
+    }
+    pool.join_all();
+    service.reset();        // reset service so that next call will not fail
+}
+
+
+size_t Job::registerJob(const string& name, JobCreator f) {
+    static size_t nJobTypes(0);
+    std::unique_lock<mutex> lock(globalJobMutex);
+    auto ret = getMap().insert({ boost::to_upper_copy(name), {nJobTypes + 1, f}});
+    if(ret.second) {
         return ret.first->second.first;
     }
     return nJobTypes++;
 }
 
 
-vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
+vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, bool check) {
     vector<JobPtr> tmp;
-    std::unique_lock<mutex> lock( globalJobMutex );
-    for( auto & it : tree ) {
+    std::unique_lock<mutex> lock(globalJobMutex);
+    for(auto & it : tree) {
         string name = it.first;
-        auto it2 = getMap().find( boost::to_upper_copy( name ) );       // check if the current tag matches a registered (Job-derived) class.
-        if( it2 != getMap().end() ) {
+        auto it2 = getMap().find(boost::to_upper_copy(name));       // check if the current tag matches a registered (Job-derived) class.
+        if(it2 != getMap().end()) {
             Job* tmpJob = it2->second.second();
-            tmpJob->parseProperties( vm, it.second );
-            if( tmpJob->check() ) {
-                tmp.push_back( shared_ptr<Job>( tmpJob ) );
+            tmpJob->parsePropertyTree(vm, it.second);
+            if(!check || tmpJob->check()) {
+                tmp.push_back(shared_ptr<Job>(tmpJob));
             } else LOG_WARN << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
         } else {
 #ifdef DEBUG_
@@ -70,12 +81,12 @@ vector<Job::JobPtr> Job::parseTree( po::variables_map& vm, bpt::ptree& tree ) {
 }
 
 
-Job::JobPtr Job::newJob( const string& name ) {
+Job::JobPtr Job::newJob(const string& name) {
     JobPtr tmp;
-    std::unique_lock<mutex> lock( globalJobMutex );
-    auto it = getMap().find( boost::to_upper_copy( name ) );
-    if( it != getMap().end() ) {
-        tmp.reset( it->second.second() );
+    std::unique_lock<mutex> lock(globalJobMutex);
+    auto it = getMap().find(boost::to_upper_copy(name));
+    if(it != getMap().end()) {
+        tmp.reset(it->second.second());
     } else {
 #ifdef DEBUG__
         LOG_WARN << "No job with tag \"" << name << "\" registered.";
@@ -85,9 +96,9 @@ Job::JobPtr Job::newJob( const string& name ) {
 }
 
 
-string Job::stateString( uint8_t state ) {
+string Job::stateString(uint8_t state) {
 
-    switch( state ) {
+    switch(state) {
         case JSTATE_IDLE: return "idle";
         case JSTATE_ACTIVE: return "active";
         case JSTATE_PAUSED: return "paused";
@@ -99,9 +110,9 @@ string Job::stateString( uint8_t state ) {
 }
 
 
-string Job::stateTag( uint8_t state ) {
+string Job::stateTag(uint8_t state) {
 
-    switch( state ) {
+    switch(state) {
         case JSTATE_IDLE: return "I";
         case JSTATE_ACTIVE: return "A";
         case JSTATE_PAUSED: return "P";
@@ -113,117 +124,111 @@ string Job::stateTag( uint8_t state ) {
 }
 
 
-Job::Info::Info( void ) : id( 0 ), priority( 0 ), verbosity( 0 ), step( 0 ), state( JSTATE_IDLE ) {
+Job::Info::Info(void) : id(0), priority(10), verbosity(0), maxThreads(255), maxPartRetries(1),
+         step(0), state(JSTATE_IDLE) {
 
 }
 
 
-size_t Job::Info::size( void ) const {
-    size_t sz = sizeof( size_t ) + sizeof( time_t ) + 6;
-    sz += typeString.length() + name.length() + user.length() + host.length() + logFile.length() + 5 ;
+uint64_t Job::Info::size(void) const {
+    uint64_t sz = sizeof(uint32_t) + 6;
+    sz += typeString.length() + name.length() + user.length() + host.length() + logFile.length() + 5;
+    sz += 3*sizeof(time_t);
     return sz;
 }
 
 
-uint64_t Job::Info::pack( char* ptr ) const {
-
+uint64_t Job::Info::pack(char* ptr) const {
     using redux::util::pack;
-    
-    uint64_t count = pack( ptr, typeString );    // NB: the type-string has to be first in the packed block,
-    count += pack( ptr+count, name );            //   it is used to identify which job-class to instantiate on the receiving side.
-    count += pack( ptr+count, user );
-    count += pack( ptr+count, host );
-    count += pack( ptr+count, logFile );
-    count += pack( ptr+count, id );
-    count += pack( ptr+count, priority );
-    count += pack( ptr+count, verbosity );
-    count += pack( ptr+count, maxThreads );
-    count += pack( ptr+count, maxPartRetries );
-    count += pack( ptr+count, step.load() );
-    count += pack( ptr+count, state.load() );
-    count += pack( ptr+count, to_time_t( submitTime ) );
-
+    uint64_t count = pack(ptr, typeString);    // NB: the type-string has to be first in the packed block,
+    count += pack(ptr+count, id);              //   it is used to identify which job-class to instantiate on the receiving side.
+    count += pack(ptr+count, priority);
+    count += pack(ptr+count, verbosity);
+    count += pack(ptr+count, maxThreads);
+    count += pack(ptr+count, maxPartRetries);
+    count += pack(ptr+count, step.load());
+    count += pack(ptr+count, state.load());
+    count += pack(ptr+count, name);
+    count += pack(ptr+count, user);
+    count += pack(ptr+count, host);
+    count += pack(ptr+count, logFile);
+    count += pack(ptr+count, to_time_t(submitTime));
+    count += pack(ptr+count, to_time_t(startedTime));
+    count += pack(ptr+count, to_time_t(completedTime));
     return count;
-
 }
 
 
-uint64_t Job::Info::unpack( const char* ptr, bool swap_endian ) {
-
+uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
-    
-    uint64_t count = unpack( ptr, typeString );
-    count += unpack( ptr+count, name );
-    count += unpack( ptr+count, user );
-    count += unpack( ptr+count, host );
-    count += unpack( ptr+count, logFile );
-    count += unpack( ptr+count, id, swap_endian );
-    count += unpack( ptr+count, priority );
-    count += unpack( ptr+count, verbosity );
-    count += unpack( ptr+count, maxThreads );
-    count += unpack( ptr+count, maxPartRetries );
+    uint64_t count = unpack(ptr, typeString);
+    count += unpack(ptr+count, id, swap_endian);
+    count += unpack(ptr+count, priority);
+    count += unpack(ptr+count, verbosity);
+    count += unpack(ptr+count, maxThreads);
+    count += unpack(ptr+count, maxPartRetries);
     uint8_t tmp;
-    count += unpack( ptr+count, tmp );
-    step.store( tmp );
-    count += unpack( ptr+count, tmp );
-    state.store( tmp );
+    count += unpack(ptr+count, tmp);
+    step.store(tmp);
+    count += unpack(ptr+count, tmp);
+    state.store(tmp);
+    count += unpack(ptr+count, name);
+    count += unpack(ptr+count, user);
+    count += unpack(ptr+count, host);
+    count += unpack(ptr+count, logFile);
     time_t timestamp;
-    count += unpack( ptr+count, timestamp, swap_endian );
-    submitTime = boost::posix_time::from_time_t( timestamp );
-
+    count += unpack(ptr+count, timestamp, swap_endian);
+    submitTime = boost::posix_time::from_time_t(timestamp);
+    count += unpack(ptr+count, timestamp, swap_endian);
+    startedTime = boost::posix_time::from_time_t(timestamp);
+    count += unpack(ptr+count, timestamp, swap_endian);
+    completedTime = boost::posix_time::from_time_t(timestamp);
     return count;
 }
 
 
-std::string Job::Info::printHeader( void ) {
-    string hdr = alignRight( "ID", 5 ) + alignCenter( "type", 10 ) + alignCenter( "submitted", 20 );
-    hdr += alignCenter( "name", 15 ) + alignLeft( "user", 15 ) + alignCenter( "priority", 8 ) + alignCenter( "state", 8 );
+std::string Job::Info::printHeader(void) {
+    string hdr = alignRight("ID", 5) + alignCenter("type", 10) + alignCenter("submitted", 20);
+    hdr += alignCenter("name", 15) + alignLeft("user", 15) + alignCenter("priority", 8) + alignCenter("state", 8);
     return hdr;
 }
 
 
-std::string Job::Info::print( void ) {
-    string info = alignRight( std::to_string( id ), 5 ) + alignCenter( typeString, 10 );
-    info += alignCenter( to_iso_extended_string( submitTime ), 20 );
-    info += alignCenter( name, 15 ) + alignLeft( user + "@" + host, 15 ) + alignCenter( std::to_string( priority ), 8 )
-    + alignCenter( stateTag( state ), 3 ); // + alignLeft( stepString( step ), 15 );
+std::string Job::Info::print(void) {
+    string info = alignRight(std::to_string(id), 5) + alignCenter(typeString, 10);
+    info += alignCenter(to_iso_extended_string(submitTime), 20);
+    info += alignCenter(name, 15) + alignLeft(user + "@" + host, 15) + alignCenter(std::to_string(priority), 8)
+    + alignCenter(stateTag(state), 3); // + alignLeft(stepString(step), 15);
     return info;
 }
 
 
-void Job::parseProperties( po::variables_map&, bpt::ptree& tree ) {
+void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
     
-    //LOG_TRACE << "Job::parseProperties()";
-    
-    info.priority = tree.get<uint8_t>( "PRIORITY", 10 );
-    info.logFile = tree.get<string>( "LOGFILE", "" );
-    info.verbosity = tree.get<uint8_t>( "VERBOSITY", 0 );
-    info.maxThreads = tree.get<uint8_t>( "MAX_THREADS", 255 );
-    info.maxPartRetries = tree.get<uint8_t>( "MAX_PART_RETRIES", 0 );
+    info.priority = tree.get<uint8_t>("PRIORITY", defaults.priority);
+    info.verbosity = tree.get<uint8_t>("VERBOSITY", defaults.verbosity);
+    info.maxThreads = tree.get<uint8_t>("MAX_THREADS", defaults.maxThreads);
+    info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", defaults.maxPartRetries);
+    info.logFile = tree.get<string>("LOGFILE", defaults.logFile);
     
 }
 
 
-bpt::ptree Job::getPropertyTree( bpt::ptree* root ) {
-
+bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
     bpt::ptree tree;
-
-    tree.put( "PRIORITY", info.priority );
-    tree.put( "LOGFILE", info.logFile );
-    tree.put( "VERBOSITY", info.verbosity );
-    tree.put( "MAX_THREADS", info.maxThreads );
-    tree.put( "MAX_PART_RETRIES", info.maxPartRetries );
-
-    if( root ) {
-        root->push_back( bpt::ptree::value_type( "job", tree ) );
+    if(info.priority != defaults.priority) tree.put("PRIORITY", info.priority);
+    if(info.verbosity != defaults.verbosity) tree.put("VERBOSITY", info.verbosity);
+    if(info.maxThreads != defaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);
+    if(info.maxPartRetries != defaults.maxPartRetries) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
+    if(info.logFile != defaults.logFile) tree.put("LOGFILE", info.logFile);
+    if(root) {
+        root->push_back(bpt::ptree::value_type("job", tree));
     }
-
     return tree;
-
 }
 
 
-Job::Job( void ) {
+Job::Job(void) {
     info.user = getUname();
     info.host = boost::asio::ip::host_name();
 #ifdef DBG_JOB_
@@ -232,34 +237,33 @@ Job::Job( void ) {
 }
 
 
-Job::~Job( void ) {
+Job::~Job(void) {
 #ifdef DBG_JOB_
     LOG_DEBUG << "Destructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1);
 #endif
 }
 
 
-size_t Job::size( void ) const {
-    size_t sz = info.size();
-    return sz;
+uint64_t Job::size(void) const {
+    return info.size();
 }
 
 
-uint64_t Job::pack( char* ptr ) const {
-    return info.pack( ptr );
+uint64_t Job::pack(char* ptr) const {
+    return info.pack(ptr);
 }
 
 
-uint64_t Job::unpack( const char* ptr, bool swap_endian ) {
-    return info.unpack( ptr, swap_endian );
+uint64_t Job::unpack(const char* ptr, bool swap_endian) {
+    return info.unpack(ptr, swap_endian);
 }
 
 
-bool Job::operator<( const Job& rhs ) {
-    return ( info.id < rhs.info.id );
+bool Job::operator<(const Job& rhs) {
+    return (info.id < rhs.info.id);
 }
 
 
-bool Job::operator!=( const Job& rhs ) {
-    return ( info.id != rhs.info.id );
+bool Job::operator!=(const Job& rhs) {
+    return (info.id != rhs.info.id);
 }

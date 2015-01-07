@@ -18,9 +18,9 @@ namespace redux {
     struct Part {
         typedef std::shared_ptr<Part> Ptr;
         Part();
-        Part(const Part&) = delete;
+        //Part(const Part&) = delete;
         virtual ~Part();
-        virtual size_t size( void ) const;
+        virtual uint64_t size( void ) const;
         virtual uint64_t pack( char* ) const;
         virtual uint64_t unpack( const char*, bool swap_endian=false );
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
@@ -34,7 +34,7 @@ namespace redux {
         WorkInProgress(network::TcpConnection::Ptr c=0);
         WorkInProgress(const WorkInProgress&);
         ~WorkInProgress();
-        size_t size( bool includeJob ) const;
+        uint64_t size( bool includeJob ) const;
         uint64_t pack( char*, bool includeJob) const;
         uint64_t unpack( const char*, bool swap_endian=false );
         std::string print(void);

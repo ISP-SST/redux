@@ -45,6 +45,7 @@ namespace redux {
         typedef PointType<double> PointD;
         typedef PointType<float> PointF;
         typedef PointType<int> PointI;
+        typedef PointType<uint16_t> Point16;
         typedef PointType<uint32_t> Point;
 
         /*!

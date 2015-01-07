@@ -1,7 +1,6 @@
 #include "redux/momfbd/workspace.hpp"
 
 #include "redux/momfbd/momfbdjob.hpp"
-#include "redux/momfbd/defines.hpp"
 #include "redux/image/utils.hpp"
 
 #include "redux/file/fileana.hpp"

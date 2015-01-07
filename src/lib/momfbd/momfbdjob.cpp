@@ -1,6 +1,5 @@
 #include "redux/momfbd/momfbdjob.hpp"
 
-#include "redux/momfbd/defines.hpp"
 #include "redux/momfbd/util.hpp"
 
 #include "redux/translators.hpp"

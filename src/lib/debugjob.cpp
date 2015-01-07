@@ -62,7 +62,6 @@ uint64_t DebugJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, 
 
 DebugJob::DebugJob( void ) : maxIterations( 1000 ), gamma( 1 ), xSize( 1920 ), ySize( 1080 ), coordinates { -1.9, 1.9, -0.9, 0.9 } {
     info.typeString = "debugjob";
-
 }
 
 
@@ -71,9 +70,9 @@ DebugJob::~DebugJob( void ) {
 }
 
 
-void DebugJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
+void DebugJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
     
-    Job::parseProperties( vm, tree );
+    Job::parsePropertyTree( vm, tree );
     
     maxIterations = tree.get<uint32_t>( "MAX_ITERATIONS", 1000 );
     patchSize = tree.get<uint32_t>( "PATCH_SIZE", 200 );
@@ -331,7 +330,8 @@ void DebugJob::runMain( Part::Ptr& part ) {
 #endif
     
     auto pptr = static_pointer_cast<DebugPart>( part );
-
+    //part->step = JSTEP_POSTPROCESS;
+    //return;
     // temporaries, to avoid cache collisions.
     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
     uint32_t sizeY = pptr->yPixelH - pptr->yPixelL + 1;
@@ -346,7 +346,10 @@ void DebugJob::runMain( Part::Ptr& part ) {
 
     int32_t pid = getpid();
 
-    auto tmp = sharedArray<int64_t>( sizeY, sizeX );
+//     auto tmp = sharedArray<int64_t>( sizeY, sizeX );
+//     auto ptr = tmp.get();
+    pptr->result.resize( sizeY, sizeX );
+    auto tmp = pptr->result.get(sizeY, sizeX);
     auto ptr = tmp.get();
 
     for( uint32_t ix = 0; ix < sizeX; ++ix ) {
@@ -370,8 +373,8 @@ void DebugJob::runMain( Part::Ptr& part ) {
         }
     }
 
-    pptr->result.resize( sizeY, sizeX );
-    memcpy( pptr->result.ptr(), tmp.get()[0], sizeY * sizeX * sizeof( int64_t ) );
+    //pptr->result.resize( sizeY, sizeX );
+    //memcpy( pptr->result.ptr(), tmp.get()[0], sizeY * sizeX * sizeof( int64_t ) );
 
     part->step = JSTEP_POSTPROCESS;
 
@@ -384,7 +387,9 @@ void DebugJob::postProcess( void ) {
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::postProcess()";
 #endif
-    
+    //info.step.store( JSTEP_COMPLETED );
+    //info.state.store( JSTATE_IDLE );
+    //return;
     auto image = sharedArray<int16_t>( ySize, xSize );
     int16_t** img = image.get();
 

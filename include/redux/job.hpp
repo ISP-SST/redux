@@ -14,7 +14,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/thread/thread.hpp>
 
-namespace po = boost::program_options;
+namespace bpo = boost::program_options;
 namespace bpt = boost::property_tree;
 
 
@@ -23,6 +23,8 @@ namespace redux {
     /*! @ingroup redux
      *  @{
      */
+    
+    void runThreadsAndWait(boost::asio::io_service& service, uint8_t nThreads );
 
     struct WorkInProgress;
     
@@ -49,7 +51,7 @@ namespace redux {
 
         static MapT& getMap(void) { static MapT m; return m; };
         static size_t registerJob( const std::string&, JobCreator f );
-        static std::vector<JobPtr> parseTree( po::variables_map& vm, bpt::ptree& tree );
+        static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, bool check=false );
         static JobPtr newJob( const std::string& );
         
         virtual std::string stepString(uint8_t) { return "-"; };
@@ -57,15 +59,17 @@ namespace redux {
         static std::string stateTag(uint8_t);
         
         struct Info {
-            size_t id;
+            uint32_t id;
             uint8_t priority, verbosity, maxThreads, maxPartRetries;
             std::atomic<uint8_t> step;
             std::atomic<uint8_t> state;
             std::string typeString, name, user, host;
             std::string logFile;
             boost::posix_time::ptime submitTime;
+            boost::posix_time::ptime startedTime;
+            boost::posix_time::ptime completedTime;
             Info();
-            size_t size(void) const;
+            uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             static std::string printHeader(void);
@@ -74,7 +78,7 @@ namespace redux {
         
         virtual uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>& p, bool) { p.clear(); return 0; };
         
-        virtual void parseProperties( po::variables_map&, bpt::ptree& );
+        virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree& );
         /*! @brief Returns a boost::property_tree containing the settings for this job.
          *  @details If a ptree pointer is provided, the tree will also be appended to it,
          *  inside a named block
@@ -91,7 +95,7 @@ namespace redux {
         Job(const Job&) = delete;
         virtual ~Job(void);
 
-        virtual size_t size(void) const;
+        virtual uint64_t size(void) const;
         virtual uint64_t pack(char*) const;
         virtual uint64_t unpack(const char*, bool);
 

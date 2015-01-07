@@ -59,7 +59,7 @@ Logger::Logger( bpo::variables_map& vm ) {
 
     boost::log::add_common_attributes();
 
-    if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, used it.
+    if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, use it.
         defaultSeverity = vm["verbosity"].as<int>();
     }
         

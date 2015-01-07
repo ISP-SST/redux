@@ -1,7 +1,7 @@
 #ifndef REDUX_TRANSLATORS_HPP
 #define REDUX_TRANSLATORS_HPP
 
-#include "redux/momfbd/defines.hpp"
+#include "redux/momfbd/config.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <algorithm>
@@ -130,7 +130,7 @@ namespace redux {
                     std::transform(tok.begin(), tok.end(), back_inserter(result), boost::lexical_cast<T, internal_type>);
                 }
             }
-            return external_type(result);
+            return result;
         }
 
         // Converts a vector to a comma-separated string

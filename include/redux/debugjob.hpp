@@ -41,7 +41,7 @@ namespace redux {
         DebugJob( const DebugJob& ) = delete;
         ~DebugJob(void);
 
-        void parseProperties( po::variables_map& vm, bpt::ptree& tree );
+        void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
         bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
         
         size_t size(void) const;

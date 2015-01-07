@@ -82,7 +82,8 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-    LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size() << "  nPeers = " << peers.size() << " nPeerWIP = " << peerWIP.size();
+    LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
+    << "  nPeers = " << peers.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size();
 
     updateLoadAvg();
     cleanup();
@@ -276,8 +277,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                 ids.push_back( jobCounter );
                 ids[0]++;
                 jobs.push_back( job );
-            }
-            else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
+            } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
         }
     }
     catch( const exception& e ) {
@@ -310,6 +310,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             if( jobs.size() ) LOG << "Clearing joblist.";
             jobs.clear();
+            stop();
             return;
         }
 
@@ -359,7 +360,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
 }
 
-Job::JobPtr Daemon::selectJob( bool localRequest ) {
+/*Job::JobPtr Daemon::selectJob( bool localRequest ) {
     Job::JobPtr job;
     for( auto & it : jobs ) {
         if( it->info.step.load() < Job::JSTEP_RUNNING ) {
@@ -368,7 +369,7 @@ Job::JobPtr Daemon::selectJob( bool localRequest ) {
         }
     }
     return job;
-}
+}*/
 
 bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
@@ -484,14 +485,16 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     
     WorkInProgress& wip = it->second;
     if( blockSize ) {
-        LOG_DEBUG << "putParts():  blockSize = " << blockSize;
-        LOG_DEBUG << "putParts():  wip = " << wip.print();
+        //LOG_DEBUG << "putParts():  blockSize = " << blockSize;
+        //LOG_DEBUG << "putParts():  wip = " << wip.print();
         wip.unpack( buf.get(), conn->getSwapEndian() );
-        LOG_DEBUG << "putParts(): wip2 = " << wip.print();
+        //LOG_DEBUG << "putParts(): wip2 = " << wip.print();
         wip.job->returnResults( wip );
+        //LOG_DEBUG << "putParts(): wip3 = " << wip.print();
+    } else {
+        LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
     }
-    else LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
-
+    
     *conn << CMD_OK;         // all ok
 
 }

@@ -4,7 +4,6 @@
 
 #include "redux/util/datautil.hpp"
 
-#include "redux/momfbd/defines.hpp"
 
 using namespace redux::momfbd;
 using namespace redux::util;
@@ -50,8 +49,8 @@ size_t PatchData::nPixelsY(void) {
 }
 
 
-size_t PatchData::size( void ) const {
-    size_t sz = Part::size();
+uint64_t PatchData::size( void ) const {
+    uint64_t sz = Part::size();
     sz += 3*Point::size() + PointF::size();
     sz += images.size();
     return sz;
@@ -94,8 +93,13 @@ bool PatchData::operator==(const PatchData& rhs) {
 }
 
 
-size_t PatchResult::size( void ) const {
-    size_t sz = Part::size();
+PatchResult::PatchResult(const PatchData& rhs) : Part(rhs) {
+    
+}
+
+
+uint64_t PatchResult::size( void ) const {
+    uint64_t sz = Part::size();
     sz += restoredObjects.size();
     sz += modeCoefficients.size();
     sz += PSFs.size();
@@ -108,7 +112,7 @@ uint64_t PatchResult::pack( char* ptr ) const {
     uint64_t count = Part::pack( ptr );
     count += restoredObjects.pack(ptr+count);
     count += modeCoefficients.pack(ptr+count);
-    count += PSFs.pack(ptr);
+    count += PSFs.pack(ptr+count);
     return count;
 }
 

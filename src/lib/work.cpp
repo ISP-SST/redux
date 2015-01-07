@@ -10,8 +10,8 @@ using namespace redux;
 using namespace std;
 
 #ifdef DEBUG_
-#define DBG_PART_
-#define DBG_WIP_
+//#define DBG_PART_
+//#define DBG_WIP_
 #define lg Logger::mlg
 #endif
 
@@ -39,7 +39,7 @@ Part::~Part() {
 #endif
 }
 
-size_t Part::size( void ) const {
+uint64_t Part::size( void ) const {
     return sizeof( id ) + sizeof( step ) + sizeof( nRetries ) ;
 }
 
@@ -88,9 +88,9 @@ WorkInProgress::~WorkInProgress() {
 }
 
 
-size_t WorkInProgress::size( bool includeJob ) const {
+uint64_t WorkInProgress::size( bool includeJob ) const {
     
-    size_t sz = sizeof( size_t ) + sizeof(nCompleted) + 1 ; // nParts + includeJob
+    uint64_t sz = sizeof( size_t ) + sizeof(nCompleted) + 1 ; // nParts + includeJob
     if( includeJob ) {
         sz += job->size();
     }
