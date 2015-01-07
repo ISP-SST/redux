@@ -147,7 +147,7 @@ const map<string, int> redux::momfbd::getstepMap = {
 /********************  Channel  ********************/
 
 ChannelCfg::ChannelCfg() : arcSecsPerPixel(0), pixelSize(1E-5), rotationAngle(0), noiseFudge(1), weight(1),
-                           borderClip(10), maxLocalShift(5), incompletel(0), mmRowl(0), mmWidthl(0),
+                           borderClip(10), maxLocalShift(5), incomplete(0), mmRow(0), mmWidth(0),
                            imageNumberOffset(0) {
 
 }
@@ -207,13 +207,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         }
     }
 
-    alignClipl = tree.get<vector<int16_t>>( "ALIGN_CLIP", defaults.alignClipl );
+    alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", defaults.alignClip );
     borderClip = tree.get<uint16_t>("BORDER_CLIP", defaults.borderClip);
     maxLocalShift = tree.get<uint16_t>("MAX_LOCAL_SHIFT", defaults.maxLocalShift);
-    incompletel = tree.get<bool>( "INCOMPLETE", defaults.incompletel );
+    incomplete = tree.get<bool>( "INCOMPLETE", defaults.incomplete );
 
     //imageDataDir = cleanPath(tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDir));
-    imageDataDirl = tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDirl);
+    imageDataDir = tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDir);
     //imageTemplate = cleanPath( tree.get<string>( "FILENAME_TEMPLATE", "" ) );
     imageTemplate = tree.get<string>( "FILENAME_TEMPLATE", defaults.imageTemplate );
     darkTemplate = tree.get<string>( "DARK_TEMPLATE", defaults.darkTemplate );
@@ -225,25 +225,25 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     psfFile = tree.get<string>( "PSF", defaults.psfFile );
     //mmFile = cleanPath( tree.get<string>( "MODMAT", "" ), imageDataDirl );
     mmFile = tree.get<string>( "MODMAT", defaults.mmFile );
-    mmRowl = tree.get<uint8_t>( "MMROW", defaults.mmRowl );
-    mmWidthl = tree.get<uint8_t>( "MMWIDTH",defaults.mmWidthl);
-    stokesWeightsl = tree.get<vector<float>>( "VECTOR", defaults.stokesWeightsl );
+    mmRow = tree.get<uint8_t>( "MMROW", defaults.mmRow );
+    mmWidth = tree.get<uint8_t>( "MMWIDTH",defaults.mmWidth);
+    stokesWeights = tree.get<vector<float>>( "VECTOR", defaults.stokesWeights );
     if( mmFile.length() > 0 ) {
-        if( !mmRowl ) {
+        if( !mmRow ) {
             LOG_CRITICAL << "a modulation matrix was provided but no row specified (MMROW).";
         }
-        if( !mmWidthl ) {
+        if( !mmWidth ) {
             LOG_CRITICAL << "modulation matrix dimensions cannot be autodetected (yet): you must provide the matrix width (MMWIDTH)!";
         }
-        if( stokesWeightsl.size() == 0 ) {
+        if( stokesWeights.size() == 0 ) {
             LOG_ERR << "modulation matrix specified but no VECTOR input given!";
-        } else if( stokesWeightsl.size() != mmWidthl ) {
-            LOG_ERR << "VECTOR input has " << stokesWeightsl.size() << " elements, but MMWIDTH=" << mmWidthl;
+        } else if( stokesWeights.size() != mmWidth ) {
+            LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << mmWidth;
         }
     }
     else {  // TODO: don't modify cfg values!! ...make the main code use weight 1 as default instead.
-        mmRowl = mmWidthl = 1;
-        stokesWeightsl.resize( 1, 1.0 );
+        mmRow = mmWidth = 1;
+        stokesWeights.resize( 1, 1.0 );
     }
 
     
@@ -254,7 +254,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
 
     imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUM", defaults.imageNumbers);
     wfIndex = tree.get<vector<uint32_t>>( "WFINDEX", defaults.wfIndex );
-    darkNumbersl = tree.get<vector<uint32_t>>("DARK_NUM", defaults.darkNumbersl);
+    darkNumbers = tree.get<vector<uint32_t>>("DARK_NUM", defaults.darkNumbers);
 
 }
 
@@ -268,12 +268,12 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(noiseFudge != defaults.noiseFudge) tree.put("NF", noiseFudge);
     if(weight != defaults.weight) tree.put("WEIGHT", weight);
     
-    if(alignClipl != defaults.alignClipl) tree.put("ALIGN_CLIP", alignClipl);
+    if(alignClip != defaults.alignClip) tree.put("ALIGN_CLIP", alignClip);
     if(borderClip != defaults.borderClip) tree.put("BORDER_CLIP", borderClip);
     if(maxLocalShift != defaults.maxLocalShift) tree.put("MAX_LOCAL_SHIFT", maxLocalShift);
-    if(incompletel != defaults.incompletel) tree.put("INCOMPLETE", incompletel);
+    if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", incomplete);
 
-    if(imageDataDirl != defaults.imageDataDirl) tree.put("IMAGE_DATA_DIR", imageDataDirl);
+    if(imageDataDir != defaults.imageDataDir) tree.put("IMAGE_DATA_DIR", imageDataDir);
     if(imageTemplate != defaults.imageTemplate) tree.put("FILENAME_TEMPLATE", imageTemplate);
     if(darkTemplate != defaults.darkTemplate) tree.put("DARK_TEMPLATE", darkTemplate);
     if(gainFile != defaults.gainFile) tree.put("GAIN_FILE", gainFile);
@@ -281,9 +281,9 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(backgainFile != defaults.backgainFile) tree.put("BACK_GAIN", backgainFile);
     if(psfFile != defaults.psfFile) tree.put("PSF", psfFile);
     if(mmFile != defaults.mmFile) tree.put("MODMAT", mmFile);
-    if(mmRowl != defaults.mmRowl) tree.put("MMROW", mmRowl);
-    if(mmWidthl != defaults.mmWidthl) tree.put("MMWIDTH", mmWidthl);
-    if(stokesWeightsl != defaults.stokesWeightsl) tree.put("VECTOR", stokesWeightsl);
+    if(mmRow != defaults.mmRow) tree.put("MMROW", mmRow);
+    if(mmWidth != defaults.mmWidth) tree.put("MMWIDTH", mmWidth);
+    if(stokesWeights != defaults.stokesWeights) tree.put("VECTOR", stokesWeights);
     
     if(xOffsetFile != defaults.xOffsetFile) tree.put("XOFFSET", xOffsetFile);
     if(yOffsetFile != defaults.yOffsetFile) tree.put("YOFFSET", yOffsetFile);
@@ -291,7 +291,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(imageNumberOffset != defaults.imageNumberOffset) tree.put("DT", imageNumberOffset);
     if(imageNumbers != defaults.imageNumbers) tree.put("IMAGE_NUM", imageNumbers);
     if(wfIndex != defaults.wfIndex) tree.put("WFINDEX", wfIndex);
-    if(darkNumbersl != defaults.darkNumbersl) tree.put("DARK_NUM", darkNumbersl);
+    if(darkNumbers != defaults.darkNumbers) tree.put("DARK_NUM", darkNumbers);
 
 }
 
@@ -303,14 +303,14 @@ uint64_t ChannelCfg::size(void) const {
     sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
     sz += diversityOrders.size() * sizeof( uint32_t ) + sizeof( uint64_t );
     sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += alignClipl.size()*sizeof(int16_t) + sizeof(uint64_t);
-    sz += imageDataDirl.length() + 1;
+    sz += alignClip.size()*sizeof(int16_t) + sizeof(uint64_t);
+    sz += imageDataDir.length() + 1;
     sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
     sz += xOffsetFile.length() + yOffsetFile.length() + 2;
     sz += imageNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
     sz += wfIndex.size()*sizeof(uint32_t) + sizeof(uint64_t);
-    sz += darkNumbersl.size()*sizeof(uint32_t) + sizeof(uint64_t);
+    sz += darkNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
     return sz;
 }
 
@@ -324,10 +324,10 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, diversity);
     count += pack(ptr+count, diversityOrders);
     count += pack(ptr+count, diversityTypes);
-    count += pack(ptr+count, alignClipl);
+    count += pack(ptr+count, alignClip);
     count += pack(ptr+count, borderClip);
     count += pack(ptr+count, maxLocalShift);
-    count += pack(ptr+count, imageDataDirl);
+    count += pack(ptr+count, imageDataDir);
     count += pack(ptr+count, imageTemplate);
     count += pack(ptr+count, darkTemplate);
     count += pack(ptr+count, gainFile);
@@ -340,7 +340,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, imageNumberOffset);
     count += pack(ptr+count, imageNumbers);
     count += pack(ptr+count, wfIndex);
-    count += pack(ptr+count, darkNumbersl);
+    count += pack(ptr+count, darkNumbers);
     return count;
 }
 
@@ -354,10 +354,10 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, diversity, swap_endian);
     count += unpack(ptr+count, diversityOrders, swap_endian);
     count += unpack(ptr+count, diversityTypes, swap_endian);
-    count += unpack(ptr+count, alignClipl, swap_endian);
+    count += unpack(ptr+count, alignClip, swap_endian);
     count += unpack(ptr+count, borderClip, swap_endian);
     count += unpack(ptr+count, maxLocalShift, swap_endian);
-    count += unpack(ptr+count, imageDataDirl);
+    count += unpack(ptr+count, imageDataDir);
     count += unpack(ptr+count, imageTemplate);
     count += unpack(ptr+count, darkTemplate);
     count += unpack(ptr+count, gainFile);
@@ -370,7 +370,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, imageNumberOffset, swap_endian);
     count += unpack(ptr+count, imageNumbers, swap_endian);
     count += unpack(ptr+count, wfIndex, swap_endian);
-    count += unpack(ptr+count, darkNumbersl, swap_endian);
+    count += unpack(ptr+count, darkNumbers, swap_endian);
     return count;
 }
 
@@ -386,11 +386,11 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
            (weight == rhs.weight) &&
            (borderClip == rhs.borderClip) &&
            (maxLocalShift == rhs.maxLocalShift) &&
-           (imageDataDirl == rhs.imageDataDirl) &&
+           (imageDataDir == rhs.imageDataDir) &&
            (imageNumberOffset == rhs.imageNumberOffset) &&
            (imageNumbers == rhs.imageNumbers) &&
            (wfIndex == rhs.wfIndex) &&
-           (darkNumbersl == rhs.darkNumbersl);
+           (darkNumbers == rhs.darkNumbers);
 }
 
 

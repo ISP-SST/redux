@@ -385,10 +385,10 @@ void Object::prepareStorage(void) {
     info->clipStartY = sharedArray<int16_t>(nChannels);
     info->clipEndY = sharedArray<int16_t>(nChannels);
     for(int i=0; i<nChannels; ++i ) {
-        info->clipStartX.get() [ i ] = channels[i]->alignClipl[0];
-        info->clipEndX.get() [ i ] = channels[i]->alignClipl[1];
-        info->clipStartY.get() [ i ] = channels[i]->alignClipl[2];
-        info->clipEndY.get() [ i ] = channels[i]->alignClipl[3];
+        info->clipStartX.get() [ i ] = channels[i]->alignClip[0];
+        info->clipEndX.get() [ i ] = channels[i]->alignClip[1];
+        info->clipStartY.get() [ i ] = channels[i]->alignClip[2];
+        info->clipEndY.get() [ i ] = channels[i]->alignClip[3];
     }
     
     info->nPH = pupilSize;

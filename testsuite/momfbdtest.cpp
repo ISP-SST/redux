@@ -7,11 +7,9 @@
 #include "redux/momfbd/modecache.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/patch.hpp"
-//#include "redux/momfbd/legacy.hpp"
 #include "redux/math/linalg.hpp"
 #include "redux/util/arrayutil.hpp"
 
-//#include "modes.h"
 #include "redux/image/utils.hpp"
 
 #include <boost/property_tree/ptree.hpp>
@@ -38,9 +36,9 @@ namespace {
         ChannelCfg ccfg;
         {
             ccfg.arcSecsPerPixel = ccfg.pixelSize = ccfg.rotationAngle = ccfg.weight = ccfg.borderClip = ccfg.maxLocalShift = 137; // just some non-default values
-            ccfg.imageDataDirl = "path/to/data/";
+            ccfg.imageDataDir = "path/to/data/";
             ccfg.imageNumbers = {23,45};
-            ccfg.darkNumbersl = {145,88};
+            ccfg.darkNumbers = {145,88};
             // export settings as config file and parse/compare
             tree.clear();
             ccfg.getProperties(tree);
@@ -66,14 +64,7 @@ namespace {
             tmp = ccfg;                     // assign
             BOOST_CHECK( ccfg == tmp );
         }
-    /*      return (saveMask == rhs.saveMask) &&
-           (patchSize == rhs.patchSize) &&
-           (pupilSize == rhs.pupilSize) &&
-           (wavelength == rhs.wavelength) &&
-           (outputFileName == rhs.outputFileName) &&
-           (pupilFile == rhs.pupilFile) &&
-           ChannelCfg::operator==(rhs);
-  */
+
         ObjectCfg ocfg;
         {
             ocfg.saveMask = ocfg.patchSize = ocfg.pupilSize = ocfg.wavelength = 122; // just some non-default values

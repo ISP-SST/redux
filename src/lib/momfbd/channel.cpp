@@ -207,12 +207,12 @@ bool Channel::checkCfg(void) {
     if( nWild > 1 ) {
         LOG_ERR << "Dark template contains too many wildcards: \"" << darkTemplate << "\"";
         return false;
-    } else if( nWild == 1 && darkNumbersl.empty() ) {
+    } else if( nWild == 1 && darkNumbers.empty() ) {
         LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)";
         return false;
-    } else if( nWild == 0 && darkNumbersl.size() ) {
+    } else if( nWild == 0 && darkNumbers.size() ) {
         LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename.";
-        darkNumbersl.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
+        darkNumbers.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
     }
 
     return true;
@@ -225,11 +225,11 @@ bool Channel::checkData(void) {
     LOG_TRACE << "Channel::checkData()";
     
     // Images
-    if( incompletel ) {  // check if files are present
+    if( incomplete ) {  // check if files are present
         for( size_t i( 0 ); i < imageNumbers.size(); ) {
             bfs::path fn = bfs::path( boost::str( boost::format( imageTemplate ) % (imageNumberOffset + imageNumbers[i]) ) );
             if( !bfs::exists( fn ) ) {
-                fn = bfs::path( imageDataDirl ) / bfs::path( boost::str( boost::format( imageTemplate ) % (imageNumberOffset + imageNumbers[i]) ) );
+                fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % (imageNumberOffset + imageNumbers[i]) ) );
                 if( !bfs::exists( fn ) ) {
                     LOG_CRITICAL << "Not found !!! \"" << fn.string() << "\"";
                     imageNumbers.erase( imageNumbers.begin() + i );
@@ -239,19 +239,19 @@ bool Channel::checkData(void) {
             ++i;
         }
         if( imageNumbers.empty() ) {
-            LOG_CRITICAL << boost::format( "No files found for incomplete object with filename template \"%s\" in directory \"%s\"" ) % imageTemplate % imageDataDirl;
+            LOG_CRITICAL << boost::format( "No files found for incomplete object with filename template \"%s\" in directory \"%s\"" ) % imageTemplate % imageDataDir;
             return false;
         }
     }
     if( imageNumbers.empty() ) {        // single file
-        bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( imageTemplate );
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
         if( ! bfs::exists( fn ) ) {
             LOG_ERR << boost::format( "Image-file %s not found!" ) % fn;
             return false;
         }
     } else {                            // template + numbers 
         for( auto & it : imageNumbers ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( boost::str( boost::format( imageTemplate ) % (imageNumberOffset + it) ) );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % (imageNumberOffset + it) ) );
             if( !bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Image-file %s not found!" ) % boost::str( boost::format( imageTemplate ) % (imageNumberOffset + it) );
                 return false;
@@ -262,19 +262,19 @@ bool Channel::checkData(void) {
 
     // Dark(s)
     size_t nWild = std::count(darkTemplate.begin(), darkTemplate.end(), '%');
-    if( nWild == 0 || darkNumbersl.empty() ) {         // single file, DARK_NUM will be ignored if no wildcard in the template
+    if( nWild == 0 || darkNumbers.empty() ) {         // single file, DARK_NUM will be ignored if no wildcard in the template
         if( ! bfs::exists( bfs::path( darkTemplate ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( darkTemplate );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( darkTemplate );
             if( ! bfs::exists( fn ) ) {
                LOG_ERR << boost::format( "Dark-file %s not found!" ) % darkTemplate;
                 return false;
             } else darkTemplate = fn.c_str();
         }
     } else {                            // template
-        for( auto & it : darkNumbersl ) {
+        for( auto & it : darkNumbers ) {
             bfs::path fn = bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
             if( !bfs::exists( fn ) ) {
-                fn = bfs::path( imageDataDirl ) / bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
+                fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( darkTemplate ) % it ) );
                 if( !bfs::exists( fn ) ) {
                     LOG_ERR << boost::format( "Dark-file %s not found!" ) % boost::str( boost::format( darkTemplate ) % it );
                     return false;
@@ -287,7 +287,7 @@ bool Channel::checkData(void) {
     // Gain
     if( !gainFile.empty() ) {
         if( ! bfs::exists( bfs::path( gainFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( gainFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( gainFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Gain-file %s not found!" ) % gainFile;
                 return false;
@@ -297,7 +297,7 @@ bool Channel::checkData(void) {
 
     if( !responseFile.empty() ) {
         if( ! bfs::exists( bfs::path( responseFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( responseFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( responseFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Response-file %s not found!" ) % responseFile;
                 return false;
@@ -307,7 +307,7 @@ bool Channel::checkData(void) {
 
     if( !backgainFile.empty() ) {
         if( ! bfs::exists( bfs::path( backgainFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( backgainFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( backgainFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Backgain-file %s not found!" ) % backgainFile;
                 return false;
@@ -317,7 +317,7 @@ bool Channel::checkData(void) {
 
     if( !psfFile.empty() ) {
         if( ! bfs::exists( bfs::path( psfFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( psfFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( psfFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "PSF-file %s not found!" ) % psfFile;
                 return false;
@@ -327,7 +327,7 @@ bool Channel::checkData(void) {
 
     if( !mmFile.empty() ) {
         if( ! bfs::exists( bfs::path( mmFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( mmFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( mmFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Modulation-matrix file %s not found!" ) % mmFile;
                 return false;
@@ -337,7 +337,7 @@ bool Channel::checkData(void) {
 
     if( !xOffsetFile.empty() ) {
         if( ! bfs::exists( bfs::path( xOffsetFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( xOffsetFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( xOffsetFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Offset-file %s not found!" ) % xOffsetFile;
                 return false;
@@ -347,7 +347,7 @@ bool Channel::checkData(void) {
 
     if( !yOffsetFile.empty() ) {
         if( ! bfs::exists( bfs::path( yOffsetFile ) ) ) {
-            bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( yOffsetFile );
+            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( yOffsetFile );
             if( ! bfs::exists( fn ) ) {
                 LOG_ERR << boost::format( "Offset-file %s not found!" ) % yOffsetFile;
                 return false;
@@ -376,15 +376,15 @@ void Channel::loadData( boost::asio::io_service& service ) {
 
     if( !darkTemplate.empty() ) {       // needs to be read synchronously because of adding/normalization
         size_t nWild = std::count(darkTemplate.begin(), darkTemplate.end(), '%');
-        if( nWild == 0 || darkNumbersl.empty() ) {
+        if( nWild == 0 || darkNumbers.empty() ) {
             LOG_DETAIL << boost::format( "Loading file %s" ) % darkTemplate;
             redux::file::readFile( darkTemplate, dark );
             checkIfMultiFrames(dark);
         }
         else {
             Image<float> tmp;
-            for( size_t di = 0; di < darkNumbersl.size(); ++di ) {
-                bfs::path fn = bfs::path( boost::str( boost::format( darkTemplate ) % darkNumbersl[di] ) );
+            for( size_t di = 0; di < darkNumbers.size(); ++di ) {
+                bfs::path fn = bfs::path( boost::str( boost::format( darkTemplate ) % darkNumbers[di] ) );
                 LOG_DETAIL << boost::format( "Loading file %s" ) % fn;
                 if( !di ) {
                     redux::file::readFile( fn.string(), dark );
@@ -434,7 +434,7 @@ void Channel::loadData( boost::asio::io_service& service ) {
     if( nImages ) {
         imageStats.resize( nImages );
         Image<float> tmp;
-        bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[0] ) );
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[0] ) );
         redux::file::readFile( fn.string(), tmp );                      // read first file to get dimensions
         images.resize( nImages, tmp.dimSize( 0 ), tmp.dimSize( 1 ) );
         for( size_t i = 0; i < nImages; ++i ) {
@@ -442,7 +442,7 @@ void Channel::loadData( boost::asio::io_service& service ) {
             service.post( std::bind( &Channel::loadImage, this, i ) );
         }
     } else  {
-        bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( imageTemplate );
+        bfs::path fn = bfs::path( imageDataDir ) / bfs::path( imageTemplate );
         redux::file::readFile( fn.string(), images );
         loadWrapper(fn.string(), images );                              // Single image read synchronously so stats can be done below
         imageStats.resize( 1 );
@@ -503,7 +503,7 @@ void Channel::normalizeData(boost::asio::io_service& service, double value) {
 
 void Channel::loadImage( size_t index ) {
     Image<float> subimg( images, index, index, 0, images.dimSize( 1 ) - 1, 0, images.dimSize( 2 ) - 1 );
-    bfs::path fn = bfs::path( imageDataDirl ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
+    bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[index] ) );
     redux::file::readFile( fn.string(), subimg );
     LOG_DETAIL << boost::format( "Loaded file %s" ) % fn;
     imageStats[index]->getStats(myJob.borderClip,subimg,ST_VALUES);                          // only get min/max/mean
@@ -725,57 +725,57 @@ Point16 Channel::clipImages(void) {
         return Point16(images.dimSize(1),images.dimSize(2));
     }
 */
-    LOG_DETAIL << "Clipping images using " << printArray(alignClipl,"alignClip");
+    LOG_DETAIL << "Clipping images using " << printArray(alignClip,"alignClip");
     bool flipX=false,flipY=false;
-    if( alignClipl[0] > alignClipl[1]) {     // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
-        std::swap(alignClipl[0], alignClipl[1]);
+    if( alignClip[0] > alignClip[1]) {     // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
+        std::swap(alignClip[0], alignClip[1]);
         flipX = true;
         LOG_DETAIL << "Reversing x-coordinate for this channel.";
     }
-    if( alignClipl[2] > alignClipl[3]) {
-        std::swap(alignClipl[2], alignClipl[3]);
+    if( alignClip[2] > alignClip[3]) {
+        std::swap(alignClip[2], alignClip[3]);
         flipY = true;
         LOG_DETAIL << "Reversing y-coordinate for this channel.";
     }
-    for( auto& it: alignClipl ) --it;        // NOTE: momfbd uses 1-based indexes, we start with 0...
+    for( auto& it: alignClip ) --it;        // NOTE: momfbd uses 1-based indexes, we start with 0...
     
     string tmp =  printArray(images.dimensions(),"original");
-    images.setLimits( 0, imageNumbers.size()-1, alignClipl[2], alignClipl[3], alignClipl[0], alignClipl[1] );
+    images.setLimits( 0, imageNumbers.size()-1, alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
     images.trim(false);
     LOG_DEBUG << "          image stack: " << tmp << printArray(images.dimensions(),"  clipped");
     
     if( dark.valid() ) {
         LOG_DEBUG << "                 dark: " << printArray(dark.dimensions(),"original");
-        dark.setLimits( alignClipl[2], alignClipl[3], alignClipl[0], alignClipl[1] );
+        dark.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         dark.trim();
     }
 
     if( gain.valid() ) {
         LOG_DEBUG << "                 gain: " << printArray(gain.dimensions(),"original");
-        gain.setLimits( alignClipl[2], alignClipl[3], alignClipl[0], alignClipl[1] );
+        gain.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         gain.trim();
     }
 
     if( ccdResponse.valid() ) {
         LOG_DEBUG << "          ccdResponse: " << printArray(ccdResponse.dimensions(),"original");
-        ccdResponse.setLimits( alignClipl[2], alignClipl[3], alignClipl[0], alignClipl[1] );
+        ccdResponse.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         dark.trim();
     }
 
     if( ccdScattering.valid() ) {
         LOG_DEBUG << "        ccdScattering: " << printArray(ccdScattering.dimensions(),"original");
-        ccdScattering.setLimits( alignClipl[2], alignClipl[3], alignClipl[0], alignClipl[1] );
+        ccdScattering.setLimits( alignClip[2], alignClip[3], alignClip[0], alignClip[1] );
         ccdScattering.trim();
     }
 
     if( psf.valid() ) {     // The PSF has to be symmetrically clipped, otherwise the convolution will be skewed.
         const std::vector<size_t>& dims = psf.dimensions();
-        auto tmp = alignClipl;
-        size_t sy = alignClipl[3] - alignClipl[2] + 1;
-        size_t sx = alignClipl[1] - alignClipl[0] + 1;
+        auto tmp = alignClip;
+        size_t sy = alignClip[3] - alignClip[2] + 1;
+        size_t sx = alignClip[1] - alignClip[0] + 1;
         if (dims.size() != 2 || dims[0] < sy || dims[1] < sx) throw std::logic_error("PSF has wrong dimensions: " + printArray(dims,"dims"));
-        int skewY = (dims[0] - sy)/2  - alignClipl[2];
-        int skewX = (dims[1] - sx)/2  - alignClipl[0];
+        int skewY = (dims[0] - sy)/2  - alignClip[2];
+        int skewX = (dims[1] - sx)/2  - alignClip[0];
         tmp[0] += skewX;
         tmp[1] += skewX;
         tmp[2] += skewY;
@@ -786,8 +786,8 @@ Point16 Channel::clipImages(void) {
     }
 
     if( flipX || flipY ) {
-        size_t sy = alignClipl[3] - alignClipl[2] + 1;
-        size_t sx = alignClipl[1] - alignClipl[0] + 1;
+        size_t sy = alignClip[3] - alignClip[2] + 1;
+        size_t sx = alignClip[1] - alignClip[0] + 1;
         size_t ni = imageNumbers.size();
         shared_ptr<float**> imgShared = images.get(ni,sy,sx);
         float*** imgPtr = imgShared.get();

@@ -81,14 +81,14 @@ namespace redux {
             /*****************************/
             
             /******* Data settings *******/
-            std::vector<int16_t> alignClipl;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
+            std::vector<int16_t> alignClip;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
             uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
             uint16_t maxLocalShift;                 //!< How much are the patches allowed to be shifted (default: 5 pixels)
-            uint8_t incompletel;                    //!< Some files might not exist, just skip those.
+            uint8_t incomplete;                    //!< Some files might not exist, just skip those.
             /*****************************/
 
             /************ Input **********/
-            std::string imageDataDirl;              //!< Where the data is located
+            std::string imageDataDir;              //!< Where the data is located
             std::string imageTemplate;
             std::string darkTemplate;
             std::string gainFile;
@@ -96,14 +96,14 @@ namespace redux {
             std::string backgainFile;
             std::string psfFile;
             std::string mmFile;                     //!< Modulation matrix
-            uint8_t mmRowl;                          //!< Number of rows in modulation matrix
-            uint8_t mmWidthl;                        //!< Number of cols in modulation matrix
+            uint8_t mmRow;                          //!< Number of rows in modulation matrix
+            uint8_t mmWidth;                        //!< Number of cols in modulation matrix
             std::string xOffsetFile,yOffsetFile;    //!< Alignment offsets (from pinhole-calibration)
             uint32_t imageNumberOffset;             //!< Add this offset to each image number in this channel
             std::vector<uint32_t> imageNumbers;     //!< Use these numbers together with the template to generate file-list
             std::vector<uint32_t> wfIndex;          //!< Identify wavefront, used to group/constrain simultaneous images if image-numbers can't be used.
-            std::vector<uint32_t> darkNumbersl;     //!< Use these numbers together with the template to generate file-list
-            std::vector<float> stokesWeightsl;
+            std::vector<uint32_t> darkNumbers;     //!< Use these numbers together with the template to generate file-list
+            std::vector<float> stokesWeights;
             /*****************************/
            
             
