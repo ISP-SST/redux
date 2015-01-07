@@ -1,7 +1,6 @@
 #include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/momfbd/defines.hpp"
-#include "redux/momfbd/objectcfg.hpp"
 #include "redux/momfbd/util.hpp"
 
 #include "redux/translators.hpp"
@@ -20,21 +19,6 @@ using namespace std;
 using boost::algorithm::iequals;
 
 
-const map<string, int> redux::momfbd::getstepMap( { {"getstep_steepest_descent", CFG_GETSTEP_SDSC},
-    {"getstep_conjugate_gradient", CFG_GETSTEP_CNJG},
-    {"getstep_BFGS_inv", CFG_GETSTEP_BFGS_inv}
-} );
-
-const map<string, int> redux::momfbd::gradientMap = { {"gradient_diff", CFG_GRADIENT_DIFF},
-    {"gradient_Vogel", CFG_GRADIENT_VOGEL}
-};
-
-const map<string, int> redux::momfbd::fillpixMap = { {"median", CFG_FPM_MEDIAN},
-    {"invdistweight", CFG_FPM_INVDISTWEIGHT},
-    {"horint", CFG_FPM_HORINT}
-};
-
-
 #define lg Logger::mlg
 namespace {
 
@@ -42,73 +26,21 @@ namespace {
     static Job* createMomfbdJob( void ) {
         return new MomfbdJob();
     }
-
-    void checkFAP( double& F, double& A, double& P ) {
-        double rad2asec = 180.0 * 3600.0 / redux::PI;
-        size_t count = F > 0 ? 1 : 0;
-        count += A > 0 ? 1 : 0;
-        count += P > 0 ? 1 : 0;
-        if( count == 0 ) {
-            F = DEF_TELESCOPE_F;
-            A = DEF_ARCSECPERPIX;
-            P = F * A / rad2asec;
-        }
-        else if( count == 3 ) {
-            LOG_WARN << "Too many parameters given: replacing telescope focal length (" << F << ") with computed value = " << ( P / A * rad2asec );
-            F = P * rad2asec / A;
-        }
-        else if( count == 2 ) {
-            if( !( F > 0 ) ) F = P * rad2asec / A;
-            else if( A > 0 ) P = F * A / rad2asec;
-            else A = P / F * rad2asec;
-        }
-        else {
-            if( !( F > 0 ) ) {
-                F = DEF_TELESCOPE_F;
-                if( A > 0 ) P = F * A / rad2asec;
-                else A = P / F * rad2asec;
-            }
-            else {
-                A = DEF_ARCSECPERPIX;
-                P = F * A / rad2asec;
-            }
-
-        }
-    }
-
 }
 size_t MomfbdJob::jobType = Job::registerJob( "momfbd", createMomfbdJob );
 
-int MomfbdJob::getFromMap( string str, const map<string, int>& m ) {
-    auto res = m.find( str );
-    if( res != m.end() ) {
-        return res->second;
-    }
-    return 0;
-}
 
-void MomfbdJob::maybeOverride( bool value, uint32_t& flagset, uint32_t flag ) {
-    if( value != bool( flagset & flag ) ) {
-        flagset ^= flag;
-    }
-}
-
-MomfbdJob::MomfbdJob( void ) : basis( 0 ), fillpix_method( 0 ), output_data_type( 0 ), flags( 0 ), patchSize( 0 ), sequenceNumber( 0 ),
-    klMinMode( 0 ), klMaxMode( 0 ), borderClip( 0 ), minIterations( 0 ), maxIterations( 0 ), nDoneMask( 0 ),
-    gradient_method( 0 ), getstep_method( 0 ), max_local_shift( 0 ), nInitialModes( 0 ), nModesIncrement( 0 ), pupilSize( 0 ),
-    nPatchesX( 0 ), nPatchesY( 0 ), ncal( 0 ), telescopeFocalLength( 0 ), telescopeDiameter( 0 ), arcSecsPerPixel( 0 ),
-    pixelSize( 0 ), reg_gamma( 0 ), FTOL( 0 ), EPS( 0 ), svd_reg( 0 ) {
-
-    //LOG_DEBUG << "MomfbdJob::MomfbdJob()   (jobType = " << jobType << ")";
+MomfbdJob::MomfbdJob( void ) {
     info.typeString = "momfbd";
 }
 
+
 MomfbdJob::~MomfbdJob( void ) {
-    //LOG_DEBUG << "MomfbdJob::~MomfbdJob()";
+    
 }
 
-uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
 
+uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
     using redux::util::unpack;
     size_t nParts;
     uint64_t count = unpack( ptr, nParts, swap_endian );
@@ -120,246 +52,50 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts,
     return count;
 }
 
-void MomfbdJob::parseProperties( po::variables_map& vm, bpt::ptree& tree ) {
 
-    Job::parseProperties( vm, tree );
-    LOG_DEBUG << "MomfbdJob::parseProperties()";
+void MomfbdJob::parsePropertyTree( po::variables_map& vm, bpt::ptree& tree ) {
 
-    bpt::ptree cmdTree;      // just to be able to use the VectorTranslator
+    Job::parsePropertyTree( vm, tree );
+    LOG_DEBUG << "MomfbdJob::parsePropertyTree()";
+    
+    // possibly override cfg-entries with command-line arguments
+    if( vm.count( "simx" ) ) tree.put( "SIM_X", vm["simx"].as<string>() );
+    if( vm.count( "simy" ) ) tree.put( "SIM_Y", vm["simy"].as<string>() );
+    if( vm.count( "imgn" ) ) tree.put( "IMAGE_NUM", vm["imgn"].as<string>() );
+    if( vm.count( "output-file" ) ) tree.put( "output-file", vm["output-file"].as<string>() );
+    if( vm.count( "force" ) ) tree.put( "OVERWRITE", true );
+    if( vm.count( "swap" ) ) tree.put( "SWAP", true );
 
-    if( vm.count( "simx" ) ) cmdTree.put( "simx", vm["simx"].as<string>() );
-    if( vm.count( "simy" ) ) cmdTree.put( "simy", vm["simy"].as<string>() );
-    if( vm.count( "imgn" ) ) cmdTree.put( "imgn", vm["imgn"].as<string>() );
+    GlobalCfg::parseProperties(tree);
 
-    if( vm.count( "output-file" ) ) cmdTree.put( "output-file", vm["output-file"].as<string>() );
-    if( vm.count( "sequence" ) ) sequenceNumber = vm["sequence"].as<int>();
-
-    string tmpString = tree.get<string>( "BASIS", "Zernike" );
-    basis = iequals( tmpString, "Karhunen-Loeve" ) ? CFG_KARHUNEN_LOEVE : CFG_ZERNIKE;
-
-    modes = tree.get<vector<uint32_t>>( "MODES", vector<uint32_t>( { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-                                                                     20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35
-                                                                   } ) );
-    imageNumbers = cmdTree.get<vector<uint32_t>>( "imgn", {} );
-    if( imageNumbers.size() == 0 ) imageNumbers = tree.get<vector<uint32_t>>( "IMAGE_NUM", {} );
-    darkNumbers = tree.get<vector<uint32_t>>( "DARK_NUM", {} );
-    sequenceNumber = tree.get<uint32_t>( "SEQUENCE_NUM", sequenceNumber );
-
-    klMinMode  = tree.get<uint32_t>( "KL_MIN_MODE", DEF_KL_MIN_MODE );
-    klMaxMode  = tree.get<uint32_t>( "KL_MAX_MODE", DEF_KL_MAX_MODE );
-    patchSize    = tree.get<uint32_t>( "NUM_POINTS", DEF_NUM_POINTS );
-    borderClip = tree.get<uint32_t>( "BORDER_CLIP", DEF_BORDER_CLIP );
-
-    telescopeDiameter = tree.get<double>( "TELESCOPE_D", DEF_TELESCOPE_D );
-    telescopeFocalLength = tree.get<double>( "TELESCOPE_F", 0 );
-    arcSecsPerPixel = tree.get<double>( "ARCSECPERPIX", 0 );
-    pixelSize = tree.get<double>( "PIXELSIZE", 0 );
-
-    checkFAP( telescopeFocalLength, arcSecsPerPixel, pixelSize );
-
-    LOG << "Pixel size = " << pixelSize;
-    LOG << "Arcseconds per pixel = " << arcSecsPerPixel;
-    LOG << "Telescope focal length = " << telescopeFocalLength;
-
-    minIterations = tree.get<uint32_t>( "MIN_ITER", DEF_MIN_ITER );
-    maxIterations = tree.get<uint32_t>( "MAX_ITER", DEF_MAX_ITER );
-    nDoneMask = tree.get<uint32_t>( "N_DONE_ITER", DEF_N_DONE_ITER );
-    nDoneMask = ( 1 << nDoneMask ) - 1;
-
-    FTOL = tree.get<double>( "FTOL", DEF_FTOL );
-    EPS = tree.get<double>( "EPS", DEF_EPS );
-    svd_reg = tree.get<double>( "SVD_REG", DEF_SVD_REG );
-    reg_gamma = tree.get<double>( "REG_GAMMA", DEF_REG_GAMMA );
-
-    programDataDir = cleanPath( tree.get<string>( "PROG_DATA_DIR", DEF_PROG_DATA_DIR ) );
-    imageDataDir = cleanPath( tree.get<string>( "IMAGE_DATA_DIR", "" ) );
-
-    stokesWeights = tree.get<vector<double>>( "VECTOR", vector<double>() );
-
-    getstep_method = getFromMap( tree.get<string>( "GETSTEP", DEF_GETSTEP ), getstepMap );
-    if( getstep_method == 0 ) {
-        LOG_ERR << "unknown getstep method \"" << tree.get<string>( "GETSTEP", DEF_GETSTEP ) << "\"\n  Valid entries currently are: "
-                "\"getstep_steepest_descent\", \"getstep_conjugate_gradient\" or \"getstep_BFGS_inv\"";
-    }
-    gradient_method = getFromMap( tree.get<string>( "GRADIENT", DEF_GRADIENT ), gradientMap );
-    if( gradient_method == 0 ) {
-        LOG_ERR << "unknown gradient method \"" << tree.get<string>( "GRADIENT", DEF_GRADIENT ) << "\"\n  Valid entries currently are: "
-                "\"gradient_diff\" or \"gradient_Vogel\"";
-    }
-    fillpix_method = getFromMap( tree.get<string>( "FPMETHOD", DEF_FPMETHOD ), fillpixMap );
-    if( fillpix_method == 0 ) {
-        LOG_ERR << "unknown fillpix method \"" << tree.get<string>( "FPMETHOD", DEF_FPMETHOD ) << "\"\n  Valid entries currently are: "
-                "\"median\", \"invdistweight\" or \"horint\"";
-    }
-
-    time_obs = tree.get<string>( "TIME_OBS", "" );
-    date_obs = tree.get<string>( "DATE_OBS", DEF_DATE_OBS );
-
-    max_local_shift = tree.get<uint32_t>( "MAX_LOCAL_SHIFT", DEF_MAX_LOCAL_SHIFT );
-    nInitialModes = tree.get<uint32_t>( "MODE_START", DEF_MODE_START );
-    nModesIncrement = tree.get<uint32_t>( "MODE_STEP", DEF_MODE_STEP );
-
-    if( tree.get<bool>( "FLATFIELD", false ) && tree.get<bool>( "CALIBRATE", false ) ) {
-        LOG_ERR << "both FLATFIELD and CALIBRATE mode requested";
-    }
-
-    pupilFile = cleanPath( tree.get<string>( "PUPIL", "" ), imageDataDir );
-    if( pupilFile != "" ) {
-        util::loadPupil( pupilFile, pupil );
-        pupil.resize();
-        if(pupil.nDimensions()>0) pupilFile.clear();    // pupil already loaded, master doesn't need to look for it.
-    }
-
-    flags = 0;
-    if( tree.get<bool>( "CALIBRATE", false ) )             flags |= MFBD_CALIBRATE;
-    if( tree.get<bool>( "DONT_MATCH_IMAGE_NUMS", false ) ) flags |= MFBD_DONT_MATCH_IMAGE_NUMS;
-    if( tree.get<bool>( "FAST_QR", false ) )               flags |= MFBD_FAST_QR;
-    if( tree.get<bool>( "FIT_PLANE", false ) )             flags |= MFBD_FIT_PLANE;
-    if( tree.get<bool>( "FLATFIELD", false ) )             flags |= MFBD_FLATFIELD;
-    if( tree.get<bool>( "GET_ALPHA", false ) || ( flags & MFBD_CALIBRATE ) ) flags |= MFBD_GET_ALPHA;
-    if( tree.get<bool>( "GET_COBJ", false ) )              flags |= MFBD_GET_COBJ;
-    if( tree.get<bool>( "GET_DIVERSITY", false ) )         flags |= MFBD_GET_DIVERSITY;
-    if( tree.get<bool>( "GET_METRIC", false ) )            flags |= MFBD_GET_METRIC;
-    if( tree.get<bool>( "GET_MODES", false ) )             flags |= MFBD_GET_MODES;
-    if( tree.get<bool>( "GET_PSF", false ) )               flags |= MFBD_GET_PSF;
-    if( tree.get<bool>( "GET_PSF_AVG", false ) )           flags |= MFBD_GET_PSF_AVG;
-    if( tree.get<bool>( "GET_RESIDUAL", false ) )          flags |= MFBD_GET_RESIDUAL;
-    if( tree.get<bool>( "GLOBAL_NOISE", false ) )          flags |= MFBD_GLOBAL_NOISE;
-    if( tree.get<bool>( "NEW_CONSTRAINTS", false ) )       flags |= MFBD_NEW_CONSTRAINTS;
-    if( tree.get<bool>( "NO_CLIP", false ) )               flags |= MFBD_NO_CLIP;
-    if( tree.get<bool>( "NO_CONSTRAINTS", false ) )        flags |= MFBD_NO_CONSTRAINTS;
-    if( tree.get<bool>( "NO_FILTER", false ) )             flags |= MFBD_NO_FILTER;
-    if( tree.get<bool>( "SAVE_FFDATA", false ) )           flags |= MFBD_SAVE_FFDATA;
-
-    if( vm.count( "force" ) ) flags |= MFBD_FORCE_WRITE;
-    if( vm.count( "swap" ) )  flags |= MFBD_SWAP;
-
-    if( ( flags & MFBD_CALIBRATE ) && ( flags & MFBD_FLATFIELD ) ) {
-        LOG_WARN << "both FLATFIELD and CALIBRATE mode requested, forcing CALIBRATE";
-        flags &= ~MFBD_FLATFIELD;
-    }
-    if( ( flags & MFBD_GET_PSF ) && ( flags & MFBD_GET_PSF_AVG ) ) {
-        LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
-    }
-    if( ( flags & MFBD_CALIBRATE ) && ( flags & MFBD_NEW_CONSTRAINTS ) ) {
-        LOG_WARN << "calibration mode uses old style constraints, ignoring NEW_CONSTRAINTS";
-        flags &= ~MFBD_NEW_CONSTRAINTS;
-    }
-
-    subImagePosX = cmdTree.get<vector<uint32_t>>( "simx", {} );
-    if( subImagePosX.size() == 0 ) subImagePosX = tree.get<vector<uint32_t>>( "SIM_X", {} );
-    subImagePosY = cmdTree.get<vector<uint32_t>>( "simy", {} );
-    if( subImagePosY.size() == 0 ) subImagePosY = tree.get<vector<uint32_t>>( "SIM_Y", {} );
-
-    if( tree.get<bool>( "CAL_X", false ) ) {
-        if( tree.get<bool>( "CAL_Y", false ) ) {
-            if( subImagePosX.size() || subImagePosY.size() ) LOG << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y";
-            subImagePosX = tree.get<vector<uint32_t>>( "CAL_X", {} );
-            subImagePosY = tree.get<vector<uint32_t>>( "CAL_Y", {} );
-            if( subImagePosX.empty() || ( subImagePosX.size() != subImagePosY.size() ) ) {
-                LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!";
-            }
-            else ncal = subImagePosX.size();
-        }
-        else LOG_ERR << "CAL_Y must be provided if CAL_X is!";
-    }
-    LOG << "MomfbdJob::parseProps()  " << printArray(subImagePosX,"SubX");
-    LOG << "MomfbdJob::parseProps()  " << printArray(subImagePosY,"SubY");
-
-    auto filetypes = tree.get<vector<FileType>>( "FILE_TYPE", vector<FileType>( 1, flags & MFBD_CALIBRATE ? FT_ANA : FT_FITS ) );
-    for( auto & it : filetypes ) flags |= it;
-    if( ( flags & MFBD_FT_MASK ) == 0 ) LOG_ERR << "\"FILE_TYPE\" has to be one of ANA/FITS/MOMFBD.";
-
-    tmpString = tree.get<string>( "DATA_TYPE", DEF_DATA_TYPE );
-    if( iequals( tmpString, "FLOAT" ) ) output_data_type = MFBD_F32T;
-    else if( iequals( tmpString, "SHORT" ) ) output_data_type = MFBD_I16T;
-    else {
-        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using INT16";
-        output_data_type = MFBD_I16T;
-    }
-
-    tmpString = tree.get<string>( "OUTPUT_FILES", "" );
-    if( tmpString != "" ) {
-        boost::split( outputFiles, tmpString, boost::is_any_of( "," ) );
-    }
     size_t nObj( 0 );
     for( auto & it : tree ) {
         if( iequals( it.first, "OBJECT" ) ) {
-            tmpString = ( nObj >= outputFiles.size() ) ? "" : outputFiles[nObj++];
-            ObjectCfg* tmpObj = new ObjectCfg( *this );
-            tmpObj->parseProperties( it.second, tmpString );
-            objects.push_back( shared_ptr<ObjectCfg>( tmpObj ) );
+            Object* tmpObj = new Object( *this );
+            tmpObj->parsePropertyTree( it.second );
+            if( nObj < outputFiles.size() ) {
+                tmpObj->outputFileName = outputFiles[nObj++];
+            }
+            objects.push_back( shared_ptr<Object>( tmpObj ) );
         }
     }
     if( outputFiles.size() > objects.size() ) {
         LOG_WARN << outputFiles.size() << " output file names specified but only " << objects.size() << " objects found.";
     }
-    LOG_DEBUG << "MomfbdJob::parseProperties() done.";
+    LOG_DEBUG << "MomfbdJob::parsePropertyTree() done.";
 
 }
 
+
 bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
 
-    bpt::ptree tree = Job::getPropertyTree();         // get common properties
+    bpt::ptree tree = Job::getPropertyTree();         // get Job-properties
 
-    for( auto & it : objects ) {
-        it->getPropertyTree( &tree );
+    GlobalCfg::getProperties(tree);
+
+    for( shared_ptr<Object>& obj: objects ) {
+        obj->getPropertyTree( tree );
     }
-
-    // TODO BASIS
-    tree.put( "MODES", modes );
-    if( !imageNumbers.empty() ) tree.put( "IMAGE_NUM", imageNumbers );
-    if( !darkNumbers.empty() ) tree.put( "DARK_NUM", darkNumbers );
-    tree.put( "SEQUENCE_NUM", sequenceNumber );
-    if( klMinMode != DEF_KL_MIN_MODE ) tree.put( "KL_MIN_MODE", klMinMode );
-    if( klMaxMode != DEF_KL_MAX_MODE ) tree.put( "KL_MAX_MODE", klMaxMode );
-    if( patchSize != DEF_NUM_POINTS ) tree.put( "NUM_POINTS", patchSize );
-    if( borderClip != DEF_BORDER_CLIP ) tree.put( "BORDER_CLIP", borderClip );
-    if( telescopeDiameter != DEF_TELESCOPE_D ) tree.put( "TELESCOPE_D", telescopeDiameter );
-    if( telescopeFocalLength != 0 ) tree.put( "TELESCOPE_F", telescopeFocalLength );
-    if( arcSecsPerPixel != 0 ) tree.put( "ARCSECPERPIX", arcSecsPerPixel );
-    if( pixelSize != 0 ) tree.put( "PIXELSIZE", pixelSize );
-    if( minIterations != DEF_MIN_ITER ) tree.put( "MIN_ITER", minIterations );
-    if( maxIterations != DEF_MAX_ITER ) tree.put( "MAX_ITER", maxIterations );
-    if( nDoneMask != DEF_N_DONE_ITER ) tree.put( "N_DONE_ITER", nDoneMask );
-    if( FTOL != DEF_FTOL ) tree.put( "FTOL", FTOL );
-    if( EPS != DEF_EPS ) tree.put( "EPS", EPS );
-    if( svd_reg != DEF_SVD_REG ) tree.put( "SVD_REG", svd_reg );
-    if( reg_gamma != DEF_REG_GAMMA ) tree.put( "REG_GAMMA", reg_gamma );
-    if( programDataDir != DEF_PROG_DATA_DIR ) tree.put( "PROG_DATA_DIR", programDataDir );
-    if( !imageDataDir.empty() ) tree.put( "IMAGE_DATA_DIR", imageDataDir );
-    if( !stokesWeights.empty() ) tree.put( "VECTOR", stokesWeights );
-    //if(getstep_method!=DEF_GETSTEP) tree.put("GETSTEP",getstep_method);
-    //if(gradient_method!=DEF_GRADIENT) tree.put("GRADIENT",gradient_method);
-    //if(fillpix_method!=DEF_FPMETHOD) tree.put("FPMETHOD",fillpix_method);
-    if( !time_obs.empty() ) tree.put( "TIME_OBS", time_obs );
-    if( date_obs != DEF_DATE_OBS ) tree.put( "DATE_OBS", date_obs );
-    if( max_local_shift != DEF_MAX_LOCAL_SHIFT ) tree.put( "MAX_LOCAL_SHIFT", max_local_shift );
-    if( nInitialModes != DEF_MODE_START ) tree.put( "MODE_START", nInitialModes );
-    if( nModesIncrement != DEF_MODE_STEP ) tree.put( "MODE_STEP", nModesIncrement );
-    if( !outputFiles.empty() ) tree.put( "OUTPUT_FILES", outputFiles );
-    // TODO PUPIL/SIM_X/SIM_Y/CAL_X/CAL_Y/FILE_TYPE/DATA_TYPE
-
-    if( flags & MFBD_CALIBRATE ) tree.put( "CALIBRATE", ( bool )( flags & MFBD_CALIBRATE ) );
-    if( flags & MFBD_DONT_MATCH_IMAGE_NUMS ) tree.put( "DONT_MATCH_IMAGE_NUMS", ( bool )( flags & MFBD_DONT_MATCH_IMAGE_NUMS ) );
-    if( flags & MFBD_FAST_QR ) tree.put( "FAST_QR", ( bool )( flags & MFBD_FAST_QR ) );
-    if( flags & MFBD_FIT_PLANE ) tree.put( "FIT_PLANE", ( bool )( flags & MFBD_FIT_PLANE ) );
-    if( flags & MFBD_FLATFIELD ) tree.put( "FLATFIELD", ( bool )( flags & MFBD_FLATFIELD ) );
-    if( flags & MFBD_GET_ALPHA ) tree.put( "GET_ALPHA", ( bool )( flags & MFBD_GET_ALPHA ) );
-    if( flags & MFBD_GET_COBJ ) tree.put( "GET_COBJ", ( bool )( flags & MFBD_GET_COBJ ) );
-    if( flags & MFBD_GET_DIVERSITY ) tree.put( "GET_DIVERSITY", ( bool )( flags & MFBD_GET_DIVERSITY ) );
-    if( flags & MFBD_GET_METRIC ) tree.put( "GET_METRIC", ( bool )( flags & MFBD_GET_METRIC ) );
-    if( flags & MFBD_GET_MODES ) tree.put( "GET_MODES", ( bool )( flags & MFBD_GET_MODES ) );
-    if( flags & MFBD_GET_PSF ) tree.put( "GET_PSF", ( bool )( flags & MFBD_GET_PSF ) );
-    if( flags & MFBD_GET_PSF_AVG ) tree.put( "GET_PSF_AVG", ( bool )( flags & MFBD_GET_PSF_AVG ) );
-    if( flags & MFBD_GET_RESIDUAL ) tree.put( "GET_RESIDUAL", ( bool )( flags & MFBD_GET_RESIDUAL ) );
-    if( flags & MFBD_GLOBAL_NOISE ) tree.put( "GLOBAL_NOISE", ( bool )( flags & MFBD_GLOBAL_NOISE ) );
-    if( flags & MFBD_NEW_CONSTRAINTS ) tree.put( "NEW_CONSTRAINTS", ( bool )( flags & MFBD_NEW_CONSTRAINTS ) );
-    if( flags & MFBD_NO_CLIP ) tree.put( "NO_CLIP", ( bool )( flags & MFBD_NO_CLIP ) );
-    if( flags & MFBD_NO_CONSTRAINTS ) tree.put( "NO_CONSTRAINTS", ( bool )( flags & MFBD_NO_CONSTRAINTS ) );
-    if( flags & MFBD_NO_FILTER ) tree.put( "NO_FILTER", ( bool )( flags & MFBD_NO_FILTER ) );
-    if( flags & MFBD_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", ( bool )( flags & MFBD_SAVE_FFDATA ) );
-
 
     if( root ) {
         root->push_back( bpt::ptree::value_type( "momfbd", tree ) );
@@ -368,81 +104,26 @@ bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
     return tree;
 }
 
-size_t MomfbdJob::size( void ) const {
-    size_t sz = Job::size();
-    sz += 3;                                    // basis, fillpix_method, output_data_type;
-    sz += 18 * sizeof( uint32_t );
-    sz += 8 * sizeof( double );
-    sz += modes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += imageNumbers.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += darkNumbers.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += subImagePosX.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += subImagePosY.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += stokesWeights.size() * sizeof( double ) + sizeof( uint64_t );
-    sz += imageDataDir.length() + programDataDir.length() + time_obs.length() + date_obs.length() + pupilFile.length() + 5;        // strings + \0
-    sz += 2 * sizeof( uint32_t );           // outputFiles.size() + objects.size()
-    for( auto & it : outputFiles ) {
-        sz += it.length() + 1;
-    }
-    for( auto & it : objects ) {
-        sz += it->size();
+
+uint64_t MomfbdJob::size( void ) const {
+    uint64_t sz = Job::size();
+    sz += GlobalCfg::size();
+    sz += sizeof(uint16_t);           // objects.size()
+    for( const shared_ptr<Object>& obj: objects ) {
+        sz += obj->size();
     }
     sz += pupil.size();
     return sz;
 }
 
+
 uint64_t MomfbdJob::pack( char* ptr ) const {
-    
     using redux::util::pack;
-    
     uint64_t count = Job::pack( ptr );
-    count += pack( ptr+count, basis );
-    count += pack( ptr+count, fillpix_method );
-    count += pack( ptr+count, output_data_type );
-    count += pack( ptr+count, flags );
-    count += pack( ptr+count, patchSize );
-    count += pack( ptr+count, sequenceNumber );
-    count += pack( ptr+count, klMinMode );
-    count += pack( ptr+count, klMaxMode );
-    count += pack( ptr+count, borderClip );
-    count += pack( ptr+count, minIterations );
-    count += pack( ptr+count, maxIterations );
-    count += pack( ptr+count, nDoneMask );
-    count += pack( ptr+count, gradient_method );
-    count += pack( ptr+count, getstep_method );
-    count += pack( ptr+count, max_local_shift );
-    count += pack( ptr+count, nInitialModes );
-    count += pack( ptr+count, nModesIncrement );
-    count += pack( ptr+count, pupilSize );
-    count += pack( ptr+count, nPatchesX );
-    count += pack( ptr+count, nPatchesY );
-    count += pack( ptr+count, ncal );
-    count += pack( ptr+count, telescopeFocalLength );
-    count += pack( ptr+count, telescopeDiameter );
-    count += pack( ptr+count, arcSecsPerPixel );
-    count += pack( ptr+count, pixelSize );
-    count += pack( ptr+count, reg_gamma );
-    count += pack( ptr+count, FTOL );
-    count += pack( ptr+count, EPS );
-    count += pack( ptr+count, svd_reg );
-    count += pack( ptr+count, modes );
-    count += pack( ptr+count, imageNumbers );
-    count += pack( ptr+count, darkNumbers );
-    count += pack( ptr+count, subImagePosX );
-    count += pack( ptr+count, subImagePosY );
-    count += pack( ptr+count, stokesWeights );
-    count += pack( ptr+count, imageDataDir );
-    count += pack( ptr+count, programDataDir );
-    count += pack( ptr+count, time_obs );
-    count += pack( ptr+count, date_obs );
-    count += pack( ptr+count, pupilFile );
-    count += pack( ptr+count, (uint32_t)outputFiles.size() );
-    for( auto & it : outputFiles ) {
-        count += pack( ptr+count, it );
-    }
-    count += pack( ptr+count, (uint32_t)objects.size() );
-    for( auto & it : objects ) {
-        count += it->pack( ptr+count );
+    count += GlobalCfg::pack( ptr+count );
+    count += pack( ptr+count, (uint16_t)objects.size() );
+    for( const shared_ptr<Object>& obj: objects ) {
+        count += obj->pack( ptr+count );
     }
     count += pupil.pack( ptr+count);
     
@@ -450,77 +131,28 @@ uint64_t MomfbdJob::pack( char* ptr ) const {
     
 }
 
+
 uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
-    
     using redux::util::unpack;
-    
     uint64_t count = Job::unpack( ptr, swap_endian );
-    count += unpack( ptr+count, basis );
-    count += unpack( ptr+count, fillpix_method );
-    count += unpack( ptr+count, output_data_type );
-    count += unpack( ptr+count, flags, swap_endian );
-    count += unpack( ptr+count, patchSize, swap_endian );
-    count += unpack( ptr+count, sequenceNumber, swap_endian );
-    count += unpack( ptr+count, klMinMode, swap_endian );
-    count += unpack( ptr+count, klMaxMode, swap_endian );
-    count += unpack( ptr+count, borderClip, swap_endian );
-    count += unpack( ptr+count, minIterations, swap_endian );
-    count += unpack( ptr+count, maxIterations, swap_endian );
-    count += unpack( ptr+count, nDoneMask, swap_endian );
-    count += unpack( ptr+count, gradient_method, swap_endian );
-    count += unpack( ptr+count, getstep_method, swap_endian );
-    count += unpack( ptr+count, max_local_shift, swap_endian );
-    count += unpack( ptr+count, nInitialModes, swap_endian );
-    count += unpack( ptr+count, nModesIncrement, swap_endian );
-    count += unpack( ptr+count, pupilSize, swap_endian );
-    count += unpack( ptr+count, nPatchesX, swap_endian );
-    count += unpack( ptr+count, nPatchesY, swap_endian );
-    count += unpack( ptr+count, ncal, swap_endian );
-    count += unpack( ptr+count, telescopeFocalLength, swap_endian );
-    count += unpack( ptr+count, telescopeDiameter, swap_endian );
-    count += unpack( ptr+count, arcSecsPerPixel, swap_endian );
-    count += unpack( ptr+count, pixelSize, swap_endian );
-    count += unpack( ptr+count, reg_gamma, swap_endian );
-    count += unpack( ptr+count, FTOL, swap_endian );
-    count += unpack( ptr+count, EPS, swap_endian );
-    count += unpack( ptr+count, svd_reg, swap_endian );
-    count += unpack( ptr+count, modes, swap_endian );
-    count += unpack( ptr+count, imageNumbers, swap_endian );
-    count += unpack( ptr+count, darkNumbers, swap_endian );
-    count += unpack( ptr+count, subImagePosX, swap_endian );
-    count += unpack( ptr+count, subImagePosY, swap_endian );
-    count += unpack( ptr+count, stokesWeights, swap_endian );
-    count += unpack( ptr+count, imageDataDir );
-    count += unpack( ptr+count, programDataDir );
-    count += unpack( ptr+count, time_obs );
-    count += unpack( ptr+count, date_obs );
-    count += unpack( ptr+count, pupilFile );
-    uint32_t tmp;
-    count += unpack( ptr+count, tmp, swap_endian );
-    outputFiles.resize( tmp );
-    for( auto & it : outputFiles ) {
-        count += unpack( ptr+count, it, swap_endian );
-    }
+    count += GlobalCfg::unpack( ptr+count, swap_endian );
+    uint16_t tmp;
     count += unpack( ptr+count, tmp, swap_endian );
     objects.resize( tmp );
-    for( auto & it : objects ) {
-        it.reset(new ObjectCfg(*this));
-        count += it->unpack( ptr+count, swap_endian );
+    for( shared_ptr<Object>& obj: objects ) {
+        obj.reset(new Object(*this));
+        count += obj->unpack( ptr+count, swap_endian );
     }
-    
     count += pupil.unpack( ptr+count, swap_endian );
-    
     return count;
-    
 }
-
 
 
 void MomfbdJob::checkParts( void ) {
 
     uint8_t mask = 0;
     for( auto & it : patches ) {
-        /*if( it.second->step & JSTEP_ERR && (it.second->nRetries<info.maxPartRetries)) {    // TODO: handle failed parts.
+        /*if( (it.second->step & JSTEP_ERR) && (it.second->nRetries<info.maxPartRetries)) {
             it.second->nRetries++;
             it.second->step &= ~JSTEP_ERR;
         }*/
@@ -531,6 +163,7 @@ void MomfbdJob::checkParts( void ) {
 
     }
 
+    LOG << "checkParts(): mask = " << bitString(mask);
     if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
         info.step.store( mask );
     }
@@ -557,19 +190,34 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         unique_lock<mutex> lock( jobMutex );
 //         size_t nParts = wip.peer->status.nThreads;
 //         if( info.nThreads ) nParts = std::min( wip.peer->status.nThreads, info.nThreads );
-        if(wip.connection)
-        for( auto & it : patches ) {
-            if( it.second->step == JSTEP_QUEUED ) {
-                it.second->step = JSTEP_RUNNING;
-                wip.parts.push_back( it.second );
+        if(!wip.connection) {   // local worker, check if there are results to write
+            LOG_DEBUG << "getWork(): LOCAL " << (bool)wip.connection;
+            for( auto & it : patches ) {
+                //    LOG_DEBUG << "getWork(): patch " << it.second->id <<  "  step = " << bitString(it.second->step);
+                if( it.second->step & JSTEP_POSTPROCESS ) {
+                    LOG_DEBUG << "getWork(): PP-patch   step = " << bitString(it.second->step);
+                    wip.parts.push_back( it.second );
+                }
+            }
+            if( wip.parts.size() ) {
+                LOG_DEBUG << "getWork(): nPP = " << wip.parts.size();
                 ret = true;
-                break;// only 1 part at a time for MomfbdJob
+            }
+        }
+        if(!ret && wip.connection) {
+            for( auto & it : patches ) {
+                if( it.second->step == JSTEP_QUEUED ) {
+                    it.second->step = JSTEP_RUNNING;
+                    wip.parts.push_back( it.second );
+                    ret = true;
+                    break;// only 1 part at a time for MomfbdJob
+                }
             }
         }
     }
     
-    if( ret ) {
         LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
+    if( ret ) {
         unique_lock<mutex> lock( jobMutex );
         checkParts();
     }
@@ -579,7 +227,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
 void MomfbdJob::ungetWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
-    for( auto & it : wip.parts ) {
+    for( Part::Ptr& it : wip.parts ) {
         it->step = JSTEP_QUEUED;
     }
     wip.parts.clear();
@@ -591,7 +239,7 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 void MomfbdJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
-    for( auto & it : wip.parts ) {
+    for( Part::Ptr& it : wip.parts ) {
         auto patch = static_pointer_cast<PatchData>( it );
         patches[it->id]->step = patch->step;
         //patches[it->id]->result = patch->result;
@@ -610,55 +258,45 @@ void MomfbdJob::init(void) {
         //coeff = legacy::klConfig(klMinMode,klMaxMode);
     }
     
-    for( auto& it : objects ) {
-        it->init(); //coeff);
+    for( shared_ptr<Object>& obj: objects ) {
+        obj->init(); //coeff);
     }
 }
 
 
 void MomfbdJob::cleanup(void) {
-    for( auto& it : objects ) {
-        it->cleanup();
+    for( shared_ptr<Object>& obj: objects ) {
+        obj->cleanup();
     }
 }
 
 
 bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8_t maxThreads ) {
     
-    uint8_t step = info.step.load();
-    if( step == JSTEP_PREPROCESS ) {
+    uint8_t jobStep = info.step.load();
+    uint8_t patchStep = wip.parts.size() ? wip.parts[0]->step : 0;
+    if( jobStep == JSTEP_PREPROCESS ) {
         preProcess(service);                           // preprocess on master: load, flatfield, split in patches
     }
-    else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
+    else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
         size_t nThreads = std::min( maxThreads, info.maxThreads);
-        boost::thread_group pool;
-        for( auto & it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
-
-            //LOG_DETAIL << "Configuring slave";
-            WorkSpace ws( *this, static_pointer_cast<PatchData>(it) );
-            service.reset();
-            ws.init(service);            // Global setup, allocations, etc.
-            for( size_t t = 0; t < nThreads; ++t ) {
-                pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+        if( patchStep == JSTEP_POSTPROCESS ) {      // store results
+            storePatches(wip, service, nThreads);
+        } else {                                    // main processing
+            for( Part::Ptr& it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
+                //LOG_DETAIL << "Configuring slave";
+                WorkSpace ws( *this, static_pointer_cast<PatchData>(it) );
+                ws.init(service);            // Global setup, allocations, etc.
+                runThreadsAndWait(service, nThreads);
+                // Run
+                service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( ws ) ) );
+                runThreadsAndWait(service, nThreads);
+                // Get/return results and cleanup.
+                ws.collectResults();
             }
-            pool.join_all();
-            
-            // Run
-            //LOG_DETAIL << "Start main processing routine...";
-            service.reset();
-            service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( ws ) ) );
-            for( size_t t = 0; t < nThreads; ++t ) {
-                pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-            }
-            pool.join_all();
-            
-            //LOG_DETAIL << "Main processing completed";
-            
-            // Get/return results and cleanup.
-            
         }
     }
-    else if( step == JSTEP_POSTPROCESS ) {
+    else if( jobStep == JSTEP_POSTPROCESS ) {
         postProcess(service);                          // postprocess on master, collect results, save...
     }
     else {
@@ -668,6 +306,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     return false;
     
 }
+
 
 void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
@@ -683,69 +322,48 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
 
     // load shared files synchronously (dark,gain,psf,offset...)
-    service.reset();
     if( pupil.nDimensions() < 2 && pupilFile != "" ) {
         service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), 0 ) );
     }
-    for( auto & it : objects ) {
-        it->loadData(service);
+    for( shared_ptr<Object>& obj : objects ) {
+        obj->loadData(service);
     }
 
     info.maxThreads = 12;
-    {
-        boost::thread_group pool;
-        // load remaining files asynchronously  (images)
-        for( size_t t = 0; t < info.maxThreads; ++t ) {
-            LOG_TRACE << "Adding load-thread #" << (t+1);
-            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-        }
-        pool.join_all();
-    }
+    runThreadsAndWait(service, info.maxThreads);
+
     // Done loading files -> start the preprocessing (flatfielding etc.)
     
-    service.reset();
-    Point imageSizes;
-    for( auto & it : objects ) {
-        Point tmp = it->clipImages();
+    Point16 imageSizes;
+    for( shared_ptr<Object>& obj : objects ) {
+        Point16 tmp = obj->clipImages();
         if(imageSizes.x == 0) {
             imageSizes = tmp;
         } else if( tmp != imageSizes ) {
             throw std::logic_error("The clipped images have different sizes for the different objects, please verify the ALIGN_CLIP values.");
         }
-        it->preprocessData(service);
+        obj->preprocessData(service);
     }
-
-    {
-        boost::thread_group pool;
-        for( size_t t = 0; t < info.maxThreads; ++t ) {
-            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-        }
-        pool.join_all();
-    }
+    runThreadsAndWait(service, info.maxThreads);
+    
     // Done pre-processing -> normalize within each object
     
-    service.reset();
     size_t nTotalImages(0);
-    for( auto & it : objects ) {
-        it->normalize(service);
-        nTotalImages += it->nImages(nTotalImages);
+    for( shared_ptr<Object>& obj : objects) {
+        obj->normalize(service);
+        nTotalImages += obj->nImages(nTotalImages);
     }
-
-    {
-        boost::thread_group pool;
-        for( size_t t = 0; t < info.maxThreads; ++t ) {
-            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-        }
-        pool.join_all();
-    }
-
+    runThreadsAndWait(service, info.maxThreads);
+    
     // Done normalizing -> collect images to master-stack
+    
     imageStack.resize(nTotalImages,imageSizes.y,imageSizes.x);
-    for( auto & it : objects ) {
-        it->collectImages(imageStack);
+    for( shared_ptr<Object>& obj : objects ) {
+        obj->collectImages(imageStack);
     }
 
     redux::file::Ana::write( "masterstack.f0", imageStack );
+    
     // Done normalizing -> split in patches
     
     int minimumOverlap = 16;                // desired width of blending zone in pixels
@@ -753,7 +371,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     if( subImagePosX.empty() ) {
         // TODO: do we need to handle single patches ?? (this only supports nPatches >= 2)
         // TODO: verify michiel's splitting method
-        int firstPos = max_local_shift + patchSize/2;
+        int firstPos = maxLocalShift + patchSize/2;
         int lastPos = imageSizes.x - firstPos - 1;
         nPatchesX = 2;
         double separation = (lastPos-firstPos)/static_cast<double>(nPatchesX-1);
@@ -770,7 +388,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
 
     if( subImagePosY.empty() ) {
-        int firstPos = max_local_shift + patchSize/2;
+        int firstPos = maxLocalShift + patchSize/2;
         int lastPos = imageSizes.y - firstPos - 1;
         nPatchesY = 2;
         double separation = (lastPos-firstPos)/static_cast<double>(nPatchesY-1);
@@ -793,32 +411,25 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
         return;
     }
 
-    service.reset();
-    for( uint i=0; i<objects.size(); ++i ) {
-        service.post( std::bind( &ObjectCfg::prepareStorage, objects[i].get() ) );
+    for( shared_ptr<Object>& obj : objects ) {
+        service.post( std::bind( &Object::prepareStorage, obj.get() ) );
     }
-    {
-        boost::thread_group pool;
-        for( size_t t = 0; t < 1/*objects.size()*/; ++t ) {
-            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-        }
-        pool.join_all();
-    }
+    runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
+    
     size_t count = 0;
-    uint32_t yid=0;
-    service.reset();
-    uint32_t halfBlockSize = patchSize/2 + max_local_shift;
-    for( auto posY : subImagePosY ) {       // y-coordinate of patch-centre
-        uint32_t xid=0;
-        uint32_t trimmedPosY = std::min(std::max(halfBlockSize,posY),imageSizes.y-halfBlockSize);       // stay inside borders
+    uint16_t yid=0;
+    uint16_t halfBlockSize = patchSize/2 + maxLocalShift;
+    for( const uint16_t posY : subImagePosY ) {       // y-coordinate of patch-centre
+        uint16_t xid=0;
+        uint16_t trimmedPosY = std::min(std::max(halfBlockSize,posY),uint16_t(imageSizes.y-halfBlockSize));       // stay inside borders
         if( trimmedPosY != posY ) LOG_WARN << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << posY << " -> " << trimmedPosY;
-        for( auto posX : subImagePosX ) {   // x-coordinate of patch-centre
-            uint32_t trimmedPosX = std::min(std::max(halfBlockSize,posX),imageSizes.x-halfBlockSize);   // stay inside borders
+        for( const uint16_t posX : subImagePosX ) {   // x-coordinate of patch-centre
+            uint16_t trimmedPosX = std::min(std::max(halfBlockSize,posX),uint16_t(imageSizes.x-halfBlockSize));   // stay inside borders
             if( trimmedPosX != posX ) LOG_WARN << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << posX << " -> " << trimmedPosX;
             PatchData::Ptr patch( new PatchData() );
             patch->step = JSTEP_QUEUED;
-            patch->first.x = max_local_shift;
-            patch->first.y = max_local_shift;
+            patch->first.x = maxLocalShift;
+            patch->first.y = maxLocalShift;
             patch->last.x = patch->first.x+patchSize-1;
             patch->last.y = patch->first.y+patchSize-1;
             patch->id = ++count;
@@ -832,18 +443,13 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
     LOG_DETAIL << "MomfbdJob::preProcess()  nPatches = " << patches.size();
 
-    {
-        boost::thread_group pool;
-        for( size_t t = 0; t < 1/*info.maxThreads*/; ++t ) {
-            pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
-        }
-        pool.join_all();
-    }
+    runThreadsAndWait(service, 1); //info.maxThreads);  TODO: fix multithreaded localoffstets
 
     info.step.store( JSTEP_QUEUED );
 
     LOG_DETAIL << "MomfbdJob::preProcess()  Done.";
 }
+
 
 void MomfbdJob::applyLocalOffsets( PatchData::Ptr patch ) {
     
@@ -857,8 +463,8 @@ void MomfbdJob::applyLocalOffsets( PatchData::Ptr patch ) {
 //     patch->data = sharedArray<char>(totalPatchSize);
 //     char* ptr = patch->data.get();
 //     uint64_t count(0);
-    for( auto & it : objects ) {
-        it->applyLocalOffsets(patch);
+    for( shared_ptr<Object>& obj: objects ) {
+        obj->applyLocalOffsets(patch);
     }
 //     
 //     if(count != totalPatchSize) {
@@ -873,8 +479,8 @@ void MomfbdJob::runMain( WorkSpace& ws ) {
 
 
 
-    LOG << "MomfbdJob::runMain()  patch#" << ws.data->id << "  x1=" << ws.data->first.x << "  y1=" << ws.data->first.y;
-usleep(10000);
+    LOG << "MomfbdJob::runMain()  patch#" << ws.data->id << " (" << ws.data->index.x << "," << ws.data->index.y << ")  x1=" << ws.data->first.x << "  y1=" << ws.data->first.y;
+usleep(100000);
     //     // temporaries, to avoid cache collisions.
 //     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
 //     uint32_t sizeY = pptr->yPixelH - pptr->yPixelL + 1;
@@ -921,6 +527,19 @@ usleep(10000);
 
 }
 
+void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& service, uint8_t nThreads) {
+    LOG << "MomfbdJob::storePatches()";
+    for( shared_ptr<Object>& obj: objects ) {
+        obj->storePatches(wip, service, nThreads);
+    }
+    
+    for( Part::Ptr& part: wip.parts ) {
+        //PatchData::Ptr patch = static_pointer_cast<PatchData>(part);
+        part->step = JSTEP_COMPLETED;
+    }
+
+    
+}
 
 
 void MomfbdJob::postProcess( boost::asio::io_service& service ) {
@@ -1041,10 +660,11 @@ bool MomfbdJob::check(void) {
 
 bool MomfbdJob::checkCfg(void) {
     
-    if( objects.empty() ) return false;     // nothing to do
+    if( !GlobalCfg::check() ) return false;
+    if( objects.empty() ) return false;     // need at least 1 object
     
-    for( auto & it : objects ) {
-        if( !it->checkCfg() ) return false;
+    for( shared_ptr<Object>& obj: objects ) {
+        if( !obj->checkCfg() ) return false;
     }
     
     return true;
@@ -1053,12 +673,17 @@ bool MomfbdJob::checkCfg(void) {
 
 bool MomfbdJob::checkData(void) {
 
-    for( auto & it : objects ) {
-        if( !it->checkData() ) return false;
+    for( shared_ptr<Object>& obj: objects ) {
+        if( !obj->checkData() ) return false;
     }
     
     return true;
 }
         
+        
+const MomfbdJob& MomfbdJob::operator=(const GlobalCfg& rhs) {
+    GlobalCfg::operator=(rhs);
+    return *this;
+}
 
 

@@ -1,7 +1,8 @@
 #ifndef REDUX_MOMFBD_MOMFBDJOB_HPP
 #define REDUX_MOMFBD_MOMFBDJOB_HPP
 
-#include "redux/momfbd/objectcfg.hpp"
+#include "redux/momfbd/config.hpp"
+#include "redux/momfbd/object.hpp"
 #include "redux/momfbd/patch.hpp"
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
@@ -16,15 +17,11 @@ namespace redux {
          *  @{
          */
 
-        extern const std::map<std::string, int> getstepMap;
-        extern const std::map<std::string, int> gradientMap;
-        extern const std::map<std::string, int> fillpixMap;
-
-        class ChannelCfg;
+        class Channel;
         /*! @brief Class containing the configuration settings for a MOMFBD job.
          *
          */
-        class MomfbdJob : public Job {
+        class MomfbdJob : public Job, public GlobalCfg {
 
         enum Step { JSTEP_SUBMIT = 1,
                     JSTEP_PREPROCESS = 2,
@@ -36,18 +33,16 @@ namespace redux {
         
         public:
             static size_t jobType;
-            static int getFromMap( std::string str, const std::map<std::string, int>& m );
-            static void maybeOverride( bool value, uint32_t& set, uint32_t flag );
 
             MomfbdJob( void );
             ~MomfbdJob( void );
 
             uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
             
-            void parseProperties( po::variables_map& vm, bpt::ptree& tree );
+            void parsePropertyTree( po::variables_map& vm, bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
 
-            size_t size( void ) const;
+            uint64_t size( void ) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
 
@@ -62,23 +57,9 @@ namespace redux {
             bool check(void);
             bool checkCfg(void);
             bool checkData(void);
-            const std::vector<std::shared_ptr<ObjectCfg>>& getObjects(void) const { return objects; };
-        
-            uint8_t basis, fillpix_method, output_data_type;
+            const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
 
-            uint32_t flags, patchSize, sequenceNumber;
-            uint32_t klMinMode, klMaxMode, borderClip;
-            uint32_t minIterations , maxIterations, nDoneMask;
-            uint32_t gradient_method, getstep_method;
-            uint32_t max_local_shift, nInitialModes, nModesIncrement;
-            uint32_t pupilSize, nPatchesX, nPatchesY, ncal;
-
-            double telescopeFocalLength, telescopeDiameter, arcSecsPerPixel, pixelSize;
-            double reg_gamma, FTOL, EPS, svd_reg;
-
-            std::vector<uint32_t> modes, imageNumbers, darkNumbers;
-            std::vector<uint32_t> subImagePosX,subImagePosY;
-            std::vector<double> stokesWeights;
+            const MomfbdJob& operator=(const GlobalCfg&);
 
         private:
 
@@ -86,24 +67,21 @@ namespace redux {
             void preProcess( boost::asio::io_service& );
             void applyLocalOffsets( PatchData::Ptr );
             void runMain( WorkSpace& );
+            void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             void postProcess( boost::asio::io_service& );
 
-
-            std::string imageDataDir;
-            std::string programDataDir;
-            std::string time_obs, date_obs;
-            std::string pupilFile;
             std::vector<std::string> outputFiles;
 
-            std::vector<std::shared_ptr<ObjectCfg>> objects;
+            std::vector<std::shared_ptr<Object>> objects;
 
             redux::util::Array<double> pupil;
             redux::util::Array<float> imageStack;
+            std::map<uint32_t, const ModeCache::ModePtr> modes;
 
             std::map<size_t,PatchData::Ptr> patches;
         
-            friend class ObjectCfg;
-            friend class ChannelCfg;
+            friend class Object;
+            friend class Channel;
 
 
         };
