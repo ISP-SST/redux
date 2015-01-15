@@ -215,6 +215,9 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
                 if( it->step == JSTEP_QUEUED ) {
                     it->step = JSTEP_RUNNING;
                     wip.parts.push_back( it );
+                    if(wip.previousJob.get() != this) {     // First time for this slave -> include global data
+                        wip.parts.push_back( globalData );
+                    }
                     ret = true;
                     break;// only 1 part at a time for MomfbdJob
                 }
@@ -284,6 +287,10 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
         if( patchStep == JSTEP_POSTPROCESS ) {      // store results
             storePatches(wip, service, nThreads);
         } else {                                    // main processing
+            if( wip.parts.size() > 1 ) {
+                globalData = static_pointer_cast<GlobalData>(wip.parts[1]);
+                wip.parts.resize(1);
+            }
             for( Part::Ptr& it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 //LOG_DETAIL << "Configuring slave";
                 WorkSpace ws( *this, static_pointer_cast<PatchData>(it) );
