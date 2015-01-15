@@ -123,12 +123,12 @@ void redux::momfbd::util::loadPupil( const std::string& filename, redux::util::A
 }
 
 
-double redux::momfbd::util::cf2pix(double arcsecperpix,double telescope_d) {
+double redux::momfbd::util::cf2pix(double arcsecperpix, double telescope_d) {
     return 1.0 / pix2cf(arcsecperpix,telescope_d);
 }
 
 
-double redux::momfbd::util::pix2cf(double arcsecperpix,double telescope_d) {
+double redux::momfbd::util::pix2cf(double arcsecperpix, double telescope_d) {
     static const double a = (redux::PI*redux::PI)/648000.0;
     return a * (arcsecperpix*telescope_d);
 }

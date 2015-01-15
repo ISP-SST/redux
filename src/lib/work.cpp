@@ -69,13 +69,13 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-WorkInProgress::WorkInProgress( network::TcpConnection::Ptr c ) : connection( c ), nCompleted(0) {
+WorkInProgress::WorkInProgress( network::TcpConnection::Ptr c ) : connection( c ), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif
 }
 
-WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), parts(rhs.parts), connection(rhs.connection), nCompleted(rhs.nCompleted) {
+WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), parts(rhs.parts), connection(rhs.connection), nParts(rhs.nParts), nCompleted(rhs.nCompleted) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif

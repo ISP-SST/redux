@@ -30,7 +30,7 @@ namespace redux {
 
         public:
 
-            Channel( const Object&, const MomfbdJob& );
+            Channel( Object&, MomfbdJob& );
             ~Channel();
 
             void parsePropertyTree( bpt::ptree& );
@@ -71,8 +71,9 @@ namespace redux {
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
             
-            const Object& myObject;
-            const MomfbdJob& myJob;
+            /*
+            Object& myObject;
+            MomfbdJob& myJob;
 
             friend class Object;
             

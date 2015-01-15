@@ -29,7 +29,7 @@ namespace redux {
 
         public:
 
-            Object( const MomfbdJob& );
+            Object( MomfbdJob& );
             ~Object();
 
             void parsePropertyTree( bpt::ptree& );
@@ -51,7 +51,7 @@ namespace redux {
             redux::util::Array<double> pupil;
             std::map<uint32_t, const ModeCache::ModePtr> modes;
 
-            const MomfbdJob& myJob;
+            MomfbdJob& myJob;
             std::vector<std::shared_ptr<Channel>> channels;
             
         private:

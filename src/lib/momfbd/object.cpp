@@ -50,8 +50,7 @@ namespace {
 }
 
 
-Object::Object( const MomfbdJob& j ) : ObjectCfg(j), lim_freq(), r_c(), cf2pix(), pix2cf(), cf2def(), 
-                                pupil(j.pupil), myJob(j) {
+Object::Object( MomfbdJob& j ) : ObjectCfg(j), myJob(j) {
     
     
 }

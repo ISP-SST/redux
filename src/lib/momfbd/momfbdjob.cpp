@@ -335,7 +335,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
         Point16 tmp = obj->clipImages();
         if(imageSizes.x == 0) {
             imageSizes = tmp;
-        } else if( tmp != imageSizes ) {
+        } else if( tmp != imageSizes ) {    // TBD: allow for different patchsizes (i.e. pixelsize/ccd-size) for different objects/channels.
             throw std::logic_error("The clipped images have different sizes for the different objects, please verify the ALIGN_CLIP values.");
         }
         obj->preprocessData(service);
@@ -475,7 +475,7 @@ void MomfbdJob::runMain( WorkSpace& ws ) {
 
 
 
-    LOG << "MomfbdJob::runMain()  patch#" << ws.data->id << " (" << ws.data->index.x << "," << ws.data->index.y << ")  x1=" << ws.data->first.x << "  y1=" << ws.data->first.y;
+    LOG << "MomfbdJob::runMain()  patch#" << ws.data->id << "   index=" << ws.data->index << " pos=" << ws.data->pos;
 usleep(100000);
     //     // temporaries, to avoid cache collisions.
 //     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
@@ -656,7 +656,10 @@ bool MomfbdJob::check(void) {
 
 bool MomfbdJob::checkCfg(void) {
     
-    if( !GlobalCfg::check() ) return false;
+    if( (runFlags&RF_FLATFIELD) && (runFlags&RF_CALIBRATE) ) {
+        LOG_ERR << "Both FLATFIELD and CALIBRATE mode requested";
+        return false;
+    }
     if( objects.empty() ) return false;     // need at least 1 object
     
     for( shared_ptr<Object>& obj: objects ) {

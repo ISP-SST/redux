@@ -49,7 +49,7 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& blockSize ) {
     
     try {
         char sz[sizeof( uint64_t )];
-        size_t count = boost::asio::read( socket(), boost::asio::buffer( sz, sizeof( size_t ) ) );
+        uint64_t count = boost::asio::read( socket(), boost::asio::buffer( sz, sizeof( uint64_t ) ) );
 
         if( count != sizeof( uint64_t ) ) {
             throw ios_base::failure( "blockSize: Only received " + to_string( count ) + "/" + to_string( sizeof( uint64_t ) ) + " bytes." );

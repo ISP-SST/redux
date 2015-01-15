@@ -139,7 +139,8 @@ bool Worker::fetchWork( void ) {
         *connection << CMD_GET_WORK;
 
         size_t blockSize;
-        auto buf = connection->receiveBlock( blockSize );               // reply
+        shared_ptr<char> buf = connection->receiveBlock( blockSize );               // reply
+        cout << "Received " << blockSize << " bytes." << endl;
         LOG_TRACE << "Received " << blockSize << " bytes.";
 
         if( !blockSize ) return false;
@@ -149,16 +150,14 @@ bool Worker::fetchWork( void ) {
         uint64_t count = wip.unpack( ptr, connection->getSwapEndian() );
 
         if( count != blockSize ) {
-            throw invalid_argument( "Parsing of datablock failed, there was a missmatch of " + to_string( count - blockSize ) + " bytes." );
-
+            throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
         }
-
         wip.connection = connection;
 
         return true;
     }
     catch( const exception& e ) {
-        LOG_ERR << "fetchWork: Exception caught while fetching job " << e.what() << endl;
+        LOG_ERR << "fetchWork: Exception caught while fetching job: " << e.what() << endl;
     }
     catch( ... ) {
         LOG_ERR << "fetchWork: Unrecognized exception caught while fetching job." << endl;

@@ -38,10 +38,10 @@ namespace redux {
         uint64_t pack( char*, bool includeJob) const;
         uint64_t unpack( const char*, bool swap_endian=false );
         std::string print(void);
-        std::shared_ptr<Job> job;
+        std::shared_ptr<Job> job, previousJob;
         std::vector<Part::Ptr> parts;
         network::TcpConnection::Ptr connection;            // Basically only used to separate remote/local jobs.
-        uint16_t nCompleted;
+        uint16_t nParts,nCompleted;
     };
 
 

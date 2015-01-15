@@ -1,4 +1,4 @@
-#include "redux/momfbd/modecache.hpp"
+#include "redux/momfbd/cache.hpp"
 
 #include "redux/constants.hpp"
 #include "redux/math/linalg.hpp"
@@ -55,30 +55,61 @@ namespace {
 }
 
 
-ModeCache::index::index(int modeNumber, int nPoints, double r_c, double wavelength, double angle)
+Cache::ModeID::ModeID(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle)
     : firstMode(0), lastMode(0),
       modeNumber(modeNumber), nPoints(nPoints),
-      r_c(r_c), wavelength(wavelength), angle(angle) { }
+      pupilRadius(pupilRadius), wavelength(wavelength), angle(angle) { }
 
 
-ModeCache::index::index(int firstMode, int lastMode, int modeNumber, int nPoints, double r_c, double wavelength, double angle)
+Cache::ModeID::ModeID(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle)
     : firstMode(firstMode), lastMode(lastMode),
       modeNumber(modeNumber), nPoints(nPoints),
-      r_c(r_c), wavelength(wavelength), angle(angle) { }
+      pupilRadius(pupilRadius), wavelength(wavelength), angle(angle) { }
 
-      
-bool ModeCache::index::operator<(const index& rhs) const {
+uint64_t Cache::ModeID::size( void ) const {
+    static uint64_t sz = 4*sizeof(uint16_t) + 3*sizeof(double);
+    return sz;
+}
+
+
+uint64_t Cache::ModeID::pack( char* ptr ) const {
+    using redux::util::pack;
+    uint64_t count = pack(ptr,firstMode);
+    count += pack(ptr+count,lastMode);
+    count += pack(ptr+count,modeNumber);
+    count += pack(ptr+count,nPoints);
+    count += pack(ptr+count,pupilRadius);
+    count += pack(ptr+count,wavelength);
+    count += pack(ptr+count,angle);
+    return count;
+}
+
+
+uint64_t Cache::ModeID::unpack( const char* ptr, bool swap_endian ) {
+    using redux::util::unpack;
+    uint64_t count = unpack(ptr,firstMode,swap_endian);
+    count += unpack(ptr+count,lastMode,swap_endian);
+    count += unpack(ptr+count,modeNumber,swap_endian);
+    count += unpack(ptr+count,nPoints,swap_endian);
+    count += unpack(ptr+count,pupilRadius,swap_endian);
+    count += unpack(ptr+count,wavelength,swap_endian);
+    count += unpack(ptr+count,angle,swap_endian);
+    return count;
+}
+
+
+bool Cache::ModeID::operator<(const ModeID& rhs) const {
     if(firstMode == rhs.firstMode) {
         if(lastMode == rhs.lastMode) {
             if(modeNumber == rhs.modeNumber) {
                 if(nPoints == rhs.nPoints) {
-                    if(r_c == rhs.r_c) {
+                    if(pupilRadius == rhs.pupilRadius) {
                         if(wavelength == rhs.wavelength) {
                             return (angle < rhs.angle);
                         }
                         else return (wavelength < rhs.wavelength);
                     }
-                    else return (r_c < rhs.r_c);
+                    else return (pupilRadius < rhs.pupilRadius);
                 }
                 else return (nPoints < rhs.nPoints);
             }
@@ -90,13 +121,13 @@ bool ModeCache::index::operator<(const index& rhs) const {
 }
 
 
-ModeCache& ModeCache::getCache(void) {
-    static ModeCache cache;
+Cache& Cache::getCache(void) {
+    static Cache cache;
     return cache;
 }
 
 
-void ModeCache::clear(void) {
+void Cache::clear(void) {
 
     factorials.clear();
     grids.clear();
@@ -105,7 +136,7 @@ void ModeCache::clear(void) {
 }
 
 
-const redux::image::Grid& ModeCache::grid(uint32_t sz, PointF origin) {
+const redux::image::Grid& Cache::grid(uint32_t sz, PointF origin) {
 
     unique_lock<mutex> lock(mtx);
     auto it = grids.find(make_pair(sz,origin));
@@ -115,7 +146,7 @@ const redux::image::Grid& ModeCache::grid(uint32_t sz, PointF origin) {
 }
 
 
-const std::pair<Array<double>, double>& ModeCache::pupil(uint32_t nPoints, float radius) {
+const std::pair<Array<double>, double>& Cache::pupil(uint32_t nPoints, float radius) {
 
     unique_lock<mutex> lock(mtx);
     auto it = pupils.find( make_pair(nPoints,radius) );
@@ -127,12 +158,12 @@ const std::pair<Array<double>, double>& ModeCache::pupil(uint32_t nPoints, float
 }
 
 
-double ModeCache::zernikeCovariance(int i, int j) {
+double Cache::zernikeCovariance(int32_t i, int32_t j) {
 
     if(i > j) std::swap(i, j);      // it's symmetric, so only store 1
 
     unique_lock<mutex> lock(mtx);
-    std::pair<int, int> index = make_pair(i, j);
+    std::pair<int32_t, int32_t> index = make_pair(i, j);
     auto it = zernikeCovariances.find(index);
     if(it != zernikeCovariances.end()) return it->second;
 
@@ -144,14 +175,14 @@ double ModeCache::zernikeCovariance(int i, int j) {
 }
 
 
-const vector<double>& ModeCache::zernikeRadialPolynomial(int m, int n) {
+const vector<double>& Cache::zernikeRadialPolynomial(int32_t m, int32_t n) {
 
     unique_lock<mutex> lock(mtx);
     auto it = zernikeRadialPolynomials.find(make_pair(m, n));
     if(it != zernikeRadialPolynomials.end()) return it->second;
 
-    int nmm = (n - m) / 2;
-    int npm = (n + m) / 2;
+    int32_t nmm = (n - m) / 2;
+    int32_t npm = (n + m) / 2;
     size_t nmax = max(npm, n);
     size_t fsz = factorials.size();
     if(fsz <= nmax) {
@@ -159,7 +190,7 @@ const vector<double>& ModeCache::zernikeRadialPolynomial(int m, int n) {
         for(size_t i = max(fsz, 1UL); i <= nmax; ++i) factorials[i] = i * factorials[i - 1];
     }
     vector<double> res(nmm + 1);
-    for(int s = 0, pm = -1; s <= nmm; ++s) {
+    for(int32_t s = 0, pm = -1; s <= nmm; ++s) {
         res[s] = (double)((pm *= -1) * factorials[n - s]) / (factorials[s] * factorials[npm - s] * factorials[nmm - s]);
     }
     std::reverse(res.begin(), res.end());
@@ -168,7 +199,7 @@ const vector<double>& ModeCache::zernikeRadialPolynomial(int m, int n) {
 }
 
 
-const std::map<int, PupilMode::KL_cfg>& ModeCache::karhunenLoeveExpansion(int first_mode, int last_mode) {
+const std::map<uint16_t, PupilMode::KLPtr>& Cache::karhunenLoeveExpansion(uint16_t first_mode, uint16_t last_mode) {
 
 
     {
@@ -178,10 +209,10 @@ const std::map<int, PupilMode::KL_cfg>& ModeCache::karhunenLoeveExpansion(int fi
     }
 
 
-    map<int, int> mapping, reverse_mapping;
-    map<int, double> values;
-    for(int i = first_mode; i <= last_mode; ++i) mapping[i] = i;
-    for(int i = first_mode; i <= last_mode - 1; ++i) {
+    map<uint16_t, uint16_t> mapping, reverse_mapping;
+    map<uint16_t, double> values;
+    for(uint16_t i = first_mode; i <= last_mode; ++i) mapping[i] = i;
+    for(uint16_t i = first_mode; i <= last_mode - 1; ++i) {
         double cov1 = zernikeCovariance(mapping[i], mapping[last_mode]);
         for(int j = last_mode - 1; j > i; --j) {
             double cov2 = zernikeCovariance(mapping[i], mapping[j]);
@@ -246,18 +277,19 @@ const std::map<int, PupilMode::KL_cfg>& ModeCache::karhunenLoeveExpansion(int fi
         offset += blockSize;
     }
 
-    std::map<int, PupilMode::KL_cfg> res;
-    for(int i = first_mode; i <= last_mode; ++i) {
-        PupilMode::KL_cfg &cfg = res[i];      // will insert a new element and return a reference if it doesn't exist
+    std::map<uint16_t, PupilMode::KLPtr> res;
+    for(uint16_t i = first_mode; i <= last_mode; ++i) {
+        PupilMode::KLPtr &cfg = res[i];      // will insert a new element and return a reference if it doesn't exist
+        if(!cfg) cfg.reset(new PupilMode::KL);
         int im = reverse_mapping.at(i), s;
         for(s = 0; (first_in_block[s] > im) || (last_in_block[s] < im); ++s);
         int n = last_in_block[s] - first_in_block[s] + 1;
-        cfg.covariance = values[im - first_mode];
+        cfg->covariance = values[im - first_mode];
         for(int m = 0; m < n; ++m) {
             int j = m + first_in_block[s];
             // N.B. minus-sign for the coefficients below is arbitrary. Depending on the SVD solver used, the result might vary in sign.
-            // This minus was added just to get the KL modes as close as possible to the Zernikes (i.e. the principal component has weight ~ 1 rather that ~ -1)
-            cfg.zernikeWeights.push_back(make_pair(mapping.at(j), - blockMatrix[s][m][im - first_in_block[s]]));
+            // This minus was added just to get the KL modes as close as possible to the Zernikes (i.e. the principal component has weight closer to 1 than -1)
+            cfg->zernikeWeights.push_back(make_pair(mapping.at(j), - blockMatrix[s][m][im - first_in_block[s]]));
         }
     }
 
@@ -274,53 +306,58 @@ const std::map<int, PupilMode::KL_cfg>& ModeCache::karhunenLoeveExpansion(int fi
 
 }
 
-#include "redux/file/fileana.hpp"
-const ModeCache::ModePtr& ModeCache::addMode(int modeNumber, int nPoints, double r_c, double wavelength, double angle,  ModeCache::ModePtr& m) {
 
-    index idx(modeNumber, nPoints, r_c, wavelength, angle);
+const PupilMode::Ptr& Cache::addMode(const ModeID& idx, PupilMode::Ptr& m) {
 
     unique_lock<mutex> lock(mtx);
     auto it = modes.find(idx);
     if(it != modes.end()) return it->second;
-
     return modes.emplace(idx, m).first->second;
 
 }
 
 
-const ModeCache::ModePtr& ModeCache::mode(int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
+const PupilMode::Ptr& Cache::addMode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m) {
 
-    index idx(modeNumber, nPoints, r_c, wavelength, angle);
+    ModeID idx(modeNumber, nPoints, pupilRadius, wavelength, angle);
+    return addMode(idx, m);
+
+}
+
+
+const PupilMode::Ptr& Cache::mode(const ModeID& idx) {
+
     {
         unique_lock<mutex> lock(mtx);
         auto it = modes.find(idx);
         if(it != modes.end()) return it->second;
     }
 
-    ModePtr ptr(new PupilMode(modeNumber, nPoints, r_c, wavelength, angle));
+    PupilMode::Ptr ptr;
+    if( idx.firstMode == 0 || idx.lastMode == 0 ) ptr.reset(new PupilMode(idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.wavelength, idx.angle));    // Zernike
+    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.wavelength, idx.angle));                // K-L
+    
     unique_lock<mutex> lock(mtx);
     return modes.emplace(idx, ptr).first->second;
 
 }
 
 
-const ModeCache::ModePtr& ModeCache::mode(int firstMode, int lastMode, int modeNumber, int nPoints, double r_c, double wavelength, double angle) {
+const PupilMode::Ptr& Cache::mode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
 
+    ModeID idx(modeNumber, nPoints, pupilRadius, wavelength, angle);
+    return mode(idx);
+
+}
+
+
+const PupilMode::Ptr& Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
+
+    ModeID idx(firstMode, lastMode, modeNumber, nPoints, pupilRadius, wavelength, angle);
     if( modeNumber == 2 || modeNumber == 3) {   // Always use Zernike modes for the tilts
-        return mode( modeNumber, nPoints, r_c, wavelength, angle);
+        idx.firstMode = idx.lastMode == 0;
     }
-    
-    index idx(firstMode, lastMode, modeNumber, nPoints, r_c, wavelength, angle);
-    {
-        unique_lock<mutex> lock(mtx);
-        auto it = modes.find(idx);
-        if(it != modes.end()) return it->second;
-    }
-
-    ModePtr ptr(new PupilMode(firstMode, lastMode, modeNumber, nPoints, r_c, wavelength, angle));
-    
-    unique_lock<mutex> lock(mtx);
-    return modes.emplace(idx, ptr).first->second;
+    return mode(idx);
 
 }
 
