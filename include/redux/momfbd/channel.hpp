@@ -41,6 +41,8 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void) const;
             void collectImages(redux::util::Array<float>&) const;
+            void getPatchData(ChannelData::Ptr, uint16_t yid, uint16_t xid) const;
+            void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             void initWorkSpace( WorkSpace& ws );
             
@@ -49,6 +51,11 @@ namespace redux {
             
             bool checkCfg(void);
             bool checkData(void);
+            
+            void init(void);
+            void initCache(void);
+            void cleanup(void);
+            
             size_t nImages(size_t offset=0) { dataOffset=offset; return images.dimSize(0); } 
 
             void loadData(boost::asio::io_service&);
@@ -60,7 +67,6 @@ namespace redux {
             void normalizeImage(size_t index, double value);
             
             size_t sizeOfPatch(uint32_t) const;
-            void applyLocalOffsets(PatchData::Ptr) const;
             
             Point16 clipImages(void);
 

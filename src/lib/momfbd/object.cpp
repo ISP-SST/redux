@@ -33,20 +33,6 @@ namespace {
 
     const string thisChannel = "momfbdobj";
 
-    void getObjectPupilSize( double &lim_freq, double &r_c, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel ) {
-        double radians_per_arcsec = redux::PI/(180.0*3600.0);             // (2.0*redux::PI)/(360.0*3600.0)
-        double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
-        double q_number = wavelength / ( radians_per_pixel * telescopeDiameter );
-        lim_freq = ( double )nPixels / q_number;
-        nPupilPixels = nPixels>>2;
-        r_c = lim_freq / 2.0;                   // telescope radius in pupil pixels...
-        if( nPupilPixels < r_c ) {           // this should only be needed for oversampled images
-            uint16_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
-            for( int i = 0; ( nPupilPixels = max( goodsizes[i], nPupilPixels ) ) < r_c; ++i ); // find right size
-        }
-        nPupilPixels <<= 1;
-    }
-
 }
 
 
@@ -64,8 +50,6 @@ Object::~Object() {
 void Object::parsePropertyTree( bpt::ptree& tree ) {
 
     ObjectCfg::parseProperties(tree, myJob);
-
-    getObjectPupilSize( lim_freq, r_c, pupilSize, wavelength, patchSize, myJob.telescopeD, myJob.arcSecsPerPixel );
 
     for( auto & it : tree ) {
         if( iequals( it.first, "CHANNEL" ) ) {
@@ -99,15 +83,9 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 
 size_t Object::size(void) const {
     size_t sz = ObjectCfg::size();
-    sz += 5*sizeof(double);                 // lim_freq, r_c, cf2pix, pix2cf, cf2def
-    sz += pupil.size();
-    sz += 2*sizeof(uint16_t);                   // channels.size() & modes.size()
+    sz += sizeof(uint16_t);                   // channels.size()
     for( const shared_ptr<Channel>& ch : channels ) {
         sz += ch->size();
-    }
-    for(auto& it: modes) {
-        sz += sizeof(uint32_t);
-        sz += it.second->size();
     }
     return sz;
 }
@@ -116,17 +94,6 @@ size_t Object::size(void) const {
 uint64_t Object::pack(char* ptr) const {
     using redux::util::pack;
     uint64_t count = ObjectCfg::pack(ptr);
-    count += pack(ptr+count, lim_freq);
-    count += pack(ptr+count, r_c);
-    count += pack(ptr+count, cf2pix);
-    count += pack(ptr+count, pix2cf);
-    count += pack(ptr+count, cf2def);
-    count += pupil.pack(ptr+count);
-    count += pack(ptr+count, (uint16_t)modes.size());
-    for(auto& it: modes) {
-        count += pack(ptr+count, it.first);
-        count += it.second->pack(ptr+count);
-    }
     count += pack(ptr+count, (uint16_t)channels.size());
     for( const shared_ptr<Channel>& ch : channels ) {
         count += ch->pack(ptr+count);
@@ -140,24 +107,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
 
     uint64_t count = ObjectCfg::unpack(ptr, swap_endian);
-    count += unpack(ptr+count, lim_freq, swap_endian);
-    count += unpack(ptr+count, r_c, swap_endian);
-    count += unpack(ptr+count, cf2pix, swap_endian);
-    count += unpack(ptr+count, pix2cf, swap_endian);
-    count += unpack(ptr+count, cf2def, swap_endian);
-    count += pupil.unpack(ptr+count, swap_endian);
     uint16_t tmp;
-    count += unpack(ptr+count, tmp, swap_endian);
-    if(tmp) {
-        ModeCache& cache = ModeCache::getCache();
-        while(tmp--) {
-            uint32_t modeNumber;
-            PupilMode::Ptr md( new PupilMode );
-            count += unpack(ptr+count, modeNumber, swap_endian);
-            count += md->unpack(ptr+count, swap_endian);
-            modes.emplace( modeNumber, cache.mode( modeNumber, pupilSize, r_c, wavelength, rotationAngle ) );
-        }
-    }
     count += unpack(ptr+count, tmp, swap_endian);
     channels.resize(tmp);
     for( shared_ptr<Channel>& ch : channels ) {
@@ -180,6 +130,11 @@ void Object::collectImages(redux::util::Array<float>& stack) const {
 }
 
 
+void Object::calcPatchPositions(const std::vector<uint16_t>& y, const std::vector<uint16_t>& x) {
+    for( shared_ptr<Channel>& ch : channels ) ch->calcPatchPositions(y,x);
+}
+
+
 void Object::initWorkSpace( WorkSpace& ws ) {
     for( shared_ptr<Channel>& ch : channels ) ch->initWorkSpace(ws);
 }
@@ -187,7 +142,7 @@ void Object::initWorkSpace( WorkSpace& ws ) {
 
 bool Object::checkCfg(void) {
     
-    //if( !ObjectCfg::check() ) return false;
+    if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
     if( channels.empty() ) {
         LOG_CRITICAL << "Each object must have at least 1 channel specified.";
     }
@@ -262,6 +217,18 @@ bool Object::checkData(void) {
 
 void Object::init( void ) {
 
+    for( shared_ptr<Channel>& ch : channels ) {
+        ch->init();
+    }
+    
+//   init( KL_cfg* kl_cfg, double lambda, double r_c, int nph_in, int basis, int nm, int *mode_num,
+
+void Object::initCache( void ) {
+
+    for( shared_ptr<Channel>& ch : channels ) {
+        ch->initCache();
+    }
+    
 //   init( KL_cfg* kl_cfg, double lambda, double r_c, int nph_in, int basis, int nm, int *mode_num,
 //              int nch, int *ndo, int **dorder, int **dtype, int kl_min_mode, int kl_max_mode, double svd_reg, double angle, double **pupil_in ) 
    
@@ -288,9 +255,6 @@ void Object::cleanup( void ) {
 void Object::loadData( boost::asio::io_service& service ) {
     
     LOG << "Object::loadData()";
-    if( pupil.nDimensions() < 2 && pupilFile != "" ) {
-        service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), pupilSize ) );
-    }
 
     for( shared_ptr<Channel>& ch : channels ) {
         ch->loadData( service );
@@ -302,35 +266,6 @@ void Object::loadData( boost::asio::io_service& service ) {
 void Object::preprocessData(boost::asio::io_service& service ) {
     
     LOG_TRACE << "Object::preprocessData()";
-    ModeCache& cache = ModeCache::getCache();
-    if( pupil.nDimensions() < 2 ) {
-        LOG_DETAIL << "Object::preprocessData()  Generating pupil.";
-        const std::pair<Array<double>, double>& ppair = cache.pupil(pupilSize,r_c);
-        pupil = ppair.first;
-    }
-    
-    if ( modes.size() < myJob.modeNumbers.size() ) {
-        LOG_DETAIL << "Object::preprocessData()  Generating modes.";
-        for( auto & modeNumber: myJob.modeNumbers ) {
-            if( myJob.modeBasis == KARHUNEN_LOEVE ) {
-                modes.emplace( modeNumber, cache.mode( myJob.klMinMode, myJob.klMaxMode, modeNumber, pupilSize, r_c, wavelength, rotationAngle ) );
-            } else {
-                modes.emplace( modeNumber, cache.mode( modeNumber, pupilSize, r_c, wavelength, rotationAngle ) );
-            }
-        }
-    }
-    
-    cf2pix = util::cf2pix(myJob.arcSecsPerPixel, myJob.telescopeD);
-    cf2def = util::cf2def(1.0,myJob.telescopeD/myJob.telescopeF);
-    auto it = modes.find(2);
-    if(it != modes.end()) {
-        LOG_DETAIL << "Object::preprocessData()  adjusting pixel <-> coefficient conversion for this object.";
-        double tmp = it->second->at(pupilSize/2,pupilSize/2+1) - it->second->at(pupilSize/2,pupilSize/2);
-        tmp *= 0.5 * wavelength * lim_freq;
-        cf2pix *= tmp;
-    }
-    pix2cf = 1.0/cf2pix;
-    
     for( shared_ptr<Channel>& ch : channels ) {
         ch->preprocessData(service);
     }
@@ -393,24 +328,26 @@ void Object::prepareStorage(void) {
     info->nPH = pupilSize;
     
     Array<float> tmp;
+    
     if(saveMask&SF_SAVE_MODES && (info->nPH>0)) {
-        tmp.resize(modes.size()+1,info->nPH,info->nPH);
+        tmp.resize(myJob.modeNumbers.size()+1,info->nPH,info->nPH);
         tmp.zero();
         Array<float> tmp_slice(tmp, 0, 0, 0, info->nPH-1, 0, info->nPH-1);
-        tmp_slice = pupil;
+        tmp_slice = 0;//pupil;
         info->phOffset = 0;
-        if(modes.size()) {
-            info->nModes = modes.size();
+        if(myJob.modeNumbers.size()) {
+            info->nModes = myJob.modeNumbers.size();
             info->modesOffset = pupilSize*pupilSize*sizeof(float);
-            for( auto& it: modes ) {
+            /*for( auto& it: modes ) {
                 tmp_slice.shift(0,1);
                 tmp_slice = *it.second;
-            }
+            }*/
         }
     }
+    /*
     info->pix2cf = pix2cf;
     info->cf2pix = cf2pix;
-    
+    */
     info->nPatchesX = 0;//nPatchesX;
     info->nPatchesY = 0;//nPatchesY;
     info->patches.resize ( info->nPatchesY, info->nPatchesX );
@@ -485,14 +422,6 @@ size_t Object::sizeOfPatch(uint32_t npixels) const {
     return sz;
 }
 
-
-void  Object::applyLocalOffsets(PatchData::Ptr patch) const {
-    //LOG_TRACE << "ObjectCfg::applyLocalOffsets #" << patch->id;
-    for( const shared_ptr<Channel>& ch : channels ) {
-        ch->applyLocalOffsets(patch);
-    }
-}
- 
 
 Point16 Object::clipImages(void) {
     Point16 sizes;

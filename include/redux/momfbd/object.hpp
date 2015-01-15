@@ -41,16 +41,13 @@ namespace redux {
             
             size_t nImages(size_t offset=0);
             void collectImages(redux::util::Array<float>&) const;
+            void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };
             const MomfbdJob& getJob(void) const { return myJob; };
             
             void initWorkSpace( WorkSpace& ws );
         
-            double lim_freq, r_c, cf2pix, pix2cf, cf2def;
-            redux::util::Array<double> pupil;
-            std::map<uint32_t, const ModeCache::ModePtr> modes;
-
             MomfbdJob& myJob;
             std::vector<std::shared_ptr<Channel>> channels;
             
@@ -61,6 +58,7 @@ namespace redux {
             bool checkData(void);
 
             void init(void);
+            void initCache(void);
             void cleanup(void);
             void loadData(boost::asio::io_service&);
             void preprocessData(boost::asio::io_service&);
@@ -69,7 +67,6 @@ namespace redux {
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             
             size_t sizeOfPatch(uint32_t) const;
-            void applyLocalOffsets(PatchData::Ptr) const;
             
             Point16 clipImages(void);
 

@@ -34,11 +34,25 @@ using namespace std;
 namespace {
 
     const string thisChannel = "momfbdch";
+    void calculatePupilSize( double &lim_freq, double &r_c, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel ) {
+        double radians_per_arcsec = redux::PI/(180.0*3600.0);             // (2.0*redux::PI)/(360.0*3600.0)
+        double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
+        double q_number = wavelength / ( radians_per_pixel * telescopeDiameter );
+        lim_freq = ( double )nPixels / q_number;
+        nPupilPixels = nPixels>>2;
+        r_c = lim_freq / 2.0;                   // telescope radius in pupil pixels...
+        if( nPupilPixels < r_c ) {           // this should only be needed for oversampled images
+            uint16_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
+            for( int i = 0; ( nPupilPixels = max( goodsizes[i], nPupilPixels ) ) < r_c; ++i ); // find right size
+        }
+        nPupilPixels <<= 1;
+    }
+
 
 }
 
 
-Channel::Channel( const Object& o, const MomfbdJob& j ) : myObject( o ), myJob( j ) {
+Channel::Channel( Object& o, MomfbdJob& j ) : myObject( o ), myJob( j ) {
 
 }
 
@@ -358,6 +372,29 @@ bool Channel::checkData(void) {
     return true;
 }
 
+void Channel::init( void ) {
+
+}
+
+
+void Channel::initCache( void ) {
+    
+    double lim_freq, r_c;
+    uint16_t nPupilPixels;
+
+    calculatePupilSize( lim_freq, r_c, nPupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
+    cout << "Channel::initCache()   lim_freq = " << lim_freq << "  nPupilPixels = " << nPupilPixels << "  r_c = " << r_c << endl;
+    
+    Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilSize, r_c, myObject.wavelength, rotationAngle);
+
+}
+
+
+void Channel::cleanup( void ) {
+
+}
+
+
 
 namespace {
     template <typename T>
@@ -672,51 +709,65 @@ size_t Channel::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-void Channel::applyLocalOffsets(PatchData::Ptr patch) const {
+void Channel::getPatchData(ChannelData::Ptr chData, uint16_t yid, uint16_t xid) const {
    
-    //LOG_TRACE << "ChannelCfg::applyLocalOffsets #" << patch->id;
-    int patchOffsetX, patchOffsetY;
-    float residualOffsetX, residualOffsetY;
-    residualOffsetX = residualOffsetY = patchOffsetX = patchOffsetY = 0;
+    if( imageNumbers.empty() ) return;
+    
+    chData->offset.x = chData->offset.y = chData->residualOffset.x = chData->residualOffset.y = 0;
+    
+    uint16_t blockSize = patchSize + 2*maxLocalShift;
+    uint16_t halfBlockSize = blockSize/2;
+    
+    Point16 first(subImagePosY[yid]-halfBlockSize, subImagePosX[xid]-halfBlockSize);
+    Point16 last(first.y+blockSize-1, first.x+blockSize-1);
+    
+    double tmpD;
+    Image<float> tmpImages(images, 0, imageNumbers.size()-1, first.y, last.y, first.x, last.x);
     
     if(xOffset.valid()) {
-        Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
         Statistics stats;
-        stats.getStats(tmpOff,ST_VALUES);
-        double tmp;
-        residualOffsetX = modf(stats.mean/100 , &tmp);
-        patchOffsetX = lrint(tmp);
+        stats.getStats(Image<int16_t>(xOffset, first.y, last.y, first.x, last.x), ST_VALUES);
+        chData->residualOffset.x = modf(stats.mean/100 , &tmpD);
+        chData->offset.x = lrint(tmpD);
+        tmpD = stats.mean/100;
     }
     
     if(yOffset.valid()) {
-        Image<int16_t> tmpOff(xOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x);
         Statistics stats;
-        stats.getStats(Image<int16_t>(yOffset, patch->first.y, patch->last.y, patch->first.x, patch->last.x),ST_VALUES);
-        double tmp;
-        residualOffsetY = modf(stats.mean/100 , &tmp);
-        patchOffsetY = lrint(tmp);
+        stats.getStats(Image<int16_t>(yOffset, first.y, last.y, first.x, last.x), ST_VALUES);
+        chData->residualOffset.y = modf(stats.mean/100 , &tmpD);
+        chData->offset.y = lrint(tmpD);
+        tmpD = stats.mean/100;
     }
-   
-    if( patchOffsetX ) {
-        int shift = patch->images.shift(2,patchOffsetX);
-        if( shift != patchOffsetX) {
-            residualOffsetX += (patchOffsetX-shift);
+
+    if( chData->offset.x ) {
+        int shift = tmpImages.shift(2,chData->offset.x);
+        if( shift != chData->offset.x) {
+            chData->residualOffset.x += (chData->offset.x-shift);
+            chData->offset.x = shift;
         }
     }
 
-    if( patchOffsetY ) {
-        int shift = patch->images.shift(1,patchOffsetY);
-        if( shift != patchOffsetY) {
-            residualOffsetY += (patchOffsetY-shift);
+    if( chData->offset.y ) {
+        int shift = tmpImages.shift(1,chData->offset.y);
+        if( shift != chData->offset.y) {
+            chData->residualOffset.y += (chData->offset.y-shift);
+            chData->offset.y = shift;
         }
     }
     
-    patch->residualOffset.y = residualOffsetY;
-    patch->residualOffset.x = residualOffsetX;
-   // LOG_TRACE << "ChannelCfg::applyLocalOffsets #" << patch->id << "  ...end";
+    chData->images = tmpImages;
 
 }
- 
+
+
+void Channel::calcPatchPositions(const std::vector<uint16_t>& y, const std::vector<uint16_t>& x) {
+    // For now just copy the anchor positions.
+    // TODO: use calibration to map the pixelcoordinates for each channel to allow for non-identical hardware & image scales in different objects/channels.
+    subImagePosY = y;
+    subImagePosX = x;
+}
+
 
 Point16 Channel::clipImages(void) {
 
