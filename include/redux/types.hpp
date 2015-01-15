@@ -24,8 +24,8 @@ namespace redux {
         /*!
         * A general 2D point
         */
-        template<class T> struct PointType {
-            PointType ( T yy=0, T xx=0 ) : x ( xx ), y ( yy ) {}
+        template<typename T> struct PointType {
+            PointType ( T yy=0, T xx=0 ) : x(xx), y(yy) {}
             static size_t size(void) { return 2*sizeof(T); };
             uint64_t pack(char* ptr) const {
                 uint64_t count = redux::util::pack(ptr,x);
@@ -47,12 +47,18 @@ namespace redux {
         typedef PointType<int> PointI;
         typedef PointType<uint16_t> Point16;
         typedef PointType<uint32_t> Point;
-
+        template<typename T>
+        std::ostream& operator<<(std::ostream& os, const PointType<T>& pt) {
+            os << "(" << pt.x << "," << pt.y << ")";
+            return os;
+        }
+        
         /*!
         * A general 2D rectangle
         */
         template<class T> struct RegionType {
-            RegionType ( T y1=0, T x1=0, T y2=0, T x2=0 ) : first(x1,y1), last(x2,y2) {}
+            RegionType ( T firsty, T firstx, T lasty, T lastx ) : first(firsty,firstx), last(lasty,lastx) {}
+            RegionType ( T lasty, T lastx ) : first(0,0), last(lasty,lastx) {}
             static size_t size(void) { return 4*sizeof(T); };
             uint64_t pack(char* ptr) const {
                 uint64_t count = first.pack(ptr);
@@ -64,12 +70,21 @@ namespace redux {
                 count += last.unpack(ptr+count,swap_endian);
                 return count;
             }
+            template <typename U> bool operator==(const RegionType<U>& rhs) const { return (first == rhs.first && first == rhs.first); }
+            template <typename U> bool operator!=(const RegionType<U>& rhs) const { return !(*this == rhs); }
+            template <typename U> bool operator<(const RegionType<U>& rhs) const { if (first==rhs.first) return (first < rhs.first); return (first < rhs.first); }
             PointType<T> first,last;
         };
         typedef RegionType<double> RegionD;
         typedef RegionType<float> RegionF;
         typedef RegionType<int> RegionI;
+        typedef RegionType<uint16_t> Region16;
         typedef RegionType<uint32_t> Region;
+        template<typename T>
+        std::ostream& operator<<(std::ostream& os, const RegionType<T>& rt) {
+            os << rt.first << "-" << rt.last;
+            return os;
+        }
 
         
         typedef std::complex<double> complex_t;
