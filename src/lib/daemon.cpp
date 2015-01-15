@@ -161,7 +161,7 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
         *conn >> cmd;
     }
     catch( const boost::exception& ) {      // disconnected -> close socket and return.
-        conn->socket().close();
+        removeConnection(conn);
         return;
     }
 
@@ -213,12 +213,25 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
         conn->setSwapEndian(remote_info.littleEndian != myInfo->info.littleEndian);
     } else {
         host->touch();
+        host->nConnections++;
     }
 
 
 }
 
 
+void Daemon::removeConnection( TcpConnection::Ptr& conn ) {
+    
+    unique_lock<mutex> lock( peerMutex );
+    conn->socket().close();
+    Host::Ptr& host = connections[conn];
+    if( host ) {
+        LOG << "removeConnection(): nConn = " << host->nConnections;
+        if(--host->nConnections == 0) {
+            connections.erase(conn);
+        }
+    } else connections.erase(conn);
+}
 
 
 // TODO a timeout to allow a peer to reconnect before removing it (which would clear stats/id when/if it reconnects).
