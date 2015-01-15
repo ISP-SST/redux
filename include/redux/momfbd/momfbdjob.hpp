@@ -68,7 +68,8 @@ namespace redux {
 
             void checkParts( void );
             void preProcess( boost::asio::io_service& );
-            void applyLocalOffsets( PatchData::Ptr );
+            void initCache( void );
+            void initPatchData( PatchData::Ptr );
             void runMain( WorkSpace& );
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             void postProcess( boost::asio::io_service& );
@@ -77,11 +78,14 @@ namespace redux {
 
             std::vector<std::shared_ptr<Object>> objects;
 
-            redux::util::Array<double> pupil;
-            redux::util::Array<float> imageStack;
-            std::map<uint32_t, const ModeCache::ModePtr> modes;
+            //redux::util::Array<double> pupil;
+            //redux::util::Array<float> imageStack;
+            //std::map<uint32_t, const PupilMode::Ptr> modes;
 
-            std::map<size_t,PatchData::Ptr> patches;
+            //std::map<size_t,PatchData::Ptr> patches;
+            redux::util::Array<PatchData::Ptr> patches;
+            
+            GlobalData::Ptr globalData;
         
             friend class Object;
             friend class Channel;

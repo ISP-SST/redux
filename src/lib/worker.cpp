@@ -129,9 +129,6 @@ bool Worker::fetchWork( void ) {
         }
 
         if( !connection->socket().is_open() ) {
-#ifdef DEBUG_
-            LOG_TRACE << "fetchWork()  no socket, can't fetch.";
-#endif
             return false;
         }
 
@@ -146,8 +143,7 @@ bool Worker::fetchWork( void ) {
         if( !blockSize ) return false;
 
         const char* ptr = buf.get();
-
-        uint64_t count = wip.unpack( ptr, connection->getSwapEndian() );
+        uint64_t count = wip.unpackWork( ptr, connection->getSwapEndian() );
 
         if( count != blockSize ) {
             throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
@@ -170,8 +166,6 @@ bool Worker::fetchWork( void ) {
 
 bool Worker::getWork( void ) {
 
-    Job::JobPtr lastJob = wip.job;
-
     if( wip.connection ) {            // remote work: return parts.
         returnWork();
     } else if ( wip.parts.size() ) {
@@ -179,12 +173,15 @@ bool Worker::getWork( void ) {
     }
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-        if( !lastJob || (wip.job && *(wip.job) != *lastJob) ) {
+        cout << "Got work: " << wip.print() << "   job=" << bool(wip.job) << "   pjob=" << bool(wip.previousJob) << endl;
+        if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
+        cout << "Initializing new job: " << wip.print() << endl;
             LOG_DEBUG << "Initializing new job: " + wip.print();
             wip.job->init();
-            if( lastJob ) {
-                lastJob->cleanup();
+            if( wip.previousJob ) {
+                wip.previousJob->cleanup();
             }
+            wip.previousJob = wip.job;
         } else LOG_DEBUG << "Starting new part of the same job: " + wip.print();
         return true;
     }
@@ -194,8 +191,10 @@ bool Worker::getWork( void ) {
 #endif
 
     wip.job.reset();
+    wip.previousJob.reset();
     wip.connection.reset();
     wip.parts.clear();
+    
     return false;
 
 }
@@ -213,22 +212,20 @@ void Worker::returnWork( void ) {
             }
 
             LOG_DETAIL << "Returning result: " + wip.print();
-
-            bool includeJob = false;
-            size_t blockSize = wip.size(includeJob);
-
-            size_t totalSize = blockSize + sizeof( size_t ) + 1;
-            auto buf = sharedArray<char>( totalSize );        // + blocksize + cmd
-
-            char* ptr = buf.get();
+            uint64_t blockSize = wip.workSize();
+            size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
+            
+            shared_ptr<char> data = sharedArray<char>( totalSize );
+            char* ptr = data.get();
+            
             uint64_t count = pack( ptr, CMD_PUT_PARTS );
             count += pack( ptr+count, blockSize );
-            if(blockSize) {
-                count += wip.pack( ptr+count, includeJob );
+           if(blockSize) {
+                count += wip.packWork(ptr+count);
 
             }
 
-            connection->writeAndCheck( buf, totalSize );
+            connection->writeAndCheck( data, totalSize );
 
             Command cmd = CMD_ERR;
 

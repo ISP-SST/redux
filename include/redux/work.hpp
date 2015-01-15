@@ -34,9 +34,12 @@ namespace redux {
         WorkInProgress(network::TcpConnection::Ptr c=0);
         WorkInProgress(const WorkInProgress&);
         ~WorkInProgress();
-        uint64_t size( bool includeJob ) const;
-        uint64_t pack( char*, bool includeJob) const;
-        uint64_t unpack( const char*, bool swap_endian=false );
+        uint64_t size(void) const;
+        uint64_t pack(char*) const;
+        uint64_t unpack(const char*, bool swap_endian=false);
+        uint64_t workSize(void);
+        uint64_t packWork(char*) const;
+        uint64_t unpackWork(const char*, bool swap_endian=false);
         std::string print(void);
         std::shared_ptr<Job> job, previousJob;
         std::vector<Part::Ptr> parts;

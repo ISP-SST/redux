@@ -251,7 +251,7 @@ void Daemon::cleanup( void ) {
             auto wip = peerWIP.find( it->second );
             if( wip != peerWIP.end() ) {
                 if( wip->second.job ) {
-                    LOG_DETAIL << "Peer disconnected, returning work to queue: " << wip->second.print();
+                    LOG_DETAIL << "Peer #" << it->first << " disconnected, returning unfinished work to queue: " << wip->second.print();
                     wip->second.job->ungetWork( wip->second );
                 }
                 peerWIP.erase(wip);

@@ -88,77 +88,89 @@ WorkInProgress::~WorkInProgress() {
 }
 
 
-uint64_t WorkInProgress::size( bool includeJob ) const {
-    
-    uint64_t sz = sizeof( size_t ) + sizeof(nCompleted) + 1 ; // nParts + includeJob
-    if( includeJob ) {
-        sz += job->size();
-    }
-
-    for( auto & it : parts ) {
-        if( it ) {
-            sz += it->size();
-        }
-    }
-    
+uint64_t WorkInProgress::size(void) const {
+    static uint64_t sz = 2*sizeof(uint16_t); // nParts + nCompleted
     return sz;
-    
 }
 
 
-uint64_t WorkInProgress::pack( char* ptr, bool includeJob ) const {
-
+uint64_t WorkInProgress::pack( char* ptr ) const {
     using redux::util::pack;
-    
-    uint64_t count(0);
-    if( includeJob ) {
-        count += pack( ptr, uint8_t(1) );
-        count += job->pack( ptr+count );
-    } else count += pack( ptr, uint8_t(0) );
-    count += pack( ptr+count, parts.size() );
-    for( auto & it : parts ) {
-        if( it ) {
-            count += it->pack( ptr+count );
-        }
-    }
+    uint64_t count = pack( ptr, nParts );
     count += pack( ptr+count, nCompleted );
-    
     return count;
-    
 }
 
 
 uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
-
     using redux::util::unpack;
-    
-    uint8_t hasJob;
-    uint64_t count = unpack( ptr, hasJob );
-    if( hasJob ) {
+    uint64_t count = unpack( ptr, nParts, swap_endian );
+    count += unpack( ptr+count, nCompleted, swap_endian );
+    return count;
+}
+
+
+uint64_t WorkInProgress::workSize(void) {
+    uint64_t sz = this->size() + 1; // + newJob
+    if(job && job != previousJob) {
+        sz += job->size();
+    }
+    nParts = 0;
+    for( const Part::Ptr& it: parts ) {
+        if( it ) {
+            nParts++;
+            sz += it->size();
+        }
+    }
+    return sz;
+}
+
+
+uint64_t WorkInProgress::packWork( char* ptr ) const {
+    using redux::util::pack;
+    uint64_t count = this->pack( ptr );
+    bool newJob = (job && job != previousJob);
+    count += pack( ptr+count, newJob );
+    if(newJob) {
+        count += job->pack(ptr+count);
+    }
+    for( auto& it: parts ) {
+        if( it ) {
+            count += it->pack(ptr+count);
+        }
+    }
+    return count;
+}
+
+
+uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
+    using redux::util::unpack;
+    uint64_t count = this->unpack( ptr, swap_endian );
+    bool newJob;
+    count += unpack( ptr+count, newJob );
+    if( newJob ) {
+        swap(job,previousJob);
         string tmpS = string( ptr+count );
         job = Job::newJob( tmpS );
         if( job ) {
             count += job->unpack( ptr+count, swap_endian );
         }
         else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
-    }
+    } else job = previousJob;
     if( job ) {
+        parts.resize(nParts);
         count += job->unpackParts( ptr+count, parts, swap_endian );
-    }
-    else throw invalid_argument( "Can't unpack parts without a job instance..." );
-    
-    count += unpack( ptr+count, nCompleted, swap_endian );
+    } else throw invalid_argument( "Can't unpack parts without a job instance..." );
     
     return count;
-    
 }
 
 
 std::string WorkInProgress::print( void ) {
     
-    string ret = "\"" + ( job ? job->info.name : string( "null" ) ) + "\"";
+    string ret = "\"" + ( job ? job->info.name : string( "undefined" ) ) + "\"";
     if( parts.size() ) {
-        ret += " (" + to_string( nCompleted ) + "/" + to_string( parts.size() ) + " part(s):";
+        ret += " (" + to_string( nCompleted ) + "/" + to_string( nParts ) + " part(s):";
         for( auto & it : parts ) {
             if( it ) {
                 ret += " " + to_string( it->id );

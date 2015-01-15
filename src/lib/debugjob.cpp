@@ -46,13 +46,13 @@ namespace {
 size_t DebugJob::jobType = Job::registerJob( "DebugJob", createDebugJob );
 
 
-uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {
+uint64_t DebugJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
 
     using redux::util::unpack;
     size_t nParts;
     uint64_t count = unpack( ptr, nParts, swap_endian );
-    wip.parts.resize( nParts );
-    for( auto & it : wip.parts ) {
+    parts.resize( nParts );
+    for( auto & it : parts ) {
         it.reset( new DebugPart() );
         count += it->unpack( ptr+count, swap_endian );
     }
