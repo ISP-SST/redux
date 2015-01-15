@@ -224,6 +224,7 @@ bool Channel::checkCfg(void) {
         return false;
     }
 
+    //calculatePupilSize( lim_freq, r_c, pupilSize, wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
 
     // Do we have a correct filename template ?
     if( imageTemplate.empty() ) {
@@ -416,6 +417,22 @@ void Channel::initCache( void ) {
     cout << "Channel::initCache()   lim_freq = " << lim_freq << "  nPupilPixels = " << nPupilPixels << "  r_c = " << r_c << endl;
     
     Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilSize, r_c, myObject.wavelength, rotationAngle);
+    for( int i=0; i<diversityOrders.size(); ++i ) {
+        Cache::ModeID id2 = id;
+        if(diversityTypes[i] == ZERNIKE) {
+            id2.firstMode = id2.lastMode = 0;
+        }
+        id2.modeNumber = diversityOrders[i];
+        myJob.globalData->fetch(id2);
+    }
+    
+    if(myJob.modeBasis == ZERNIKE) {
+        id.firstMode = id.lastMode = 0;
+    }
+    for( uint16_t& it: myJob.modeNumbers ) {
+        id.modeNumber = it;
+        myJob.globalData->fetch(id);
+    }
 
 }
 
@@ -537,6 +554,36 @@ void Channel::preprocessData( boost::asio::io_service& service ) {
     for( size_t i = 0; i < nImages; ++i ) {
         service.post( std::bind( &Channel::preprocessImage, this, i, avgMean ) );
     }
+    /*
+    Cache& cache = Cache::getCache();
+    if( pupil.nDimensions() < 2 ) {
+        LOG_DETAIL << "Object::preprocessData()  Generating pupil.";
+        const std::pair<Array<double>, double>& ppair = cache.pupil(pupilSize,r_c);
+        pupil = ppair.first;
+    }
+    
+    if ( modes.size() < myJob.modeNumbers.size() ) {
+        LOG_DETAIL << "Object::preprocessData()  Generating modes.";
+        for( auto & modeNumber: myJob.modeNumbers ) {
+            if( myJob.modeBasis == KARHUNEN_LOEVE ) {
+                modes.emplace( modeNumber, cache.mode( myJob.klMinMode, myJob.klMaxMode, modeNumber, pupilSize, r_c, wavelength, rotationAngle ) );
+            } else {
+                modes.emplace( modeNumber, cache.mode( modeNumber, pupilSize, r_c, wavelength, rotationAngle ) );
+            }
+        }
+    }
+    
+    cf2pix = util::cf2pix(myJob.arcSecsPerPixel, myJob.telescopeD);
+    cf2def = util::cf2def(1.0,myJob.telescopeD/myJob.telescopeF);
+    auto it = modes.find(2);
+    if(it != modes.end()) {
+        LOG_DETAIL << "Object::preprocessData()  adjusting pixel <-> coefficient conversion for this object.";
+        double tmp = it->second->at(pupilSize/2,pupilSize/2+1) - it->second->at(pupilSize/2,pupilSize/2);
+        tmp *= 0.5 * wavelength * lim_freq;
+        cf2pix *= tmp;
+    }
+    pix2cf = 1.0/cf2pix;
+    */
 
 }
 
