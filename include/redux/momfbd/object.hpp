@@ -3,7 +3,7 @@
 
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/channel.hpp"
-#include "redux/momfbd/modecache.hpp"
+#include "redux/momfbd/cache.hpp"
 
 #include "redux/util/array.hpp"
 

@@ -147,8 +147,9 @@ const map<string, int> redux::momfbd::getstepMap = {
 /********************  Channel  ********************/
 
 ChannelCfg::ChannelCfg() : arcSecsPerPixel(0), pixelSize(1E-5), rotationAngle(0), noiseFudge(1), weight(1),
-                           borderClip(10), maxLocalShift(5), incomplete(0), mmRow(0), mmWidth(0),
-                           imageNumberOffset(0) {
+                           borderClip(10), maxLocalShift(5), minimumOverlap(16), incomplete(0),
+                           patchSize(128), pupilSize(64),
+                           mmRow(0), mmWidth(0), imageNumberOffset(0) {
 
 }
 
@@ -210,8 +211,27 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", defaults.alignClip );
     borderClip = tree.get<uint16_t>("BORDER_CLIP", defaults.borderClip);
     maxLocalShift = tree.get<uint16_t>("MAX_LOCAL_SHIFT", defaults.maxLocalShift);
+    minimumOverlap = tree.get<uint16_t>("MINIMUM_OVERLAP", defaults.minimumOverlap);
     incomplete = tree.get<bool>( "INCOMPLETE", defaults.incomplete );
+    
+    patchSize  = tree.get<uint16_t>("NUM_POINTS", defaults.patchSize);
+    pupilSize  = tree.get<uint16_t>("PUPIL_POINTS", defaults.pupilSize);
+    
+    subImagePosX = tree.get<vector<uint16_t>>( "SIM_X", defaults.subImagePosX );
+    subImagePosY = tree.get<vector<uint16_t>>( "SIM_Y", defaults.subImagePosY );
+    if( tree.get<bool>( "CAL_X", false ) ) {
+        if( tree.get<bool>( "CAL_Y", false ) ) {
+            if( subImagePosX.size() || subImagePosY.size() ) LOG << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y";
+            subImagePosX = tree.get<vector<uint16_t>>( "CAL_X", defaults.subImagePosX );
+            subImagePosY = tree.get<vector<uint16_t>>( "CAL_Y", defaults.subImagePosY );
+            if( subImagePosX.empty() || ( subImagePosX.size() != subImagePosY.size() ) ) {
+                LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!";
+            }
+        }
+        else LOG_ERR << "CAL_Y must be provided if CAL_X is!";
+    }
 
+    
     //imageDataDir = cleanPath(tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDir));
     imageDataDir = tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDir);
     //imageTemplate = cleanPath( tree.get<string>( "FILENAME_TEMPLATE", "" ) );
@@ -223,6 +243,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     backgainFile = tree.get<string>( "BACK_GAIN", defaults.backgainFile );
     //psfFile = cleanPath( tree.get<string>( "PSF", "" ), imageDataDirl );
     psfFile = tree.get<string>( "PSF", defaults.psfFile );
+    pupilFile = tree.get<string>("PUPIL", defaults.pupilFile);
     //mmFile = cleanPath( tree.get<string>( "MODMAT", "" ), imageDataDirl );
     mmFile = tree.get<string>( "MODMAT", defaults.mmFile );
     mmRow = tree.get<uint8_t>( "MMROW", defaults.mmRow );
@@ -238,7 +259,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         if( stokesWeights.size() == 0 ) {
             LOG_ERR << "modulation matrix specified but no VECTOR input given!";
         } else if( stokesWeights.size() != mmWidth ) {
-            LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << mmWidth;
+            LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << (int)mmWidth;
         }
     }
     else {  // TODO: don't modify cfg values!! ...make the main code use weight 1 as default instead.
@@ -271,7 +292,13 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(alignClip != defaults.alignClip) tree.put("ALIGN_CLIP", alignClip);
     if(borderClip != defaults.borderClip) tree.put("BORDER_CLIP", borderClip);
     if(maxLocalShift != defaults.maxLocalShift) tree.put("MAX_LOCAL_SHIFT", maxLocalShift);
-    if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", incomplete);
+    if(minimumOverlap != defaults.minimumOverlap) tree.put("MINIMUM_OVERLAP", minimumOverlap);
+    if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", (bool)incomplete);
+
+    if(patchSize != defaults.patchSize) tree.put("NUM_POINTS", patchSize);
+    if(pupilSize != defaults.pupilSize) tree.put("PUPIL_POINTS", pupilSize);
+    if(subImagePosX != defaults.subImagePosX) tree.put("SIM_X", subImagePosX);
+    if(subImagePosY != defaults.subImagePosY) tree.put("SIM_Y", subImagePosY);
 
     if(imageDataDir != defaults.imageDataDir) tree.put("IMAGE_DATA_DIR", imageDataDir);
     if(imageTemplate != defaults.imageTemplate) tree.put("FILENAME_TEMPLATE", imageTemplate);
@@ -280,6 +307,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(responseFile != defaults.responseFile) tree.put("CCD_RESPONSE", responseFile);
     if(backgainFile != defaults.backgainFile) tree.put("BACK_GAIN", backgainFile);
     if(psfFile != defaults.psfFile) tree.put("PSF", psfFile);
+    if(pupilFile != defaults.pupilFile) tree.put("PUPIL", pupilFile);
     if(mmFile != defaults.mmFile) tree.put("MODMAT", mmFile);
     if(mmRow != defaults.mmRow) tree.put("MMROW", mmRow);
     if(mmWidth != defaults.mmWidth) tree.put("MMWIDTH", mmWidth);
@@ -297,9 +325,11 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
 
 
 uint64_t ChannelCfg::size(void) const {
-    uint64_t sz = 4*sizeof(float);          // arcSecsPerPixel, pixelSize, rotationAngle, weight
-    sz += 2*sizeof(uint16_t);
+    uint64_t sz = 5*sizeof(float);          // arcSecsPerPixel, pixelSize, rotationAngle, weight, noiseFudge
+    sz += 5*sizeof(uint16_t)+3;           // borderClip, maxLocalShift, minimumOverlap, patchSize, pupilSize, incomplete, mmRow, mmWidth
     sz += sizeof(uint32_t);                 // imageNumberOffset
+    sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
+    sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
     sz += diversityOrders.size() * sizeof( uint32_t ) + sizeof( uint64_t );
     sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
@@ -307,10 +337,12 @@ uint64_t ChannelCfg::size(void) const {
     sz += imageDataDir.length() + 1;
     sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
+    sz += pupilFile.length() + 1;
     sz += xOffsetFile.length() + yOffsetFile.length() + 2;
     sz += imageNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
     sz += wfIndex.size()*sizeof(uint32_t) + sizeof(uint64_t);
     sz += darkNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
+    sz += stokesWeights.size()*sizeof(float) + sizeof(uint64_t);
     return sz;
 }
 
@@ -320,6 +352,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     uint64_t count = pack(ptr, arcSecsPerPixel);
     count += pack(ptr+count, pixelSize);
     count += pack(ptr+count, rotationAngle);
+    count += pack(ptr+count, noiseFudge);
     count += pack(ptr+count, weight);
     count += pack(ptr+count, diversity);
     count += pack(ptr+count, diversityOrders);
@@ -327,6 +360,12 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, alignClip);
     count += pack(ptr+count, borderClip);
     count += pack(ptr+count, maxLocalShift);
+    count += pack(ptr+count, minimumOverlap);
+    count += pack(ptr+count, incomplete);
+    count += pack(ptr+count, patchSize);
+    count += pack(ptr+count, pupilSize);
+    count += pack(ptr+count, subImagePosX);
+    count += pack(ptr+count, subImagePosY);
     count += pack(ptr+count, imageDataDir);
     count += pack(ptr+count, imageTemplate);
     count += pack(ptr+count, darkTemplate);
@@ -334,13 +373,17 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, responseFile);
     count += pack(ptr+count, backgainFile);
     count += pack(ptr+count, psfFile);
+    count += pack(ptr+count, pupilFile);
     count += pack(ptr+count, mmFile);
+    count += pack(ptr+count, mmRow);
+    count += pack(ptr+count, mmWidth);
     count += pack(ptr+count, xOffsetFile);
     count += pack(ptr+count, yOffsetFile);
     count += pack(ptr+count, imageNumberOffset);
     count += pack(ptr+count, imageNumbers);
     count += pack(ptr+count, wfIndex);
     count += pack(ptr+count, darkNumbers);
+    count += pack(ptr+count, stokesWeights);
     return count;
 }
 
@@ -350,6 +393,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     uint64_t count = unpack(ptr, arcSecsPerPixel, swap_endian);
     count += unpack(ptr+count, pixelSize, swap_endian);
     count += unpack(ptr+count, rotationAngle, swap_endian);
+    count += unpack(ptr+count, noiseFudge, swap_endian);
     count += unpack(ptr+count, weight, swap_endian);
     count += unpack(ptr+count, diversity, swap_endian);
     count += unpack(ptr+count, diversityOrders, swap_endian);
@@ -357,6 +401,12 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, alignClip, swap_endian);
     count += unpack(ptr+count, borderClip, swap_endian);
     count += unpack(ptr+count, maxLocalShift, swap_endian);
+    count += unpack(ptr+count, minimumOverlap, swap_endian);
+    count += unpack(ptr+count, incomplete);
+    count += unpack(ptr+count, patchSize, swap_endian);
+    count += unpack(ptr+count, pupilSize, swap_endian);
+    count += unpack(ptr+count, subImagePosX, swap_endian);
+    count += unpack(ptr+count, subImagePosY, swap_endian);
     count += unpack(ptr+count, imageDataDir);
     count += unpack(ptr+count, imageTemplate);
     count += unpack(ptr+count, darkTemplate);
@@ -364,28 +414,35 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, responseFile);
     count += unpack(ptr+count, backgainFile);
     count += unpack(ptr+count, psfFile);
+    count += unpack(ptr+count, pupilFile);
     count += unpack(ptr+count, mmFile);
+    count += unpack(ptr+count, mmRow);
+    count += unpack(ptr+count, mmWidth);
     count += unpack(ptr+count, xOffsetFile);
     count += unpack(ptr+count, yOffsetFile);
     count += unpack(ptr+count, imageNumberOffset, swap_endian);
     count += unpack(ptr+count, imageNumbers, swap_endian);
     count += unpack(ptr+count, wfIndex, swap_endian);
     count += unpack(ptr+count, darkNumbers, swap_endian);
+    count += unpack(ptr+count, stokesWeights, swap_endian);
     return count;
 }
 
-
-bool ChannelCfg::check(void) {
-    return true;
-}
 
 bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
     return (arcSecsPerPixel == rhs.arcSecsPerPixel) &&
            (pixelSize == rhs.pixelSize) &&
            (rotationAngle == rhs.rotationAngle) &&
            (weight == rhs.weight) &&
+           (noiseFudge == rhs.noiseFudge) &&
            (borderClip == rhs.borderClip) &&
            (maxLocalShift == rhs.maxLocalShift) &&
+           (minimumOverlap == rhs.minimumOverlap) &&
+           (incomplete == rhs.incomplete) &&
+           (patchSize == rhs.patchSize) &&
+           (pupilSize == rhs.pupilSize) &&
+           (subImagePosX == rhs.subImagePosX) &&
+           (subImagePosY == rhs.subImagePosY) &&
            (imageDataDir == rhs.imageDataDir) &&
            (imageNumberOffset == rhs.imageNumberOffset) &&
            (imageNumbers == rhs.imageNumbers) &&
@@ -397,8 +454,7 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
 
 /********************   Object  ********************/
 
-ObjectCfg::ObjectCfg() : saveMask(0), nPatchesX( 0 ), nPatchesY( 0 ),
-     patchSize(128), pupilSize(64), wavelength(0) {
+ObjectCfg::ObjectCfg() : saveMask(0), wavelength(0) {
 
 }
 
@@ -420,31 +476,13 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ObjectCfg& defaults) {
     if( tree.get<bool>( "GET_PSF_AVG", defaults.saveMask&SF_SAVE_PSF_AVG ) ) saveMask |= SF_SAVE_PSF_AVG;
     if( tree.get<bool>( "GET_RESIDUAL", defaults.saveMask&SF_SAVE_RESIDUAL ) ) saveMask |= SF_SAVE_RESIDUAL;
     if( tree.get<bool>( "SAVE_FFDATA", defaults.saveMask&SF_SAVE_FFDATA ) ) saveMask |= SF_SAVE_FFDATA;
-    patchSize  = tree.get<uint16_t>("NUM_POINTS", defaults.patchSize);
-    pupilSize  = tree.get<uint16_t>("PUPIL_POINTS", defaults.pupilSize);
     //outputFileName = cleanPath(tree.get<string>("OUTPUT_FILE", defaults.outputFileName), imageDataDir);
     outputFileName = tree.get<string>("OUTPUT_FILE", defaults.outputFileName);
     //pupilFile = cleanPath(tree.get<string>("PUPIL", defaults.pupilFile), imageDataDir);
-    pupilFile = tree.get<string>("PUPIL", defaults.pupilFile);
     wavelength = tree.get<float>("WAVELENGTH", defaults.wavelength);
 
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
         LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
-    }
-    
-    subImagePosX = tree.get<vector<uint16_t>>( "SIM_X", defaults.subImagePosX );
-    subImagePosY = tree.get<vector<uint16_t>>( "SIM_Y", defaults.subImagePosY );
-
-    if( tree.get<bool>( "CAL_X", false ) ) {
-        if( tree.get<bool>( "CAL_Y", false ) ) {
-            if( subImagePosX.size() || subImagePosY.size() ) LOG << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y";
-            subImagePosX = tree.get<vector<uint16_t>>( "CAL_X", defaults.subImagePosX );
-            subImagePosY = tree.get<vector<uint16_t>>( "CAL_Y", defaults.subImagePosY );
-            if( subImagePosX.empty() || ( subImagePosX.size() != subImagePosY.size() ) ) {
-                LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!";
-            }
-        }
-        else LOG_ERR << "CAL_Y must be provided if CAL_X is!";
     }
 
     ChannelCfg::parseProperties(tree, defaults);
@@ -464,12 +502,7 @@ void ObjectCfg::getProperties(bpt::ptree& tree, const ObjectCfg& defaults) const
     if( diff & SF_SAVE_PSF_AVG ) tree.put( "GET_PSF_AVG", bool( saveMask & SF_SAVE_PSF_AVG ) );
     if( diff & SF_SAVE_RESIDUAL ) tree.put( "GET_RESIDUAL", bool( saveMask & SF_SAVE_RESIDUAL ) );
     if( diff & SF_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", bool( saveMask & SF_SAVE_FFDATA ) );
-    if(patchSize != defaults.patchSize) tree.put("NUM_POINTS", patchSize);
-    if(pupilSize != defaults.pupilSize) tree.put("PUPIL_POINTS", pupilSize);
-    if(subImagePosX != defaults.subImagePosX) tree.put("SIM_X", subImagePosX);
-    if(subImagePosY != defaults.subImagePosY) tree.put("SIM_Y", subImagePosY);
     if(outputFileName != defaults.outputFileName) tree.put("OUTPUT_FILE", outputFileName);
-    if(pupilFile != defaults.pupilFile) tree.put("PUPIL", pupilFile);
     if(wavelength != defaults.wavelength) tree.put("WAVELENGTH", wavelength);
 
     ChannelCfg::getProperties(tree, defaults);
@@ -479,11 +512,8 @@ void ObjectCfg::getProperties(bpt::ptree& tree, const ObjectCfg& defaults) const
 
 uint64_t ObjectCfg::size(void) const {
     uint64_t sz = ChannelCfg::size();
-    sz += 5*sizeof(uint16_t);           // patchSize, pupilSize, saveMask, nPatchesX, nPatchesY
-    sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
-    sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
+    sz += sizeof(uint16_t);           // saveMask
     sz += outputFileName.length() + 1;
-    sz += pupilFile.length() + 1;
     sz += sizeof(float);                // wavelength
     return sz;
 }
@@ -493,14 +523,7 @@ uint64_t ObjectCfg::pack(char* ptr) const {
     using redux::util::pack;
     uint64_t count = ChannelCfg::pack(ptr);
     count += pack(ptr+count, saveMask);
-    count += pack( ptr+count, nPatchesX );
-    count += pack( ptr+count, nPatchesY );
-    count += pack(ptr+count, patchSize);
-    count += pack(ptr+count, pupilSize);
-    count += pack( ptr+count, subImagePosX );
-    count += pack( ptr+count, subImagePosY );
     count += pack(ptr+count, outputFileName);
-    count += pack(ptr+count, pupilFile);
     count += pack(ptr+count, wavelength);
     return count;
 }
@@ -510,24 +533,9 @@ uint64_t ObjectCfg::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
     uint64_t count = ChannelCfg::unpack(ptr, swap_endian);
     count += unpack(ptr+count, saveMask, swap_endian);
-    count += unpack(ptr+count, nPatchesX, swap_endian);
-    count += unpack(ptr+count, nPatchesY, swap_endian);
-    count += unpack(ptr+count, patchSize, swap_endian);
-    count += unpack(ptr+count, pupilSize, swap_endian);
-    count += unpack(ptr+count, subImagePosX, swap_endian);
-    count += unpack(ptr+count, subImagePosY, swap_endian);
-    count += unpack(ptr+count, outputFileName, swap_endian);
-    count += unpack(ptr+count, pupilFile, swap_endian);
+    count += unpack(ptr+count, outputFileName);
     count += unpack(ptr+count, wavelength, swap_endian);
     return count;
-}
-
-
-bool ObjectCfg::check(void) {
-    if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
-        LOG_WARN << "Both GET_PSF and GET_PSF_AVG mode specified.";
-    }
-    return true;
 }
 
 
@@ -539,15 +547,8 @@ const ObjectCfg& ObjectCfg::operator=(const ChannelCfg& rhs) {
 
 bool ObjectCfg::operator==(const ObjectCfg& rhs) const {
     return (saveMask == rhs.saveMask) &&
-           (patchSize == rhs.patchSize) &&
-           (nPatchesX == rhs.nPatchesX) &&
-           (nPatchesY == rhs.nPatchesY) &&
-           (pupilSize == rhs.pupilSize) &&
            (wavelength == rhs.wavelength) &&
            (outputFileName == rhs.outputFileName) &&
-           (subImagePosX == rhs.subImagePosX) &&
-           (subImagePosY == rhs.subImagePosY) &&
-           (pupilFile == rhs.pupilFile) &&
            ChannelCfg::operator==(rhs);
 }
 
@@ -872,18 +873,6 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     }
 
     return count;
-}
-
-
-bool GlobalCfg::check(void) {
-    if( (runFlags&RF_FLATFIELD) && (runFlags&RF_CALIBRATE) ) {
-        LOG_ERR << "Both FLATFIELD and CALIBRATE mode requested";
-        return false;
-    }
-    if( !checkFAP(telescopeF, arcSecsPerPixel, pixelSize) ) {
-        return false;
-    }
-    return ObjectCfg::check();
 }
 
 

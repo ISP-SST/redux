@@ -1,7 +1,7 @@
 #include "redux/momfbd/modes.hpp"
 
 #include "redux/constants.hpp"
-#include "redux/momfbd/modecache.hpp"
+#include "redux/momfbd/cache.hpp"
 //#include "redux/momfbd/legacy.hpp"
 #include "redux/util/arrayutil.hpp"
 
@@ -35,10 +35,10 @@ void calculate(void) {
     
 }
 
-PupilMode::PupilMode(int modeNumber, int nPoints, double r_c, double lambda, double angle) : Array<double> (nPoints, nPoints) {      // Zernike
+PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double lambda, double angle) : Array<double> (nPoints, nPoints) {      // Zernike
 
 
-    static ModeCache& cache = ModeCache::getCache();
+    static Cache& cache = Cache::getCache();
     const std::pair<Array<float>,float>& pupil = cache.pupil(nPoints,r_c);
 
     zero();
@@ -180,7 +180,7 @@ PupilMode::PupilMode(int modeNumber, int nPoints, double r_c, double lambda, dou
 }
 
 
-PupilMode::PupilMode(int firstMode, int lastMode, int klModeNumber, int nPoints, double r_c, double lambda, double angle, double cutoff) : Array<double> (nPoints, nPoints) {
+PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double lambda, double angle, double cutoff) : Array<double> (nPoints, nPoints) {
 
     if(firstMode > lastMode) swap(firstMode, lastMode);
 
@@ -192,15 +192,15 @@ PupilMode::PupilMode(int firstMode, int lastMode, int klModeNumber, int nPoints,
 
     zero();
         
-    static ModeCache& cache = ModeCache::getCache();
-    const std::map<int, PupilMode::KL_cfg>& kle = cache.karhunenLoeveExpansion(firstMode, lastMode);
+    static Cache& cache = Cache::getCache();
+    const std::map<uint16_t, PupilMode::KLPtr>& kle = cache.karhunenLoeveExpansion(firstMode, lastMode);
 
     double c;
-    for(auto & it : kle.at(klModeNumber).zernikeWeights) {
+    for(auto & it : kle.at(klModeNumber)->zernikeWeights) {
         if(fabs(c = it.second) >= cutoff) {
-            int zernikeModeIndex = it.first;
-            auto ptr = cache.mode(zernikeModeIndex, nPoints, r_c, lambda, angle);
-            this->add(*ptr, c);
+            uint16_t zernikeModeIndex = it.first;
+            const PupilMode::Ptr& mode = cache.mode(zernikeModeIndex, nPoints, r_c, lambda, angle);
+            this->add(*mode, c);
         }
     }
 

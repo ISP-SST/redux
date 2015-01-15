@@ -387,15 +387,12 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
     unique_lock<mutex> lock( jobMutex );
-    Job::JobPtr nextjob;
-    bool ret = false;
+    wip.previousJob = wip.job;
+    wip.job.reset();
     // TODO: sort by priority
     for( Job::JobPtr& job : jobs ) {
         if( job->check() && job->getWork( wip, nThreads ) ) {
-            ret = true;
-        }
-        if ( ret ) {
-            nextjob = job;
+            wip.job = job;
             break;
         }
     }
@@ -436,13 +433,12 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         }
     }*/
     
-    if( ret ) {
-        LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << nextjob->info.id;
-        nextjob->info.state.store( Job::JSTATE_ACTIVE );
-        wip.job = nextjob;
+    if( wip.job ) {
+        LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << wip.job->info.id;
+        wip.job->info.state.store( Job::JSTATE_ACTIVE );
     }
     
-    return ret;
+    return bool(wip.job);
 }
 
 
@@ -461,27 +457,35 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     WorkInProgress& wip = it->second;
     Host::Ptr host = it->first;
 
-    Job::JobPtr lastJob = wip.job;
-    size_t blockSize = 0;
+    uint64_t blockSize = 0;
     bool includeJob = false;
+    shared_ptr<char> data;
     if( getWork( wip, host->status.nThreads ) ) {
-        if(!lastJob || *wip.job != *lastJob) {
-            includeJob = true;
-        }
+        blockSize += wip.workSize();
+       // if(!previousJob || *wip.job != *previousJob) {
+       //     includeJob = true;
+       // }
         LOG_DEBUG << (includeJob?"(new job) ":"") << " to host: " << host->info.name << ":" << host->info.pid;
-        blockSize = wip.size( includeJob );
+       // blockSize = wip.size( includeJob );
     }
 
-    auto buf = sharedArray<char>( blockSize + sizeof( size_t ) );
+    data = sharedArray<char>(blockSize+sizeof(uint64_t));
+    char* ptr = data.get();
+    uint64_t count = pack( ptr, blockSize );
+    if(wip.job) {
+        count += wip.packWork( ptr+count );
+
+    }
+    conn->writeAndCheck( data, blockSize+sizeof(uint64_t) );
+
+    
+/*    auto buf = sharedArray<char>( blockSize + sizeof( size_t ) );
     char* ptr = buf.get();
     uint64_t count = sizeof( size_t );
     if( blockSize > 0 ) {
-        count += wip.pack( ptr+count, includeJob );
+        count += wip.pack( ptr+count, previousJob );
     }
-    blockSize = std::min(blockSize,count);       // if something is compressed, we don't send the whole allocated block.
-    pack( buf.get(), blockSize );
-
-    conn->writeAndCheck( buf, blockSize + sizeof( size_t ) );
+*/
 
 }
 

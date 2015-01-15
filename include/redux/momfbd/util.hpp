@@ -25,6 +25,22 @@ namespace redux {
             double def2cf(double pd_defocus,double telescope_r);
             double cf2def(double alpha,double telescope_r);
 
+            template <typename T>
+            std::vector<T> segment(T first, T last, T segmentLength, T minimumOverlap=0) {
+                int nSegments=2;
+                double separation = (last-first)/static_cast<double>(nSegments-1);
+                double overlap = std::max(segmentLength-separation,0.0);
+                while(overlap < minimumOverlap) {
+                    ++nSegments;
+                    separation = (last-first)/static_cast<double>(nSegments-1);
+                    overlap = std::max(segmentLength-separation,0.0);
+                }
+                std::vector<T> ret;
+                for(size_t i = 0; i < nSegments; ++i) {
+                    ret.push_back(static_cast<T>(i*separation+first) );
+                }
+                return ret;
+            }
         }
 
     }

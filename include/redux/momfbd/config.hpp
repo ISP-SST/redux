@@ -54,8 +54,6 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             
-            bool check(void);
-            
             bool operator==(const ChannelCfg&) const;
             
             
@@ -81,7 +79,11 @@ namespace redux {
             std::vector<int16_t> alignClip;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
             uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
             uint16_t maxLocalShift;                 //!< How much are the patches allowed to be shifted (default: 5 pixels)
-            uint8_t incomplete;                    //!< Some files might not exist, just skip those.
+            uint16_t minimumOverlap;                //!< Desired width of blending zone in pixels (default: 16 pixels)
+            uint8_t incomplete;                     //!< Some files might not exist, just skip those.
+            uint16_t patchSize;                     //!< (default: 128)
+            uint16_t pupilSize;                     //!< (default: 64)
+            std::vector<uint16_t> subImagePosX, subImagePosY;
             /*****************************/
 
             /************ Input **********/
@@ -92,6 +94,7 @@ namespace redux {
             std::string responseFile;
             std::string backgainFile;
             std::string psfFile;
+            std::string pupilFile;
             std::string mmFile;                     //!< Modulation matrix
             uint8_t mmRow;                          //!< Number of rows in modulation matrix
             uint8_t mmWidth;                        //!< Number of cols in modulation matrix
@@ -99,7 +102,7 @@ namespace redux {
             uint32_t imageNumberOffset;             //!< Add this offset to each image number in this channel
             std::vector<uint32_t> imageNumbers;     //!< Use these numbers together with the template to generate file-list
             std::vector<uint32_t> wfIndex;          //!< Identify wavefront, used to group/constrain simultaneous images if image-numbers can't be used.
-            std::vector<uint32_t> darkNumbers;     //!< Use these numbers together with the template to generate file-list
+            std::vector<uint32_t> darkNumbers;      //!< Use these numbers together with the template to generate file-list
             std::vector<float> stokesWeights;
             /*****************************/
            
@@ -123,20 +126,13 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             
-            bool check(void);
-            
             const ObjectCfg& operator=(const ChannelCfg&);
             bool operator==(const ObjectCfg&) const;
             
             
             /******* Data settings *******/
             uint16_t saveMask;              //!< (default: 0)
-            uint16_t nPatchesX, nPatchesY;
-            uint16_t patchSize;             //!< (default: 128)
-            uint16_t pupilSize;             //!< (default: 64)
-            std::vector<uint16_t> subImagePosX, subImagePosY;
             std::string outputFileName;
-            std::string pupilFile;
             float wavelength;               //!< (default: 0, has to be specified)
             /*****************************/
             
@@ -157,8 +153,6 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
-            
-            bool check(void);
             
             const GlobalCfg& operator=(const ObjectCfg&);
             const GlobalCfg& operator=(const ChannelCfg&);

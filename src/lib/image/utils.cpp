@@ -64,16 +64,16 @@ void Grid::init(void) {
     angle = sharedArray<float>(size.y, size.x);
     float** distPtr = distance.get();
     float** anglePtr = angle.get();
-    for(uint i = 0; i < size.y; ++i) {
-        double yDist = i - origin.y;
+    for(uint y = 0; y < size.y; ++y) {
+        double yDist = y - origin.y;
         double y2 = sqr(yDist);
-        for(uint j = 0; j < size.x; ++j) {
-            double xDist = j - origin.x;
+        for(uint x = 0; x < size.x; ++x) {
+            double xDist = x - origin.x;
             if(yDist || xDist) {
                 double x2 = sqr(xDist);
-                distPtr[i][j] = sqrt(y2 + x2);
-                anglePtr[i][j] = atan2(yDist, xDist);       // note: slow index is Y, fast is X
-            } else distPtr[i][j] = anglePtr[i][j] = 0;      // this pixel is at the origin -> set the angle to 0. 
+                distPtr[y][x] = sqrt(y2 + x2);
+                anglePtr[y][x] = atan2(yDist, xDist);       // note: slow index is Y, fast is X
+            } else distPtr[y][x] = anglePtr[y][x] = 0;      // this pixel is at the origin -> set the angle to 0. 
         }
     }   
 

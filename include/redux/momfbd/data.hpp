@@ -1,14 +1,13 @@
 #ifndef REDUX_MOMFBD_DATA_HPP
 #define REDUX_MOMFBD_DATA_HPP
 
-#include "redux/momfbd/patch.hpp"
-
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/image/statistics.hpp"
 #include "redux/util/array.hpp"
 
 #include <memory>
+#include <mutex>
 
 
 namespace redux {
@@ -18,9 +17,6 @@ namespace redux {
         /*! @ingroup momfbd
          *  @{
          */
-        struct WorkSpace;
-        struct Object;
-        struct Channel;
         struct ImageData;
         struct WaveFrontData;
         struct ChannelData;
@@ -32,7 +28,7 @@ namespace redux {
         
         struct ImageData : public redux::util::Array<float>, public std::enable_shared_from_this<ImageData> {
             
-            ImageData(const WorkSpace&, const ObjPtr&, const ChPtr&, const redux::util::Array<float>& stack, uint32_t index, int firstY, int lastY, int firstX, int lastX);
+            ImageData(const ObjPtr&, const ChPtr&, const redux::util::Array<float>& stack, uint32_t index, int firstY, int lastY, int firstX, int lastX);
             ~ImageData(void);
             
             void init(void);
@@ -45,7 +41,6 @@ namespace redux {
             // imgFT
             uint32_t index;
             
-            const WorkSpace& ws;
             ObjPtr object;
             ChPtr channel;
             WfPtr wfg;
@@ -69,46 +64,6 @@ namespace redux {
 
         };
         
-
-        struct ObjectData : public std::enable_shared_from_this<ObjectData> {
-            
-            ObjectData(const WorkSpace&, const std::shared_ptr<Object>&);
-            ~ObjectData();
-            
-            void prepareData(const PatchData::Ptr&, std::map<uint32_t, WfPtr>&, boost::asio::io_service&);
-            void clear(void);
-            
-            void addToFT(const redux::image::FourierTransform&);
-            void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>);
-            
-            // modes
-            // approxObj
-            const WorkSpace& ws;
-            std::vector<ChPtr> channels;
-            std::shared_ptr<Object> cfg;
-            
-            std::mutex mtx;
-            redux::image::FourierTransform ftSum;
-            redux::util::Array<double> Q;
-            redux::util::Array<complex_t> P;
-        };
-
-        
-        struct ChannelData : public std::enable_shared_from_this<ChannelData> {
-            
-            ChannelData(const WorkSpace&, const ObjPtr&, const std::shared_ptr<Channel>&);
-            ~ChannelData(void);
-            
-            void prepareData(const PatchData::Ptr&, std::map<uint32_t, WfPtr>&, boost::asio::io_service&);
-            void clear(void);
-
-            const WorkSpace& ws;
-            std::vector<ImPtr> images;
-            std::shared_ptr<Channel> cfg;
-            ObjPtr obj;
-            // phi_fixed
-        };
-
 
         /*! @} */
 
