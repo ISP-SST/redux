@@ -4,7 +4,7 @@
 #include "redux/logger.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/momfbd/modes.hpp"
-#include "redux/momfbd/modecache.hpp"
+#include "redux/momfbd/cache.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/patch.hpp"
 #include "redux/math/linalg.hpp"
@@ -35,17 +35,41 @@ namespace {
 
         ChannelCfg ccfg;
         {
-            ccfg.arcSecsPerPixel = ccfg.pixelSize = ccfg.rotationAngle = ccfg.weight = ccfg.borderClip = ccfg.maxLocalShift = 137; // just some non-default values
+            // Set some non-default values for ChannelCfg
+            ccfg.arcSecsPerPixel = ccfg.pixelSize = ccfg.rotationAngle = 137;
+            ccfg.noiseFudge = ccfg.weight = 138;
+            ccfg.diversity = {10.5,32.2};
+            ccfg.diversityOrders = {11,33};
+            ccfg.diversityTypes = {12,34};
+            ccfg.alignClip = {13,34,14,35};
+            ccfg.borderClip = ccfg.maxLocalShift = ccfg.minimumOverlap = 139;
+            ccfg.incomplete = true;
+            ccfg.patchSize = ccfg.pupilSize = 140;
+            ccfg.subImagePosX = {88,99,111,122};
+            ccfg.subImagePosY = {89,98,112,121};
             ccfg.imageDataDir = "path/to/data/";
+            ccfg.imageTemplate = "imgname_with_number_%07d.ext";
+            ccfg.darkTemplate = "darkname_with_number_%07d.ext";
+            ccfg.gainFile = "gainFile.ext";
+            ccfg.responseFile = "responseFile.ext";
+            ccfg.backgainFile = "backgainFile.ext";
+            ccfg.psfFile = "psfFile.ext";
+            ccfg.pupilFile = "pupilfile.ext";
+            ccfg.mmFile = "mmFile.ext";
+            ccfg.mmRow = ccfg.mmWidth = ccfg.imageNumberOffset = 141;
+            ccfg.xOffsetFile = "xOffsetFile.ext";
+            ccfg.yOffsetFile = "yOffsetFile.ext";
             ccfg.imageNumbers = {23,45};
+            ccfg.wfIndex = {2,4,6};
             ccfg.darkNumbers = {145,88};
+            ccfg.stokesWeights = {0.99,0.11,0.12,0.13};
             // export settings as config file and parse/compare
             tree.clear();
             ccfg.getProperties(tree);
             cfg.clear();
-            bpt::write_info( cfg, tree );   // basically just to test that the ptree is valid
+            bpt::write_info( cfg, tree );   // test that the ptree is valid
             bpt::read_info( cfg, tree );
-            ChannelCfg tmp;
+            ChannelCfg tmp;                 // default values
             BOOST_CHECK( !(ccfg == tmp) );
             tmp.parseProperties( tree );
             BOOST_CHECK( ccfg == tmp );
@@ -54,7 +78,7 @@ namespace {
             char* ptr = buf.get();
             uint64_t count = ccfg.pack( ptr );
             BOOST_CHECK_EQUAL( count, ccfg.size() );
-            tmp = ChannelCfg();
+            tmp = ChannelCfg();             // reset default values and test unpack
             count = tmp.unpack( ptr, false );
             BOOST_CHECK_EQUAL( count, ccfg.size() );
             BOOST_CHECK_EQUAL( count, tmp.size() );
@@ -67,16 +91,16 @@ namespace {
 
         ObjectCfg ocfg;
         {
-            ocfg.saveMask = ocfg.patchSize = ocfg.pupilSize = ocfg.wavelength = 122; // just some non-default values
+            // Set some non-default values for ObjectCfg
+            ocfg.saveMask = ocfg.wavelength = 122;
             ocfg.outputFileName = "filename.ext";
-            ocfg.pupilFile = "pupilfile.ext";
             // export settings as config file and parse/compare
             tree.clear();
             ocfg.getProperties(tree);
             cfg.clear();
-            bpt::write_info( cfg, tree );   // basically just to test that the ptree is valid
+            bpt::write_info( cfg, tree );   // test that the ptree is valid
             bpt::read_info( cfg, tree );
-            ObjectCfg tmp;
+            ObjectCfg tmp;                  // default values
             BOOST_CHECK( !(ocfg == tmp) );
             tmp.parseProperties( tree );
             BOOST_CHECK( ocfg == tmp );
@@ -85,7 +109,7 @@ namespace {
             char* ptr = buf.get();
             uint64_t count = ocfg.pack( ptr );
             BOOST_CHECK_EQUAL( count, ocfg.size() );
-            tmp = ObjectCfg();
+            tmp = ObjectCfg();              // reset default values and test unpack
             count = tmp.unpack( ptr, false );
             BOOST_CHECK_EQUAL( count, ocfg.size() );
             BOOST_CHECK_EQUAL( count, tmp.size() );
@@ -103,6 +127,7 @@ namespace {
 
         GlobalCfg gcfg;
         {
+            // Set some non-default values for GlobalCfg
             gcfg.runFlags = 4095;
             gcfg.modeBasis = 2;
             gcfg.klMinMode = gcfg.klMaxMode = gcfg.klCutoff = gcfg.nInitialModes = gcfg.nModeIncrement = 118;
@@ -120,9 +145,9 @@ namespace {
             tree.clear();
             gcfg.getProperties(tree);
             cfg.clear();
-            bpt::write_info( cfg, tree );   // basically just to test that the ptree is valid
+            bpt::write_info( cfg, tree );   // test that the ptree is valid
             bpt::read_info( cfg, tree );
-            GlobalCfg tmp;
+            GlobalCfg tmp;                  // default values
             BOOST_CHECK( !(gcfg == tmp) );
             tmp.parseProperties( tree );
             BOOST_CHECK( gcfg == tmp );
@@ -131,7 +156,7 @@ namespace {
             char* ptr = buf.get();
             uint64_t count = gcfg.pack( ptr );
             BOOST_CHECK_EQUAL( count, gcfg.size() );
-            tmp = GlobalCfg();
+            tmp = GlobalCfg();              // reset default values and test unpack
             count = tmp.unpack( ptr, false );
             BOOST_CHECK_EQUAL( count, gcfg.size() );
             BOOST_CHECK_EQUAL( count, tmp.size() );
@@ -217,7 +242,7 @@ return;
         }
 
         {   // no image data
-            PatchData pd,pd2;
+            PatchData pd(mjob),pd2(mjob);
             pd.id = 123;
             pd.index = {1,2};
             auto buf = sharedArray<char>( pd.size() );
@@ -230,7 +255,7 @@ return;
             BOOST_CHECK( pd == pd2 );
             
             // with images
-            pd.images.resize(10,100,120);
+            /*pd.images.resize(10,100,120);
             float cnt(0.3);
             for(auto& it: pd.images) it = (cnt += 1);
             buf = sharedArray<char>( pd.size() );
@@ -240,7 +265,7 @@ return;
             count = pd2.unpack( ptr, false );
             BOOST_CHECK_EQUAL( count, pd.size() );
             BOOST_CHECK_EQUAL( count, pd2.size() );
-            BOOST_CHECK( pd == pd2 );
+            BOOST_CHECK( pd == pd2 );*/
             
         }
 /*
@@ -274,7 +299,7 @@ return;
         int last_mode = 25;
         int nModes = last_mode - first_mode + 1;
 
-        static ModeCache& cache = ModeCache::getCache();
+        static Cache& cache = Cache::getCache();
         const redux::image::Grid& grid = cache.grid(nPixels);
         float** aPtr = grid.angle.get();
         Array<float> awrapper(*aPtr, nPixels, nPixels);
@@ -294,7 +319,7 @@ return;
             //for(auto &it : m_new_cfg[m].zernikeWeights ) coeffs.push_back(it.second);
             //cout << "ned:  #" << (first_mode+m) << printArray(coeffs,"  coeffs") << endl;
             //coeffs.clear();
-            for(auto & it : kle[first_mode + m].zernikeWeights) coeffs.push_back(it.second);
+            for(auto & it : kle[first_mode + m]->zernikeWeights) coeffs.push_back(it.second);
             //cout << "new:  #" << (first_mode + m) << printArray(coeffs, "  coeffs") << endl;
         }
 
