@@ -22,7 +22,7 @@ const std::string thisChannel = "workspace";
 WorkSpace::WorkSpace( const MomfbdJob& j, PatchData::Ptr d ) : data( d ), cfg( j ) {
     //std::cout << "WorkSpace():  first = (" << d->first.x << "," << d->first.y << ")  last = (" << d->last.x << "," << d->last.y;
     //std::cout << ")   id = (" << d->index.x << "," << d->index.y << ")" << std::endl;
-    int nPixels = std::min( d->nPixelsY(),d->nPixelsX() );
+    int nPixels = 1;//std::min( d->nPixelsY(),d->nPixelsX() );
     window.resize( nPixels,nPixels );
     window = 1.0;
     window = redux::image::apodize( window,nPixels/8 );
@@ -35,12 +35,12 @@ WorkSpace::WorkSpace( const MomfbdJob& j, PatchData::Ptr d ) : data( d ), cfg( j
     noiseWindow = 1.0;
     noiseWindow = redux::image::apodize( noiseWindow, md/16 );
     //redux::file::Ana::write( "noisewindow.f0", noiseWindow );
-
+/*
     for( auto & it: cfg.getObjects() ) {
         ObjPtr obj( new ObjectData( *this, it ) );
         objects.push_back( obj );
     }
-
+*/
 
 }
 
@@ -53,9 +53,9 @@ WorkSpace::~WorkSpace() {
 
 
 void WorkSpace::init( boost::asio::io_service& service ) {
-    for( auto & it: objects ) {
+    /*for( auto & it: objects ) {
         it->prepareData( data, wavefronts, service );
-    }
+    }*/
 }
 
 

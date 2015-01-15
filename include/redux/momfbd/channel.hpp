@@ -77,7 +77,6 @@ namespace redux {
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
             
-            /*
             Object& myObject;
             MomfbdJob& myJob;
 

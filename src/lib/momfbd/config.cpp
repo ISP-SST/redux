@@ -51,28 +51,6 @@ namespace {
         }
     }
 
-    
-    bool checkFAP( float& F, float& A, float& P ) {
-        double rad2asec = 180.0 * 3600.0 / redux::PI;
-        size_t count = F > 0 ? 1 : 0;
-        count += A > 0 ? 1 : 0;
-        count += P > 0 ? 1 : 0;
-        if( count < 2 ) {
-            LOG_ERR << "At least TWO of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
-            return false;
-        }
-        else if( count == 3 ) {
-            LOG_WARN << "Too many parameters given: replacing \"TELESCOPE_F\" (" << F << ") with computed value = " << ( P / A * rad2asec );
-            F = P * rad2asec / A;
-        }
-        else {
-            if( !( F > 0 ) ) F = P * rad2asec / A;
-            else if( A > 0 ) P = F * A / rad2asec;
-            else A = P / F * rad2asec;
-        }
-        return true;
-    }
-
 
     void parseSegment( vector<uint32_t>& divs, vector<uint32_t>& types, string elem ) {
         size_t n = std::count( elem.begin(), elem.end(), '-' );

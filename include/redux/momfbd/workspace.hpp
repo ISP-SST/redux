@@ -39,7 +39,7 @@ namespace redux {
             
             PatchData::Ptr data;
             const MomfbdJob& cfg;
-            redux::util::Array<ModeCache::ModePtr> modes;
+            redux::util::Array<PupilMode::Ptr> modes;
             redux::util::Array<double> window,noiseWindow;
             redux::util::Array<complex_t> imgFTs;               //! Stack of Fourier-transforms of input-images ([nTotalImages][pupilSize][pupilSize])
             redux::util::Array<complex_t> objFT;                //! Fourier-transforms of the approximate object ([pupilSize][pupilSize])

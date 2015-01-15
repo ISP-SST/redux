@@ -34,6 +34,32 @@ using namespace std;
 namespace {
 
     const string thisChannel = "momfbdch";
+        
+    bool checkImageScale( float F, float& A, float& P ) {
+        
+        if( F > 0 ) {
+            double rad2asec = 180.0 * 3600.0 / redux::PI;
+            size_t count = F > 0 ? 1 : 0;
+            count += A > 0 ? 1 : 0;
+            count += P > 0 ? 1 : 0;
+            if( A <= 0 && P <= 0 ) {
+                LOG_ERR << "At least one of the parameters \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
+                return false;
+            }
+            else if( A > 0 && P > 0 ) {
+                LOG_WARN << "Both \"ARCSECPERPIX\" and \"PIXELSIZE\" specified: replacing \"ARCSECPERPIX\" (" << A << ") with computed value = " << (P/F*rad2asec);
+                A = P / F * rad2asec;
+            }
+            else {
+                if( A > 0 ) P = F * A / rad2asec;
+                else A = P / F * rad2asec;
+            }
+            return true;
+        }
+        LOG_ERR << "\"TELESCOPE_F\" has to be provided.";
+        return false;
+    }
+
     void calculatePupilSize( double &lim_freq, double &r_c, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel ) {
         double radians_per_arcsec = redux::PI/(180.0*3600.0);             // (2.0*redux::PI)/(360.0*3600.0)
         double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
@@ -194,6 +220,10 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
 bool Channel::checkCfg(void) {
     
     LOG_TRACE << "Channel::checkCfg()";
+    if( !checkImageScale(myJob.telescopeF, arcSecsPerPixel, pixelSize) ) {
+        return false;
+    }
+
 
     // Do we have a correct filename template ?
     if( imageTemplate.empty() ) {
@@ -455,6 +485,10 @@ void Channel::loadData( boost::asio::io_service& service ) {
         service.post( std::bind( loadWrapper< Image<float> >, psfFile, std::ref(psf) ) );
     }
 
+    if( !pupilFile.empty() ) {
+        //service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), pupilSize ) );
+    }
+    
     if( !mmFile.empty() ) {
         service.post( std::bind( loadWrapper< Image<float> >, mmFile, std::ref(modulationMatrix) ) );
     }

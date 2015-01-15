@@ -2,6 +2,7 @@
 
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/channel.hpp"
+#include "redux/momfbd/data.hpp"
 #include "redux/momfbd/util.hpp"
 
 #include "redux/file/filemomfbd.hpp"
@@ -143,6 +144,8 @@ void Object::initWorkSpace( WorkSpace& ws ) {
 bool Object::checkCfg(void) {
     
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
+        LOG_WARN << "Both GET_PSF and GET_PSF_AVG mode specified.";
+    }
     if( channels.empty() ) {
         LOG_CRITICAL << "Each object must have at least 1 channel specified.";
     }
@@ -222,6 +225,22 @@ void Object::init( void ) {
     }
     
 //   init( KL_cfg* kl_cfg, double lambda, double r_c, int nph_in, int basis, int nm, int *mode_num,
+//              int nch, int *ndo, int **dorder, int **dtype, int kl_min_mode, int kl_max_mode, double svd_reg, double angle, double **pupil_in ) 
+   
+//    modes.init(coeff,lambda,r_c,nph,myJob.basis,myJob.modes);
+   
+/*    for( int o = 1; o <= nObjects; ++o ) {
+        mode[o] = new modes( kl_cfs, cfg->lambda[o], cfg->lim_freq[o] / 2.0, cfg->nph[o], cfg->basis, cfg->nModes, cfg->mode_num, nChannels[o], cfg->nDiversityOrders[o], cfg->dorder[o], cfg->dtype[o], cfg->kl_min_mode, cfg->kl_max_mode, cfg->svd_reg, cfg->angle[o], cfg->pupil[o], io );
+//              cfg->pix2cf[o]/=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
+//              cfg->cf2pix[o]*=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
+        cfg->pix2cf[o] /= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
+        cfg->cf2pix[o] *= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
+    }
+*/
+
+
+}
+
 
 void Object::initCache( void ) {
 
