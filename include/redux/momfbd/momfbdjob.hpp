@@ -3,7 +3,9 @@
 
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/object.hpp"
-#include "redux/momfbd/patch.hpp"
+
+#include "redux/momfbd/workspace.hpp"
+
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
 
@@ -40,7 +42,7 @@ namespace redux {
             MomfbdJob( void );
             ~MomfbdJob( void );
 
-            uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
+            uint64_t unpackParts(const char* ptr, WorkInProgress&, bool);
             
             void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
@@ -86,6 +88,7 @@ namespace redux {
             redux::util::Array<PatchData::Ptr> patches;
             
             GlobalData::Ptr globalData;
+            WorkSpace::Ptr proc;
         
             friend class Object;
             friend class Channel;

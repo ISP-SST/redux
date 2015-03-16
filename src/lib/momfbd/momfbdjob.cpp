@@ -37,22 +37,18 @@ MomfbdJob::~MomfbdJob( void ) {
 }
 
 
-uint64_t MomfbdJob::unpackParts( const char* ptr, std::vector<Part::Ptr>& parts, bool swap_endian ) {
+uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {
     using redux::util::unpack;
-    cout << "MomfbdJob::unpackWork(0)   nParts = " << parts.size() << endl;
     uint64_t count(0);
-    if( parts.size() ) {
-        parts[0].reset( new PatchData(*this) );
-        count += parts[0]->unpack( ptr+count, swap_endian );
-        if( parts.size() > 1 ) {
-            parts[1].reset( new GlobalData );
-            count += parts[1]->unpack( ptr+count, swap_endian );
-            cout << "MomfbdJob::unpackWork(1)   p1 = " << (bool)parts[1] << endl;
+    if( wip.nParts ) {
+        wip.parts.resize(1);
+        if(!wip.parts[0]) wip.parts[0].reset(new PatchData(*this));
+        count += wip.parts[0]->unpack( ptr+count, swap_endian );
+        if( wip.nParts > 1 ) {
+            globalData.reset( new GlobalData );
+            count += globalData->unpack( ptr+count, swap_endian );
         }
-        cout << "MomfbdJob::unpackWork(2)   p0 = " << (bool)parts[0] << endl;
     }
-    cout << "MomfbdJob::unpackWork(E)   nParts = " << parts.size() << endl;
-    cout << "MomfbdJob::unpackWork(E)   count = " << count << endl;
     return count;
 }
 /*
@@ -170,7 +166,7 @@ void MomfbdJob::checkParts( void ) {
 
     }
 
-    LOG << "checkParts(): mask = " << bitString(mask);
+    //LOG << "checkParts(): mask = " << bitString(mask);
     if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
         info.step.store( mask );
     }
@@ -209,9 +205,8 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
                 ret = true;
             }
         }
-        if(!ret && wip.connection) {
+        if(!ret /*&& wip.connection*/) {
             for( auto & it : patches ) {
-                LOG_DEBUG << "getWork(R): patch " << it->id <<  "  step = " << bitString(it->step);
                 if( it->step == JSTEP_QUEUED ) {
                     it->step = JSTEP_RUNNING;
                     wip.parts.push_back( it );
@@ -247,11 +242,13 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 #include "redux/file/fileana.hpp"
 
 void MomfbdJob::returnResults( WorkInProgress& wip ) {
+    LOG_DEBUG << "returnResults(): " << wip.print();
     unique_lock<mutex> lock( jobMutex );
     checkParts();
     for( Part::Ptr& it : wip.parts ) {
-        PatchData::Ptr patch = static_pointer_cast<PatchData>( it );
+        PatchResult::Ptr patch = static_pointer_cast<PatchResult>( it );
         patches(patch->index.y,patch->index.y)->step = patch->step;
+    LOG_DEBUG << "returnResults()  patch: " << patch->id << "   index=" << patch->index << " pos=" << patch->pos;
         //patches[it->id]->result = patch->result;
     //redux::file::Ana::write( "patch_" + to_string(patch->index.x) + "_" + to_string(patch->index.y) + ".f0", patch->images );
     }
@@ -283,24 +280,16 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
         preProcess(service);                           // preprocess on master: load, flatfield, split in patches
     }
     else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
-        size_t nThreads = std::min( maxThreads, info.maxThreads);
+        uint8_t nThreads = std::min( maxThreads, info.maxThreads);
         if( patchStep == JSTEP_POSTPROCESS ) {      // store results
             storePatches(wip, service, nThreads);
         } else {                                    // main processing
-            if( wip.parts.size() > 1 ) {
-                globalData = static_pointer_cast<GlobalData>(wip.parts[1]);
-                wip.parts.resize(1);
-            }
+            if( !proc ) proc.reset( new WorkSpace(*this) );            // Initialize, allocations, etc.
             for( Part::Ptr& it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
-                //LOG_DETAIL << "Configuring slave";
-                WorkSpace ws( *this, static_pointer_cast<PatchData>(it) );
-                ws.init(service);            // Global setup, allocations, etc.
-                runThreadsAndWait(service, nThreads);
-                // Run
-                service.post( std::bind( &MomfbdJob::runMain, this, boost::ref( ws ) ) );
-                runThreadsAndWait(service, nThreads);
-                // Get/return results and cleanup.
-                ws.collectResults();
+                // Run main processing
+                proc->run(static_pointer_cast<PatchData>(it), service, nThreads);
+                // Get results
+                it = proc->result;
             }
         }
     }
@@ -418,12 +407,11 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     patches.resize(subImagePosY.size(),subImagePosX.size());
     for( uint y=0; y<subImagePosY.size(); ++y ) {
         for( uint x=0; x<subImagePosX.size(); ++x ) {
-            PatchData::Ptr patch( new PatchData(*this) );
+            PatchData::Ptr patch( new PatchData(*this, y, x ) );
             patch->step = JSTEP_QUEUED;
             patch->pos.x = subImagePosX[x];
             patch->pos.y = subImagePosY[y];
             patch->id = ++count;
-            patch->setIndex(y, x);
             service.post( std::bind( &MomfbdJob::initPatchData, this, patch ) );
             patches(y,x) = patch;
         }
@@ -466,10 +454,18 @@ void MomfbdJob::initPatchData( PatchData::Ptr patch ) {
 //     patch->data = sharedArray<char>(totalPatchSize);
 //     char* ptr = patch->data.get();
 //     uint64_t count(0);
+    patch->objects.resize(objects.size());
+    auto it = patch->objects.begin();
     for( shared_ptr<Object>& obj: objects ) {
-        ObjectData::Ptr objData(new ObjectData(obj));
-        patch->objects.push_back(objData);
-        objData->init(patch->index.y,patch->index.x);
+        it->channels.resize(obj->channels.size());
+        auto it2 = it->channels.begin();
+        for( const shared_ptr<Channel>& ch : obj->channels ) {
+            ch->getPatchData(*it2++,patch->index.y,patch->index.x);
+        }
+//         ObjectData::Ptr objData(new ObjectData(obj));
+//         patch->objects.push_back(objData);
+//         it->init(patch->index.y,patch->index.x);
+        it++;
         //obj->applyLocalOffsets(objData);
     }
 //     
@@ -484,9 +480,6 @@ void MomfbdJob::initPatchData( PatchData::Ptr patch ) {
 void MomfbdJob::runMain( WorkSpace& ws ) {
 
 
-
-    LOG << "MomfbdJob::runMain()  patch#" << ws.data->id << "   index=" << ws.data->index << " pos=" << ws.data->pos;
-usleep(100000);
     //     // temporaries, to avoid cache collisions.
 //     uint32_t sizeX = pptr->xPixelH - pptr->xPixelL + 1;
 //     uint32_t sizeY = pptr->yPixelH - pptr->yPixelL + 1;

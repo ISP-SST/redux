@@ -25,7 +25,7 @@ namespace redux {
         virtual uint64_t unpack( const char*, bool swap_endian=false );
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
         uint64_t id;
-        uint8_t step, nRetries;
+        uint8_t step, nRetries, partType;
     };
 
 

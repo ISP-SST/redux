@@ -29,7 +29,7 @@ namespace {
     const std::string StateTags[10] = { "-", "Pre", "Q", "D", "C", "Post", "I", "A", "P", "E" };
 
     mutex globalJobMutex;
-    /*const*/ Job::Info defaults;
+    /*const*/ Job::Info globalDefaults;
     
 #ifdef DBG_JOB_
     static atomic<int> jobCounter(0);
@@ -205,22 +205,22 @@ std::string Job::Info::print(void) {
 
 void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
     
-    info.priority = tree.get<uint8_t>("PRIORITY", defaults.priority);
-    info.verbosity = tree.get<uint8_t>("VERBOSITY", defaults.verbosity);
-    info.maxThreads = tree.get<uint8_t>("MAX_THREADS", defaults.maxThreads);
-    info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", defaults.maxPartRetries);
-    info.logFile = tree.get<string>("LOGFILE", defaults.logFile);
+    info.priority = tree.get<uint8_t>("PRIORITY", globalDefaults.priority);
+    info.verbosity = tree.get<uint8_t>("VERBOSITY", globalDefaults.verbosity);
+    info.maxThreads = tree.get<uint8_t>("MAX_THREADS", globalDefaults.maxThreads);
+    info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", globalDefaults.maxPartRetries);
+    info.logFile = tree.get<string>("LOGFILE", globalDefaults.logFile);
     
 }
 
 
 bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
     bpt::ptree tree;
-    if(info.priority != defaults.priority) tree.put("PRIORITY", info.priority);
-    if(info.verbosity != defaults.verbosity) tree.put("VERBOSITY", info.verbosity);
-    if(info.maxThreads != defaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);
-    if(info.maxPartRetries != defaults.maxPartRetries) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
-    if(info.logFile != defaults.logFile) tree.put("LOGFILE", info.logFile);
+    if(info.priority != globalDefaults.priority) tree.put("PRIORITY", info.priority);
+    if(info.verbosity != globalDefaults.verbosity) tree.put("VERBOSITY", info.verbosity);
+    if(info.maxThreads != globalDefaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);
+    if(info.maxPartRetries != globalDefaults.maxPartRetries) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
+    if(info.logFile != globalDefaults.logFile) tree.put("LOGFILE", info.logFile);
     if(root) {
         root->push_back(bpt::ptree::value_type("job", tree));
     }

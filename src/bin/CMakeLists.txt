@@ -24,5 +24,3 @@ endif()
 
 set(CMAKE_AUTOMOC ON)
 REDUX_ADD_EXECUTABLE( redux-gui redux-gui.cpp )
-
-add_subdirectory(parport_gui)

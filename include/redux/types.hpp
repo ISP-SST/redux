@@ -26,7 +26,7 @@ namespace redux {
         */
         template<typename T> struct PointType {
             PointType ( T yy=0, T xx=0 ) : x(xx), y(yy) {}
-            static size_t size(void) { return 2*sizeof(T); };
+            static uint64_t size(void) { return 2*sizeof(T); };
             uint64_t pack(char* ptr) const {
                 uint64_t count = redux::util::pack(ptr,x);
                 count += redux::util::pack(ptr+count,y);
@@ -59,7 +59,7 @@ namespace redux {
         template<class T> struct RegionType {
             RegionType ( T firsty, T firstx, T lasty, T lastx ) : first(firsty,firstx), last(lasty,lastx) {}
             RegionType ( T lasty, T lastx ) : first(0,0), last(lasty,lastx) {}
-            static size_t size(void) { return 4*sizeof(T); };
+            static uint64_t size(void) { return 4*sizeof(T); };
             uint64_t pack(char* ptr) const {
                 uint64_t count = first.pack(ptr);
                 count += last.pack(ptr+count);

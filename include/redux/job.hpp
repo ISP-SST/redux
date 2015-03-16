@@ -76,7 +76,7 @@ namespace redux {
             std::string print(void);
         } info;
         
-        virtual uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>& p, bool) { p.clear(); return 0; };
+        virtual uint64_t unpackParts(const char* ptr, WorkInProgress& wip, bool) { wip.parts.clear(); return 0; };
         
         virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree& );
         /*! @brief Returns a boost::property_tree containing the settings for this job.

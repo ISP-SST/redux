@@ -1,9 +1,9 @@
 #include "redux/momfbd/workspace.hpp"
 
 #include "redux/momfbd/momfbdjob.hpp"
-#include "redux/image/utils.hpp"
 
-#include "redux/file/fileana.hpp"
+#include "redux/image/utils.hpp"
+#include "redux/logger.hpp"
 
 using namespace redux::momfbd;
 using namespace redux::image;
@@ -19,7 +19,7 @@ const std::string thisChannel = "workspace";
 }
 
 
-WorkSpace::WorkSpace( const MomfbdJob& j, PatchData::Ptr d ) : data( d ), cfg( j ) {
+WorkSpace::WorkSpace( const MomfbdJob& j ) : result(new PatchResult(j)), cfg(j) {
     //std::cout << "WorkSpace():  first = (" << d->first.x << "," << d->first.y << ")  last = (" << d->last.x << "," << d->last.y;
     //std::cout << ")   id = (" << d->index.x << "," << d->index.y << ")" << std::endl;
     int nPixels = 1;//std::min( d->nPixelsY(),d->nPixelsX() );
@@ -52,7 +52,13 @@ WorkSpace::~WorkSpace() {
 }
 
 
-void WorkSpace::init( boost::asio::io_service& service ) {
+void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nThreads ) {
+    data = p;
+    result->id = data->id;
+    result->index = data->index;
+    result->pos = data->pos;
+    LOG << "WorkSpace::run()  patch#" << data->id << "   index=" << data->index << " pos=" << data->pos;
+usleep(10000);
     /*for( auto & it: objects ) {
         it->prepareData( data, wavefronts, service );
     }*/
@@ -60,16 +66,16 @@ void WorkSpace::init( boost::asio::io_service& service ) {
 
 
 void WorkSpace::clear( void ) {
-    for( auto & it: objects ) {
-        it->clear();
-    }
+    //for( auto & it: objects ) {
+        //it->clear();
+    //}
     objects.clear();
     wavefronts.clear();
 }
 
 
-void WorkSpace::collectResults( void ) {
-
+PatchResult::Ptr& WorkSpace::getResult( void ) {
+    return result;
     //data->images.resize();      // don't send raw data back.
 }
 

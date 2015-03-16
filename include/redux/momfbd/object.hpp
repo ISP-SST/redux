@@ -6,6 +6,7 @@
 #include "redux/momfbd/cache.hpp"
 
 #include "redux/util/array.hpp"
+#include "redux/work.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/property_tree/ptree.hpp>

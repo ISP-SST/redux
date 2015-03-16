@@ -2,7 +2,7 @@
 #define REDUX_MOMFBD_CHANNEL_HPP
 
 #include "redux/momfbd/config.hpp"
-#include "redux/momfbd/patch.hpp"
+//#include "redux/momfbd/data.hpp"
 
 #include <redux/image/image.hpp>
 #include <redux/image/statistics.hpp>
@@ -23,6 +23,7 @@ namespace redux {
         class MomfbdJob;
         class Object;
         class WorkSpace;
+        struct ChannelData;
         /*! @brief Class containing the channel-specific configuration for a MomfbdJob/Object
          * 
          */
@@ -41,7 +42,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void) const;
             void collectImages(redux::util::Array<float>&) const;
-            void getPatchData(ChannelData::Ptr, uint16_t yid, uint16_t xid) const;
+            void getPatchData(ChannelData&, uint16_t yid, uint16_t xid) const;
             void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             void initWorkSpace( WorkSpace& ws );

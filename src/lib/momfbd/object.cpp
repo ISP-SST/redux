@@ -32,7 +32,7 @@ using boost::algorithm::iequals;
 #define lg Logger::mlg
 namespace {
 
-    const string thisChannel = "momfbdobj";
+    const string thisChannel = "object";
 
 }
 
@@ -99,7 +99,9 @@ uint64_t Object::pack(char* ptr) const {
     for( const shared_ptr<Channel>& ch : channels ) {
         count += ch->pack(ptr+count);
     }
-    if(count != size()) cout << "Obj " << hexString(this) << " has a size mismatch: " << count << "  sz = " << size() << "  diff = " << (size()-count) <<endl;
+    if(count != size()) {
+        LOG_ERR << "(" << hexString(this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size();
+    }
     return count;
 }
 

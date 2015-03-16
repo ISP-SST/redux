@@ -27,7 +27,7 @@ namespace {
 #endif
     
 }
-Part::Part() : id( 0 ), step( 0 ), nRetries( 0 ) {
+Part::Part() : id( 0 ), step( 0 ), nRetries( 0 ), partType(0) {
 #ifdef DBG_PART_
     LOG_DEBUG << "Constructing Part: (" << hexString(this) << ") new instance count = " << (partCounter.fetch_add(1)+1);
 #endif
@@ -40,7 +40,7 @@ Part::~Part() {
 }
 
 uint64_t Part::size( void ) const {
-    return sizeof( id ) + sizeof( step ) + sizeof( nRetries ) ;
+    return sizeof( id ) + sizeof( step ) + sizeof( nRetries )  + sizeof( partType ) ;
 }
 
 
@@ -51,6 +51,7 @@ uint64_t Part::pack( char* ptr ) const {
     uint64_t count = pack( ptr, id );
     count += pack( ptr+count, step );
     count += pack( ptr+count, nRetries );
+    count += pack( ptr+count, partType );
 
     return count;
 
@@ -64,6 +65,7 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = unpack( ptr, id, swap_endian );
     count += unpack( ptr+count, step, swap_endian );
     count += unpack( ptr+count, nRetries, swap_endian );
+    count += unpack( ptr+count, partType, swap_endian );
     
     return count;
 }
@@ -158,8 +160,7 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
         else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
     } else job = previousJob;
     if( job ) {
-        parts.resize(nParts);
-        count += job->unpackParts( ptr+count, parts, swap_endian );
+        count += job->unpackParts( ptr+count, *this, swap_endian );
     } else throw invalid_argument( "Can't unpack parts without a job instance..." );
     
     return count;

@@ -33,30 +33,31 @@ using namespace std;
 #define lg Logger::mlg
 namespace {
 
-    const string thisChannel = "momfbdch";
+    const string thisChannel = "channel";
         
-    bool checkImageScale( float F, float& A, float& P ) {
+    bool checkImageScale( float& F, float& A, float& P ) {
         
-        if( F > 0 ) {
-            double rad2asec = 180.0 * 3600.0 / redux::PI;
-            size_t count = F > 0 ? 1 : 0;
-            count += A > 0 ? 1 : 0;
-            count += P > 0 ? 1 : 0;
-            if( A <= 0 && P <= 0 ) {
-                LOG_ERR << "At least one of the parameters \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
-                return false;
-            }
-            else if( A > 0 && P > 0 ) {
-                LOG_WARN << "Both \"ARCSECPERPIX\" and \"PIXELSIZE\" specified: replacing \"ARCSECPERPIX\" (" << A << ") with computed value = " << (P/F*rad2asec);
-                A = P / F * rad2asec;
-            }
-            else {
-                if( A > 0 ) P = F * A / rad2asec;
-                else A = P / F * rad2asec;
+        double rad2asec = 180.0 * 3600.0 / redux::PI;
+        size_t count = F > 0 ? 1 : 0;
+        count += A > 0 ? 1 : 0;
+        count += P > 0 ? 1 : 0;
+        if( count > 2 ) {
+            LOG_WARN << "Too many parameters specified: replacing telescope focal length (" << F
+                     << ") with computed value (" << (P * rad2asec / A) << ")";
+            F = P * rad2asec / A;
+            return true;
+        } else if ( count < 2 ) {
+            LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
+        } else {    // count == 2
+            if( F <= 0 ) {
+                F = P * rad2asec / A;
+            } else if ( A <= 0 ) {
+                A = P * rad2asec / F;
+            } else if ( P <= 0 ) {
+                P = F * A / rad2asec;
             }
             return true;
         }
-        LOG_ERR << "\"TELESCOPE_F\" has to be provided.";
         return false;
     }
 
@@ -195,7 +196,9 @@ uint64_t Channel::pack( char* ptr ) const {
     uint16_t statSize = imageStats.size();
     count += pack( ptr+count, statSize );
     for( auto &it : imageStats ) count += it->pack(ptr+count);
-    if(count != size()) cout << "Ch " << hexString(this) << " has a size mismatch: " << count << "  sz = " << size() << "  diff = " << (size()-count) <<endl;
+    if(count != size()) {
+        LOG_ERR << "(" << hexString(this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size();
+    }
     return count;
 }
 
@@ -220,7 +223,7 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
 bool Channel::checkCfg(void) {
     
     LOG_TRACE << "Channel::checkCfg()";
-    if( !checkImageScale(myJob.telescopeF, arcSecsPerPixel, pixelSize) ) {
+    if( !checkImageScale(telescopeF, arcSecsPerPixel, pixelSize) ) {
         return false;
     }
 
@@ -414,10 +417,10 @@ void Channel::initCache( void ) {
     uint16_t nPupilPixels;
 
     calculatePupilSize( lim_freq, r_c, nPupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
-    cout << "Channel::initCache()   lim_freq = " << lim_freq << "  nPupilPixels = " << nPupilPixels << "  r_c = " << r_c << endl;
+    //cout << "Channel::initCache()   lim_freq = " << lim_freq << "  nPupilPixels = " << nPupilPixels << "  r_c = " << r_c << endl;
     
     Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilSize, r_c, myObject.wavelength, rotationAngle);
-    for( int i=0; i<diversityOrders.size(); ++i ) {
+    for( size_t i=0; i<diversityOrders.size(); ++i ) {
         Cache::ModeID id2 = id;
         if(diversityTypes[i] == ZERNIKE) {
             id2.firstMode = id2.lastMode = 0;
@@ -790,11 +793,11 @@ size_t Channel::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-void Channel::getPatchData(ChannelData::Ptr chData, uint16_t yid, uint16_t xid) const {
+void Channel::getPatchData(ChannelData& chData, uint16_t yid, uint16_t xid) const {
    
     if( imageNumbers.empty() ) return;
     
-    chData->offset.x = chData->offset.y = chData->residualOffset.x = chData->residualOffset.y = 0;
+    chData.offset.x = chData.offset.y = chData.residualOffset.x = chData.residualOffset.y = 0;
     
     uint16_t blockSize = patchSize + 2*maxLocalShift;
     uint16_t halfBlockSize = blockSize/2;
@@ -808,36 +811,36 @@ void Channel::getPatchData(ChannelData::Ptr chData, uint16_t yid, uint16_t xid) 
     if(xOffset.valid()) {
         Statistics stats;
         stats.getStats(Image<int16_t>(xOffset, first.y, last.y, first.x, last.x), ST_VALUES);
-        chData->residualOffset.x = modf(stats.mean/100 , &tmpD);
-        chData->offset.x = lrint(tmpD);
+        chData.residualOffset.x = modf(stats.mean/100 , &tmpD);
+        chData.offset.x = lrint(tmpD);
         tmpD = stats.mean/100;
     }
     
     if(yOffset.valid()) {
         Statistics stats;
         stats.getStats(Image<int16_t>(yOffset, first.y, last.y, first.x, last.x), ST_VALUES);
-        chData->residualOffset.y = modf(stats.mean/100 , &tmpD);
-        chData->offset.y = lrint(tmpD);
+        chData.residualOffset.y = modf(stats.mean/100 , &tmpD);
+        chData.offset.y = lrint(tmpD);
         tmpD = stats.mean/100;
     }
 
-    if( chData->offset.x ) {
-        int shift = tmpImages.shift(2,chData->offset.x);
-        if( shift != chData->offset.x) {
-            chData->residualOffset.x += (chData->offset.x-shift);
-            chData->offset.x = shift;
+    if( chData.offset.x ) {
+        int shift = tmpImages.shift(2,chData.offset.x);
+        if( shift != chData.offset.x) {
+            chData.residualOffset.x += (chData.offset.x-shift);
+            chData.offset.x = shift;
         }
     }
 
-    if( chData->offset.y ) {
-        int shift = tmpImages.shift(1,chData->offset.y);
-        if( shift != chData->offset.y) {
-            chData->residualOffset.y += (chData->offset.y-shift);
-            chData->offset.y = shift;
+    if( chData.offset.y ) {
+        int shift = tmpImages.shift(1,chData.offset.y);
+        if( shift != chData.offset.y) {
+            chData.residualOffset.y += (chData.offset.y-shift);
+            chData.offset.y = shift;
         }
     }
     
-    chData->images = tmpImages;
+    chData.images = tmpImages;
 
 }
 

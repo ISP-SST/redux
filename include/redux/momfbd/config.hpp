@@ -46,9 +46,11 @@ namespace redux {
 
             ChannelCfg();
             virtual ~ChannelCfg();
+            
+            operator std::string() const;           //!< cast to string (for easy printing of configuration)
 
-            void parseProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() );
-            void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
+            virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() );
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;
@@ -58,6 +60,7 @@ namespace redux {
             
             
             /********* Hardware **********/
+            float telescopeF;                       //!< Telescope focal length  (or Ratio?)
             float arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
             float pixelSize;                        //!< Physical size of pixels (default: 10\mu)
             float rotationAngle;                    //!< Tilt of this camera relative to "anchor channel" (default: 0)
@@ -109,6 +112,12 @@ namespace redux {
             
             
         };
+        
+
+        inline std::ostream& operator<<( std::ostream &strm, const ChannelCfg &obj ) {
+            strm << static_cast<std::string>(obj);
+            return strm;
+        }
 
         
         /*!
@@ -118,9 +127,9 @@ namespace redux {
 
             ObjectCfg();
             virtual ~ObjectCfg();
-
-            void parseProperties( bpt::ptree&, const ObjectCfg& defaults=ObjectCfg() );
-            void getProperties( bpt::ptree&, const ObjectCfg& defaults=ObjectCfg() ) const;
+            
+            virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() );
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() ) const;
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;
@@ -147,8 +156,8 @@ namespace redux {
             GlobalCfg();
             ~GlobalCfg();
 
-            void parseProperties( bpt::ptree& );
-            void getProperties( bpt::ptree& ) const;
+            virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() );
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() ) const;
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;
@@ -172,7 +181,6 @@ namespace redux {
             
             /********* Hardware **********/
             float telescopeD;           //!< Telescope diameter
-            float telescopeF;           //!< Telescope focal length  (or Ratio?)
             /*****************************/
 
             /**** Numerical settings *****/

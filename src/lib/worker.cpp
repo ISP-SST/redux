@@ -137,7 +137,6 @@ bool Worker::fetchWork( void ) {
 
         size_t blockSize;
         shared_ptr<char> buf = connection->receiveBlock( blockSize );               // reply
-        cout << "Received " << blockSize << " bytes." << endl;
         LOG_TRACE << "Received " << blockSize << " bytes.";
 
         if( !blockSize ) return false;
@@ -173,9 +172,7 @@ bool Worker::getWork( void ) {
     }
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-        cout << "Got work: " << wip.print() << "   job=" << bool(wip.job) << "   pjob=" << bool(wip.previousJob) << endl;
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
-        cout << "Initializing new job: " << wip.print() << endl;
             LOG_DEBUG << "Initializing new job: " + wip.print();
             wip.job->init();
             if( wip.previousJob ) {

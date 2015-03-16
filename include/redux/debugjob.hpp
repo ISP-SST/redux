@@ -31,7 +31,7 @@ namespace redux {
         };
         typedef std::shared_ptr<DebugPart> PartPtr;
         
-        uint64_t unpackParts(const char* ptr, std::vector<Part::Ptr>&, bool);
+        uint64_t unpackParts(const char*, WorkInProgress&, bool);
 
     public:
 

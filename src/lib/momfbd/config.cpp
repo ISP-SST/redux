@@ -25,7 +25,7 @@ using boost::algorithm::iequals;
 namespace {
     const string thisChannel = "config";
 
-    /*const*/ GlobalCfg defaults;
+    /*const*/ GlobalCfg globalDefaults;
     const string basisTags[] = {"","Zernike","Karhunen-Loeve"};
     const string fpmTags[] = {"","median","invdistweight","horint"};
     const string gmTags[] = {"","gradient_diff","gradient_Vogel"};
@@ -83,7 +83,6 @@ namespace {
         return -pd_defocus * redux::PI * telescope_r * telescope_r * tmp;
     }
 
-
 }
 
 const map<FileType, string> redux::momfbd::FileTypeNames = {
@@ -124,7 +123,7 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : arcSecsPerPixel(0), pixelSize(1E-5), rotationAngle(0), noiseFudge(1), weight(1),
+ChannelCfg::ChannelCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5), rotationAngle(0), noiseFudge(1), weight(1),
                            borderClip(10), maxLocalShift(5), minimumOverlap(16), incomplete(0),
                            patchSize(128), pupilSize(64),
                            mmRow(0), mmWidth(0), imageNumberOffset(0) {
@@ -137,8 +136,18 @@ ChannelCfg::~ChannelCfg() {
 }
 
 
+ChannelCfg::operator std::string() const {
+    bpt::ptree dump;
+    std::stringstream ss;
+    this->getProperties(dump);
+    bpt::write_info( ss, dump );
+    return ss.str();
+}
+
+
 void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     
+    telescopeF = tree.get<float>("TELESCOPE_F", defaults.telescopeF);
     arcSecsPerPixel = tree.get<double>("ARCSECPERPIX", defaults.arcSecsPerPixel);
     pixelSize = tree.get<double>("PIXELSIZE", defaults.pixelSize);
     rotationAngle = tree.get<double>("ANGLE", defaults.rotationAngle);
@@ -226,6 +235,12 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     mmFile = tree.get<string>( "MODMAT", defaults.mmFile );
     mmRow = tree.get<uint8_t>( "MMROW", defaults.mmRow );
     mmWidth = tree.get<uint8_t>( "MMWIDTH",defaults.mmWidth);
+    xOffsetFile = tree.get<string>( "XOFFSET", "" );
+    yOffsetFile = tree.get<string>( "YOFFSET", "" );
+    imageNumberOffset = tree.get<uint32_t>( "DT", defaults.imageNumberOffset );
+    imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUM", defaults.imageNumbers);
+    wfIndex = tree.get<vector<uint32_t>>( "WFINDEX", defaults.wfIndex );
+    darkNumbers = tree.get<vector<uint32_t>>("DARK_NUM", defaults.darkNumbers);
     stokesWeights = tree.get<vector<float>>( "VECTOR", defaults.stokesWeights );
     if( mmFile.length() > 0 ) {
         if( !mmRow ) {
@@ -245,21 +260,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         stokesWeights.resize( 1, 1.0 );
     }
 
-    
-    xOffsetFile = tree.get<string>( "XOFFSET", "" );
-    yOffsetFile = tree.get<string>( "YOFFSET", "" );
-
-    imageNumberOffset = tree.get<uint32_t>( "DT", defaults.imageNumberOffset );
-
-    imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUM", defaults.imageNumbers);
-    wfIndex = tree.get<vector<uint32_t>>( "WFINDEX", defaults.wfIndex );
-    darkNumbers = tree.get<vector<uint32_t>>("DARK_NUM", defaults.darkNumbers);
 
 }
 
 
 void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) const {
 
+    if(telescopeF != defaults.telescopeF) tree.put("TELESCOPE_F", telescopeF);
     if(arcSecsPerPixel != defaults.arcSecsPerPixel) tree.put("ARCSECPERPIX", arcSecsPerPixel);
     if(pixelSize != defaults.pixelSize) tree.put("PIXELSIZE", pixelSize);
     if(rotationAngle != defaults.rotationAngle) tree.put("ANGLE", rotationAngle);
@@ -289,7 +296,6 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(mmFile != defaults.mmFile) tree.put("MODMAT", mmFile);
     if(mmRow != defaults.mmRow) tree.put("MMROW", mmRow);
     if(mmWidth != defaults.mmWidth) tree.put("MMWIDTH", mmWidth);
-    if(stokesWeights != defaults.stokesWeights) tree.put("VECTOR", stokesWeights);
     
     if(xOffsetFile != defaults.xOffsetFile) tree.put("XOFFSET", xOffsetFile);
     if(yOffsetFile != defaults.yOffsetFile) tree.put("YOFFSET", yOffsetFile);
@@ -298,13 +304,16 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(imageNumbers != defaults.imageNumbers) tree.put("IMAGE_NUM", imageNumbers);
     if(wfIndex != defaults.wfIndex) tree.put("WFINDEX", wfIndex);
     if(darkNumbers != defaults.darkNumbers) tree.put("DARK_NUM", darkNumbers);
+    
+    if(stokesWeights != defaults.stokesWeights) tree.put("VECTOR", stokesWeights);
+    
 
 }
 
 
 uint64_t ChannelCfg::size(void) const {
-    uint64_t sz = 5*sizeof(float);          // arcSecsPerPixel, pixelSize, rotationAngle, weight, noiseFudge
-    sz += 5*sizeof(uint16_t)+3;           // borderClip, maxLocalShift, minimumOverlap, patchSize, pupilSize, incomplete, mmRow, mmWidth
+    uint64_t sz = 6*sizeof(float);          // telescopeF, arcSecsPerPixel, pixelSize, rotationAngle, weight, noiseFudge
+    sz += 5*sizeof(uint16_t)+3;             // borderClip, maxLocalShift, minimumOverlap, patchSize, pupilSize, incomplete, mmRow, mmWidth
     sz += sizeof(uint32_t);                 // imageNumberOffset
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
@@ -327,7 +336,8 @@ uint64_t ChannelCfg::size(void) const {
 
 uint64_t ChannelCfg::pack(char* ptr) const {
     using redux::util::pack;
-    uint64_t count = pack(ptr, arcSecsPerPixel);
+    uint64_t count = pack(ptr, telescopeF);
+    count += pack(ptr+count, arcSecsPerPixel);
     count += pack(ptr+count, pixelSize);
     count += pack(ptr+count, rotationAngle);
     count += pack(ptr+count, noiseFudge);
@@ -368,7 +378,8 @@ uint64_t ChannelCfg::pack(char* ptr) const {
 
 uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
-    uint64_t count = unpack(ptr, arcSecsPerPixel, swap_endian);
+    uint64_t count = unpack(ptr, telescopeF, swap_endian);
+    count += unpack(ptr+count, arcSecsPerPixel, swap_endian);
     count += unpack(ptr+count, pixelSize, swap_endian);
     count += unpack(ptr+count, rotationAngle, swap_endian);
     count += unpack(ptr+count, noiseFudge, swap_endian);
@@ -408,11 +419,12 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
 
 
 bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
-    return (arcSecsPerPixel == rhs.arcSecsPerPixel) &&
+    return (telescopeF == rhs.telescopeF) &&
+           (arcSecsPerPixel == rhs.arcSecsPerPixel) &&
            (pixelSize == rhs.pixelSize) &&
            (rotationAngle == rhs.rotationAngle) &&
-           (weight == rhs.weight) &&
            (noiseFudge == rhs.noiseFudge) &&
+           (weight == rhs.weight) &&
            (borderClip == rhs.borderClip) &&
            (maxLocalShift == rhs.maxLocalShift) &&
            (minimumOverlap == rhs.minimumOverlap) &&
@@ -442,8 +454,9 @@ ObjectCfg::~ObjectCfg() {
 }
 
 
-void ObjectCfg::parseProperties(bpt::ptree& tree, const ObjectCfg& defaults) {
-
+void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
+    
+    const ObjectCfg& defaults = reinterpret_cast<const ObjectCfg&>(def);
     saveMask = 0;
     if( tree.get<bool>( "GET_ALPHA", defaults.saveMask&SF_SAVE_ALPHA ) ) saveMask |= SF_SAVE_ALPHA;
     if( tree.get<bool>( "GET_COBJ", defaults.saveMask&SF_SAVE_COBJ ) ) saveMask |= SF_SAVE_COBJ;
@@ -468,7 +481,9 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ObjectCfg& defaults) {
 }
 
 
-void ObjectCfg::getProperties(bpt::ptree& tree, const ObjectCfg& defaults) const {
+void ObjectCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
+
+    const ObjectCfg& defaults = reinterpret_cast<const ObjectCfg&>(def);
 
     uint16_t diff = saveMask ^ defaults.saveMask;
     if( diff & SF_SAVE_ALPHA ) tree.put( "GET_ALPHA", bool( saveMask & SF_SAVE_ALPHA ) );
@@ -538,7 +553,7 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
     nInitialModes(5), nModeIncrement(5),
     modeNumbers({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
-    telescopeD(0), telescopeF(0), minIterations(5), maxIterations(500),
+    telescopeD(0), minIterations(5), maxIterations(500),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_gamma(1E-4),
     outputFileType(FT_NONE), outputDataType(DT_F32T),
@@ -553,7 +568,9 @@ GlobalCfg::~GlobalCfg() {
 }
 
 
-void GlobalCfg::parseProperties(bpt::ptree& tree) {
+void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
+    
+    const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
 
     if( tree.get<bool>( "CALIBRATE", false ) )             runFlags |= RF_CALIBRATE;
     if( tree.get<bool>( "DONT_MATCH_IMAGE_NUMS", false ) ) runFlags |= RF_DONT_MATCH_IMAGE_NUMS;
@@ -586,7 +603,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree) {
             if(iequals(tmpString, "Zernike")) {
                 modeBasis = ZERNIKE;
             } else {
-                LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \"" << basisTags[defaults.modeBasis] << "\"";
+                LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \"" << basisTags[globalDefaults.modeBasis] << "\"";
                 //modeBasis = defaults.modeBasis;
             }
     }
@@ -599,7 +616,6 @@ void GlobalCfg::parseProperties(bpt::ptree& tree) {
     modeNumbers = tree.get<vector<uint16_t>>("MODES", defaults.modeNumbers);
 
     telescopeD = tree.get<float>("TELESCOPE_D", defaults.telescopeD);
-    telescopeF = tree.get<float>("TELESCOPE_F", defaults.telescopeF);
 
     minIterations = tree.get<uint32_t>("MIN_ITER", defaults.minIterations);
     maxIterations = tree.get<uint32_t>("MAX_ITER", defaults.maxIterations);
@@ -677,7 +693,10 @@ void GlobalCfg::parseProperties(bpt::ptree& tree) {
 }
 
 
-void GlobalCfg::getProperties(bpt::ptree& tree) const {
+void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
+    
+    const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
+    
 /*
     defaults.modeBasis = 123;
     defaults.klMinMode = 123;
@@ -735,7 +754,6 @@ void GlobalCfg::getProperties(bpt::ptree& tree) const {
     if(modeNumbers != defaults.modeNumbers) tree.put("MODES", modeNumbers);
     
     if(telescopeD != defaults.telescopeD) tree.put("TELESCOPE_D", telescopeD);
-    if(telescopeF != defaults.telescopeF) tree.put("TELESCOPE_F", telescopeF);
     
     if(minIterations != defaults.minIterations) tree.put("MIN_ITER", minIterations);
     if(maxIterations != defaults.maxIterations) tree.put("MAX_ITER", maxIterations);
@@ -765,7 +783,7 @@ uint64_t GlobalCfg::size(void) const {
     sz += 6*sizeof(uint8_t);                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType
     sz += 8*sizeof(uint16_t);                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, outputFiles.size()
     sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
-    sz += 7*sizeof(float);                   // klCutoff, telescopeD, telescopeF, badPixelThreshold, FTOL, EPS, reg_gamma
+    sz += 6*sizeof(float);                   // klCutoff, telescopeD, badPixelThreshold, FTOL, EPS, reg_gamma
     sz += sizeof(uint32_t);                  // sequenceNumber
     sz += observationTime.length() + 1;
     sz += observationDate.length() + 1;
@@ -789,7 +807,6 @@ uint64_t GlobalCfg::pack(char* ptr) const {
     count += pack(ptr+count, nModeIncrement);
     count += pack(ptr+count, modeNumbers);
     count += pack(ptr+count, telescopeD);
-    count += pack(ptr+count, telescopeF);
     count += pack(ptr+count, minIterations);
     count += pack(ptr+count, maxIterations);
     count += pack(ptr+count, fillpixMethod);
@@ -827,7 +844,6 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, nModeIncrement, swap_endian);
     count += unpack(ptr+count, modeNumbers, swap_endian);
     count += unpack(ptr+count, telescopeD, swap_endian);
-    count += unpack(ptr+count, telescopeF, swap_endian);
     count += unpack(ptr+count, minIterations, swap_endian);
     count += unpack(ptr+count, maxIterations, swap_endian);
     count += unpack(ptr+count, fillpixMethod);
@@ -875,7 +891,6 @@ bool GlobalCfg::operator==(const GlobalCfg& rhs) const {
            (nInitialModes == rhs.nInitialModes) &&
            (nModeIncrement == rhs.nModeIncrement) &&
            (telescopeD == rhs.telescopeD) &&
-           (telescopeF == rhs.telescopeF) &&
            (minIterations == rhs.minIterations) &&
            (maxIterations == rhs.maxIterations) &&
            (fillpixMethod == rhs.fillpixMethod) &&
