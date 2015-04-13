@@ -564,7 +564,7 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     tmp32 = versionString.length() + 1;
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:version-length" );
     writeOrThrow ( file, versionString.c_str(), tmp32, "FileMomfbd:version-string" );
-
+    
     // time string
     tmp32 = timeString.length() + 1;
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:time-length" );
@@ -654,7 +654,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
             }
             size_t n = readOrThrow ( file, fPtr, nPH * nPH, "MomfbdData:pupil" );
             if( n != (nPH * nPH * sizeof(float))) {
-                cout << "MomfbdData:pupil:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
+                cout << "FileMomfbd:pupil:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
             }
             if ( swapNeeded ) {
                 swapEndian ( fPtr, nPH * nPH );
@@ -663,7 +663,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
         }
 
         // modes
-        if ( nModes & (modesOffset>0) ) {
+        if ( nModes && (modesOffset>0) ) {
             // Load data
             file.seekg ( modesOffset );
             float* fPtr = reinterpret_cast<float*> ( ptr+count );
@@ -672,7 +672,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
             }
             size_t n = readOrThrow ( file, fPtr, nModes * nPH * nPH, "MomfbdData:modes" );
             if( n != (nModes * nPH * nPH * sizeof(float))) {
-                cout << "MomfbdData:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
+                cout << "FileMomfbd:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
             }
             if ( swapNeeded ) {
                 swapEndian ( fPtr, nModes * nPH * nPH );
