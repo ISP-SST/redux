@@ -474,7 +474,7 @@ void FileMomfbd::read ( std::ifstream& file ) {
         phOffset = file.tellg();
         file.seekg ( nPH * nPH * sizeof ( float ), ios_base::cur );
         modesOffset = file.tellg();
-        file.seekg ( nModes * nPH * nPH * sizeof ( float ), ios_base::cur );
+        file.seekg ( nModes * (nPH*nPH*sizeof(float) + 1), ios_base::cur );     // a single byte at the beginning of each mode is used to indicate pupil or OTF type mode
 
     } else nModes = nPH = 0;
 
@@ -548,7 +548,7 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     int32_t dummySize(0);
     shared_ptr<float> dummy;
     if((phOffset<0) && writeMask&MOMFBD_MODES) dummySize = nPH*nPH;
-    if((modesOffset<0) && writeMask&MOMFBD_MODES) dummySize = std::max(nModes*nPH*nPH, dummySize);
+    if((modesOffset<0) && writeMask&MOMFBD_MODES) dummySize = std::max(nModes*(nPH*nPH+1), dummySize);
 
     if(dummySize) {
         dummy = sharedArray<float>(dummySize);
@@ -593,7 +593,12 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
             if( modesOffset>=0 ) {
                 fPtr = reinterpret_cast<const float*> ( data + modesOffset );
             } else fPtr = dummy.get();
-            writeOrThrow ( file, fPtr, nModes * nPH * nPH, "FileMomfbd:Mode-data" );
+            uint8_t tmp8(1);
+            for( int i=0; i<nModes; ++i ) {
+                writeOrThrow ( file, &tmp8, 1, "FileMomfbd:Mode-type" );   // always pad with a 1 (= Pupil-mode)
+                writeOrThrow ( file, fPtr, nPH * nPH, "FileMomfbd:Mode-data" );
+                fPtr += nPH * nPH;
+            }
         }
     }
 
@@ -670,9 +675,13 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
             if( verbosity > 2 ) {
                 cout << "FileMomfbd::loading modes.    size = (" << nModes << "," << nPH << "," << nPH << ")  modesOffset = " << modesOffset << endl;
             }
-            size_t n = readOrThrow ( file, fPtr, nModes * nPH * nPH, "MomfbdData:modes" );
-            if( n != (nModes * nPH * nPH * sizeof(float))) {
-                cout << "FileMomfbd:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
+            for (int i=0; i< nModes; ++i ) {
+                file.seekg ( 1, ios_base::cur ); // FIXME: skip first byte for now.
+                size_t n = readOrThrow ( file, fPtr, nPH * nPH, "MomfbdData:modes" );
+                if( n != (nPH * nPH * sizeof(float))) {
+                    cout << "FileMomfbd:modes:  size mismatch: " << n << " != " << (nPH * nPH * sizeof(float)) << endl;
+                }
+                fPtr += nPH * nPH;
             }
             if ( swapNeeded ) {
                 swapEndian ( fPtr, nModes * nPH * nPH );
