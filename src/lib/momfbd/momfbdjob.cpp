@@ -62,7 +62,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap
 void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
 
     Job::parsePropertyTree( vm, tree );
-    LOG_DEBUG << "MomfbdJob::parsePropertyTree()";
+    //LOG_DEBUG << "MomfbdJob::parsePropertyTree()";
     
     // possibly override cfg-entries with command-line arguments
     if( vm.count( "simx" ) ) tree.put( "SIM_X", vm["simx"].as<string>() );
@@ -88,7 +88,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
     if( outputFiles.size() > objects.size() ) {
         LOG_WARN << outputFiles.size() << " output file names specified but only " << objects.size() << " objects found.";
     }
-    LOG_DEBUG << "MomfbdJob::parsePropertyTree() done.";
+    //LOG_DEBUG << "MomfbdJob::parsePropertyTree() done.";
 
 }
 
@@ -284,7 +284,13 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
         if( patchStep == JSTEP_POSTPROCESS ) {      // store results
             storePatches(wip, service, nThreads);
         } else {                                    // main processing
-            if( !proc ) proc.reset( new WorkSpace(*this) );            // Initialize, allocations, etc.
+            if(!globalData) {
+                 globalData.reset( new GlobalData );
+            }
+            if( !proc ) {
+                proc.reset( new WorkSpace(*this) );            // Initialize, allocations, etc.
+                proc->init();
+            }
             for( Part::Ptr& it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 // Run main processing
                 proc->run(static_pointer_cast<PatchData>(it), service, nThreads);
@@ -317,7 +323,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
         info.state.store( JSTATE_IDLE );
         return;
     }
-
+    
     // load shared files synchronously (dark,gain,psf,offset...)
     /*if( pupil.nDimensions() < 2 && pupilFile != "" ) {
         service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), 0 ) );
@@ -369,11 +375,11 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     // TODO: do split per channel instead, to allow for different image-scales and/or hardware
     if( subImagePosX.empty() ) { // x-coordinate of patch-centre
         subImagePosX = segment<uint16_t>(halfBlockSize,imageSizes.x-halfBlockSize-1,patchSize,minimumOverlap);
-        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"x-pos");
+        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X");
     }
     if( subImagePosY.empty() ) { // y-coordinate of patch-centre
         subImagePosY = segment<uint16_t>(halfBlockSize,imageSizes.y-halfBlockSize-1,patchSize,minimumOverlap);
-        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"y-pos");
+        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y");
     }
  
     if( subImagePosX.empty() || subImagePosY.empty() ) {
@@ -384,18 +390,18 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
 
     for( uint16_t& pos : subImagePosY ) {
-        uint16_t trimmedPos = std::min(std::max(halfBlockSize,pos),uint16_t(imageSizes.y-halfBlockSize));       // stay inside borders
-        if( trimmedPos != pos ) {
-            LOG_WARN << "MomfbdJob::preProcess() y-position of patch was outside the image area and was trimmed: " << pos << " -> " << trimmedPos;
-            pos = trimmedPos;
+        uint16_t adjustedPos = std::min(std::max(halfBlockSize,pos),uint16_t(imageSizes.y-halfBlockSize));       // stay inside borders
+        if( adjustedPos != pos ) {
+            LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos;
+            pos = adjustedPos;
         }
     }
 
     for( uint16_t& pos : subImagePosX ) {
-        uint16_t trimmedPos = std::min(std::max(halfBlockSize,pos),uint16_t(imageSizes.x-halfBlockSize));       // stay inside borders
-        if( trimmedPos != pos ) {
-            LOG_WARN << "MomfbdJob::preProcess() x-position of patch was outside the image area and was trimmed: " << pos << " -> " << trimmedPos;
-            pos = trimmedPos;
+        uint16_t adjustedPos = std::min(std::max(halfBlockSize,pos),uint16_t(imageSizes.x-halfBlockSize));       // stay inside borders
+        if( adjustedPos != pos ) {
+            LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos;
+            pos = adjustedPos;
         }
     }
 
@@ -403,6 +409,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
         obj->calcPatchPositions(subImagePosY,subImagePosX);
     }
 
+    service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
+    runThreadsAndWait(service, 1); //info.maxThreads);
+    
     uint64_t count(0);
     patches.resize(subImagePosY.size(),subImagePosX.size());
     for( uint y=0; y<subImagePosY.size(); ++y ) {
@@ -412,12 +421,13 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
             patch->pos.x = subImagePosX[x];
             patch->pos.y = subImagePosY[y];
             patch->id = ++count;
-            service.post( std::bind( &MomfbdJob::initPatchData, this, patch ) );
+            //service.post( std::bind( &MomfbdJob::initPatchData, this, patch ) );
+            service.post( std::bind( &PatchData::getData, patch.get() ) );
             patches(y,x) = patch;
         }
     }
 
-    service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
+    //service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
     
     LOG_DETAIL << "MomfbdJob::preProcess()  nPatches = " << patches.nElements();
     runThreadsAndWait(service, info.maxThreads);
@@ -435,10 +445,14 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
 void MomfbdJob::initCache(void) {
     LOG_DETAIL << "MomfbdJob::initCache()";
-    globalData.reset(new GlobalData);
+    if(!globalData) {       // create GlobalData if they don't exist
+        globalData.reset(new GlobalData);
+    }
+
     for( shared_ptr<Object>& obj: objects ) {
         obj->initCache();
     }
+
     LOG_DETAIL << "MomfbdJob::initCache()  Done.";
 }
 
@@ -454,20 +468,20 @@ void MomfbdJob::initPatchData( PatchData::Ptr patch ) {
 //     patch->data = sharedArray<char>(totalPatchSize);
 //     char* ptr = patch->data.get();
 //     uint64_t count(0);
-    patch->objects.resize(objects.size());
-    auto it = patch->objects.begin();
-    for( shared_ptr<Object>& obj: objects ) {
-        it->channels.resize(obj->channels.size());
-        auto it2 = it->channels.begin();
-        for( const shared_ptr<Channel>& ch : obj->channels ) {
-            ch->getPatchData(*it2++,patch->index.y,patch->index.x);
-        }
-//         ObjectData::Ptr objData(new ObjectData(obj));
-//         patch->objects.push_back(objData);
-//         it->init(patch->index.y,patch->index.x);
-        it++;
-        //obj->applyLocalOffsets(objData);
-    }
+//     patch->objects.resize(objects.size());
+//     auto it = patch->objects.begin();
+//     for( shared_ptr<Object>& obj: objects ) {
+//         it->channels.resize(obj->channels.size());
+//         auto it2 = it->channels.begin();
+//         for( const shared_ptr<Channel>& ch : obj->channels ) {
+//             ch->getPatchData(*it2++,patch->index.y,patch->index.x);
+//         }
+// //         ObjectData::Ptr objData(new ObjectData(obj));
+// //         patch->objects.push_back(objData);
+// //         it->init(patch->index.y,patch->index.x);
+//         it++;
+//         //obj->applyLocalOffsets(objData);
+//     }
 //     
 //     if(count != totalPatchSize) {
 //         LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());

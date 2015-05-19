@@ -35,57 +35,58 @@ void calculate(void) {
     
 }
 
-PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double lambda, double angle) : Array<double> (nPoints, nPoints) {      // Zernike
+PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double lambda, double angle) :
+    Array<double> (nPoints, nPoints), inv_atm_rms(0)  {      // Zernike
 
 
     static Cache& cache = Cache::getCache();
-    const std::pair<Array<float>,float>& pupil = cache.pupil(nPoints,r_c);
+    const std::pair<Array<double>,double>& pupil = cache.pupil(nPoints,r_c);
 
     zero();
 
-    double** modePtr = makePointers(ptr(), nPoints, nPoints);
-    const float** pupPtr = makePointers(pupil.first.ptr(), nPoints, nPoints);
-
     if(modeNumber == 1) {
-        add(pupil.first,1.0/(pupil.second*lambda));
+        add(pupil.first,1.0/lambda);
     } else {
 
         int m, n;
         noll_to_mn(modeNumber, m, n);
 
         const vector<double>& coeff = cache.zernikeRadialPolynomial(m, n);
-        const redux::image::Grid& grid = cache.grid(nPoints,redux::PointF(nPoints/2+0.5,nPoints/2+0.5));
-        float** distPtr = grid.distance.get();
+        const redux::image::Grid& grid = cache.grid(nPoints,redux::PointF(nPoints/2,nPoints/2));
+        float** distPtr = grid.distance.get();  // distance from pixels to centre (pupil & modes are centered on pixel (mid,mid))
         float** aPtr = grid.angle.get();
 
-        shared_ptr<double*> r = sharedArray<double> (nPoints, nPoints);
-        shared_ptr<double*> r2 = sharedArray<double> (nPoints, nPoints);
+        double** modePtr = makePointers(ptr(), nPoints, nPoints);
+        const double** pupPtr = makePointers(pupil.first.ptr(), nPoints, nPoints);
+
+        shared_ptr<double*> r = sharedArray<double> (nPoints, nPoints);     // normalized distance ^{some order}
+        shared_ptr<double*> r2 = sharedArray<double> (nPoints, nPoints);    // normalized distance squared
         double** rPtr = r.get();
         double** r2Ptr = r2.get();
         double squared_sum(0);
 
-        for(int i = 0; i < nPoints; ++i) {
-            for(int j = 0; j < nPoints; ++j) {
-                if(pupPtr[i][j]>0) {
-                    double tmp = distPtr[i][j] / r_c;
+        for(int y = 0; y < nPoints; ++y) {
+            for(int x = 0; x < nPoints; ++x) {
+                //if(pupPtr[y][x]>0) {
+                    double tmp = distPtr[y][x] / r_c;                       // normalize radial distance
                     //if(tmp>1) continue;
-                    r2Ptr[i][j] = tmp * tmp;
-                    if(m == 0) rPtr[i][j] = 1;
-                    else if(m == 1) rPtr[i][j] = tmp;
-                    else rPtr[i][j] = pow(tmp, m);
-                    modePtr[i][j] = rPtr[i][j] * coeff[0];
-                }
+                    r2Ptr[y][x] = tmp * tmp;
+                    if(m == 0) rPtr[y][x] = 1;
+                    else if(m == 1) rPtr[y][x] = tmp;
+                    else rPtr[y][x] = pow(tmp, m);                          // leading term ~ r^{m}
+                    modePtr[y][x] = rPtr[y][x] * coeff[0];                  // add leading order to mode
+                //}
             }
         }
 
         // generate polynomial part
         for(auto it = coeff.begin() + 1; it < coeff.end(); it++) {
-            for(int i = 0; i < nPoints; ++i) {
-                for(int j = 0; j < nPoints; ++j) {
-                    if(pupPtr[i][j]>0) {
-                        rPtr[i][j] *= r2Ptr[i][j];
-                        modePtr[i][j] += rPtr[i][j] * *it;
-                    }
+            for(int y = 0; y < nPoints; ++y) {
+                for(int x = 0; x < nPoints; ++x) {
+                    //if(pupPtr[y][x]>0) {
+                        rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m-2}
+                        modePtr[y][x] += rPtr[y][x] * *it;
+                    //}
                 }
             }
         }
@@ -93,95 +94,61 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
         // Angular component
         if(m == 0) {
             double sf = sqrt(n + 1);
-            for(int i = 0; i < nPoints; ++i) {
-                for(int j = 0; j < nPoints; ++j) {
-                    if(pupPtr[i][j]>0) {
-                        modePtr[i][j] *= sf * pupPtr[i][j];
-                        squared_sum +=  modePtr[i][j]*modePtr[i][j];
+            for(int y = 0; y < nPoints; ++y) {
+                for(int x = 0; x < nPoints; ++x) {
+                    modePtr[y][x] *= sf; // * pupPtr[y][x];
+                    if(pupPtr[y][x]>0) {
+                        squared_sum +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
                     }
                 }
             }
         }
         else if(modeNumber % 2) {
             double sf = sqrt((double) 2 * (n + 1));
-            for(int i = 0; i < nPoints; ++i) {
-                for(int j = 0; j < nPoints; ++j) {
-                    if(pupPtr[i][j]>0) {
-                        modePtr[i][j] *= sf * pupPtr[i][j] * sin(m * (aPtr[i][j] + angle));
-                        squared_sum +=  modePtr[i][j]*modePtr[i][j];
+            for(int y = 0; y < nPoints; ++y) {
+                for(int x = 0; x < nPoints; ++x) {
+                    modePtr[y][x] *= sf * sin(m * (aPtr[y][x] + angle)); //* pupPtr[y][x] 
+                    if(pupPtr[y][x]>0) {
+                        squared_sum +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
                     }
                 }
             }
         }
         else {
             double sf = sqrt((double) 2 * (n + 1));
-            for(int i = 0; i < nPoints; ++i) {
-                for(int j = 0; j < nPoints; ++j) {
-                    if(pupPtr[i][j]>0) {
-                        modePtr[i][j] *= sf * pupPtr[i][j] * cos(m * (aPtr[i][j] + angle));
-                        squared_sum +=  modePtr[i][j]*modePtr[i][j];
+            for(int y = 0; y < nPoints; ++y) {
+                for(int x = 0; x < nPoints; ++x) {
+                    modePtr[y][x] *= sf * cos(m * (aPtr[y][x] + angle)); //* pupPtr[y][x] 
+                    if(pupPtr[y][x]>0) {
+                        squared_sum +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
                     }
                 }
             }
         }
             
         // normalize
-        /*squared_sum = 1.0 / (sqrt(squared_sum / pupil.second) * lambda);
-        for(int i = 0; i < nPoints; ++i) {
-            for(int j = 0; j < nPoints; ++j) {
-                modePtr[i][j] *= squared_sum;
-            }
-        }*/
-        
-        
-    }
-
-    // normalize
-    double norm = 0.0, N = 0.0, dx = 0.5 / r_c, dy = 0.5 / r_c;
-    int half = nPoints / 2;
-    for(int i = 0; i < nPoints; ++i) {
-        double xl = fabs(i - half) / r_c - dx;
-        double xh = xl + 2 * dx;
-        double xls = xl * xl;
-        double xhs = xh * xh;
-        for(int j = 0; j < nPoints; ++j) {
-            double yl = fabs(j - half) / r_c - dy;
-            double yh = yl + 2 * dy;
-            double yhs = yh * yh;
-            double rsl = xls + yl * yl;
-            double rsh = xhs + yhs;
-            if(rsl <= 1.0) {    // good pixel
-                if(rsh < 1.0) {    // full pixel
-                    norm += modePtr[i][j] * modePtr[i][j];
-                    N += 1.0;
-                }
-                else {           // partial pixel
-                    double x2 = sqrt(max(1.0 - yhs, (double) 0.0));
-                    double y3 = sqrt(max(1.0 - xhs, (double) 0.0));
-                    double f = (xh > yh) ? 2*dy * (min(xh, max(xl, x2)) - xl) / (4 * dx * dy) :
-                               2*dx* (min(yh, max(yl, y3)) - yl) / (4 * dx * dy);
-                    norm += f * modePtr[i][j] * modePtr[i][j];
-                    N += f;
-                }
+        squared_sum = 1.0 / (sqrt(squared_sum / pupil.second) * lambda);
+        for(int y = 0; y < nPoints; ++y) {
+            for(int x = 0; x < nPoints; ++x) {
+                //if(pupPtr[y][x]>0) {
+                    modePtr[y][x] *= squared_sum;
+                //}
             }
         }
-    }
-    norm = 1 / (sqrt(norm / N) * lambda);
-    for(int i = 0; i < nPoints; ++i) {
-        for(int j = 0; j < nPoints; ++j) {
-            modePtr[i][j] *= norm;
-        }
+        
+        delPointers(modePtr);
+        delPointers(pupPtr);
+        
     }
 
-    delPointers(modePtr);
-    delPointers(pupPtr);
-
+    inv_atm_rms = 1.0 / ( sqrt(cache.zernikeCovariance(modeNumber,modeNumber))*lambda*lambda );
 
 }
 
 
-PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double lambda, double angle, double cutoff) : Array<double> (nPoints, nPoints) {
-
+PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double lambda, double angle, double cutoff) :
+     Array<double> (nPoints, nPoints), inv_atm_rms(0) {
+cout << "Generating KL mode:   #" << klModeNumber << "   nPoints = " << nPoints << "  R=" << r_c << "  lamba=" << lambda << "   co=" << cutoff << endl;
     if(firstMode > lastMode) swap(firstMode, lastMode);
 
     if(klModeNumber < firstMode || klModeNumber > lastMode) {
@@ -193,16 +160,17 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
     zero();
         
     static Cache& cache = Cache::getCache();
-    const std::map<uint16_t, PupilMode::KLPtr>& kle = cache.karhunenLoeveExpansion(firstMode, lastMode);
-
+    const PupilMode::KLPtr& kle = cache.karhunenLoeveExpansion(firstMode, lastMode).at(klModeNumber);
     double c;
-    for(auto & it : kle.at(klModeNumber)->zernikeWeights) {
+    for(auto & it : kle->zernikeWeights) {
         if(fabs(c = it.second) >= cutoff) {
             uint16_t zernikeModeIndex = it.first;
             const PupilMode::Ptr& mode = cache.mode(zernikeModeIndex, nPoints, r_c, lambda, angle);
             this->add(*mode, c);
         }
     }
+    
+    inv_atm_rms = 1.0 / ( sqrt(kle->covariance)*lambda*lambda );
 
 }
 

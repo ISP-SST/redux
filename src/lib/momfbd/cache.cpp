@@ -284,12 +284,20 @@ const std::map<uint16_t, PupilMode::KLPtr>& Cache::karhunenLoeveExpansion(uint16
         int im = reverse_mapping.at(i), s;
         for(s = 0; (first_in_block[s] > im) || (last_in_block[s] < im); ++s);
         int n = last_in_block[s] - first_in_block[s] + 1;
-        cfg->covariance = values[im - first_mode];
+        cfg->covariance = singular_values[im - first_mode];
+        int sign = 1;   // Overall sign of the expansion is arbitrary. Depending on the SVD solver used, the sign varies.
+                        // We choose the sign so that the KL modes as close as possible to the Zernikes (i.e. the principal component has weight closer to 1 than -1)
+        double largestCoeff = 0;
+        for(int m = 0; m < n; ++m) {
+            double c = blockMatrix[s][m][im - first_in_block[s]];
+            if ( fabs(c) > largestCoeff ) {
+                largestCoeff = fabs(c);
+                sign = (c<0)?-1:1;
+            }
+        }
         for(int m = 0; m < n; ++m) {
             int j = m + first_in_block[s];
-            // N.B. minus-sign for the coefficients below is arbitrary. Depending on the SVD solver used, the result might vary in sign.
-            // This minus was added just to get the KL modes as close as possible to the Zernikes (i.e. the principal component has weight closer to 1 than -1)
-            cfg->zernikeWeights.push_back(make_pair(mapping.at(j), - blockMatrix[s][m][im - first_in_block[s]]));
+            cfg->zernikeWeights.push_back(make_pair(mapping.at(j), sign * blockMatrix[s][m][im - first_in_block[s]]));
         }
     }
 
@@ -307,7 +315,7 @@ const std::map<uint16_t, PupilMode::KLPtr>& Cache::karhunenLoeveExpansion(uint16
 }
 
 
-const PupilMode::Ptr& Cache::addMode(const ModeID& idx, PupilMode::Ptr& m) {
+const PupilMode::Ptr Cache::addMode(const ModeID& idx, PupilMode::Ptr& m) {
 
     unique_lock<mutex> lock(mtx);
     auto it = modes.find(idx);
@@ -317,7 +325,7 @@ const PupilMode::Ptr& Cache::addMode(const ModeID& idx, PupilMode::Ptr& m) {
 }
 
 
-const PupilMode::Ptr& Cache::addMode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m) {
+const PupilMode::Ptr Cache::addMode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m) {
 
     ModeID idx(modeNumber, nPoints, pupilRadius, wavelength, angle);
     return addMode(idx, m);
@@ -325,7 +333,7 @@ const PupilMode::Ptr& Cache::addMode(uint16_t modeNumber, uint16_t nPoints, doub
 }
 
 
-const PupilMode::Ptr& Cache::mode(const ModeID& idx) {
+const PupilMode::Ptr Cache::mode(const ModeID& idx) {
 
     {
         unique_lock<mutex> lock(mtx);
@@ -343,7 +351,7 @@ const PupilMode::Ptr& Cache::mode(const ModeID& idx) {
 }
 
 
-const PupilMode::Ptr& Cache::mode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
+const PupilMode::Ptr Cache::mode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
 
     ModeID idx(modeNumber, nPoints, pupilRadius, wavelength, angle);
     return mode(idx);
@@ -351,7 +359,7 @@ const PupilMode::Ptr& Cache::mode(uint16_t modeNumber, uint16_t nPoints, double 
 }
 
 
-const PupilMode::Ptr& Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
+const PupilMode::Ptr Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
 
     ModeID idx(firstMode, lastMode, modeNumber, nPoints, pupilRadius, wavelength, angle);
     if( modeNumber == 2 || modeNumber == 3) {   // Always use Zernike modes for the tilts

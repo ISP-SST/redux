@@ -18,21 +18,21 @@ using namespace std;
 
 namespace {
 
-    const int maxDistance = 32;
-    const double deltasqr = 4;
-    const double beta = 2;
+const int maxDistance = 32;
+const double deltasqr = 4;
+const double beta = 2;
 
-    map<int, double> getDistanceMap ( void ) {
-        map<int, double> tmp;
-        for ( int i = 0; i <= maxDistance; ++i ) {
-            int i2 = i * i;
-            for ( int j = 0; j <= maxDistance; ++j ) {
-                int j2 = j * j;
-                tmp.insert ( pair<int, double> ( i2 + j2, pow ( i2 + j2 + deltasqr, -beta ) ) );
-            }
+map<int, double> getDistanceMap ( void ) {
+    map<int, double> tmp;
+    for ( int i = 0; i <= maxDistance; ++i ) {
+        int i2 = i * i;
+        for ( int j = 0; j <= maxDistance; ++j ) {
+            int j2 = j * j;
+            tmp.insert ( pair<int, double> ( i2 + j2, pow ( i2 + j2 + deltasqr, -beta ) ) );
         }
-        return tmp;
     }
+    return tmp;
+}
 
 }
 
@@ -59,7 +59,7 @@ Grid::Grid( uint32_t nPointsY, uint32_t nPointsX, float originY, float originX )
 }
 
 void Grid::init(void) {
-    
+
     distance = sharedArray<float>(size.y, size.x);
     angle = sharedArray<float>(size.y, size.x);
     float** distPtr = distance.get();
@@ -73,95 +73,76 @@ void Grid::init(void) {
                 double x2 = sqr(xDist);
                 distPtr[y][x] = sqrt(y2 + x2);
                 anglePtr[y][x] = atan2(yDist, xDist);       // note: slow index is Y, fast is X
-            } else distPtr[y][x] = anglePtr[y][x] = 0;      // this pixel is at the origin -> set the angle to 0. 
+            } else distPtr[y][x] = anglePtr[y][x] = 0;      // this pixel is at the origin -> set the angle to 0.
         }
-    }   
+    }
 
 }
 
 
 double redux::image::makePupil( util::Array<double>& aperture, uint32_t nPoints, float radius, bool normalize ) {
-    
-    double area = 0.0, origin = 0.0;
-    
-    uint32_t mid = nPoints/2;
-    bool odd = nPoints%2;       // N.B: Don't use odd number of points for pupils!! Implemented just for completion.
-    
-    odd = true;                 // Pupil should be centered ON pixel (mid,mid), to match the location of the origin for Fourier-transforms. 
-                                // Forcing "odd" will center pupil on (mid,mid) rather than making it symmetric around a point between pixels. 
-    
-    if( odd ) origin = 0.5;
-                                
+
+cout << "makePupil:  nPoints = " << nPoints << "  R=" << radius << "  normalize=" << normalize << endl;
+    double area = 0.0, origin = 0.5;
+    uint32_t mid = nPoints/2;   // N.B: Don't use odd number of points for pupils !!
+                                // Pupil should be centered ON pixel (mid,mid), to match the location of the origin for Fourier-transforms.
+
+    if( nPoints%2 ) {
+        // TODO: warn or throw if nPoints is odd.
+    }
+
     Grid grid(mid+1,origin,origin);
-    float** distPtr = grid.distance.get();
-    aperture.resize(nPoints,nPoints);
+    float** distPtr = grid.distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
+    aperture.resize(nPoints,nPoints);           // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
     aperture.zero();
+    double val;
     
     for(uint x = 0; x < mid; ++x) {
-        for(uint y = 0; y <=x; ++y) {
-            double val = 0;
+        for(uint y = 0; y <=x; ++y) {       // We only generate the first octant, then copy.
+            val = 0;
             if(distPtr[y+1][x+1] < radius) {
                 val = 1;
-                //val = distPtr[y+1][x+1];
-            } else if(distPtr[y][x] < radius) {
-                val = (radius-distPtr[y][x])/(distPtr[y+1][x+1]-distPtr[y][x]); // linear fill-factor from radial ratio
-                // TODO: better approximation of pixel fill-factor.
-            }
-            if(odd) {
+            } else if(distPtr[y][x] < radius) {     // partial pixel
                 if( x == 0 && y == 0 ) {    // central pixel = 1 for all practical cases
-                                            // a pupil of size < sqrt(2) pixel is a bit absurd, this is just for completeness/fun :-)
-                    if( radius > sqrt(2)/2.0 ) val = 1;
-                    else if( radius < 0.5 ) val = redux::PI*radius*radius;
-                    else val = redux::PI*radius*radius + (radius-0.5)/(sqrt(2)/2.0-0.5)*(1-redux::PI*radius*radius);
-                    aperture(mid,mid) = val;
-                    area += val;
+                    if( radius < 0.5 ) val = redux::PI*radius*radius;       // a pupil of size < sqrt(2) pixel is a bit absurd...
+                    else val = redux::PI*radius*radius + (radius-0.5)/(sqrt(0.5)-0.5)*(1-redux::PI*radius*radius);
                 } else {
-                    aperture(mid+y,mid+x) = val;
-                    area += val;
-                    if ( x != 0 ) {
-                        aperture(mid+y,mid-x) = val;
-                        area += val;
-                        if ( y != 0 ) {
-                            aperture(mid-y,mid-x) = val;
-                            area += val;
-                        }
-                    }
-                    if ( y != 0 ) {
-                        aperture(mid-y,mid+x) = val;
-                        area += val;
-                    }
-                    if( x != y ) {
-                        aperture(mid+x,mid+y) = val;
-                        area += val;
-                        if ( x != 0 ) {
-                            aperture(mid-x,mid+y) = val;
-                            area += val;
-                            if ( y != 0 ) {
-                                aperture(mid-x,mid-y) = val;
-                                area += val;
-                            }
-                        }
-                        if ( y != 0 ) {
-                            aperture(mid+x,mid-y) = val;
-                            area += val;
-                        }
-                    }
+                    // TBD: better approximation of pixel fill-factor ??
+                    val = (radius-distPtr[y][x])/(distPtr[y+1][x+1]-distPtr[y][x]); // linear fill-factor from radial ratio
                 }
-            } else {
+            }
+            if ( val > 0 ) {
                 aperture(mid+y,mid+x) = val;
-                aperture(mid+y,mid-x-1) = aperture(mid-y-1,mid+x) = aperture(mid-y-1,mid-x-1) = val;
-                area += 4*val;
+                area += val;
                 if(x != y) {
-                    aperture(mid+x,mid+y) = val;  // Use symmetry to fill quadrants (if off-diagonal)
-                    aperture(mid+x,mid-y-1) = aperture(mid-x-1,mid+y) = aperture(mid-x-1,mid-y-1) = val;
-                    area += 4*val;
+                    aperture(mid+x,mid+y) = val;  // Use symmetry to fill the second octant
+                    area += val;
                 }
             }
         }
-    }   
-    
+    }
+    for(uint x = 0; x < mid; ++x) {
+        for(uint y = 0; y <mid; ++y) {       // copy 1st quadrant to 2,3,4
+            val = aperture(mid+y,mid+x);
+            if ( val > 0 ) {
+                if( x ) {
+                    aperture(mid+y,mid-x) = val;
+                    area += val;
+                }
+                if( y ) {
+                    aperture(mid-y,mid+x) = val;
+                    area += val;
+                }
+                if( x && y ) {
+                    aperture(mid-y,mid-x) = val;
+                    area += val;
+                }
+            }
+        }
+    }
+
     return area;
-    
+
 }
 
 
@@ -266,19 +247,19 @@ double redux::image::horizontalInterpolation ( T** array, size_t sizeY, size_t s
     if ( ( posX < sizeX - 1 ) ) val |= ( ( ptr[posX + 2] > 0 ) );
     //now select based on the number
     switch ( val ) {
-        case ( 10 ) :   // = 0 1 x 1 0
-        case ( 11 ) :   // = 0 1 x 1 1
-        case ( 26 ) :   // = 1 1 x 1 0
-        case ( 27 ) :   // = 1 1 x 1 1
-            return ( ptr[posX - 1] + ptr[posX + 1] ) / 2;
-        case ( 18 ) :   // = 1 0 x 1 0
-        case ( 19 ) :   // = 1 0 x 1 1
-            return ( ptr[posX - 2] + 2 * ptr[posX + 1] ) / 3;
-        case ( 9 ) :    // = 0 1 x 0 1
-        case ( 25 ) :   // = 1 1 x 0 1
-            return ( 2 * ptr[posX - 1] + ptr[posX + 2] ) / 3;
-        default:
-            return inverseDistanceWeight<T> ( array, sizeY, sizeX, posY, posX );
+    case ( 10 ) :   // = 0 1 x 1 0
+    case ( 11 ) :   // = 0 1 x 1 1
+    case ( 26 ) :   // = 1 1 x 1 0
+    case ( 27 ) :   // = 1 1 x 1 1
+        return ( ptr[posX - 1] + ptr[posX + 1] ) / 2;
+    case ( 18 ) :   // = 1 0 x 1 0
+    case ( 19 ) :   // = 1 0 x 1 1
+        return ( ptr[posX - 2] + 2 * ptr[posX + 1] ) / 3;
+    case ( 9 ) :    // = 0 1 x 0 1
+    case ( 25 ) :   // = 1 1 x 0 1
+        return ( 2 * ptr[posX - 1] + ptr[posX + 2] ) / 3;
+    default:
+        return inverseDistanceWeight<T> ( array, sizeY, sizeX, posY, posX );
     }
 
 }
@@ -291,16 +272,14 @@ Array<T> redux::image::apodize ( const Array<T>& in, size_t blendRegion ) {
     if ( !blendRegion ) return in;     // nothing to do
     Array<T> array;
     in.copy(array);
-    const vector<int64_t>& first = array.first();
-    size_t sizeY = array.last() [0]-first[0]+1;
-    size_t sizeX = array.last() [1]-first[1]+1;
+    size_t sizeY = array.dimSize(0);
+    size_t sizeX = array.dimSize(1);
+    T** aPtr = makePointers(array.get(),sizeY,sizeX);
     blendRegion = std::min ( std::min ( blendRegion,sizeY ),sizeX );
 
     double* tmp = new double[blendRegion+1];
     tmp[0] = 0;
-    redux::math::apodize ( tmp, blendRegion, 1.0 );
-//     auto sharedPtrs = array.get(sizeY,sizeX);
-//     T** data = sharedPtrs.get();
+    redux::math::apodize( tmp, blendRegion, 1.0 );
     for ( size_t y=0,yy=sizeY-1; y<sizeY; ++y,--yy ) {
         double yfactor = 1;
         if ( y < blendRegion ) yfactor *= tmp[y];
@@ -308,14 +287,15 @@ Array<T> redux::image::apodize ( const Array<T>& in, size_t blendRegion ) {
             double xfactor = yfactor;
             if ( x < blendRegion ) xfactor *= tmp[x];
             if ( xfactor < 1 ) {
-                array ( y,x )   *= xfactor;
-                array ( yy,x )  *= xfactor;
-                array ( y,xx )  *= xfactor;
-                array ( yy,xx ) *= xfactor;
+                aPtr[y][x]  *= xfactor;
+                aPtr[yy][x] *= xfactor;
+                aPtr[y][xx] *= xfactor;
+                aPtr[yy][xx]*= xfactor;
             }
         }
     }
     delete[] tmp;
+    delPointers(aPtr);
     return array;
 }
 template Array<int16_t> redux::image::apodize ( const Array<int16_t>&, size_t );
@@ -400,7 +380,7 @@ void redux::image::descatter ( Array<T>& data, const Array<U>& ccdgain, const Ar
             double new_img = (*in_it++ - *tmp_it++);
             metric += (img_it - new_img)*(img_it - new_img);
             img_it = new_img;
-        }        
+        }
         metric /= data.nElements();
         delta /= metric;
         //cout << "descatter:  iter = " << i << ", ChiSq = " << metric <<  ", delta = " << delta << endl;
@@ -412,5 +392,6 @@ void redux::image::descatter ( Array<T>& data, const Array<U>& ccdgain, const Ar
 template void redux::image::descatter ( Array<float>&, const Array<float>&, const Array<float>&, int, double, double );
 template void redux::image::descatter ( Array<double>&, const Array<float>&, const Array<float>&, int, double, double );
 template void redux::image::descatter ( Array<float>&, const Array<double>&, const Array<double>&, int, double, double );
+
 
 

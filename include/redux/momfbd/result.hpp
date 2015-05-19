@@ -48,7 +48,7 @@ namespace redux {
             void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>);
             
             std::mutex mtx;
-            redux::image::FourierTransform ftSum;
+            redux::image::FourierTransform ftSum;                //! Fourier-transforms of the approximate object (sum of FTs of all images)
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;
             

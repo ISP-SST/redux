@@ -2,7 +2,7 @@
 #define REDUX_MOMFBD_CHANNEL_HPP
 
 #include "redux/momfbd/config.hpp"
-//#include "redux/momfbd/data.hpp"
+#include "redux/momfbd/workspace.hpp"
 
 #include <redux/image/image.hpp>
 #include <redux/image/statistics.hpp>
@@ -24,6 +24,8 @@ namespace redux {
         class Object;
         class WorkSpace;
         struct ChannelData;
+        struct SubImage;
+        struct WaveFront;
         /*! @brief Class containing the channel-specific configuration for a MomfbdJob/Object
          * 
          */
@@ -42,12 +44,24 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void) const;
             void collectImages(redux::util::Array<float>&) const;
-            void getPatchData(ChannelData&, uint16_t yid, uint16_t xid) const;
+            void getPatchData(ChannelData&, Point16 patchID) const;
             void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
-            void initWorkSpace( WorkSpace& ws );
+            /*************   Processing on slave   ***************/
+            /*************         Methods         ***************/
+            void initProcessing(WorkSpace::Ptr);
+            void initPatch(ChannelData&);
+            void initPhiFixed(void);
+            void computePhi(void);
+            void addMode(redux::util::Array<double>&, uint16_t, double) const;
+            void getPhi(redux::util::Array<double>&, const WaveFront&) const;
+            //void addAllFT(redux::image::FourierTransform&);
+            void addAllFT(redux::util::Array<double>&);
+            double metric(void);
+            /*****************************************************/
             
             uint32_t dataOffset;
+
         private:
             
             bool checkCfg(void);
@@ -71,17 +85,35 @@ namespace redux {
             
             Point16 clipImages(void);
 
-            std::vector<redux::image::Statistics::Ptr> imageStats;
 
+            /*************   Local variables for   ***************/
+            /************* PreProcessing on master ***************/
+            std::vector<redux::image::Statistics::Ptr> imageStats;
             redux::image::Image<float> images, dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
+            /*****************************************************/
             
+            /*************   Local variables for   ***************/
+            /*************   Processing on slave   ***************/
+            std::mutex mtx;
+            WorkSpace::Ptr workspace;
+            std::map<uint16_t, const PupilMode::Ptr> modes;                 //!< modes used in this channel
+            std::pair<redux::util::Array<double>, double> pupil;            //!< pupil & area of pupil
+            std::vector<std::shared_ptr<SubImage>> subImages;
+            redux::image::Image<float> fittedPlane;
+            redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
+            redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel
+            /*****************************************************/
+            
+            double frequencyCutoff, pupilRadiusInPixels;
+
             Object& myObject;
             MomfbdJob& myJob;
 
             friend class Object;
+            friend struct SubImage;
             
         };
 

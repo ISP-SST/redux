@@ -32,19 +32,19 @@ using boost::algorithm::iequals;
 #define lg Logger::mlg
 namespace {
 
-    const string thisChannel = "object";
+const string thisChannel = "object";
 
 }
 
 
 Object::Object( MomfbdJob& j ) : ObjectCfg(j), myJob(j) {
-    
-    
+
+
 }
 
 
 Object::~Object() {
-    
+
 }
 
 
@@ -60,7 +60,7 @@ void Object::parsePropertyTree( bpt::ptree& tree ) {
         }
     }
 
-    LOG_DEBUG << "Object::parseProperties() done.";
+    //LOG_DEBUG << "Object::parseProperties() done.";
 
 }
 
@@ -68,17 +68,17 @@ void Object::parsePropertyTree( bpt::ptree& tree ) {
 bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 
     bpt::ptree node;
-    
+
     for( shared_ptr<Channel>& ch : channels ) {
         ch->getPropertyTree( node );
     }
 
     ObjectCfg::getProperties(node,myJob);
-    
+
     tree.push_back( bpt::ptree::value_type( "object", node ) );
-    
+
     return node;
-    
+
 }
 
 
@@ -117,7 +117,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
         ch.reset(new Channel(*this,myJob));
         count += ch->unpack(ptr+count, swap_endian);
     }
-   return count;
+    return count;
 }
 
 
@@ -138,24 +138,149 @@ void Object::calcPatchPositions(const std::vector<uint16_t>& y, const std::vecto
 }
 
 
-void Object::initWorkSpace( WorkSpace& ws ) {
-    for( shared_ptr<Channel>& ch : channels ) ch->initWorkSpace(ws);
+void Object::initProcessing( WorkSpace::Ptr ws ) {
+    //cout << "Object::initProcessing(" << hexString(this) << ")" << endl;
+    if( patchSize && pupilPixels ) {
+        P.resize(2*pupilPixels,2*pupilPixels);
+        Q.resize(2*pupilPixels,2*pupilPixels);
+        ftSum.resize(patchSize,patchSize);          // full-complex for now
+        for( auto& ch : channels ) {
+            if( patchSize == ch->patchSize && pupilPixels == ch->pupilPixels) {
+                ch->initProcessing(ws);
+            } else {
+                LOG_ERR << "Different sub-field sizes not supported....yet.  obj.patchSize=" << patchSize
+                << "  ch.patchSize=" << ch->patchSize << "  obj.pupilPixels=" << pupilPixels << "  ch.pupilPixels=" << ch->pupilPixels;
+            }
+        }
+    } else {
+        LOG_ERR << "Object patchSize is 0 !!!";
+    }
+}
+
+
+void Object::initPatch( ObjectData& od ) {
+    cout << "Object::initPatch(" << hexString(this) << ")  reg_gamma = " << myJob.reg_gamma << endl;
+    addAllFT();
+}
+
+
+void Object::initPQ( void ) {
+    unique_lock<mutex> lock( mtx );
+    P.zero();
+    Q = myJob.reg_gamma;
+}
+
+
+void Object::addAllFT( void ) {
+    unique_lock<mutex> lock( mtx );
+    ftSum.zero();
+    for( shared_ptr<Channel>& ch : channels ) ch->addAllFT(ftSum);
+}
+
+
+void Object::addToFT( const redux::image::FourierTransform& ft ) {
+    unique_lock<mutex> lock( mtx );
+    if( !ftSum.sameSizes(ft) ) {
+        ftSum.resize(ft.dimensions(true));
+        ftSum.zero();
+    }
+    //  std::cout << "Object::addToFT():  1   " << hexString(this) << printArray(ft.dimensions(), "  ft.dims") << printArray(ftSum.dimensions(), "  ftSum.dims") << std::endl;
+   // ftSum += ft;
+//    std::cout << "Object::addToFT():  2   " << printArray(ft.dimensions(), "ft.dims") << printArray(ftSum.dimensions(), "  ftSum.dims") << std::endl;
+}
+
+
+void Object::addToPQ( const redux::image::FourierTransform& ft, const Array<complex_t> sj ) {
+//   std::cout << "Object::addToPQ():  1   " << hexString(this) << printArray(ft.dimensions(), "  ft.dims") << printArray(sj.dimensions(), "  sj.dims") << std::endl;
+    typedef Array<complex_t>::const_iterator cit;
+    unique_lock<mutex> lock( mtx );
+    cit ftit = ft.begin();
+    cit sjit = sj.begin();
+    auto qit = Q.begin();
+
+    for( auto& pit: P ) {
+        *qit++ += norm( *sjit );            // Q += sj.re^2 + sj.im^2 = norm(sj)
+        pit += *ftit++ * *sjit++;           // P += ft * sj
+    }
+}
+
+
+void Object::addAllPQ(void) {
+    for( shared_ptr<Channel>& ch : channels ) {
+        for( shared_ptr<SubImage>& im : ch->subImages ) {
+            unique_lock<mutex> lock( mtx );
+            im->addPQ(P,Q);
+        }
+    }
+}
+
+
+#include "redux/file/fileana.hpp"
+
+void Object::slask(void) {
+//    cout << "Object::slask(void)" << endl;
+//     static int bla(0);
+//     unique_lock<mutex> lock( mtx );
+//     redux::file::Ana::write( "ftsum_" + to_string( bla++ ) + ".f0", ftSum );
+//     Array<double> img;
+//     ftSum.inv(img);
+//     redux::file::Ana::write( "ftsuminv_" + to_string( bla ) + ".f0", img );
+}
+
+
+double Object::metric(void) {
+
+    double m = 0.0;
+    uint nY = ftSum.dimSize(0);
+    uint nX = ftSum.dimSize(1);
+    if(nY != P.dimSize(0) || nX != P.dimSize(1) ||
+       nY != Q.dimSize(0) || nX != Q.dimSize(1) ) {
+        cout << "Object::metric()   dim mismatch: " << printArray(ftSum.dimensions(),"ftdims")
+                                                    << printArray(P.dimensions()," pdims")
+                                                    << printArray(Q.dimensions()," qdims") << endl;
+    }
+    double** fs = makePointers(ftSum.ptr(), nY, nX);
+    complex_t** p = makePointers(P.ptr(), nY, nX);
+    double** q = makePointers(Q.ptr(), nY, nX);
+    
+    for(uint y=0; y<nY; ++y) {
+        for(uint x=0; x<nX; ++x) {
+            m += fs[y][x]-norm(p[y][x])/q[y][x]; // warning: |q| may be < 1E-20 (i.e. not "safe")?
+        }
+    }
+    m/=(double)(nY*nX);
+
+    cout << "Object::metric()   m = " << m << endl;
+    delPointers(fs);
+    delPointers(p);
+    delPointers(q);
+//   for(int x=1;x<=nPixels;++x)
+//     for(int y=1;y<=nPixels;++y)
+//       l+=ftSum[x][y]-(p[x][y].re*p[x][y].re+p[x][y].im*p[x][y].im)/q[x][y]; // warning: |q| may be < 1E-20 (i.e. not "safe")?
+//   l/=(double)(nPixels*nPixels);
+//   if(reg_alpha){
+//     double sum=0.0;
+//     for(int i=1;i<=nImages;++i) sum+=subImages[i]->metric(alpha[i]); // alpha is passed down
+//     l+=0.5*reg_alpha*sum;
+//   }
+  return m;
+
 }
 
 
 bool Object::checkCfg(void) {
-    
+
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
         LOG_WARN << "Both GET_PSF and GET_PSF_AVG mode specified.";
     }
     if( channels.empty() ) {
         LOG_CRITICAL << "Each object must have at least 1 channel specified.";
     }
-    
+
     for( shared_ptr<Channel>& ch: channels ) {
         if( !ch->checkCfg() ) return false;
     }
-    
+
     if( outputFileName.empty() ) {  // TODO: clean this up
         string tpl = channels[0]->imageTemplate;
         size_t p = tpl.find_first_of( '%' );
@@ -203,19 +328,19 @@ bool Object::checkCfg(void) {
 
 
 bool Object::checkData(void) {
-    
- //   fn = bfs::path( outputFileName );
-/*    if( !bfs::exists( fn ) ) {
-        LOG_CRITICAL << "Not found !!! \"" << fn.string() << "\"";
-        imageNumbers.erase( imageNumbers.begin() + i );
-        continue;
-    }
-  */  
+
+//   fn = bfs::path( outputFileName );
+    /*    if( !bfs::exists( fn ) ) {
+            LOG_CRITICAL << "Not found !!! \"" << fn.string() << "\"";
+            imageNumbers.erase( imageNumbers.begin() + i );
+            continue;
+        }
+      */
 
     for( shared_ptr<Channel>& ch : channels ) {
         if( !ch->checkData() ) return false;
     }
-    
+
     return true;
 }
 
@@ -225,46 +350,29 @@ void Object::init( void ) {
     for( shared_ptr<Channel>& ch : channels ) {
         ch->init();
     }
-    
+
 //   init( KL_cfg* kl_cfg, double lambda, double r_c, int nph_in, int basis, int nm, int *mode_num,
-//              int nch, int *ndo, int **dorder, int **dtype, int kl_min_mode, int kl_max_mode, double svd_reg, double angle, double **pupil_in ) 
-   
+//              int nch, int *ndo, int **dorder, int **dtype, int kl_min_mode, int kl_max_mode, double svd_reg, double angle, double **pupil_in )
+
 //    modes.init(coeff,lambda,r_c,nph,myJob.basis,myJob.modes);
-   
-/*    for( int o = 1; o <= nObjects; ++o ) {
-        mode[o] = new modes( kl_cfs, cfg->lambda[o], cfg->lim_freq[o] / 2.0, cfg->nph[o], cfg->basis, cfg->nModes, cfg->mode_num, nChannels[o], cfg->nDiversityOrders[o], cfg->dorder[o], cfg->dtype[o], cfg->kl_min_mode, cfg->kl_max_mode, cfg->svd_reg, cfg->angle[o], cfg->pupil[o], io );
-//              cfg->pix2cf[o]/=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
-//              cfg->cf2pix[o]*=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
-        cfg->pix2cf[o] /= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
-        cfg->cf2pix[o] *= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
-    }
-*/
+
+    /*    for( int o = 1; o <= nObjects; ++o ) {
+            mode[o] = new modes( kl_cfs, cfg->lambda[o], cfg->lim_freq[o] / 2.0, cfg->nph[o], cfg->basis, cfg->nModes, cfg->mode_num, nChannels[o], cfg->nDiversityOrders[o], cfg->dorder[o], cfg->dtype[o], cfg->kl_min_mode, cfg->kl_max_mode, cfg->svd_reg, cfg->angle[o], cfg->pupil[o], io );
+    //              cfg->pix2cf[o]/=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
+    //              cfg->cf2pix[o]*=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
+            cfg->pix2cf[o] /= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
+            cfg->cf2pix[o] *= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
+        }
+    */
 
 
 }
 
 
 void Object::initCache( void ) {
-
     for( shared_ptr<Channel>& ch : channels ) {
         ch->initCache();
     }
-    
-//   init( KL_cfg* kl_cfg, double lambda, double r_c, int nph_in, int basis, int nm, int *mode_num,
-//              int nch, int *ndo, int **dorder, int **dtype, int kl_min_mode, int kl_max_mode, double svd_reg, double angle, double **pupil_in ) 
-   
-//    modes.init(coeff,lambda,r_c,nph,myJob.basis,myJob.modes);
-   
-/*    for( int o = 1; o <= nObjects; ++o ) {
-        mode[o] = new modes( kl_cfs, cfg->lambda[o], cfg->lim_freq[o] / 2.0, cfg->nph[o], cfg->basis, cfg->nModes, cfg->mode_num, nChannels[o], cfg->nDiversityOrders[o], cfg->dorder[o], cfg->dtype[o], cfg->kl_min_mode, cfg->kl_max_mode, cfg->svd_reg, cfg->angle[o], cfg->pupil[o], io );
-//              cfg->pix2cf[o]/=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
-//              cfg->cf2pix[o]*=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
-        cfg->pix2cf[o] /= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
-        cfg->cf2pix[o] *= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
-    }
-*/
-
-
 }
 
 
@@ -274,19 +382,13 @@ void Object::cleanup( void ) {
 
 
 void Object::loadData( boost::asio::io_service& service ) {
-    
-    LOG << "Object::loadData()";
-
     for( shared_ptr<Channel>& ch : channels ) {
         ch->loadData( service );
     }
-    
 }
 
 
 void Object::preprocessData(boost::asio::io_service& service ) {
-    
-    LOG_TRACE << "Object::preprocessData()";
     for( shared_ptr<Channel>& ch : channels ) {
         ch->preprocessData(service);
     }
@@ -294,8 +396,7 @@ void Object::preprocessData(boost::asio::io_service& service ) {
 
 
 void Object::normalize(boost::asio::io_service& service ) {
-    
-    LOG_TRACE << "Object::normalize()";
+
     double maxMean = std::numeric_limits<double>::lowest();
     for( shared_ptr<Channel>& ch : channels ) {
         double mM = ch->getMaxMean();
@@ -310,9 +411,9 @@ void Object::normalize(boost::asio::io_service& service ) {
 void Object::prepareStorage(void) {
 
     bfs::path fn = bfs::path( outputFileName + ".momfbd" );     // TODO: fix storage properly
-    
-    LOG_DEBUG << "Preparing file " << fn << " for temporary, and possibly final, storage.";
-    
+
+    LOG << "Preparing file " << fn << " for temporary, and possibly final, storage.";
+
     std::shared_ptr<FileMomfbd> info ( new FileMomfbd() );
 
     // Extract date/time from the git commit.
@@ -332,7 +433,7 @@ void Object::prepareStorage(void) {
 //         info->dataMask |= MOMFBD_NAMES;
 //     }
     info->nFileNames = info->fileNames.size();
-    
+
     int32_t n_img = nImages();
     int32_t nChannels = info->nChannels = channels.size();
     info->clipStartX = sharedArray<int16_t>(nChannels);
@@ -345,26 +446,35 @@ void Object::prepareStorage(void) {
         info->clipStartY.get() [ i ] = channels[i]->alignClip[2];
         info->clipEndY.get() [ i ] = channels[i]->alignClip[3];
     }
-    
-    info->nPH = pupilSize;
-    
+
+    info->nPH = pupilPixels;
+
     Array<float> tmp;
-    
+
     if(saveMask&SF_SAVE_MODES && (info->nPH>0)) {
-        tmp.resize(myJob.modeNumbers.size()+1,info->nPH,info->nPH);
+        double pupilRadiusInPixels = pupilPixels/2.0;
+        if( channels.size() ) pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
+        tmp.resize(myJob.modeNumbers.size()+1,info->nPH,info->nPH);                 // +1 to also fit pupil in the array
         tmp.zero();
-        Array<float> tmp_slice(tmp, 0, 0, 0, info->nPH-1, 0, info->nPH-1);
-        tmp_slice = 0;//pupil;
+        Array<float> tmp_slice(tmp, 0, 0, 0, info->nPH-1, 0, info->nPH-1);          // subarray
+        tmp_slice = myJob.globalData->fetch(pupilPixels,pupilRadiusInPixels).first;
         info->phOffset = 0;
         if(myJob.modeNumbers.size()) {
+            Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, wavelength, rotationAngle);
+            if(myJob.modeBasis == ZERNIKE) {    // Needed because klMinMode/klMaxMode might be non-zero even if we are using Zerikes
+                id.firstMode = id.lastMode = 0;
+            }
             info->nModes = myJob.modeNumbers.size();
-            info->modesOffset = pupilSize*pupilSize*sizeof(float);
-            /*for( auto& it: modes ) {
-                tmp_slice.shift(0,1);
-                tmp_slice = *it.second;
-            }*/
+            info->modesOffset = pupilPixels*pupilPixels*sizeof(float);
+            for( uint16_t& it: myJob.modeNumbers ) {    // Note: globalData might also contain modes we don't want to save here, e.g. PhaseDiversity modes.
+                tmp_slice.shift(0,1);       // shift subarray 1 step (in the first dimension)
+                id.modeNumber = it;
+                tmp_slice = *(myJob.globalData->fetch(id));
+
+            }
         }
     }
+
     /*
     info->pix2cf = pix2cf;
     info->cf2pix = cf2pix;
@@ -372,7 +482,7 @@ void Object::prepareStorage(void) {
     info->nPatchesX = 0;//nPatchesX;
     info->nPatchesY = 0;//nPatchesY;
     info->patches.resize ( info->nPatchesY, info->nPatchesX );
-    
+
     auto dummy = sharedArray<int32_t>(nChannels);
     for ( int x = 0; x < info->nPatchesX; ++x ) {
         for ( int y = 0; y < info->nPatchesY; ++y ) {
@@ -399,9 +509,8 @@ void Object::prepareStorage(void) {
         }   // y-loop
     }   // x-loop
 
-    
-    
-    
+
+
     uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
     if(saveMask&SF_SAVE_PSF || saveMask&SF_SAVE_PSF_AVG)    writeMask |= MOMFBD_PSF;
     if(saveMask&SF_SAVE_COBJ)    writeMask |= MOMFBD_OBJ;
@@ -409,29 +518,29 @@ void Object::prepareStorage(void) {
     if(saveMask&SF_SAVE_ALPHA)    writeMask |= MOMFBD_ALPHA;
     if(saveMask&SF_SAVE_DIVERSITY)    writeMask |= MOMFBD_DIV;
     if(saveMask&SF_SAVE_MODES)    writeMask |= MOMFBD_MODES;
-    
+
     //cout << "prepareStorage: " << bitString(writeMask) << endl;
     info->write ( fn.string(), reinterpret_cast<char*>(tmp.ptr()), writeMask );
     //cout << "prepareStorage done."  << endl;
- 
+
 }
 
 
 void Object::storePatches( WorkInProgress& wip, boost::asio::io_service& service, uint8_t nThreads) {
-  
+
     bfs::path fn = bfs::path( outputFileName );
     fn.replace_extension( "momfbd" );
     std::shared_ptr<FileMomfbd> info ( new FileMomfbd(fn.string()) );
 
     LOG_DEBUG << "storePatches()";
-    
+
     for( auto& it: wip.parts ) {
         PatchData::Ptr patch = static_pointer_cast<PatchData>(it);
         LOG_DEBUG << "storePatches() index: (" << patch->index.x << "," << patch->index.y << ")  offest = "
-        << info->patches( patch->index.x ,patch->index.y).offset;
+                  << info->patches( patch->index.x ,patch->index.y).offset;
         patch->step = MomfbdJob::JSTEP_COMPLETED;
     }
-  
+
 }
 
 

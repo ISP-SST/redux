@@ -39,15 +39,15 @@ namespace redux {
             double zernikeCovariance( int32_t m, int32_t n );
             const std::vector<double>& zernikeRadialPolynomial( int32_t m, int32_t n );
             const std::map<uint16_t, PupilMode::KLPtr>& karhunenLoeveExpansion( uint16_t first_mode, uint16_t last_mode );
-            const PupilMode::Ptr& addMode ( const ModeID&, PupilMode::Ptr& m);
-            const PupilMode::Ptr& addMode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m);
-            const PupilMode::Ptr& mode ( const ModeID& );
-            const PupilMode::Ptr& mode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
-            const PupilMode::Ptr& mode ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
+            const PupilMode::Ptr addMode ( const ModeID&, PupilMode::Ptr& m);
+            const PupilMode::Ptr addMode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m);
+            const PupilMode::Ptr mode ( const ModeID& );
+            const PupilMode::Ptr mode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
+            const PupilMode::Ptr mode ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
             
-            Cache() {}
-            ~Cache() { std::cout << "~Cache(): nModes = "<< modes.size() << std::endl; }
+//             ~Cache() { std::cout << "~Cache(): nModes = "<< modes.size() << std::endl; }
         private:
+            Cache() {}
             Cache( const Cache& ) {}
 
             std::mutex mtx;

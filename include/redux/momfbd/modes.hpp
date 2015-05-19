@@ -21,10 +21,11 @@ namespace redux {
             typedef std::shared_ptr<PupilMode> Ptr;
             typedef std::shared_ptr<KL> KLPtr;
 
-            PupilMode() {};
+            PupilMode() : inv_atm_rms(0) {};
             PupilMode ( uint16_t modeNumber, uint16_t nPoints, double r_c = 1.0, double lambda = 1.0, double angle = 0.0 ); // Zernike
             PupilMode ( uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c = 1.0, double lambda = 1.0, double angle = 0.0, double cutoff=0.0 ); // KL
 
+            double inv_atm_rms;                         //!< inverse of sqrt(covariance)*sqr(lambda), used in metric computations.
         };
 
     }

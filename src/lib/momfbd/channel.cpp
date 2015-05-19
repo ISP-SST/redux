@@ -2,6 +2,8 @@
 
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/object.hpp"
+#include "redux/momfbd/subimage.hpp"
+#include "redux/momfbd/wavefront.hpp"
 
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
@@ -61,16 +63,16 @@ namespace {
         return false;
     }
 
-    void calculatePupilSize( double &lim_freq, double &r_c, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel ) {
-        double radians_per_arcsec = redux::PI/(180.0*3600.0);             // (2.0*redux::PI)/(360.0*3600.0)
+    void calculatePupilSize( double &frequencyCutoff, double &pupilRadiusInPixels, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel ) {
+        static double radians_per_arcsec = redux::PI/(180.0*3600.0);             // (2.0*redux::PI)/(360.0*3600.0)
         double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
         double q_number = wavelength / ( radians_per_pixel * telescopeDiameter );
-        lim_freq = ( double )nPixels / q_number;
+        frequencyCutoff = ( double )nPixels / q_number;
         nPupilPixels = nPixels>>2;
-        r_c = lim_freq / 2.0;                   // telescope radius in pupil pixels...
-        if( nPupilPixels < r_c ) {           // this should only be needed for oversampled images
+        pupilRadiusInPixels = frequencyCutoff / 2.0;                   // telescope radius in pupil pixels...
+        if( nPupilPixels < pupilRadiusInPixels ) {           // this should only be needed for oversampled images
             uint16_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
-            for( int i = 0; ( nPupilPixels = max( goodsizes[i], nPupilPixels ) ) < r_c; ++i ); // find right size
+            for( int i = 0; ( nPupilPixels = max( goodsizes[i], nPupilPixels ) ) < pupilRadiusInPixels; ++i ); // find right size
         }
         nPupilPixels <<= 1;
     }
@@ -146,7 +148,7 @@ void Channel::parsePropertyTree( bpt::ptree& tree ) {
     }
 
 
-    LOG_DEBUG << "Channel::parseProperties() done.";
+    //LOG_DEBUG << "Channel::parseProperties() done.";
 
 }
 
@@ -222,7 +224,6 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
 
 bool Channel::checkCfg(void) {
     
-    LOG_TRACE << "Channel::checkCfg()";
     if( !checkImageScale(telescopeF, arcSecsPerPixel, pixelSize) ) {
         return false;
     }
@@ -269,8 +270,6 @@ bool Channel::checkCfg(void) {
 
 
 bool Channel::checkData(void) {
-    
-    LOG_TRACE << "Channel::checkData()";
     
     // Images
     if( incomplete ) {  // check if files are present
@@ -412,29 +411,32 @@ void Channel::init( void ) {
 
 
 void Channel::initCache( void ) {
-    
-    double lim_freq, r_c;
-    uint16_t nPupilPixels;
 
-    calculatePupilSize( lim_freq, r_c, nPupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
-    //cout << "Channel::initCache()   lim_freq = " << lim_freq << "  nPupilPixels = " << nPupilPixels << "  r_c = " << r_c << endl;
-    
-    Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilSize, r_c, myObject.wavelength, rotationAngle);
-    for( size_t i=0; i<diversityOrders.size(); ++i ) {
+    LOG_DETAIL << "wavelength = " << myObject.wavelength << "   patchSize = " << patchSize << "  telescopeD = " << myJob.telescopeD << "  arcSecsPerPixel = " << arcSecsPerPixel;
+    calculatePupilSize( frequencyCutoff, pupilRadiusInPixels, pupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
+    myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
+    myObject.pupilPixels = pupilPixels;
+    LOG_DETAIL << "frequencyCutoff = " << frequencyCutoff << "  pupilSize = " << pupilPixels << "  pupilRadiusInPixels = " << pupilRadiusInPixels;
+    pupil = myJob.globalData->fetch(pupilPixels,pupilRadiusInPixels);
+
+    Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, myObject.wavelength, rotationAngle);
+    for( uint i=0; i<diversityModes.size(); ++i ) {
+        uint16_t modeNumber = diversityModes[i];
         Cache::ModeID id2 = id;
         if(diversityTypes[i] == ZERNIKE) {
             id2.firstMode = id2.lastMode = 0;
         }
-        id2.modeNumber = diversityOrders[i];
+        id2.modeNumber = modeNumber;
         myJob.globalData->fetch(id2);
     }
-    
+
     if(myJob.modeBasis == ZERNIKE) {
         id.firstMode = id.lastMode = 0;
     }
     for( uint16_t& it: myJob.modeNumbers ) {
         id.modeNumber = it;
-        myJob.globalData->fetch(id);
+        const PupilMode::Ptr mode = myJob.globalData->fetch(id);
+        modes.emplace( it, myJob.globalData->fetch(id) );
     }
 
 }
@@ -609,8 +611,120 @@ void Channel::collectImages(redux::util::Array<float>& stack) const {
 }
 
             
-void Channel::initWorkSpace( WorkSpace& ws ) {
+void Channel::initProcessing( WorkSpace::Ptr ws ) {
+    workspace = ws;
+    initCache();        // this will initialize modes & pupil for this channel
+    initPhiFixed();
     
+    for ( uint16_t i=0; i<imageNumbers.size(); ++i ) {
+        uint32_t imageNumber = imageNumbers[i];
+        std::shared_ptr<WaveFront>& wf = workspace->wavefronts[imageNumber];
+        if(!wf) wf.reset(new WaveFront());
+        for(auto& m: modes) {
+            wf->addWeight(m.first, m.second->inv_atm_rms);
+        }
+    }
+
+    // link vector of subimages to their wavefronts
+    //cout << "Channel::initProcessing()" << endl;
+}
+
+
+void Channel::initPatch( ChannelData& cd ) {
+    
+    if(imageNumbers.size() != cd.images.dimSize()) {
+        LOG_ERR << "Number of images in stack does not match the imageNumbers.";
+    }
+    cout << "Channel::initPatch()" << endl;
+    subImages.clear();
+    for ( uint16_t i=0; i<imageNumbers.size(); ++i ) {
+        uint32_t imageNumber = imageNumbers[i];
+        std::shared_ptr<SubImage> simg( new SubImage(myObject, *this, cd.images, i, maxLocalShift, patchSize+maxLocalShift-1, maxLocalShift, patchSize+maxLocalShift-1) ); // TODO: fix offsets
+        subImages.push_back( simg );
+        simg->init(workspace->window);
+        std::shared_ptr<WaveFront>& wf = workspace->wavefronts[imageNumber];
+        if(!wf) cout << "Channel::initPatch(): wf = NULL for imageNumber = " << imageNumber << endl;
+        wf->addImage(simg);
+    }
+}
+
+
+void Channel::initPhiFixed(void) {
+    phi_fixed.resize(pupilPixels,pupilPixels);
+    phi_fixed.zero();
+    Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, myObject.wavelength, rotationAngle);
+    uint16_t modeNumber;
+    for( uint i = 0; i<diversityModes.size(); ++i ) {
+        Cache::ModeID id2 = id;
+        modeNumber = diversityModes[i];
+        cout << "Channel::initPhiFixed()  i=" << i << endl;
+        if(diversityTypes[i] == ZERNIKE) {
+            id2.firstMode = id2.lastMode = 0;
+        }
+        id2.modeNumber = modeNumber;
+        const PupilMode::Ptr mode = myJob.globalData->fetch(id2);
+        redux::file::Ana::write( "mode_" + to_string( modeNumber ) + "_" + to_string( i ) + ".f0", *mode );
+        phi_fixed.add(*mode, diversity[i]);
+        redux::file::Ana::write( "phi-mode_" + to_string( modeNumber ) + "_" + to_string( i ) + ".f0", phi_fixed );
+    }
+    computePhi();   // no tilts for now, just initialize once
+}
+
+
+void Channel::computePhi(void) {
+    //cout << "Channel::computePhi()" << endl;
+    phi_channel = phi_fixed;
+    static int bla(0);
+    if(diversityModes.size()) {
+        redux::file::Ana::write( "phi_" + to_string( bla++ ) + ".f0", phi_channel );
+    }
+    // TODO: add tilt corrections
+}
+
+
+void Channel::addMode(redux::util::Array<double>& phi, uint16_t modenumber, double weight) const {
+    const PupilMode::Ptr mode = modes.at(modenumber);
+   // cout << "Channel::addMode()  mode = " << modenumber << "  weight = " << weight << endl;
+ redux::file::Ana::write("mode_"+to_string(modenumber)+".f0", *mode);
+ redux::file::Ana::write("pupil.f0", pupil.first);
+      if( mode ) {
+        phi.add(*mode, weight);
+    }
+}
+
+
+void Channel::getPhi(redux::util::Array<double>& phi, const WaveFront& wf) const {
+    phi = phi_channel;
+    //return;
+    //cout << "Channel::getPhi()" << endl;
+    for( auto& it: wf.alpha ) {
+        //cout << "Channel::getPhi()  it.first = " << it.first << endl;
+        const PupilMode::Ptr mode = modes.at(it.first);
+        if( mode ) { //&& it.second.second ) { // TODO: possibility to enable/disable modes
+        //cout << "Channel::getPhi()  mode = " << hexString(mode.get()) << endl;
+            phi.add(*mode, it.second.value);
+        }
+    }
+}
+
+
+void Channel::addAllFT(redux::util::Array<double>& ftsum) {
+    for ( shared_ptr<SubImage>& it: subImages ) {
+        it->addFT(ftsum);
+    }
+}
+
+double Channel::metric(void) {
+
+  double sum = 0.0;
+//   for(shared_ptr<SubImage> &im: subImages) {
+//       for( auto& a: im->wf->alpha) {
+//           double coeff = a.second.first;
+//           sum += coeff*coeff * modes.at(a.first)->inv_atm_rms;
+//       }
+//   }
+  return sum;
+
 }
 
 
@@ -793,7 +907,7 @@ size_t Channel::sizeOfPatch(uint32_t npixels) const {
 }
 
 
-void Channel::getPatchData(ChannelData& chData, uint16_t yid, uint16_t xid) const {
+void Channel::getPatchData(ChannelData& chData, Point16 patchID) const {
    
     if( imageNumbers.empty() ) return;
     
@@ -802,7 +916,7 @@ void Channel::getPatchData(ChannelData& chData, uint16_t yid, uint16_t xid) cons
     uint16_t blockSize = patchSize + 2*maxLocalShift;
     uint16_t halfBlockSize = blockSize/2;
     
-    Point16 first(subImagePosY[yid]-halfBlockSize, subImagePosX[xid]-halfBlockSize);
+    Point16 first(subImagePosY[patchID.y]-halfBlockSize, subImagePosX[patchID.x]-halfBlockSize);
     Point16 last(first.y+blockSize-1, first.x+blockSize-1);
     
     double tmpD;

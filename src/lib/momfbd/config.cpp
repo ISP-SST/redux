@@ -125,7 +125,7 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 ChannelCfg::ChannelCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5), rotationAngle(0), noiseFudge(1), weight(1),
                            borderClip(10), maxLocalShift(5), minimumOverlap(16), incomplete(0),
-                           patchSize(128), pupilSize(64),
+                           patchSize(128), pupilPixels(64),
                            mmRow(0), mmWidth(0), imageNumberOffset(0) {
 
 }
@@ -157,17 +157,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     
     // TODO: collect diversity settings in a struct and write a translator
     string tmpString = tree.get<string>( "DIVERSITY", "" );
-    if( tmpString.empty() ) {
-        LOG_WARN << "no diversity specified (assuming zero).";
-        diversity.resize( 1, 0.0 );
-        diversityOrders.resize( 1, 4 );
-        diversityTypes.resize( 1, ZERNIKE );
-    }
-    else {
-        double tmpD;
+    diversity.clear();
+    diversityModes.clear();
+    diversityTypes.clear();
+    if( ! tmpString.empty() ) {
+        double tmpD = 1.0;
         if( tmpString.find( "mm" ) != string::npos ) tmpD = 1.00E-03;
         else if( tmpString.find( "cm" ) != string::npos ) tmpD = 1.00E-02;
-        else tmpD = 1.0;
         tmpString.erase( boost::remove_if( tmpString, boost::is_any_of( "cm\" " ) ), tmpString.end() );
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
         tmpTree.put( "tmp", tmpString );
@@ -175,24 +171,35 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         tmpString = tree.get<string>( "DIV_ORDERS", "" );
         if( tmpString.empty() ) {
             if( diversity.size() > 1 ) {
-                LOG_ERR << "multiple coefficients found but no diversity orders specified!";
-            }
-            else {
-                diversityOrders.resize( 1, 4 );
+                LOG_ERR << "Multiple diversity coefficients specified, but no orders provided!";
+            } else if( diversity.size() == 1 ) {  // A single diversity value is interpreted as (de)focus.
+                diversityModes.resize( 1, 4 );
                 diversityTypes.resize( 1,  ZERNIKE );
-                //diversity[1] = def2cf( tmpD * diversity[1], myJob.telescopeD / myJob.telescopeF );
             }
-        }
-        else {
+        } else {
             vector<string> tmp;
             boost::split( tmp, tmpString, boost::is_any_of( "," ) );
             for( auto & it : tmp ) {
-                parseSegment( diversityOrders, diversityTypes, it );
-            }
-            if( diversity.size() != diversityOrders.size() ) {
-                LOG_ERR << "number of diversity orders does not match number of diversity coefficients!";
+                parseSegment( diversityModes, diversityTypes, it );
             }
         }
+
+        if( diversity.size() == diversityModes.size() ) {
+            for(uint i=0; i<diversity.size(); ++i) {
+                if(diversityModes[i] == 4) {   // focus term, convert from physical length (including mm/cm) to coefficient
+                    diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
+                }
+            }
+        } else {
+            LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!";
+        }
+        
+        if( diversity.size() ) {
+            LOG << "Diversity: " << printArray(diversityModes, "modes")
+                << "    " << printArray(diversityTypes, "types")
+                << "    " << printArray(diversity, "values");
+        }
+        
     }
 
     alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", defaults.alignClip );
@@ -202,7 +209,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     incomplete = tree.get<bool>( "INCOMPLETE", defaults.incomplete );
     
     patchSize  = tree.get<uint16_t>("NUM_POINTS", defaults.patchSize);
-    pupilSize  = tree.get<uint16_t>("PUPIL_POINTS", defaults.pupilSize);
+    pupilPixels  = tree.get<uint16_t>("PUPIL_POINTS", defaults.pupilPixels);
     
     subImagePosX = tree.get<vector<uint16_t>>( "SIM_X", defaults.subImagePosX );
     subImagePosY = tree.get<vector<uint16_t>>( "SIM_Y", defaults.subImagePosY );
@@ -281,7 +288,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", (bool)incomplete);
 
     if(patchSize != defaults.patchSize) tree.put("NUM_POINTS", patchSize);
-    if(pupilSize != defaults.pupilSize) tree.put("PUPIL_POINTS", pupilSize);
+    if(pupilPixels != defaults.pupilPixels) tree.put("PUPIL_POINTS", pupilPixels);
     if(subImagePosX != defaults.subImagePosX) tree.put("SIM_X", subImagePosX);
     if(subImagePosY != defaults.subImagePosY) tree.put("SIM_Y", subImagePosY);
 
@@ -318,7 +325,7 @@ uint64_t ChannelCfg::size(void) const {
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
-    sz += diversityOrders.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += diversityModes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
     sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
     sz += alignClip.size()*sizeof(int16_t) + sizeof(uint64_t);
     sz += imageDataDir.length() + 1;
@@ -343,7 +350,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, noiseFudge);
     count += pack(ptr+count, weight);
     count += pack(ptr+count, diversity);
-    count += pack(ptr+count, diversityOrders);
+    count += pack(ptr+count, diversityModes);
     count += pack(ptr+count, diversityTypes);
     count += pack(ptr+count, alignClip);
     count += pack(ptr+count, borderClip);
@@ -351,7 +358,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, minimumOverlap);
     count += pack(ptr+count, incomplete);
     count += pack(ptr+count, patchSize);
-    count += pack(ptr+count, pupilSize);
+    count += pack(ptr+count, pupilPixels);
     count += pack(ptr+count, subImagePosX);
     count += pack(ptr+count, subImagePosY);
     count += pack(ptr+count, imageDataDir);
@@ -385,7 +392,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, noiseFudge, swap_endian);
     count += unpack(ptr+count, weight, swap_endian);
     count += unpack(ptr+count, diversity, swap_endian);
-    count += unpack(ptr+count, diversityOrders, swap_endian);
+    count += unpack(ptr+count, diversityModes, swap_endian);
     count += unpack(ptr+count, diversityTypes, swap_endian);
     count += unpack(ptr+count, alignClip, swap_endian);
     count += unpack(ptr+count, borderClip, swap_endian);
@@ -393,7 +400,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, minimumOverlap, swap_endian);
     count += unpack(ptr+count, incomplete);
     count += unpack(ptr+count, patchSize, swap_endian);
-    count += unpack(ptr+count, pupilSize, swap_endian);
+    count += unpack(ptr+count, pupilPixels, swap_endian);
     count += unpack(ptr+count, subImagePosX, swap_endian);
     count += unpack(ptr+count, subImagePosY, swap_endian);
     count += unpack(ptr+count, imageDataDir);
@@ -430,7 +437,7 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
            (minimumOverlap == rhs.minimumOverlap) &&
            (incomplete == rhs.incomplete) &&
            (patchSize == rhs.patchSize) &&
-           (pupilSize == rhs.pupilSize) &&
+           (pupilPixels == rhs.pupilPixels) &&
            (subImagePosX == rhs.subImagePosX) &&
            (subImagePosY == rhs.subImagePosY) &&
            (imageDataDir == rhs.imageDataDir) &&

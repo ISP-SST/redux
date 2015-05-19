@@ -21,6 +21,21 @@ const std::string thisChannel = "data";
 }
 
 
+ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
+
+}
+
+
+void ChannelData::getPatchData(Point16& id) {
+    myChannel->getPatchData(*this,id);
+}
+
+
+void ChannelData::initPatch(void) {
+    myChannel->initPatch(*this);
+}
+
+
 uint64_t ChannelData::size( void ) const {
     static uint64_t sz = offset.size() + residualOffset.size();
     return sz+images.size();
@@ -42,6 +57,30 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     count += residualOffset.unpack(ptr+count, swap_endian);
     count += images.unpack(ptr+count, swap_endian);
     return count;
+}
+
+
+ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
+
+    for( auto& it: o->getChannels() ) {
+        channels.push_back(ChannelData(it));
+    }
+
+}
+
+
+void ObjectData::getPatchData(Point16& id) {
+    for( ChannelData& ch: channels ) {
+        ch.getPatchData(id);
+    }
+}
+
+
+void ObjectData::initPatch(void) {
+    for( ChannelData& ch: channels ) {
+        ch.initPatch();
+    }
+    myObject->initPatch(*this);
 }
 
 
@@ -67,8 +106,11 @@ uint64_t ObjectData::pack( char* ptr ) const {
 uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = 0;
-    for( ChannelData& cd: channels ) {
-        count += cd.unpack( ptr+count, swap_endian );
+    channels.clear();
+    for( auto& it: myObject->getChannels() ) {
+        ChannelData chan(it);
+        count += chan.unpack( ptr+count, swap_endian );
+        channels.push_back(chan);
     }
     return count;
 }
@@ -76,8 +118,25 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
 
 PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
     
-    objects.resize(j.getObjects().size());
-    
+    for( auto& it: j.getObjects() ) {
+        objects.push_back(ObjectData(it));
+    }
+
+}
+
+
+void PatchData::getData(void) {
+    for( ObjectData& obj: objects ) {
+        obj.getPatchData(index);
+    }
+}
+
+
+void PatchData::initPatch(void) {
+    //cout << "Initializing patch # " << index << endl;
+    for( ObjectData& obj: objects ) {
+        obj.initPatch();
+    }
 }
 
 
@@ -108,17 +167,11 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = Part::unpack(ptr, swap_endian);
     count += index.unpack(ptr+count, swap_endian);
     count += pos.unpack(ptr+count, swap_endian);
-    const vector<shared_ptr<Object>>& job_obj = myJob.getObjects();
-    cout << "PatchData::unpack(): nObj = " << job_obj.size() << endl;
-    objects.resize(job_obj.size());
-    auto it = job_obj.begin();
-    for( ObjectData& objData: objects ) {
-        //ObjectData::Ptr objData(new ObjectData(obj));
-        //objects.push_back(objData);
-    cout << "PatchData::unpack(): nCh = " << (*it)->channels.size() << endl;
-        objData.channels.resize((*it)->channels.size());
-        count += objData.unpack( ptr+count, swap_endian );
-        it++;
+    objects.clear();
+    for( auto& it: myJob.getObjects() ) {
+        ObjectData obj(it);
+        count += obj.unpack( ptr+count, swap_endian );
+        objects.push_back(obj);
     }
     return count;
 }
@@ -132,9 +185,21 @@ bool PatchData::operator==(const PatchData& rhs) {
 }
 
 
-void GlobalData::fetch(const Cache::ModeID& id) {
+const pair<Array<double>, double>& GlobalData::fetch(uint16_t pupilPixels, double pupilRadiusInPixels ) {
+    //cout << "GlobalData::fetch():   pupilPixels=" << pupilPixels << "  pupilRadiusInPixels=" << pupilRadiusInPixels << endl;
+    unique_lock<mutex> lock(mtx);
+    //cout << "GlobalData::fetch2():   pupilPixels=" << pupilPixels << "  pupilRadiusInPixels=" << pupilRadiusInPixels << "  pupils.sz=" << pupils.size() << endl;
+    return pupils.emplace( make_pair(pupilPixels,pupilRadiusInPixels),
+                           Cache::getCache().pupil(pupilPixels, pupilRadiusInPixels) ).first->second;
+
+}
+
+
+const PupilMode::Ptr GlobalData::fetch(const Cache::ModeID& id) {
+//cout << " GlobalData::fetch1(mode)  id=" << id.modeNumber << endl;
+    unique_lock<mutex> lock(mtx);
     Cache& cache = Cache::getCache();
-    modes.emplace(id, cache.mode(id));
+    return modes.emplace( id, cache.mode(id) ).first->second;
 }
 
 
@@ -177,70 +242,3 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     return count;
 }
 
-
-
-
-
-
-
-
-
-ImageData::ImageData( const ObjPtr& obj, const ChPtr& ch, const redux::util::Array<float>& stack,
-                         uint32_t index, int firstY, int lastY, int firstX, int lastX )
-    : Array<float>( stack, index, index, firstY, lastY, firstX, lastX ),
-      index( index ), object( obj ), channel( ch ) {
-
-    // std::cout << "Image():  1   " << hexString(this) << std::endl;
-
-}
-
-
-ImageData::~ImageData(void) {
-
-  //  std::cout << "~Image():  1   " << hexString(this) << std::endl;
-}
-
-
-void ImageData::init( void ) {
-
-    auto dims = dimensions( true );
-    img.resize( dims );
-    for( auto& it: dims ) {
-        it *= 2;
-    }
-    SJ.resize( dims );
-
-    stats.getStats(*this, ST_VALUES);
-    string str = "Image::init():  mean=" + to_string(stats.mean);
-
-    img.zero();
-/*    Array<double>::const_iterator wit = ws.window.begin();
-    Array<float>::const_iterator dit = this->begin();
-    for( auto& iit: img ) {                     // windowing: subtract and re-add mean afterwards
-        iit = (*dit++ - stats.mean) * *wit++ + stats.mean;
-    }
-*/    
-    stats.getStats(img, ST_VALUES|ST_RMS);
-    str += "  mean2=" + to_string( stats.mean ) + "  std=" + to_string( stats.stddev );
-    
-    ft.reset( img );
-//    FourierTransform::reorder( ft );
-    stats.noise = channel->cfg->noiseFudge * ft.noise(-1,-1);       // mask/cutoff < 0 will revert to hardcoded values used by MvN
-    str += "  noise=" + to_string( stats.noise );
-    //object->addToFT( ft );
-/*    
-    redux::file::Ana::write( "windowed_" + to_string( ws.data->index.x ) + "_" + to_string( ws.data->index.y ) +
-                             "_" + to_string( index ) + ".f0", img );
-    redux::file::Ana::write( "windowedft_" + to_string( ws.data->index.x ) + "_" + to_string( ws.data->index.y ) +
-                             "_" + to_string( index ) + ".f0", ft );
-*/
-    //cout << str << endl;
-    //std::cout << "Image::init():  E  " << std::endl;
-}
-
-
-void ImageData::clear(void) {
-    object.reset();
-    channel.reset();
-    wfg.reset();
-}

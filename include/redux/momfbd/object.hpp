@@ -4,6 +4,7 @@
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/channel.hpp"
 #include "redux/momfbd/cache.hpp"
+#include "redux/momfbd/data.hpp"
 
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
@@ -46,13 +47,24 @@ namespace redux {
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };
             const MomfbdJob& getJob(void) const { return myJob; };
-            
-            void initWorkSpace( WorkSpace& ws );
         
             MomfbdJob& myJob;
             std::vector<std::shared_ptr<Channel>> channels;
             
-        private:
+            /*************   Processing on slave   ***************/
+            /*************         Methods         ***************/
+            void initProcessing(WorkSpace::Ptr);
+            void initPatch(ObjectData&);
+            void initPQ(void);
+            void addAllFT(void);
+            void addToFT(const redux::image::FourierTransform&);
+            void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>);
+            void addAllPQ(void);
+            void slask(void);
+            double metric(void);
+            /*****************************************************/
+            
+        //private:
 
             
             bool checkCfg(void);
@@ -70,6 +82,15 @@ namespace redux {
             size_t sizeOfPatch(uint32_t) const;
             
             Point16 clipImages(void);
+            
+            /*************   Processing on slave   ***************/
+            /*************     Local variables     ***************/
+            std::mutex mtx;
+            //redux::image::FourierTransform ftSum;                //! Fourier-transform of the approximate object (sum of FTs of all images)
+            redux::util::Array<double>  ftSum;                //! Sum of the norm of all images' fourier-transforms
+            redux::util::Array<double> Q;
+            redux::util::Array<complex_t> P;
+            /*****************************************************/
 
             friend class MomfbdJob;
             friend class Channel;

@@ -28,9 +28,14 @@ namespace redux {
          *  just holds the patch-specific information and the input data.
          */
                 
+        class Channel;
         struct ChannelData {
-            typedef std::shared_ptr<ChannelData> Ptr;
             
+            typedef std::shared_ptr<ChannelData> Ptr;
+            std::shared_ptr<Channel> myChannel;
+            ChannelData( std::shared_ptr<Channel> c );
+            void getPatchData(Point16&);
+            void initPatch(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -45,10 +50,14 @@ namespace redux {
             redux::util::Array<float> images;
         };
 
+        class Object;
         struct ObjectData {
             
             typedef std::shared_ptr<ObjectData> Ptr;
-            
+            std::shared_ptr<Object> myObject;
+            ObjectData( std::shared_ptr<Object> o );
+            void getPatchData(Point16&);
+            void initPatch(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -67,7 +76,8 @@ namespace redux {
             Point16 index;                      //! Patch-index in mozaic
             Point16 pos;                        //! Position of patch, coordinates in the "anchor channel"
             PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
-
+            void getData(void);
+            void initPatch(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -76,64 +86,17 @@ namespace redux {
        
         struct GlobalData : public Part {   // Used for sending e.g. modes/pupils to the slaves.
             typedef std::shared_ptr<GlobalData> Ptr;
-            std::map<std::pair<uint32_t, float>, const std::pair<redux::util::Array<double>, double>> pupils;
+            std::mutex mtx;
+            std::map<std::pair<uint32_t, float>, const std::pair<redux::util::Array<double>, double>&> pupils;
             std::map<Cache::ModeID, const PupilMode::Ptr> modes;
             GlobalData(void){ partType = PT_GLOBAL; };
-            void fetch(const Cache::ModeID&);
+            const std::pair<redux::util::Array<double>, double>& fetch(uint16_t,double);
+            const PupilMode::Ptr fetch(const Cache::ModeID&);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
         };
 
-
-        
-
-        struct WaveFrontData;
-        struct ChannelResult;
-        struct ObjectResult;
-        typedef std::shared_ptr<WaveFrontData> WfPtr;
-        typedef std::shared_ptr<ChannelResult> ChPtr;
-        typedef std::shared_ptr<ObjectResult> ObjPtr;
-        
-        struct ImageData : public redux::util::Array<float>, public std::enable_shared_from_this<ImageData> {
-            typedef std::shared_ptr<ImageData> Ptr;
-            
-            ImageData(const ObjPtr&, const ChPtr&, const redux::util::Array<float>& stack, uint32_t index, int firstY, int lastY, int firstX, int lastX);
-            ~ImageData(void);
-            
-            void init(void);
-            void setWaveFront( WfPtr wf ) { wfg = wf; };
-            void clear(void);
-            
-            Point offset;
-            // alpha (sptr)
-            // OTF
-            // imgFT
-            uint32_t index;
-            
-            ObjPtr object;
-            ChPtr channel;
-            WfPtr wfg;
-            
-            redux::util::Array<double> img;
-            redux::util::Array<complex_t> SJ;
-            redux::image::FourierTransform ft;
-            redux::image::Statistics stats;
-            
-        };
-
-
-        struct WaveFrontData : public std::enable_shared_from_this<WaveFrontData> {
-            
-            WaveFrontData(ImageData::Ptr im) { if(im) { images.push_back(im); } };
-            
-            void addImage(ImageData::Ptr im) { images.push_back(im); im->setWaveFront( shared_from_this() ); };
-            
-            std::vector<double> alpha;
-            std::vector<ImageData::Ptr> images;          // list of images sampling this wavefront
-
-        };
-        
 
         /*! @} */
 

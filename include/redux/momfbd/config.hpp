@@ -74,8 +74,8 @@ namespace redux {
             /********  Diversity  ********/
             // TODO: reorganize
             std::vector<double> diversity;
-            std::vector<uint32_t> diversityOrders;
-            std::vector<uint32_t> diversityTypes;
+            std::vector<uint32_t> diversityModes;  //!< mode numbers
+            std::vector<uint32_t> diversityTypes;   //!< mode types (Zernike/KL)
             /*****************************/
             
             /******* Data settings *******/
@@ -85,7 +85,7 @@ namespace redux {
             uint16_t minimumOverlap;                //!< Desired width of blending zone in pixels (default: 16 pixels)
             uint8_t incomplete;                     //!< Some files might not exist, just skip those.
             uint16_t patchSize;                     //!< (default: 128)
-            uint16_t pupilSize;                     //!< (default: 64)
+            uint16_t pupilPixels;                     //!< (default: 64)
             std::vector<uint16_t> subImagePosX, subImagePosY;
             /*****************************/
 
