@@ -54,9 +54,6 @@ namespace {
 
     }
 
-    void cleanupChar( unsigned char *arg ) {
-        if( arg ) delete[]( char* )arg;
-    }
 
 }
 
@@ -164,7 +161,7 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
         }
 
         // IDL type-ID = ANA type-ID + 1
-        return IDL_ImportArray( nDims, dim, header->m_Header.datyp + 1, ( UCHAR* )data, cleanupChar, NULL );
+        return IDL_ImportArray( nDims, dim, header->m_Header.datyp + 1, ( UCHAR* )data, redux::util::castAndDelete<char>, NULL );
     } catch (exception& e) {
         cout << "Failed to read Ana file: " << name << endl << "Reason: " << e.what() << endl;
         return IDL_GettmpInt(-1);    // return a dummy
@@ -244,7 +241,7 @@ void redux::fzread( int argc, IDL_VPTR* argv, char* argk ) {
         char *var_name = IDL_VarName( imageVar );
 
         // IDL type-ID = ANA type-ID + 1
-        argv[0] = IDL_ImportNamedArray( var_name, nDims, dim, header->m_Header.datyp + 1, ( UCHAR* )data, cleanupChar, NULL );
+        argv[0] = IDL_ImportNamedArray( var_name, nDims, dim, header->m_Header.datyp + 1, ( UCHAR* )data, redux::util::castAndDelete<char>, NULL );
 
         string hdrText = header->getText();
         size_t textSize = hdrText.length();
