@@ -38,12 +38,12 @@ void cfgTest( void ) {
         ccfg.telescopeF = ccfg.arcSecsPerPixel = ccfg.pixelSize = ccfg.rotationAngle = 137;
         ccfg.noiseFudge = ccfg.weight = 138;
         ccfg.diversity = {10.5,32.2};
-        ccfg.diversityOrders = {11,33};
+        ccfg.diversityModes = {11,33};
         ccfg.diversityTypes = {12,34};
         ccfg.alignClip = {13,34,14,35};
         ccfg.borderClip = ccfg.maxLocalShift = ccfg.minimumOverlap = 139;
         ccfg.incomplete = true;
-        ccfg.patchSize = ccfg.pupilSize = 140;
+        ccfg.patchSize = ccfg.pupilPixels = 140;
         ccfg.subImagePosX = {88,99,111,122};
         ccfg.subImagePosY = {89,98,112,121};
         ccfg.imageDataDir = "path/to/data/";
@@ -55,7 +55,8 @@ void cfgTest( void ) {
         ccfg.psfFile = "psfFile.ext";
         ccfg.pupilFile = "pupilfile.ext";
         ccfg.mmFile = "mmFile.ext";
-        ccfg.mmRow = ccfg.mmWidth = ccfg.imageNumberOffset = 141;
+        ccfg.mmRow = ccfg.imageNumberOffset = 141;
+        ccfg.mmWidth = 4;
         ccfg.xOffsetFile = "xOffsetFile.ext";
         ccfg.yOffsetFile = "yOffsetFile.ext";
         ccfg.imageNumbers = {23,45};
@@ -91,7 +92,7 @@ void cfgTest( void ) {
     ObjectCfg ocfg;
     {
         // Set some non-default values for ObjectCfg
-        ocfg.saveMask = ocfg.wavelength = 122;
+        ocfg.saveMask = ocfg.wavelength = 58;
         ocfg.outputFileName = "filename.ext";
         // export settings as config file and parse/compare
         tree.clear();
