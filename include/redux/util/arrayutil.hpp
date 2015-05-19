@@ -24,12 +24,13 @@ namespace redux {
          *  @param p Pointer (of any order)
          */
         //@{
-        template <class T>  void delArray( T*& p ) { delete[] p; }
+        template <class T> void delArray( T*& p ) { if(p) delete[] p; p = nullptr; }
         template <class T>
         void delArray( T**& p ) {
             delArray( *p );              // Call delArray() for the next pointer-level.
             delete[] p;                  // Delete current pointer-level.
         }
+        template <typename T, typename U> void castAndDelete( U* p ) { if(p) delete[] reinterpret_cast<T*>(p); p = nullptr; }
         //@}
 
         /*! @name delPointers
