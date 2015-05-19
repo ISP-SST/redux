@@ -1,8 +1,10 @@
 #ifndef REDUX_UTIL_ARRAY_HPP
 #define REDUX_UTIL_ARRAY_HPP
 
+#include "redux/types.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <stdexcept>
 #include <memory>
@@ -396,6 +398,14 @@ namespace redux {
                 }
             }
 
+            template <typename U>
+            void copyTo( void* data ) {
+                U* ptr = reinterpret_cast<U*>( data );
+                for( auto & it : *this ) {
+                    *ptr++ = static_cast<U>( it);
+                }
+            }
+
             template <typename U = T>
             Array<U> copy( bool skipTrivialDims=true ) const {
                 std::vector<size_t> newDimSizes = dimensions(skipTrivialDims);
@@ -407,26 +417,59 @@ namespace redux {
                 return tmp;
             }
 
+/*
+            void copy( Array<T>& arr ) const {
+                if( this == &arr ) return;     // check for self-assignment
+                if( !sameSize( arr ) ) {
+                    arr.resize( dimensions(true) );
+                    std::cout << "copy( Array<T>& arr ) Resizing to " <<  printArray(dimensions(true)," nds") << std::endl;
+                } else std::cout << "copy( Array<T>& arr ) NO RESIZE !!!!   " << nElements_ << " vs " << arr.nElements_ << std::endl;
+                std::cout << "copy( Array<T>& arr )    " << printArray(currentSizes," cs") << printArray(arr.dimensions()," cs") << std::endl;
+                const_iterator cit = begin();
+                for( auto & it : arr ) {
+                    it = *cit;
+                    ++cit;
+                }
+                //std::cout << "copy( Array<U>& arr ) END" << printArray(currentSizes," cs") << printArray(arr.dimensions()," cs") << std::endl;
+            }
+*/
+
+
             template <typename U>
+            void copy( Array<U>& out ) const {
+                if( !sameSizes( out ) ) out.resize( currentSizes );
+                const_iterator cit = begin();
+                for( auto & it : out ) it = *cit++; // static_cast<U>( *cit++ );
+            }
+
+
+/*            template <typename U>
             void copy( Array<U>& arr ) const {
                 if( this == reinterpret_cast<Array<T>*>(&arr) ) return;     // check for self-assignment
-                if( !sameSize( arr ) ) {
-                    std::vector<size_t> newDimSizes;
-                    for( auto & it : currentSizes ) {
-                        if( it > 1 ) {
-                            newDimSizes.push_back( it );
-                        }
-                    }
-                    arr.resize( newDimSizes );
+                if( !sameSizes( arr ) ) {   // BUG: segfault sometimes when calling Array<double>::copy(Array<float>&), fix this asap !!!
+//                     std::vector<size_t> newDimSizes;
+//                     for( auto & it : currentSizes ) {
+//                         if( it > 1 ) {
+//                             newDimSizes.push_back( it );
+//                         }
+//                     }
+//                     arr.resize( newDimSizes );
+                    arr.resize( dimensions(true) );
+//                    std::cout << "copy( Array<U>& arr ) Resizing to " <<  printArray(dimensions(true)," nds") << std::endl;
+                } else {
+                    std::cout << "copy( Array<U>& arr ) NO RESIZE !!!!   " << nElements_ << " vs " << arr.nElements_ << std::endl;
+                    std::cout << "copy( Array<U>& arr )    " << printArray(currentSizes," cs") << printArray(arr.dimensions()," cs") << std::endl;
                 }
                 const_iterator cit = begin();
                 for( auto & it : arr ) {
-                    it = static_cast<U>( *cit );
+                    //if ( cit < end() ) {
+                        it = static_cast<U>( *cit );
+                    //} else std::cout << "copy( Array<U> ) BLA cit is OOB" << std::endl;
                     ++cit;
                 }
-
+                //std::cout << "copy( Array<U>& arr ) END" << printArray(currentSizes," cs") << printArray(arr.dimensions()," cs") << std::endl;
             }
-            
+*/            
             Array<T>& trim( bool skipTrivialDims=true ) {
                 Array<T> tmp = copy(skipTrivialDims);
                 *this = tmp;
@@ -497,6 +540,7 @@ namespace redux {
             void set( const std::vector<T>& values ) {
                 if( values.size() == nElements_ ) {
                     T* ptr = datablock.get();
+                    // TODO: for dense arrays do: memcpy(datablock.get(),values.data(),nElements_*sizeof(T));
                     for( auto & i : values ) {
                         *ptr++ = i;
                     }
@@ -637,9 +681,33 @@ namespace redux {
                 }
                 return *this;
             }
+/*
+            const Array<T>& operator=( const Array<T>& rhs ) {
+                std::cout << "operator=( const Array<T>& rhs )" << std::endl;
+                if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
+                if(currentSizes == rhs.currentSizes) {
+                    std::cout << "operator=( const Array<T>& rhs )      using memcpy" << std::endl;
+                    memcpy(datablock.get(),rhs.datablock.get(),dataSize*sizeof(T));
+                } else {
+                    typename Array<T>::const_iterator rhsit = rhs.begin();
+                    std::cout << "operator=( const Array<T>& rhs )      using slowcpy" << std::endl;
+                    for( auto & it : *this ) it = *rhsit++;
+                }
+                return *this;
+            }
+*/
 
-            
-            
+/*            const Array<T>& operator=( const Array<T>& rhs ) {
+                if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
+                if( rhs.dense_) {
+                    memcpy(ptr(),rhs.ptr(),dataSize);
+                    return *this;
+                }
+                typename Array<T>::const_iterator rhsit = rhs.begin();
+                for( auto & it : *this ) it = *rhsit++;
+                return *this;
+            }
+*/
             template <typename U>
             const Array<T>& operator=( const Array<U>& rhs ) {
                 if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
@@ -795,14 +863,20 @@ namespace redux {
             }
             template <typename U>
             void setLimits( const std::vector<U>& limits ) {
-                if( limits.size() != 2*nDims_ )  {  // odd number of indices, or too many indices
-                    throw std::logic_error("Array::setLimits: Dimensions does not match.");
-                }
                 std::vector<U> first(nDims_);
                 std::vector<U> last(nDims_);
-                for( size_t i = 0; i < nDims_; ++i ) {
-                    last[i] = limits[2 * i + 1];
-                    first[i] = limits[2 * i];
+                if( limits.size() == nDims_ ) {
+                    for( size_t i = 0; i < nDims_; ++i ) {
+                        last[i] = dimFirst[i]+limits[i]-1;
+                        first[i] = dimFirst[i];
+                    }
+                } else if (limits.size() == 2*nDims_) {
+                    for( size_t i = 0; i < nDims_; ++i ) {
+                        last[i] = limits[2 * i + 1];
+                        first[i] = limits[2 * i];
+                    }
+                } else {  // odd number of indices, or too many indices
+                    throw std::logic_error("Array::setLimits: Dimensions does not match.");
                 }
                 setLimits(first,last);
             }
@@ -961,6 +1035,23 @@ namespace redux {
             friend class iterator;
 
         };
+    
+        template <> template <>
+        inline const Array<double>& Array<double>::operator=( const Array<redux::complex_t>& rhs ) {
+            if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
+            typename Array<redux::complex_t>::const_iterator rhsit = rhs.begin();
+            for( auto & it : *this ) it = (*rhsit++).real();
+            return *this;
+        }
+
+        template <> template <>
+        inline const Array<float>& Array<float>::operator=( const Array<redux::complex_t>& rhs ) {
+            if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
+            typename Array<redux::complex_t>::const_iterator rhsit = rhs.begin();
+            for( auto & it : *this ) it = (*rhsit++).real();
+            return *this;
+        }
+
 
 
         /*! @} */
