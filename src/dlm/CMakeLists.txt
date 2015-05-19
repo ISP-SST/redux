@@ -1,5 +1,5 @@
 USE_REDUX("")
-USE_EXTERNAL(idl)
+USE_EXTERNAL(idl fftw3)
 
 
 if (DEFINED IDL_FOUND)
@@ -41,12 +41,14 @@ if (DEFINED IDL_FOUND)
     configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")
     
     
-    add_library(rdx SHARED rdx.cpp
-                           #${RDX_SRC}/util/stringutil.cpp
+    add_library(rdx MODULE rdx.cpp
+                           ${RDX_SRC}/image/fouriertransform.cpp
+                           ${RDX_SRC}/image/statistics.cpp
                )
     SET(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
-    
+    #add_dependencies(rdx fftw3 fftw3_threads)
+    target_link_libraries (rdx fftw3 fftw3_threads)
     
     install(TARGETS ana momfbd rdx DESTINATION ${IDL_DLM_DIR} )
     install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${RDX_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )

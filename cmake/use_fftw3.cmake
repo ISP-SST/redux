@@ -4,7 +4,7 @@
 
 set( EXT_NAME "FFTW3" )
 
-set( EXT_COMPONENTS fftw3 )
+set( EXT_COMPONENTS fftw3 fftw3_threads )
 
 if(WIN32)
     set (EXT_HINT "${THIRDPARTY_DIR}/vendor/fftw3/3.3.3")
