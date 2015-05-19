@@ -32,7 +32,7 @@ namespace redux {
             }
 
             template <typename U>
-            const Image<T>& operator+=( const Image<U> rhs ) {
+            const Image<T>& operator+=( const Image<U>& rhs ) {
                 redux::util::Array<T>::operator+=( rhs );
                 nFrames += rhs.nFrames;
                 return *this;
