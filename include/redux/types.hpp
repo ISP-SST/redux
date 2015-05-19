@@ -70,9 +70,9 @@ namespace redux {
                 count += last.unpack(ptr+count,swap_endian);
                 return count;
             }
-            template <typename U> bool operator==(const RegionType<U>& rhs) const { return (first == rhs.first && first == rhs.first); }
+            template <typename U> bool operator==(const RegionType<U>& rhs) const { return (first == rhs.first && last == rhs.last); }
             template <typename U> bool operator!=(const RegionType<U>& rhs) const { return !(*this == rhs); }
-            template <typename U> bool operator<(const RegionType<U>& rhs) const { if (first==rhs.first) return (first < rhs.first); return (first < rhs.first); }
+            template <typename U> bool operator<(const RegionType<U>& rhs) const { if (first==rhs.first) return (last < rhs.last); return (first < rhs.first); }
             PointType<T> first,last;
         };
         typedef RegionType<double> RegionD;
