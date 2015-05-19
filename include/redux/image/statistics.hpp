@@ -14,7 +14,8 @@ namespace redux {
         struct Statistics {
             typedef std::shared_ptr<Statistics> Ptr;
 
-            Statistics() : clip(-1), cutoff(-1) {}
+            Statistics() : clip(-1), cutoff(-1), min(0), max(0), median(0),
+                           mean(0), rms(0), stddev(0), noise(0), noiseRMS(0), noiseType(0) {}
             template <typename T> void getMinMaxMean(const redux::util::Array<T>& data);
             template <typename T> void getRmsStddev(const redux::util::Array<T>& data, double mean);
             template <typename T> void getNoise(const redux::util::Array<T>& data);
@@ -30,7 +31,7 @@ namespace redux {
             int clip;
             double cutoff;
             double min, max, median;
-            double mean, rms, stddev;
+            double sum, mean, rms, stddev;
             double noise, noiseRMS;
             uint8_t noiseType;              // flag indicating noise statistics (not used atm.)
 

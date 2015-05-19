@@ -12,11 +12,11 @@ using namespace redux::util;
 using namespace std;
 
 template <typename T>
-void redux::image::Statistics::getMinMaxMean(const redux::util::Array<T>& data) {
+void redux::image::Statistics::getMinMaxMean(const Array<T>& data) {
     
     min = std::numeric_limits<double>::max();
     max = std::numeric_limits<double>::lowest();
-    double sum = 0;
+    sum = 0;
     size_t nElements = data.nElements();
     for( auto & it : data ) {
         if( it > max ) max = it;
@@ -26,10 +26,14 @@ void redux::image::Statistics::getMinMaxMean(const redux::util::Array<T>& data) 
     mean = sum / nElements;
     
 }
+template void redux::image::Statistics::getMinMaxMean( const Array<float>& );
+template void redux::image::Statistics::getMinMaxMean( const Array<double>& );
+template void redux::image::Statistics::getMinMaxMean( const Array<int16_t>& );
+template void redux::image::Statistics::getMinMaxMean( const Array<int32_t>& );
 
            
 template <typename T>
-void redux::image::Statistics::getRmsStddev(const redux::util::Array<T>& data, double mean) {
+void redux::image::Statistics::getRmsStddev(const Array<T>& data, double mean) {
     size_t nElements = data.nElements();
     if(nElements > 1) {
         rms = stddev = 0;
@@ -53,7 +57,7 @@ void redux::image::Statistics::getNoise(const redux::image::FourierTransform& ft
 
        
 template <typename T>
-void redux::image::Statistics::getNoise(const redux::util::Array<T>& data) {
+void redux::image::Statistics::getNoise(const Array<T>& data) {
     Array<T> tmpImage = data.copy();            // make a deep copy because "apodize" is destructive.
     apodize( tmpImage, 8 );                     // edge smoothing to reduce the FFT boundary-artifacts
     FourierTransform ft( tmpImage, FT_NORMALIZE );
@@ -121,12 +125,12 @@ template void redux::image::Statistics::getStats( uint32_t, const Array<int32_t>
             int clip;
             double cutoff;
             double min, max, median;
-            double mean, rms, stddev;
+            double sum, mean, rms, stddev;
             double noise, noiseRMS;
             uint8_t noiseType;              // flag indicating noise statistics (not used atm.)
 */
 size_t redux::image::Statistics::size( void ) {
-    return 1 + sizeof(int) + 9*sizeof(double);
+    return 1 + sizeof(int) + 10*sizeof(double);
 }
 
 
@@ -138,6 +142,7 @@ uint64_t redux::image::Statistics::pack( char* ptr ) const {
     count += pack(ptr+count, min);
     count += pack(ptr+count, max);
     count += pack(ptr+count, median);
+    count += pack(ptr+count, sum);
     count += pack(ptr+count, mean);
     count += pack(ptr+count, rms);
     count += pack(ptr+count, stddev);
@@ -155,6 +160,7 @@ uint64_t redux::image::Statistics::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count, min, swap_endian);
     count += unpack(ptr+count, max, swap_endian);
     count += unpack(ptr+count, median, swap_endian);
+    count += unpack(ptr+count, sum, swap_endian);
     count += unpack(ptr+count, mean, swap_endian);
     count += unpack(ptr+count, rms, swap_endian);
     count += unpack(ptr+count, stddev, swap_endian);
