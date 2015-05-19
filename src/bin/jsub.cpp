@@ -108,7 +108,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     char* ptr = buf.get();
     uint64_t packedBytes = pack(ptr,CMD_ADD_JOB);
     packedBytes += pack(ptr+packedBytes,sz);
-         LOG << "uploadJobs(5)  packedBytes = " << packedBytes;
+
     sz += sizeof(size_t)+1;
     for( auto &it: jobs ) {
         packedBytes += it->pack(ptr+packedBytes);
@@ -130,12 +130,10 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     size_t count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(size_t) ) );
     if( count == sizeof(size_t) ) {
         unpack(ptr, idSize);     // TBD: server swaps now, should the receiver always swap ?
-        count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, (idSize)*sizeof(size_t) ) );
-        if( count != sz ) {
-            LOG << "Upload of " << idSize << " jobs completed successfully";
-            if( idSize ) {
-                LOG << printArray(reinterpret_cast<size_t*>(buf.get()),idSize,"Job IDs ");
-            }
+        sz = idSize*sizeof(size_t);
+        count = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sz ) );
+        if( count == sz ) {
+            LOG << "Upload of " << idSize << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),idSize,"IDs");
         } else {
             LOG_ERR << "Failed to read job IDs.";
             return;
