@@ -4,6 +4,7 @@
 
 #include "redux/momfbd/data.hpp"
 #include "redux/momfbd/result.hpp"
+#include "redux/momfbd/wavefront.hpp"
 
 #include <memory>
 
@@ -20,29 +21,36 @@ namespace redux {
         
          /*! Container used during processing. Basically temporary arrays and reorganized references to original data.
          */
-        struct WorkSpace {
+        struct WorkSpace : public std::enable_shared_from_this<WorkSpace> {
             
             typedef std::shared_ptr<WorkSpace> Ptr;
             
-            std::vector<ObjPtr> objects;
-            std::map<uint32_t, WfPtr> wavefronts;           //! Constrained groups, using imageNumber/wf_num as identifier.
+            const std::vector<std::shared_ptr<Object>>& objects;
+            std::map<uint32_t, std::shared_ptr<WaveFront>> wavefronts;                  //!< Constrained groups, using imageNumber/wf_num as identifier.
+            WaveFront::alpha_map alpha_init;                                            //!< Default values for wavefront coefficients.
             
             WorkSpace(const redux::momfbd::MomfbdJob&);
             ~WorkSpace();
             
+            void init(void);
+            
             void run(PatchData::Ptr, boost::asio::io_service&, uint8_t nThreads);
+            
+            double coefficientMetric(boost::asio::io_service&);
+            double objectMetric(boost::asio::io_service&);
+           
+            
             void clear(void);
+            void resetAlpha(void);
             PatchResult::Ptr& getResult(void);
             
             PatchData::Ptr data;
             PatchResult::Ptr result;
             
-            const MomfbdJob& cfg;
+            const MomfbdJob& job;
             
-            redux::util::Array<PupilMode::Ptr> modes;
-            redux::util::Array<double> window,noiseWindow;
-            redux::util::Array<complex_t> imgFTs;               //! Stack of Fourier-transforms of input-images ([nTotalImages][pupilSize][pupilSize])
-            redux::util::Array<complex_t> objFT;                //! Fourier-transforms of the approximate object ([pupilSize][pupilSize])
+            redux::util::Array<double> window, noiseWindow;
+
         };
 
         /*! @} */
