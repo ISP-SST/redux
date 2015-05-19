@@ -79,7 +79,7 @@ set(THIRDPARTY_DIR "${THIRDPARTY_DIR}" CACHE PATH "Path to thirdparty software."
 
 get_filename_component(REDUX_DIR ${REDUX_DIR} REALPATH)
 
-option(REDUX_SKIP_GUI "Should the gui/QT parts be skipped?" OFF)
+option(REDUX_SKIP_GUI "Should the gui/QT parts be skipped?" ON)
 option(REDUX_AUTO_REVISION "Automatically run the revision script on each build ?" ON)
 
 # Try to find cppcheck
