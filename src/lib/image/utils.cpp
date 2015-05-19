@@ -165,16 +165,16 @@ double redux::image::makePupil( util::Array<double>& aperture, uint32_t nPoints,
 }
 
 
-double redux::image::makePupil_mvn( double** pupil, uint32_t nph, float r_c ) {
-    
+double redux::image::makePupil_mvn( double** pupil, int nph, float r_c ) {
+
     double area = 0.0;
-    memset(*pupil,0,(nph+1)*(nph+1)*sizeof(double));
-    int xo = 1 + nph / 2, yo = 1 + nph / 2;
+    memset(*pupil,0,nph*nph*sizeof(double));
+    int xo = nph / 2, yo = nph / 2;
     double dx = 0.5 / r_c, dy = 0.5 / r_c;
-    for(uint x = 1; x <= nph; ++x) {
+    for(int x = 0; x < nph; ++x) {
         double xl = fabs((double)(x - xo)) / r_c - dx, xh = fabs((double)(x - xo)) / r_c + dx;
         double xhs = sqr(xh);
-        for(uint y = 1; y <= nph; ++y) {
+        for(int y = 0; y < nph; ++y) {
             double yl = fabs((double)(y - yo)) / r_c - dy, yh = fabs((double)(y - yo)) / r_c + dy;
             double yhs = sqr(yh);
             double rsl = sqr(xl) + sqr(yl), rsh = xhs + yhs;
@@ -186,7 +186,7 @@ double redux::image::makePupil_mvn( double** pupil, uint32_t nph, float r_c ) {
                     double x2 = sqrt(max(1.0 - yhs, (double)0.0));
                     double y3 = sqrt(max(1.0 - xhs, (double)0.0));
                     double f = (xh > yh) ? (yh - yl) * (min(xh, max(xl, x2)) - xl) / (4 * dx * dy) :
-                             (xh - xl) * (min(yh, max(yl, y3)) - yl) / (4 * dx * dy);
+                               (xh - xl) * (min(yh, max(yl, y3)) - yl) / (4 * dx * dy);
                     pupil[x][y] = f;
                 }
                 area += pupil[x][y];
@@ -196,7 +196,7 @@ double redux::image::makePupil_mvn( double** pupil, uint32_t nph, float r_c ) {
     }
 
     return area;
-    
+
 }
 
 

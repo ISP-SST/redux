@@ -12,7 +12,7 @@ using namespace std;
 
 
 #ifdef DEBUG_
-#define DBG_NET_
+//#define DBG_NET_
 #endif
 
 #define lg Logger::mlg

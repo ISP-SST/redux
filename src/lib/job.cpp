@@ -17,7 +17,7 @@ using namespace std;
 
 
 #ifdef DEBUG_
-#define DBG_JOB_
+//#define DBG_JOB_
 #endif
 
 #define lg Logger::lg

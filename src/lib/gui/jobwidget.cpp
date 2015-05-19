@@ -467,7 +467,7 @@ void JobWidget::removeHost( void ) {
     QModelIndexList selection = peerTree->selectedIndexes();
     vector<uint> indices;
     uint j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); i++ ) {
+    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); ++i ) {
         if( i->column() != 0 ) continue;
         j = i->row();
         cout << "selected row = " << j << endl;
@@ -527,7 +527,7 @@ void JobWidget::moveJobUp( void ) {
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); i++ ) {
+    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); ++i ) {
         if( i->column() != 0 ) continue;
         j = i->row();
         if( i->parent().flags() ) j++;
@@ -551,7 +551,7 @@ void JobWidget::moveJobDown( void ) {
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); i++ ) {
+    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); ++i ) {
         if( i->column() != 0 ) continue;
         j = i->row();
         if( i->parent().flags() ) j++;
@@ -577,7 +577,7 @@ void JobWidget::removeJob( void ) {
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<uint> indices;
     uint j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); i++ ) {
+    for( QList<QModelIndex>::iterator i = selection.begin(); i < selection.end(); ++i ) {
         if( i->column() != 0 ) continue;
         j = i->row();
         if( i->parent().flags() ) j++;

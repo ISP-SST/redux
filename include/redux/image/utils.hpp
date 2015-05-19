@@ -32,7 +32,7 @@ namespace redux {
         };
         
         double makePupil( util::Array<double>& aperture, uint32_t nPoints, float radius, bool normalize=false);
-        double makePupil_mvn( double** data, uint32_t nPoints, float radius );
+        double makePupil_mvn( double** data, int nPoints, float radius );
 
         template <typename T>
         void reverseX( T** data, size_t sizeY, size_t sizeX ) {

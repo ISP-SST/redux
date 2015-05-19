@@ -465,7 +465,7 @@ void DebugJob::postProcess( void ) {
 
         for( uint32_t ix = 0; ix < sizeX; ++ix ) {
             for( uint32_t iy = 0; iy < sizeY; ++iy ) {
-                size_t tmp = res[iy][ix];
+                int64_t tmp = res[iy][ix];
 
                 if( tmp < 0 ) {
                     img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;

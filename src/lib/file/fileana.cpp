@@ -218,10 +218,11 @@ void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nEleme
         throw ios_base::failure( "Ana::readCompressed(): Failed to read the specified number of bytes." );
     }
 
-    int nBlocks = hdr->m_CompressedHeader.nblocks;
+    uint32_t nBlocks = hdr->m_CompressedHeader.nblocks;
+    uint32_t blockSize = hdr->m_CompressedHeader.bsize;
     // fix a possible problem with chdr.nblocks
-    if( hdr->m_CompressedHeader.bsize * hdr->m_CompressedHeader.nblocks > nElements ) {
-        nBlocks = static_cast<uint32_t>( nElements / hdr->m_CompressedHeader.bsize );
+    if( blockSize * nBlocks > nElements ) {
+        nBlocks = static_cast<uint32_t>( nElements / blockSize );
     }
 
     // consistency check
@@ -229,8 +230,7 @@ void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nEleme
         throw logic_error( "Ana::readCompressed(): type-mismatch between primary and compressed headers." );
     }
 
-    int slice = hdr->m_CompressedHeader.slice_size;
-    int blockSize = hdr->m_CompressedHeader.bsize;
+    uint8_t slice = hdr->m_CompressedHeader.slice_size;
 
     switch( hdr->m_CompressedHeader.type ) {
         case( 0 ):
