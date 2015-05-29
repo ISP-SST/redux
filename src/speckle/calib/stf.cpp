@@ -189,7 +189,8 @@ int main (int argc, char *argv[]) {
             eff.resize(sz);
             MPI_Bcast (eff.data(), sz, MPI_FLOAT, 0, MPI_COMM_WORLD);
             init_wam_slave (eff);
-
+static ZernikeData& zd = ZernikeData::get();
+zd.init(eff);
             // initialise Zernike matrix if necessary
             init_zernike();
 
