@@ -58,7 +58,7 @@ namespace redux {
         };
 
         void noll_to_nm (int i, int& n, int& m);
-        double calcZernikeCovariance (int i, int j);
+        double calcZernikeCovariance (uint32_t i, uint32_t j);
         void calcRadialZernike(double* out, uint32_t nPoints, uint16_t n, uint16_t abs_m);
         void init_zernike (void);
         double zernrad (double r, int n, int l);

@@ -34,9 +34,19 @@ using namespace std;
 
 namespace {     // Anonymuous namespace -> only visible from this compilation unit (.cpp file)
 
-    const double pi_15 (1.5 * M_PI);
-    const double pi_2 (2.0 * M_PI);
-    const double pi_2_inv (1.0 / pi_2);
+    // pre-calculate some constants used in this file
+    const long double pi_15 (1.5L * M_PI);
+    const long double pi_2 (2.0L * M_PI);
+    const long double pi_2_inv (1.0L / pi_2);
+    
+    const long double five_thirds (5.0L / 3.0L);
+    const long double eight_thirds (8.0L / 3.0L);
+    const long double fourteen_thirds (14.0L / 3.0L);
+    const long double seventeen_thirds (17.0L / 3.0L);
+    const long double twentythree_thirds (23.0L / 3.0L);
+    const long double six_fifths (6.0L / 5.0L);
+    const long double five_sixths (5.0L / 6.0L);
+    const long double eleven_sixths (11.0L / 6.0L);
 
     const double stepr_inv (RADIAL_SAMPLES - 1);
     const double stepr (1.0 / stepr_inv);
@@ -91,30 +101,30 @@ void redux::speckle::noll_to_nm (int i, int& n, int& m) {
 
 
 
-double redux::speckle::calcZernikeCovariance (int i, int j) {
+double redux::speckle::calcZernikeCovariance (uint32_t i1, uint32_t i2) {
 
-    if ( (i < 1) || (j < 1)) return 0.0;
+    if ( (i1 < 1) || (i2 < 1)) return 0.0;
 
-    int m, n, o, p;
-    noll_to_nm (i, n, m);
-    noll_to_nm (j, p, o);
+    int32_t n1, n2, m1, m2, isign;;
+    noll_to_nm (i1, n1, m1);
+    noll_to_nm (i2, n2, m2);
 
-    if (m != o) return 0.0;                         // only the same azimuthal order is non-zero.
-
-    if (m && (i + j) % 2) return 0.0;               // only sine-sine or cosine-cosine is non-zero (or m=0 => only radial component)
+    if (m1 != m2) return 0.0;                          // only the same azimuthal order is non-zero.
+    if (m1 && (i1 + i2) % 2) return 0.0;               // only sine-sine or cosine-cosine is non-zero (or m=0 => only radial component)
 
     //  ; Now deal with the numerical terms: Dai
-    int isign;
-    static double kk = pow (4.8 * exp (lgamma_r (6.0 / 5.0, &isign)), 5.0 / 6.0) *
-                       exp (lgamma_r (14.0 / 3.0, &isign) + 2.0 * lgamma_r (11.0 / 6.0, &isign)) / (pow (2.0, (8.0 / 3.0)) * M_PI);
-    double k = kk * sqrt ( (double) ( (n + 1) * (p + 1)));
+    // pre-calculate kk and store as static. (i.e. only initialized/computed once)
+    static long double kk = pow(4.8L * exp (lgamma_r (six_fifths, &isign)), five_sixths) *
+                       exp (lgamma_r (fourteen_thirds, &isign) + 2.0L * lgamma_r (eleven_sixths, &isign)) /
+                       (pow (2.0L, (eight_thirds)) * M_PI);
+    long double k = kk * sqrt( static_cast<long double>( (n1 + 1) * (n2 + 1)));
 
-    double g1 = lgamma_r ( ( (double) (n + p) -  5.0 / 3.0) / 2.0, &isign);
-    double g2 = lgamma_r ( ( (double) (n - p) + 17.0 / 3.0) / 2.0, &isign);
-    double g3 = lgamma_r ( ( (double) (p - n) + 17.0 / 3.0) / 2.0, &isign);
-    double g4 = lgamma_r ( ( (double) (n + p) + 23.0 / 3.0) / 2.0, &isign);
+    long double g1 = lgamma_r ( ( static_cast<long double>(n1 + n2) - five_thirds) / 2.0L, &isign);
+    long double g2 = lgamma_r ( ( static_cast<long double>(n1 - n2) + seventeen_thirds) / 2.0L, &isign);
+    long double g3 = lgamma_r ( ( static_cast<long double>(n2 - n1) + seventeen_thirds) / 2.0L, &isign);
+    long double g4 = lgamma_r ( ( static_cast<long double>(n1 + n2) + twentythree_thirds) / 2.0L, &isign);
 
-    isign = ( ( (n + p - 2 * m) / 2) % 2) ? -1 : +1;
+    isign = ( ( (n1 + n2 - 2 * m1) / 2) % 2) ? -1 : +1;
 
     return k * exp (g1 - g2 - g3 - g4) * isign;
 
