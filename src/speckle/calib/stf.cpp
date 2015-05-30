@@ -2,8 +2,6 @@
 #include "wam.hpp"
 #include "zernike.hpp"
 
-#include <string>
-
 #include <mpi.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_monte.h>
@@ -22,6 +20,9 @@ int main (int argc, char *argv[]) {
     // parameters
     double params[4];
     vector<float> eff;
+    
+    // Initialize the (singleton) container.
+    ZernikeData& zd = ZernikeData::get();
     
     // result variables
     double *result;
@@ -69,13 +70,13 @@ int main (int argc, char *argv[]) {
         // get memory
         result = (double *) malloc (7 * SPECKLE_FREQSTEPS * sizeof (double));
 
-        // initialise efficency factors
-        eff = init_wam_master (argv[5]);
+        // initialize using provided efficency file
+        eff = zd.init(argv[5]);
         int sz = eff.size();
         string effString = "eff=[";
         for(int i=0; i<sz; ++i) {
             if(i) effString += " ,";
-            effString += to_string(eff[i]);
+            effString += to_string((long double)eff[i]);
         }
         effString += "]";
         MPI_Bcast (&sz, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -188,16 +189,11 @@ int main (int argc, char *argv[]) {
 
             eff.resize(sz);
             MPI_Bcast (eff.data(), sz, MPI_FLOAT, 0, MPI_COMM_WORLD);
-            init_wam_slave (eff);
-static ZernikeData& zd = ZernikeData::get();
-zd.init(eff);
-            // initialise Zernike matrix if necessary
-            init_zernike();
+            zd.init(eff);
 
             // begin computation
             while (1) {
                 // receive the parameters from master
-            //boost::timer::auto_cpu_timer timer;
                 MPI_Recv (params, 4, MPI_DOUBLE, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status);
 
                 // break, if tag says NOGO

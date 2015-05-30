@@ -1,6 +1,6 @@
 
-USE_REDUX(redux)    # includes listed thirdparty dependencies and sets up paths etc.
-USE_EXTERNAL(openmpi)
+USE_REDUX("")
+USE_EXTERNAL(openmpi gsl)
 
 SET(MPI_CFLAGS "-DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DUSE_STDARG=1 -DMALLOC_RET_VOID=1")
 
