@@ -1,7 +1,6 @@
 #include "zernike.hpp"
 
 #include "defs.hpp"
-#include "atmcov.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -44,41 +43,32 @@ namespace {     // Anonymuous namespace -> only visible from this compilation un
     const double stepphi (2 * M_PI / (ANGULAR_SAMPLES - 1));
     const double stepphi_inv (1.0 / stepphi);
 
-    double rz[ (SPECKLE_IMAX + 1)][RADIAL_SAMPLES];
-    double cs[ANGULAR_SAMPLES];
+    double zernikeRadialValues[ (SPECKLE_IMAX + 1)][RADIAL_SAMPLES];
+    double cosineValues[ANGULAR_SAMPLES];
 
     bool doInit (true);
 
 
     /*
-     *      fak: compute k! recursively
+     *      factorial: compute k! recursively
      */
-    long double fak (uint32_t k) {
-
+    long double factorial(uint32_t k) {
         static vector<long double> factorials;
-
         uint32_t fsz = factorials.size();
-
         if (fsz <= k) {
             factorials.resize (k + 1, 1);
-
             for (uint32_t i = std::max (fsz, 1U); i <= k; ++i) factorials[i] = i * factorials[i - 1];
         }
-
         return factorials[k];
-
     }
 
     int initAngular (void) {
         for (int i = 0; i < ANGULAR_SAMPLES; ++i) {
-            cs[i] = cos (i * stepphi);
+            cosineValues[i] = cos (i * stepphi);
         }
-
         return 0;
     }
 
-
-    size_t dataCount (0);
 }
 
 
@@ -133,13 +123,10 @@ double redux::speckle::calcZernikeCovariance (int i, int j) {
 
 void redux::speckle::calcRadialZernike (double* out, uint32_t nPoints, uint16_t n, uint16_t abs_m) {
 
-    // cout << "calcRadialZernike()   nPoints = " << nPoints << "  n = " << n << "  abs_m = " << abs_m << endl;
-
     long double step = 1.0L / static_cast<long double> (nPoints - 1);
 
     if (n == 0) {
         for (uint32_t i = 0; i < nPoints; ++i) out[i] = 1;
-
         return;
     } else if (n == 1) {
         for (uint32_t i = 0; i < nPoints; ++i) out[i] = i * step;
@@ -159,10 +146,8 @@ void redux::speckle::calcRadialZernike (double* out, uint32_t nPoints, uint16_t 
     vector<long double> coeff (nmm + 1);
 
     for (int32_t s = 0, pm = -1; s <= nmm; ++s) {
-        coeff[s] = (double) ( (pm *= -1) * fak (n - s)) / (fak (s) * fak (npm - s) * fak (nmm - s))*sqrt ( (double) (n + 1));
+        coeff[s] = (double) ( (pm *= -1) * factorial (n - s)) / (factorial (s) * factorial (npm - s) * factorial (nmm - s))*sqrt ( (double) (n + 1));
     }
-// * sqrt ( (double) (n + 1));
-//    std::reverse (coeff.begin(), coeff.end());      // reverse so that coeff[0] is the coefficient for r^n
 
     memset (out, 0, nPoints * sizeof (double));
 
@@ -182,8 +167,8 @@ void redux::speckle::calcRadialZernike (double* out, uint32_t nPoints, uint16_t 
 }
 
 
-// TODO: test accuracy of samplings and pick some smart size...
-uint32_t selectSampling (uint16_t n) {
+// TODO: test accuracy of samplings and pick some smart sizes...
+uint32_t selectSampling (uint32_t n) {
 //     if(n<2) return 2;
 //     if(n<4) return 2000;
 //     if(n<8) return 20000;
@@ -193,22 +178,24 @@ uint32_t selectSampling (uint16_t n) {
 }
 
 
-ZernikeData::ZernikeData::cov_t::cov_t (uint16_t n1_in, uint16_t n2_in, int32_t m_in, double cov_in) :
+ZernikeData::ZernikeData::cov_t::cov_t (uint32_t n1_in, uint32_t n2_in, int32_t m_in, double cov_in) :
     n1 (max (n1_in, n2_in)), n2 (min (n1_in, n2_in)), m (m_in), cov (cov_in) {
     sampling1 = selectSampling (n1);
     sampling2 = selectSampling (n2);
 }
 
+void ZernikeData::ZernikeData::cov_t::swap (void) {
+    std::swap(n1,n2);
+    std::swap(sampling1,sampling1);
+}
 
 bool ZernikeData::ZernikeData::cov_t::operator< (const cov_t& rhs) const {
     if (m == rhs.m) {
         if (n1 == rhs.n1) {
             return (n2 < rhs.n2);
         }
-
         return (n1 < rhs.n1);
     }
-
     return (m < rhs.m);
 }
 
@@ -218,10 +205,8 @@ bool ZernikeData::ZernikeData::data_index::operator< (const data_index& rhs) con
         if (abs_m == rhs.abs_m) {
             return (sampling < rhs.sampling);
         }
-
         return (abs_m < rhs.abs_m);
     }
-
     return (n < rhs.n);
 }
 
@@ -232,27 +217,24 @@ ZernikeData& ZernikeData::get (void) {
 }
 
 
-void ZernikeData::init (const vector<float>& eff, uint16_t Imax, float cov_cutoff) {
-   // cout << " ZernikeData::init()   eff.sz = " << eff.size() << endl;
+void ZernikeData::init (const vector<float>& eff, uint32_t Imax, float cov_cutoff) {
     {
         unique_lock<mutex> lock (mtx);
         static int dummy = initAngular();                   // static variable will only initialize once, i.e. only call initAngular once.
-        uint16_t nEff = eff.size();
+        int32_t n1,n2,nEff = eff.size();
+        int32_t m;                                          // m is the same, or cov=0.0
         covariances.clear();
 
-        for (uint16_t i1 = 1; i1 <= nEff; ++i1) {                   // i1,i2 matches the Noll-indices
-            for (uint16_t i2 = 1; i2 <= Imax; ++i2) {
-                //double a = calcZernikeCovariance (i1, i2);
-                double a = redux::speckle::atmcov (i1, i2);
-
+        for (uint16_t i1 = 2; i1 <= nEff; ++i1) {                   // i1,i2 matches the Noll-indices
+            for (uint16_t i2 = 2; i2 <= Imax; ++i2) {
+                double a = calcZernikeCovariance (i1, i2);
                 if (fabs (a) > cov_cutoff) {
-                    int m, n1, n2;                                  // m is the same, or cov=0.0
                     noll_to_nm (i1, n1, m);
                     noll_to_nm (i2, n2, m);
-                    cov_t tmpc (n1, n2, m, a);
-
+                    cov_t tmpc(n1, n2, m, a);
                     if (i2 > nEff) {
-                        tmpc.cov *= eff[i1 - 1];                  // ...but the list of efficiencies start with Z_2, so subtract 1.
+                        tmpc.cov *= eff[i1 - 1];                    // ...but the list of efficiencies start with Z_2, so subtract 1.
+                        tmpc.swap();                                // Needed to use the right datapointer for the QPcorr part.
                     } else {
                         tmpc.cov *= eff[i2 - 1] * (1.0 - 0.5 * eff[i1 - 1]);
                     }
@@ -260,46 +242,57 @@ void ZernikeData::init (const vector<float>& eff, uint16_t Imax, float cov_cutof
                     auto ret = covariances.emplace (tmpc);
 
                     if (!ret.second) {  // already existing => this is the same Zernikes, but swapped  => add the covariances
-                     //   cout << "DUP:   n1 = " << tmpc.n1 << "  n2 = " << tmpc.n2 << "  m = " << tmpc.m << "  cov = " << tmpc.cov << "  cov2 = " << ret.first->cov << flush;
                         ret.first->cov += tmpc.cov;
-                     //   cout << "  newcov2 = " << ret.first->cov << endl;
                     }
                 }
             }
         }
     }   // end of locked scope
- //   cout << " ZernikeData::init()   cov.sz = " << covariances.size() << endl;
 
     for (auto & it : covariances) { // get pointers to data
-        //cout << "COV:   n1 = " << it.n1 << "  n2 = " << it.n2 << "  m = " << it.m << "  cov = " << it.cov << "  s1 = " << it.sampling1 << "  s2 = " << it.sampling2 << endl;
         it.data1 = radialData (it.n1, abs (it.m), it.sampling1);
         it.data2 = radialData (it.n2, abs (it.m), it.sampling2);
     }
 
- //   cout << " ZernikeData::init()   DataSize = " << dataCount << "   orig = " << ( (SPECKLE_IMAX + 1) *RADIAL_SAMPLES)
- //        << "   (" << (100 * dataCount / ( (double) ( (SPECKLE_IMAX + 1) *RADIAL_SAMPLES))) << "%)" << endl;
-
 }
 
 
-std::shared_ptr<double>& ZernikeData::radialData (uint16_t n, uint16_t abs_m, uint32_t nPoints) {
+
+
+std::vector<float> ZernikeData::init (const string& filename, uint32_t Imax, float cov_cutoff) {
+    
+    ifstream fp( filename );
+    string tmp;
+    float val;
+
+    vector<float> eff;
+    while( fp.good() ) {
+        std::getline( fp, tmp );
+        stringstream ss( tmp );
+        ss >> val;
+
+        if( !ss.fail() ) {
+            eff.push_back( val );
+        }
+    }
+    
+    init(eff,Imax,cov_cutoff);
+    
+    return std::move(eff);
+    
+}
+
+
+std::shared_ptr<double> ZernikeData::radialData (uint32_t n, uint32_t abs_m, uint32_t nPoints) {
     unique_lock<mutex> lock (mtx);
     data_index index = {n, abs_m, nPoints};
     auto it = radialPolynomials.find (index);
-
     if (it != radialPolynomials.end()) {
-        //cout << "radialData() EXISTING  nPoints = " << nPoints << "  n = " << n << "  abs_m = " << abs_m << endl;
         return it->second;
     }
-
-    dataCount += nPoints;
-    shared_ptr<double> data (new double[nPoints], [](double* p) {  /*cout << "FREEING DATA @ "  << hexString(p) << endl;*/  delete[] p; } );
-    //cout << "radialData()    NEW DATA @ "  << hexString(data.get())<< "  nPoints = " << nPoints << "  n = " << n << "  abs_m = " << abs_m << endl;
+    shared_ptr<double> data (new double[nPoints], [](double* p) { delete[] p; } );
     calcRadialZernike (data.get(), nPoints, n, abs_m);
-   // radialPolynomials.emplace (index, data);
-   // return data;
     return radialPolynomials.emplace(index, data).first->second;
-
 }
 
 
@@ -309,20 +302,13 @@ double ZernikeData::QRsumQPcorr (const double& plus1_rho, const double& plus1_ph
     double val = 0.0;
     for (const auto & it : covariances) {
         if (it.data1 && it.data2) {
-//        cout << "QRsumQPcorr:                  data1 = " << hexString(it.data1.get()) << "  data2 = " << hexString(it.data2.get())
-//              << "  m = " << it.m << "  sampling1 = " << it.sampling1 << "  sampling2 = " << it.sampling2 << endl;
-            //double tmp =  zernikeDiffPolar (it.data1.get(), it.sampling1, it.m, plus1_rho, plus1_phi, minus1_rho, minus1_phi);
-            //tmp *= zernikeDiffPolar (it.data2.get(), it.sampling2, it.m, plus2_rho, plus2_phi, minus2_rho, minus2_phi);
-            double tmp =  zernikePolar(it.data1.get(), it.sampling1, it.m, plus1_rho, plus1_phi) - zernikePolar(it.data1.get(), it.sampling1, it.m, minus1_rho, minus1_phi);
-            tmp *= zernikePolar(it.data2.get(), it.sampling2, it.m, plus2_rho, plus2_phi) - zernikePolar(it.data2.get(), it.sampling2, it.m, minus2_rho, minus2_phi);
+            double tmp = zernikePolar(it.data1.get(), it.sampling1, it.m, plus1_rho, plus1_phi)
+                       - zernikePolar(it.data1.get(), it.sampling1, it.m, minus1_rho, minus1_phi);
+            tmp *= zernikePolar(it.data2.get(), it.sampling2, it.m, plus2_rho, plus2_phi)
+                 - zernikePolar(it.data2.get(), it.sampling2, it.m, minus2_rho, minus2_phi);
             val += it.cov * tmp;
-        } else {
-        cout << "QRsumQPcorr:NULL at  n1 = " << it.n1 << "  n2 = " << it.n2
-              << "  m = " << it.m << "  sampling1 = " << it.sampling1 << "  sampling2 = " << it.sampling2 << endl;
-            
         }
     }
-
     return val;
 
 }
@@ -330,89 +316,28 @@ double ZernikeData::QRsumQPcorr (const double& plus1_rho, const double& plus1_ph
 
 void redux::speckle::init_zernike (void) {
 
- //   cout << " init_zernike()   doInit = " << doInit << endl;
-
     if (doInit) {
         for (int i = 0; i < ANGULAR_SAMPLES; ++i) {
-            cs[i] = cos (i * stepphi);
+            cosineValues[i] = cos (i * stepphi);
         }
 
-        int n, l;
-
-//         vector<double> r(RADIAL_SAMPLES);
-//         int cnt(0);
-//         std::generate (r.begin(), r.end(), [&cnt](void){ return cnt++*stepr; } );
-//cout << printArray(r,"RRRRRR") << endl;
-
+        int32_t n;
+        int32_t m;
         for (int j = 1; j <= SPECKLE_IMAX; j++) {
-            noll_to_nm (j, n, l);
-
-//             zernrad( r.data(), rz[j], RADIAL_SAMPLES, n, l );
+            noll_to_nm (j, n, m);
             for (int i = 0; i < RADIAL_SAMPLES; i++) {
-                rz[j][i] = zernrad (/*sqrt*/ (i * stepr), n, l) * sqrt ( (double) (n + 1));
+                zernikeRadialValues[j][i] = zernrad ((i * stepr), n, m) * sqrt ( (double) (n + 1));
             }
-            if( l == 0 ) {
-                Array<double> wrapper (rz[j], RADIAL_SAMPLES);
+            if( m == 0 ) {
+                Array<double> wrapper (zernikeRadialValues[j], RADIAL_SAMPLES);
                 Ana::write ("oldr_"+to_string(n)+".f0", wrapper);
             }
         }
-
-  //      cout << endl << " init_zernike()   doInit = done.  " << rz[17][100] << "  " << rz[17][100] << endl;
-
-
-//         {
-//             Array<double> awrapper (cs, ANGULAR_SAMPLES);
-//             Ana::write ("ang_old.f0", awrapper);
-//         }
-// 
-//         {
-//             Array<double> wrapper (rz[0], SPECKLE_IMAX, RADIAL_SAMPLES);
-//             Ana::write ("rad_new.f0", wrapper);
-//         }
-// 
-        /*        Cache& cache = Cache::getCache();
-
-                for (int j = 1; j <= SPECKLE_IMAX; j++) {
-                    noll_to_nm (j, n, l);
-                    auto coeff = cache.zernikeRadialPolynomial (n, l);
-                    cout << "j = " << j << "  nC = " << coeff.size() << printArray (coeff, "  coeff") << endl;
-
-                    if (true || coeff.empty()) continue;
-
-                    double r2;
-                    int m = abs (l);
-
-                    for (int i = 0; i < RADIAL_SAMPLES; i++) {
-                        double r = i * stepr;
-                        double r2 = r * r;
-                        double val = 1;
-
-                        if (m == 0) val = 1;
-                        else if (m == 1) val = r;
-                        else val = pow (r, m);                  // leading term ~ r^{m}
-
-                        val *= coeff[0];
-
-        //                 for (auto it = coeff.begin() + 1; it < coeff.end(); it++) {
-        //                     rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m-2}
-        //                     modePtr[y][x] += rPtr[y][x] * *it;
-        //
-        //                 }
-
-
-
-
-
-
-
-                        rz[j][i] = zernrad (i * stepr, n, l) * sqrt ( (double) (n + 1));
-                    }
-                }
-        */
         doInit = false;
     }
 
 }
+
 
 /*
  *      zernrad: compute radial Zernike polynomial for degree (n,l)
@@ -425,8 +350,8 @@ double redux::speckle::zernrad (double r, int n, int l) {
     long double result = 0;
 
     for (int s = 0; s <= (n - m) / 2; s++)  {
-        long double denominator = fak (s) * fak ( (n + m) / 2 - s) * fak ( (n - m) / 2 - s);
-        long double ilg = fak (n - s) / denominator;
+        long double denominator = factorial (s) * factorial ( (n + m) / 2 - s) * factorial ( (n - m) / 2 - s);
+        long double ilg = factorial (n - s) / denominator;
         result  += sign * ilg * pow (r, (double) (n - 2 * s));
         sign *= -1;
     }
@@ -434,74 +359,14 @@ double redux::speckle::zernrad (double r, int n, int l) {
     return (double) result;
 }
 
-void redux::speckle::zernrad (const double* r, double* out, int count, int n, int l) {
 
-    int sign = 1;
-    int m = std::abs (l);
-    int nCoeffs = (n - m) / 2 + 1;
-    double* coeffs = new double[nCoeffs];
-
-    for (int s = 0; s < nCoeffs; ++s)  {
-        long double denominator = fak (s) * fak ( (n + m) / 2 - s) * fak ( (n - m) / 2 - s);
-        coeffs[s] = sign * fak (n - s) / denominator * sqrt ( (double) (n + 1));
-        sign *= -1;
-    }
-
-    memset (out, 0, count * sizeof (double));
-
-    for (int s = 0; s < nCoeffs; ++s)  {
-        for (int i = 0; i < count; ++i)  {
-            out[i] += coeffs[s] * pow (r[i], (double) (n - 2 * s));
-        }
-
-//         transform (r, r+count, out,
-//                       [&coeffs,s,n](double rr){
-//                          return coeffs[s] * pow( rr, ( double )( n - 2 * s ) ) * sqrt( ( double )( n + 1 ) );
-//                       } );
-    }
-
-    delete[] coeffs;
+const double* redux::speckle::getZRV(uint32_t i) {
+    if (i > SPECKLE_IMAX) return nullptr;
+    return zernikeRadialValues[i];
 }
-void redux::speckle::zernrad2 (const double* r, double* out, int count, int n, int m) {
 
-    int32_t nmm = (n - m) / 2;
-    int32_t npm = (n + m) / 2;
-
-    vector<double> coeff (nmm + 1);
-
-    for (int32_t s = 0, pm = -1; s <= nmm; ++s) {
-        coeff[s] = (double) ( (pm *= -1) * fak (n - s)) / (fak (s) * fak (npm - s) * fak (nmm - s));
-    }
-
-    std::reverse (coeff.begin(), coeff.end());
-
-    /*        for(int y = 0; y < nPoints; ++y) {
-                for(int x = 0; x < nPoints; ++x) {
-                    //if(pupPtr[y][x]>0) {
-                        double tmp = distPtr[y][x] / r_c;                       // normalize radial distance
-                        //if(tmp>1) continue;
-                        r2Ptr[y][x] = tmp * tmp;
-                        if(m == 0) rPtr[y][x] = 1;
-                        else if(m == 1) rPtr[y][x] = tmp;
-                        else rPtr[y][x] = pow(tmp, m);                          // leading term ~ r^{m}
-                        modePtr[y][x] = rPtr[y][x] * coeff[0];                  // add leading order to mode
-                    //}
-                }
-            }
-
-            // generate polynomial part
-            for(auto it = coeff.begin() + 1; it < coeff.end(); it++) {
-                for(int y = 0; y < nPoints; ++y) {
-                    for(int x = 0; x < nPoints; ++x) {
-                        //if(pupPtr[y][x]>0) {
-                            rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m-2}
-                            modePtr[y][x] += rPtr[y][x] * *it;
-                        //}
-                    }
-                }
-            }
-    */
-
+uint32_t redux::speckle::getSamplesR (void) {
+    return RADIAL_SAMPLES;
 }
 
 /*
@@ -513,45 +378,12 @@ void redux::speckle::zernrad2 (const double* r, double* out, int count, int n, i
  *      x, y:           Co-ordinates in pupil with radius 1.
  */
 double redux::speckle::zernike (int i, int m, double x, double y) {
-
-    double rho = sqrt (x * x + y * y);
-
-    if (rho > 1.0 || i < 1 || i > SPECKLE_IMAX) {
+    
+    if (i < 1 || i > SPECKLE_IMAX) {
         return 0.0;
     }
 
-    double remainder = rho * stepr_inv;
-    int idxr = static_cast<int> (remainder);
-    double z = rz[i][idxr];
-
-    if (idxr < stepr_inv) {        // linear interpolation
-        remainder -= idxr;
-        z = (1.0 - remainder) * z + remainder * rz[i][idxr + 1];
-    }
-
-    if (m == 0) {
-        return z;
-    } else {
-        z *= M_SQRT2;
-    }
-
-    if (rho > SPECKLE_EPS)  {
-        double phi = abs (m) * (atan2 (y, x) + 2 * M_PI);
-
-        if (i % 2) {   // odd mode -> convert cosine to sine by adding 3/2*\pi
-            phi += 1.5 * M_PI; // sine
-        }
-
-        int factor = static_cast<int> (phi * pi_2_inv);
-
-        if (phi < 0) factor--;
-
-        phi -= factor * pi_2;
-        int idxphi = static_cast<int> (phi * stepphi_inv + 0.5);
-        z *= cs[idxphi];
-    }
-
-    return z;
+    return zernike(zernikeRadialValues[i], RADIAL_SAMPLES, m, x, y);
 
 }
 
@@ -562,7 +394,7 @@ double redux::speckle::zernikePolar (int i, int m, double rho, double phi) {
         return 0.0;
     }
 
-    return zernikePolar (rz[i], RADIAL_SAMPLES, m, rho, phi);
+    return zernikePolar (zernikeRadialValues[i], RADIAL_SAMPLES, m, rho, phi);
 
 }
 
@@ -573,8 +405,21 @@ double redux::speckle::zernikeDiffPolar (int i, int m, const double& rho1, const
         return 0.0;
     }
 
-    return zernikeDiffPolar (rz[i], RADIAL_SAMPLES, m, rho1, phi1, rho2, phi2);
+    return zernikeDiffPolar (zernikeRadialValues[i], RADIAL_SAMPLES, m, rho1, phi1, rho2, phi2);
 
+}
+
+
+double redux::speckle::zernike(const double* rdata, uint32_t sampling, int32_t m, double x, double y) {
+
+    double rho = sqrt (x * x + y * y);
+    double phi = 0;
+    if (rho > 1.0 ) {
+        return 0.0;
+    } else if(rho > SPECKLE_EPS) {
+        phi = atan2 (y, x);
+    }
+    return zernikePolar(rdata,sampling,m,rho,phi);
 }
 
 
@@ -587,12 +432,12 @@ double redux::speckle::zernikePolar (const double* rdata, uint32_t sampling, int
     sampling--;     // we use (sampling-1) below, so make it easier...
 
     double tmp = rho * sampling;
-    uint32_t idxr = static_cast<uint32_t> (tmp);
-    double z = rdata[idxr];
+    uint32_t idx = static_cast<uint32_t> (tmp);
+    double z = rdata[idx];
 
-    if (idxr < sampling) {         // linear interpolation
-        tmp -= idxr;
-        z = (1.0 - tmp) * z + tmp * rdata[idxr + 1];
+    if (idx < sampling) {         // linear interpolation
+        tmp -= idx;
+        z = (1.0 - tmp) * z + tmp * rdata[idx + 1];
     }
 
     if (m == 0) {
@@ -600,27 +445,23 @@ double redux::speckle::zernikePolar (const double* rdata, uint32_t sampling, int
     }
 
     z *= M_SQRT2;
-
     if (rho > SPECKLE_EPS)  {
         phi *= abs (m);
-
         if (m < 0) {   // odd mode -> convert cosine to sine by adding 3/2*\pi
             phi += pi_15;
         }
-
         int factor = static_cast<int> (phi * pi_2_inv);
-
         if (phi < 0) factor--;
-
         phi -= factor * pi_2;
-        uint32_t idxphi = static_cast<uint32_t> (phi * stepphi_inv + 0.5);
-        z *= cs[idxphi];
+        idx = static_cast<uint32_t> (phi * stepphi_inv + 0.5);
+        z *= cosineValues[idx];
     }
 
     return z;
 }
 
 
+// TODO: This is basically 2 calls to the above function, see if it can be done smarter...
 double redux::speckle::zernikeDiffPolar (const double* rdata, uint32_t sampling, int32_t m, const double& rho1, const double& phi1, const double& rho2, const double& phi2) {
 
     double z1 (0);
@@ -630,7 +471,6 @@ double redux::speckle::zernikeDiffPolar (const double* rdata, uint32_t sampling,
 
     double tmp = rho1 * sampling;
     uint32_t idx = static_cast<uint32_t> (tmp);
-//    cout << "zernikeDiffPolar()   data = " << hexString(rdata) << "  sampling = " << sampling << "   m = " << m << "   tmp = " << tmp << "   idx = " <<  idx << endl;
     z1 = rdata[idx];
 
     if (idx < sampling) {        // linear interpolation
@@ -640,7 +480,6 @@ double redux::speckle::zernikeDiffPolar (const double* rdata, uint32_t sampling,
 
     tmp = rho2 * sampling;
     idx = static_cast<uint32_t> (tmp);
-//    cout << "zernikeDiffPolar()                                               tmp2 = " << tmp << "  idx2 = " <<  idx << endl;
     z2 = rdata[idx];
 
     if (idx < sampling) {        // linear interpolation
@@ -668,7 +507,7 @@ double redux::speckle::zernikeDiffPolar (const double* rdata, uint32_t sampling,
 
         tmp -= factor * pi_2;
         idx = static_cast<uint32_t> (tmp * stepphi_inv + 0.5);
-        z1 *= cs[idx];
+        z1 *= cosineValues[idx];
     }
 
     if (rho2 > SPECKLE_EPS) {
@@ -684,7 +523,7 @@ double redux::speckle::zernikeDiffPolar (const double* rdata, uint32_t sampling,
 
         tmp -= factor * pi_2;
         idx = static_cast<uint32_t> (tmp * stepphi_inv + 0.5);
-        z2 *= cs[idx];
+        z2 *= cosineValues[idx];
     }
 
     return (z1 - z2);

@@ -2,7 +2,6 @@
 
 #include "defs.hpp"
 #include "zernike.hpp"
-#include "atmcov.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -70,17 +69,14 @@ void redux::speckle::init_wam_slave( const vector<float>& data ) {
 
     eff = data;
     uint16_t nEff = eff.size();
-//set<pair<int,int>> bla;
-    for(uint16_t i1=1; i1<=nEff; ++i1) {                        // i1,i2 matches the Noll-indices
-        for(uint16_t i2=1; i2<=SPECKLE_IMAX; ++i2) {
-            //double a = calcZernikeCovariance( i1, i2 );
-            double a = redux::speckle::atmcov( i1, i2 );
+    int32_t n;
+    int32_t m1,m2;
+    for(uint16_t i1=2; i1<=nEff; ++i1) {                        // i1,i2 matches the Noll-indices, skip Z_1 (piston) and start at #2
+        for(uint16_t i2=2; i2<=SPECKLE_IMAX; ++i2) {
+            double a = calcZernikeCovariance( i1, i2 );
             if (fabs(a) > SPECKLE_EPS2) {
-                int n,m1,m2;
                 noll_to_nm(i1,n,m1);
-             //   bla.insert({n,m1});
                 noll_to_nm(i2,n,m2);
-              //  bla.insert({n,m2});
                 weight_t tmpw = { i1, i2, m1, m2, a };
                 if(i2>nEff) {
                     tmpw.val *= eff[i1-1];                      // ...but the list of efficiencies start with Z_2, so subtract 1.
@@ -93,8 +89,6 @@ void redux::speckle::init_wam_slave( const vector<float>& data ) {
             }
         }
     }
-//cout << bla.size() << " used I:  " << endl;
-//for(auto& it: bla) cout << "n = " << it.first << "   m = " << it.second << endl;
 }
 
 
@@ -110,14 +104,11 @@ double redux::speckle::QRsum( double plus1_rho, double plus1_phi, double minus1_
                               double plus2_rho, double plus2_phi, double minus2_rho, double minus2_phi ) {
 
     double val = 0.0;
-
     for( const auto & it : Kweights ) {
-        double diff1 = zernikePolar( it.i1, it.m1, plus1_rho, plus1_phi) - zernikePolar( it.i1, it.m1, minus1_rho, minus1_phi );
-        double diff2 = zernikePolar( it.i2, it.m2, plus2_rho, plus2_phi) - zernikePolar( it.i2, it.m2, minus2_rho, minus2_phi );
-        val += it.val * diff1 * diff2;
-
+        double tmp = zernikePolar( it.i1, it.m1, plus1_rho, plus1_phi) - zernikePolar( it.i1, it.m1, minus1_rho, minus1_phi);
+        tmp *= zernikePolar( it.i2, it.m2, plus2_rho, plus2_phi) - zernikePolar( it.i2, it.m2, minus2_rho, minus2_phi);
+        val += it.val * tmp;
     }
-
     return val;
 
 }
@@ -132,14 +123,11 @@ double redux::speckle::QPcorr( double plus1_rho, double plus1_phi, double minus1
                                double plus2_rho, double plus2_phi, double minus2_rho, double minus2_phi ) {
 
     double val = 0.0;
-
     for( const auto & it : Lweights ) {
-        double diff1 = zernikePolar( it.i1, it.m1, plus1_rho, plus1_phi) - zernikePolar( it.i1, it.m1, minus1_rho, minus1_phi );
-        double diff2 = zernikePolar( it.i2, it.m2, plus2_rho, plus2_phi) - zernikePolar( it.i2, it.m2, minus2_rho, minus2_phi );
-        val += it.val * diff1 * diff2;
-
+        double tmp = zernikePolar( it.i1, it.m1, plus1_rho, plus1_phi) - zernikePolar( it.i1, it.m1, minus1_rho, minus1_phi);
+        tmp *= zernikePolar( it.i2, it.m2, plus2_rho, plus2_phi) - zernikePolar( it.i2, it.m2, minus2_rho, minus2_phi);
+        val += it.val * tmp;
     }
-
     return val;
 
 }
@@ -153,7 +141,6 @@ double redux::speckle::QRsumQPcorr( const double& plus1_rho, const double& plus1
                                     const double& plus2_rho, const double& plus2_phi, const double& minus2_rho, const double& minus2_phi ) {
 
     double val = 0.0;
-
     for( const auto & it : KLweights ) {
         double tmp =  zernikePolar( it.i1, it.m1, plus1_rho, plus1_phi) - zernikePolar( it.i1, it.m1, minus1_rho, minus1_phi );
                tmp *= zernikePolar( it.i2, it.m2, plus2_rho, plus2_phi) - zernikePolar( it.i2, it.m2, minus2_rho, minus2_phi );

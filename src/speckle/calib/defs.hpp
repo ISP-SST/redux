@@ -10,6 +10,9 @@
 #ifndef SPECKLE_IMAX
   #define SPECKLE_IMAX      231                   // truncation index for inf sum (Noll)
 #endif
+#ifndef SPECKLE_COV_CUTOFF
+  #define SPECKLE_COV_CUTOFF      1E-12            // skip smaller covariances.
+#endif
 #ifndef SPECKLE_FREQSTEPS
   #define SPECKLE_FREQSTEPS 100                   // stepwidth in frequency
 #endif

@@ -1,6 +1,8 @@
 #ifndef REDUX_SPECKLE_CALIB_ZERNIKE_HPP
 #define REDUX_SPECKLE_CALIB_ZERNIKE_HPP
 
+#include "defs.hpp"
+
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -15,10 +17,11 @@ namespace redux {
         class ZernikeData {
             
             struct cov_t {
-                cov_t(uint16_t n1, uint16_t n2, int32_t m, double cov);
+                cov_t(uint32_t n1, uint32_t n2, int32_t m, double cov);
+                void swap(void);
                 bool operator<(const cov_t&) const;
-                uint16_t n1;                            // radial order of first Zernike
-                uint16_t n2;                            // radial order of second Zernike
+                uint32_t n1;                            // radial order of first Zernike
+                uint32_t n2;                            // radial order of second Zernike
                 int32_t m;                              // azimuthal order of Zernikes (must be same or covariance is zero)
                 mutable double cov;                     // "effective covariance", i.e. weighted with the efficiencies passed to "init()".  
 
@@ -28,9 +31,11 @@ namespace redux {
             };
 
         public:
+            bool empty(void) { return covariances.empty(); }
             static ZernikeData& get(void);
-            void init(const std::vector<float>& eff, uint16_t Imax=231, float cov_cutoff=0.0);
-            std::shared_ptr<double>& radialData(uint16_t n, uint16_t abs_m, uint32_t nPoints);
+            void init(const std::vector<float>& eff, uint32_t Imax=SPECKLE_IMAX, float cov_cutoff=SPECKLE_COV_CUTOFF);
+            std::vector<float> init(const std::string& filename, uint32_t Imax=SPECKLE_IMAX, float cov_cutoff=SPECKLE_COV_CUTOFF);
+            std::shared_ptr<double> radialData(uint32_t n, uint32_t abs_m, uint32_t nPoints);
             
             double QRsumQPcorr( const double& plus1_rho, const double& plus1_phi, const double& minus1_rho, const double& minus1_phi,
                                 const double& plus2_rho, const double& plus2_phi, const double& minus2_rho, const double& minus2_phi ) const;
@@ -41,9 +46,9 @@ namespace redux {
             
             
             struct data_index {
+                data_index(uint32_t n, uint32_t abs_m, uint32_t sampling=0) : n(n), abs_m(abs_m), sampling(sampling) {};
                 bool operator<(const data_index&) const;
-                uint16_t n, abs_m;
-                uint32_t sampling;
+                uint32_t n, abs_m, sampling;
             };
             
             std::mutex mtx;
@@ -57,11 +62,16 @@ namespace redux {
         void calcRadialZernike(double* out, uint32_t nPoints, uint16_t n, uint16_t abs_m);
         void init_zernike (void);
         double zernrad (double r, int n, int l);
-        void zernrad (const double* r, double* out, int count, int n, int l);
-        void zernrad2 (const double* r, double* out, int count, int n, int l);
+        const double* getZRV (uint32_t i);
+        uint32_t getSamplesR (void);
+        
+        // wrappers that call the below versions together with sampling & radData defined in .cpp file.
+        // TODO: replace with class-methods when tests are done.
         double zernike (int i, int m, double x, double y);
         double zernikePolar (int i, int m, double rho, double phi);
         double zernikeDiffPolar (int i, int m, const double& rho1, const double& phi1, const double& rho2, const double& phi2);
+        
+        double zernike (const double* rdata, uint32_t sampling, int32_t m, double x, double y);
         double zernikePolar (const double* rdata, uint32_t sampling, int32_t m, double rho, double phi);
         double zernikeDiffPolar (const double* rdata, uint32_t sampling, int32_t m, const double& rho1, const double& phi1, const double& rho2, const double& phi2);
 
