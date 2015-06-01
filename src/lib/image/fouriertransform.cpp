@@ -144,11 +144,6 @@ FourierTransform::FourierTransform (const Array<T>& rhs, int flags, uint8_t nT) 
     reset (rhs, flags, nT);
 
 }
-template FourierTransform::FourierTransform (const Array<int16_t>&, int, uint8_t);
-template FourierTransform::FourierTransform (const Array<int32_t>&, int, uint8_t);
-template FourierTransform::FourierTransform (const Array<float>&, int, uint8_t);
-template FourierTransform::FourierTransform (const Array<double>&, int, uint8_t);
-template FourierTransform::FourierTransform (const Array<complex_t>&, int, uint8_t);
 
 
 template <typename T>
@@ -235,11 +230,6 @@ namespace redux {
         }
     }
 }
-template void FourierTransform::reset (const Array<int16_t>&, int, uint8_t);
-template void FourierTransform::reset (const Array<int32_t>&, int, uint8_t);
-template void FourierTransform::reset (const Array<float>&, int, uint8_t);
-template void FourierTransform::reset (const Array<double>&, int, uint8_t);
-template void FourierTransform::reset (const Array<complex_t>&, int, uint8_t);
 
 
 void FourierTransform::set(Array<double>& rhs) {
@@ -568,9 +558,6 @@ void FourierTransform::reorder (redux::util::Array<T>& in) {
     delete[] buf;
 
 }
-template void FourierTransform::reorder (redux::util::Array<float>& in);
-template void FourierTransform::reorder (redux::util::Array<double>& in);
-template void FourierTransform::reorder (redux::util::Array<complex_t>& in);
 
 
 void FourierTransform::reorder (void) {
@@ -651,4 +638,18 @@ const FourierTransform& FourierTransform::operator= (const FourierTransform& rhs
     inputSize = rhs.inputSize;
     return *this;
 }
+
+// Explicit instantiations are needed when template implementations are not in the header.
+// They should also be at the bottom to make sure all code is present when they are invoked.
+
+template FourierTransform::FourierTransform (const Array<int16_t>&, int, uint8_t);
+template FourierTransform::FourierTransform (const Array<int32_t>&, int, uint8_t);
+template FourierTransform::FourierTransform (const Array<float>&, int, uint8_t);
+template FourierTransform::FourierTransform (const Array<double>&, int, uint8_t);
+template FourierTransform::FourierTransform (const Array<complex_t>&, int, uint8_t);
+
+template void FourierTransform::reorder (redux::util::Array<float>& in);
+template void FourierTransform::reorder (redux::util::Array<double>& in);
+template void FourierTransform::reorder (redux::util::Array<complex_t>& in);
+
 

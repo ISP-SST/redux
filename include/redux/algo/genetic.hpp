@@ -125,8 +125,8 @@ namespace redux {
             Genetic ( uint nVars = 2, uint nInd = 100 );
 
             void calcFitness ( void );
-            double evolve ( uint& steps = 0 );
-            double evolveTo ( double goal, uint& steps = 0 );
+            double evolve ( uint& steps );
+            double evolveTo ( double goal, uint& steps );
             T* getFittest ( void );
             T* getIndividual ( uint );
             void setParameterRange ( uint n, T low, T high, bool per = false );

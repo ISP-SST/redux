@@ -86,11 +86,11 @@ int main (int argc, char *argv[]) {
         fprintf (stderr, "# (partially) corrected Zernikes: %d   %s\n", sz-1, effString.c_str() );
         fprintf (stderr, "# spatial frequency\n");
 
-        for (double i = 0.0; i < 1.0; i += step) fprintf (stderr, "%.7lf\n", i);
+        for (double i = 0.0; i < 1.0; i += step) fprintf (stderr, "%.7f\n", i);
 
         fprintf (stderr, "# seeing alpha\n");
 
-        for (double j = as; j <= ae + SPECKLE_EPS; j += ast) fprintf (stderr, "%.7lf\n", j);
+        for (double j = as; j <= ae + SPECKLE_EPS; j += ast) fprintf (stderr, "%.7f\n", j);
 
         fprintf (stderr, "# functions\n");
 
@@ -134,7 +134,7 @@ int main (int argc, char *argv[]) {
             fprintf (stderr, "letf      s_letf    stf       s_stf     sr        s_sr\n");
 
             for (l = 0; l < SPECKLE_FREQSTEPS; l++) {
-                fprintf (stderr, "%.7lf  %.7lf  %.7lf  %.7lf  %.7lf  %.7lf\n",
+                fprintf (stderr, "%.7f  %.7f  %.7f  %.7f  %.7f  %.7f\n",
                          result[l * 7 + 1], result[l * 7 + 2], result[l * 7 + 3],
                          result[l * 7 + 4], result[l * 7 + 5], result[l * 7 + 6]);
             }

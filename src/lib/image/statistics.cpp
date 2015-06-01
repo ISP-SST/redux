@@ -4,7 +4,6 @@
 #include "redux/image/utils.hpp"
 #include "redux/util/bitoperations.hpp"
 
-#include <atomic>
 #include <limits>
 
 using namespace redux::image;

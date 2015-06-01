@@ -657,7 +657,8 @@ void MomfbdJob::postProcess( boost::asio::io_service& service ) {
 bool MomfbdJob::check(void) {
     bool ret(false);
     unique_lock<mutex> lock(jobMutex);
-    switch (info.step) {
+    int val = info.step;
+    switch (val) {
         case 0:                 ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;
         case JSTEP_SUBMIT:      ret = checkData(); if(ret) info.step = JSTEP_PREPROCESS; break;
         case JSTEP_PREPROCESS: ;                  // no checks at these steps, just fall through and return true

@@ -192,7 +192,8 @@ void DebugJob::checkParts( void ) {
 bool DebugJob::check(void) {
     bool ret(false);
     unique_lock<mutex> lock(jobMutex);
-    switch (info.step) {
+    int val = info.step;
+    switch (val) {
         case 0:                 ret = true; if(ret) info.step = JSTEP_SUBMIT; break;
         case JSTEP_SUBMIT:      ret = true; if(ret) info.step = JSTEP_PREPROCESS; break;
         case JSTEP_PREPROCESS: ;                  // no checks at these steps, just fall through and return true

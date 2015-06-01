@@ -112,10 +112,10 @@ namespace redux {
                 void reset ( void );
                 void keep ( uint );
 
-                double evolve ( uint& steps = 0 ) {
+                double evolve ( uint& steps ) {
                     return evolveTo ( DBL_MAX, steps );
                 };
-                double evolveTo ( double goal, uint& steps = 0 );
+                double evolveTo ( double goal, uint& steps );
                 void sort ( void );
 
                 void modifyPopSize ( int n );
