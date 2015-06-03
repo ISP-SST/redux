@@ -11,43 +11,63 @@ using namespace redux::util;
 using namespace std;
 
 template <typename T>
-void redux::image::Statistics::getMinMaxMean(const Array<T>& data) {
+void redux::image::Statistics::getMinMaxMean(const T* data, size_t n) {
     
     min = std::numeric_limits<double>::max();
     max = std::numeric_limits<double>::lowest();
     sum = 0;
-    size_t nElements = data.nElements();
-    for( auto & it : data ) {
-        if( it > max ) max = it;
-        if( it < min ) min = it;
-        sum += static_cast<double>( it );
+    const T* ptr = data + n;
+    size_t count(0);
+    while( ptr-- > data ) {
+        double tmp = static_cast<double>( *ptr );
+        if( tmp > max ) {
+            max = tmp;
+        } else if( tmp < min ) {
+            min = tmp;
+        }
+        if ( tmp == tmp ) { // will exclude NaN
+            sum += tmp;
+            count++;
+        }
     }
-    mean = sum / nElements;
+    mean = sum;
+    if(count) mean /= count;
     
 }
-template void redux::image::Statistics::getMinMaxMean( const Array<float>& );
-template void redux::image::Statistics::getMinMaxMean( const Array<double>& );
-template void redux::image::Statistics::getMinMaxMean( const Array<int16_t>& );
-template void redux::image::Statistics::getMinMaxMean( const Array<int32_t>& );
+template void redux::image::Statistics::getMinMaxMean( const float*, size_t );
+template void redux::image::Statistics::getMinMaxMean( const double*, size_t );
+template void redux::image::Statistics::getMinMaxMean( const int16_t*, size_t );
+template void redux::image::Statistics::getMinMaxMean( const int32_t*, size_t );
 
            
 template <typename T>
-void redux::image::Statistics::getRmsStddev(const Array<T>& data, double mean) {
-    size_t nElements = data.nElements();
-    if(nElements > 1) {
+void redux::image::Statistics::getRmsStddev(const T* data, size_t n) {
+    if(n > 1) {
+        size_t count(0);
         rms = stddev = 0;
-        for( auto & it : data ) {
-            rms += static_cast<double>( it * it );
-            double tmp = ( static_cast<double>( it ) - mean );
-            stddev += tmp * tmp;
+        const T* ptr = data + n;
+        while( ptr-- > data ) {
+            long double tmp = static_cast<long double>( *ptr );
+            if( tmp == tmp ) {
+                rms += static_cast<long double>( tmp * tmp );
+                tmp = (tmp - mean);
+                stddev += tmp * tmp;
+                count++;
+            }
         }
-        rms = sqrt( rms / nElements );
-        stddev = sqrt( stddev / (nElements-1) );
-    } else if (nElements == 1) {
-        rms = data(0);
+        if (count) {
+            rms = sqrt( rms / count );
+            if (count > 1) stddev = sqrt( stddev / (count-1) );
+        }
+    } else if (n == 1) {
+        rms = (*data == *data)?*data:0;
         stddev = 0;
     }
 }
+template void redux::image::Statistics::getRmsStddev( const float*, size_t );
+template void redux::image::Statistics::getRmsStddev( const double*, size_t );
+template void redux::image::Statistics::getRmsStddev( const int16_t*, size_t );
+template void redux::image::Statistics::getRmsStddev( const int32_t*, size_t );
 
 
 void redux::image::Statistics::getNoise(const redux::image::FourierTransform& ft) {
@@ -72,7 +92,7 @@ void redux::image::Statistics::getStats( const Array<T>& data, int flags ) {
     // TODO: median
     
     if( flags & ST_RMS ) {
-        getRmsStddev(data,mean);
+        getRmsStddev(data);
     }
     
     if( flags & ST_NOISE ) {
@@ -84,6 +104,28 @@ template void redux::image::Statistics::getStats( const Array<float>&, int );
 template void redux::image::Statistics::getStats( const Array<double>&, int );
 template void redux::image::Statistics::getStats( const Array<int16_t>&, int );
 template void redux::image::Statistics::getStats( const Array<int32_t>&, int );
+
+
+template <typename T>
+void redux::image::Statistics::getStats( const T* data, size_t count, int flags ) {
+
+    getMinMaxMean(data, count);
+    
+    // TODO: median
+    
+    if( flags & ST_RMS ) {
+        getRmsStddev(data,count);
+    }
+/*    
+    if( flags & ST_NOISE ) {
+        getNoise(data,count);
+    }*/
+
+}
+template void redux::image::Statistics::getStats( const float*, size_t, int );
+template void redux::image::Statistics::getStats( const double*, size_t, int );
+template void redux::image::Statistics::getStats( const int16_t*, size_t, int );
+template void redux::image::Statistics::getStats( const int32_t*, size_t, int );
 
 
 

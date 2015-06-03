@@ -16,11 +16,20 @@ namespace redux {
 
             Statistics() : clip(-1), cutoff(-1), min(0), max(0), median(0),
                            mean(0), rms(0), stddev(0), noise(0), noiseRMS(0), noiseType(0) {}
-            template <typename T> void getMinMaxMean(const redux::util::Array<T>& data);
-            template <typename T> void getRmsStddev(const redux::util::Array<T>& data, double mean);
+            template <typename T> void getMinMaxMean(const T* data, size_t count);
+            template <typename T> void getMinMaxMean(const redux::util::Array<T>& data) {
+                getMinMaxMean(data.ptr(),data.nElements());
+            }
+
+            template <typename T> void getRmsStddev(const T* data, size_t count);
+            template <typename T> void getRmsStddev(const redux::util::Array<T>& data) {
+                getRmsStddev(data.ptr(),data.nElements());
+            }
             template <typename T> void getNoise(const redux::util::Array<T>& data);
             void getNoise(const redux::image::FourierTransform& ft);
+//        template <class T, typename ...S>
             
+            template <typename T> void getStats(const T* data, size_t count, int flags=ST_ALL);
             template <typename T> void getStats(const redux::util::Array<T>& data, int flags=ST_ALL);
             template <typename T> void getStats(uint32_t borderClip, const redux::util::Array<T>& data, int flags=ST_ALL);
             
