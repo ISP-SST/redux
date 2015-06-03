@@ -95,6 +95,10 @@ namespace redux {
             static void write( const std::string& filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana> hdr=0, int sliceSize=0 );
             template <typename T>
             static void write( const std::string& filename, const redux::image::Image<T>& image, int sliceSize=0 );
+            template <typename T>
+            static void write( const std::string& filename, const T* data, size_t n=1 );
+            template <typename T>
+            static void write( const std::string& filename, const std::vector<T>& v ) { write(filename,v.data(),v.size()); }
            //@}
             
 

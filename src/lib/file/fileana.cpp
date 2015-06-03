@@ -595,3 +595,45 @@ template void redux::file::Ana::write( const string&, const redux::image::Image<
 template void redux::file::Ana::write( const string&, const redux::image::Image<double >&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<complex_t >&, int );
 
+
+template <typename T>
+void redux::file::Ana::write( const string & filename, const T* data, size_t n ) {
+    
+    if( n == 0 ) {
+        return;
+    }
+    
+    ofstream file( filename, ifstream::binary );
+    if( !file.good() ) {
+        throw std::ios_base::failure( "Failed to open file: " + filename );
+    }
+
+    Ana tmpHdr;
+
+    tmpHdr.m_Header.dim[0] = n;
+    tmpHdr.m_Header.ndim = 1;
+    tmpHdr.m_Header.datyp = getDatyp<T>();
+    tmpHdr.m_Header.synch_pattern = MAGIC_ANA;
+    tmpHdr.m_Header.subf = 0;
+    tmpHdr.m_Header.nhb = 1;
+
+    tmpHdr.write( file );
+
+    file.write( reinterpret_cast<const char*>( data ), tmpHdr.m_Header.dim[0]*typeSizes[tmpHdr.m_Header.datyp] );
+
+    if( !file.good() )
+        throw ios_base::failure( "Ana::write(): write failed." );
+
+
+}
+template void redux::file::Ana::write( const string&, const uint8_t*, size_t n );
+template void redux::file::Ana::write( const string&, const int16_t*, size_t n );
+template void redux::file::Ana::write( const string&, const int32_t*, size_t n );
+template void redux::file::Ana::write( const string&, const int64_t*, size_t n );
+template void redux::file::Ana::write( const string&, const float*, size_t n );
+template void redux::file::Ana::write( const string&, const double*, size_t n );
+template void redux::file::Ana::write( const string&, const complex_t*, size_t n );
+
+
+
+
