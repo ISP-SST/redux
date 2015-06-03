@@ -202,7 +202,7 @@ bool ZernikeData::ZernikeData::cov_t::operator< (const cov_t& rhs) const {
 bool ZernikeData::ZernikeData::data_index::operator< (const data_index& rhs) const {
     if (n == rhs.n) {
         if (abs_m == rhs.abs_m) {
-            return (sampling < rhs.sampling);
+            return (sampling && rhs.sampling && (sampling < rhs.sampling));
         }
         return (abs_m < rhs.abs_m);
     }
