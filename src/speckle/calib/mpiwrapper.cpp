@@ -297,7 +297,7 @@ void MpiWrapper::writeResults(std::ostream& strm) const {
     streamsize oldPrec = strm.precision(8);
     
     strm << "# (partially) corrected Zernikes: " << efficiencies.size() << "   efficiencies=[";
-    for(uint i=0; i<efficiencies.size(); ++i) { strm << (i?", ":" ") << freq[i] << endl; }
+    for(uint i=0; i<efficiencies.size(); ++i) { strm << (i?", ":" ") << freq[i]; }
     strm << "]\n# spatial frequency\n";
     for(uint i=0; i<freq.size(); ++i) strm << freq[i] << endl;
     strm << "# seeing alpha\n";
