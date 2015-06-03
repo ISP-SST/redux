@@ -118,7 +118,10 @@ double redux::speckle::calcZernikeCovariance (uint32_t i1, uint32_t i2) {
 
 void redux::speckle::calcRadialZernike (double* out, uint32_t nPoints, uint16_t n, uint16_t abs_m) {
 
-    long double step = 1.0L / static_cast<long double> (nPoints - 1);
+    // cout << "calcRadialZernike()   nPoints = " << nPoints << "  n = " << n << "  abs_m = " << abs_m << endl;
+
+    long double step = 1.0L / static_cast<long double>(nPoints - 1);
+    long double sqrt_n1 = sqrt(static_cast<long double>((abs_m?2:1)*(n + 1))); // Normalization factor so that the integral over the unit disk is = pi
 
     if (n == 0) {
         for (uint32_t i = 0; i < nPoints; ++i) out[i] = 1;
@@ -141,7 +144,7 @@ void redux::speckle::calcRadialZernike (double* out, uint32_t nPoints, uint16_t 
     vector<long double> coeff (nmm + 1);
 
     for (int32_t s = 0, pm = -1; s <= nmm; ++s) {
-        coeff[s] = (double) ( (pm *= -1) * factorial (n - s)) / (factorial (s) * factorial (npm - s) * factorial (nmm - s))*sqrt ( (double) (n + 1));
+        coeff[s] = (double) ( (pm *= -1) * factorial (n - s)) / (factorial (s) * factorial (npm - s) * factorial (nmm - s))*sqrt_n1;
     }
 
     memset (out, 0, nPoints * sizeof (double));
@@ -413,7 +416,6 @@ double redux::speckle::zernikePolar (const double* rdata, uint32_t sampling, int
         return z;
     }
 
-    z *= M_SQRT2;
     if (rho > SPECKLE_EPS)  {
         phi *= abs (m);
         if (m < 0) {   // odd mode -> convert cosine to sine by adding 3/2*\pi
@@ -459,9 +461,6 @@ double redux::speckle::zernikeDiffPolar (const double* rdata, uint32_t sampling,
     if (m == 0) {
         return (z1 - z2);
     }
-
-    z1 *= M_SQRT2;
-    z2 *= M_SQRT2;
 
     if (rho1 > SPECKLE_EPS) {
         tmp = abs (m) * phi1;
