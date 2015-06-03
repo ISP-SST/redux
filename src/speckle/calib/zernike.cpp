@@ -277,6 +277,26 @@ vector<float> ZernikeData::init (const string& filename, uint32_t Imax, float co
 }
 
 
+vector<float> ZernikeData::load (const string& filename) {
+    
+    ifstream fp( filename );
+    string tmp;
+    float val;
+    vector<float> eff;
+    while( fp.good() ) {
+        std::getline( fp, tmp );
+        stringstream ss( tmp );
+        ss >> val;
+        if( !ss.fail() ) {
+            eff.push_back( val );
+        }
+    }
+    
+    return std::move(eff);
+    
+}
+
+
 shared_ptr<double> ZernikeData::getRadialData (uint32_t n, int32_t m, uint32_t nPoints) {
     data_index index(n, abs(m), nPoints);
     auto it = radialPolynomials.find (index);

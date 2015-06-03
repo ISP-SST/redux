@@ -34,6 +34,7 @@ namespace redux {
             static ZernikeData& get(void);
             void init(const std::vector<float>& eff, uint32_t Imax=SPECKLE_IMAX, float cov_cutoff=SPECKLE_COV_CUTOFF);
             std::vector<float> init(const std::string& filename, uint32_t Imax=SPECKLE_IMAX, float cov_cutoff=SPECKLE_COV_CUTOFF);
+            static std::vector<float> load (const std::string& filename);
             std::shared_ptr<double> getRadialData(uint32_t n, int32_t abs_m, uint32_t nPoints=0);
             std::shared_ptr<double> getRadialData(uint32_t i);
             uint32_t getSampling(uint32_t n, int32_t m);
