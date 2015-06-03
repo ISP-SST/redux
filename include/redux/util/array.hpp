@@ -193,13 +193,8 @@ namespace redux {
             };
 
             template <typename ...S>
-            Array( T* ptr, S ...sizes ) : begin_(0) {
-                setSizes( sizes... );
-                setStrides();
-                countElements();
-                if( dataSize ) {
-                    datablock.reset( ptr, []( T * p ) {} );
-                }
+            Array( T* ptr, S ...sizes ) {
+                reset( ptr, sizes... );
             }
 
             /*! @name Copy constructors
@@ -321,7 +316,23 @@ namespace redux {
             }
             template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
             //@}
-            
+
+            /*! @name reset
+             *  @brief Set the array to wrap a new raw datablock with the specified sizes
+             */
+            //@{
+            template <typename ...S>
+            void reset( T* ptr, S ...sizes ) {
+                setSizes( sizes... );
+                setStrides();
+                countElements();
+                if( dataSize ) {
+                    datablock.reset( ptr, []( T * p ) {} );
+                }
+            }
+            //@}
+
+                        
             /*! @name permuteDimensions
              *  @brief Permute the dimensions specified
              *  @note This will only shuffle the dimensional information around, the datablock will not be touched.
