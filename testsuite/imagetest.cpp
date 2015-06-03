@@ -11,6 +11,7 @@
 
 #include <iostream>
 
+
 using namespace redux::image;
 using namespace redux::util;
 using namespace redux;
@@ -41,13 +42,13 @@ namespace {
         size_t nDims = dims.size();
         if ( nDims == 0 ) return;
         
-        std::vector<size_t> subFirst=dims, subLast=dims;
+        std::vector<size_t> subFirst=dims, subLast=dims;    // dimensions of a centered & half-sized subarray
         for( size_t i=0; i<nDims; ++i) {
             subFirst[i] *= 0.25;
             subLast[i]  *= 0.75;
         }
         
-        Array<T> array( 2, s... );
+        Array<T> array( 2, s... );      // test if constructor works if a new dimension is prepended
         BOOST_CHECK_EQUAL( array.nDimensions(), nDims+1 );
         BOOST_CHECK_EQUAL( array.dimSize(0), 2 );
         for( size_t i=0; i<nDims; ++i) {
@@ -377,7 +378,7 @@ namespace {
         BOOST_CHECK_CLOSE( stats.max, mx, 1E-20);
         BOOST_CHECK_CLOSE( stats.mean, avg, 1E-20);
         
-        stats.getRmsStddev(array,avg);
+        stats.getRmsStddev(array);
         double rms,stddev;
         redux::math::rmsStddev(rawPtr,array.nElements(),rms,stddev);
         BOOST_CHECK_CLOSE( stats.rms, rms, 1E-20);
@@ -387,8 +388,440 @@ namespace {
 
 }
 
+
 void arrayTests( void ) {
     
+    // test different dimensions and datatypes
+    testArray<int8_t>(100);
+    testArray<uint16_t>(44,55);
+    testArray<int>(4,14,9);
+    testArray<size_t>(4,7,6,5);
+    testArray<double>(4,5,6,7,8);
+    testArray<float>(100,100,100);
+    testArray<uint32_t>(13,1,9);
+    
+    testStat<int>(100,103);
+    
+}
+
+
+void statTest( void ) {
+    
+
+    int64_t nPoints = 800;
+    Array<double> peak(nPoints,nPoints);
+    redux::math::gauss( peak.get(), nPoints, nPoints, 200, 500, nPoints/2, nPoints/2);    // centered gaussian with fwhm (50,50)
+    for( int i = 0; i < nPoints; ++i ) {
+        double y = i;
+        for( int j = 0; j < nPoints; ++j ) {
+            double x = j;
+            peak(i,j) *= 7;
+            peak(i,j) += (y+0.5*x)/800;
+            peak(i,j) += sin(x/50)*cos(y/200);
+        }
+    }
+
+    redux::file::Ana::write( "stats.f0", peak );
+    
+    using namespace std;
+    Statistics stats;
+    stats.getMinMaxMean(peak);
+    cout << std::setprecision(9) << "Min = " << stats.min << "  Max = " << stats.max << "   Mean = " << stats.mean << endl;
+    stats.getRmsStddev(peak);
+    cout << "StdDev = " << stats.stddev << "  RMS = " << stats.rms << endl;
+    
+    int mask = 10; //10;
+    double limit = -1; //130;
+    
+    FourierTransform ft1(peak.copy<complex_t>());
+    redux::file::Ana::write( "pow1.f0", ft1.power() );
+    double noise1 = ft1.noise(mask,limit);
+    FourierTransform ft2(peak);
+    redux::file::Ana::write( "pow2.f0", ft2.power() );
+    double noise2 = ft2.noise(mask,limit);
+    cout << "Noise1 = " << noise1 << "  Noise2 = " << noise2 << endl;
+    
+    //peak -= stats.mean;
+    double std_mvn = std_dev(peak,nPoints);
+    cout << "StdDev_mvn = " << std_mvn << endl;
+
+
+}
+
+
+
+void gridTest( void ) {
+    
+    // Grids
+    // TODO: Better testcase, this is basically the same math as int the Grid-constructor.
+
+    int64_t nPoints = 50;
+    float originX = 11;
+    float originY = 11.5;
+    Grid grid(nPoints,originY,originX);
+    float** distPtr = grid.distance.get();
+    float** anglePtr = grid.angle.get();
+    for( int i = 0; i < nPoints; ++i ) {
+        double yDist = i - originY;
+        for( int j = 0; j < nPoints; ++j ) {
+            double xDist = j - originX;
+            BOOST_CHECK_CLOSE( distPtr[i][j], (float)sqrt(yDist*yDist+xDist*xDist), 1E-10);
+            if(yDist || xDist) {
+                BOOST_CHECK_CLOSE( anglePtr[i][j], (float)atan2(yDist, xDist), 1E-5 );
+            } else  BOOST_CHECK_EQUAL( anglePtr[i][j], 0.0 );
+        }
+    }
+
+    
+}
+
+
+
+void fourierTest( void ) {
+    
+    size_t nPoints = 10;
+    double tolerance = 1E-9;
+    srand(time(NULL));
+    {   // *= operator
+        FourierTransform fullFT(nPoints,nPoints,FT_FULLCOMPLEX);    // full-complex
+        BOOST_CHECK( fullFT.dimSize(0) == nPoints );
+        BOOST_CHECK( fullFT.dimSize(1) == nPoints );
+
+        FourierTransform halfFT(nPoints,nPoints);                   // half-complex
+        BOOST_CHECK( halfFT.dimSize(0) == nPoints );
+        BOOST_CHECK( halfFT.dimSize(1) == nPoints/2+1 );
+
+        complex_t salt(rand()%100,rand()%100);
+        // test *= operator for full-complex to full-complex AND half-complex to half-complex
+        for( uint y=0; y<nPoints; ++y) { 
+            for( uint x=0; x<nPoints/2+1 ; ++x) {
+                complex_t val(y,x);
+                val += salt;
+                halfFT(y,x) = fullFT(y,x) = val;
+                if( x ) fullFT(y,nPoints-x) = val;
+            }
+        }
+        fullFT *= fullFT;
+        halfFT *= halfFT;
+        for( uint y=0; y<nPoints; ++y) { 
+            for( uint x=0; x<nPoints/2+1; ++x) {
+                complex_t val(y,x);
+                val += salt;
+                val *= val;
+                BOOST_CHECK_SMALL( norm(halfFT(y,x)-val), tolerance );
+                BOOST_CHECK_SMALL( norm(fullFT(y,x)-val), tolerance );
+                if( x ) BOOST_CHECK_SMALL( norm(fullFT(y,nPoints-x)-val), tolerance );
+            }
+        }
+
+        // test *= operator for full-complex to half-complex
+        for( uint y=0; y<nPoints; ++y) { 
+            for( uint x=0; x<nPoints/2+1 ; ++x) {
+                complex_t val(y,x);
+                val += salt;
+                halfFT(y,x) = fullFT(y,x) = val;
+                if( x ) fullFT(y,nPoints-x) = val;
+            }
+        }
+        halfFT *= fullFT;
+        for( uint y=0; y<nPoints; ++y) { 
+            for( uint x=0; x<nPoints/2+1; ++x) {
+                complex_t val(y,x);
+                val += salt;
+                val *= val;
+                BOOST_CHECK_SMALL( norm(halfFT(y,x)-val), tolerance );
+            }
+        }
+
+        // test *= operator for half-complex to full-complex
+        for( uint y=0; y<nPoints; ++y) { 
+            for( uint x=0; x<nPoints/2+1 ; ++x) {
+                complex_t val(y,x);
+                val += salt;
+                halfFT(y,x) = fullFT(y,x) = val;
+                if( x ) fullFT(y,nPoints-x) = val;
+            }
+        }
+        fullFT *= halfFT;
+        for( uint y=0; y<nPoints; ++y) { 
+            for( uint x=0; x<nPoints/2+1; ++x) {
+                complex_t val(y,x);
+                val += salt;
+                val *= val;
+                BOOST_CHECK_SMALL( norm(fullFT(y,x)-val), tolerance );
+                if( x ) BOOST_CHECK_SMALL( norm(fullFT(y,nPoints-x)-val), tolerance );
+            }
+        }
+
+    }
+    
+    {   // test some simple transformas
+        Array<double> tmp(nPoints,nPoints);
+        double salt(rand()%100);
+        //tmp.zero();
+        //tmp(0,0) = 1;      // a delta function
+        //tmp(nPoints/2,nPoints/2) = 1;      // a delta function
+        tmp = salt;             //  Set the array to some arbitrary constant value
+        {                       //  The transform of a constant will only have 1 non-zero value, located at (0,0)
+            FourierTransform fullFT(tmp,FT_FULLCOMPLEX|FT_NORMALIZE);
+            FourierTransform halfFT(tmp,FT_NORMALIZE);
+            complex_t val(salt,0);                  // expected value of zero-frequency component
+            BOOST_CHECK_SMALL( norm(fullFT(0,0)-val), tolerance );
+            BOOST_CHECK_SMALL( norm(halfFT(0,0)-val), tolerance );
+            for( uint y=0; y<nPoints; ++y) { 
+                for( uint x=0; x<nPoints/2+1; ++x) {
+                    if( x || y ) BOOST_CHECK_SMALL( norm(halfFT(y,x)), tolerance );         // check all except (0,0)
+                    if( x || y ) BOOST_CHECK_SMALL( norm(fullFT(y,x)), tolerance );         // check all except (0,0)
+                    if( x ) BOOST_CHECK_SMALL( norm(fullFT(y,nPoints-x)), tolerance );
+                }
+            }
+            fullFT.reorder();                       // check that the zero-frequency value is reordered to the right location
+            for( uint y=0; y<nPoints; ++y) { 
+                for( uint x=0; x<nPoints; ++x) {
+                    if( (x == nPoints/2) && (y == nPoints/2) ) BOOST_CHECK_SMALL( norm(fullFT(y,x)-val), tolerance );
+                    else BOOST_CHECK_SMALL( norm(fullFT(y,x)), tolerance );
+                }
+            }
+            
+            Array<double> tmp2;
+            // get inverse and compare
+            halfFT.inv(tmp2);
+            BOOST_CHECK( tmp2 == tmp );
+            // get inverse (of reordered FT) and compare
+            fullFT.inv(tmp2);
+            //BOOST_CHECK( tmp2 == tmp );
+            
+            tmp2.zero();
+            tmp2(0,0) = 3;      // a delta function
+            fullFT.reset(tmp2,FT_FULLCOMPLEX);
+            halfFT.reset(tmp2);
+            //tmp2(nPoints/2,nPoints/2) = 1;      // a delta function
+            redux::file::Ana::write( "fullft.f0", fullFT );
+            redux::file::Ana::write( "halfft.f0", halfFT );
+            
+            redux::file::Ana::write( "tmp0.f0", tmp2 );
+            fullFT.convolveInPlace(tmp2);
+            redux::file::Ana::write( "tmp2.f0", tmp2 );
+
+/*
+fullft=f0('fullft.f0')
+halfft=f0('halfft.f0')
+tmp0=f0('tmp0.f0')
+tmp2=f0('tmp2.f0')
+idlco=convol(tmp0,tmp0)
+diff = idlco-tmp2
+print,min(diff),max(diff),mean(diff)
+print,tmp0
+print,tmp2
+
+inft=f0('inft.f0')
+tmp0=f0('tmp0.f0')
+idlft=fft(tmp0)
+
+ 
+            fullFT.convolveInPlace(tmp2,FT_FULLCOMPLEX|FT_NORMALIZE);
+            redux::file::Ana::write( "tmp.f0", tmp );
+            redux::file::Ana::write( "tmp2.f0", tmp2 );
+            BOOST_CHECK( tmp2 == tmp );*/
+        }
+        return;
+        {                       //  The same but as normalized FTs
+            FourierTransform fullFT(tmp,FT_FULLCOMPLEX|FT_NORMALIZE);
+            FourierTransform halfFT(tmp,FT_NORMALIZE);
+            complex_t val(salt,0);          // geometry factor normalized out, only the mean-value remains
+            BOOST_CHECK_EQUAL( fullFT(0,0), val );
+            BOOST_CHECK_EQUAL( halfFT(0,0), val );
+            for( uint y=0; y<nPoints; ++y) { 
+                for( uint x=0; x<nPoints/2+1; ++x) {
+                    if( x || y ) BOOST_CHECK_EQUAL( fullFT(y,x), complex_t(0,0) );         // check all except (0,0)
+                    if( x ) BOOST_CHECK_EQUAL( fullFT(y,nPoints-x), complex_t(0,0) );
+                }
+            }
+            fullFT.reorder();
+            for( uint y=0; y<nPoints; ++y) { 
+                for( uint x=0; x<nPoints; ++x) {
+                    if( (x == nPoints/2) && (y == nPoints/2) ) BOOST_CHECK_EQUAL( fullFT(y,x), val );
+                    else  BOOST_CHECK_EQUAL( fullFT(y,x), complex_t(0,0) );
+                }
+            }
+            Array<double> tmp2;
+            fullFT.inv(tmp2);
+            BOOST_CHECK( tmp2 == tmp );
+            halfFT.inv(tmp2);
+            BOOST_CHECK( tmp2 == tmp );
+        }
+        {
+//             Array<double> tmp2(nPoints,nPoints);
+//             tmp2.zero();
+//             tmp2(0,0) = 1;      // a delta function
+//             
+        }
+    }
+return;
+    
+    Array<double> peak(nPoints,nPoints);
+    peak.zero();
+    redux::math::gauss( peak.get(), nPoints, nPoints, nPoints/20, nPoints/40, nPoints/2, nPoints/2);    // centered gaussian with fwhm (20,20)
+/*    for( int i = 0; i < nPoints; ++i ) {
+        double y = i-nPoints/2;
+        for( int j = 0; j < nPoints; ++j ) {
+            double x = j-nPoints/2;
+            if(x*x+y*y < nPoints/2) {
+                peak(i,j) = 1;
+            }
+//             peak(i,j) *= 7;
+//             peak(i,j) += (y+0.5*x)/800;
+//             peak(i,j) += sin(x/50)*cos(y/200);
+        }
+    }
+*/
+
+/*
+
+halfft=f0('halfft.f0')
+fullft=f0('fullft.f0')
+tmp=f0('tmp.f0')
+tmp2=f0('tmp2.f0')
+inft=f0('inft.f0')
+
+tvscl,inft
+tvscl,tmp2,105,0
+;tvscl,prod,310,0
+
+print,min(tmp),max(tmp),mean(tmp)
+print,min(tmp2),max(tmp2),mean(tmp2)
+
+;print,real_part(halfft)
+;print,real_part(fullft)
+;print,real_part(prod)
+
+peak=f0('peak.f0')
+ft=f0('ft.f0')
+fc=f0('fc.f0')
+ft3=f0('ft3.f0')
+ft4=f0('ft4.f0')
+fthh=f0('fthh.f0')
+ftff=f0('ftff.f0')
+fthf=f0('fthf.f0')
+ftfh=f0('ftfh.f0')
+idlft = FFT(peak)  
+ftinv=f0('ftinv.f0')
+fcinv=f0('fcinv.f0')
+ftci=f0('ftci.f0')
+fcci=f0('fcci.f0')
+ftac=f0('ftac.f0')
+fcac=f0('fcac.f0')
+ftacinv=f0('ftacinv.f0')
+fcacinv=f0('fcacinv.f0')
+
+;tvscl,peak
+tvscl,ft*ft
+tvscl,fc*fc,105,0
+tvscl,fthh,310,0
+tvscl,ftff,415,0
+tvscl,ftfh,620,0
+tvscl,fthf,825,0
+print,min(ft*ft),max(ft*ft),mean(ft*ft)
+print,min(ftfh),max(ftfh),mean(ftfh)
+
+print,min(ftff),max(ftff),mean(ftff)
+print,min(fthf),max(fthf),mean(fthf)
+print,ft(99:100,0:3)
+print,ft3(99:103,0:3)
+print,fc(99:103,0:3)
+
+tvscl,ftinv,0,200
+tvscl,fcinv,200,200
+tvscl,ftci,400,200
+tvscl,fcci,600,200
+
+tvscl,ftac,0,400
+tvscl,fcac,200,400
+tvscl,ftacinv,400,400
+tvscl,fcacinv,600,400
+
+print,min(peak),max(peak)
+print,min(ft),max(ft)
+print,min(fc),max(fc)
+print,min(ft-fc(0:100,*)),max(ft-fc(0:100,*))
+print,min(ftac),max(ftac)
+print,min(fcac),max(fcac)
+print,min(ftac-fcac(0:100,*)),max(ftac-fcac(0:100,*))
+print,min(fcci-fcac(0:100,*)),max(fcci-fcac(0:100,*))
+
+   rhs #100 = (-2.70823e-08,-5.55051e-16)   oValue #100 = (-2.70823e-08,-5.55051e-16)   nValue #100 = (7.33452e-16,3.00641e-23)
+
+*/
+Array<double> peak2(peak,nPoints,nPoints/2);
+
+    redux::file::Ana::write( "peak.f0", peak );
+
+    FourierTransform ft(peak,FT_NORMALIZE);
+    //ft.reorder();
+    redux::file::Ana::write( "ft.f0", ft );
+    FourierTransform ft2(peak,FT_FULLCOMPLEX|FT_NORMALIZE);
+    //ft2.reorder();
+    redux::file::Ana::write( "fc.f0", ft2 );
+//    ft.convolveInPlace(peak);
+    redux::file::Ana::write( "ftci.f0", peak );
+//    ft.inv(peak);
+    redux::file::Ana::write( "ftinv.f0", peak );
+//    ft2.convolveInPlace(peak);
+    redux::file::Ana::write( "fcci.f0", peak );
+//    ft2.inv(peak);
+    redux::file::Ana::write( "fcinv.f0", peak );
+
+    //auto bla1 = ft.convolve(peak);
+    
+    redux::util::Array<double> tmp;
+    peak.copy(tmp);
+    //ft.convolveInPlace( tmp );
+cout << "BLA1" << endl;
+    //FourierTransform ft3(ft2,ft.dimensions());
+    //Array<complex_t> ft3( reinterpret_cast<Array<complex_t>&>(ft2), ft.dimensions() );
+    //FourierTransform ft4 = ft;
+    //FourierTransform ft5 = ft2;
+    //int bla=1;
+    //for(auto & it: ft) it = bla++;
+    //ft *= complex_t(3,0);
+    //Array<complex_t> ft3;
+    //ft.copy(ft3);
+    //ft3 = complex_t(0.1,0);
+
+    //for(auto & it: ft3) it = bla++;
+    redux::file::Ana::write( "ft.f0", ft );
+    redux::file::Ana::write( "fc.f0", ft2 );
+    //ft3 *= ft;
+    //ft *= ft4;
+    //redux::file::Ana::write( "fthh.f0", ft );
+    //ft2 *= ft5;
+    //redux::file::Ana::write( "ftff.f0", ft2 );
+    //ft = ft4;
+    //ft2 = ft5;
+    //ft4.copy(ft);
+    //ft5.copy(ft2);
+    ft *= ft2;
+    redux::file::Ana::write( "ftfh.f0", ft );
+    //ft2 *= ft4;
+    //redux::file::Ana::write( "fthf.f0", ft2 );
+cout << "BLA2" << endl;
+    
+    redux::file::Ana::write( "ftac.f0", ft );
+return;
+    auto bla2 = ft2.convolve(peak);
+    //ft.autocorrelate();
+    //ft2.autocorrelate();
+    redux::file::Ana::write( "fcac.f0", bla2 );
+    
+return;
+
+    ft.inv(peak);
+    redux::file::Ana::write( "ftacinv.f0", peak );
+    ft2.inv(peak);
+    redux::file::Ana::write( "fcacinv.f0", peak );
+    
+    
+    return;
     testArray<int8_t>(100);
     testArray<uint16_t>(44,55);
     testArray<int>(4,14,9);
@@ -444,7 +877,7 @@ return;
         Statistics stats;
         stats.getMinMaxMean(peak);
         cout << std::setprecision(9) << "Min = " << stats.min << "  Max = " << stats.max << "   Mean = " << stats.mean << endl;
-        stats.getRmsStddev(peak,stats.mean);
+        stats.getRmsStddev(peak);
         cout << "StdDev = " << stats.stddev << "  RMS = " << stats.rms << endl;
         
         int mask = 10; //10;
@@ -537,8 +970,10 @@ namespace testsuite {
 
             test_suite* ts = BOOST_TEST_SUITE( "IMAGE" );
 
-            ts->add( BOOST_TEST_CASE( &arrayTests ) );
-            ts->add( BOOST_TEST_CASE( &transformTest ) );
+            //ts->add( BOOST_TEST_CASE( &arrayTests ) );
+            //ts->add( BOOST_TEST_CASE( &statTest ) );
+            ts->add( BOOST_TEST_CASE( &fourierTest ) );
+            //ts->add( BOOST_TEST_CASE( &transformTest ) );
 
             framework::master_test_suite().add( ts );
 

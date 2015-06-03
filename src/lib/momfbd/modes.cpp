@@ -148,7 +148,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
 
 PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double lambda, double angle, double cutoff) :
      Array<double> (nPoints, nPoints), inv_atm_rms(0) {
-cout << "Generating KL mode:   #" << klModeNumber << "   nPoints = " << nPoints << "  R=" << r_c << "  lamba=" << lambda << "   co=" << cutoff << endl;
+
     if(firstMode > lastMode) swap(firstMode, lastMode);
 
     if(klModeNumber < firstMode || klModeNumber > lastMode) {

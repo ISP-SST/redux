@@ -82,7 +82,6 @@ void Grid::init(void) {
 
 double redux::image::makePupil( util::Array<double>& aperture, uint32_t nPoints, float radius, bool normalize ) {
 
-cout << "makePupil:  nPoints = " << nPoints << "  R=" << radius << "  normalize=" << normalize << endl;
     double area = 0.0, origin = 0.5;
     uint32_t mid = nPoints/2;   // N.B: Don't use odd number of points for pupils !!
                                 // Pupil should be centered ON pixel (mid,mid), to match the location of the origin for Fourier-transforms.

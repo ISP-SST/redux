@@ -11,6 +11,9 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/image/utils.hpp"
 
+//#include "io.h"
+//#include "modes.h"
+
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/program_options.hpp>
@@ -282,29 +285,29 @@ void packTest( void ) {
 }
 
 
-
-
 void modeTest(void) {
 
-    return;
-    // io_class bla;
+    //return;
+    //io_class bla;
 
-    double lambda = 100;
-    double rc = 72;
-    double angle = 0;
-    int nPixels = 150;
-    double svd_reg = 0;
+    double lambda = 1; //7.77200e-07; //1000;
+    double rc = 80; //87.1075; //29.7;
+    double angle = 0; //45*redux::PI/180.0;
+    int nPixels = 164;
+    double cutoff = 0;
 
     int first_mode = 1;
-    int last_mode = 25;
+    int last_mode = 20;
     int nModes = last_mode - first_mode + 1;
 
     static Cache& cache = Cache::getCache();
     const redux::image::Grid& grid = cache.grid(nPixels);
+    auto& pupil = cache.pupil(nPixels,rc);
     float** aPtr = grid.angle.get();
     Array<float> awrapper(*aPtr, nPixels, nPixels);
     redux::file::Ana::write("modetest_angle.f0", awrapper);
-
+    redux::file::Ana::write("modetest_pupil.f0", pupil.first);
+    //cout << "PupilArea = " << pupil.second << endl;
     //PupilMode::KL_cfg* m_new_cfg = legacy::klConfig(first_mode, last_mode);
     //klmc* m_cfg = kl_cfg(first_mode, last_mode);
 
@@ -315,41 +318,145 @@ void modeTest(void) {
 
     for(int m = 0; m < nModes; ++m) {
         //cout << "old:  #" << (first_mode + m) << printArray(m_cfg[first_mode + m].c + 1, m_cfg[first_mode + m].nm, "  coeffs") << endl;
+        //cout << "old:  #" << (first_mode + m) << printArray(m_cfg[first_mode + m].m + 1, m_cfg[first_mode + m].nm, "  modes") << endl;
         vector<double> coeffs;
         //for(auto &it : m_new_cfg[m].zernikeWeights ) coeffs.push_back(it.second);
         //cout << "ned:  #" << (first_mode+m) << printArray(coeffs,"  coeffs") << endl;
         //coeffs.clear();
         for(auto & it : kle[first_mode + m]->zernikeWeights) coeffs.push_back(it.second);
         //cout << "new:  #" << (first_mode + m) << printArray(coeffs, "  coeffs") << endl;
+        //cout << "      v = " << m_cfg[first_mode + m].v << "    cov = " << kle[first_mode + m]->covariance << endl;
     }
 
 
-
-    PupilMode **zz = new PupilMode* [nModes];
-    memset(zz, 0, nModes * sizeof(PupilMode*));
-
     // use temporary storage z to avoid recomputing too many Zernikes
-    /// mde **z = new mde* [nModes];
-    // memset(z, 0, nModes * sizeof(mde*));
+    //mde **z = new mde* [nModes];
+    //memset(z, 0, nModes * sizeof(mde*));
+    Array<float> newZModes(nModes,nPixels,nPixels);
+    Array<float> newKLModes(nModes,nPixels,nPixels);
+    //Array<float> oldZModes(nModes,nPixels,nPixels);
+    //Array<float> oldKLModes(nModes,nPixels,nPixels);
+    Array<float> newz_slice(newZModes, 0, 0, 0, nPixels-1, 0, nPixels-1);          // subarray @ first mode
+    Array<float> newkl_slice(newKLModes, 0, 0, 0, nPixels-1, 0, nPixels-1);        // subarray @ first mode
+    //Array<float> oldz_slice(oldZModes, 0, 0, 0, nPixels-1, 0, nPixels-1);          // subarray @ first mode
+    //Array<float> oldkl_slice(oldKLModes, 0, 0, 0, nPixels-1, 0, nPixels-1);        // subarray @ first mode
 
     for(int j = first_mode; j <= last_mode; ++j) {
 
-        //PupilMode mode(j, nPixels, rc, lambda, angle);           //  PupilMode ( int modeIndex, int nPoints, double r_c = 1.0, double lambda = 1.0, double angle = 0.0 ); // Zernike
-        //PupilMode mode( m_new_cfg, j, nPixels, zz-first_mode, rc, lambda, angle, svd_reg );
-        PupilMode mode(first_mode, last_mode, j, nPixels, rc, lambda, angle, svd_reg);
-        //cout << "loop: " << hexString(&mode) << endl;
-        //pmd oldmode(lambda, rc, nPixels, j, angle, bla);                //  pmd(lambda,r_c,nph,mn,angle,io));
-        //pmd oldmode(lambda, rc, nPixels, j, m_cfg, svd_reg, z - first_mode, angle, bla);
-        // Array<double> wrapper(*(oldmode.mode + 1) + 1, nPixels, nPixels);
+        PupilMode zmode(j, nPixels, rc, lambda, angle);
+        PupilMode klmode(first_mode, last_mode, j, nPixels, rc, lambda, angle, cutoff);
 
+        //pmd oldzmode(lambda, rc, nPixels, j, angle, bla);                //  pmd(lambda,r_c,nph,mn,angle,io));
+        //pmd oldklmode(lambda, rc, nPixels, j, m_cfg, cutoff, z - first_mode, angle, bla);
+        //Array<double> zwrapper(*(oldzmode.mode + 1) + 1, nPixels, nPixels);
+        //Array<double> klwrapper(*(oldklmode.mode + 1) + 1, nPixels, nPixels);
+        
+        newz_slice = zmode;
+        newz_slice *= pupil.first;
+        newz_slice.shift(0,1);
+        
+        newkl_slice = klmode;
+        newkl_slice *= pupil.first;
+        newkl_slice.shift(0,1);
+        
+//         oldz_slice = zwrapper;
+//         oldz_slice *= pupil.first;
+//         oldz_slice.shift(0,1);
+//         
+//         oldkl_slice = klwrapper;
+//         oldkl_slice *= pupil.first;
+//         oldkl_slice.shift(0,1);
+        
         //cout << printArray(mode,"mode") << endl;
-        redux::file::Ana::write("modetest_" + to_string(j) + ".f0", mode);
+        //redux::file::Ana::write("newzmode_" + to_string(j) + ".f0", zmode);
+        //redux::file::Ana::write("newklmode_" + to_string(j) + ".f0", klmode);
         // redux::file::Ana::write("modetest_" + to_string(j) + "b.f0", wrapper);
 
     }
+/*
+npixels=164
+nmodes=20
+imgperrow=5
+pupil=f0('/home.local/tomas/build/redux/modetest_pupil.f0')
+newz=f0('/home.local/tomas/build/redux/newzmodes.f0')
+newkl=f0('/home.local/tomas/build/redux/newklmodes.f0')
+oldz=f0('/home.local/tomas/build/redux/oldzmodes.f0')
+oldkl=f0('/home.local/tomas/build/redux/oldklmodes.f0')
+diff=newz-oldz
+dist=f0('/home.local/tomas/build/redux/grid_distance.f0')
+ap=f0('/home.local/tomas/build/redux/aperture.f0')
+ap2=f0('/home.local/tomas/build/redux/aperture2.f0')
+diffa = ap-ap2
+for q=0,nmodes-1 do tvscl,newz(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
+for q=0,nmodes-1 do tvscl,oldz(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
+for q=0,nmodes-1 do tvscl,diff(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
+for q=0,nmodes-1 do tvscl,newkl(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
+for q=0,nmodes-1 do tvscl,oldkl(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
+;for q=0,nmodes-1 do print,min(oldz(*,*,q)),max(oldz(*,*,q)),min(newz(*,*,q)),max(newz(*,*,q))
+;for q=0,nmodes-1 do print,min(oldz(*,*,q))/min(newz(*,*,q)),max(oldz(*,*,q))/max(newz(*,*,q))
+for q=0,nmodes-1 do print,min(newz(*,*,q))-min(oldz(*,*,q)),max(newz(*,*,q))-max(oldz(*,*,q))
+;for q=0,nmodes-1 do print,min(oldkl(*,*,q)),max(oldkl(*,*,q)),min(newkl(*,*,q)),max(newkl(*,*,q))
+for q=0,nmodes-1 do print,min(newkl(*,*,q))-min(oldkl(*,*,q)),max(newkl(*,*,q))-max(oldkl(*,*,q))
+    
+    
+oldpsf=f0('src/bin/oldpsf.f0')                 
+oldotf=f0('src/bin/oldotf.f0')
+newotf=f0('src/bin/newotf.f0')
+newpsf=f0('src/bin/newpsf.f0')
+tvscl,oldpsf
+tvscl,newpsf
 
-    // delete[] z;
-    delete[] zz;
+mode3=f0('src/bin/mode_3_0.f0')
+mode4=f0('src/bin/mode_4_1.f0')
+phimode3=f0('src/bin/phi-mode_3_0.f0')
+phimode4=f0('src/bin/phi-mode_4_1.f0')
+phi=f0('src/bin/phi_1.f0')
+tvscl,mode3*pupil
+tvscl,mode4*pupil,npixels,0
+tvscl,phimode3*pupil,2*npixels,0
+tvscl,phimode4*pupil,3*npixels,0
+tvscl,phi*pupil,4*npixels,0
+print,mean(mode3),mean(mode4),mean(phimode3),mean(phimode4),mean(phi)
+
+
+
+wborig=f0('src/bin/camXX.00010.7772.0014668.orig')
+wborig1=f0('src/bin/camXX.00010.7772.0014668.1.orig')
+wborig2=f0('src/bin/camXX.00010.7772.0014668.2.orig')
+wborig3=f0('src/bin/camXX.00010.7772.0014668.3.orig')
+wborig4=f0('src/bin/camXX.00010.7772.0014668.4.orig')
+wborig5=f0('src/bin/camXX.00010.7772.0014668.5.orig')
+tvscl,wborig
+tvscl,wborig1
+tvscl,wborig2
+tvscl,wborig3
+tvscl,wborig4
+tvscl,wborig5
+
+img=f0('src/bin/windowed_1_0.f0')
+imgft=f0('src/bin/windowedft_1_0.f0')
+tvscl,img
+
+ftsum_0=f0('src/bin/ftsum_0.f0')
+ftsum_1=f0('src/bin/ftsum_1.f0')
+ftsum_2=f0('src/bin/ftsum_2.f0')
+ftsum_3=f0('src/bin/ftsum_3.f0')
+ftsum_4=f0('src/bin/ftsum_4.f0')
+ftsum_5=f0('src/bin/ftsum_5.f0')
+ftsum_6=f0('src/bin/ftsum_6.f0')
+ftsum_7=f0('src/bin/ftsum_7.f0')
+ftsum_8=f0('src/bin/ftsum_8.f0')
+tvscl,alog10(ftsum_0)
+
+Output from testsuite:
+Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.0023%  MvN=-0.58%
+
+*/
+    redux::file::Ana::write("newzmodes.f0", newZModes);
+    redux::file::Ana::write("newklmodes.f0", newKLModes);
+    //redux::file::Ana::write("oldzmodes.f0", oldZModes);
+    //redux::file::Ana::write("oldklmodes.f0", oldKLModes);
+    //delete[] z;
 
 
     // kl_uncfg(m_cfg, first_mode, last_mode);
@@ -358,23 +465,23 @@ void modeTest(void) {
     double radius = 0.4321*nPixels;
     Array<double> aperture;
     double area = makePupil(aperture,nPixels,radius);
-    redux::file::Ana::write("aperture.f0", aperture);
+    //redux::file::Ana::write("aperture.f0", aperture);
 
-    Array<double> aperture2(nPixels+1,nPixels+1);    // add extra space to make room for Michiels +1 offset to array indexing
-    auto a2Ptr = aperture2.get(nPixels+1,nPixels+1);
-    double area_mvn = makePupil_mvn(a2Ptr.get(),nPixels,radius);
-    redux::file::Ana::write("aperture2.f0", aperture2);
+    double** ap = makePointers(aperture.ptr(), nPixels, nPixels);
+    double area_mvn = makePupil_mvn(ap,nPixels,radius);
+    //redux::file::Ana::write("aperture2.f0", aperture);
+    delPointers(ap);
 
     auto pup_pair = cache.pupil(nPixels,radius);
-    redux::file::Ana::write("aperture3.f0", pup_pair.first);
+    //redux::file::Ana::write("aperture3.f0", pup_pair.first);
 
-    cout << "Area = " << area << "  Area_mvn  = " << area_mvn << "   r^2*PI = " << (radius*radius*redux::PI) << endl;
-    cout << "ap=f0('aperture.f0')\n"
-         << "ap2=f0('aperture2.f0')\n"
-         << "ap[" <<(nPixels/2-2) << ":" << (nPixels/2+2) << ","<<(nPixels/2-2) << ":" << (nPixels/2+2) << "]\n"
-         << "ap2[" <<(nPixels/2-1) << ":" << (nPixels/2+3) << ","<<(nPixels/2-1) << ":" << (nPixels/2+3) << "]\n"
-         << "diff = ap-ap2[1:" << nPixels << ",1:" << nPixels << "]\n"
-         << "print,min(diff),max(diff),mean(diff)" << endl;
+//    cout << "Area = " << area << "  Area_mvn  = " << area_mvn << "   r^2*PI = " << (radius*radius*redux::PI) << endl;
+//     cout << "ap=f0('/home/tomas/build/redux/aperture.f0')\n"
+//          << "ap2=f0('/home/tomas/build/redux/aperture2.f0')\n"
+//          << "ap[" <<(nPixels/2-2) << ":" << (nPixels/2+2) << ","<<(nPixels/2-2) << ":" << (nPixels/2+2) << "]\n"
+//          << "ap2[" <<(nPixels/2-1) << ":" << (nPixels/2+3) << ","<<(nPixels/2-1) << ":" << (nPixels/2+3) << "]\n"
+//          << "diff = ap-ap2[1:" << nPixels << ",1:" << nPixels << "]\n"
+//          << "print,min(diff),max(diff),mean(diff)" << endl;
 
 }
 
