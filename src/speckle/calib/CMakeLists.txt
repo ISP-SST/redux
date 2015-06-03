@@ -1,11 +1,12 @@
 
 USE_REDUX("")
-USE_EXTERNAL(openmpi gsl)
+USE_EXTERNAL(openmpi gsl threads)
 
 SET(MPI_CFLAGS "-DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DUSE_STDARG=1 -DMALLOC_RET_VOID=1")
 
 set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_CFLAGS})
 
 REDUX_ADD_EXECUTABLE( stf_new stf.cpp zernike.cpp wam.cpp )
+REDUX_ADD_EXECUTABLE( stf_newest stf_newest.cpp mpiwrapper.cpp zernike.cpp wam.cpp )
 
 
