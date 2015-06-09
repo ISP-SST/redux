@@ -12,7 +12,6 @@
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_monte.h>
 #include <gsl/gsl_monte_vegas.h>
-#include <boost/graph/graph_concepts.hpp>
 
 using namespace redux::speckle;
 using namespace std;
