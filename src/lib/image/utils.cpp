@@ -8,6 +8,8 @@
 
 #include <map>
 
+#include <gsl/gsl_multifit.h>
+
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -180,8 +182,62 @@ double redux::image::makePupil_mvn( double** pupil, int nph, float r_c ) {
 }
 
 
+template <typename T>
+redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in) {
 
-// nverseDistanceWeight( T** array, size_t sizeY, size_t sizeX, size_t posY, size_t posX ) {
+    int ySize = in.dimSize (0);
+    int xSize = in.dimSize (1);
+    redux::util::Array<T> ret (ySize, xSize);
+
+    int n = ySize * xSize;
+    int nParams = 3;                                                        //   fit a plane as:   z = a*x + b*y + c
+    
+    gsl_vector *data = gsl_vector_alloc (n);
+    gsl_vector *coeff = gsl_vector_alloc (nParams);
+    gsl_matrix *X = gsl_matrix_alloc (n, nParams);
+    gsl_matrix *covar = gsl_matrix_alloc (nParams, nParams);
+    
+    const T* inPtr = in.ptr();
+    for (int i = 0; i < ySize; ++i) {
+        double y = static_cast<double> (i) / (ySize - 1) - 0.5;             // x,y \in [-0.5, 0.5]
+        for (int j = 0; j < xSize; ++j) {
+            double x = static_cast<double> (j) / (xSize - 1) - 0.5;
+            int offset = i * xSize + j;
+            gsl_matrix_set (X, offset, 0, x);
+            gsl_matrix_set (X, offset, 1, y);
+            gsl_matrix_set (X, offset, 2, 1);
+            gsl_vector_set (data, offset, inPtr[offset]);
+        }
+    }
+    
+    double chisq;
+    gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc (n, nParams);
+    gsl_multifit_linear (X, data, coeff, covar, &chisq, work);
+    gsl_multifit_linear_free (work);
+
+    double a = gsl_vector_get (coeff, 0);
+    double b = gsl_vector_get (coeff, 1);
+    double c = gsl_vector_get (coeff, 2);
+
+    gsl_vector_free (data);
+    gsl_vector_free (coeff);
+    gsl_matrix_free (X);
+    gsl_matrix_free (covar);
+
+    T* retPtr = ret.ptr();
+    for (int i = 0; i < ySize; ++i) {
+        double y = static_cast<double> (i) / (ySize - 1) - 0.5;
+        for (int j = 0; j < xSize; ++j) {
+            double x = static_cast<double> (j) / (xSize - 1) - 0.5;
+            int offset = i * xSize + j;
+            retPtr[offset] = a * x + b * y + c;
+        }
+    }
+
+    return ret;
+}
+template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&);
+template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&);
 
 //double inv_dist_wght(double **a,int xl,int xh,int yl,int yh,int xb,int yb)
 double redux::image::inv_dist_wght ( float **a, size_t sizeY, size_t sizeX, size_t posY, size_t posX ) {

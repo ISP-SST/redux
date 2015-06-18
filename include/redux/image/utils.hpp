@@ -35,6 +35,8 @@ namespace redux {
         double makePupil_mvn( double** data, int nPoints, float radius );
 
         template <typename T>
+        redux::util::Array<T> fitPlane( const redux::util::Array<T>& in );
+        template <typename T>
         void reverseX( T** data, size_t sizeY, size_t sizeX ) {
             for( size_t y = 0; y < sizeY; ++y ) {
                 std::reverse( data[y], data[y] + sizeX );
