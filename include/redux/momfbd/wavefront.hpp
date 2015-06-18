@@ -15,9 +15,10 @@ namespace redux {
         /*! @ingroup momfbd
          *  @{
          */
-
-        struct SubImage;
-
+        
+        /*! @brief Structure representing a wavefront. Contains information about co-temporal images.
+         *
+         */
         struct WaveFront : public std::enable_shared_from_this<WaveFront> {
             
             struct ModeInfo {
@@ -28,20 +29,30 @@ namespace redux {
             };
             typedef std::map<uint16_t,ModeInfo> modeinfo_map;
             
-            void clear(void);
+            WaveFront(void);
+            void init(size_t);
+            void count(void) { nImages++; };
+            void reset(void);
             size_t nFreeParameters(void) const { return modes.size(); };
+            size_t setPointers(double* a, double* g );
             void addImage(std::shared_ptr<SubImage> im);
             void addWeight(uint16_t,double);
             void zeroAlphaWeights(void);
-            void computePhases(boost::asio::io_service&);
-            void computePhasesAndOTF(boost::asio::io_service&);
             void setAlpha(const modeinfo_map& a);
+
+            void addPhases(boost::asio::io_service&);
+            void calcOTFs(boost::asio::io_service&);
+            void calcGradient(boost::asio::io_service&, const grad_t&);
+            double metric(boost::asio::io_service&);
+            double metric(boost::asio::io_service&, const double* dAlpha);
             double coefficientMetric(void);
-            void gradientTest(void);
+
             modeinfo_map modes;                                     //!< The coefficients defining this wavefront. (map: mode-number -> coefficient)
             std::set<std::shared_ptr<SubImage>> images;             //!< List of images sampling this wavefront (i.e. co-temporal)
             double *alpha, *grad;                                   // shortcuts to datalocations for this wavefront.
             size_t nImages;
+            redux::util::Array<double> phi;                 // temporary arrays for gradient calculations
+            redux::util::Array<complex_t> otf;
 
         };
         

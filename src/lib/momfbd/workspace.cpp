@@ -70,7 +70,6 @@ if (p->id != 1) return;
 
     for( auto& it: wavefronts ) {
         if(it.second) {
-            it.second->clear();     // clear image-list and set alpha-values to 0
         } else LOG << "WorkSpace::run(1)  it.second is NULL";
     }
     p->initPatch();
@@ -104,32 +103,8 @@ if (p->id != 1) return;
 
 
 
-    usleep(10000);
-   // if(data->id == 1) { // DEBUG: only for 1 patch to avoid duplicate output during testing
-        for( auto& it: wavefronts ) {
-            if(it.second) {
-                //it.second->setAlpha(alpha_init);
-                it.second->computePhasesAndOTF(service);
-            } else LOG << "WorkSpace::run(2)  it.second is NULL";
-        }
-        //service.post( std::bind( &WaveFront::computePhases, it.second.get() ) );
-        runThreadsAndWait(service, job.info.maxThreads);
+    coefficientMetric( service );
 
-        for( auto& it: job.getObjects() ) {
-            it->addAllPQ();
-            it->metric();
-        }
-        
-        for( auto& it: wavefronts ) {
-            if(it.second) {
-                //it.second->setAlpha(alpha_init);
-                it.second->gradientTest();
-            } else LOG << "WorkSpace::run(2)  it.second is NULL";
-        }
-        coefficientMetric(service);
-        objectMetric(service);
-        
-   // }
 }
 
 

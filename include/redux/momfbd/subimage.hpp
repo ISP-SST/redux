@@ -9,6 +9,7 @@
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -83,6 +84,9 @@ namespace redux {
             
 
         };
+        
+        
+        typedef std::function<double(SubImage&, uint16_t, double, complex_t*, double*)> grad_t;
 
 
         /*! @} */

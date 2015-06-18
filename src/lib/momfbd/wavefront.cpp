@@ -13,9 +13,29 @@ namespace {
 
 }
 
-void WaveFront::clear (void) {
-    cout << "  WaveFront::clear()" << endl;
+WaveFront::WaveFront(void) : nImages(0) {
+
+}
+
+
+void WaveFront::init(size_t pupilSize) {
+    phi.resize(modes.size(),pupilSize,pupilSize);
+    otf.resize(modes.size(),2*pupilSize,2*pupilSize);
+}
+
+
+void WaveFront::reset (void) {
     images.clear();
+}
+
+
+size_t WaveFront::setPointers(double* a, double* g ) {
+    alpha=a;
+    grad=g;
+    for ( auto& it: modes ) {
+        it.second.value = a++;
+    }
+    return modes.size();
 }
 
 
@@ -24,14 +44,12 @@ void WaveFront::addImage (std::shared_ptr<SubImage> im) {
         images.insert (im);
         im->setWaveFront (shared_from_this());
     }
-
-    cout << hexString (this) << "  WaveFront::addImage()  im = " << hexString (im.get()) << "   nIm = " << images.size() << endl;
 }
 
 
 void WaveFront::addWeight (uint16_t modenumber, double w) {
     modes[modenumber].weight += w;
-    cout << hexString (this) << "  WaveFront::addWeight():   modeAddr = " << hexString (&modes[modenumber]) << "   Mode: " << modenumber << "   w: " << w << "   weight: " << modes[modenumber].weight << endl;
+    //cout << hexString (this) << "  WaveFront::addWeight():   modeAddr = " << hexString (&modes[modenumber]) << "   Mode: " << modenumber << "   w: " << w << "   weight: " << modes[modenumber].weight << endl;
 }
 
 
@@ -47,20 +65,42 @@ void  WaveFront::setAlpha (const modeinfo_map& a) {
 }
 
 
-
-void WaveFront::computePhases (boost::asio::io_service& service) {
+void WaveFront::addPhases (boost::asio::io_service& service) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
             service.post (std::bind((void(SubImage::*)(const double*))&SubImage::addPhases, it.get(), alpha));
-//             it->computePhases();
-//             it->OTF();
-//             it->PSF();
         }
     }
 }
 
 
-void WaveFront::computePhasesAndOTF (boost::asio::io_service& service) {
+void WaveFront::calcOTFs (boost::asio::io_service& service) {
+    for (const shared_ptr<SubImage>& it : images) {
+        if (it) {
+            service.post ([it,this] {    // use a lambda to ensure these calls are sequential
+                it->addPhases(alpha);
+                it->calcOTF();
+                it->calcVogelWeight();
+            });
+        }
+    }
+}
+
+
+void WaveFront::calcGradient (boost::asio::io_service& service, const grad_t& gradient) {
+    int count(0);
+    for ( auto& m: modes ) {
+        service.post ([this,gradient,count,&m] {
+            for (const shared_ptr<SubImage>& it : images) {
+                grad[count] += gradient(*it, m.first, 1E-2, otf.ptr(count,0,0), phi.ptr(count,0,0) );
+            }
+        });
+        count++;
+    }
+}
+
+
+double WaveFront::metric(boost::asio::io_service& service) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
             service.post ([it,this] {    // use a lambda to ensure these two calls are sequential
@@ -69,6 +109,13 @@ void WaveFront::computePhasesAndOTF (boost::asio::io_service& service) {
             });
         }
     }
+    return 0;
+}
+
+
+double WaveFront::metric(boost::asio::io_service& service, const double* dAlpha) {
+    
+    return 0;
 }
 
 
@@ -81,21 +128,7 @@ double WaveFront::coefficientMetric (void) {
         cnt++;
     }
 
-    cout << hexString (this) << "  WaveFront::coefficientMetric()  nAlpha = " << modes.size() << "   sum = " << sum << endl;
     return sum;
 
 }
 
-void WaveFront::gradientTest (void) {
-    cout << hexString (this) << "  WaveFront::gradientTest()  nAlpha = " << modes.size() << "  nImages = " << images.size() << endl;
-    vector<double> grad (modes.size(), 0.0);
-
-    for (const shared_ptr<SubImage>& it : images) {
-        if (it) {
-            //it->gradientFiniteDifference (grad);
-          //  it->gradientVogel(grad.data());
-        } else cout << hexString (this) << "  WaveFront::gradientTest()  it == NULL" << endl;
-    }
-
-    cout << hexString (this) << "  WaveFront::gradientTest() " << printArray (grad, "grad") << endl;
-}
