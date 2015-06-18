@@ -7,6 +7,7 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <sstream>
 #include <thread>
 
 #include <boost/bind.hpp>
@@ -144,7 +145,45 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
 
 }
 
-int main( int argc, char *argv[] ) {
+bool replace(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = str.find(from);
+    bool found = false;
+    while(start_pos != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        found = true;
+        start_pos = str.find(from);
+    }
+    return found;
+}
+
+
+string filterOldCfg(string filename) {
+    
+    std::ifstream in(filename, std::ios::in | std::ios::binary);
+    if (!in) {
+        throw (errno);
+    }
+
+    std::string text;
+    in.seekg (0, std::ios::end);
+    text.reserve (in.tellg());
+    in.seekg (0, std::ios::beg);
+    std::copy ( (std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>(), std::back_inserter (text));
+    in.close();
+
+    bool found = replace(text, "channel{", "channel {");
+    found |= replace(text, "object{", "object {");
+    found |= replace(text, "=", " ");
+    
+    if (found) { // old cfg file, wrap inside momfbd { ... }
+        text = "momfbd { \n" + text + "\n}";
+    }
+
+    return text;
+}
+
+
+int main (int argc, char *argv[]) {
 
 
     bpo::variables_map vm;
@@ -166,11 +205,12 @@ int main( int argc, char *argv[] ) {
     try {
         Logger logger( vm );
         bpt::ptree momfbd;
-        bpt::read_info( vm["config"].as<string>(), momfbd );
-        bool check = (vm.count( "no-check" )+vm.count( "print" )) == 0;
-        vector<Job::JobPtr> jobs = Job::parseTree( vm, momfbd, check );
+        std::stringstream filteredCfg(filterOldCfg(vm["config"].as<string>()));
+        bpt::read_info (filteredCfg , momfbd);
+        bool check = (vm.count ("no-check") + vm.count ("print")) == 0;
+        vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
 
-        if( vm.count( "print" ) ) {     // dump configuration to console and exit
+        if (vm.count ("print")) {       // dump configuration to console and exit
             bpt::ptree dump;
             for( auto & it : jobs ) {
                 it->getPropertyTree( &dump );
