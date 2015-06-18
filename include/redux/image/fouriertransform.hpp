@@ -48,12 +48,18 @@ namespace redux {
             FourierTransform( const FourierTransform&);
             template <typename T>
             FourierTransform( const redux::util::Array<T>&, int flags=0, uint8_t nThreads=1);
+            template <typename T>
+            FourierTransform( const T*, size_t ySize, size_t xSize, int flags=0, uint8_t nThreads=1);
             
             template <typename T>
-            void reset( const redux::util::Array<T>&, int flags=0, uint8_t nThreads=1);
+            void reset( const T*, size_t ySize, size_t xSize, int flags=0, uint8_t nThreads=1);
+            template <typename T>
+            void reset( const redux::util::Array<T>&in, int flags=0, uint8_t nThreads=1) { reset(in.get(),in.dimSize(0),in.dimSize(1),flags,nThreads); }
             
             template <typename T>
-            void directInverse( redux::util::Array<T>& );
+            void directInverse( T* );
+            template <typename T>
+            void directInverse( redux::util::Array<T>& out ) { directInverse(out.get()); }
             template <typename T>
             void inv( redux::util::Array<T>&, int flags=0 ) const;
             
@@ -62,7 +68,9 @@ namespace redux {
             
             void autocorrelate( void );
             template <typename T>
-            static void autocorrelate( redux::util::Array<T>& );
+            static void autocorrelate( T*, size_t, size_t );
+            template <typename T>
+            static void autocorrelate( redux::util::Array<T>& in ) { autocorrelate(in.get(), in.dimSize(0), in.dimSize(1)); }
             template <typename T>
             static void autocorrelate( const redux::util::Array<T>&, redux::util::Array<T>& );
 
@@ -88,9 +96,11 @@ namespace redux {
 
             void reorder(void);
             template <typename T>
-            static void reorder( redux::util::Array<T>& );
-            FourierTransform reordered(void) const;
+            static void reorder( T*, size_t, size_t );
+            template <typename T>
+            static void reorder( redux::util::Array<T>& in ) { reorder(in.get(), in.dimSize(0), in.dimSize(1)); }
 
+            FourierTransform reordered(void) const;
             
             void resize(const std::vector<size_t>& sizes);
             template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
@@ -106,8 +116,9 @@ namespace redux {
 
             void set( redux::util::Array<double>&);
             void set( redux::util::Array<complex_t>&);
-            void init( const redux::util::Array<double>&);
-            void init( const redux::util::Array<complex_t>&);
+            void init(void);
+            void init(const double*, size_t, size_t);
+            void init(const complex_t*, size_t, size_t);
 
         private:
             Plan::Ptr plan;

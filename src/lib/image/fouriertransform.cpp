@@ -65,7 +65,7 @@ void FourierTransform::Plan::init (void) {
                 throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
             }
     } else {
-        if (id.tp == C2C)  {
+        if (id.tp == C2C) {
             if (id.sizes.size() == 2) {
                 auto in = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
                 auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
@@ -122,12 +122,13 @@ FourierTransform::FourierTransform() : centered (false), halfComplex (false), no
 
 
 FourierTransform::FourierTransform (size_t ySize, size_t xSize, int flags, uint8_t nT) :
-    centered (false), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized (false), nThreads(nT) {
+    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized (false), nThreads(nT), inputSize(ySize*xSize) {
     if (halfComplex) {
         Array<complex_t>::resize (ySize, xSize / 2 + 1);
     } else {
         Array<complex_t>::resize (ySize, xSize);
     }
+    init();
 }
 
 
@@ -141,49 +142,53 @@ template <typename T>
 FourierTransform::FourierTransform (const Array<T>& rhs, int flags, uint8_t nT) :
     centered (false), halfComplex (false), normalized (false) {
 
-    reset (rhs, flags, nT);
+    vector<size_t> dims = rhs.dimensions();
+    if (dims.empty()) {
+        throw logic_error ("FourierTransform initialized with no non-trivial dimensions: " + printArray (rhs.dimensions(), "dims"));
+    } else {
+        if (dims.size() > 2) {
+            throw logic_error ("FourierTransform only supports 1&2 dimensions at the moment: " + printArray (dimensions(), "dims"));
+        }
+    }
+
+    reset(rhs.ptr(), dims[0], dims[1], flags, nT);
 
 }
 
 
 template <typename T>
-void FourierTransform::reset (const Array<T>& rhs, int flags, uint8_t nT) {
+FourierTransform::FourierTransform (const T* rhs, size_t ySize, size_t xSize, int flags, uint8_t nT) :
+    centered (false), halfComplex (false), normalized (false) {
+        
+    reset(rhs, ySize, xSize, flags, nT);
 
-    vector<size_t> dims = rhs.dimensions();
+}
 
-    if (dims.empty()) {
-        throw logic_error ("FourierTransform::reset() called with no non-trivial dimensions: " + printArray (rhs.dimensions(), "dims"));
-    } else {
-        if (dims.size() > 2) {
-            throw logic_error ("FourierTransform::reset() only supports 1&2 dimensions at the moment: " + printArray (dimensions(), "dims"));
-        }
-    }
 
-    inputSize = rhs.nElements();
+template <typename T>
+void FourierTransform::reset (const T* rhs, size_t ySize, size_t xSize, int flags, uint8_t nT) {
+
+    inputSize = ySize*xSize;
     normalized = false;
     centered = false;       // output from FFTW is in re-ordered form, i.e. not centered
     nThreads = nT;
 
     if (flags & FT_FULLCOMPLEX) {
         halfComplex = false;
-        Array<complex_t> tmp;
-        rhs.copy (tmp);
-
+        Array<complex_t> tmp(ySize,xSize);
+        tmp.copyFrom<T>(rhs);
         if (flags & FT_REORDER) {
-            reorder (tmp);
+            reorder(tmp.get(),ySize,xSize);
         }
-
-        init (tmp);
+        init(tmp.get(),ySize,xSize);
     } else {
         halfComplex = true;     // transform of real data, let's save half the space.
-        Array<double> tmp;
-        rhs.copy (tmp);
-
+        Array<double> tmp(ySize,xSize);
+        tmp.copyFrom<T>(rhs);
         if (flags & FT_REORDER) {
-            reorder (tmp);
+            reorder(tmp.get(),ySize,xSize);
         }
-
-        init (tmp);
+        init(tmp.get(),ySize,xSize);
     }
 
     if (flags & FT_NORMALIZE) {
@@ -196,32 +201,22 @@ void FourierTransform::reset (const Array<T>& rhs, int flags, uint8_t nT) {
 namespace redux {
     namespace image {
         template <>
-        void FourierTransform::reset (const Array<complex_t>& rhs, int flags, uint8_t nT) {
+        void FourierTransform::reset (const complex_t* rhs, size_t ySize, size_t xSize, int flags, uint8_t nT) {
 
-            vector<size_t> dims = rhs.dimensions();
-
-            if (dims.empty()) {
-                throw logic_error ("FourierTransform::reset() called with no non-trivial dimensions: " + printArray (rhs.dimensions(), "dims"));
-            } else {
-                if (dims.size() > 2) {
-                    throw logic_error ("FourierTransform::reset() only supports 1&2 dimensions at the moment: " + printArray (dimensions(), "dims"));
-                }
-            }
-
-            inputSize = rhs.nElements();
+            inputSize = ySize*xSize;
             normalized = false;
             centered = false;       // output from FFTW is in re-ordered form, i.e. not centered
             halfComplex = false;
             nThreads = nT;
 
-            Array<complex_t> tmp;
-            rhs.copy (tmp);
+            Array<complex_t> tmp(ySize,xSize);
+            memcpy(tmp.get(),rhs,ySize*xSize*sizeof(complex_t));
 
             if (flags & FT_REORDER) {
-                reorder();
+                reorder(tmp.get(),ySize,xSize);
             }
 
-            init (tmp);
+            init(tmp.get(),ySize,xSize);
 
             if (flags & FT_NORMALIZE) {
                 normalize();
@@ -242,56 +237,68 @@ void FourierTransform::set(Array<complex_t>& rhs) {
 }
 
 
-void FourierTransform::init (const Array<double>& rhs) {
+void FourierTransform::init (void) {
 
-    const vector<size_t>& dims = rhs.dimensions();
-
-    // for r2c transforms, the last dimension has size = n/2+1
-    if( (dims[0] != dimSize(0)) || (2*(dims[1]-1) != 2*(dimSize(1)-1))) {
-        Array<complex_t>::resize (dims[0],dims[1]/2+1);
+    if( halfComplex ) { 
+        vector<size_t> dims = dimensions();
+        dims.back() -= 1;
+        dims.back() <<= 1;
+        plan = getPlan (dims, Plan::R2C, nThreads);
+    } else {
+        plan = getPlan (dimensions(), Plan::C2C, nThreads);
     }
 
-    plan = getPlan (rhs.dimensions(), Plan::R2C, nThreads);
-    size_t sz = rhs.nElements();
-    double* tmpData = new double[sz];
-    memcpy (tmpData, rhs.ptr(), sz * sizeof (double));  // copy data because r2c-transforms modifies input
+}
+
+
+void FourierTransform::init (const double* in, size_t ySize, size_t xSize) {
+
+    // for r2c transforms, the last dimension has size = n/2+1
+    if( (ySize != dimSize(0)) || (xSize != 2*(dimSize(1)-1))) {
+        Array<complex_t>::resize (ySize,xSize/2+1);
+    }
+
+    plan = getPlan({ySize, xSize}, Plan::R2C, nThreads);
+    
+    double* tmpData = new double[ySize*xSize];
+    memcpy (tmpData, in, ySize*xSize*sizeof (double));  // copy data because r2c-transforms modifies input
     fftw_execute_dft_r2c (plan->forward_plan, tmpData, reinterpret_cast<fftw_complex*> (ptr()));
     delete[] tmpData;
 
 }
 
 
-void FourierTransform::init (const Array<complex_t>& rhs) {
-    if (!sameSizes (rhs)) {
-        Array<complex_t>::resize (rhs.dimensions());
+void FourierTransform::init (const complex_t* in, size_t ySize, size_t xSize) {
+    if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
+        Array<complex_t>::resize(ySize,xSize);
     }
 
-    plan = getPlan (rhs.dimensions(), Plan::C2C, nThreads);
-    complex_t* dataPtr = const_cast<complex_t*> (rhs.ptr());    // fftw takes non-const, even if input is not modified.
+    plan = getPlan({ySize, xSize}, Plan::C2C, nThreads);
+    complex_t* dataPtr = const_cast<complex_t*>(in);    // fftw takes non-const, even if input is not modified.
     fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (ptr()));
 }
 
 
 template <typename T>
-void FourierTransform::directInverse (Array<T>& out) {
+void FourierTransform::directInverse(T* out) {
 
     if (centered) {
         reorder();
     }
-
-    if (halfComplex) {
-        fftw_execute_dft_c2r (plan->backward_plan, reinterpret_cast<fftw_complex*> (ptr()), reinterpret_cast<double*> (out.ptr()));
-    } else {
-        fftw_execute_dft (plan->backward_plan, reinterpret_cast<fftw_complex*> (ptr()), reinterpret_cast<fftw_complex*> (out.ptr()));
+    
+    if (!normalized) {
+        normalize();
     }
 
-    if (!normalized) {
-        out *= 1.0/inputSize;
+    if (halfComplex) {
+        fftw_execute_dft_c2r (plan->backward_plan, reinterpret_cast<fftw_complex*> (ptr()), reinterpret_cast<double*> (out));
+    } else {
+        fftw_execute_dft (plan->backward_plan, reinterpret_cast<fftw_complex*> (ptr()), reinterpret_cast<fftw_complex*> (out));
     }
 
 }
-template void FourierTransform::directInverse (Array<double>& out);
-template void FourierTransform::directInverse (Array<complex_t>& out);
+template void FourierTransform::directInverse (double* out);
+template void FourierTransform::directInverse (complex_t* out);
 
 
 template <typename T>
@@ -308,11 +315,15 @@ void FourierTransform::inv (Array<T>& out, int flags) const {
         delete[] dataPtr;
         tmp.copy (out);
     } else {
+        if (centered) {
+            FourierTransform tmp(*this);
+            tmp.reorder();
+            tmp.inv(out,flags);
+        }
         Array<complex_t> tmp(dims);
         complex_t* dataPtr = const_cast<complex_t*> (ptr());
         fftw_execute_dft (plan->backward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (tmp.ptr()));
-        out = tmp;
-        //tmp.copy( out );
+        tmp.copy( out );
     }
 
     if (flags & FT_REORDER) {
@@ -335,6 +346,11 @@ namespace redux {
                 fftw_execute_dft_c2r (plan->backward_plan, reinterpret_cast<fftw_complex*> (dataPtr), out.ptr());
                 delete[] dataPtr;
             } else {
+                if (centered) {
+                    FourierTransform tmp(*this);
+                    tmp.reorder();
+                    tmp.inv(out,flags);
+                }
                 Array<complex_t> tmp(dims);
                 complex_t* dataPtr = const_cast<complex_t*> (ptr());
                 fftw_execute_dft (plan->backward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (tmp.ptr()));
@@ -380,37 +396,30 @@ template Array<complex_t> FourierTransform::correlate (const Array<complex_t>&) 
 
 void FourierTransform::autocorrelate (void) {
     for (auto & it : *this) {
-        it = norm (it);         // = re*re + im*im
+        it = norm(it);         // = re*re + im*im
     }
 }
 
 
 template <typename T>
-void FourierTransform::autocorrelate (Array<T>& data) {
-    FourierTransform ft (data);
-
-    for (auto & it : ft) {
-        it = norm (it);
-    }
-
-    ft.inv (data, FT_REORDER);
+void FourierTransform::autocorrelate(T* data, size_t ySize, size_t xSize ) {
+    FourierTransform ft(data, ySize, xSize);
+    ft.autocorrelate();
+    ft.directInverse(data);
+    reorder(data, ySize, xSize);
 }
-template void FourierTransform::autocorrelate (Array<float>&);
-template void FourierTransform::autocorrelate (Array<double>&);
-template void FourierTransform::autocorrelate (Array<complex_t>&);
+template void FourierTransform::autocorrelate(double*, size_t, size_t);
+template void FourierTransform::autocorrelate(complex_t*, size_t, size_t);
+
 
 template <typename T>
 void FourierTransform::autocorrelate (const Array<T>& in, Array<T>& out) {
     FourierTransform ft (in);
-
-    for (auto & it : ft) {
-        it = norm (it);
-    }
-
+    ft.autocorrelate();
     out.resize (in.dimensions());
-    ft.inv (out, FT_REORDER);
+    ft.directInverse(out.get());
+    reorder(out);
 }
-template void FourierTransform::autocorrelate (const Array<float>&, Array<float>&);
 template void FourierTransform::autocorrelate (const Array<double>&, Array<double>&);
 template void FourierTransform::autocorrelate (const Array<complex_t>&, Array<complex_t>&);
 
@@ -418,11 +427,9 @@ template void FourierTransform::autocorrelate (const Array<complex_t>&, Array<co
 Array<double> FourierTransform::power (void) const {
     Array<double> tmp (dimensions());
     auto it = tmp.begin();
-
     for (auto & it2 : *this) {
         *it++ = norm (it2);
     }
-
     return tmp;
 }
 
@@ -529,18 +536,18 @@ void FourierTransform::normalize (FourierTransform& in) {
 
 
 template <typename T>
-void FourierTransform::reorder (redux::util::Array<T>& in) {
+void FourierTransform::reorder(T* in, size_t ySize, size_t xSize) {
 
-    size_t halfY = in.dimSize (0) / 2;
-    size_t stride = in.dimSize (1);
-    size_t halfX = stride / 2;
+    size_t halfY = ySize / 2;
+    size_t halfX = xSize / 2;
+    size_t stride = xSize;
     size_t chunkSize = halfX * sizeof (T);
     char *buf = new char[chunkSize];
 
-    T* southWest = in.ptr();
-    T* southEast = in.ptr (0, halfX);
-    T* northWest = in.ptr (halfY, 0);
-    T* northEast = in.ptr (halfY, halfX);
+    T* southWest = in;
+    T* southEast = in + halfX;
+    T* northWest = in + halfY*stride;
+    T* northEast = in + halfY*stride + halfX;
 
     for (size_t y = 0; y < halfY; ++y) {
         memcpy (buf, southWest, chunkSize);
@@ -562,7 +569,7 @@ void FourierTransform::reorder (redux::util::Array<T>& in) {
 
 void FourierTransform::reorder (void) {
     if (!halfComplex) {
-        reorder (*this);
+        reorder(get(),dimSize(0),dimSize(1));
         centered = !centered;
     } else {
         cout << "REORDER:  fix for half-complex." << endl;
