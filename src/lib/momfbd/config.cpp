@@ -246,6 +246,8 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     yOffsetFile = tree.get<string>( "YOFFSET", "" );
     imageNumberOffset = tree.get<uint32_t>( "DT", defaults.imageNumberOffset );
     imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUM", defaults.imageNumbers);
+    if(imageNumbers.empty())
+        imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUMS", defaults.imageNumbers);
     wfIndex = tree.get<vector<uint32_t>>( "WFINDEX", defaults.wfIndex );
     darkNumbers = tree.get<vector<uint32_t>>("DARK_NUM", defaults.darkNumbers);
     stokesWeights = tree.get<vector<float>>( "VECTOR", defaults.stokesWeights );
@@ -313,7 +315,6 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(darkNumbers != defaults.darkNumbers) tree.put("DARK_NUM", darkNumbers);
     
     if(stokesWeights != defaults.stokesWeights) tree.put("VECTOR", stokesWeights);
-    
 
 }
 
