@@ -1046,6 +1046,13 @@ namespace redux {
             friend class iterator;
 
         };
+        
+        template <> template <typename U>
+        void Array<complex_t>::copy( Array<U>& out ) const {
+            if( !sameSizes( out ) ) out.resize( currentSizes );
+            const_iterator cit = begin();
+            for( auto & it : out ) it = (*cit++).real();
+        }
     
         template <> template <>
         inline const Array<double>& Array<double>::operator=( const Array<redux::complex_t>& rhs ) {
