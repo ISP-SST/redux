@@ -26,8 +26,7 @@ namespace redux {
             typedef std::shared_ptr<WorkSpace> Ptr;
             
             const std::vector<std::shared_ptr<Object>>& objects;
-            std::map<uint32_t, std::shared_ptr<WaveFront>> wavefronts;                  //!< Constrained groups, using imageNumber/wf_num as identifier.
-            WaveFront::alpha_map alpha_init;                                            //!< Default values for wavefront coefficients.
+            std::map<uint32_t, std::shared_ptr<WaveFront>> wavefronts;              //!< Constrained groups, using imageNumber/wf_num as identifier.
             
             WorkSpace(const redux::momfbd::MomfbdJob&);
             ~WorkSpace();
@@ -50,7 +49,9 @@ namespace redux {
             const MomfbdJob& job;
             
             redux::util::Array<double> window, noiseWindow;
+            size_t nFreeParameters;
 
+            std::shared_ptr<double> alpha,grad_alpha,saved_alpha;
         };
 
         /*! @} */

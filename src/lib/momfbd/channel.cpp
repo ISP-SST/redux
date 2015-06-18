@@ -730,12 +730,12 @@ void Channel::getPhi(redux::util::Array<double>& phi, const WaveFront& wf) const
     phi = phi_channel;
     //return;
     //cout << "Channel::getPhi()" << endl;
-    for( auto& it: wf.alpha ) {
+    for( auto& it: wf.modes ) {
         //cout << "Channel::getPhi()  it.first = " << it.first << endl;
         const PupilMode::Ptr mode = modes.at(it.first);
         if( mode ) { //&& it.second.second ) { // TODO: possibility to enable/disable modes
         //cout << "Channel::getPhi()  mode = " << hexString(mode.get()) << endl;
-            phi.add(*mode, it.second.value);
+            phi.add(*mode, *it.second.value);
         }
     }
 }

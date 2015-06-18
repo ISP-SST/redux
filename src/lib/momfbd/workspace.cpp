@@ -20,7 +20,7 @@ const std::string thisChannel = "workspace";
 }
 
 
-WorkSpace::WorkSpace( const MomfbdJob& j ) : objects(j.getObjects()), result(new PatchResult(j)), job(j) {
+WorkSpace::WorkSpace( const MomfbdJob& j ) : objects( j.getObjects() ), result( new PatchResult(j) ), job(j), nFreeParameters(0) {
     //std::cout << "WorkSpace():  first = (" << d->first.x << "," << d->first.y << ")  last = (" << d->last.x << "," << d->last.y;
     //std::cout << ")   id = (" << d->index.x << "," << d->index.y << ")" << std::endl;
 
@@ -50,15 +50,15 @@ void WorkSpace::init( void ) {
     noiseWindow = redux::image::apodize( noiseWindow, md/16 );
     //redux::file::Ana::write( "noisewindow.f0", noiseWindow );
 
-    for( auto& it: job.getObjects() ) {
+    wavefronts.clear();
+
+    for( auto & it : job.getObjects() ) {
         it->initProcessing( shared_from_this() );
     }
 
     for( auto& it: job.modeNumbers ) {
-        alpha_init[it]; // = WaveFront::alpha_t();
     }
 
-    cout << "WorkSpace::init()  pS = " << job.patchSize << "  nAlpha = " << alpha_init.size() << endl;
 
 }
 
@@ -185,7 +185,7 @@ void WorkSpace::clear( void ) {
 void WorkSpace::resetAlpha( void ) {
     for( auto& it: wavefronts ) {
         if(it.second) {
-            it.second->setAlpha(alpha_init);
+            //it.second->setAlpha( alpha_init );
         } else LOG << "WorkSpace::resetAlpha()  it.second is NULL";
     }
 }

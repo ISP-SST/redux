@@ -31,25 +31,40 @@ namespace redux {
                      uint32_t index, uint16_t firstY, uint16_t firstX, uint16_t patchSize, uint16_t pupilSize);
             ~SubImage(void);
             
-            void addPQ(redux::util::Array<complex_t>&,redux::util::Array<double>&) const;
             void init(void);
             
             void addFT(redux::util::Array<double>& ftsum) const;
-            void computePhases(void);
-            void oldGradientDiff(std::vector<double>&);
-            void calcOTF(void);
-            void calcOTF(const std::map<uint16_t,std::pair<double,bool>>&);
-            redux::util::Array<double> PSF(void);
+            void addPQ(complex_t* P, double* Q) const { addPQ(OTF.get(),P,Q); };
+            void addPQ(const complex_t* otf, complex_t* P, double* Q) const;
+            void setAlpha(double*);
+            
+            double metricChange(const complex_t* newOTF) const;
+            double gradientFiniteDifference(uint16_t, double, complex_t*, double*) const;
+            double gradientVogel(uint16_t mode, double dalpha, complex_t* tmpOTF, double* tmpPhi) const;
+            void calcVogelWeight(void);
+            
             void clearModes(redux::util::Array<double>&p) const;
             void clearModes(void) { clearModes(phi); };
             
-            void setWaveFront( std::shared_ptr<WaveFront> w ) { wf = w; };
-            void clear(void);
+            void addMode(uint16_t m, double alpha) { addMode(phi.get(), m, alpha); }
+            void addMode(double* phiPtr, uint16_t m, double alpha) const;
+            void addModes(size_t nModes, uint16_t* modes, const double* alpha) { addModes(phi.get(), nModes, modes, alpha); }
+            void addModes(double* phiPtr, size_t nModes, uint16_t* modes, const double* alpha) const;
             
-            Point offset;
-            // alpha (sptr)
-            // OTF
-            // imgFT
+            void addPhases(const double* alpha) { addPhases(phi.get(), alpha); };
+            void addPhases(double* phiPtr, const double* alpha) const;
+            
+            void calcOTF(void) { calcPFOTF(PF.get(), OTF.get(), phi.get()); }
+            void calcOTF(redux::util::Array<complex_t>& otf) const { calcOTF(otf.get(), phi.get()); }
+            void calcOTF(complex_t* otfPtr, const double* phiPtr) const;
+            void calcPFOTF(redux::util::Array<complex_t>& pf, redux::util::Array<complex_t>& otf) const { calcPFOTF(pf.get(), otf.get(), phi.get()); }
+            void calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiPtr) const;
+            
+            redux::util::Array<double> getPSF(void);
+            void setWaveFront( std::shared_ptr<WaveFront> w ) { wf = w; };
+            
+            void dump( std::string tag );
+
             uint32_t index;
             uint16_t imgSize, pupilSize, otfSize;
             
@@ -61,8 +76,8 @@ namespace redux {
             redux::util::Array<double> img;         //!< Working copy of the current subimage. (apodized)     size = patchSize
             redux::util::Array<double> phi;         //!< Array containing the phase of this OTF               size = pupilsize
             redux::image::FourierTransform PF;      //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
-            redux::image::FourierTransform SJ;      //!< Optical Transfer Function = autocorrelation of PTF.  size = 2*pupilsize
-            redux::image::FourierTransform ft;      //!< Fourier transform of img.                            size = 2*pupilsize
+            redux::image::FourierTransform OTF;     //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
+            redux::image::FourierTransform imgFT;   //!< Fourier transform of img.                            size = 2*pupilsize
             redux::util::Array<double> vogel;       //!< used for the Vogel-method of gradient computaion     size = pupilsize
             redux::image::Statistics stats;
             

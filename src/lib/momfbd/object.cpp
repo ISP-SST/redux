@@ -217,7 +217,7 @@ void Object::addAllPQ(void) {
     for( shared_ptr<Channel>& ch : channels ) {
         for( shared_ptr<SubImage>& im : ch->subImages ) {
             unique_lock<mutex> lock( mtx );
-            im->addPQ(P,Q);
+            im->addPQ(P.get(),Q.get());
         }
     }
 }

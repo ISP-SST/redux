@@ -16,7 +16,6 @@ namespace {
 void WaveFront::clear (void) {
     cout << "  WaveFront::clear()" << endl;
     images.clear();
-    zeroValues();
 }
 
 
@@ -26,39 +25,33 @@ void WaveFront::addImage (std::shared_ptr<SubImage> im) {
         im->setWaveFront (shared_from_this());
     }
 
-    cout << "  WaveFront::addImage()  im = " << hexString (im.get()) << "   nIm = " << images.size() << endl;
+    cout << hexString (this) << "  WaveFront::addImage()  im = " << hexString (im.get()) << "   nIm = " << images.size() << endl;
 }
 
 
 void WaveFront::addWeight (uint16_t modenumber, double w) {
-    alpha[modenumber].weight += w;
-    cout << "WaveFront::addWeight():   modeAddr = " << hexString (&alpha[modenumber]) << "   Mode: " << modenumber << "   w: " << w << "   weight: " << alpha[modenumber].weight << endl;
+    modes[modenumber].weight += w;
+    cout << hexString (this) << "  WaveFront::addWeight():   modeAddr = " << hexString (&modes[modenumber]) << "   Mode: " << modenumber << "   w: " << w << "   weight: " << modes[modenumber].weight << endl;
 }
 
 
-void WaveFront::zeroWeights (void) {
-    for (auto & it : alpha) {
+void WaveFront::zeroAlphaWeights (void) {
+    for (auto & it : modes) {
         it.second.weight = 0;
     }
 }
 
 
-void WaveFront::zeroValues (void) {
-    for (auto & it : alpha) {
-        it.second.value = 0;
-    }
+void  WaveFront::setAlpha (const modeinfo_map& a) {
+    modes = a;
 }
 
-
-void  WaveFront::setAlpha (const alpha_map& a) {
-    alpha = a;
-}
 
 
 void WaveFront::computePhases (boost::asio::io_service& service) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
-            service.post (std::bind (&SubImage::computePhases, it.get()));
+            service.post (std::bind((void(SubImage::*)(const double*))&SubImage::addPhases, it.get(), alpha));
 //             it->computePhases();
 //             it->OTF();
 //             it->PSF();
@@ -70,8 +63,8 @@ void WaveFront::computePhases (boost::asio::io_service& service) {
 void WaveFront::computePhasesAndOTF (boost::asio::io_service& service) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
-            service.post ([it] {    // use a lambda to ensure these two calls are sequential
-                it->computePhases();
+            service.post ([it,this] {    // use a lambda to ensure these two calls are sequential
+                it->addPhases(alpha);
                 it->calcOTF();
             });
         }
@@ -82,25 +75,26 @@ void WaveFront::computePhasesAndOTF (boost::asio::io_service& service) {
 double WaveFront::coefficientMetric (void) {
 
     double sum = 0.0;
-
-    for (auto & a : alpha) {
-        sum += a.second.metric();
+    size_t cnt(0);
+    for (auto& a : modes) {
+        sum += a.second.weight*alpha[cnt]*alpha[cnt];
+        cnt++;
     }
 
-    cout << hexString (this) << "  WaveFront::coefficientMetric()  nAlpha = " << alpha.size() << "   sum = " << sum << endl;
+    cout << hexString (this) << "  WaveFront::coefficientMetric()  nAlpha = " << modes.size() << "   sum = " << sum << endl;
     return sum;
 
 }
 
 void WaveFront::gradientTest (void) {
-    cout << hexString (this) << "  WaveFront::gradientTest()  nAlpha = " << alpha.size() << "  nImages = " << images.size() << endl;
-    vector<double> grad (alpha.size(), 0.0);
+    cout << hexString (this) << "  WaveFront::gradientTest()  nAlpha = " << modes.size() << "  nImages = " << images.size() << endl;
+    vector<double> grad (modes.size(), 0.0);
 
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
-            cout << hexString (this) << "  WaveFront::gradientTest()  it != NULL" << endl;
-            it->oldGradientDiff (grad);
-        }
+            //it->gradientFiniteDifference (grad);
+          //  it->gradientVogel(grad.data());
+        } else cout << hexString (this) << "  WaveFront::gradientTest()  it == NULL" << endl;
     }
 
     cout << hexString (this) << "  WaveFront::gradientTest() " << printArray (grad, "grad") << endl;
