@@ -194,7 +194,7 @@ namespace redux {
 
             template <typename ...S>
             Array( T* ptr, S ...sizes ) {
-                reset( ptr, sizes... );
+                wrap( ptr, sizes... );
             }
 
             /*! @name Copy constructors
@@ -317,12 +317,12 @@ namespace redux {
             template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
             //@}
 
-            /*! @name reset
+            /*! @name wrap
              *  @brief Set the array to wrap a new raw datablock with the specified sizes
              */
             //@{
             template <typename ...S>
-            void reset( T* ptr, S ...sizes ) {
+            void wrap( T* ptr, S ...sizes ) {
                 setSizes( sizes... );
                 setStrides();
                 countElements();
