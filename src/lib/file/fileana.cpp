@@ -492,11 +492,6 @@ template void redux::file::Ana::read( const string & filename, redux::image::Ima
 template <typename T>
 void redux::file::Ana::write( const string & filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana> hdr, int sliceSize ) {
 
-    ofstream file( filename, ifstream::binary );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Failed to open file: " + filename );
-    }
-
     if( !hdr.get() ) {
         hdr.reset( new Ana() );
     }
@@ -511,6 +506,16 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
             nElements *= *it;
         }
     }
+    
+    if(nDims == 0) {
+        return;
+    }
+        
+    ofstream file( filename, ifstream::binary );
+    if( !file.good() ) {
+        throw std::ios_base::failure( "Failed to open file: " + filename );
+    }
+
     hdr->m_Header.ndim = nDims;
     if( hdr->m_Header.ndim > 16 ) {
         throw invalid_argument( "Ana::write(): the ANA/f0 format does not support more dimensions than 16." );
