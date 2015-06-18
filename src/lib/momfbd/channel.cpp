@@ -412,15 +412,44 @@ void Channel::init( void ) {
 
 }
 
-
+#define INDEX_THRESHOLD  0
+//#define INDEX_THRESHOLD  1E-12
+// TBD: this should be a parameter somewhere...
 void Channel::initCache( void ) {
 
     LOG_DETAIL << "wavelength = " << myObject.wavelength << "   patchSize = " << patchSize << "  telescopeD = " << myJob.telescopeD << "  arcSecsPerPixel = " << arcSecsPerPixel;
     calculatePupilSize( frequencyCutoff, pupilRadiusInPixels, pupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
-    myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
-    myObject.pupilPixels = pupilPixels;
+    myJob.patchSize = myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
+    myJob.pupilPixels = myObject.pupilPixels = pupilPixels;
+    size_t otfPixels = 2 * pupilPixels;
     LOG_DETAIL << "frequencyCutoff = " << frequencyCutoff << "  pupilSize = " << pupilPixels << "  pupilRadiusInPixels = " << pupilRadiusInPixels;
     pupil = myJob.globalData->fetch(pupilPixels,pupilRadiusInPixels);
+    // Create a temporary OTF and store the indices where the OTF/pupil are non-zero. This will be used in loops to skip irrelevant evaluations.
+    Array<double> tmpImg( 2 * pupilPixels, 2 * pupilPixels );
+    tmpImg.zero();
+    Array<double> tmpSubImg( tmpImg, 0, pupilPixels - 1, 0, pupilPixels - 1 );
+    pupil.first.copy( tmpSubImg );
+    FourierTransform::autocorrelate( tmpImg );
+    double* tmpPtr = pupil.first.get();
+
+    for( size_t index = 0; index < pupil.first.nElements(); ++index ) {     // map indices where the pupil-mask is non-zero.
+        if( tmpPtr[index] > INDEX_THRESHOLD ) {
+            pupilIndices.insert( index );
+            size_t otfOffset = ( index / pupilPixels ) * otfPixels + ( index % pupilPixels ) + ( pupilPixels / 2 ) + ( pupilPixels / 2 ) * otfPixels;
+            pupilInOTF.insert( make_pair( index, otfOffset ) );
+        }
+    }
+
+    LOG_DETAIL << "Generated pupilIndices with " << pupilIndices.size() << " elements. (full size = " << pupil.first.nElements() << ", area = " << pupil.second << " )";
+    tmpPtr = tmpImg.get();
+
+    for( size_t index = 0; index < tmpImg.nElements(); ++index ) {          // map indices where the OTF-mask (auto-correlated pupil-mask) is non-zero.
+        if( tmpPtr[index] > INDEX_THRESHOLD ) {
+            otfIndices.insert( index );
+        }
+    }
+
+    LOG_DETAIL << "Generated otfIndices with " << otfIndices.size() << " elements. (full size = " << tmpImg.nElements() << ")";
 
     Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, myObject.wavelength, rotationAngle);
     for( uint i=0; i<diversityModes.size(); ++i ) {

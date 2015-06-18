@@ -105,6 +105,8 @@ namespace redux {
             redux::image::Image<float> fittedPlane;
             redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
             redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel
+            std::set<size_t> pupilIndices, otfIndices;                      //!< Arrays with the offsets where the pupil/otf are greater than some threshold
+            std::set<std::pair<size_t,size_t>> pupilInOTF;                  //!< Arrays with the offsets where the pupil/img are located/centered in the OTF grid
             /*****************************************************/
             
             double frequencyCutoff, pupilRadiusInPixels;
