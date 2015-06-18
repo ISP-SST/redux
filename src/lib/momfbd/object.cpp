@@ -163,6 +163,8 @@ void Object::initProcessing( WorkSpace::Ptr ws ) {
 
 void Object::initPatch( ObjectData& od ) {
     cout << "Object::initPatch(" << hexString(this) << ")  reg_gamma = " << myJob.reg_gamma << endl;
+    reg_gamma = 0;
+    ftSum.zero();
     addAllFT();
 }
 
@@ -170,26 +172,29 @@ void Object::initPatch( ObjectData& od ) {
 void Object::initPQ( void ) {
     unique_lock<mutex> lock( mtx );
     P.zero();
-    Q = myJob.reg_gamma;
+    Q = reg_gamma;
 }
 
 
 void Object::addAllFT( void ) {
     unique_lock<mutex> lock( mtx );
     ftSum.zero();
-    for( shared_ptr<Channel>& ch : channels ) ch->addAllFT(ftSum);
+    for( shared_ptr<Channel>& ch : channels ) {
+        for( shared_ptr<SubImage>& im : ch->subImages ) {
+            im->addFT(ftSum);
+        }
+    }
 }
 
-
-void Object::addToFT( const redux::image::FourierTransform& ft ) {
+void Object::addToFT( const redux::image::FourierTransform& ft, double rg ) {
     unique_lock<mutex> lock( mtx );
-    if( !ftSum.sameSizes(ft) ) {
-        ftSum.resize(ft.dimensions(true));
-        ftSum.zero();
+    reg_gamma += 0.10*rg;///nImages;
+    std::cout << "Object::addToFT():  1   " << hexString(this) << printArray(ft.dimensions(), "  ft.dims") << "  rg=" << rg <<  "  reg_gamma=" << reg_gamma << std::endl;
+    const complex_t* ftPtr = ft.get();
+    double* ftsPtr = ftSum.get();
+    for (size_t ind = 0; ind < ftSum.nElements(); ++ind) {
+        ftsPtr[ind] += norm (ftPtr[ind]);
     }
-    //  std::cout << "Object::addToFT():  1   " << hexString(this) << printArray(ft.dimensions(), "  ft.dims") << printArray(ftSum.dimensions(), "  ftSum.dims") << std::endl;
-   // ftSum += ft;
-//    std::cout << "Object::addToFT():  2   " << printArray(ft.dimensions(), "ft.dims") << printArray(ftSum.dimensions(), "  ftSum.dims") << std::endl;
 }
 
 

@@ -57,7 +57,7 @@ namespace redux {
             void initPatch(ObjectData&);
             void initPQ(void);
             void addAllFT(void);
-            void addToFT(const redux::image::FourierTransform&);
+            void addToFT(const redux::image::FourierTransform&, double);
             void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>);
             void addAllPQ(void);
             void slask(void);
@@ -90,6 +90,7 @@ namespace redux {
             redux::util::Array<double>  ftSum;                //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;
+            double reg_gamma;
             /*****************************************************/
 
             uint16_t ID;

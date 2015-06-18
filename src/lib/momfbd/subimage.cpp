@@ -72,7 +72,7 @@ void SubImage::init (void) {
     stats.noise = channel.noiseFudge * ft.noise (-1, -1);       // mask/cutoff < 0 will revert to hardcoded values used by MvN
 
     str += "  noise=" + to_string (stats.noise);
-    object.addToFT( ft );
+    object.addToFT( ft, stats.noise/stats.stddev );
 
 
 //      static int bla(0);
