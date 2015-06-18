@@ -1000,7 +1000,8 @@ void Channel::getPatchData(ChannelData& chData, Point16 patchID) const {
         }
     }
     
-    chData.images = tmpImages;
+
+    chData.images = tmpImages.copy(false);
 
 }
 
