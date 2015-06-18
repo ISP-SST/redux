@@ -31,7 +31,7 @@ namespace redux {
 
         public:
 
-            Object( MomfbdJob& );
+            Object( MomfbdJob&, uint16_t id=0 );
             ~Object();
 
             void parsePropertyTree( bpt::ptree& );
@@ -92,6 +92,7 @@ namespace redux {
             redux::util::Array<complex_t> P;
             /*****************************************************/
 
+            uint16_t ID;
             friend class MomfbdJob;
             friend class Channel;
 

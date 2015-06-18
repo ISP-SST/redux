@@ -37,7 +37,7 @@ const string thisChannel = "object";
 }
 
 
-Object::Object( MomfbdJob& j ) : ObjectCfg(j), myJob(j) {
+Object::Object( MomfbdJob& j, uint16_t id ) : ObjectCfg(j), myJob(j), ID(id) {
 
 
 }
@@ -52,9 +52,10 @@ void Object::parsePropertyTree( bpt::ptree& tree ) {
 
     ObjectCfg::parseProperties(tree, myJob);
 
+    uint16_t nCh(0);
     for( auto & it : tree ) {
         if( iequals( it.first, "CHANNEL" ) ) {
-            Channel* tmpCh = new Channel( *this, myJob );
+            Channel* tmpCh = new Channel( *this, myJob, nCh++ );
             tmpCh->parsePropertyTree( it.second );
             channels.push_back( shared_ptr<Channel>( tmpCh ) );
         }
@@ -84,7 +85,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 
 size_t Object::size(void) const {
     size_t sz = ObjectCfg::size();
-    sz += sizeof(uint16_t);                   // channels.size()
+    sz += 2*sizeof(uint16_t);                   // channels.size() + ID
     for( const shared_ptr<Channel>& ch : channels ) {
         sz += ch->size();
     }
@@ -95,6 +96,7 @@ size_t Object::size(void) const {
 uint64_t Object::pack(char* ptr) const {
     using redux::util::pack;
     uint64_t count = ObjectCfg::pack(ptr);
+    count += pack(ptr+count, ID);
     count += pack(ptr+count, (uint16_t)channels.size());
     for( const shared_ptr<Channel>& ch : channels ) {
         count += ch->pack(ptr+count);
@@ -110,6 +112,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
 
     uint64_t count = ObjectCfg::unpack(ptr, swap_endian);
+    count += unpack(ptr+count, ID, swap_endian);
     uint16_t tmp;
     count += unpack(ptr+count, tmp, swap_endian);
     channels.resize(tmp);

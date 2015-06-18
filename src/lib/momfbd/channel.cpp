@@ -81,7 +81,7 @@ namespace {
 }
 
 
-Channel::Channel( Object& o, MomfbdJob& j ) : myObject( o ), myJob( j ) {
+Channel::Channel( Object& o, MomfbdJob& j, uint16_t id ) : ID( id ), myObject( o ), myJob( j ) {
 
 }
 
@@ -183,6 +183,7 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree& tree ) {
 size_t Channel::size( void ) const {
 
     size_t sz = ChannelCfg::size();
+    sz += sizeof( uint16_t );       // ID;
     sz += sizeof( uint32_t );       // dataOffset;
     sz += dark.size();
     sz += imageStats.size() * Statistics::size() + sizeof(uint16_t);
@@ -192,9 +193,10 @@ size_t Channel::size( void ) const {
 
 uint64_t Channel::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = ChannelCfg::pack(ptr);
-    count += pack( ptr+count, dataOffset );
-    count += dark.pack( ptr+count );
+    uint64_t count = ChannelCfg::pack( ptr );
+    count += pack( ptr + count, ID );
+    count += pack( ptr + count, dataOffset );
+    count += dark.pack( ptr + count );
     uint16_t statSize = imageStats.size();
     count += pack( ptr+count, statSize );
     for( auto &it : imageStats ) count += it->pack(ptr+count);
@@ -208,9 +210,10 @@ uint64_t Channel::pack( char* ptr ) const {
 uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
 
-    uint64_t count = ChannelCfg::unpack(ptr, swap_endian);
-    count += unpack(ptr+count, dataOffset, swap_endian);
-    count += dark.unpack(ptr+count, swap_endian);
+    uint64_t count = ChannelCfg::unpack( ptr, swap_endian );
+    count += unpack( ptr + count, ID, swap_endian );
+    count += unpack( ptr + count, dataOffset, swap_endian );
+    count += dark.unpack( ptr + count, swap_endian );
     uint16_t statSize;
     count += unpack(ptr+count, statSize, swap_endian);
     imageStats.resize(statSize);

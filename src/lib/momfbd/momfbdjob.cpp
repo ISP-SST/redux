@@ -74,15 +74,16 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
 
     GlobalCfg::parseProperties(tree);
 
-    size_t nObj( 0 );
+    uint16_t nObj(0);
     for( auto & it : tree ) {
         if( iequals( it.first, "OBJECT" ) ) {
-            Object* tmpObj = new Object( *this );
+            Object* tmpObj = new Object( *this, nObj );
             tmpObj->parsePropertyTree( it.second );
             if( nObj < outputFiles.size() ) {
-                tmpObj->outputFileName = outputFiles[nObj++];
+                tmpObj->outputFileName = outputFiles[nObj];
             }
             objects.push_back( shared_ptr<Object>( tmpObj ) );
+            nObj++;
         }
     }
     if( outputFiles.size() > objects.size() ) {

@@ -33,7 +33,7 @@ namespace redux {
 
         public:
 
-            Channel( Object&, MomfbdJob& );
+            Channel( Object&, MomfbdJob&, uint16_t id=0 );
             ~Channel();
 
             void parsePropertyTree( bpt::ptree& );
@@ -109,6 +109,7 @@ namespace redux {
             
             double frequencyCutoff, pupilRadiusInPixels;
 
+            uint16_t ID;
             Object& myObject;
             MomfbdJob& myJob;
 
