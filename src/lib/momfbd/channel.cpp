@@ -647,18 +647,30 @@ void Channel::initProcessing( WorkSpace::Ptr ws ) {
     workspace = ws;
     initCache();        // this will initialize modes & pupil for this channel
     initPhiFixed();
+    for( auto& m : modes ) {           // check if the tilts are present
+        if( m.first == 2 || m.first == 3 ) {
+            shared_ptr<Tilts> tilts( new Tilts(*this,m.first));
+            auto ret = workspace->tilts.emplace(m.first,tilts);
+            if ( ret.second ) {     // new tiltmode, i.e. this will be the reference channel
+                tilts->nFreeAlpha = imageNumbers.size();
+            } else {                // existing tiltmode, this channel is added as a "relative tilt"
+                ret.first->second->addRelativeTilt(tilts);
+            }
+            tilts->init();
+        }
+    }
     
     for ( uint16_t i=0; i<imageNumbers.size(); ++i ) {
         uint32_t imageNumber = imageNumbers[i];
         std::shared_ptr<WaveFront>& wf = workspace->wavefronts[imageNumber];
         if(!wf) wf.reset(new WaveFront());
         for(auto& m: modes) {
-            wf->addWeight(m.first, m.second->inv_atm_rms);
+            if( m.first > 3 ) {     // tilts are treated separately
+                wf->addWeight( m.first, 1.0 / ( m.second->inv_atm_rms ) );
+            }
         }
     }
 
-    // link vector of subimages to their wavefronts
-    //cout << "Channel::initProcessing()" << endl;
 }
 
 

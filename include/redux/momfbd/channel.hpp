@@ -25,6 +25,7 @@ namespace redux {
         class WorkSpace;
         struct ChannelData;
         struct SubImage;
+        struct Tilts;
         struct WaveFront;
         /*! @brief Class containing the channel-specific configuration for a MomfbdJob/Object
          * 
@@ -116,6 +117,7 @@ namespace redux {
             MomfbdJob& myJob;
 
             friend class Object;
+            friend struct Tilts;
             friend struct SubImage;
             
         };

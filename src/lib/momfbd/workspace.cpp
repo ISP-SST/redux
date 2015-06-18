@@ -50,6 +50,7 @@ void WorkSpace::init( void ) {
     noiseWindow = redux::image::apodize( noiseWindow, md/16 );
     //redux::file::Ana::write( "noisewindow.f0", noiseWindow );
 
+    tilts.clear();
     wavefronts.clear();
 
     for( auto & it : job.getObjects() ) {
