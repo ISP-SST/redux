@@ -111,18 +111,12 @@ namespace redux {
 
 
             template <typename U = T>
-            Image<U> copy( void ) const {
-                std::vector<size_t> newDimSizes;
-                for( auto & it : this->dimensions() ) {
-                    if( it > 1 ) {
-                        newDimSizes.push_back( it );
-                    }
-                }
+            Image<U> copy( bool skipTrivialDims=true ) const {
+                std::vector<size_t> newDimSizes = this->dimensions(skipTrivialDims);
                 Image<U> tmp( newDimSizes );
                 auto cit = this->begin();
                 for( auto & it : tmp ) {
-                    it = static_cast<U>( *cit );
-                    ++cit;
+                    it = static_cast<U>( *cit++ );
                 }
                 return tmp;
             }
