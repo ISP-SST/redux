@@ -63,6 +63,7 @@ namespace redux {
             
             uint32_t dataOffset;
 
+            void dump( std::string tag );
         private:
             
             bool checkCfg(void);

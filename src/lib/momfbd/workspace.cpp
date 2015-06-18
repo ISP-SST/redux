@@ -6,6 +6,8 @@
 #include "redux/image/utils.hpp"
 #include "redux/logger.hpp"
 
+#include "redux/file/fileana.hpp"
+using namespace redux::file;
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
@@ -174,6 +176,16 @@ PatchResult::Ptr& WorkSpace::getResult( void ) {
 
 
 
+void WorkSpace::dump( string tag) {
+
+    for( auto & it : job.getObjects() ) {
+        it->dump(tag);
+    }
+
+    Ana::write (tag + "_window.f0", window);
+    Ana::write (tag + "_noisewindow.f0", noiseWindow);
+
+}
 
 
 

@@ -64,6 +64,7 @@ namespace redux {
             double metric(void);
             /*****************************************************/
             
+            void dump( std::string tag );
         //private:
 
             

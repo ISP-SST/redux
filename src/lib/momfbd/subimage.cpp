@@ -271,7 +271,6 @@ void SubImage::dump (std::string tag) {
     Ana::write (tag + "_otf.f0", OTF);
     Ana::write (tag + "_imgFT.f0", imgFT);
     Ana::write (tag + "_window.f0", window);
-    Ana::write (tag + "_pupil.f0", channel.pupil.first);
     Ana::write (tag + "_P.f0", object.P);
     Ana::write (tag + "_Q.f0", object.Q);
     Ana::write (tag + "_vogel.f0", vogel);

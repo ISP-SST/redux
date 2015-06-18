@@ -26,6 +26,7 @@
 #include "redux/image/fouriertransform.hpp"
 
 namespace bfs = boost::filesystem;
+using namespace redux::file;
 using namespace redux::image;
 using namespace redux::momfbd;
 using namespace redux::util;
@@ -1142,4 +1143,22 @@ Point16 Channel::clipImages(void) {
     
 }
 
+
+void Channel::dump (std::string tag) {
+    
+    cout << "Dumping channel #" << ID << "  this=" << hexString(this) << " with tag=" << tag << endl;
+
+    tag += "_ch_"+to_string(ID);
+    Ana::write (tag + "_pupil.f0", pupil.first);
+    Ana::write (tag + "_fittedplane.f0", fittedPlane);
+    Ana::write (tag + "_phi_fixed.f0", phi_fixed);
+    Ana::write (tag + "_phi_channel.f0", phi_channel);
+    for( uint i=0; i< subImages.size(); ++i ) {
+        subImages[i]->dump(tag+"_"+to_string(i));
+    }
+    for( auto& m : modes ) {
+        Ana::write (tag + "_mode_"+to_string(m.first)+".f0", *m.second);
+    }
+
+}
 

@@ -12,6 +12,7 @@
 #include "redux/logger.hpp"
 #include "redux/revision.hpp"
 
+#include "redux/file/fileana.hpp"
 #include <cstdio>
 #include <limits>
 #include <string>
@@ -223,7 +224,6 @@ void Object::addAllPQ(void) {
 }
 
 
-#include "redux/file/fileana.hpp"
 
 void Object::slask(void) {
 //    cout << "Object::slask(void)" << endl;
@@ -575,3 +575,15 @@ Point16 Object::clipImages(void) {
     return sizes;
 }
 
+
+void Object::dump (std::string tag) {
+    cout << "Dumping object  #" << ID << "  this=" << hexString(this) << " with tag=" << tag << endl;
+    tag += "_obj_"+to_string(ID);
+    Ana::write (tag + "_ftsum.f0", ftSum);
+    Ana::write (tag + "_q.f0", Q);
+    Ana::write (tag + "_p.f0", P);
+    for( shared_ptr<Channel>& ch : channels ) {
+        ch->dump(tag);
+    }
+
+}

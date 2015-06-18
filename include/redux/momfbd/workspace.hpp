@@ -45,6 +45,7 @@ namespace redux {
             void resetAlpha(void);
             PatchResult::Ptr& getResult(void);
             
+            void dump( std::string tag );
             PatchData::Ptr data;
             PatchResult::Ptr result;
             
