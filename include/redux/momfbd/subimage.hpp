@@ -44,8 +44,8 @@ namespace redux {
             double gradientVogel(uint16_t mode, double dalpha, complex_t* tmpOTF, double* tmpPhi) const;
             void calcVogelWeight(void);
             
-            void clearModes(redux::util::Array<double>&p) const;
-            void clearModes(void) { clearModes(phi); };
+            void resetPhi(redux::util::Array<double>&p) const;
+            void resetPhi(void) { resetPhi(phi); };
             
             void addMode(uint16_t m, double alpha) { addMode(phi.get(), m, alpha); }
             void addMode(double* phiPtr, uint16_t m, double alpha) const;

@@ -35,6 +35,7 @@ namespace redux {
             
             void init(void);
             
+            void resetAllPhi( boost::asio::io_service& );
             void run(PatchData::Ptr, boost::asio::io_service&, uint8_t nThreads);
             
             double coefficientMetric(boost::asio::io_service&);

@@ -66,6 +66,18 @@ void WorkSpace::init( void ) {
 }
 
 
+
+
+void WorkSpace::resetAllPhi( boost::asio::io_service& service ) {
+    for( auto& oit: job.getObjects() ) {
+        for( auto& cit: oit->channels ) {
+            for( auto& it: cit->subImages ) {
+                service.post( std::bind((void(SubImage::*)(void))&SubImage::resetPhi, it.get() ) );
+            }
+        }
+    }
+}
+
 void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nThreads ) {
 
 if (p->id != 1) return;

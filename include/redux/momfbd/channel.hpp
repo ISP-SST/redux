@@ -119,6 +119,7 @@ namespace redux {
 
             friend class Object;
             friend struct Tilts;
+            friend class WorkSpace;
             friend struct SubImage;
             
         };

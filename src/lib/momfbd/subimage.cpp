@@ -194,7 +194,7 @@ void SubImage::calcVogelWeight(void) {
 }
 
 
-void SubImage::clearModes (redux::util::Array<double>&p) const {
+void SubImage::resetPhi (redux::util::Array<double>&p) const {
     memcpy(p.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements() *sizeof (double));
 }
 
