@@ -19,36 +19,31 @@ namespace {
 }
 
 
-SubImage::SubImage (const Object& obj, const Channel& ch, const redux::util::Array<float>& stack,
-                    uint32_t index, int firstY, int lastY, int firstX, int lastX)
-    : Array<float> (stack, index, index, firstY, lastY, firstX, lastX),
-      index (index), object (obj), channel (ch) {
+SubImage::SubImage (Object& obj, const Channel& ch, const redux::util::Array<double>& wind, const redux::util::Array<float>& stack,
+                    uint32_t index, uint16_t firstY, uint16_t firstX, uint16_t patchSize, uint16_t pupilSize)
+    : Array<float> (stack, index, index, firstY, firstY + patchSize - 1, firstX, firstX + patchSize - 1),
+      index (index), imgSize (patchSize), pupilSize (pupilSize), otfSize (2 * pupilSize), object (obj), channel (ch), window (wind) {
 
-    // std::cout << "Image():  1   " << hexString(this) << std::endl;
+    img.resize (imgSize, imgSize);
+    phi.resize (pupilSize, pupilSize);
+    PF.resize (pupilSize, pupilSize);
+    SJ.resize (otfSize, otfSize);                  // big enough for autocorrelation of the PTF
+    vogel.resize (pupilSize, pupilSize);
 
 }
 
 
 SubImage::~SubImage (void) {
 
-    //  std::cout << "~Image():  1   " << hexString(this) << std::endl;
+    //  std::cout << "~SubImage():  1   " << hexString(this) << std::endl;
 }
 
 
-void SubImage::init (const Array<double>& window) {
+void SubImage::init (void) {
 
-//    auto dims = dimensions( true );   // skip trivial dimensions
-//     img.resize( dims );
-//     for( auto& it: dims ) {
-//         it *= 2;
-//     }
-    img.resize (dimensions (true));                                     // skip trivial dimensions
-    SJ.resize (2 * channel.pupilPixels, 2 * channel.pupilPixels);       // make it big enough for autocorrelation of the OTF
-
-    stats.getStats (*this, ST_VALUES);
+    stats.getStats (*this, ST_VALUES);                      // get mean of un-windowed image
     string str = "    SubImage::init(" + to_string (index) + "):  mean=" + to_string (stats.mean);
 
-//    img.zero();
     auto wit = window.begin();
     Array<float>::const_iterator dit = this->begin();
 
@@ -56,36 +51,46 @@ void SubImage::init (const Array<double>& window) {
         iit = (*dit++ - stats.mean) * *wit++ + stats.mean;
     }
 
-    stats.getStats (img, ST_VALUES | ST_RMS);
-    str += "  mean2=" + to_string (stats.mean) + "  std=" + to_string (stats.stddev);
+    stats.getStats (img, ST_VALUES | ST_RMS);               // get statistics
+    str += "  mean2=" + to_string (stats.mean) + "  std=" + to_string (stats.stddev) + "  sum=" + to_string (stats.sum);
 
-    ft.reset (img, FT_FULLCOMPLEX);                             // full-complex for now, perhaps half-complex later for performance
+    if (imgSize == otfSize) {                                                       // imgSize = 2*pupilSize
+        ft.reset (img.get(), imgSize, imgSize, FT_FULLCOMPLEX | FT_NORMALIZE);   // full-complex for now, perhaps half-complex later for performance
+    } else {                                                                        // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
+        int offset = (otfSize - imgSize) / 2;
+        Array<double> tmp (otfSize, otfSize);
+        tmp.zero();
+        double* imgPtr = img.get();
+        double* tmpPtr = tmp.get();
+        for (int i = 0; i < imgSize; ++i) {
+            memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));
+        }
+        ft.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX | FT_NORMALIZE);   // full-complex for now, perhaps half-complex later for performance
+    }
+
     FourierTransform::reorder (ft);                             // keep FT in centered form
     stats.noise = channel.noiseFudge * ft.noise (-1, -1);       // mask/cutoff < 0 will revert to hardcoded values used by MvN
-    str += "  noise=" + to_string (stats.noise);
-    //object.addToFT( ft );
 
-//     static int bla(0);
-//     redux::file::Ana::write("windowed_" + to_string(++bla) + "_" + to_string(index) + ".f0", img);
-//     redux::file::Ana::write("windowedft_" + to_string(bla) + "_" + to_string(index) + ".f0", ft);
+    str += "  noise=" + to_string (stats.noise);
+    object.addToFT( ft );
+
+
+//      static int bla(0);
+//      dump("init_"+to_string(++bla));
+
 
     cout << str << printArray (dimensions(), "  dims") << endl;
-    //std::cout << "Image::init():  E  " << std::endl;
+
 }
 
 
-//void SubImage::addFT(redux::image::FourierTransform& ftsum) {
-void SubImage::addFT (redux::util::Array<double>& ftsum) {
-//    cout << "SubImage::addFT(" << hexString(this) << ")  " << printArray(ftsum.dimensions(), "sumdims") << printArray(ft.dimensions(), "  ftdims") << endl;
-    auto ftit = ft.begin();
-
-    for (auto & it : ftsum) {
-        it += norm (*ftit++);
+void SubImage::addFT(Array<double>& ftsum) const {
+//    cout << "SubImage::addFT:  " << __LINE__ << "   this=" << hexString(this) << endl;
+    const complex_t* ftPtr = ft.get();
+    double* ftsPtr = ftsum.get();
+    for (size_t ind = 0; ind < ft.nElements(); ++ind) {
+        ftsPtr[ind] += norm (ftPtr[ind]);
     }
-
-    //ftsum += ft;
-//     static int bla(0);
-//     redux::file::Ana::write("ftsum_" + to_string(bla++) + ".f0", ftsum);
 }
 
 void SubImage::addPQ (redux::util::Array<complex_t>& P, redux::util::Array<double>& Q) const {
@@ -174,8 +179,8 @@ void SubImage::oldGradientDiff (vector<double>& grad) {
     Array<complex_t> OSJ;
     SJ.copy (OSJ);
     // SJ += 1.2E-3;
-    const complex_t** p = makePointers (object.P.ptr(), object.P.dimSize (0), object.P.dimSize (1));
-    const double** q = makePointers (object.Q.ptr(), object.Q.dimSize (0), object.Q.dimSize (1));
+    const complex_t** p = makePointers<const complex_t> (object.P.ptr(), object.P.dimSize (0), object.P.dimSize (1));
+    const double** q = makePointers<const double> (object.Q.ptr(), object.Q.dimSize (0), object.Q.dimSize (1));
     const complex_t** sj = makePointers ( (const complex_t*) SJ.ptr(), SJ.dimSize (0), SJ.dimSize (1));
     const complex_t** osj = makePointers ( (const complex_t*) OSJ.ptr(), OSJ.dimSize (0), OSJ.dimSize (1));
     const complex_t** ftp = makePointers ( (const complex_t*) ft.ptr(), ft.dimSize (0), ft.dimSize (1));
@@ -188,7 +193,7 @@ void SubImage::oldGradientDiff (vector<double>& grad) {
         redux::file::Ana::write ("osj_" + to_string (obj_cnt) + "_" + to_string (it.first) + ".f0", OSJ);
         channel.addMode (phi, it.first, -dalpha);              // new phi
         redux::file::Ana::write ("phib_" + to_string (obj_cnt) + "_" + to_string (it.first) + ".f0", phi);
-        OTF();                                    // new sj
+        calcOTF();                                    // new sj
         //SJ += (cnt+1);
         cout << "   sj2=" << sj[imgPixels / 4][imgPixels / 3] << flush;
         redux::file::Ana::write ("sj_" + to_string (obj_cnt) + "_" + to_string (it.first) + ".f0", SJ);
@@ -231,7 +236,14 @@ print,min(mode4),max(mode4),mean(mode4)
 print,min(sj),max(sj),mean(sj)
 */
 
-void SubImage::OTF (void) {
+
+void SubImage::clearModes (redux::util::Array<double>&p) const {
+    //cout << "SubImage::clearModes()  this=" << hexString (this) << "  phiPtr=" << hexString(p.get()) << endl;
+    memcpy(p.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements() *sizeof (double));
+}
+
+#define ALPHA_CUTOFF 1E-12
+void SubImage::calcOTF (void) {
     //    cout << "SubImage::OTF()  channel.pupilPixels = " << channel.pupilPixels << endl;
     SJ.zero();
     complex_t** sj = makePointers (SJ.ptr(), SJ.dimSize (0), SJ.dimSize (1));
@@ -267,7 +279,7 @@ void SubImage::OTF (void) {
 }
 
 
-void SubImage::OTF (const std::map<uint16_t, std::pair<double, bool>>& alpha) {
+void SubImage::calcOTF (const std::map<uint16_t, std::pair<double, bool>>& alpha) {
 
 }
 

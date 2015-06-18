@@ -72,7 +72,7 @@ void WaveFront::computePhasesAndOTF (boost::asio::io_service& service) {
         if (it) {
             service.post ([it] {    // use a lambda to ensure these two calls are sequential
                 it->computePhases();
-                it->OTF();
+                it->calcOTF();
             });
         }
     }

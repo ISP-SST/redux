@@ -642,9 +642,10 @@ void Channel::initPatch( ChannelData& cd ) {
     subImages.clear();
     for ( uint16_t i=0; i<imageNumbers.size(); ++i ) {
         uint32_t imageNumber = imageNumbers[i];
-        std::shared_ptr<SubImage> simg( new SubImage(myObject, *this, cd.images, i, maxLocalShift, patchSize+maxLocalShift-1, maxLocalShift, patchSize+maxLocalShift-1) ); // TODO: fix offsets
+        std::shared_ptr<SubImage> simg( new SubImage( myObject, *this, workspace->window, cd.images, i, maxLocalShift, maxLocalShift,
+                                        patchSize, pupilPixels ) ); // TODO: fix offsets
         subImages.push_back( simg );
-        simg->init(workspace->window);
+        simg->init();
         std::shared_ptr<WaveFront>& wf = workspace->wavefronts[imageNumber];
         if(!wf) cout << "Channel::initPatch(): wf = NULL for imageNumber = " << imageNumber << endl;
         wf->addImage(simg);
