@@ -343,8 +343,8 @@ void modeTest(void) {
 
     for(int j = first_mode; j <= last_mode; ++j) {
 
-        PupilMode zmode(j, nPixels, rc, lambda, angle);
-        PupilMode klmode(first_mode, last_mode, j, nPixels, rc, lambda, angle, cutoff);
+        PupilMode zmode(j, nPixels, rc, angle);
+        PupilMode klmode(first_mode, last_mode, j, nPixels, rc, angle, cutoff);
 
         //pmd oldzmode(lambda, rc, nPixels, j, angle, bla);                //  pmd(lambda,r_c,nph,mn,angle,io));
         //pmd oldklmode(lambda, rc, nPixels, j, m_cfg, cutoff, z - first_mode, angle, bla);

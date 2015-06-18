@@ -35,8 +35,8 @@ void calculate(void) {
     
 }
 
-PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double lambda, double angle) :
-    Array<double> (nPoints, nPoints), inv_atm_rms(0)  {      // Zernike
+PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double angle) :
+    Array<double> (nPoints, nPoints), atm_rms(0)  {      // Zernike
 
 
     static Cache& cache = Cache::getCache();
@@ -45,7 +45,8 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
     zero();
 
     if(modeNumber == 1) {
-        add(pupil.first,1.0/lambda);
+        //add(pupil.first,1.0/lambda);
+        memcpy(get(),pupil.first.get(),nPoints*nPoints*sizeof(double));
     } else {
 
         int m, n;
@@ -63,7 +64,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
         shared_ptr<double*> r2 = sharedArray<double> (nPoints, nPoints);    // normalized distance squared
         double** rPtr = r.get();
         double** r2Ptr = r2.get();
-        double squared_sum(0);
+        double normalization(0);
 
         for(int y = 0; y < nPoints; ++y) {
             for(int x = 0; x < nPoints; ++x) {
@@ -73,8 +74,8 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
                     r2Ptr[y][x] = tmp * tmp;
                     if(m == 0) rPtr[y][x] = 1;
                     else if(m == 1) rPtr[y][x] = tmp;
-                    else rPtr[y][x] = pow(tmp, m);                          // leading term ~ r^{m}
-                    modePtr[y][x] = rPtr[y][x] * coeff[0];                  // add leading order to mode
+                    else rPtr[y][x] = pow(tmp, m);                          // lowest order term ~ r^{m}
+                    modePtr[y][x] = rPtr[y][x] * coeff[0];                  // add lowest order to mode
                 //}
             }
         }
@@ -84,7 +85,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
             for(int y = 0; y < nPoints; ++y) {
                 for(int x = 0; x < nPoints; ++x) {
                     //if(pupPtr[y][x]>0) {
-                        rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m-2}
+                        rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m+2}
                         modePtr[y][x] += rPtr[y][x] * *it;
                     //}
                 }
@@ -98,7 +99,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
                 for(int x = 0; x < nPoints; ++x) {
                     modePtr[y][x] *= sf; // * pupPtr[y][x];
                     if(pupPtr[y][x]>0) {
-                        squared_sum +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
+                        normalization +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
                     }
                 }
             }
@@ -109,7 +110,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
                 for(int x = 0; x < nPoints; ++x) {
                     modePtr[y][x] *= sf * sin(m * (aPtr[y][x] + angle)); //* pupPtr[y][x] 
                     if(pupPtr[y][x]>0) {
-                        squared_sum +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
+                        normalization +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
                     }
                 }
             }
@@ -120,18 +121,18 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
                 for(int x = 0; x < nPoints; ++x) {
                     modePtr[y][x] *= sf * cos(m * (aPtr[y][x] + angle)); //* pupPtr[y][x] 
                     if(pupPtr[y][x]>0) {
-                        squared_sum +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
+                        normalization +=  modePtr[y][x]*modePtr[y][x] * pupPtr[y][x];
                     }
                 }
             }
         }
             
         // normalize
-        squared_sum = 1.0 / (sqrt(squared_sum / pupil.second) * lambda);
+        normalization = 1.0 / (sqrt(normalization / pupil.second));
         for(int y = 0; y < nPoints; ++y) {
             for(int x = 0; x < nPoints; ++x) {
                 //if(pupPtr[y][x]>0) {
-                    modePtr[y][x] *= squared_sum;
+                    modePtr[y][x] *= normalization;
                 //}
             }
         }
@@ -141,13 +142,13 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double l
         
     }
 
-    inv_atm_rms = 1.0 / ( sqrt(cache.zernikeCovariance(modeNumber,modeNumber))*lambda*lambda );
+    atm_rms = sqrt(cache.zernikeCovariance(modeNumber,modeNumber));
 
 }
 
 
-PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double lambda, double angle, double cutoff) :
-     Array<double> (nPoints, nPoints), inv_atm_rms(0) {
+PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double angle, double cutoff) :
+     Array<double> (nPoints, nPoints), atm_rms(0) {
 
     if(firstMode > lastMode) swap(firstMode, lastMode);
 
@@ -165,12 +166,12 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
     for(auto & it : kle->zernikeWeights) {
         if(fabs(c = it.second) >= cutoff) {
             uint16_t zernikeModeIndex = it.first;
-            const PupilMode::Ptr& mode = cache.mode(zernikeModeIndex, nPoints, r_c, lambda, angle);
+            const PupilMode::Ptr& mode = cache.mode(zernikeModeIndex, nPoints, r_c, angle);
             this->add(*mode, c);
         }
     }
     
-    inv_atm_rms = 1.0 / ( sqrt(kle->covariance)*lambda*lambda );
+    atm_rms = sqrt(kle->covariance);
 
 }
 

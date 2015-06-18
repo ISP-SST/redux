@@ -468,13 +468,14 @@ void Object::prepareStorage(void) {
         tmp_slice = myJob.globalData->fetch(pupilPixels,pupilRadiusInPixels).first;
         info->phOffset = 0;
         if(myJob.modeNumbers.size()) {
-            Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, wavelength, rotationAngle);
-            if(myJob.modeBasis == ZERNIKE) {    // Needed because klMinMode/klMaxMode might be non-zero even if we are using Zerikes
-                id.firstMode = id.lastMode = 0;
-            }
+            Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle);
             info->nModes = myJob.modeNumbers.size();
             info->modesOffset = pupilPixels*pupilPixels*sizeof(float);
             for( uint16_t& it: myJob.modeNumbers ) {    // Note: globalData might also contain modes we don't want to save here, e.g. PhaseDiversity modes.
+                if(it > 3 && myJob.modeBasis != ZERNIKE) {        // use Zernike modes for the tilts
+                    id.firstMode = myJob.klMinMode;
+                    id.lastMode = myJob.klMaxMode;
+                } else id.firstMode = id.lastMode = 0;
                 tmp_slice.shift(0,1);       // shift subarray 1 step (in the first dimension)
                 id.modeNumber = it;
                 tmp_slice = *(myJob.globalData->fetch(id));

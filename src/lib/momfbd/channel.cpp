@@ -451,8 +451,9 @@ void Channel::initCache( void ) {
 
     LOG_DETAIL << "Generated otfIndices with " << otfIndices.size() << " elements. (full size = " << tmpImg.nElements() << ")";
 
-    Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, myObject.wavelength, rotationAngle);
-    for( uint i=0; i<diversityModes.size(); ++i ) {
+    Cache::ModeID id( myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle );
+
+    for( uint i = 0; i < diversityModes.size(); ++i ) {
         uint16_t modeNumber = diversityModes[i];
         Cache::ModeID id2 = id;
         if(diversityTypes[i] == ZERNIKE) {
@@ -462,10 +463,10 @@ void Channel::initCache( void ) {
         myJob.globalData->fetch(id2);
     }
 
-    if(myJob.modeBasis == ZERNIKE) {
-        id.firstMode = id.lastMode = 0;
-    }
     for( uint16_t& it: myJob.modeNumbers ) {
+        if( myJob.modeBasis == ZERNIKE || it == 2 || it == 3 ) {    // force use of Zernike modes for all tilts
+            id.firstMode = id.lastMode = 0;
+        }
         id.modeNumber = it;
         const PupilMode::Ptr mode = myJob.globalData->fetch(id);
         modes.emplace( it, myJob.globalData->fetch(id) );
@@ -666,7 +667,7 @@ void Channel::initProcessing( WorkSpace::Ptr ws ) {
         if(!wf) wf.reset(new WaveFront());
         for(auto& m: modes) {
             if( m.first > 3 ) {     // tilts are treated separately
-                wf->addWeight( m.first, 1.0 / ( m.second->inv_atm_rms ) );
+                wf->addWeight( m.first, 1.0 / ( m.second->atm_rms * myObject.wavelength*myObject.wavelength) );
             }
         }
     }
@@ -697,13 +698,13 @@ void Channel::initPatch( ChannelData& cd ) {
 void Channel::initPhiFixed(void) {
     phi_fixed.resize(pupilPixels,pupilPixels);
     phi_fixed.zero();
-    Cache::ModeID id(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, myObject.wavelength, rotationAngle);
+    Cache::ModeID id( myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle );
     uint16_t modeNumber;
     for( uint i = 0; i<diversityModes.size(); ++i ) {
         Cache::ModeID id2 = id;
         modeNumber = diversityModes[i];
         cout << "Channel::initPhiFixed()  i=" << i << endl;
-        if(diversityTypes[i] == ZERNIKE) {
+        if( modeNumber==2 || modeNumber==3 || diversityTypes[i] == ZERNIKE ) {
             id2.firstMode = id2.lastMode = 0;
         }
         id2.modeNumber = modeNumber;

@@ -55,19 +55,19 @@ namespace {
 }
 
 
-Cache::ModeID::ModeID(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle)
+Cache::ModeID::ModeID(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle)
     : firstMode(0), lastMode(0),
       modeNumber(modeNumber), nPoints(nPoints),
-      pupilRadius(pupilRadius), wavelength(wavelength), angle(angle) { }
+      pupilRadius(pupilRadius), angle(angle) { }
 
 
-Cache::ModeID::ModeID(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle)
+Cache::ModeID::ModeID(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle)
     : firstMode(firstMode), lastMode(lastMode),
       modeNumber(modeNumber), nPoints(nPoints),
-      pupilRadius(pupilRadius), wavelength(wavelength), angle(angle) { }
+      pupilRadius(pupilRadius), angle(angle) { }
 
 uint64_t Cache::ModeID::size( void ) const {
-    static uint64_t sz = 4*sizeof(uint16_t) + 3*sizeof(double);
+    static uint64_t sz = 4*sizeof(uint16_t) + 2*sizeof(double);
     return sz;
 }
 
@@ -79,7 +79,6 @@ uint64_t Cache::ModeID::pack( char* ptr ) const {
     count += pack(ptr+count,modeNumber);
     count += pack(ptr+count,nPoints);
     count += pack(ptr+count,pupilRadius);
-    count += pack(ptr+count,wavelength);
     count += pack(ptr+count,angle);
     return count;
 }
@@ -92,7 +91,6 @@ uint64_t Cache::ModeID::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count,modeNumber,swap_endian);
     count += unpack(ptr+count,nPoints,swap_endian);
     count += unpack(ptr+count,pupilRadius,swap_endian);
-    count += unpack(ptr+count,wavelength,swap_endian);
     count += unpack(ptr+count,angle,swap_endian);
     return count;
 }
@@ -104,10 +102,7 @@ bool Cache::ModeID::operator<(const ModeID& rhs) const {
             if(modeNumber == rhs.modeNumber) {
                 if(nPoints == rhs.nPoints) {
                     if(pupilRadius == rhs.pupilRadius) {
-                        if(wavelength == rhs.wavelength) {
-                            return (angle < rhs.angle);
-                        }
-                        else return (wavelength < rhs.wavelength);
+                        return (angle < rhs.angle);
                     }
                     else return (pupilRadius < rhs.pupilRadius);
                 }
@@ -193,7 +188,7 @@ const vector<double>& Cache::zernikeRadialPolynomial(int32_t m, int32_t n) {
     for(int32_t s = 0, pm = -1; s <= nmm; ++s) {
         res[s] = (double)((pm *= -1) * factorials[n - s]) / (factorials[s] * factorials[npm - s] * factorials[nmm - s]);
     }
-    std::reverse(res.begin(), res.end());
+    std::reverse(res.begin(), res.end());       // reverse so that the first element corresponds to the lowest-order term (r^m)
     return zernikeRadialPolynomials.emplace(make_pair(m, n), res).first->second;
 
 }
@@ -325,9 +320,9 @@ const PupilMode::Ptr Cache::addMode(const ModeID& idx, PupilMode::Ptr& m) {
 }
 
 
-const PupilMode::Ptr Cache::addMode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m) {
+const PupilMode::Ptr Cache::addMode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, PupilMode::Ptr& m) {
 
-    ModeID idx(modeNumber, nPoints, pupilRadius, wavelength, angle);
+    ModeID idx(modeNumber, nPoints, pupilRadius, angle);
     return addMode(idx, m);
 
 }
@@ -342,8 +337,8 @@ const PupilMode::Ptr Cache::mode(const ModeID& idx) {
     }
 
     PupilMode::Ptr ptr;
-    if( idx.firstMode == 0 || idx.lastMode == 0 ) ptr.reset(new PupilMode(idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.wavelength, idx.angle));    // Zernike
-    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.wavelength, idx.angle));                // K-L
+    if( idx.firstMode == 0 || idx.lastMode == 0 ) ptr.reset(new PupilMode(idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle));    // Zernike
+    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle));                // K-L
     
     unique_lock<mutex> lock(mtx);
     return modes.emplace(idx, ptr).first->second;
@@ -351,17 +346,17 @@ const PupilMode::Ptr Cache::mode(const ModeID& idx) {
 }
 
 
-const PupilMode::Ptr Cache::mode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
+const PupilMode::Ptr Cache::mode(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle) {
 
-    ModeID idx(modeNumber, nPoints, pupilRadius, wavelength, angle);
+    ModeID idx(modeNumber, nPoints, pupilRadius, angle);
     return mode(idx);
 
 }
 
 
-const PupilMode::Ptr Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle) {
+const PupilMode::Ptr Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle) {
 
-    ModeID idx(firstMode, lastMode, modeNumber, nPoints, pupilRadius, wavelength, angle);
+    ModeID idx(firstMode, lastMode, modeNumber, nPoints, pupilRadius, angle);
     if( modeNumber == 2 || modeNumber == 3) {   // Always use Zernike modes for the tilts
         idx.firstMode = idx.lastMode == 0;
     }

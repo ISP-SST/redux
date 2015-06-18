@@ -201,7 +201,7 @@ void SubImage::clearModes (redux::util::Array<double>&p) const {
 
 #define ALPHA_CUTOFF 1E-12
 void SubImage::addMode (double* phiPtr, uint16_t m, double alpha) const {
-    //alpha *= object.wavelength;
+    alpha *= object.wavelength;
     //if(fabs(alpha) < ALPHA_CUTOFF) return;
     const double* modePtr = channel.modes.at(m)->get();
     for (auto & ind : channel.pupilIndices) {

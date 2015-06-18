@@ -19,9 +19,9 @@ namespace redux {
             
             struct ModeID {
                 uint16_t firstMode, lastMode, modeNumber, nPoints;
-                double pupilRadius, wavelength, angle;
-                ModeID ( uint16_t modeNumber=0, uint16_t nPoints=0, double pupilRadius=0.0, double wavelength=0.0, double angle=0.0 );
-                ModeID ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
+                double pupilRadius, angle;
+                ModeID ( uint16_t modeNumber=0, uint16_t nPoints=0, double pupilRadius=0.0, double angle=0.0 );
+                ModeID ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
                 uint64_t size(void) const;
                 uint64_t pack(char*) const;
                 uint64_t unpack(const char*, bool);
@@ -40,10 +40,10 @@ namespace redux {
             const std::vector<double>& zernikeRadialPolynomial( int32_t m, int32_t n );
             const std::map<uint16_t, PupilMode::KLPtr>& karhunenLoeveExpansion( uint16_t first_mode, uint16_t last_mode );
             const PupilMode::Ptr addMode ( const ModeID&, PupilMode::Ptr& m);
-            const PupilMode::Ptr addMode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle, PupilMode::Ptr& m);
+            const PupilMode::Ptr addMode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, PupilMode::Ptr& m);
             const PupilMode::Ptr mode ( const ModeID& );
-            const PupilMode::Ptr mode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
-            const PupilMode::Ptr mode ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double wavelength, double angle );
+            const PupilMode::Ptr mode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
+            const PupilMode::Ptr mode ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
             
 //             ~Cache() { std::cout << "~Cache(): nModes = "<< modes.size() << std::endl; }
         private:
