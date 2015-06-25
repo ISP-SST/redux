@@ -233,12 +233,12 @@ namespace {
     void momfbd_help ( void ) {
 
         cout << "MOMFBD DLM usage:\n";
-        cout << "    Syntax example:    a = momfbd_read('/path/to/file/data.momfbd',/img,/psf, verbose=2)\n";
-        cout << "                           Read only img/psf data into struct (geometry in always loaded), printout progress and struct_info.\n";
-        cout << "    Syntax example:        momfbd_write,a,'/path/to/file/data_new.momfbd',/img,/names,\n";
-        cout << "                           Write only img data, and file-names used by momfbd,  (geometry in always written)\n";
-        cout << "                     img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip, /notranspose, margin=20)\n";
-        cout << "                           Form mozaic from patches, using a margin of 20 pixels, don't transpose, clip afterwards.\n\n";
+        cout << "        IDL>a = momfbd_read('/path/to/file/data.momfbd',/img,/psf, verbose=2)\n";
+        cout << "                Read only img/psf data into struct (geometry in always loaded), printout progress and struct_info.\n";
+        cout << "        IDL>momfbd_write,a,'/path/to/file/data_new.momfbd',/img,/names,\n";
+        cout << "                Write only img data, and file-names used by momfbd,  (geometry in always written)\n";
+        cout << "        IDL>img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip, /notranspose, margin=20)\n";
+        cout << "                Form mozaic from patches, using a margin of 20 pixels, don't transpose, clip afterwards.\n\n";
         cout << "    Accepted Keywords:\n";
         cout << "        /HELP                    Print this info.\n";
         cout << "        /CHECK                   Just parse the file and show the structure, don't load data.\n";
@@ -652,7 +652,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     int checkData = kw.check;
 
     if ( verbosity > 0 ) {
-        cout << "Loading file: \"" << name << "\"" << endl;
+        cout << "Loading file:       \"" << name << "\"" << endl;
     }
 
     ifstream file;
@@ -666,6 +666,9 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         return IDL_GettmpInt ( -1 ); // return a dummy
     }
 
+    if ( verbosity > 1 ) {
+        cout << "File Version:       \"" << info->versionString << "\"" << endl;
+    }
 
     uint8_t loadMask = 0;
 

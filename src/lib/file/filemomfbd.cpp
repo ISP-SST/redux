@@ -426,17 +426,14 @@ void FileMomfbd::read ( std::ifstream& file ) {
 
     // version string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:version-length" );
-
     if ( swapNeeded ) swapEndian ( &tmp32 );
     tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:version-string" );
     versionString.assign ( tmpStr.begin(), tmpStr.begin() + tmp32 );
-
     version = atof ( versionString.c_str() );
 
     // time string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:time-length" );
-
     if ( swapNeeded ) swapEndian ( &tmp32 );
     tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:time-string" );
@@ -445,14 +442,11 @@ void FileMomfbd::read ( std::ifstream& file ) {
     // date string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:date-length" );
     if ( swapNeeded ) swapEndian ( &tmp32 );
-
     tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:date-string" );
     dateString.assign ( tmpStr.begin(), tmpStr.begin() + tmp32 );
 
-
     readOrThrow ( file, &tmp8, 1, "FileMomfbd:hasModes" );
-
     if ( tmp8 ) {
         dataMask |= MOMFBD_MODES;
         if ( version >= 20110714.0 ) {
@@ -470,14 +464,14 @@ void FileMomfbd::read ( std::ifstream& file ) {
             swapEndian ( nPH );
             swapEndian ( nModes );
         }
-
+        size_t tmpSz = nPH*nPH*sizeof(float);
         phOffset = file.tellg();
-        file.seekg ( nPH * nPH * sizeof ( float ), ios_base::cur );
+        file.seekg ( tmpSz, ios_base::cur );
         modesOffset = file.tellg();
-        file.seekg ( nModes * (nPH*nPH*sizeof(float) + 1), ios_base::cur );     // a single byte at the beginning of each mode is used to indicate pupil or OTF type mode
-
+        if(version >= 20120201.0) tmpSz++;              // Add a byte to specify mode-type
+        file.seekg ( nModes*tmpSz, ios_base::cur );
     } else nModes = nPH = 0;
-
+    
     readOrThrow ( file, &nChannels, 1, "FileMomfbd:nChannels" );
     if ( swapNeeded ) {
         swapEndian ( nChannels );
@@ -595,7 +589,7 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
             } else fPtr = dummy.get();
             uint8_t tmp8(1);
             for( int i=0; i<nModes; ++i ) {
-                writeOrThrow ( file, &tmp8, 1, "FileMomfbd:Mode-type" );   // always pad with a 1 (= Pupil-mode)
+                if(version >= 20120201.0) writeOrThrow ( file, &tmp8, 1, "FileMomfbd:Mode-type" );   // set mode 1 (= Pupil-mode)
                 writeOrThrow ( file, fPtr, nPH * nPH, "FileMomfbd:Mode-data" );
                 fPtr += nPH * nPH;
             }
