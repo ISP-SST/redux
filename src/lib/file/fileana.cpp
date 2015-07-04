@@ -84,8 +84,17 @@ void Ana::read( ifstream& file ) {
         }
         hdrSize = file.tellg();
 
-        // Hack to strip away null-characters from the string
-        // needed to correctly read broken headers written with old software
+        // Hack to strip away null-characters and copies of struct-info from the string
+        // needed to correctly read broken headers written with old software.
+        // The camera software at the sst used to pad the text string with copies of the
+        // primary block, and the momfbd code produced a zero-padded text header.
+        txtPtr += 256;  // skip part from first block
+        for( size_t i=0; i<m_Header.nhb-1; ++i, txtPtr+=512) {
+            if( !memcmp(txtPtr,reinterpret_cast<char*>( &m_Header ),256) ) {
+                memset(txtPtr,0,256);
+            }
+        }
+        txtPtr = tmpText.get(); // reset to beginning
         char* firstNull = txtPtr;
         while( *firstNull ) {
             firstNull++;
@@ -139,7 +148,7 @@ void Ana::write( ofstream& file ) {
     size_t textSize = m_ExtendedHeader.length();
     m_Header.nhb = 1;
     if( textSize > 255 ) {
-        m_Header.nhb = static_cast<uint8_t>( 1+std::max( textSize+256, size_t( 0 ) ) / 512 );
+        m_Header.nhb = static_cast<uint8_t>( 1+(textSize+256)/512 );
         if( m_Header.nhb > 16 ) {
             cout << "Warning: Ana::write() - header text is too long, it will be truncated!! (max = 7935 characters)" << endl;
             m_Header.nhb = 16;
