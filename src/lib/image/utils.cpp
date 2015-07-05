@@ -323,41 +323,51 @@ template double redux::image::horizontalInterpolation ( double**, size_t, size_t
 
 
 template <typename T>
-Array<T> redux::image::apodize ( const Array<T>& in, size_t blendRegion ) {
-    if ( !blendRegion ) return in;     // nothing to do
-    Array<T> array;
-    in.copy(array);
-    size_t sizeY = array.dimSize(0);
-    size_t sizeX = array.dimSize(1);
-    T** aPtr = makePointers(array.get(),sizeY,sizeX);
-    blendRegion = std::min ( std::min ( blendRegion,sizeY ),sizeX );
+void redux::image::apodizeInPlace (Array<T>& array, size_t blendRegion) {
 
-    double* tmp = new double[blendRegion+1];
+    size_t sizeY = array.dimSize (0);
+    size_t sizeX = array.dimSize (1);
+    blendRegion = std::min (std::min (blendRegion, sizeY >> 1), sizeX >> 1);
+
+    double* tmp = new double[blendRegion];
     tmp[0] = 0;
-    redux::math::apodize( tmp, blendRegion, 1.0 );
-    for ( size_t y=0,yy=sizeY-1; y<sizeY; ++y,--yy ) {
-        double yfactor = 1;
-        if ( y < blendRegion ) yfactor *= tmp[y];
-        for ( size_t x=0,xx=sizeX-1; x<sizeX; ++x,--xx ) {
-            double xfactor = yfactor;
-            if ( x < blendRegion ) xfactor *= tmp[x];
-            if ( xfactor < 1 ) {
-                aPtr[y][x]  *= xfactor;
-                aPtr[yy][x] *= xfactor;
-                aPtr[y][xx] *= xfactor;
-                aPtr[yy][xx]*= xfactor;
-            }
+    redux::math::apodize (tmp, blendRegion, 1.0);
+    for (size_t y = 0; y < blendRegion; ++y) {
+        for (size_t x = 0; x < sizeX; ++x) {
+            array (y, x) *= tmp[y];
+            array (sizeY - y - 1, x)  *= tmp[y];
+        }
+    }
+    for (size_t x = 0; x < blendRegion; ++x) {
+        for (size_t y = 0; y < sizeY; ++y) {
+            array (y, x)  *= tmp[x];
+            array (y, sizeX - x - 1) *= tmp[x];
         }
     }
     delete[] tmp;
-    delPointers(aPtr);
+
+}
+template void redux::image::apodizeInPlace (Array<int16_t>&, size_t);
+template void redux::image::apodizeInPlace (Array<int32_t>&, size_t);
+template void redux::image::apodizeInPlace (Array<double>&, size_t);
+template void redux::image::apodizeInPlace (Array<float>&, size_t);
+template void redux::image::apodizeInPlace (Array<complex_t>&, size_t);
+
+
+template <typename T>
+Array<T> redux::image::apodize (const Array<T>& in, size_t blendRegion) {
+    if (!blendRegion) return in;       // nothing to do
+    Array<T> array;
+    in.copy (array);
+    apodizeInPlace (array, blendRegion);
     return array;
 }
-template Array<int16_t> redux::image::apodize ( const Array<int16_t>&, size_t );
-template Array<int32_t> redux::image::apodize ( const Array<int32_t>&, size_t );
-template Array<double> redux::image::apodize ( const Array<double>&, size_t );
-template Array<float> redux::image::apodize ( const Array<float>&, size_t );
-template Array<complex_t> redux::image::apodize ( const Array<complex_t>&, size_t );
+template Array<int16_t> redux::image::apodize (const Array<int16_t>&, size_t);
+template Array<int32_t> redux::image::apodize (const Array<int32_t>&, size_t);
+template Array<double> redux::image::apodize (const Array<double>&, size_t);
+template Array<float> redux::image::apodize (const Array<float>&, size_t);
+template Array<complex_t> redux::image::apodize (const Array<complex_t>&, size_t);
+
 
 template <typename T>
 void redux::image::checkIfMultiFrames( redux::image::Image<T>& img ) {

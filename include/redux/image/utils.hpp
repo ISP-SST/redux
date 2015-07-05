@@ -192,6 +192,8 @@ namespace redux {
         }
 
         template <typename T>
+        void apodizeInPlace( redux::util::Array<T>& array, size_t blendRegion );
+        template <typename T>
         redux::util::Array<T> apodize( const redux::util::Array<T>& array, size_t blendRegion );
         
         template <typename T>
