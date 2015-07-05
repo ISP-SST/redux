@@ -23,7 +23,7 @@ execute_process(COMMAND "${GIT_EXECUTABLE}" show "-s" "--format=%s"
                 OUTPUT_VARIABLE REVISION_COMMIT_COMMENT
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                )
-
+string(REPLACE "\"" "\\\"" REVISION_COMMIT_COMMENT "${REVISION_COMMIT_COMMENT}")
 set(REVISION_DESCRIPTION "${REVISION_ID} - ${REVISION_COMMIT_COMMENT}")
 
 # Ugly way to get current time, hopefully cmake will provide such functionality soon...
