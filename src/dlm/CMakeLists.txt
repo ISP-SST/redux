@@ -40,6 +40,10 @@ if (DEFINED IDL_FOUND)
     SET(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
     configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")
     
+    add_library(gridmatch SHARED gridmatch.cpp )
+    SET(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
+    configure_file("libgridmatch.dlm.in" "${GRIDMATCH_DLM_FILE_LOCATION}")
+    
     
     add_library(rdx MODULE rdx.cpp
                            ${RDX_SRC}/image/fouriertransform.cpp
@@ -50,8 +54,8 @@ if (DEFINED IDL_FOUND)
     #add_dependencies(rdx fftw3 fftw3_threads)
     target_link_libraries (rdx fftw3 fftw3_threads)
     
-    install(TARGETS ana momfbd rdx DESTINATION ${IDL_DLM_DIR} )
-    install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${RDX_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
+    install(TARGETS ana momfbd gridmatch rdx DESTINATION ${IDL_DLM_DIR} )
+    install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} ${RDX_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
    
 else()
      message(WARNING "IDL headers not found, can not build the DLMs")
