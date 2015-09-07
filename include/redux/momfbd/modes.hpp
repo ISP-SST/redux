@@ -25,6 +25,7 @@ namespace redux {
             PupilMode ( uint16_t modeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0 ); // Zernike
             PupilMode ( uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0, double cutoff=0.0 ); // KL
 
+            operator const redux::util::Array<double>&() const { return reinterpret_cast<const redux::util::Array<double>&>(*this); }
             double atm_rms;                         //!< = sqrt(covariance), used in metric computations.
         };
 

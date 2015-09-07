@@ -390,73 +390,73 @@ template void redux::image::checkIfMultiFrames( redux::image::Image<float>& );
 
 
 template <typename T, typename U>
-void redux::image::descatter ( Array<T>& data, const Array<U>& ccdgain, const Array<U>& psf_in, int maxIterations, double minImprovement, double epsilon ) {
+void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Array<U>& psf_in, int maxIterations, double minImprovement, double epsilon) {
 
-    vector<size_t> dims = data.dimensions ( true );
+    vector<size_t> dims = data.dimensions (true);
 
-    if ( dims.size() != 2 || dims != ccdgain.dimensions() || dims != psf_in.dimensions() ) {
+    if (dims.size() != 2 || dims != ccdgain.dimensions() || dims != psf_in.dimensions()) {
         cout << "descatter(): dimensions of gain/psf does not match image." << endl;
         return;
     }
 
-    for ( auto &it: dims ) it *= 2;
+    for (auto & it : dims) it *= 2;
 
-    Array<double> img( dims );                 // Twice the size of input
-    Array<double> img_center(img, dims[0]/4, 3*dims[0]/4-1, dims[1]/4, 3*dims[1]/4-1 ); // centered subimage of half (i.e. original) size. N.B: shares data with img.
+    Array<double> img (dims);                   // Twice the size of input
+    Array<double> img_center (img, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with img.
     img.zero();                                 // whole array = 0
-    img_center = data;                          // central subimage = img_in
+    img_center.assign(data);                    // central subimage = img_in
 
-    Array<double> psf( dims );                 // Twice the size of input
-    Array<double> psf_center(psf, dims[0]/4, 3*dims[0]/4-1, dims[1]/4, 3*dims[1]/4-1 ); // centered subimage of half (i.e. original) size. N.B: shares data with psf.
+    Array<double> psf (dims);                  // Twice the size of input
+    Array<double> psf_center (psf, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with psf.
     psf.zero();                                 // whole array = 0
-    psf_center = psf_in;                        // central subimage = psf_in
-    double sum = total ( psf_in );
-    if ( sum ) {                                // normalize
-        psf_center *= 1.0/sum;
+    psf_center.assign(psf_in);                  // central subimage = psf_in
+    double sum = total (psf_in);
+    if (sum) {                                  // normalize
+        psf_center *= 1.0 / sum;
     }
 
     Array<double> gain;
-    ccdgain.copy ( gain );
+    ccdgain.copy(gain);
 
-    redux::image::FourierTransform otf ( psf, FT_REORDER|FT_NORMALIZE );
+    redux::image::FourierTransform otf (psf, FT_REORDER | FT_NORMALIZE);
 
     Array<double>::const_iterator itg = gain.begin();
-    for ( auto& it: img_center ) {
+    for (auto & it : img_center) {
         double g = *itg++;
-        it /= ( 1.0 + g*g );
+        it /= (1.0 + g * g);
     }
 
-    Array<double> tmp( dims );                 // Twice the size of input
-    Array<double> tmp_center(tmp, dims[0]/4, 3*dims[0]/4-1, dims[1]/4, 3*dims[1]/4-1 ); // centered subimage of half (i.e. original) size. N.B: shares data with tmp.
+    Array<double> tmp (dims);                  // Twice the size of input
+    Array<double> tmp_center (tmp, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with tmp.
 
     double metric = std::numeric_limits< double >::max();
     double delta;
     int i = 0;
     do {
-        img.copy(tmp);
+        img.copy (tmp);
         tmp_center *= gain;
-        otf.convolveInPlace(tmp);
+        otf.convolveInPlace (tmp);
         tmp_center *= gain;
         delta = metric;
         metric = 0.0;
         typename Array<T>::const_iterator in_it = data.begin();
         Array<double>::const_iterator tmp_it = tmp_center.begin();
-        for ( auto& img_it: img_center ) {
+        for (auto & img_it : img_center) {
             double new_img = (*in_it++ - *tmp_it++);
-            metric += (img_it - new_img)*(img_it - new_img);
+            metric += (img_it - new_img) * (img_it - new_img);
             img_it = new_img;
         }
         metric /= data.nElements();
         delta /= metric;
         //cout << "descatter:  iter = " << i << ", ChiSq = " << metric <<  ", delta = " << delta << endl;
-    } while ( (delta > minImprovement) && ( metric>epsilon ) && ( ++i<maxIterations ) );
+    } while ( (delta > minImprovement) && (metric > epsilon) && (++i < maxIterations));
 
-    img_center.copy(data);
+    img_center.copy (data);
 
 }
-template void redux::image::descatter ( Array<float>&, const Array<float>&, const Array<float>&, int, double, double );
-template void redux::image::descatter ( Array<double>&, const Array<float>&, const Array<float>&, int, double, double );
-template void redux::image::descatter ( Array<float>&, const Array<double>&, const Array<double>&, int, double, double );
+template void redux::image::descatter (Array<float>&, const Array<float>&, const Array<float>&, int, double, double);
+template void redux::image::descatter (Array<double>&, const Array<float>&, const Array<float>&, int, double, double);
+template void redux::image::descatter (Array<float>&, const Array<double>&, const Array<double>&, int, double, double);
 
 
 

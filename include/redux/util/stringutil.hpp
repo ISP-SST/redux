@@ -1,9 +1,11 @@
 #ifndef REDUX_UTIL_STRINGUTIL_HPP
 #define REDUX_UTIL_STRINGUTIL_HPP
 
+#include <map>
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <typeinfo>
 #include <iomanip>
 
 namespace redux {
@@ -34,6 +36,7 @@ namespace redux {
         bool isInteger( const std::string &s );
         bool isHex( const std::string &s );
         bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false, const std::locale& loc = std::locale());
+        bool nocaseLess(const std::string& lhs, const std::string& rhs, const std::locale& loc = std::locale());
         
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )
@@ -391,6 +394,34 @@ namespace redux {
          *  foo = [-0.433, 0.881, -0.293, -0.433, -0.493, -0.729, -0.764, -0.175, 0.627]
          *  @endcode
          */
+        template <typename T, typename U>
+        inline std::string printArray( const std::map<T,U>& data, const std::string& name = "vector", int d = 3 ) {
+
+            std::ostringstream oss;
+            oss << std::setprecision( d ) << name << " = [";
+            bool separator( false );
+            for( auto & it : data ) {
+                if( separator ) {
+                    oss << ", ";
+                }
+                //if( std::is_integral<T>::value ) {
+                //    oss << +it.first;   // trick to promote char to int before output to avoid interpretation as character
+                //} else {
+                    oss << it.first;                    
+                //}
+                oss << "->";
+                if( std::is_integral<U>::value ) {
+                    oss << +it.second;   // trick to promote char to int before output to avoid interpretation as character
+                } else {
+                    oss << it.second;                    
+                }
+                separator = true;
+            }
+
+            oss << "]";
+
+            return oss.str();
+        }
         template <typename T>
         inline std::string printArray( const T& data, const std::string& name = "vector", int d = 3 ) {
 
@@ -401,7 +432,11 @@ namespace redux {
                 if( separator ) {
                     oss << ", ";
                 }
-                oss << it;
+                //if( std::is_integral<decltype(it)>::value ) {
+                //    oss << +it;   // FIXME for some reason it=string passes as integer...weird
+                //} else {
+                    oss << it;
+                //}
                 separator = true;
             }
 

@@ -63,6 +63,15 @@ bool redux::util::contains ( const std::string & haystack, const std::string & n
 }
 
 
+bool redux::util::nocaseLess(const std::string& lhs, const std::string& rhs, const std::locale& loc) {
+
+          return std::lexicographical_compare( lhs.begin (), lhs.end (), rhs.begin (), rhs.end (),
+                                               [&loc] ( char ch1, char ch2 ) { return std::toupper( ch1, loc ) < std::toupper( ch2,loc ); }
+                                             );
+
+}
+
+
 string redux::util::alignCenter(const string& s, size_t n, unsigned char c) {
 
     if(s.length() > n) {

@@ -105,6 +105,7 @@ namespace redux {
             void resize(const std::vector<size_t>& sizes);
             template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
             
+            operator const redux::util::Array<complex_t>&() const { return reinterpret_cast<const redux::util::Array<complex_t>&>(*this); }
             const FourierTransform& operator*=( const FourierTransform& rhs );
             const FourierTransform& operator=( const FourierTransform& rhs );
 

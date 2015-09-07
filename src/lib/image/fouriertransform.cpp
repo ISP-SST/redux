@@ -637,7 +637,7 @@ const FourierTransform& FourierTransform::operator*= (const FourierTransform& rh
 
 
 const FourierTransform& FourierTransform::operator= (const FourierTransform& rhs) {
-    Array<complex_t>::operator= (rhs);
+    rhs.copy(*this);
     plan = rhs.plan;
     centered = rhs.centered;
     halfComplex = rhs.halfComplex;
