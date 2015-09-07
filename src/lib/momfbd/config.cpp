@@ -78,10 +78,10 @@ namespace {
         }
     }
 
-    double def2cf( double pd_defocus, double telescope_r ) { // defocus distance in meters
+    /*double def2cf( double pd_defocus, double telescope_r ) { // defocus distance in meters
         static const double tmp = ( 8.0 * sqrt( 3.0 ) );
         return -pd_defocus * redux::PI * telescope_r * telescope_r * tmp;
-    }
+    }*/
 
 }
 

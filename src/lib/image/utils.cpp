@@ -378,14 +378,14 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         if (m) {                                  // m!=0
             double sf = sqrt ( (double) (2 * (n + 1)));
             if (j % 2)                              // odd
-                for (int x = 0; x < nph; ++x) {
-                    for (int y = 0; y < nph; ++y) {
+                for (uint x = 0; x < nph; ++x) {
+                    for (uint y = 0; y < nph; ++y) {
                         mode[x][y] *= sf * sin ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
                     }
                 }
             else {                                   // even
-                for (int x = 0; x < nph; ++x) {
-                    for (int y = 0; y < nph; ++y) {
+                for (uint x = 0; x < nph; ++x) {
+                    for (uint y = 0; y < nph; ++y) {
                         mode[x][y] *= sf * cos ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
                     }
                 }
@@ -574,8 +574,8 @@ void redux::image::ScharmerFilter (T** data, double** q2_inv, size_t sizeY, size
     smooth(rr, sizeY, sizeX, 4, 4);
     
     frequency_cutoff *= frequency_cutoff;
-    for(int y=0; y<sizeY; ++y) {
-        for(int x=0; x<sizeX; ++x) {
+    for(uint y=0; y<sizeY; ++y) {
+        for(uint x=0; x<sizeX; ++x) {
             if( (sqr(y-yHalf)+sqr(x-xHalf)) > frequency_cutoff){
                 data[y][x] = 0.0;
             } else{

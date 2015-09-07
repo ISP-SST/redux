@@ -171,18 +171,15 @@ namespace redux {
             bool cacheLoad(bool removeAfterLoad=false){
                 if(!isLoaded) {
                     std::unique_lock<std::mutex> lock(itemMutex);
-                    //std::cout << "CacheItem::cacheLoad() itemPath = " << itemPath << std::endl;
                     if ( bfs::exists(itemPath) ) {
                         std::ifstream in(itemPath.c_str(), std::ofstream::binary|std::ios_base::ate);
                         if( in.good() ) {
                             size_t sz = in.tellg();
-                    //std::cout << "CacheItem::cacheLoad() sz = " << sz << std::endl;
                             std::unique_ptr<char[]> buf( new char[sz] );
                             in.seekg(0, std::ios_base::beg);
                             in.clear();
                             in.read(buf.get(), sz);
                             size_t psz = cunpack(buf.get(),false);
-                    //std::cout << "CacheItem::cacheLoad() psz = " << psz << std::endl;
                             if(psz == sz) {
                                 isLoaded = true;
                                 if(removeAfterLoad) {
@@ -192,14 +189,13 @@ namespace redux {
                                 return true;
                             } else std::cout << "CacheItem::cacheLoad() " << psz << " != " << sz << " !!!" << std::endl;
                         } else std::cout << "CacheItem::cacheLoad() in.good() == false !!!" << std::endl;
-                    } //else std::cout << "CacheItem::cacheLoad() " << itemPath << " doesn't exist. !!!" << std::endl;
+                    } // else std::cout << "CacheItem::cacheLoad() " << itemPath << " doesn't exist. !!!" << std::endl;
                 }
                 return false;
             }
             bool cacheStore(bool clearAfterStore=false){
                 if(isLoaded) {
                     std::unique_lock<std::mutex> lock(itemMutex);
-                    //std::cout << "CacheItem::cacheStore() itemPath = " << itemPath << std::endl;
                     bfs::create_directories(itemPath.parent_path());
                     size_t sz = csize();
                     std::unique_ptr<char[]> buf( new char[sz] );

@@ -36,7 +36,7 @@ namespace redux {
                     overlap = std::max(segmentLength-separation,0.0);
                 }
                 std::vector<T> ret;
-                for(size_t i = 0; i < nSegments; ++i) {
+                for(int i = 0; i < nSegments; ++i) {
                     ret.push_back(static_cast<T>(i*separation+first) );
                 }
                 return ret;

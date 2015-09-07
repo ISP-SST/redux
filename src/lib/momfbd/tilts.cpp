@@ -123,7 +123,7 @@ void Tilts::calcGradient(boost::asio::io_service& service, uint8_t nThreads, con
             }
             sum += df_[i];
         }
-       // df_[minIndex] -= sum;
+        df_[minIndex] -= sum;
 //        cout << endl << printArray(df_,channel.subImages.size(),"rawtiltgrad", 10) << endl;
         sum /= channel.subImages.size();
         for( uint i=0; i<channel.subImages.size(); ++i ) {

@@ -43,7 +43,7 @@ namespace {
 
         //  ; Now deal with the numerical terms: Dai
         int g1_sgn, g2_sgn, g3_sgn, g4_sgn;
-        double k = pow(4.8 * exp(lgamma_r(6.0 / 5.0, &g1_sgn)), 5.0 / 6.0) * exp(lgamma_r(14.0 / 3.0, &g1_sgn) + 2.0 * lgamma_r(11.0 / 6.0, &g1_sgn)) / (pow(2.0, (8.0 / 3.0)) * redux::PI);
+        double k = pow(4.8 * exp(lgamma_r(6.0 / 5.0, &g1_sgn)), 5.0 / 6.0) * exp(lgamma_r(14.0 / 3.0, &g2_sgn) + 2.0 * lgamma_r(11.0 / 6.0, &g3_sgn)) / (pow(2.0, (8.0 / 3.0)) * redux::PI);
         k *= pow(-1.0, (double)((n + p - 2 * m) / 2)) * sqrt((double)((n + 1) * (p + 1)));
 
         double g1 = lgamma_r(((double)(n + p) -  5.0 / 3.0) / 2.0, &g1_sgn);

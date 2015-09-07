@@ -5,7 +5,6 @@
 #include "redux/util/array.hpp"
 #include "redux/types.hpp"
 
-#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -55,27 +54,6 @@ namespace redux {
         
         template <typename T>
         redux::util::Array<T> fitPlane( const redux::util::Array<T>& in );
-        template <typename T>
-        void reverseX( T** data, size_t sizeY, size_t sizeX ) {
-            for( size_t y = 0; y < sizeY; ++y ) {
-                std::reverse( data[y], data[y] + sizeX );
-            }
-        }
-        
-
-        template <typename T>
-        void reverseY( T** data, size_t sizeY, size_t sizeX ) {
-            size_t halfY = sizeY / 2;
-            size_t nBytes = sizeX * sizeof( T );
-            T* tmp = new T[sizeX];
-            for( size_t y = 0; y < halfY; ++y ) {
-                memcpy( tmp, data[y], nBytes );
-                memcpy( data[y], data[sizeY - y - 1], nBytes );
-                memcpy( data[sizeY - y - 1], tmp, nBytes );
-            }
-            delete[] tmp;
-        }
-
 
         template <typename T>
         double total( const redux::util::Array<T>& in ) {

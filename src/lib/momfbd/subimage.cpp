@@ -42,7 +42,7 @@ namespace {
 }
 
 
-SubImage::SubImage (Object& obj, const Channel& ch, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind, const redux::util::Array<float>& stack,
+SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind, const Array<float>& stack,
                     uint32_t index, uint16_t firstY, uint16_t firstX, uint16_t patchSize, uint16_t pupilSize)
     : Array<float> (stack, index, index, firstY, firstY + patchSize - 1, firstX, firstX + patchSize - 1),
       index (index), imgSize (patchSize), pupilSize (pupilSize), otfSize (2 * pupilSize), object (obj),
@@ -56,7 +56,7 @@ SubImage::SubImage (Object& obj, const Channel& ch, const redux::util::Array<dou
     tmpOTF.resize (otfSize, otfSize);
     vogel.resize (pupilSize, pupilSize);
 
-    static int dummy = initSineLUT(); 
+    static int dummy UNUSED = initSineLUT(); 
 }
 
 
@@ -80,8 +80,7 @@ void SubImage::init (void) {
     for (auto & iit : img) {                    // windowing: subtract and re-add mean afterwards
         iit = static_cast<int16_t>(*dit++);     // FIXME: this cast is just to mimic old momfbd code for testing.
     }
-static int cnt(0);
-  //  Ana::write("img_raw"+to_string(++cnt)+".f0", img);
+
      stats.getStats(img, ST_VALUES);               // get statistics before windowing
      double avg = stats.mean;
     dit = this->begin();
@@ -309,8 +308,8 @@ void SubImage::calcVogelWeight(void) {
   //Ana::write("vogel_glft2.f0", glFT);
     glFTPtr = glFT.get();
     double* vogPtr = vogel.get();
-    const double* pupPtr = channel.pupil.first.get();
-    double scale = -2/object.wavelength;
+    //const double* pupPtr = channel.pupil.first.get();
+    //double scale = -2/object.wavelength;
     for (auto & ind : channel.pupilInOTF) {
         //vogPtr[ind.first] = -2.0*imag(pfPtr[ind.first]*conj(glFTPtr[ind.second]))*pupPtr[ind.first];
         vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*glFTPtr[ind.second]);//*pupPtr[ind.first];
@@ -329,7 +328,7 @@ void SubImage::calcVogelWeight(void) {
 }
 
 
-void SubImage::resetPhi (redux::util::Array<double>&p) const {
+void SubImage::resetPhi (Array<double>&p) const {
  //   cout << "SubImage::resetPhi(" << hexString(this) << ")"  << endl;
     memset(p.get(), 0, pupilSize*pupilSize*sizeof (double));    // FIXME: use phi_fixed
     //memcpy(p.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements() *sizeof (double));
@@ -477,7 +476,7 @@ void SubImage::calcOTF (complex_t* otfPtr, const double* phiPtr) const {
     for (auto & ind : channel.pupilInOTF) {
         double tmp = fmod(phiPtr[ind.first],pi_x_2);
         if( tmp < 0 ) tmp += pi_x_2;
-        uint32_t idx = static_cast<uint32_t> (tmp*angular_step_inv + 0.5);
+        //uint32_t idx = static_cast<uint32_t> (tmp*angular_step_inv + 0.5);
         otfPtr[ind.second] = polar(pupilPtr[ind.first]*norm, phiPtr[ind.first]);
 //         otfPtr[ind.second] = complex_t( pupilPtr[ind.first]*cos(phiPtr[ind.first]),
 //                                         pupilPtr[ind.first]*sin(phiPtr[ind.first]) );

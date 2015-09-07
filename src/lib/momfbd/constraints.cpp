@@ -4,7 +4,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/math/linalg.hpp"
-
+#include "redux/util/datautil.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -384,7 +384,6 @@ void Constraints::groupConnectedVariables( void ) {
 
 void Constraints::sortConstraints( bool blockwise ) {
     if(blockwise) {
-        uint32_t offset = 0;
         for( auto & g : groups ) {
             g.sortRows();
         }
@@ -453,13 +452,13 @@ void Constraints::init( void ) {
 
     if( nParameters ) {
         
-        const vector<shared_ptr<Object>>& objects = job.getObjects();
+        //const vector<shared_ptr<Object>>& objects = job.getObjects();
         for( uint modeIndex = 0; modeIndex < job.modeNumbers.size(); ++modeIndex ) {
             uint16_t modeNumber = job.modeNumbers[modeIndex];
             uint32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
                 shared_ptr<Constraint> c( new Constraint( imageCount * nModes + modeIndex, 1 ) );
-                for( auto wf : job.getObjects()[0]->getChannels()[0]->imageNumbers ) {  // only for first object and channel
+                for( auto wf UNUSED: job.getObjects()[0]->getChannels()[0]->imageNumbers ) {  // only for first object and channel
                     c->addEntry( imageCount * nModes + modeIndex, 1.0 );
                     imageCount++;
                 }
@@ -471,7 +470,7 @@ void Constraints::init( void ) {
                     for( auto ch : obj->getChannels() ) {
                         if( kOffset ) { // skip reference channel
                             uint32_t tOffset = 0;
-                            for( auto wf : ch->imageNumbers ) {
+                            for( auto wf UNUSED: ch->imageNumbers ) {
                                 if( tOffset ) { // skip reference wavefront
                                     shared_ptr<Constraint> c( new Constraint( modeIndex, 1 ) ); // \alpha_{11m}
                                     c->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
@@ -539,7 +538,7 @@ Array<int16_t> Constraints::getMatrix( void ) const {
     } else {
         uint32_t rowEnd = 0;
         uint32_t colEnd = 0;
-        int cnt = 0;
+        //int cnt = 0;
         for( auto &group : groups ) {
             if( ! group.dense() ) {
                 // TODO: Silent for now, but should throw or warn.
@@ -553,7 +552,7 @@ Array<int16_t> Constraints::getMatrix( void ) const {
             colEnd = colBegin + nPar - 1;
             Array<int16_t> cc( c, rowBegin, rowEnd, colBegin, colEnd );  // sub-array of c
             for( uint i = 0; i < nConstr; ++i ) {
-                uint32_t col = 0;
+                //uint32_t col = 0;
                 for( auto & entry : group.constraints[i]->entries ) {
                     if( entry.first - firstIndex >= nPar ) {
                         // TODO: Skip silently for now, but should throw or warn.
@@ -574,7 +573,7 @@ Array<int16_t> Constraints::getMatrix( void ) const {
 
 Array<double> Constraints::getNullMatrix( void ) const {
 
-    uint32_t nConstraints = constraints.size();
+    //uint32_t nConstraints = constraints.size();
     if( nConstrainedParameters == 0 || nParameters == 0 ) {
         return Array<double>();
     }
@@ -605,13 +604,13 @@ Array<int16_t> Constraints::getSubMatrix( uint32_t groupID ) const {
     uint32_t nConstr = g.constraints.size();
     uint32_t nPar = g.indices.size();
     uint32_t first = *g.indices.begin();
-    uint32_t last = *g.indices.rbegin();
+    //uint32_t last = *g.indices.rbegin();
     //cout << "Constraints::getSubMatrix(" << groupID << ")  " << nConstr << "x" << nPar << "   first = " << first << "   last = " << last << endl;
     Array<int16_t> c( nConstr, nPar );
     c.zero();
     for( uint i = 0; i < nConstr; ++i ) {
         //  cout << "Constraints::getSubMatrix(" << groupID << ")  i = " << i << endl;
-        uint32_t col = 0;
+       // uint32_t col = 0;
         for( auto & entry : g.constraints[i]->entries ) {
             //      cout << "Constraints::getSubMatrix(" << groupID << ")  e = " << entry.first << endl;
             c( i, entry.first - first ) = entry.second;

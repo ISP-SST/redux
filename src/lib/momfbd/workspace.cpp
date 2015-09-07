@@ -332,8 +332,8 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
 //     2.46e-10, 1.58e-10, 1.56e-10,
 //     -1.14e-10, -5.76e-11, -6.15e-11
 // };
-    double gv_alpha[] = { 7.63e-10,  4.92e-10,  4.84e-10, -2.25e-07,  1.53e-07,
-                         -3.55e-10, -1.79e-10, -1.91e-10,  2.27e-07, -1.5e-07 };
+//     double gv_alpha[] = { 7.63e-10,  4.92e-10,  4.84e-10, -2.25e-07,  1.53e-07,
+//                          -3.55e-10, -1.79e-10, -1.91e-10,  2.27e-07, -1.5e-07 };
 
  // cout << " nFreeParams = " << nFreeParameters << endl;
 //memcpy(alpha_init.data,gv_alpha,nFreeParameters*sizeof(double));
@@ -357,13 +357,13 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
     my_func( job.globalData->constraints.nConstrainedParameters, wrapped_f, wrapped_df, wrapped_fdf );
     
                         
-    size_t nAlpha = job.globalData->constraints.nParameters;       
+    //size_t nAlpha = job.globalData->constraints.nParameters;       
     size_t nBeta = job.globalData->constraints.nConstrainedParameters;       
-    double bla;
+    //double bla;
     for(uint i=0; i<1; ++i) {
         memset(beta->data,0,nBeta*sizeof(double));
         //gsl_vector_set(beta, i, 1.0);
-        bla = wrapped_f( beta, nullptr );
+        wrapped_f( beta, nullptr );
         //wrapped_df( beta, nullptr, grad_beta );
        // wrapped_fdf( beta, nullptr, &bla, grad_beta );
     }
@@ -425,7 +425,7 @@ wrapped_df( beta_init, nullptr, s->dx );
     //gsl_vector_set(&beta_init, 0, 1);
   //  wrapped_f( &beta_init, nullptr );
 boost::timer::auto_cpu_timer timer;
-    double previousMetric, thisMetric, gradNorm;
+    double previousMetric(0), thisMetric;//, gradNorm;
     size_t iter = 0;
     int status, successCount(0);
     bool done(false);
@@ -435,7 +435,7 @@ boost::timer::auto_cpu_timer timer;
             cout << "gsl_err1: " << gsl_strerror(status) << endl;
         }
         thisMetric = s->f;
-        gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric*thisMetric);
+        //gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric*thisMetric);
         //cout << iter << ":  metric = " << thisMetric << "   gNorm = " << gradNorm << flush;
         if (iter++) {
             double relativeChange = 2.0 * fabs(thisMetric-previousMetric) / (fabs(thisMetric)+fabs(previousMetric)+job.EPS);

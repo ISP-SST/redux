@@ -37,10 +37,7 @@ void ChannelData::initPatch(void) {
 
 
 void ChannelData::collectResults(void) {
-   // cout << "ChannelData::collectResults() " << __LINE__ << endl;
     myChannel->getResults(*this);
-    //images.resize();
-  //  cout << "ChannelData::collectResults() " << __LINE__ << endl;
 }
 
 
@@ -107,13 +104,10 @@ void ObjectData::initPatch(void) {
 
 
 void ObjectData::collectResults(void) {
- //   cout << "ObjectData::collectResults() " << __LINE__ << endl;
     myObject->getResults(*this);
-//    cout << "ObjectData::collectResults() " << __LINE__ << endl;
     for( ChannelData& ch: channels ) {
         ch.collectResults();
     }
- //   cout << "ObjectData::collectResults() " << __LINE__ << endl;
 }
 
 
@@ -184,11 +178,9 @@ void PatchData::initPatch(void) {
 
 
 void PatchData::collectResults(void) {
-//    cout << "PatchData::collectResults()   patch # " << index << endl;
     for( ObjectData& obj: objects ) {
         obj.collectResults();
     }
-//    cout << "PatchData::collectResults() " << __LINE__ << endl;
 }
 
 
@@ -230,7 +222,6 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
 
 
 void PatchData::cclear(void) {
-    std::cout << "PatchData::cclear() itemPath = " << itemPath << std::endl;
     for( ObjectData& obj: objects ) {
         obj.cclear();
     }

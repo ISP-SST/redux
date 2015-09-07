@@ -2,7 +2,7 @@
 #define REDUX_UTIL_ARRAYUTIL_HPP
 
 #include <memory>
-#include <iostream>
+#include <algorithm>
 
 namespace redux {
 
@@ -130,6 +130,28 @@ namespace redux {
         std::shared_ptr<typename detail::Dummy<T,S...>::dataType> reshapeArray( T* array, S ...sizes ) {
             typedef typename detail::Dummy<T,S...>::dataType dataType;
             return std::shared_ptr<dataType>( makePointers<T>( array, sizes... ), []( dataType* p ) { delPointers( p ); } );
+        }
+        
+        
+        template <typename T>
+        void reverseX( T** data, size_t sizeY, size_t sizeX ) {
+            for( size_t y = 0; y < sizeY; ++y ) {
+                std::reverse( data[y], data[y] + sizeX );
+            }
+        }
+        
+
+        template <typename T>
+        void reverseY( T** data, size_t sizeY, size_t sizeX ) {
+            size_t halfY = sizeY / 2;
+            size_t nBytes = sizeX * sizeof( T );
+            T* tmp = new T[sizeX];
+            for( size_t y = 0; y < halfY; ++y ) {
+                memcpy( tmp, data[y], nBytes );
+                memcpy( data[y], data[sizeY - y - 1], nBytes );
+                memcpy( data[sizeY - y - 1], tmp, nBytes );
+            }
+            delete[] tmp;
         }
 
 

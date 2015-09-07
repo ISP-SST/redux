@@ -420,10 +420,10 @@ void Object::init( void ) {
 void Object::initCache (void) {
     for (shared_ptr<Channel>& ch : channels) {
         ch->initCache();
-        size_t sz = pupilIndices.size();
+        //size_t sz = pupilIndices.size();
         pupilIndices.insert (ch->pupilIndices.begin(), ch->pupilIndices.end());
         //if (sz != pupilIndices.size()) cout << "Added to pupilIndices: " << sz << " -> " <<  pupilIndices.size() << endl;
-        sz = otfIndices.size();
+        //sz = otfIndices.size();
         otfIndices.insert (ch->otfIndices.begin(), ch->otfIndices.end());
         //if (sz != otfIndices.size()) cout << "Added to otfIndices: " << sz << " -> " <<  otfIndices.size() << endl;
     }

@@ -89,7 +89,7 @@ void Ana::read( ifstream& file ) {
         // The camera software at the sst used to pad the text string with copies of the
         // primary block, and the momfbd code produced a zero-padded text header.
         txtPtr += 256;  // skip part from first block
-        for( size_t i=0; i<m_Header.nhb-1; ++i, txtPtr+=512) {
+        for( int i=0; i<m_Header.nhb-1; ++i, txtPtr+=512) {
             if( !memcmp(txtPtr,reinterpret_cast<char*>( &m_Header ),256) ) {
                 memset(txtPtr,0,256);
             }
