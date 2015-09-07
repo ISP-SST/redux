@@ -608,21 +608,15 @@ namespace redux {
             Array<T>& operator=( const Array<T>& rhs ) = default;
 
             template <typename U>
-            const Array<T>& operator=( const Array<U>& rhs ) = delete; /*{
+            const Array<T>& operator=( const Array<U>& rhs ) {
                 if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
-                if(dense() && rhs.dense()) {
-                    std::copy(rhs.ptr(), rhs.ptr()+rhs.nElements(), ptr());
-                    //std::transform(rhs.ptr(), rhs.ptr()+rhs.nElements(), begin(), [](U d) { return static_cast<T>(d); } );
+                if( dense() && rhs.dense() ) {
+                    std::transform(rhs.ptr(), rhs.ptr()+nElements_, ptr(), ptr(), redux::math::assign<T,U>());
                 } else {
-                   // std::transform(rhs.begin(), rhs.end(), begin(), [](U d) { return static_cast<T>(d); } );
-                    //std::copy(rhs.begin(), rhs.end(), begin());
-                    iterator it = begin();
-                    for( auto & rhsit : rhs ) {
-                        *it++ = rhsit;
-                    }
+                    std::transform(rhs.begin(), rhs.end(), begin(), begin(), redux::math::assign<T,U>());
                 }
                 return *this;
-            }*/
+            }
 
             template <typename U>
             const Array<T>& operator+=( const Array<U>& rhs ) {
