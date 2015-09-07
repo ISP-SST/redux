@@ -199,6 +199,7 @@ void Object::getResults(ObjectData& od) {
         } else aoPtr[ind] = dPtr[ind] = 0;
     }
     if (!(myJob.runFlags&RF_NO_FILTER)) {
+        LOG << boost::format("Applying Scharmer filter with frequency-cutoff = %f and noise-variance = %f") % (0.9*frequencyCutoff) % avgNoiseVariance;
   //      cout << "Applying filter:  noise = " << avgNoiseVariance << " lf = " << frequencyCutoff << endl;
         ScharmerFilter(aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
@@ -207,9 +208,31 @@ void Object::getResults(ObjectData& od) {
 
     // TODO: implement add/subtract plane properly
 
-    od.results.resize(patchSize, patchSize);
-    od.results.assign(tmpC);
+    od.img.resize(patchSize, patchSize);
+    od.img.assign(tmpC);
 
+    // PSF
+    if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
+        uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
+        od.psf.resize(nPSF, patchSize, patchSize);
+        od.psf.zero();
+        if( nPSF > 1 ) {
+            Array<float> view(od.psf,0,0,0,patchSize-1,0,patchSize-1);
+            for( shared_ptr<Channel>& ch: channels) {
+                for ( shared_ptr<SubImage>& si: ch->subImages) {
+                    view = si->getPSF();
+                    view.shift(0,1);
+                }
+            }
+        } else if( nPSF == 1 ) {
+            for( shared_ptr<Channel>& ch: channels) {
+                for ( shared_ptr<SubImage>& si: ch->subImages) {
+                    si->addPSF(od.psf);
+                }
+            }
+            od.psf *= (1.0/nObjectImages);
+        }
+    }
 
 }
 
@@ -592,7 +615,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
         for (uint x = 0; x < patches.dimSize(1); ++x) {
             patches(y,x)->cacheLoad(true);
             bfs::path fn = bfs::path (outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
-            Ana::write(fn.string(), patches(y,x)->objects[ID].results);
+            Ana::write(fn.string(), patches(y,x)->objects[ID].img);
         }
     }
     
@@ -611,7 +634,7 @@ void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
 }
 
 
-void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patches) {
+void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData) {
 
     bfs::path fn = bfs::path (outputFileName + "_thi.momfbd");      // TODO: fix storage properly
 
@@ -648,12 +671,16 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patches) {
         info->clipStartY.get() [ i ] = channels[i]->alignClip[2];
         info->clipEndY.get() [ i ] = channels[i]->alignClip[3];
     }
-
     info->nPH = pupilPixels;
 
+    uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
+    int64_t imgSize = patchSize*patchSize*sizeof(float);
+    
+    if (saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG)) writeMask |= MOMFBD_PSF;
+    if (saveMask & SF_SAVE_MODES && (info->nPH > 0)) writeMask |= MOMFBD_MODES;
+    
     Array<float> modes;
-
-    if (saveMask & SF_SAVE_MODES && (info->nPH > 0)) {
+    if ( writeMask&MOMFBD_MODES ) {     // copy modes from local cache
         double pupilRadiusInPixels = pupilPixels / 2.0;
         if (channels.size()) pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
         modes.resize (myJob.modeNumbers.size() + 1, info->nPH, info->nPH);            // +1 to also fit pupil in the array
@@ -682,28 +709,38 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patches) {
     info->pix2cf = pix2cf;
     info->cf2pix = cf2pix;
     */
-    info->nPatchesY = patches.dimSize (0);
-    info->nPatchesX = patches.dimSize (1);
+    info->nPatchesY = patchesData.dimSize (0);
+    info->nPatchesX = patchesData.dimSize (1);
     info->patches.resize(info->nPatchesX, info->nPatchesY);
+
+    size_t modeSize = modes.nElements()*sizeof (float);
+    size_t blockSize = modeSize;
 
     auto dummy = sharedArray<int32_t> (nChannels);
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
-            patches(y,x)->cacheLoad(true);
-            info->patches(x,y).region[0] = patches(y,x)->roi.first.x;
-            info->patches(x,y).region[1] = patches(y,x)->roi.last.x;
-            info->patches(x,y).region[2] = patches(y,x)->roi.first.y;
-            info->patches(x,y).region[3] = patches(y,x)->roi.last.y;
+            patchesData(y,x)->cacheLoad(true);
+            info->patches(x,y).region[0] = patchesData(y,x)->roi.first.x;
+            info->patches(x,y).region[1] = patchesData(y,x)->roi.last.x;
+            info->patches(x,y).region[2] = patchesData(y,x)->roi.first.y;
+            info->patches(x,y).region[3] = patchesData(y,x)->roi.last.y;
             info->patches(x,y).nChannels = nChannels;
             info->patches(x,y).nim = sharedArray<int32_t> (nChannels); //dummy;
             info->patches(x,y).dx = sharedArray<int32_t> (nChannels); //dummy;
             info->patches(x,y).dy = sharedArray<int32_t> (nChannels);; //dummy;
             for (int i = 0; i < nChannels; ++i) {
                 info->patches(x,y).nim.get()[i] = channels[i]->nImages();
-                info->patches(x,y).dx.get()[i] = patches(y,x)->objects[ID].channels[i].shift.x;
-                info->patches(x,y).dy.get()[i] = patches(y,x)->objects[ID].channels[i].shift.y;
+                info->patches(x,y).dx.get()[i] = patchesData(y,x)->objects[ID].channels[i].shift.x;
+                info->patches(x,y).dy.get()[i] = patchesData(y,x)->objects[ID].channels[i].shift.y;
             }
-            info->patches(x,y).npsf = nObjectImages;
+            blockSize += imgSize;
+            if ( writeMask&MOMFBD_PSF ) {
+                if(patchesData(y,x)->objects[ID].psf.nDimensions()>1) {
+                    info->patches(x,y).npsf = patchesData(y,x)->objects[ID].psf.dimSize(0);
+  //                  cout << "wrPSF:  n=" << info->patches(x,y).npsf << endl;
+                    blockSize += info->patches(x,y).npsf*imgSize;
+                }
+            }
             info->patches(x,y).nobj = nObjectImages;
             info->patches(x,y).nres = nObjectImages;
             info->patches(x,y).nalpha = nObjectImages;
@@ -716,14 +753,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patches) {
 
 
 
-    uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
-    int64_t imgSize = patchSize*patchSize*sizeof(float);
-    size_t patchDataSize = imgSize;
     if (false) { // not implemented yet
-        if (saveMask & SF_SAVE_PSF || saveMask & SF_SAVE_PSF_AVG) {
-            writeMask |= MOMFBD_PSF;
-            patchDataSize += patchSize * patchSize * sizeof (float);
-        }
         if (saveMask & SF_SAVE_COBJ)                               writeMask |= MOMFBD_OBJ;
         if (saveMask & SF_SAVE_RESIDUAL)                           writeMask |= MOMFBD_RES;
         if (saveMask & SF_SAVE_ALPHA)                              writeMask |= MOMFBD_ALPHA;
@@ -731,18 +761,19 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patches) {
         if (saveMask & SF_SAVE_MODES)                              writeMask |= MOMFBD_MODES;
     }
 
-    size_t modeSize = modes.nElements() * sizeof (float);
-    size_t totalSize = modeSize + patches.nElements() * patchDataSize;
 
-    auto tmp = sharedArray<char> (totalSize);
+    auto tmp = sharedArray<char> (blockSize);
     memcpy(tmp.get(), modes.get(), modeSize);
     char* tmpPtr = tmp.get();
     int64_t offset = modeSize;
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
-            memcpy(tmpPtr+offset, patches(y,x)->objects[ID].results.get(), imgSize);
+            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].img.get(), imgSize);
             info->patches(x,y).imgPos = offset;
             offset += imgSize;
+            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].psf.get(), info->patches(x,y).npsf*imgSize);
+            info->patches(x,y).psfPos = offset;
+            offset += info->patches(x,y).npsf*imgSize;
         }
     }
 

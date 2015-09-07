@@ -112,7 +112,8 @@ void ObjectData::collectResults(void) {
 
 
 uint64_t ObjectData::size( void ) const {
-    uint64_t sz = results.size();     // nChannels
+    uint64_t sz = img.size();
+    sz += psf.size();
     for( const ChannelData& cd: channels ) {
         sz += cd.size();
     }
@@ -122,7 +123,8 @@ uint64_t ObjectData::size( void ) const {
 
 uint64_t ObjectData::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = results.pack(ptr);
+    uint64_t count = img.pack(ptr);
+    count += psf.pack(ptr+count);
     for( const ChannelData& cd: channels ) {
         count += cd.pack( ptr+count );
     }
@@ -132,7 +134,8 @@ uint64_t ObjectData::pack( char* ptr ) const {
 
 uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = results.unpack(ptr,swap_endian);
+    uint64_t count = img.unpack(ptr,swap_endian);
+    count += psf.unpack(ptr+count,swap_endian);
     channels.clear();
     for( auto& it: myObject->getChannels() ) {
         ChannelData chan(it);

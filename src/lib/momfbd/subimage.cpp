@@ -540,10 +540,17 @@ void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiP
 }
 
 
-redux::util::Array<double> SubImage::getPSF (void) {
-    redux::util::Array<double> tmp;
+void SubImage::addPSF(Array<float>& out) {
+    Array<complex_t> tmp(OTF.dimensions());
     OTF.directInverse (tmp);
-    return std::move (tmp);
+    out += tmp;
+}
+
+
+Array<double> SubImage::getPSF (void) {
+    Array<complex_t> tmp(OTF.dimensions());
+    OTF.directInverse(tmp);
+    return tmp.copy<double>();
 }
 
 

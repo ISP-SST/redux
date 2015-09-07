@@ -81,7 +81,8 @@ namespace redux {
             
             std::vector<ChannelData> channels;
             
-            redux::util::Array<float> results;      //! stack of images to be returned to the master
+            redux::util::Array<float> img;              //! (deconvolved) image to be returned to the master
+            redux::util::Array<float> psf;              //! PSF, if requested. 1 per object if PSF_AVG, otherwise nImages
             
         };
 

@@ -76,6 +76,7 @@ namespace redux {
             void calcPFOTF(redux::util::Array<complex_t>& pf, redux::util::Array<complex_t>& otf) const { calcPFOTF(pf.get(), otf.get(), phi.get()); }
             void calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiPtr) const;
             
+            void addPSF(redux::util::Array<float>& out);
             redux::util::Array<double> getPSF(void);
             void setWaveFront( std::shared_ptr<WaveFront> w ) { wf = w; };
             
