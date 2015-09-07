@@ -1,7 +1,7 @@
 #ifndef REDUX_FILE_FILEMOMFBD_HPP
 #define REDUX_FILE_FILEMOMFBD_HPP
 
-#include "redux/file/fileinfo.hpp"
+#include "redux/file/filemeta.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
@@ -24,7 +24,7 @@ namespace redux {
 
     namespace file {
 
-        struct FileMomfbd : public redux::file::FileInfo {
+        struct FileMomfbd : public redux::file::FileMeta {
 
             typedef std::shared_ptr<FileMomfbd> Ptr;
                        

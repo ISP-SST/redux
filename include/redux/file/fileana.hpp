@@ -1,7 +1,7 @@
 #ifndef REDUX_FILE_FILEANA_HPP
 #define REDUX_FILE_FILEANA_HPP
 
-#include "redux/file/fileinfo.hpp"
+#include "redux/file/filemeta.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
@@ -20,7 +20,7 @@ namespace redux {
         /*! Container for reading/writing ANA files.
         *
         */
-        struct Ana : public redux::file::FileInfo {
+        struct Ana : public redux::file::FileMeta {
 
             enum Magic { MAGIC_ANA = 0x5555aaaa, MAGIC_ANAR = 0xaaaa5555 };
             enum TypeIndex { ANA_BYTE = 0,      // uint8

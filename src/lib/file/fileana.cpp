@@ -484,10 +484,9 @@ template void redux::file::Ana::read( const string& filename, redux::util::Array
 
 template <typename T>
 void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image ) {
-    std::shared_ptr<Ana> hdr = static_pointer_cast<Ana>( image.hdr );
+    std::shared_ptr<Ana> hdr = static_pointer_cast<Ana>( image.meta );
     read( filename, image, hdr );
-    string txt = hdr->getText();
-    image.hdr = hdr;
+    image.meta = hdr;
 }
 template void redux::file::Ana::read( const string & filename, redux::image::Image<uint8_t>& image );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<int16_t>& image );
@@ -599,7 +598,7 @@ template void redux::file::Ana::write( const string&, const redux::util::Array<c
 
 template <typename T>
 void redux::file::Ana::write( const string & filename, const redux::image::Image<T>& image, int sliceSize ) {
-    write( filename, image, static_pointer_cast<redux::file::Ana>( image.hdr ), sliceSize );
+    write( filename, image, static_pointer_cast<redux::file::Ana>( image.meta ), sliceSize );
 }
 template void redux::file::Ana::write( const string&, const redux::image::Image<uint8_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<int16_t>&, int );

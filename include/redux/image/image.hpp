@@ -2,7 +2,7 @@
 #define REDUX_IMAGE_IMAGE_HPP
 
 #include "redux/util/array.hpp"
-#include "redux/file/fileinfo.hpp"
+#include "redux/file/filemeta.hpp"
 
 #include <cstring>
 #include <memory>
@@ -17,6 +17,8 @@ namespace redux {
             typedef typename std::shared_ptr<Image> Ptr;
 
             Image( void ) : nFrames( 1 ) {};
+            Image(Image<T>&& rhs) : redux::util::Array<T>(std::move(reinterpret_cast<redux::util::Array<T>&>(rhs))), meta(std::move(rhs.meta)), nFrames(std::move(rhs.nFrames)) { };
+            Image(const Image<T>& rhs) : redux::util::Array<T>(reinterpret_cast<const redux::util::Array<T>&>(rhs)), meta(rhs.meta) { };
             template <typename U>
             Image( const Image<T>& rhs, const std::vector<U>& indices ) : redux::util::Array<T>( reinterpret_cast<const redux::util::Array<T>&>( rhs ), indices ), nFrames( rhs.nFrames ) {}
             template <typename ...S>
@@ -24,53 +26,60 @@ namespace redux {
             template <typename ...S>
             Image( S ...s ) : redux::util::Array<T>( s... ), nFrames( 1 ) {}
 
-
-            template <typename U>
-            const Image<T>& operator=( const U& rhs ) {
-                redux::util::Array<T>::operator=( rhs );
+            operator const redux::util::Array<T>&() const { return reinterpret_cast<const redux::util::Array<T>&>(*this); }
+            
+            Image<T>& operator=( const Image<T>& rhs ) {
+                redux::util::Array<T>::operator=( reinterpret_cast<const redux::util::Array<T>&>(rhs) );
+                meta = rhs.meta;
+                nFrames = rhs.nFrames;
                 return *this;
             }
+            
+            template <typename U>
+            Image<T>& operator=( const Image<U>& rhs ) {
+                redux::util::Array<T>::operator=( reinterpret_cast<const redux::util::Array<U>&>(rhs) );
+                meta = rhs.meta;
+                nFrames = rhs.nFrames;
+                return *this;
+            }
+            /*template <typename U>
+            const Image<T>& operator=( const redux::util::Array<U>& rhs ) {
+                redux::util::Array<T>::operator=( rhs );
+                return *this;
+            }*/
 
             template <typename U>
             const Image<T>& operator+=( const Image<U>& rhs ) {
-                redux::util::Array<T>::operator+=( rhs );
-                nFrames += rhs.nFrames;
+                redux::util::Array<T>::operator+=( reinterpret_cast<const redux::util::Array<U>&>(rhs) );
+                nFrames += rhs.nFrames;         // TBD: should frames be counted, or assumed to always be normalized before arithmetic ?
                 return *this;
             }
 
             template <typename U>
-            const Image<T>& operator+=( const U& rhs ) {
-                redux::util::Array<T>::operator+=( rhs );
+            const Image<T>& operator-=( const Image<U>& rhs ) {
+                redux::util::Array<T>::operator-=( reinterpret_cast<const redux::util::Array<U>&>(rhs) );
                 return *this;
             }
-
+            
             template <typename U>
-            const Image<T>& operator-=( const U& rhs ) {
-                redux::util::Array<T>::operator-=( rhs );
+            const Image<T>& operator*=( const Image<U>& rhs ) {
+                redux::util::Array<T>::operator*=( reinterpret_cast<const redux::util::Array<U>&>(rhs) );
                 return *this;
             }
-
+            
             template <typename U>
-            const Image<T>& operator*=( const U& rhs ) {
-                redux::util::Array<T>::operator*=( rhs );
+            const Image<T>& operator/=( const Image<U>& rhs ) {
+                redux::util::Array<T>::operator/=( reinterpret_cast<const redux::util::Array<U>&>(rhs) );
                 return *this;
             }
 
-            template <typename U>
-            const Image<T>& operator/=( const U& rhs ) {
-                redux::util::Array<T>::operator/=( rhs );
-                return *this;
-            }
+            template <typename U> const Image<T>& operator+=( const U& rhs ) { redux::util::Array<T>::operator+=(rhs); return *this; }
+            template <typename U> const Image<T>& operator-=( const U& rhs ) { redux::util::Array<T>::operator-=(rhs); return *this; }
+            template <typename U> const Image<T>& operator*=( const U& rhs ) { redux::util::Array<T>::operator*=(rhs); return *this; }
+            template <typename U> const Image<T>& operator/=( const U& rhs ) { redux::util::Array<T>::operator/=(rhs); return *this; }
 
-            // operators with scalars
-            /*  template <typename U> const Image<T>& operator= ( const U& rhs ) { for( auto & it : *this ) it  = rhs; return *this; }
-              template <typename U> const Image<T>& operator+=( const U& rhs ) { for( auto & it : *this ) it += rhs; return *this; }
-              template <typename U> const Image<T>& operator-=( const U& rhs ) { for( auto & it : *this ) it -= rhs; return *this; }
-              template <typename U> const Image<T>& operator*=( const U& rhs ) { for( auto & it : *this ) it *= rhs; return *this; }
-              template <typename U> const Image<T>& operator/=( const U& rhs ) { for( auto & it : *this ) it /= rhs; return *this; }
-              */
 
-            void normalize( void ) { if(nFrames) *this /= static_cast<double>(nFrames); nFrames = 1; };
+            void normalize( void ) { if(nFrames > 1) redux::util::Array<T>::operator*=(1.0/nFrames); nFrames = 1; };
             double mean( void ) const {
                 double sum( 0 );
                 size_t cnt = 0;
@@ -109,16 +118,11 @@ namespace redux {
             }
 
 
-
             template <typename U = T>
             Image<U> copy( bool skipTrivialDims=true ) const {
-                std::vector<size_t> newDimSizes = this->dimensions(skipTrivialDims);
-                Image<U> tmp( newDimSizes );
-                auto cit = this->begin();
-                for( auto & it : tmp ) {
-                    it = static_cast<U>( *cit++ );
-                }
-                return tmp;
+                Image<U> tmp = redux::util::Array<T>::template copy<U>(skipTrivialDims);
+                return std::move(tmp);
+//                 std::vector<size_t> newDimSizes = this->dimensions(skipTrivialDims);
             }
 
 
@@ -132,7 +136,7 @@ namespace redux {
                 return false;
             }
 
-            std::shared_ptr<redux::file::FileInfo> hdr;
+            std::shared_ptr<redux::file::FileMeta> meta;
 
             uint32_t nFrames;      //! Set this if the image consists of multiple frames (for normalization purposes)
 
