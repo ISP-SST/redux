@@ -2,7 +2,7 @@
 #define REDUX_UTIL_ARRAY_HPP
 
 #include "redux/types.hpp"
-#include "redux/math//functions.hpp"
+#include "redux/math/functions.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
@@ -271,7 +271,7 @@ namespace redux {
             uint64_t size( void ) const {
                 uint64_t sz = sizeof( uint64_t );                                                          // blockSize
                 if( nElements_ ) {
-                    std::vector<size_t> tmp = dimensions(true);
+                    std::vector<size_t> tmp = dimensions();
                     sz += sizeof( uint64_t ) + tmp.size() * sizeof( size_t ) + nElements_ * sizeof( T );            // nDims + dimensions + dataSize
                 }
                 return sz;
@@ -285,9 +285,8 @@ namespace redux {
                 using redux::util::pack;
                 uint64_t count = pack( ptr, size() );
                 if( nElements_ ) {
-                    Array<T> tmp = this->copy(true);
-                    count += pack( ptr+count, tmp.dimensions() );
-                    count += pack( ptr+count, tmp.get(), tmp.nElements() );
+                    count += pack( ptr+count, dimensions() );
+                    count += pack( ptr+count, get(), nElements_ );
                 }
                 return count;
 
@@ -338,6 +337,7 @@ namespace redux {
                 if( dataSize ) {
                     datablock.reset( ptr, []( T * p ) {} );
                 }
+                //dense_ = true;
             }
             //@}
 
@@ -367,6 +367,7 @@ namespace redux {
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
                 end_ = ( ++it ).pos();  // 1 step after last element;
+                //dense_ = ((begin_+nElements_) == end_);
             }
             
             template <typename ...S> void permuteDimensions( S ...dims ) { permuteDimensions( {static_cast<size_t>( dims )...} ); }
@@ -458,7 +459,6 @@ namespace redux {
             Array<T>& trim( bool skipTrivialDims=true ) {
                 Array<T> tmp = copy(skipTrivialDims);
                 *this = std::move(tmp);
-        //        std::swap(*this,tmp);
                 return *this;
             }
 
@@ -500,7 +500,7 @@ namespace redux {
                     return *datablock.get();
                 }
                 for( size_t i = 0; i < sz; ++i ) {
-                    if( tmp[i] >= currentSizes[nDims_ - i - 1] ) {
+                    if( tmp[i] < 0 || abs(tmp[i]) >= currentSizes[nDims_ - i - 1] ) {
                         throw std::out_of_range( "Array::at() Index out of range." );
                     }
                 }
@@ -611,9 +611,9 @@ namespace redux {
             const Array<T>& operator=( const Array<U>& rhs ) {
                 if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
                 if( dense() && rhs.dense() ) {
-                    std::transform(rhs.ptr(), rhs.ptr()+nElements_, ptr(), ptr(), redux::math::assign<T,U>());
-                } else {
-                    std::transform(rhs.begin(), rhs.end(), begin(), begin(), redux::math::assign<T,U>());
+                    std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::assign<T,U>());
+               } else {
+                    std::transform(begin(), end(), rhs.begin(), begin(), redux::math::assign<T,U>());
                 }
                 return *this;
             }
@@ -714,30 +714,26 @@ namespace redux {
             // operators with scalars
             //template <typename U>
             const Array<T>& operator= ( const T& rhs ) { for( auto & it : *this ) it  = rhs; return *this; };
-       /*     const Array<T>& operator=( const T& rhs ) {
-                //std::cout << "Array<T>& operator=( const T& rhs )   rhs = "<< rhs << std::endl;
-                if(dense()) {
-                //std::cout << "    dense" << std::endl;
-                    std::fill(ptr(), ptr()+nElements_, rhs);
+            /*{
+                 if(dense()) {
+                    std::transform(ptr(), ptr()+nElements_, ptr(), [](const T& a){return a;});
+                    //std::fill(ptr(), ptr()+nElements_, ptr(), rhs);
                 } else {
-               // std::cout << "    not dense" << std::endl;
-                    //std::fill(begin(), end(), rhs);
-                    for( auto& it : *this ) {
-                        it = rhs;
-                    }
+                    std::transform(begin(), end(), begin(), [](const T& a){return a;});
                 }
                 return *this;
             }*/
-/*            
-            template <typename U>
-            const Array<T>& operator=( const U& rhs ) {
-                if(dense()) {
-                    std::fill(ptr(), ptr()+nElements_, static_cast<T>(rhs));
+            
+            /*template <typename U>
+            const Array<T>& operator= ( const U& rhs ) {
+                 if(dense()) {
+                    std::transform(ptr(), ptr()+nElements_, ptr(), std::bind2nd<>(redux::math::assign<T,U>(),rhs));
                 } else {
-                    std::fill(begin(), end(), static_cast<T>(rhs));
+                    std::transform(begin(), end(), begin(), std::bind2nd<>(redux::math::assign<T,U>(),rhs));
                 }
                 return *this;
             }*/
+
             
             template <typename U>
             const Array<T>& operator+=( const U& rhs ) {
@@ -807,12 +803,8 @@ namespace redux {
                 return tmp /= rhs;
             }
             
-            /*const Array<T>& operator= ( const T& rhs ) { for( auto & it : *this ) it  = rhs; return *this; };
-            const Array<T>& operator+=( const T& rhs ) { for( auto & it : *this ) it += rhs; return *this; };
-            const Array<T>& operator-=( const T& rhs ) { for( auto & it : *this ) it -= rhs; return *this; };
-            const Array<T>& operator*=( const T& rhs ) { for( auto & it : *this ) it *= rhs; return *this; };
-            const Array<T>& operator/=( const T& rhs ) { std::cout << "ArrDiv: " << rhs << std::endl; for( auto & it : *this ) it /= rhs; return *this; };
-            */virtual void zero( void ) { if( nElements_ ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
+            
+            virtual void zero( void ) { if( nElements_ ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
 
 
             template <typename U, typename V>
@@ -864,33 +856,7 @@ namespace redux {
                 }
                 return *this;
             }
-/*
-            const Array<T>& operator=( const Array<T>& rhs ) {
-                std::cout << "operator=( const Array<T>& rhs )" << std::endl;
-                if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
-                if(currentSizes == rhs.currentSizes) {
-                    std::cout << "operator=( const Array<T>& rhs )      using memcpy" << std::endl;
-                    memcpy(datablock.get(),rhs.datablock.get(),dataSize*sizeof(T));
-                } else {
-                    typename Array<T>::const_iterator rhsit = rhs.begin();
-                    std::cout << "operator=( const Array<T>& rhs )      using slowcpy" << std::endl;
-                    for( auto & it : *this ) it = *rhsit++;
-                }
-                return *this;
-            }
-*/
 
-/*            const Array<T>& operator=( const Array<T>& rhs ) {
-                if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
-                if( rhs.dense_) {
-                    memcpy(ptr(),rhs.ptr(),dataSize);
-                    return *this;
-                }
-                typename Array<T>::const_iterator rhsit = rhs.begin();
-                for( auto & it : *this ) it = *rhsit++;
-                return *this;
-            }
-*/
             
             bool operator==( const Array<T>& rhs ) const {
                 if( ! sameSize( rhs ) ) {
@@ -995,7 +961,9 @@ namespace redux {
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
                 end_ = ( ++it ).pos();  // 1 step after last element;
+                //dense_ = ((begin_+nElements_) == end_);
             }
+            
             template <typename U>
             void setLimits( const std::vector<U>& limits ) {
                 std::vector<U> first(nDims_);
@@ -1034,6 +1002,7 @@ namespace redux {
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
                 end_ = ( ++it ).pos();  // 1 step after last element;
+                //dense_ = ((begin_+nElements_) == end_);
             }
             
 
@@ -1049,7 +1018,7 @@ namespace redux {
                     n = -dimFirst[dim];
                 }
                 
-                if(n+dimLast[dim] >= dimSizes[dim]) {
+                if(abs(n+dimLast[dim]) >= dimSizes[dim]) {
                     n = dimSizes[dim]-dimLast[dim]-1;
                 }
               
@@ -1059,7 +1028,8 @@ namespace redux {
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
                 end_ = ( ++it ).pos();  // 1 step after last element;
-                
+                //dense_ = ((begin_+nElements_) == end_);         // should not change with shift, but it's a cheap calculation anyway...
+               
                 return n;   // return 
             }
 

@@ -45,6 +45,11 @@ namespace redux {
         };
 
         template<typename T, typename U>
+        struct add<T,std::complex<U>> {
+            T operator()( const T& a, const std::complex<U>& b ) const { return static_cast<T>(a + std::real(b)); }
+        };
+
+        template<typename T, typename U>
         struct subtract : public std::binary_function<T, U, T> {
             T operator()( const T& a, const U& b ) const { return static_cast<T>(a - b); }
         };
