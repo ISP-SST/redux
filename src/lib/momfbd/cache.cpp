@@ -7,9 +7,12 @@
 
 #include <cmath>
 
+using redux::momfbd::Cache;
+using redux::util::Array;
+
 using namespace redux::momfbd;
 //using namespace redux::momfbd::legacy;
-using namespace redux::util;
+//using namespace redux::util;
 using namespace redux;
 
 using namespace std;
@@ -58,16 +61,16 @@ namespace {
 Cache::ModeID::ModeID(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle)
     : firstMode(0), lastMode(0),
       modeNumber(modeNumber), nPoints(nPoints),
-      pupilRadius(pupilRadius), angle(angle) { }
+      pupilRadius(pupilRadius), angle(angle), cutoff(0) { }
 
 
-Cache::ModeID::ModeID(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle)
+Cache::ModeID::ModeID(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
     : firstMode(firstMode), lastMode(lastMode),
       modeNumber(modeNumber), nPoints(nPoints),
-      pupilRadius(pupilRadius), angle(angle) { }
+      pupilRadius(pupilRadius), angle(angle), cutoff(cutoff) { }
 
 uint64_t Cache::ModeID::size( void ) const {
-    static uint64_t sz = 4*sizeof(uint16_t) + 2*sizeof(double);
+    static uint64_t sz = 4*sizeof(uint16_t) + 3*sizeof(double);
     return sz;
 }
 
@@ -80,6 +83,7 @@ uint64_t Cache::ModeID::pack( char* ptr ) const {
     count += pack(ptr+count,nPoints);
     count += pack(ptr+count,pupilRadius);
     count += pack(ptr+count,angle);
+    count += pack(ptr+count,cutoff);
     return count;
 }
 
@@ -92,6 +96,7 @@ uint64_t Cache::ModeID::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count,nPoints,swap_endian);
     count += unpack(ptr+count,pupilRadius,swap_endian);
     count += unpack(ptr+count,angle,swap_endian);
+    count += unpack(ptr+count,cutoff,swap_endian);
     return count;
 }
 
@@ -102,17 +107,14 @@ bool Cache::ModeID::operator<(const ModeID& rhs) const {
             if(modeNumber == rhs.modeNumber) {
                 if(nPoints == rhs.nPoints) {
                     if(pupilRadius == rhs.pupilRadius) {
-                        return (angle < rhs.angle);
-                    }
-                    else return (pupilRadius < rhs.pupilRadius);
-                }
-                else return (nPoints < rhs.nPoints);
-            }
-            else return (modeNumber < rhs.modeNumber);
-        }
-        else return (lastMode < rhs.lastMode);
-    }
-    else return (firstMode < rhs.firstMode);
+                        if(angle == rhs.angle) {
+                            return (cutoff < rhs.cutoff);
+                        } else return (angle < rhs.angle);
+                    } else return (pupilRadius < rhs.pupilRadius);
+                } else return (nPoints < rhs.nPoints);
+            } else return (modeNumber < rhs.modeNumber);
+        } else return (lastMode < rhs.lastMode);
+    } else return (firstMode < rhs.firstMode);
 }
 
 
@@ -141,7 +143,7 @@ const redux::image::Grid& Cache::grid(uint32_t sz, PointF origin) {
 }
 
 
-const std::pair<Array<double>, double>& Cache::pupil(uint32_t nPoints, float radius) {
+const std::pair<Array<double>, double>& Cache::pupil(uint32_t nPoints, double radius) {
 
     unique_lock<mutex> lock(mtx);
     auto it = pupils.find( make_pair(nPoints,radius) );
@@ -241,7 +243,7 @@ const std::map<uint16_t, PupilMode::KLPtr>& Cache::karhunenLoeveExpansion(uint16
         }
         last_in_block[b] = n - 1;
         size_t blockSize = last_in_block[b] - first_in_block[b] + 1;
-        blockMatrix[b] = newArray<double>(blockSize, blockSize);
+        blockMatrix[b] = redux::util::newArray<double>(blockSize, blockSize);
 
         for(int i = first_in_block[b]; i <= last_in_block[b]; ++i) {        // diagonal elements (i_i)
             blockMatrix[b][i - first_in_block[b]][i - first_in_block[b]] = zernikeCovariance(mapping.at(i), mapping.at(i));
@@ -261,9 +263,9 @@ const std::map<uint16_t, PupilMode::KLPtr>& Cache::karhunenLoeveExpansion(uint16
     for(int b = 0; b < nBlocks; ++b) {
         int blockSize = last_in_block[b] - first_in_block[b] + 1;
         if(blockSize > 1) {
-            double **v = newArray<double>(blockSize, blockSize);
+            double **v = redux::util::newArray<double>(blockSize, blockSize);
             redux::math::svd(*blockMatrix[b], blockSize, blockSize, singular_values + offset, *v);
-            delArray(v);
+            redux::util::delArray(v);
         }
         else {
             singular_values[offset] = blockMatrix[b][0][0];
@@ -300,7 +302,7 @@ const std::map<uint16_t, PupilMode::KLPtr>& Cache::karhunenLoeveExpansion(uint16
     delete[] last_in_block;
     delete[] singular_values;
     for(int i = 0; i < nBlocks; ++i) {
-        delArray(blockMatrix[i]);
+        redux::util::delArray(blockMatrix[i]);
     }
     delete[] blockMatrix;
 
@@ -338,7 +340,7 @@ const PupilMode::Ptr Cache::mode(const ModeID& idx) {
 
     PupilMode::Ptr ptr;
     if( idx.firstMode == 0 || idx.lastMode == 0 ) ptr.reset(new PupilMode(idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle));    // Zernike
-    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle));                // K-L
+    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle, idx.cutoff));                // K-L
     
     unique_lock<mutex> lock(mtx);
     return modes.emplace(idx, ptr).first->second;
@@ -354,9 +356,9 @@ const PupilMode::Ptr Cache::mode(uint16_t modeNumber, uint16_t nPoints, double p
 }
 
 
-const PupilMode::Ptr Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle) {
+const PupilMode::Ptr Cache::mode(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff) {
 
-    ModeID idx(firstMode, lastMode, modeNumber, nPoints, pupilRadius, angle);
+    ModeID idx(firstMode, lastMode, modeNumber, nPoints, pupilRadius, angle, cutoff);
     if( modeNumber == 2 || modeNumber == 3) {   // Always use Zernike modes for the tilts
         idx.firstMode = idx.lastMode == 0;
     }

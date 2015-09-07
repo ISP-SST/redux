@@ -8,6 +8,7 @@
 #include "redux/util/stringutil.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 using boost::algorithm::iequals;
 
 using namespace redux::momfbd;

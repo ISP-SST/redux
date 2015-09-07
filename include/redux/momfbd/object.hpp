@@ -42,7 +42,6 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             
             size_t nImages(void) const;
-            //void collectImages(redux::util::Array<double>&) const;
             void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };

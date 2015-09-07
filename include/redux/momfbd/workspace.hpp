@@ -3,7 +3,6 @@
 
 
 #include "redux/momfbd/data.hpp"
-#include "redux/momfbd/result.hpp"
 #include "redux/momfbd/tilts.hpp"
 #include "redux/momfbd/wavefront.hpp"
 

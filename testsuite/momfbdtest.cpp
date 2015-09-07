@@ -290,24 +290,27 @@ void modeTest(void) {
     //return;
     //io_class bla;
 
-    double lambda = 1; //7.77200e-07; //1000;
-    double rc = 80; //87.1075; //29.7;
+    double lambda = 6.30200e-07; //2; //7.77200e-07; //1000;
+    double rc = 19.4376; //80; //87.1075; //29.7;
     double angle = 0; //45*redux::PI/180.0;
-    int nPixels = 164;
-    double cutoff = 0;
+    int nPixels = 44; //164;
+    double cutoff = 0.001;
 
-    int first_mode = 1;
-    int last_mode = 20;
+    int first_mode = 2;
+    int last_mode = 50;
     int nModes = last_mode - first_mode + 1;
 
-    static Cache& cache = Cache::getCache();
+    static redux::momfbd::Cache& cache = redux::momfbd::Cache::getCache();
     const redux::image::Grid& grid = cache.grid(nPixels);
     auto& pupil = cache.pupil(nPixels,rc);
     float** aPtr = grid.angle.get();
     Array<float> awrapper(*aPtr, nPixels, nPixels);
     redux::file::Ana::write("modetest_angle.f0", awrapper);
+    awrapper.wrap(*grid.distance.get(),nPixels, nPixels);
+    redux::file::Ana::write("grid_distance.f0", awrapper);
     redux::file::Ana::write("modetest_pupil.f0", pupil.first);
-    //cout << "PupilArea = " << pupil.second << endl;
+    
+    cout << "PupilArea = " << pupil.second << endl;
     //PupilMode::KL_cfg* m_new_cfg = legacy::klConfig(first_mode, last_mode);
     //klmc* m_cfg = kl_cfg(first_mode, last_mode);
 
@@ -374,18 +377,29 @@ void modeTest(void) {
 
     }
 /*
-npixels=164
+npixels=44
 nmodes=20
 imgperrow=5
-pupil=f0('/home.local/tomas/build/redux/modetest_pupil.f0')
-newz=f0('/home.local/tomas/build/redux/newzmodes.f0')
-newkl=f0('/home.local/tomas/build/redux/newklmodes.f0')
-oldz=f0('/home.local/tomas/build/redux/oldzmodes.f0')
-oldkl=f0('/home.local/tomas/build/redux/oldklmodes.f0')
+lambda=6.30200e-07
+datadir='/home/tomas/build/redux/'
+rdir=datadir+'src/bin/'
+mdir=datadir+'src/momfbd/'
+pupil=f0(datadir+'modetest_pupil.f0')
+otfsupport=f0(rdir+'otfsupport.f0') 
+ang=f0(datadir+'modetest_angle.f0')
+;rq=f0(rdir+'Q.f0')
+;mq=f0(mdir+'Q.f0')
+newz=f0(datadir+'newzmodes.f0')
+newkl=f0(datadir+'newklmodes.f0')
+;oldz=f0(datadir+'oldzmodes.f0')
+;oldkl=f0(datadir+'oldklmodes.f0')
+oldz=transpose(f0(datadir+'oldzmodes.f0'),[1,0,2])
+oldkl=transpose(f0(datadir+'oldklmodes.f0'),[1,0,2])
 diff=newz-oldz
-dist=f0('/home.local/tomas/build/redux/grid_distance.f0')
-ap=f0('/home.local/tomas/build/redux/aperture.f0')
-ap2=f0('/home.local/tomas/build/redux/aperture2.f0')
+signs=[-1, -1, -1, -1, -1, 1, 1, -1, -1, 1, 1, 1, -1, -1, -1, -1, 1, 1, -1, -1]
+dist=f0(datadir+'grid_distance.f0')
+ap=f0(datadir+'aperture.f0')
+ap2=f0(datadir+'aperture2.f0')
 diffa = ap-ap2
 for q=0,nmodes-1 do tvscl,newz(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
 for q=0,nmodes-1 do tvscl,oldz(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
@@ -394,11 +408,79 @@ for q=0,nmodes-1 do tvscl,newkl(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgp
 for q=0,nmodes-1 do tvscl,oldkl(*,*,q),npixels*(q mod imgperrow),npixels*(q/imgperrow)
 ;for q=0,nmodes-1 do print,min(oldz(*,*,q)),max(oldz(*,*,q)),min(newz(*,*,q)),max(newz(*,*,q))
 ;for q=0,nmodes-1 do print,min(oldz(*,*,q))/min(newz(*,*,q)),max(oldz(*,*,q))/max(newz(*,*,q))
-for q=0,nmodes-1 do print,min(newz(*,*,q))-min(oldz(*,*,q)),max(newz(*,*,q))-max(oldz(*,*,q))
+for q=0,nmodes-1 do print,min(newz(*,*,q)-oldz(*,*,q)),max(newz(*,*,q)-oldz(*,*,q))
 ;for q=0,nmodes-1 do print,min(oldkl(*,*,q)),max(oldkl(*,*,q)),min(newkl(*,*,q)),max(newkl(*,*,q))
 for q=0,nmodes-1 do print,min(newkl(*,*,q))-min(oldkl(*,*,q)),max(newkl(*,*,q))-max(oldkl(*,*,q))
+for q=0,nmodes-1 do print,min(diff(*,*,q)),max(diff(*,*,q))
     
     
+otfsupport=f0(rdir+'otfsupport.f0') 
+mq=transpose(f0(mdir+'Q.f0'))   
+rq=f0(rdir+'Q.f0')              
+mp=transpose(f0(mdir+'P.f0'))
+rp=f0(rdir+'P.f0')           
+tvscl,alog(real_part(mp)>0.1)
+print,min(rp),max(rp),mean(rp)
+print,min(mp),max(mp),mean(mp)
+print,min(rq),max(rq),mean(rq)
+print,min(mq),max(mq),mean(mq)
+
+rrpup=f0(rdir+'blu_pup.f0')              
+mmpup=f0(mdir+'blapup.f0')              
+diff=rrpup-mmpup
+print,min(diff),max(diff),mean(diff)
+tvscl,diff
+
+mphisum=transpose(f0(mdir+'phisum.f0'))   
+mpf=transpose(f0(mdir+'pf.f0'))
+rpf=f0(rdir+'blu_pf1.f0')
+diff=mpf-rpf
+print,min(diff),max(diff),mean(diff)
+motf=transpose(f0(mdir+'otf.f0'))   
+rotf=f0(rdir+'blu_otf1.f0')   
+diff=motf-rotf           
+print,min(diff),max(diff),mean(diff)
+
+
+rpupil=f0(rdir+'pupil.f0')
+mpupil=f0(mdir+'pupil1.f0')
+diff=rpupil-mpupil
+diff=rrpup-mpupil
+print,min(diff),max(diff),mean(diff)
+tvscl,diff
+
+
+
+rvp=f0(rdir+'vogel_p.f0')
+mvp=f0(mdir+'vogel_p.f0')
+diff=mvp-conj(rvp)
+print,min(diff),max(diff),mean(diff)
+rvq=f0(rdir+'vogel_q.f0')
+mvq=f0(mdir+'vogel_q.f0')
+diff=mvq-rvq
+print,min(diff),max(diff),mean(diff)
+
+rvpj=f0(rdir+'vogel_pj.f0')
+mvpj=f0(mdir+'vogel_pj.f0')
+diff=mvpj-rvpj
+print,min(diff),max(diff),mean(diff)
+
+rvhj=f0(rdir+'vogel_hj2.f0')
+mvhj=f0(mdir+'vogel_hj2.f0')
+diff=mvhj-rvhj
+print,min(diff),max(diff),mean(diff)
+
+rvotf=f0(rdir+'vogel_otf.f0')
+mvotf=f0(mdir+'vogel_otf.f0')
+diff=mvotf-rvotf
+print,min(diff),max(diff),mean(diff)
+
+rvglft=f0(rdir+'vogel_glft.f0')
+mvglft=f0(mdir+'vogel_glft.f0')
+diff=mvglft-rvglft
+print,min(diff),max(diff),mean(diff)
+
+
 oldpsf=f0('src/bin/oldpsf.f0')                 
 oldotf=f0('src/bin/oldotf.f0')
 newotf=f0('src/bin/newotf.f0')
@@ -417,6 +499,37 @@ tvscl,phimode3*pupil,2*npixels,0
 tvscl,phimode4*pupil,3*npixels,0
 tvscl,phi*pupil,4*npixels,0
 print,mean(mode3),mean(mode4),mean(phimode3),mean(phimode4),mean(phi)
+
+pupil=f0(datadir+'modetest_pupil.f0')
+zpol_1_1.f0
+
+
+zpol_1_1=f0(datadir+'zpol_1_1.f0')
+zpol_1_5=f0(datadir+'zpol_1_5.f0')
+zpol_1_3=f0(datadir+'zpol_1_3.f0')
+zpol_0_4=f0(datadir+'zpol_0_4.f0')
+zpol_0_2=f0(datadir+'zpol_0_2.f0')
+zpol_2_2=f0(datadir+'zpol_2_2.f0')
+zpol_2_4=f0(datadir+'zpol_2_4.f0')
+zpol_3_3=f0(datadir+'zpol_3_3.f0')
+zpol_3_5=f0(datadir+'zpol_3_5.f0')
+zpol_4_4=f0(datadir+'zpol_4_4.f0')
+zpol_5_5=f0(datadir+'zpol_5_5.f0')
+print,zpol_1_1
+print,zpol_1_5
+print,zpol_1_3
+print,zpol_0_4
+print,zpol_0_2
+print,zpol_2_2
+print,zpol_2_4
+print,zpol_3_3
+print,zpol_3_5
+print,zpol_4_4
+print,zpol_5_5
+
+
+
+
 
 
 
@@ -475,7 +588,7 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
     auto pup_pair = cache.pupil(nPixels,radius);
     //redux::file::Ana::write("aperture3.f0", pup_pair.first);
 
-//    cout << "Area = " << area << "  Area_mvn  = " << area_mvn << "   r^2*PI = " << (radius*radius*redux::PI) << endl;
+    cout << "Area = " << area << "  Area_mvn  = " << area_mvn << "  ratio  = " << (area/area_mvn) << "   r^2*PI = " << (radius*radius*redux::PI) << endl;
 //     cout << "ap=f0('/home/tomas/build/redux/aperture.f0')\n"
 //          << "ap2=f0('/home/tomas/build/redux/aperture2.f0')\n"
 //          << "ap[" <<(nPixels/2-2) << ":" << (nPixels/2+2) << ","<<(nPixels/2-2) << ":" << (nPixels/2+2) << "]\n"

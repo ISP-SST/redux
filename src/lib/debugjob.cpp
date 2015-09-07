@@ -255,7 +255,7 @@ void DebugJob::returnResults( WorkInProgress& wip ) {
     for( auto & it : wip.parts ) {
         auto dpart = static_pointer_cast<DebugPart>( it );
         jobParts[it->id]->step = dpart->step;
-        jobParts[it->id]->result = dpart->result;
+        jobParts[it->id]->result = std::move(dpart->result);
     }
     wip.parts.clear();
     checkParts();
@@ -375,7 +375,7 @@ void DebugJob::runMain( Part::Ptr& part ) {
 //     auto tmp = sharedArray<int64_t>( sizeY, sizeX );
 //     auto ptr = tmp.get();
     pptr->result.resize( sizeY, sizeX );
-    auto tmp = pptr->result.get(sizeY, sizeX);
+    auto tmp = pptr->result.reshape(sizeY, sizeX);
     auto ptr = tmp.get();
 
     for( uint32_t ix = 0; ix < sizeX; ++ix ) {

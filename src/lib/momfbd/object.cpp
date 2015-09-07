@@ -139,11 +139,6 @@ size_t Object::nImages(void) const {
 }
 
 
-void Object::collectImages(redux::util::Array<float>& stack) const {
-    for( const shared_ptr<Channel>& ch : channels ) ch->collectImages(stack);
-}
-
-
 void Object::calcPatchPositions(const std::vector<uint16_t>& y, const std::vector<uint16_t>& x) {
     for( shared_ptr<Channel>& ch : channels ) ch->calcPatchPositions(y,x);
 }

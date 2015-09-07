@@ -264,20 +264,6 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
     nPixelsX = region[1] - region[0] + 1;
     nPixelsY = region[3] - region[2] + 1;
     
-    int32_t dummySize(0);
-    shared_ptr<float> dummy;
-    if(!imgPos && writeMask&MOMFBD_IMG) dummySize = nPixelsX*nPixelsY;
-    if(!psfPos && writeMask&MOMFBD_PSF) dummySize = npsf*nPixelsX*nPixelsY;
-    if(!objPos && writeMask&MOMFBD_OBJ) dummySize = std::max(nobj*nPixelsX*nPixelsY, dummySize);
-    if(!resPos && writeMask&MOMFBD_RES) dummySize = std::max(nres*nPixelsX*nPixelsY, dummySize);
-    if(!alphaPos && writeMask&MOMFBD_ALPHA) dummySize = std::max(nalpha*nm, dummySize);
-    if(!diversityPos && writeMask&MOMFBD_DIV) dummySize = std::max((ndiv*nPixelsX*nPixelsY)/4, dummySize);
-    if(dummySize) {
-        dummy = sharedArray<float>(dummySize);
-        memset(dummy.get(),0,dummySize*sizeof(float));
-        for(int i=0; i<dummySize; ++i) dummy.get()[i] = i+1;
-    }
-
     writeOrThrow ( file, region, 4, "PatchInfo:region" );
     
     if( version >= 20110714.0 ){
@@ -294,36 +280,28 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
     tmp8 = ( writeMask&MOMFBD_IMG );
     writeOrThrow ( file, &tmp8, 1, "FileMomfbd:withImage" );
     if ( tmp8 ) {
-       if(imgPos) {
-            fPtr = reinterpret_cast<const float*> ( data + imgPos );
-        } else fPtr = dummy.get();
+        fPtr = reinterpret_cast<const float*> ( data + imgPos );
         writeOrThrow ( file, fPtr, nPixelsX*nPixelsY, "FileMomfbd:IMG" );
     }
     
     if ( !(writeMask&MOMFBD_PSF) ) npsf = 0;
     writeOrThrow ( file, &npsf, 1, "FileMomfbd:npsf" );
     if ( npsf ) {
-        if(psfPos) {
-            fPtr = reinterpret_cast<const float*> ( data + psfPos );
-        } else fPtr = dummy.get();
+        fPtr = reinterpret_cast<const float*> ( data + psfPos );
         writeOrThrow ( file, fPtr, npsf*nPixelsX*nPixelsY, "FileMomfbd:PSF" );
     }
     
     if ( !(writeMask&MOMFBD_OBJ) ) nobj = 0;
     writeOrThrow ( file, &nobj, 1, "FileMomfbd:nobj" );
     if ( nobj ) {
-        if(objPos) {
-            fPtr = reinterpret_cast<const float*> ( data + objPos );
-        } else fPtr = dummy.get();
+        fPtr = reinterpret_cast<const float*> ( data + objPos );
         writeOrThrow ( file, fPtr, nobj*nPixelsX*nPixelsY, "FileMomfbd:OBJ" );
     }
     
     if ( !(writeMask&MOMFBD_RES) ) nres = 0;
     writeOrThrow ( file, &nres, 1, "FileMomfbd:nres" );
     if ( nres ) {
-        if(resPos) {
-            fPtr = reinterpret_cast<const float*> ( data + resPos );
-        } else fPtr = dummy.get();
+        fPtr = reinterpret_cast<const float*> ( data + resPos );
         writeOrThrow ( file, fPtr, nres*nPixelsX*nPixelsY, "FileMomfbd:RES" );
     }
     
@@ -332,9 +310,7 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
     if ( nalpha ) {
         writeOrThrow ( file, &nm, 1, "FileMomfbd:nm" );
         if(nm) {
-            if(alphaPos) {
-                fPtr = reinterpret_cast<const float*> ( data + alphaPos );
-            } else fPtr = dummy.get();
+            fPtr = reinterpret_cast<const float*> ( data + alphaPos );
             writeOrThrow ( file, fPtr, nalpha*nm, "FileMomfbd:ALPHA" );
         }
     }
@@ -349,9 +325,7 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
                 writeOrThrow ( file, &nphx, 1, "PatchInfo:nphx" );
                 writeOrThrow ( file, &nphy, 1, "PatchInfo:nphy" );
             }
-            if(diversityPos) {
-                fPtr = reinterpret_cast<const float*> ( data + diversityPos );
-            } else fPtr = dummy.get();
+            fPtr = reinterpret_cast<const float*> ( data + diversityPos );
             if( version >= 20110916.0 ) {           // + byte with diversity-type.
                 for( int d=0; d<ndiv; ++d ) {
                     char typ=0;             // TODO: "real" type

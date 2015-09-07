@@ -70,7 +70,7 @@ namespace {
             redux::file::Ana::write(testFileAna,indata,sliceSize);
             Image<T> data;
             readFile( testFileAna, data );
-            auto hdr = static_pointer_cast<redux::file::Ana>(data.hdr);
+            auto hdr = static_pointer_cast<redux::file::Ana>(data.meta);
             if( hdr->m_Header.subf&1 ) {
                 BOOST_CHECK_EQUAL( hdr->m_CompressedHeader.slice_size, sliceSize );
             }

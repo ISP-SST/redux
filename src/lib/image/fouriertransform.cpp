@@ -122,7 +122,7 @@ FourierTransform::FourierTransform() : centered (false), halfComplex (false), no
 
 
 FourierTransform::FourierTransform (size_t ySize, size_t xSize, int flags, uint8_t nT) :
-    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized (false), nThreads(nT), inputSize(ySize*xSize) {
+    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized (flags & FT_NORMALIZE), nThreads(nT), inputSize(ySize*xSize) {
     if (halfComplex) {
         Array<complex_t>::resize (ySize, xSize / 2 + 1);
     } else {
@@ -142,7 +142,7 @@ template <typename T>
 FourierTransform::FourierTransform (const Array<T>& rhs, int flags, uint8_t nT) :
     centered (false), halfComplex (false), normalized (false) {
 
-    vector<size_t> dims = rhs.dimensions();
+    vector<size_t> dims = rhs.dimensions(true);
     if (dims.empty()) {
         throw logic_error ("FourierTransform initialized with no non-trivial dimensions: " + printArray (rhs.dimensions(), "dims"));
     } else {
@@ -163,6 +163,10 @@ FourierTransform::FourierTransform (const T* rhs, size_t ySize, size_t xSize, in
     reset(rhs, ySize, xSize, flags, nT);
 
 }
+template FourierTransform::FourierTransform (const float*, size_t, size_t, int, uint8_t);
+template FourierTransform::FourierTransform (const double*, size_t, size_t, int, uint8_t);
+template FourierTransform::FourierTransform (const complex_t*, size_t, size_t, int, uint8_t);
+template FourierTransform::FourierTransform (const int32_t*, size_t, size_t, int, uint8_t);
 
 
 template <typename T>
@@ -240,12 +244,9 @@ void FourierTransform::set(Array<complex_t>& rhs) {
 void FourierTransform::init (void) {
 
     if( halfComplex ) { 
-        vector<size_t> dims = dimensions();
-        dims.back() -= 1;
-        dims.back() <<= 1;
-        plan = getPlan (dims, Plan::R2C, nThreads);
+        plan = getPlan(dimensions(), Plan::R2C, nThreads);
     } else {
-        plan = getPlan (dimensions(), Plan::C2C, nThreads);
+        plan = getPlan(dimensions(), Plan::C2C, nThreads);
     }
 
 }

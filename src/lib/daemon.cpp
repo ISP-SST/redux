@@ -82,8 +82,8 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-    LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
-    << "  nPeers = " << peers.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size();
+//     LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
+//     << "  nPeers = " << peers.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size();
 
     updateLoadAvg();
     cleanup();
@@ -434,7 +434,7 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     }*/
     
     if( wip.job ) {
-        LOG_DEBUG << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << wip.job->info.id;
+        //cout << "getWork("<<(int)nThreads<<"): Handing out " << wip.parts.size() << " part(s) from job #" << wip.job->info.id << endl;
         wip.job->info.state.store( Job::JSTATE_ACTIVE );
     }
     
