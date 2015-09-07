@@ -1,6 +1,8 @@
 #ifndef REDUX_MATH_FUNCTIONS_HPP
 #define REDUX_MATH_FUNCTIONS_HPP
 
+#include <algorithm>
+#include <complex>
 #include <cstdlib>
 
 namespace redux {
@@ -15,6 +17,57 @@ namespace redux {
          *   @brief     Collection of mathematical functions.
          *   @author    Tomas Hillberg (hillberg@astro.su.se)
          */
+
+        /** @brief Extend the std-functors to handle different types.
+         *  @{
+         */
+        template<typename T>
+        inline T sqr( const T& a ) { return a*a; }
+        
+        template<typename T, typename U>
+        struct assign : public std::binary_function<T, U, T> {
+            T operator()( const T& a, const U& b ) const { return static_cast<T>(b); }
+        };
+
+        template<typename T>
+        struct assign<T,T> {
+            T operator()( const T& a, const T& b ) const { return b; }
+        };
+
+        template<typename T, typename U>
+        struct assign<T,std::complex<U>> {
+            T operator()( const T& a, const std::complex<U>& b ) const { return static_cast<T>(std::real(b)); }
+        };
+        
+        template<typename T, typename U>
+        struct add : public std::binary_function<T, U, T> {
+            T operator()( const T& a, const U& b ) const { return static_cast<T>(a + b); }
+        };
+
+        template<typename T, typename U>
+        struct subtract : public std::binary_function<T, U, T> {
+            T operator()( const T& a, const U& b ) const { return static_cast<T>(a - b); }
+        };
+
+        template<typename T, typename U>
+        struct multiply : public std::binary_function<T, U, T> {
+            T operator()( const T& a, const U& b ) const { return static_cast<T>(a * b); }
+        };
+
+        template<typename T, typename U>
+        struct divide : public std::binary_function<T, U, T> {
+            T  operator()( const T& a, const U& b ) const { return static_cast<T>(a / b); }
+        };
+
+        template<typename T, typename U>
+        struct norm_multiply : public std::binary_function<T, U, U> {
+            U operator()( const T& a, const U& b ) const { return static_cast<U>(std::norm(a) * b); }
+        };
+
+        template<typename T, typename U>
+        struct inv_multiply : public std::binary_function<T, U, T> {
+            T operator()( const T& a, const U& b ) const { return static_cast<T>(1/a * b); }
+        };
 
 
         /*!  @brief         Smooth the "tail" of an array towards some specified target value.
@@ -72,7 +125,7 @@ namespace redux {
          */
         //@{
         void gauss( double* data, size_t n, double dispersion, double fwhm );
-        template <typename T> void gauss( T* data, size_t sizeY, size_t sizeX, double fwhmY, double fwhmX, double centerY, double centerX);
+        template <typename T> void gauss( T* data, size_t sizeY, size_t sizeX, double fwhmY, double fwhmX, double centerY, double centerX );
         //@}
 
         /*!  @name Hann
