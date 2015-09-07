@@ -5,7 +5,7 @@
 #include "redux/momfbd/workspace.hpp"
 
 #include <redux/image/image.hpp>
-#include <redux/image/statistics.hpp>
+#include <redux/util/arraystats.hpp>
 
 #include <boost/asio.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -90,7 +90,7 @@ namespace redux {
 
             /*************   Local variables for   ***************/
             /************* PreProcessing on master ***************/
-            std::vector<redux::image::Statistics::Ptr> imageStats;
+            std::vector<redux::util::ArrayStats::Ptr> imageStats;
             redux::image::Image<float> images, dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;

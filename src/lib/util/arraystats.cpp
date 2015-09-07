@@ -1,8 +1,9 @@
-#include "redux/image/statistics.hpp"
+#include "redux/util/arraystats.hpp"
 
 #include "redux/file/fileana.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/util/bitoperations.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <limits>
 
@@ -11,7 +12,7 @@ using namespace redux::util;
 using namespace std;
 
 template <typename T>
-void redux::image::Statistics::getMinMaxMean(const T* data, size_t n) {
+void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
     
     min = std::numeric_limits<double>::max();
     max = std::numeric_limits<double>::lowest();
@@ -34,58 +35,65 @@ void redux::image::Statistics::getMinMaxMean(const T* data, size_t n) {
     if(count) mean /= count;
     
 }
-template void redux::image::Statistics::getMinMaxMean( const float*, size_t );
-template void redux::image::Statistics::getMinMaxMean( const double*, size_t );
-template void redux::image::Statistics::getMinMaxMean( const int16_t*, size_t );
-template void redux::image::Statistics::getMinMaxMean( const int32_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const float*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const double*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const int16_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const int32_t*, size_t );
 
            
 template <typename T>
-void redux::image::Statistics::getRmsStddev(const T* data, size_t n) {
+void redux::util::ArrayStats::getRmsStddev(const T* data, size_t n) {
     if(n > 1) {
         size_t count(0);
         rms = stddev = 0;
         const T* ptr = data + n;
         while( ptr-- > data ) {
-            long double tmp = static_cast<long double>( *ptr );
-            if( tmp == tmp ) {
-                rms += static_cast<long double>( tmp * tmp );
-                tmp = (tmp - mean);
-                stddev += tmp * tmp;
+            double tmp = static_cast<double>( *ptr );
+            if( tmp == tmp ) { // will exclude NaN
+                rms += tmp*tmp;
                 count++;
             }
         }
         if (count) {
-            rms = sqrt( rms / count );
-            if (count > 1) stddev = sqrt( stddev / (count-1) );
+            rms /= count;
+            stddev = sqrt(rms - mean*mean);
+            rms = sqrt(rms);
         }
     } else if (n == 1) {
-        rms = (*data == *data)?*data:0;
+        rms = (*data == *data)?*data:0; // will exclude NaN
         stddev = 0;
     }
 }
-template void redux::image::Statistics::getRmsStddev( const float*, size_t );
-template void redux::image::Statistics::getRmsStddev( const double*, size_t );
-template void redux::image::Statistics::getRmsStddev( const int16_t*, size_t );
-template void redux::image::Statistics::getRmsStddev( const int32_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const float*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const double*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const int16_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const int32_t*, size_t );
 
 
-void redux::image::Statistics::getNoise(const redux::image::FourierTransform& ft) {
+void redux::util::ArrayStats::getNoise(const redux::image::FourierTransform& ft) {
     noise = ft.noise(clip, cutoff);
 }
 
        
 template <typename T>
-void redux::image::Statistics::getNoise(const Array<T>& data) {
-    Array<T> tmpImage = data.copy();            // make a deep copy because "apodize" is destructive.
-    apodize( tmpImage, 8 );                     // edge smoothing to reduce the FFT boundary-artifacts
-    FourierTransform ft( tmpImage, FT_NORMALIZE );
-    getNoise(ft);
+void redux::util::ArrayStats::getNoise(const Array<T>& data, int smooth) {
+    
+    if(smooth>1) {
+        Array<double> tmp;
+        data.copy(tmp);                             // make a copy because "apodize" is destructive.
+        apodize( tmp, smooth );                     // edge smoothing to reduce the FFT boundary-artifacts
+        FourierTransform ft( tmp );
+        noise = ft.noise(clip, cutoff);
+    } else {
+        FourierTransform ft( data );
+        noise = ft.noise(clip, cutoff);
+    }
+
 }
 
 
 template <typename T>
-void redux::image::Statistics::getStats( const Array<T>& data, int flags ) {
+void redux::util::ArrayStats::getStats( const Array<T>& data, int flags ) {
 
     getMinMaxMean(data);
     
@@ -100,14 +108,14 @@ void redux::image::Statistics::getStats( const Array<T>& data, int flags ) {
     }
 
 }
-template void redux::image::Statistics::getStats( const Array<float>&, int );
-template void redux::image::Statistics::getStats( const Array<double>&, int );
-template void redux::image::Statistics::getStats( const Array<int16_t>&, int );
-template void redux::image::Statistics::getStats( const Array<int32_t>&, int );
+template void redux::util::ArrayStats::getStats( const Array<float>&, int );
+template void redux::util::ArrayStats::getStats( const Array<double>&, int );
+template void redux::util::ArrayStats::getStats( const Array<int16_t>&, int );
+template void redux::util::ArrayStats::getStats( const Array<int32_t>&, int );
 
 
 template <typename T>
-void redux::image::Statistics::getStats( const T* data, size_t count, int flags ) {
+void redux::util::ArrayStats::getStats( const T* data, size_t count, int flags ) {
 
     getMinMaxMean(data, count);
     
@@ -122,15 +130,15 @@ void redux::image::Statistics::getStats( const T* data, size_t count, int flags 
     }*/
 
 }
-template void redux::image::Statistics::getStats( const float*, size_t, int );
-template void redux::image::Statistics::getStats( const double*, size_t, int );
-template void redux::image::Statistics::getStats( const int16_t*, size_t, int );
-template void redux::image::Statistics::getStats( const int32_t*, size_t, int );
+template void redux::util::ArrayStats::getStats( const float*, size_t, int );
+template void redux::util::ArrayStats::getStats( const double*, size_t, int );
+template void redux::util::ArrayStats::getStats( const int16_t*, size_t, int );
+template void redux::util::ArrayStats::getStats( const int32_t*, size_t, int );
 
 
 
 template <typename T>
-void redux::image::Statistics::getStats( uint32_t borderClip, const Array<T>& data, int flags ) {
+void redux::util::ArrayStats::getStats( uint32_t borderClip, const Array<T>& data, int flags ) {
 
     if( !borderClip ) {
         getStats( data, flags );
@@ -157,10 +165,10 @@ void redux::image::Statistics::getStats( uint32_t borderClip, const Array<T>& da
     getStats(clippedImage,flags);
     
 }
-template void redux::image::Statistics::getStats( uint32_t, const Array<float>&, int );
-template void redux::image::Statistics::getStats( uint32_t, const Array<double>&, int );
-template void redux::image::Statistics::getStats( uint32_t, const Array<int16_t>&, int );
-template void redux::image::Statistics::getStats( uint32_t, const Array<int32_t>&, int );
+template void redux::util::ArrayStats::getStats( uint32_t, const Array<float>&, int );
+template void redux::util::ArrayStats::getStats( uint32_t, const Array<double>&, int );
+template void redux::util::ArrayStats::getStats( uint32_t, const Array<int16_t>&, int );
+template void redux::util::ArrayStats::getStats( uint32_t, const Array<int32_t>&, int );
 
 /*
             int clip;
@@ -170,13 +178,13 @@ template void redux::image::Statistics::getStats( uint32_t, const Array<int32_t>
             double noise, noiseRMS;
             uint8_t noiseType;              // flag indicating noise statistics (not used atm.)
 */
-size_t redux::image::Statistics::size( void ) {
-    return 1 + sizeof(int) + 10*sizeof(double);
+size_t redux::util::ArrayStats::size( void ) {
+    return sizeof(int) + 10*sizeof(double);
 }
 
 
 
-uint64_t redux::image::Statistics::pack( char* ptr ) const {
+uint64_t redux::util::ArrayStats::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = pack(ptr, clip);
     count += pack(ptr+count, cutoff);
@@ -189,12 +197,11 @@ uint64_t redux::image::Statistics::pack( char* ptr ) const {
     count += pack(ptr+count, stddev);
     count += pack(ptr+count, noise);
     count += pack(ptr+count, noiseRMS);
-    count += pack(ptr+count, noiseType);
     return count;
 }
 
 
-uint64_t redux::image::Statistics::unpack( const char* ptr, bool swap_endian ) {
+uint64_t redux::util::ArrayStats::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = unpack(ptr, clip, swap_endian);
     count += unpack(ptr+count, cutoff, swap_endian);
@@ -207,7 +214,6 @@ uint64_t redux::image::Statistics::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count, stddev, swap_endian);
     count += unpack(ptr+count, noise, swap_endian);
     count += unpack(ptr+count, noiseRMS, swap_endian);
-    count += unpack(ptr+count, noiseType, swap_endian);
     return count;
 
 }

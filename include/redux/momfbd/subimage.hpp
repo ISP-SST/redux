@@ -5,7 +5,7 @@
 
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
-#include "redux/image/statistics.hpp"
+#include "redux/util/arraystats.hpp"
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
 
@@ -74,13 +74,13 @@ namespace redux {
             const redux::util::Array<double>& window;
             std::shared_ptr<WaveFront> wf;
             
-            redux::util::Array<double> img;         //!< Working copy of the current subimage. (apodized)     size = patchSize
-            redux::util::Array<double> phi;         //!< Array containing the phase of this OTF               size = pupilsize
-            redux::image::FourierTransform PF;      //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
-            redux::image::FourierTransform OTF;     //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
-            redux::image::FourierTransform imgFT;   //!< Fourier transform of img.                            size = 2*pupilsize
-            redux::util::Array<double> vogel;       //!< used for the Vogel-method of gradient computaion     size = pupilsize
-            redux::image::Statistics stats;
+            redux::util::Array<double> img;             //!< Working copy of the current subimage. (apodized)     size = patchSize
+            redux::util::Array<double> phi,tmpPhi;      //!< Array containing the phase of this OTF               size = pupilsize
+            redux::image::FourierTransform PF;          //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
+            redux::image::FourierTransform OTF,tmpOTF;  //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
+            redux::image::FourierTransform imgFT;       //!< Fourier transform of img.                            size = 2*pupilsize
+            redux::util::Array<double> vogel;           //!< used for the Vogel-method of gradient computaion     size = pupilsize
+            redux::util::ArrayStats stats;
             
 
         };

@@ -1,33 +1,41 @@
-#ifndef REDUX_IMAGE_STATISTICS_HPP
-#define REDUX_IMAGE_STATISTICS_HPP
+#ifndef REDUX_UTIL_ARRAYSTATS_HPP
+#define REDUX_UTIL_ARRAYSTATS_HPP
 
-//#include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/image/fouriertransform.hpp"
 
 namespace redux {
 
-    namespace image {
+    namespace util {
 
         enum StatType { ST_VALUES=1, ST_RMS, ST_NOISE=4, ST_ALL=7 };
 
-        struct Statistics {
-            typedef std::shared_ptr<Statistics> Ptr;
+        struct ArrayStats {
+            typedef std::shared_ptr<ArrayStats> Ptr;
 
-            Statistics() : clip(-1), cutoff(-1), min(0), max(0), median(0),
-                           mean(0), rms(0), stddev(0), noise(0), noiseRMS(0), noiseType(0) {}
+            ArrayStats() : clip(-1), cutoff(-1), min(0), max(0), median(0),
+                           mean(0), rms(0), stddev(0), noise(0), noiseRMS(0) {}
             template <typename T> void getMinMaxMean(const T* data, size_t count);
             template <typename T> void getMinMaxMean(const redux::util::Array<T>& data) {
-                getMinMaxMean(data.ptr(),data.nElements());
+                if (data.dense()) getMinMaxMean(data.ptr(),data.nElements());
+                else {
+                    redux::util::Array<T> tmp;
+                    data.copy(tmp);
+                    getMinMaxMean(tmp.get(),data.nElements());
+                }
             }
 
             template <typename T> void getRmsStddev(const T* data, size_t count);
             template <typename T> void getRmsStddev(const redux::util::Array<T>& data) {
-                getRmsStddev(data.ptr(),data.nElements());
+                if (data.dense()) getRmsStddev(data.ptr(),data.nElements());
+                else {
+                    redux::util::Array<T> tmp;
+                    data.copy(tmp);
+                    getRmsStddev(tmp.get(),data.nElements());
+                }
             }
-            template <typename T> void getNoise(const redux::util::Array<T>& data);
+            template <typename T> void getNoise(const redux::util::Array<T>& data, int smooth=0);
             void getNoise(const redux::image::FourierTransform& ft);
-//        template <class T, typename ...S>
             
             template <typename T> void getStats(const T* data, size_t count, int flags=ST_ALL);
             template <typename T> void getStats(const redux::util::Array<T>& data, int flags=ST_ALL);
@@ -42,7 +50,6 @@ namespace redux {
             double min, max, median;
             double sum, mean, rms, stddev;
             double noise, noiseRMS;
-            uint8_t noiseType;              // flag indicating noise statistics (not used atm.)
 
         };
 
@@ -51,4 +58,4 @@ namespace redux {
 }   // redux
 
 
-#endif  // REDUX_IMAGE_STATISTICS_HPP
+#endif  // REDUX_UTIL_ARRAYSTATS_HPP

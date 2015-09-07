@@ -5,7 +5,6 @@
 
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
-#include "redux/image/statistics.hpp"
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
 

@@ -187,7 +187,7 @@ size_t Channel::size( void ) const {
     sz += sizeof( uint16_t );       // ID;
     sz += sizeof( uint32_t );       // dataOffset;
     sz += dark.size();
-    sz += imageStats.size() * Statistics::size() + sizeof(uint16_t);
+    sz += imageStats.size() * ArrayStats::size() + sizeof (uint16_t);
     return sz;
 }
 
@@ -216,11 +216,11 @@ uint64_t Channel::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr + count, dataOffset, swap_endian );
     count += dark.unpack( ptr + count, swap_endian );
     uint16_t statSize;
-    count += unpack(ptr+count, statSize, swap_endian);
-    imageStats.resize(statSize);
-    for( auto &it : imageStats ) {
-        it.reset( new Statistics() );
-        count += it->unpack(ptr+count, swap_endian);
+    count += unpack (ptr + count, statSize, swap_endian);
+    imageStats.resize (statSize);
+    for (auto & it : imageStats) {
+        it.reset (new ArrayStats());
+        count += it->unpack (ptr + count, swap_endian);
     }
     return count;
 }
@@ -629,8 +629,8 @@ void Channel::preprocessData( boost::asio::io_service& service ) {
 
 double Channel::getMaxMean(void) const {
     double maxMean = std::numeric_limits<double>::lowest();
-    for(Statistics::Ptr imStat: imageStats ) {
-        if( imStat->mean > maxMean ) maxMean = imStat->mean;
+    for (ArrayStats::Ptr imStat : imageStats) {
+        if (imStat->mean > maxMean) maxMean = imStat->mean;
     }
     return maxMean;
 }
