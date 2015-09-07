@@ -45,7 +45,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap
         if(!wip.parts[0]) wip.parts[0].reset(new PatchData(*this));
         count += wip.parts[0]->unpack( ptr+count, swap_endian );
         if( wip.nParts > 1 ) {
-            globalData.reset( new GlobalData );
+            globalData.reset( new GlobalData(*this) );
             count += globalData->unpack( ptr+count, swap_endian );
         }
     }
@@ -152,6 +152,15 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
+size_t MomfbdJob::nImages(void) const {
+    size_t nTotalImages(0);
+    for( const shared_ptr<Object>& obj : objects) {
+        nTotalImages += obj->nImages();
+    }
+    return nTotalImages;
+}
+
+
 void MomfbdJob::checkParts( void ) {
 
     uint8_t mask = 0;
@@ -167,7 +176,6 @@ void MomfbdJob::checkParts( void ) {
 
     }
 
-    //LOG << "checkParts(): mask = " << bitString(mask);
     if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
         info.step.store( mask );
     }
@@ -194,7 +202,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         unique_lock<mutex> lock( jobMutex );
 //         size_t nParts = wip.peer->status.nThreads;
 //         if( info.nThreads ) nParts = std::min( wip.peer->status.nThreads, info.nThreads );
-        if(!wip.connection) {   // local worker, check if there are results to write
+       /* if(!wip.connection) {   // local worker, check if there are results to write
             for( auto & it : patches ) {
                 if( it->step & JSTEP_POSTPROCESS ) {
                     LOG_DEBUG << "getWork(): PP-patch   step = " << bitString(it->step);
@@ -205,11 +213,12 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
                 LOG_DEBUG << "getWork(): nPP = " << wip.parts.size();
                 ret = true;
             }
-        }
+        }*/
         if(!ret /*&& wip.connection*/) {
             for( auto & it : patches ) {
                 if( it->step == JSTEP_QUEUED ) {
                     it->step = JSTEP_RUNNING;
+                    it->cacheLoad(true);
                     wip.parts.push_back( it );
                     if(wip.previousJob.get() != this) {     // First time for this slave -> include global data
                         wip.parts.push_back( globalData );
@@ -221,7 +230,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         }
     }
     
-        LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
+    //  LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
     if( ret ) {
         unique_lock<mutex> lock( jobMutex );
         checkParts();
@@ -243,13 +252,13 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 #include "redux/file/fileana.hpp"
 
 void MomfbdJob::returnResults( WorkInProgress& wip ) {
-    LOG_DEBUG << "returnResults(): " << wip.print();
     unique_lock<mutex> lock( jobMutex );
     checkParts();
     for( Part::Ptr& it : wip.parts ) {
-        PatchResult::Ptr patch = static_pointer_cast<PatchResult>( it );
-        patches(patch->index.y,patch->index.y)->step = patch->step;
-    LOG_DEBUG << "returnResults()  patch: " << patch->id << "   index=" << patch->index << " pos=" << patch->pos;
+        PatchData::Ptr patch = static_pointer_cast<PatchData>( it );
+        patch->step = JSTEP_POSTPROCESS;
+        patches(patch->index.y,patch->index.x) = patch;
+        patch->cacheStore(true);
         //patches[it->id]->result = patch->result;
     //redux::file::Ana::write( "patch_" + to_string(patch->index.x) + "_" + to_string(patch->index.y) + ".f0", patch->images );
     }
@@ -283,10 +292,10 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
         uint8_t nThreads = std::min( maxThreads, info.maxThreads);
         if( patchStep == JSTEP_POSTPROCESS ) {      // store results
-            storePatches(wip, service, nThreads);
+            //storePatches(wip, service, nThreads);
         } else {                                    // main processing
             if(!globalData) {
-                 globalData.reset( new GlobalData );
+                 globalData.reset( new GlobalData(*this) );
             }
             if( !proc ) {
                 proc.reset( new WorkSpace(*this) );            // Initialize, allocations, etc.
@@ -296,7 +305,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
                 // Run main processing
                 proc->run(static_pointer_cast<PatchData>(it), service, nThreads);
                 // Get results
-                it = proc->result;
+                //it = proc->result;
             }
         }
     }
@@ -333,14 +342,14 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
         obj->loadData(service);
     }
 
-    info.maxThreads = 12;
+    //info.maxThreads = 12;
     runThreadsAndWait(service, info.maxThreads);
 
     // Done loading files -> start the preprocessing (flatfielding etc.)
     
     Point16 imageSizes;
     for( shared_ptr<Object>& obj : objects ) {
-        Point16 tmp = obj->clipImages();
+        Point16 tmp = obj->getImageSize();
         if(imageSizes.x == 0) {
             imageSizes = tmp;
         } else if( tmp != imageSizes ) {    // TBD: allow for different patchsizes (i.e. pixelsize/ccd-size) for different objects/channels.
@@ -351,13 +360,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     runThreadsAndWait(service, info.maxThreads);
     
     // Done pre-processing -> normalize within each object
-    
-    size_t nTotalImages(0);
     for( shared_ptr<Object>& obj : objects) {
         obj->normalize(service);
-        nTotalImages += obj->nImages(nTotalImages);
     }
-    runThreadsAndWait(service, info.maxThreads);
     
     // Done normalizing -> collect images to master-stack
     
@@ -371,15 +376,17 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     // Done normalizing -> split in patches
     
     //int patchSeparation = 3 * patchSize / 4 - minimumOverlap; // target separation
-
-    uint16_t halfBlockSize = patchSize/2 + maxLocalShift;
+    uint16_t halfPatchSize = patchSize/2; // the +1 is just to avoid writing +1 everywhere below to make the indices 1-based
+    uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
     // TODO: do split per channel instead, to allow for different image-scales and/or hardware
+    // NOTE:  subImagePosX/Y are kept 1-based, so ffset by 1 during cut-out.
+    LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap;
     if( subImagePosX.empty() ) { // x-coordinate of patch-centre
-        subImagePosX = segment<uint16_t>(halfBlockSize,imageSizes.x-halfBlockSize-1,patchSize,minimumOverlap);
+        subImagePosX = segment<uint16_t>(halfPatchSize,imageSizes.x-halfPatchSize,patchSize,totalOverlap);
         LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X");
     }
     if( subImagePosY.empty() ) { // y-coordinate of patch-centre
-        subImagePosY = segment<uint16_t>(halfBlockSize,imageSizes.y-halfBlockSize-1,patchSize,minimumOverlap);
+        subImagePosY = segment<uint16_t>(halfPatchSize,imageSizes.y-halfPatchSize,patchSize,totalOverlap);
         LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y");
     }
  
@@ -391,7 +398,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
 
     for( uint16_t& pos : subImagePosY ) {
-        uint16_t adjustedPos = std::min(std::max(halfBlockSize,pos),uint16_t(imageSizes.y-halfBlockSize));       // stay inside borders
+        uint16_t adjustedPos = std::min(std::max(halfPatchSize,pos),uint16_t(imageSizes.y-halfPatchSize));       // stay inside borders
         if( adjustedPos != pos ) {
             LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos;
             pos = adjustedPos;
@@ -399,7 +406,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
 
     for( uint16_t& pos : subImagePosX ) {
-        uint16_t adjustedPos = std::min(std::max(halfBlockSize,pos),uint16_t(imageSizes.x-halfBlockSize));       // stay inside borders
+        uint16_t adjustedPos = std::min(std::max(halfPatchSize,pos),uint16_t(imageSizes.x-halfPatchSize));       // stay inside borders
         if( adjustedPos != pos ) {
             LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos;
             pos = adjustedPos;
@@ -415,13 +422,16 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     
     uint64_t count(0);
     patches.resize(subImagePosY.size(),subImagePosX.size());
+    Point16 ps(patchSize,patchSize);
     for( uint y=0; y<subImagePosY.size(); ++y ) {
         for( uint x=0; x<subImagePosX.size(); ++x ) {
             PatchData::Ptr patch( new PatchData(*this, y, x ) );
+            patch->setPath(to_string(info.id)+"/patch_"+(string)patch->index);
             patch->step = JSTEP_QUEUED;
-            patch->pos.x = subImagePosX[x];
-            patch->pos.y = subImagePosY[y];
+            patch->roi.first = Point16(subImagePosY[y]-halfPatchSize, subImagePosX[x]-halfPatchSize);
+            patch->roi.last = patch->roi.first+ps-1;
             patch->id = ++count;
+            //LOG << boost::format("Patch %s %s") % patch->index % patch->roi;
             //service.post( std::bind( &MomfbdJob::initPatchData, this, patch ) );
             service.post( std::bind( &PatchData::getData, patch.get() ) );
             patches(y,x) = patch;
@@ -435,9 +445,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
     for( shared_ptr<Object>& obj : objects ) {
         obj->calcPatchPositions(subImagePosY,subImagePosX);
-        service.post( std::bind( &Object::prepareStorage, obj.get() ) );
+        //service.post( std::bind( &Object::prepareStorage, obj.get() ) );
     }
-    runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
+    //runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
     
     info.step.store( JSTEP_QUEUED );
 
@@ -447,7 +457,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 void MomfbdJob::initCache(void) {
     LOG_DETAIL << "MomfbdJob::initCache()";
     if(!globalData) {       // create GlobalData if they don't exist
-        globalData.reset(new GlobalData);
+        globalData.reset(new GlobalData(*this));
     }
 
     for( shared_ptr<Object>& obj: objects ) {
@@ -559,6 +569,10 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
 void MomfbdJob::postProcess( boost::asio::io_service& service ) {
 
     LOG << "MomfbdJob::postProcess()";
+    for( shared_ptr<Object>& obj : objects ) {
+        service.post( std::bind( &Object::writeResults, obj.get(), patches ) );
+    }
+    runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
     
 //     auto image = sharedArray<int16_t>( ySize, xSize );
 //     int16_t** img = image.get();

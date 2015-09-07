@@ -34,7 +34,7 @@ namespace redux {
             void init(void);
             void addRelativeTilt(std::shared_ptr<Tilts>& t);
 
-            void addTiltToImages(boost::asio::io_service&);
+            void applyTiltToImages(boost::asio::io_service&);
             void addTiltToImages(boost::asio::io_service&, double*);
             void calcGradient(boost::asio::io_service&, uint8_t, const grad_t&);
 
@@ -54,6 +54,7 @@ namespace redux {
             redux::util::Array<double> phi;                 // temporary arrays for gradient calculations
             redux::util::Array<complex_t> otf;
             double* partialGrad;
+            bool anchorChannel;
             
         };
         

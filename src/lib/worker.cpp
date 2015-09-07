@@ -172,6 +172,7 @@ bool Worker::getWork( void ) {
     }
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
+        //cout << " Worker::getWork()   got local work." << endl; 
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
             LOG_DEBUG << "Initializing new job: " + wip.print();
             wip.job->init();
@@ -245,8 +246,9 @@ void Worker::run( void ) {
 
     static int sleepS(1);
 
-    LOG_TRACE << "run:   nWipParts = " << wip.parts.size() << "  conn = " << hexString(wip.connection.get()) << "  job = " << hexString(wip.job.get());
+ //   LOG_TRACE << "run:   nWipParts = " << wip.parts.size() << "  conn = " << hexString(wip.connection.get()) << "  job = " << hexString(wip.job.get());
     while( getWork() ) {
+        //cout << "Worker::run()  got work, calling run..." << endl;
         sleepS = 1;
         while( wip.job && wip.job->run( wip, ioService, daemon.myInfo->status.nThreads ) ) ;
     }

@@ -51,6 +51,8 @@ namespace redux {
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
 
+            size_t nImages(void) const;
+            
             bool getWork( WorkInProgress&, uint8_t );
             void ungetWork( WorkInProgress& );
             void returnResults( WorkInProgress& );
@@ -76,8 +78,6 @@ namespace redux {
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             void postProcess( boost::asio::io_service& );
 
-            std::vector<std::string> outputFiles;
-
             std::vector<std::shared_ptr<Object>> objects;
 
             //redux::util::Array<double> pupil;
@@ -92,6 +92,7 @@ namespace redux {
         
             friend class Object;
             friend class Channel;
+            friend class WorkSpace;
 
 
         };

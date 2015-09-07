@@ -36,12 +36,13 @@ namespace {
 template <typename T>
 void redux::math::apodize( T* data, size_t n, const T& target ) {
 
-    double mean = (*data + target) / 2;
-    double amplitude = (*data - target) / 2;
-    double step = PI / ( n + 1 );
+    double mean = 0.5 * static_cast<double>(*data + target);
+    double amplitude = 0.5 * static_cast<double>(*data - target);
+    //double step = PI / (n-1);     // FIXME: this is the correct apodization step, using MvN's version below for now...
+    double step = 2*PI / (2*n-1);
 
-    for( size_t i = 1; i <= n; ++i ) {
-        *(data + i) = static_cast<T>(mean + amplitude * cos( i * step ));
+    for( size_t i = 1; i < n; ++i ) {
+        *(data + i) = mean + amplitude * cos( i * step );
     }
 
 }

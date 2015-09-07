@@ -60,15 +60,15 @@ namespace redux {
             
             
             /********* Hardware **********/
-            float telescopeF;                       //!< Telescope focal length  (or Ratio?)
-            float arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
-            float pixelSize;                        //!< Physical size of pixels (default: 10\mu)
-            float rotationAngle;                    //!< Tilt of this camera relative to "anchor channel" (default: 0)
+            double telescopeF;                       //!< Telescope focal length  (or Ratio?)
+            double arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
+            double pixelSize;                        //!< Physical size of pixels (default: 10\mu)
+            double rotationAngle;                    //!< Tilt of this camera relative to "anchor channel" (default: 0)
             /*****************************/
             
             /**** Numerical settings *****/
-            float noiseFudge;                       //!< Noise weight (default: 1)
-            float weight;                           //!< Weight for this channel in calculations (default: 1)
+            double noiseFudge;                       //!< Noise weight (default: 1)
+            double weight;                           //!< Weight for this channel in calculations (default: 1)
             /*****************************/
 
             /********  Diversity  ********/
@@ -142,7 +142,7 @@ namespace redux {
             /******* Data settings *******/
             uint16_t saveMask;              //!< (default: 0)
             std::string outputFileName;
-            float wavelength;               //!< (default: 0, has to be specified)
+            double wavelength;               //!< (default: 0, has to be specified)
             /*****************************/
             
         };
@@ -180,12 +180,13 @@ namespace redux {
             /*****************************/
             
             /********* Hardware **********/
-            float telescopeD;           //!< Telescope diameter
+            double telescopeD;           //!< Telescope diameter
             /*****************************/
 
             /**** Numerical settings *****/
             uint16_t minIterations;
             uint16_t maxIterations;
+            uint16_t targetIterations;  //!< Exit loop after this many successful (i.e. improving) iterations
             uint8_t fillpixMethod;
             uint8_t gradientMethod;
             uint8_t getstepMethod;

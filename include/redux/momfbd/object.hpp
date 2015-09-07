@@ -41,8 +41,8 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             
-            size_t nImages(size_t offset=0);
-            void collectImages(redux::util::Array<float>&) const;
+            size_t nImages(void) const;
+            //void collectImages(redux::util::Array<double>&) const;
             void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };
@@ -55,13 +55,15 @@ namespace redux {
             /*************         Methods         ***************/
             void initProcessing(WorkSpace::Ptr);
             void initPatch(ObjectData&);
+            void getResults(ObjectData&);
             void initPQ(void);
             void addAllFT(void);
             void addToFT(const redux::image::FourierTransform&, double);
-            void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>);
+            void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
             void slask(void);
-            double metric(void);
+            void calcMetric(void);
+            double metric(void) const { return currentMetric; };
             /*****************************************************/
             
             void dump( std::string tag );
@@ -76,13 +78,17 @@ namespace redux {
             void cleanup(void);
             void loadData(boost::asio::io_service&);
             void preprocessData(boost::asio::io_service&);
+            void writeAna(const redux::util::Array<PatchData::Ptr>&);
+            void writeFits(const redux::util::Array<PatchData::Ptr>&);
+            void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
+            void writeResults(const redux::util::Array<PatchData::Ptr>&);
             void normalize(boost::asio::io_service&);
             void prepareStorage(void);
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             
             size_t sizeOfPatch(uint32_t) const;
             
-            Point16 clipImages(void);
+            Point16 getImageSize(void);
             
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/
@@ -91,10 +97,13 @@ namespace redux {
             redux::util::Array<double>  ftSum;                //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;
+            std::set<size_t> pupilIndices, otfIndices;                   //!< Arrays with the offsets where the pupil/otf are greater than some threshold
+            double currentMetric;
             double reg_gamma;
             /*****************************************************/
 
             uint16_t ID;
+            uint32_t nObjectImages;
             friend class MomfbdJob;
             friend class Channel;
 

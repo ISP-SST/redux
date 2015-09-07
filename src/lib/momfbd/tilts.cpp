@@ -4,8 +4,10 @@
 #include "redux/job.hpp"
 
 #include "redux/util/stringutil.hpp"
+#include "redux/file/fileana.hpp"
 
 using namespace redux::momfbd;
+using namespace redux::file;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
@@ -18,7 +20,7 @@ namespace {
 }
 
 
-Tilts::Tilts(Channel& c, uint16_t m) : channel(c), mode(m), nFreeAlpha(1), partialGrad(nullptr) {
+Tilts::Tilts(Channel& c, uint16_t m) : channel(c), mode(m), nFreeAlpha(1), partialGrad(nullptr), anchorChannel(false) {
 
 }
 
@@ -46,7 +48,7 @@ size_t Tilts::setPointers(double* a, double* g ) {
 void Tilts::init(void) {
     phi.resize(channel.imageNumbers.size(),channel.pupilPixels,channel.pupilPixels);
     otf.resize(channel.imageNumbers.size(),2*channel.pupilPixels,2*channel.pupilPixels);
-    if(relativeTilts.empty()) {     // only for relative tilts/channels
+    if(!anchorChannel) {     // only for relative tilts/channels
         partialGrad = new double[channel.imageNumbers.size()];
     }
 }
@@ -58,11 +60,11 @@ void Tilts::addRelativeTilt(std::shared_ptr<Tilts>& t) {
 }
 
 
-void Tilts::addTiltToImages(boost::asio::io_service& service) {
+void Tilts::applyTiltToImages(boost::asio::io_service& service) {
 
     for( size_t i=0; i<channel.subImages.size(); ++i ) {
         service.post ([i,this] {
-            channel.subImages[i]->addMode( mode, x_[i] );
+            channel.subImages[i]->setAlpha( mode, x_[i] );              // anchor-channel apply tilts to images
         });
     }
     
@@ -76,17 +78,18 @@ void Tilts::addTiltToImages(boost::asio::io_service& service) {
 void Tilts::addTiltToImages(boost::asio::io_service& service, double* ref) {
     for( size_t i=0; i<channel.subImages.size(); ++i ) {
         service.post ([ref,i,this] {
-            channel.subImages[i]->addMode( mode, ref[i] + *x_ );
+            channel.subImages[i]->setAlpha( mode, ref[i] + *x_ );       // non-anchor, apply "anchor-alpha + delta" to images
         });
     }
 }
 
+
 void Tilts::calcGradient(boost::asio::io_service& service, uint8_t nThreads, const grad_t& gradient) {
     
-    if( relativeTilts.empty() ) {   // this is a single offset value, to be paired with each tilt in refTilt
+    if( !anchorChannel ) {   // this is a single offset value, to be paired with each tilt in refTilt
         for( size_t i=0; i<channel.subImages.size(); ++i ) {
             service.post ([this,gradient,i] {
-                partialGrad[i] = gradient(*channel.subImages[i], mode, 1E-4, otf.ptr(i,0,0), phi.ptr(i,0,0) );
+                partialGrad[i] = gradient(*channel.subImages[i], mode, 1E-2); //, otf.ptr(i,0,0), phi.ptr(i,0,0) );
             });
         }
     } else {        // this is the anchor channel
@@ -96,21 +99,44 @@ void Tilts::calcGradient(boost::asio::io_service& service, uint8_t nThreads, con
         runThreadsAndWait( service, nThreads );
         for( uint i=0; i<channel.subImages.size(); ++i ) {
             service.post ([this,gradient,i] {
-                df_[i] = gradient(*channel.subImages[i], mode, 1E-2, otf.ptr(i,0,0), phi.ptr(i,0,0) );
+                df_[i] = gradient(*channel.subImages[i], mode, 1E-2); //, otf.ptr(i,0,0), phi.ptr(i,0,0) );
+               // cout << "   DFI = " << df_[i] << endl;
+                Array<complex_t> tmpOTF(otf,i,i,0,otf.dimSize(1)-1,0,otf.dimSize(2)-1);
+                //Ana::write ("gm"+to_string(mode)+"_otf.f0", tmpOTF);
+                Array<double> tmpPhi(phi,i,i,0,phi.dimSize(1)-1,0,phi.dimSize(2)-1);
+                //Ana::write ("gm"+to_string(mode)+"_phi.f0", tmpPhi);
+
             });
         }
         runThreadsAndWait( service, nThreads );
         for(uint i=0; i<relativeTilts.size(); ++i ) {
-           relativeTilts[i]->addPartials();
+            relativeTilts[i]->addPartials();
             for( uint j=0; j<channel.subImages.size(); ++j ) df_[j] += relativeTilts[i]->partialGrad[j];
         }
+        double sum=0.0;
+        double minVal=fabs(df_[0]);
+        size_t minIndex=0;
+        for( uint i=0; i<channel.subImages.size(); ++i ) {
+            if( fabs(df_[i]) < minVal ) {
+                minVal=fabs(df_[i]);
+                minIndex = i;
+            }
+            sum += df_[i];
+        }
+       // df_[minIndex] -= sum;
+//        cout << endl << printArray(df_,channel.subImages.size(),"rawtiltgrad", 10) << endl;
+        sum /= channel.subImages.size();
+        for( uint i=0; i<channel.subImages.size(); ++i ) {
+            df_[i] -= sum;
+        }
+//        cout << endl << printArray(df_,channel.subImages.size(),"tiltgrad", 10) << endl;
     }
     
 }
 
 
 double Tilts::getPartial(size_t i) {
-    if(i < channel.subImages.size() && relativeTilts.empty() ) {
+    if(i < channel.subImages.size() && !anchorChannel ) {
         return partialGrad[i];
     }
     return 0;
@@ -118,7 +144,7 @@ double Tilts::getPartial(size_t i) {
 
 
 void Tilts::addPartials(void) {
-    if( relativeTilts.empty() ) {
+    if( !anchorChannel ) {
         for(uint i=0; i<channel.subImages.size(); ++i) {
             *df_ += partialGrad[i];
         }

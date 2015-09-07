@@ -147,7 +147,7 @@ ChannelCfg::operator std::string() const {
 
 void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     
-    telescopeF = tree.get<float>("TELESCOPE_F", defaults.telescopeF);
+    telescopeF = tree.get<double>("TELESCOPE_F", defaults.telescopeF);
     arcSecsPerPixel = tree.get<double>("ARCSECPERPIX", defaults.arcSecsPerPixel);
     pixelSize = tree.get<double>("PIXELSIZE", defaults.pixelSize);
     rotationAngle = tree.get<double>("ANGLE", defaults.rotationAngle);
@@ -320,7 +320,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
 
 
 uint64_t ChannelCfg::size(void) const {
-    uint64_t sz = 6*sizeof(float);          // telescopeF, arcSecsPerPixel, pixelSize, rotationAngle, weight, noiseFudge
+    uint64_t sz = 6*sizeof(double);          // telescopeF, arcSecsPerPixel, pixelSize, rotationAngle, weight, noiseFudge
     sz += 5*sizeof(uint16_t)+3;             // borderClip, maxLocalShift, minimumOverlap, patchSize, pupilSize, incomplete, mmRow, mmWidth
     sz += sizeof(uint32_t);                 // imageNumberOffset
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
@@ -478,7 +478,7 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     //outputFileName = cleanPath(tree.get<string>("OUTPUT_FILE", defaults.outputFileName), imageDataDir);
     outputFileName = tree.get<string>("OUTPUT_FILE", defaults.outputFileName);
     //pupilFile = cleanPath(tree.get<string>("PUPIL", defaults.pupilFile), imageDataDir);
-    wavelength = tree.get<float>("WAVELENGTH", defaults.wavelength);
+    wavelength = tree.get<double>("WAVELENGTH", defaults.wavelength);
 
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
         LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
@@ -515,7 +515,7 @@ uint64_t ObjectCfg::size(void) const {
     uint64_t sz = ChannelCfg::size();
     sz += sizeof(uint16_t);           // saveMask
     sz += outputFileName.length() + 1;
-    sz += sizeof(float);                // wavelength
+    sz += sizeof(double);                // wavelength
     return sz;
 }
 
@@ -561,11 +561,11 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
     nInitialModes(5), nModeIncrement(5),
     modeNumbers({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
-    telescopeD(0), minIterations(5), maxIterations(500),
+    telescopeD(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_gamma(1E-4),
-    outputFileType(FT_NONE), outputDataType(DT_F32T),
-    sequenceNumber(0), tmpDataDir("./data") {
+    outputFileType(FT_NONE), outputDataType(DT_F32T), sequenceNumber(0),
+    observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
 
 
 }
@@ -623,10 +623,11 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     nModeIncrement  = tree.get<uint16_t>("MODE_STEP", defaults.nModeIncrement);
     modeNumbers = tree.get<vector<uint16_t>>("MODES", defaults.modeNumbers);
 
-    telescopeD = tree.get<float>("TELESCOPE_D", defaults.telescopeD);
+    telescopeD = tree.get<double>("TELESCOPE_D", defaults.telescopeD);
 
-    minIterations = tree.get<uint32_t>("MIN_ITER", defaults.minIterations);
-    maxIterations = tree.get<uint32_t>("MAX_ITER", defaults.maxIterations);
+    minIterations = tree.get<uint16_t>("MIN_ITER", defaults.minIterations);
+    maxIterations = tree.get<uint16_t>("MAX_ITER", defaults.maxIterations);
+    targetIterations = tree.get<uint16_t>("N_DONE_ITER", defaults.targetIterations);
     fillpixMethod = defaults.fillpixMethod;
     tmpString = tree.get<string>("FPMETHOD", "");
     int tmpInt;
@@ -677,8 +678,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     if(iequals(tmpString, "FLOAT")) outputDataType = DT_F32T;
     else if(iequals(tmpString, "SHORT")) outputDataType = DT_I16T;
     else {
-        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default";
-        //outputDataType = defaults.outputDataType;
+        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default (" +dtTags[defaults.outputDataType]+ ")";
     }
 
     sequenceNumber = tree.get<uint32_t>("SEQUENCE_NUM", defaults.sequenceNumber);
@@ -765,6 +765,7 @@ void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
     
     if(minIterations != defaults.minIterations) tree.put("MIN_ITER", minIterations);
     if(maxIterations != defaults.maxIterations) tree.put("MAX_ITER", maxIterations);
+    if(targetIterations != defaults.targetIterations) tree.put("N_DONE_ITER", targetIterations);
     if(fillpixMethod != defaults.fillpixMethod) tree.put("FPMETHOD", fpmTags[fillpixMethod%4]);
     if(gradientMethod != defaults.gradientMethod) tree.put("GRADIENT", gmTags[gradientMethod%3]);
     if(getstepMethod != defaults.getstepMethod) tree.put("GETSTEP", gsmTags[getstepMethod%5]);
@@ -789,9 +790,10 @@ void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
 uint64_t GlobalCfg::size(void) const {
     uint64_t sz = ObjectCfg::size();
     sz += 6*sizeof(uint8_t);                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType
-    sz += 8*sizeof(uint16_t);                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, outputFiles.size()
+    sz += 9*sizeof(uint16_t);                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
     sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
-    sz += 6*sizeof(float);                   // klCutoff, telescopeD, badPixelThreshold, FTOL, EPS, reg_gamma
+    sz += 5*sizeof(float);                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma
+    sz += sizeof(double);                    // telescopeD
     sz += sizeof(uint32_t);                  // sequenceNumber
     sz += observationTime.length() + 1;
     sz += observationDate.length() + 1;
@@ -817,6 +819,7 @@ uint64_t GlobalCfg::pack(char* ptr) const {
     count += pack(ptr+count, telescopeD);
     count += pack(ptr+count, minIterations);
     count += pack(ptr+count, maxIterations);
+    count += pack(ptr+count, targetIterations);
     count += pack(ptr+count, fillpixMethod);
     count += pack(ptr+count, gradientMethod);
     count += pack(ptr+count, getstepMethod);
@@ -854,6 +857,7 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, telescopeD, swap_endian);
     count += unpack(ptr+count, minIterations, swap_endian);
     count += unpack(ptr+count, maxIterations, swap_endian);
+    count += unpack(ptr+count, targetIterations, swap_endian);
     count += unpack(ptr+count, fillpixMethod);
     count += unpack(ptr+count, gradientMethod);
     count += unpack(ptr+count, getstepMethod);

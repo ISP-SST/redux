@@ -1,7 +1,10 @@
 #ifndef REDUX_MATH_LINALG_HPP
 #define REDUX_MATH_LINALG_HPP
 
-#include <opencv/cv.h>
+//#include <opencv/cv.h>
+#include "redux/util/array.hpp"
+
+#include <gsl/gsl_permutation.h>
 
 namespace redux {
 
@@ -11,7 +14,7 @@ namespace redux {
          *  If A is (m x n) then svd produces a vector S (min(m,n) x 1) with (non-negative) singular values in decreasing order,
          *  and unitary matrices U (m x m) and V (n x n) so that A = U*(I*S)*V^T
          */
-        template<typename T>
+ /*       template<typename T>
         void svd2(T* A, int rows, int cols, T* S, T* U=nullptr, T* V=nullptr) {
             
             CvMat A_ = cvMat(rows, cols, cv::DataType<T>::type, A);
@@ -25,13 +28,20 @@ namespace redux {
             }
 
         }
+ */       
+        void qr_decomp(const double* A, int rows, int cols, double* Q, double* R);
+        void qr_decomp(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R);
         
-        void qr_decomp(double* A, int rows, int cols, double* Q, double* R);
+        void qr_decomp_pivot(const double* A, int rows, int cols, double* Q, double* R, gsl_permutation* p);
+        void qr_decomp_pivot(const double* A, int rows, int cols, double* Q, double* R);
+        void qr_decomp_pivot(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R, gsl_permutation* p);
+        
+        
         void svd(double* A_U, int rows, int cols, double* S, double* V);
         
      
         
-        template<typename T>
+ /*       template<typename T>
         void svd(T* data, int rows, int cols, T* sigma, T* u, T* v) {
             
             cv::Mat data_(rows, cols, cv::DataType<T>::type, data); // does not copy or free
@@ -49,7 +59,7 @@ namespace redux {
             //cvSVD( &data_, &sigma_, &u_, &v_ );
 
         }
-
+*/
 
     }
 

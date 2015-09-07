@@ -31,9 +31,28 @@ namespace redux {
             bool operator<( const Grid& rhs ) const { if( size == rhs.size ) return (origin < rhs.origin); return ( size < rhs.size ); }
         };
         
-        double makePupil( util::Array<double>& aperture, uint32_t nPoints, float radius, bool normalize=false);
-        double makePupil_mvn( double** data, int nPoints, float radius );
+        double makePupil_thi( double** pupil, uint32_t nPoints, double radius);
+        double makePupil_mvn( double** pupil, int nPoints, double radius );
+        template <typename T>
+        double makePupil( util::Array<T>& pupil, uint32_t nPoints, double radius) {
+            pupil.resize(nPoints,nPoints);
+            T **ptr = redux::util::makePointers(pupil.get(),nPoints,nPoints);
+            double area = makePupil_mvn(ptr,nPoints,radius); // FIXME: temporarily using MvN pupilmaker for easier debugging.
+            redux::util::delPointers(ptr);
+            return area;
+        }
 
+        void makeZernike_thi( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
+        void makeZernike_mvn( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
+        template <typename T>
+        void makeZernike( util::Array<T>& mode, int j, uint32_t nPoints, double radius, double angle=0) {
+            mode.resize(nPoints,nPoints);
+            T **ptr = redux::util::makePointers(mode.get(),nPoints,nPoints);
+            makeZernike_mvn(ptr,nPoints,radius,angle); // FIXME: temporarily using MvN Z-maker for easier debugging.
+            redux::util::delPointers(ptr);
+        }
+
+        
         template <typename T>
         redux::util::Array<T> fitPlane( const redux::util::Array<T>& in );
         template <typename T>
@@ -109,7 +128,46 @@ namespace redux {
             return *tmp.mid();
         }
 
-
+        template <typename T>
+        void connectedRegion(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, uint y, uint x, T threshold=T(0));
+        template <typename T>
+        void connectedRegion(T** data, size_t sizeY, size_t sizeX, uint y, uint x, T threshold=T(0)) {
+            uint8_t** mask = redux::util::newArray<uint8_t>(sizeY,sizeX);
+            connectedRegion(data, mask, sizeY, sizeX, y, x, threshold);
+            std::transform(*data, *data+sizeY*sizeX, *mask, *data, redux::math::multiply<T,uint8_t>());
+            redux::util::delArray(mask);
+        }
+        template <typename T>
+        void connectedRegion(T* data, size_t sizeY, size_t sizeX, uint y, uint x, T threshold=T(0)) {
+            T** ptr = redux::util::makePointers(data, sizeY, sizeX);
+            connectedRegion(ptr, sizeY, sizeX, y, x, threshold);
+            redux::util::delPointers(ptr);
+        }
+       
+        template <typename T>
+        void smooth(T** data, size_t sizeY, size_t sizeX, size_t nY, size_t nX);
+        template <typename T>
+        void smooth(T** data, size_t sizeY, size_t sizeX, size_t n) { smooth(data, sizeY, sizeX, n, n); }
+        template <typename T>
+        void smooth(T* data, size_t sizeY, size_t sizeX, size_t nY, size_t nX) {
+            T** ptr = redux::util::makePointers(data, sizeY, sizeX);
+            smooth(ptr, sizeY, sizeX, nY, nX);
+            redux::util::delPointers(ptr);
+        }
+        template <typename T>
+        void smooth(T* data, size_t sizeY, size_t sizeX, size_t n) { smooth(data, sizeY, sizeX, n, n); }
+        
+        template <typename T>
+        void ScharmerFilter (T** data, double** q2_inv, size_t sizeY, size_t sizeX, double noise_power, double frequency_cutoff);
+        template <typename T>
+        void ScharmerFilter(T* data, double* q2_inv, size_t sizeY, size_t sizeX, double noise_power, double frequency_cutoff) {
+            T** ptr = redux::util::makePointers(data, sizeY, sizeX);
+            double** qPtr = redux::util::makePointers(q2_inv, sizeY, sizeX);
+            ScharmerFilter(ptr, qPtr, sizeY, sizeX, noise_power, frequency_cutoff);
+            redux::util::delPointers(ptr);
+            redux::util::delPointers(qPtr);
+        }
+        
         template <typename T>
         double inverseDistanceWeight( T**, size_t sizeY, size_t sizeX, size_t posY, size_t posX );
 
@@ -197,7 +255,7 @@ namespace redux {
         redux::util::Array<T> apodize( const redux::util::Array<T>& array, size_t blendRegion );
         
         template <typename T>
-        void checkIfMultiFrames( redux::image::Image<T>& img );
+        void normalizeIfMultiFrames( redux::image::Image<T>& img );
         
         /*! Fit and subtract the backscatter patter for semi-transparent CCDs 
          *  @param data Image to be cleaned

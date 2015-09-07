@@ -26,8 +26,8 @@ ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
 }
 
 
-void ChannelData::getPatchData(Point16& id) {
-    myChannel->getPatchData(*this,id);
+void ChannelData::getPatchData(const PatchData& patch) {
+    myChannel->getPatchData(*this,patch);
 }
 
 
@@ -36,16 +36,28 @@ void ChannelData::initPatch(void) {
 }
 
 
+void ChannelData::collectResults(void) {
+   // cout << "ChannelData::collectResults() " << __LINE__ << endl;
+    myChannel->getResults(*this);
+    //images.resize();
+  //  cout << "ChannelData::collectResults() " << __LINE__ << endl;
+}
+
+
 uint64_t ChannelData::size( void ) const {
-    static uint64_t sz = offset.size() + residualOffset.size();
-    return sz+images.size();
+    uint64_t sz = shift.size() + offset.size() + residualOffset.size();
+    sz += alpha.size(); 
+    sz += images.size();
+    return sz;
 }
 
 
 uint64_t ChannelData::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = offset.pack(ptr);
+    uint64_t count = shift.pack(ptr);
+    count += offset.pack(ptr+count);
     count += residualOffset.pack(ptr+count);
+    count += alpha.pack(ptr+count);
     count += images.pack(ptr+count);
     return count;
 }
@@ -53,10 +65,18 @@ uint64_t ChannelData::pack( char* ptr ) const {
 
 uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = offset.unpack(ptr, swap_endian);
+    uint64_t count = shift.unpack(ptr, swap_endian);
+    count += offset.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
+    count += alpha.unpack(ptr+count, swap_endian);
     count += images.unpack(ptr+count, swap_endian);
     return count;
+}
+
+
+void ChannelData::cclear(void) {
+    alpha.clear();
+    images.clear();
 }
 
 
@@ -69,23 +89,36 @@ ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
 }
 
 
-void ObjectData::getPatchData(Point16& id) {
+void ObjectData::getPatchData(const PatchData& patch) {
     for( ChannelData& ch: channels ) {
-        ch.getPatchData(id);
+        ch.getPatchData(patch);
     }
 }
 
 
 void ObjectData::initPatch(void) {
+    myObject->initPatch(*this);
     for( ChannelData& ch: channels ) {
         ch.initPatch();
     }
-    myObject->initPatch(*this);
+    myObject->initPQ();
+    myObject->addAllPQ();
+}
+
+
+void ObjectData::collectResults(void) {
+ //   cout << "ObjectData::collectResults() " << __LINE__ << endl;
+    myObject->getResults(*this);
+//    cout << "ObjectData::collectResults() " << __LINE__ << endl;
+    for( ChannelData& ch: channels ) {
+        ch.collectResults();
+    }
+ //   cout << "ObjectData::collectResults() " << __LINE__ << endl;
 }
 
 
 uint64_t ObjectData::size( void ) const {
-    uint64_t sz = 0;     // nChannels
+    uint64_t sz = results.size();     // nChannels
     for( const ChannelData& cd: channels ) {
         sz += cd.size();
     }
@@ -95,7 +128,7 @@ uint64_t ObjectData::size( void ) const {
 
 uint64_t ObjectData::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = 0;
+    uint64_t count = results.pack(ptr);
     for( const ChannelData& cd: channels ) {
         count += cd.pack( ptr+count );
     }
@@ -105,7 +138,7 @@ uint64_t ObjectData::pack( char* ptr ) const {
 
 uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = 0;
+    uint64_t count = results.unpack(ptr,swap_endian);
     channels.clear();
     for( auto& it: myObject->getChannels() ) {
         ChannelData chan(it);
@@ -113,6 +146,14 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
         channels.push_back(chan);
     }
     return count;
+}
+
+
+void ObjectData::cclear(void) {
+    for( ChannelData& cd: channels ) {
+        cd.cclear();
+    }
+    channels.clear();
 }
 
 
@@ -127,8 +168,10 @@ PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j)
 
 void PatchData::getData(void) {
     for( ObjectData& obj: objects ) {
-        obj.getPatchData(index);
+        obj.getPatchData(*this);
     }
+    isLoaded = true;
+    cacheStore(true);
 }
 
 
@@ -140,9 +183,18 @@ void PatchData::initPatch(void) {
 }
 
 
+void PatchData::collectResults(void) {
+//    cout << "PatchData::collectResults()   patch # " << index << endl;
+    for( ObjectData& obj: objects ) {
+        obj.collectResults();
+    }
+//    cout << "PatchData::collectResults() " << __LINE__ << endl;
+}
+
+
 uint64_t PatchData::size( void ) const {
     uint64_t sz = Part::size();
-    sz += index.size() + pos.size();
+    sz += index.size() + roi.size();
     for( const ObjectData& obj: objects ) {
         sz += obj.size();
     }
@@ -154,7 +206,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = Part::pack(ptr);
     count += index.pack(ptr+count);
-    count += pos.pack(ptr+count);
+    count += roi.pack(ptr+count);
     for( const ObjectData& obj: objects ) {
         count += obj.pack(ptr+count);
     }
@@ -166,7 +218,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = Part::unpack(ptr, swap_endian);
     count += index.unpack(ptr+count, swap_endian);
-    count += pos.unpack(ptr+count, swap_endian);
+    count += roi.unpack(ptr+count, swap_endian);
     objects.clear();
     for( auto& it: myJob.getObjects() ) {
         ObjectData obj(it);
@@ -174,6 +226,15 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
         objects.push_back(obj);
     }
     return count;
+}
+
+
+void PatchData::cclear(void) {
+    std::cout << "PatchData::cclear() itemPath = " << itemPath << std::endl;
+    for( ObjectData& obj: objects ) {
+        obj.cclear();
+    }
+    objects.clear();
 }
 
 
@@ -209,6 +270,7 @@ uint64_t GlobalData::size( void ) const {
         sz += it.first.size();
         sz += it.second->size();
     }
+    sz += constraints.size();
     return sz;
 }
 
@@ -220,7 +282,8 @@ uint64_t GlobalData::pack( char* ptr ) const {
         count += it.first.pack(ptr+count);
         count += it.second->pack(ptr+count);
     }
-    cout << "GlobalData::pack():  packed " << modes.size() << " modes." << endl;
+  //  cout << "GlobalData::pack():  packed " << modes.size() << " modes." << endl;
+    count += constraints.pack(ptr+count);
     return count;
 }
 
@@ -238,7 +301,8 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
             modes.emplace(id, mode);
         }
     }
-    cout << "GlobalData::unpack():  got " << modes.size() << " modes." << endl;
+ //   cout << "GlobalData::unpack():  got " << modes.size() << " modes." << endl;
+    count += constraints.unpack(ptr+count,swap_endian);
     return count;
 }
 

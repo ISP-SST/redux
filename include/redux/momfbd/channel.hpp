@@ -44,14 +44,18 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             double getMaxMean(void) const;
-            void collectImages(redux::util::Array<float>&) const;
-            void getPatchData(ChannelData&, Point16 patchID) const;
+            //void collectImages(redux::util::Array<double>&) const;
+            size_t nImages(void) const { return images.size(); } 
+            void getPatchData(ChannelData&, const PatchData&) const;
             void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
             void initProcessing(WorkSpace::Ptr);
             void initPatch(ChannelData&);
+            void getResults(ChannelData&);
+            const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
+            void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void initPhiFixed(void);
             void computePhi(void);
             void addMode(redux::util::Array<double>&, uint16_t, double) const;
@@ -60,8 +64,6 @@ namespace redux {
             void addAllFT(redux::util::Array<double>&);
             double metric(void);
             /*****************************************************/
-            
-            uint32_t dataOffset;
 
             void dump( std::string tag );
         private:
@@ -73,8 +75,6 @@ namespace redux {
             void initCache(void);
             void cleanup(void);
             
-            size_t nImages(size_t offset=0) { dataOffset=offset; return images.dimSize(0); } 
-
             void loadData(boost::asio::io_service&);
             void preprocessData(boost::asio::io_service&);
             void normalizeData(boost::asio::io_service&, double value);
@@ -85,13 +85,14 @@ namespace redux {
             
             size_t sizeOfPatch(uint32_t) const;
             
-            Point16 clipImages(void);
+            Point16 getImageSize(void);
 
 
             /*************   Local variables for   ***************/
             /************* PreProcessing on master ***************/
             std::vector<redux::util::ArrayStats::Ptr> imageStats;
-            redux::image::Image<float> images, dark, gain;
+            std::vector<redux::image::Image<float>> images;
+            redux::image::Image<float> dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
@@ -104,7 +105,7 @@ namespace redux {
             std::map<uint16_t, const PupilMode::Ptr> modes;                 //!< modes used in this channel
             std::pair<redux::util::Array<double>, double> pupil;            //!< pupil & area of pupil
             std::vector<std::shared_ptr<SubImage>> subImages;
-            redux::image::Image<float> fittedPlane;
+            redux::util::Array<float> fittedPlane;
             redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
             redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel
             std::set<size_t> pupilIndices, otfIndices;                      //!< Arrays with the offsets where the pupil/otf are greater than some threshold

@@ -13,7 +13,7 @@ using namespace redux::util;
 using namespace std;
 
 
-void redux::math::qr_decomp(double* A, int rows, int cols, double* Q, double* R) {
+void redux::math::qr_decomp(const double* A, int rows, int cols, double* Q, double* R) {
     
     gsl_matrix* a = gsl_matrix_alloc(rows, cols);
     gsl_vector* tau = gsl_vector_alloc(std::min(rows,cols));
@@ -36,6 +36,69 @@ void redux::math::qr_decomp(double* A, int rows, int cols, double* Q, double* R)
     gsl_matrix_free(a);
     
 }
+   
+   
+void redux::math::qr_decomp(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R) {
+    
+    const vector<size_t>& adims =  A.dimensions();
+    
+    if( adims.size() != 2 /*|| adims[0] >= adims[1]*/ ) {
+        cout << "redux::math::qr_decomp():: size of A is not ok: " << printArray(adims,"adims") << endl;
+        return;
+    }
+    Q.resize(adims[0],adims[0]);
+    R.resize(adims[0],adims[1]);
+    qr_decomp(A.get(),adims[0],adims[1],Q.get(),R.get());
+}
+
+
+void redux::math::qr_decomp_pivot(const double* A, int rows, int cols, double* Q, double* R, gsl_permutation* p) {
+    
+    gsl_matrix* a = gsl_matrix_alloc(rows, cols);
+    gsl_vector* tau = gsl_vector_alloc(std::min(rows,cols));
+    gsl_vector* tmp = gsl_vector_alloc(std::max(rows,cols));
+    
+    int signum;
+    
+    memcpy(a->data,A,rows*cols*sizeof(double));
+
+    gsl_linalg_QRPT_decomp(a, tau, p, &signum, tmp);
+    
+    gsl_matrix q,r;
+    q.data = Q;
+    r.data = R;
+    q.size1 = r.size1 = rows;
+    q.tda = q.size2 = rows;
+    r.tda = r.size2 = cols;
+
+    gsl_linalg_QR_unpack (a, tau, &q, &r);
+
+    
+    gsl_vector_free(tau);
+    gsl_matrix_free(a);
+    
+}
+
+void redux::math::qr_decomp_pivot(const double* A, int rows, int cols, double* Q, double* R) {
+    gsl_permutation* p = gsl_permutation_alloc(std::max(rows,cols));
+    //gsl_permutation_init(p);
+    qr_decomp_pivot(A, rows, cols, Q, R, p);
+    gsl_permutation_free(p);
+}
+
+void redux::math::qr_decomp_pivot(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R, gsl_permutation* p) {
+    const vector<size_t>& adims =  A.dimensions();
+    
+    if( adims.size() != 2 || adims[0] >= adims[1] ) {
+        cout << "redux::math::qr_decomp_pivot():: size of A is not ok: " << printArray(adims,"adims") << endl;
+        return;
+    }
+    Q.resize(adims[0],adims[0]);
+    R.resize(adims[0],adims[1]);
+    qr_decomp_pivot(A.get(),adims[0],adims[1],Q.get(),R.get(),p);
+    
+}
+
    
    
 void redux::math::svd(double* A_U, int rows, int cols, double* S, double* V) {

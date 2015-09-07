@@ -65,22 +65,23 @@ void  WaveFront::setAlpha (const modeinfo_map& a) {
 }
 
 
-void WaveFront::addPhases (boost::asio::io_service& service) {
+void WaveFront::setAlphas(boost::asio::io_service& service) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
-            service.post (std::bind((void(SubImage::*)(const double*))&SubImage::addPhases, it.get(), alpha));
+            service.post (std::bind((void(SubImage::*)(const double*))&SubImage::setAlphas, it.get(), alpha));
+            //service.post (std::bind((void(SubImage::*)(const double*))&SubImage::addPhases, it.get(), alpha)); // FIXME: for testing only!
         }
     }
 }
 
 
-void WaveFront::calcOTFs (boost::asio::io_service& service) {
+void WaveFront::setAlphasAndUpdate(boost::asio::io_service& service, bool calcVogel) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
-            service.post ([it,this] {    // use a lambda to ensure these calls are sequential
-                it->addPhases(alpha);
-                it->calcOTF();
-                it->calcVogelWeight();
+            service.post ([this, it, calcVogel] {    // use a lambda to ensure these calls are sequential
+                it->setAlphas(alpha);
+                //it->addPhases(alpha);   // FIXME: this is for testing only
+                it->update(calcVogel);
             });
         }
     }
@@ -92,7 +93,7 @@ void WaveFront::calcGradient (boost::asio::io_service& service, const grad_t& gr
     for ( auto& m: modes ) {
         service.post ([this,gradient,count,&m] {
             for (const shared_ptr<SubImage>& it : images) {
-                grad[count] += gradient(*it, m.first, 1E-2, otf.ptr(count,0,0), phi.ptr(count,0,0) );
+                grad[count] += gradient(*it, m.first, 1E-2); //, otf.ptr(count,0,0), phi.ptr(count,0,0) );
             }
         });
         count++;
@@ -104,7 +105,8 @@ double WaveFront::metric(boost::asio::io_service& service) {
     for (const shared_ptr<SubImage>& it : images) {
         if (it) {
             service.post ([it,this] {    // use a lambda to ensure these two calls are sequential
-                it->addPhases(alpha);
+                //it->addScaledPhases(alpha);
+                it->setAlphas(alpha);   // FIXME: for testing only !!
                 it->calcOTF();
             });
         }
