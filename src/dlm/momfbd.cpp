@@ -1086,10 +1086,10 @@ void img_clip ( Array<float>& img ) {
     while ( firstY < lastY && !rowSums[firstY] ) ++firstY;
     while ( lastY && !rowSums[lastY] ) --lastY;
 
-    if ( firstX < lastX && firstY < lastY ) {
-        img.setLimits ( firstY,lastY,firstX,lastX );
-        Array<float> tmp ( img,firstY,lastY,firstX,lastX );
-        img = tmp;
+    if( firstX < lastX && firstY < lastY ) {
+        img.setLimits( firstY, lastY, firstX, lastX );
+        Array<float> tmp( img, firstY, lastY, firstX, lastX );
+        img = tmp.copy();
     }
 
 }
@@ -1192,16 +1192,18 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     int imgSizeX = imgLastX - imgFirstX + 1;
     int imgSizeY = imgLastY - imgFirstY + 1;
 
-    Array<float> pic ( imgSizeY, imgSizeX );
-    memset ( pic.ptr ( 0 ), 0, imgSizeX * imgSizeY * sizeof ( float ) );
+    Array<float> pic( imgSizeY, imgSizeX );
+    memset( pic.ptr( 0 ), 0, imgSizeX * imgSizeY * sizeof( float ) );
 
-    for ( int yp = 0; yp < nPatchesY; ++yp ) {
-        for ( int xp = 0; xp < nPatchesX; ++xp ) {
-            Array<float> patch ( img, yp, yp, xp, xp, 0, patchSizeY-1, 0, patchSizeX-1 );
-            Array<float> weights = getWeights ( overlaps ( yp, xp ), margin, patchSizeY, patchSizeX );
-            for ( int y = patchesFirstY[yp] + margin; y <= patchesLastY[yp] - margin; ++y ) {
-                for ( int x = patchesFirstX[xp] + margin; x <= patchesLastX[xp] - margin; ++x ) {
-                    pic ( y, x ) += patch ( 0, 0, y - patchesFirstY[yp], x - patchesFirstX[xp] ) * weights ( y - patchesFirstY[yp], x - patchesFirstX[xp] );
+    for( int yp = 0; yp < nPatchesY; ++yp ) {
+        for( int xp = 0; xp < nPatchesX; ++xp ) {
+            Array<float> patch( img, yp, yp, xp, xp, 0, patchSizeY - 1, 0, patchSizeX - 1 );
+            Array<float> weights = getWeights( overlaps( yp, xp ), margin, patchSizeY, patchSizeX );
+            for( int y = patchesFirstY[yp]; y <= patchesLastY[yp]; ++y ) {
+                for( int x = patchesFirstX[xp] + margin; x <= patchesLastX[xp] - margin; ++x ) {
+                    if( ( y >= margin ) && y < ( imgSizeY - margin ) && ( x >= margin ) && x < ( imgSizeX - margin ) ) {
+                        pic( y, x ) += patch( 0, 0, y - patchesFirstY[yp], x - patchesFirstX[xp] ) * weights( y - patchesFirstY[yp], x - patchesFirstX[xp] );
+                    }
                 }
             }
         }

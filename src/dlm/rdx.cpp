@@ -1,7 +1,7 @@
 #include "rdx.hpp"
 
 #include "redux/image/fouriertransform.hpp"
-#include "redux/image/statistics.hpp"
+#include "redux/util/arraystats.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -245,7 +245,7 @@ void descatter (int szY, int szX, const T* img, const T* gain, const T* psf, T* 
 
     subImg.template copyFrom<T> (psf);              // use temporarily for initializing the OTF
     FourierTransform otf (paddedImg, FT_REORDER | FT_NORMALIZE, std::max (nthreads, 1));
-    Statistics stats;
+    ArrayStats stats;
     stats.getMinMaxMean (subImg);
     otf /= stats.sum;                               // PSF has to be normalized so that sum=1
 
@@ -435,7 +435,7 @@ void convolve (int szY, int szX, T* img, T* psf, T* out, int nthreads, int norma
     FourierTransform ft (psfA, 0, std::max (nthreads, 1));
 
     if (normalize) {
-        Statistics stats;
+        ArrayStats stats;
         stats.getMinMaxMean (psfA);
         ft /= stats.sum;
     }

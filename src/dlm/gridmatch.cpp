@@ -390,10 +390,6 @@ IDL_VPTR redux::gridmatch( int argc, IDL_VPTR argv[] )
     float         *out, *p1, *p2, *gwx, *gwy, xoffset, yoffset, gwid;
     IDL_LONG      *gx, *gy, nx, ny, nxg, nyg, dx2, dy2, nc, dx, dy, i1, i2, j1, j2;
     IDL_MEMINT    dims[IDL_MAX_ARRAY_DIM];
-    void          gwind0( float *, float *, float, IDL_LONG, IDL_LONG, IDL_LONG,
-                          IDL_LONG );
-    void          match_1( float *, float *, IDL_LONG, IDL_LONG, IDL_LONG, IDL_LONG,
-                           IDL_LONG, IDL_LONG, float *, float *, float *, float * );
 
     if( argc < 7 || argc > 8 )
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP,
