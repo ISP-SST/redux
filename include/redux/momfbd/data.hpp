@@ -2,6 +2,7 @@
 #define REDUX_MOMFBD_DATA_HPP
 
 #include "redux/momfbd/cache.hpp"
+#include "redux/momfbd/constraints.hpp"
 
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
@@ -88,7 +89,8 @@ namespace redux {
             std::mutex mtx;
             std::map<std::pair<uint32_t, float>, const std::pair<redux::util::Array<double>, double>&> pupils;
             std::map<Cache::ModeID, const PupilMode::Ptr> modes;
-            GlobalData(void){ partType = PT_GLOBAL; };
+            Constraints constraints;
+            GlobalData(const MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
             const std::pair<redux::util::Array<double>, double>& fetch(uint16_t,double);
             const PupilMode::Ptr fetch(const Cache::ModeID&);
             uint64_t size(void) const;
