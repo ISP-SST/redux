@@ -652,20 +652,15 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
     info->dateString = myJob.observationDate;
     info->timeString = "FIXME";
-//     if(false) {
-//         for( auto& it: channels ) {
-//             info->fileNames.push_back ( "FIXME" );
-//         }
-//         info->dataMask |= MOMFBD_NAMES;
-//     }
-    info->nFileNames = info->fileNames.size();
 
     int32_t nChannels = info->nChannels = channels.size();
     info->clipStartX = sharedArray<int16_t> (nChannels);
     info->clipEndX = sharedArray<int16_t> (nChannels);
     info->clipStartY = sharedArray<int16_t> (nChannels);
     info->clipEndY = sharedArray<int16_t> (nChannels);
+    info->fileNames.clear();
     for (int i = 0; i < nChannels; ++i) {
+        channels[i]->getFileNames(info->fileNames);
         info->clipStartX.get() [ i ] = channels[i]->alignClip[0];
         info->clipEndX.get() [ i ] = channels[i]->alignClip[1];
         info->clipStartY.get() [ i ] = channels[i]->alignClip[2];
@@ -676,8 +671,9 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
     int64_t imgSize = patchSize*patchSize*sizeof(float);
     
-    if (saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG)) writeMask |= MOMFBD_PSF;
-    if (saveMask & SF_SAVE_MODES && (info->nPH > 0)) writeMask |= MOMFBD_MODES;
+    if( info->fileNames.size() ) writeMask |= MOMFBD_NAMES;
+    if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) writeMask |= MOMFBD_PSF;
+    if( saveMask & SF_SAVE_MODES && (info->nPH > 0) ) writeMask |= MOMFBD_MODES;
     
     Array<float> modes;
     if ( writeMask&MOMFBD_MODES ) {     // copy modes from local cache

@@ -677,15 +677,16 @@ double Channel::getMaxMean (void) const {
     return maxMean;
 }
 
-/*
-void Channel::collectImages (redux::util::Array<double>& stack) const {
-    size_t n = images.dimSize (0);
-    if (n) {
-        Array<double> block (stack, dataOffset, dataOffset + n - 1, 0, images.dimSize (1) - 1, 0, images.dimSize (2) - 1); // sub-array of stack, starting at offset.
-        images.copy (block);
+
+void Channel::getFileNames(std::vector<std::string>& files) const {
+
+    for (auto &num: imageNumbers) {
+        bfs::path fn = bfs::path(imageDataDir)/bfs::path(boost::str(boost::format(imageTemplate) % num));
+        files.push_back(fn.string());
     }
+    
 }
-*/
+
 
 void Channel::initProcessing (WorkSpace::Ptr ws) {
     workspace = ws;

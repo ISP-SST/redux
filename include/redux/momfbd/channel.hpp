@@ -44,7 +44,7 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             double getMaxMean(void) const;
-            //void collectImages(redux::util::Array<double>&) const;
+            void getFileNames(std::vector<std::string>&) const;
             size_t nImages(void) const { return images.size(); } 
             void getPatchData(ChannelData&, const PatchData&) const;
             void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
