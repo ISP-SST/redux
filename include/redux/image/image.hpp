@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include <memory>
+#include <mutex>
 
 namespace redux {
 
@@ -137,6 +138,7 @@ namespace redux {
             }
 
             std::shared_ptr<redux::file::FileMeta> meta;
+            std::mutex imgMutex;
 
             uint32_t nFrames;      //! Set this if the image consists of multiple frames (for normalization purposes)
 

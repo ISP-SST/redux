@@ -139,7 +139,10 @@ namespace {
             ClippedFile cf(fn,cl,sym);
             img.resize();
             Image<T>& cimg = redux::util::Cache::get<ClippedFile, Image<T> >(cf,img);
-            if(cimg.nElements() == 0) cf.loadImage(cimg,norm);
+            {
+                unique_lock<mutex> lock(cimg.imgMutex);
+                if(cimg.nElements() == 0) cf.loadImage(cimg,norm);
+            }
             img = cimg;
         }
 
