@@ -683,31 +683,31 @@ namespace redux {
             }
             
             template <typename U>
-            Array<T> operator+( const Array<U>& rhs ) {
+            Array<T> operator+( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return tmp += rhs;
+                return std::move(tmp+=rhs);
             }
 
             template <typename U>
-            Array<T> operator-( const Array<U>& rhs ) {
+            Array<T> operator-( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return tmp -= rhs;
+                return std::move(tmp-=rhs);
             }
 
             template <typename U>
-            Array<T> operator*( const Array<U>& rhs ) {
+            Array<T> operator*( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return tmp *= rhs;
+                return std::move(tmp*=rhs);
             }
 
            template <typename U>
-            Array<T> operator/( const Array<U>& rhs ) {
+            Array<T> operator/( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return tmp /= rhs;
+                return std::move(tmp/=rhs);
             }
             
             
