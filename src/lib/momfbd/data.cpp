@@ -43,7 +43,6 @@ void ChannelData::collectResults(void) {
 
 uint64_t ChannelData::size( void ) const {
     uint64_t sz = shift.size() + offset.size() + residualOffset.size();
-    sz += alpha.size(); 
     sz += images.size();
     return sz;
 }
@@ -54,7 +53,6 @@ uint64_t ChannelData::pack( char* ptr ) const {
     uint64_t count = shift.pack(ptr);
     count += offset.pack(ptr+count);
     count += residualOffset.pack(ptr+count);
-    count += alpha.pack(ptr+count);
     count += images.pack(ptr+count);
     return count;
 }
@@ -65,14 +63,12 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = shift.unpack(ptr, swap_endian);
     count += offset.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
-    count += alpha.unpack(ptr+count, swap_endian);
     count += images.unpack(ptr+count, swap_endian);
     return count;
 }
 
 
 void ChannelData::cclear(void) {
-    alpha.clear();
     images.clear();
 }
 
@@ -114,6 +110,10 @@ void ObjectData::collectResults(void) {
 uint64_t ObjectData::size( void ) const {
     uint64_t sz = img.size();
     sz += psf.size();
+    sz += cobj.size();
+    sz += res.size();
+    sz += alpha.size();
+    sz += div.size();
     for( const ChannelData& cd: channels ) {
         sz += cd.size();
     }
@@ -125,6 +125,10 @@ uint64_t ObjectData::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = img.pack(ptr);
     count += psf.pack(ptr+count);
+    count += cobj.pack(ptr+count);
+    count += res.pack(ptr+count);
+    count += alpha.pack(ptr+count);
+    count += div.pack(ptr+count);
     for( const ChannelData& cd: channels ) {
         count += cd.pack( ptr+count );
     }
@@ -136,6 +140,10 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = img.unpack(ptr,swap_endian);
     count += psf.unpack(ptr+count,swap_endian);
+    count += cobj.unpack(ptr+count,swap_endian);
+    count += res.unpack(ptr+count,swap_endian);
+    count += alpha.unpack(ptr+count,swap_endian);
+    count += div.unpack(ptr+count,swap_endian);
     channels.clear();
     for( auto& it: myObject->getChannels() ) {
         ChannelData chan(it);

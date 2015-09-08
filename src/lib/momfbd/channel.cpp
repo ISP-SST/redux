@@ -757,41 +757,12 @@ void Channel::initPatch (ChannelData& cd) {
 
 void Channel::getResults (ChannelData& cd) {
     
- //   cout << "Channel::getResults(" << hexString(this) << ") " << __LINE__ << endl;
-    if( myObject.saveMask & SF_SAVE_ALPHA) {
- //       cout << "Channel::getResults() getting alpha... " << subImages.size() << endl;
-        cd.alpha.resize(subImages.size(), modes.size());
-        for (uint16_t i = 0; i < subImages.size(); ++i) {
-            subImages[i]->getAlphas(cd.alpha.ptr(i,0));
- //           cout << " Channel::getResults ()  " << __LINE__ << printArray(cd.alpha.ptr(i,0), modes.size(), " alpha") << endl;
-        }
-    }
 }
 
 
 void Channel::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
-    
-//    cout << " Channel::writeAna ()    nY = " <<patches.dimSize(0) << "  nX = " <<patches.dimSize(1) << endl;
-    if( myObject.saveMask & SF_SAVE_ALPHA ) {
-        bfs::path fn = bfs::path (myObject.outputFileName + ".alpha."+to_string(ID+1)+".f0");
-        LOG << "Saving alpha-coefficients to: " << fn;
-        Array<float> alpha(patches.dimSize(0), patches.dimSize(1), imageNumbers.size(), modes.size());
-        for( auto& it: patches ) {
-//         for (uint y = 0; y < patches.dimSize(0); ++y) {
-//             for (uint x = 0; x < patches.dimSize(1); ++x) {
-//         cout << " Channel::writeAna ()  " << __LINE__ << "  py = " << it->index.y << "  px = " << it->index.x << endl;
-            Array<float> subalpha(alpha, it->index.y, it->index.y, it->index.x, it->index.x, 0, imageNumbers.size()-1, 0, modes.size()-1);
-//        cout << " Channel::writeAna ()  " << __LINE__ << printArray(it->objects[myObject.ID].channels[ID].alpha.dimensions(), " palphadims") << endl;
- //        cout << " Channel::writeAna ()  " << __LINE__ << "  saget = " << hexString(subalpha.get()) <<  printArray(subalpha.dimensions(), " salphadims") << endl;
-           it->objects[myObject.ID].channels[ID].alpha.copy(subalpha);
-//         cout << " Channel::writeAna ()  " << __LINE__ << "  saget = " << hexString(subalpha.get()) << endl;
-       }
-        Ana::write(fn.string(), alpha);
-    }
-//     }
-    
-    
+     
 }
 
 

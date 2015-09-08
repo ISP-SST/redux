@@ -78,6 +78,15 @@ namespace redux {
             
             void addPSF(redux::util::Array<float>& out);
             redux::util::Array<double> getPSF(void);
+            
+            template <typename T>
+            redux::util::Array<T> convolveImage(const redux::util::Array<T>& im) { return std::move(OTF.convolve(im)); }
+            
+            template <typename T>
+            redux::util::Array<T> residual(const redux::util::Array<T>& im) { return std::move(OTF.convolve(im)-img); }
+            template <typename T>
+            redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) { return std::move(cim-img); }
+            
             void setWaveFront( std::shared_ptr<WaveFront> w ) { wf = w; };
             
             void update(bool newVogel=false);

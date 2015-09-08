@@ -50,11 +50,6 @@ namespace redux {
             PointF residualOffset;                              //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
             /*************************/
             
-            /********* Output ********/
-            redux::util::Array<float> alpha;                    //!< Mode coefficients  (nImages x nModes)
-            /*************************/
-            
-            
             uint64_t size(void) const;
             uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
             uint64_t unpack(const char*, bool);
@@ -81,8 +76,14 @@ namespace redux {
             
             std::vector<ChannelData> channels;
             
-            redux::util::Array<float> img;              //! (deconvolved) image to be returned to the master
-            redux::util::Array<float> psf;              //! PSF, if requested. 1 per object if PSF_AVG, otherwise nImages
+            /********* Results ********/
+            redux::util::Array<float> img;              //!< Restored image.
+            redux::util::Array<float> psf;              //!< PSFs.               ((1|nImages) x nPixels x nPixels)
+            redux::util::Array<float> cobj;             //!< Convolved objects.  (nImages x nPixels x nPixels)
+            redux::util::Array<float> res;              //!< Residuals.          (nImages x nPixels x nPixels)
+            redux::util::Array<float> alpha;            //!< Mode coefficients   (nImages x nModes)
+            redux::util::Array<float> div;              //!< Diversity           (nCh x pupilPixels x pupilPixels)
+            /**************************/
             
         };
 

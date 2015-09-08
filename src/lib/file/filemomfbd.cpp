@@ -102,7 +102,7 @@ uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, c
         resPos = file.tellg();
         tmpSize = nres * nPixelsX * nPixelsY * sizeof ( float );
         patchSize += tmpSize;
-        file.seekg ( tmpSize );
+        file.seekg ( tmpSize, ios_base::cur );
     }
 
     nalpha = nm = 0;
@@ -315,8 +315,6 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
         }
     }
     
-    nphx = nPixelsX / 2;
-    nphy = nPixelsY / 2;
     if( !(writeMask&MOMFBD_DIV) ) ndiv = 0;
     if ( version >= 20100726.0 ) {  // check if this is a version that can have div info...
         writeOrThrow ( file, &ndiv, 1, "FileMomfbd:ndiv" );
@@ -330,7 +328,7 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
                 for( int d=0; d<ndiv; ++d ) {
                     char typ=0;             // TODO: "real" type
                     writeOrThrow ( file, &typ, 1, "MomfbdPatch:div-typ" );   // just discard div-type for now.
-                    writeOrThrow ( file, fPtr, nphy*nphx*sizeof(float), "MomfbdPatch:div" );
+                    writeOrThrow ( file, fPtr, nphy*nphx, "MomfbdPatch:div" );
                     fPtr += nphy*nphx;
                 }
             } else {

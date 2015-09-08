@@ -4,6 +4,7 @@
 #include "redux/momfbd/object.hpp"
 
 #include "redux/file/fileana.hpp"
+#include "redux/logger.hpp"
 #include "redux/util/datautil.hpp"
 
 #include <algorithm>
@@ -412,7 +413,7 @@ namespace {
 
 void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
   //  unique_lock<mutex> lock (gmtx);
-  //  cout << "SubImage::setAlphas()  " << printArray(modes,"modes") << printArray(a,modes.size(),"alphas") << endl;
+    //LOG_TRACE << "SubImage::setAlphas(" << hexString(this) << ")  " << printArray(a,modes.size(),"alphas");
     int cnt=0;
     for (auto & m : modes) {
         //if( m > 2 ) {
@@ -426,10 +427,10 @@ void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
 
 void SubImage::getAlphas(float* alphas) const {
     size_t cnt (0);
-    for (auto& it: currentAlpha) {
+    for (auto& it: alpha) {
         alphas[cnt++] = it.second;
     }
-   // cout << "SubImage::getAlphas(" << hexString(this) << ")  " << printArray(alphas,alpha.size(),"alphas") << endl;
+    //LOG_TRACE << "SubImage::getAlphas(" << hexString(this) << ")  " << printArray(alphas,alpha.size(),"alphas");
 }
 
 
