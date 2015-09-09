@@ -750,10 +750,17 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     info->fileNames.clear();
     for (int i = 0; i < nChannels; ++i) {
         channels[i]->getFileNames(info->fileNames);
-        info->clipStartX.get() [ i ] = channels[i]->alignClip[0];
-        info->clipEndX.get() [ i ] = channels[i]->alignClip[1];
-        info->clipStartY.get() [ i ] = channels[i]->alignClip[2];
-        info->clipEndY.get() [ i ] = channels[i]->alignClip[3];
+        if(channels[i]->alignClip.empty()) {
+            Point16 sz = channels[i]->getImageSize();
+            info->clipStartX.get()[i] = info->clipStartY.get()[i] = 1;
+            info->clipEndX.get()[i] = sz.x;
+            info->clipEndY.get()[i] = sz.y;
+        } else {
+            info->clipStartX.get()[i] = channels[i]->alignClip[0];
+            info->clipEndX.get()[i] = channels[i]->alignClip[1];
+            info->clipStartY.get()[i] = channels[i]->alignClip[2];
+            info->clipEndY.get()[i] = channels[i]->alignClip[3];
+        }
     }
     info->nPH = pupilPixels;
 
@@ -767,7 +774,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     if( saveMask & SF_SAVE_RESIDUAL ) writeMask |= MOMFBD_RES;
     if( saveMask & SF_SAVE_ALPHA ) writeMask |= MOMFBD_ALPHA;
     if( saveMask & SF_SAVE_DIVERSITY ) writeMask |= MOMFBD_DIV;
-
+    
     Array<float> modes;
     if ( writeMask&MOMFBD_MODES ) {     // copy modes from local cache
         double pupilRadiusInPixels = pupilPixels / 2.0;
