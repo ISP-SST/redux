@@ -52,7 +52,7 @@ namespace redux {
            
             
             void clear(void);
-            void resetAlpha(void);
+            void getAlpha(void);
            // PatchResult::Ptr& getResult(void);
             
             void dump( std::string tag );
@@ -62,12 +62,16 @@ namespace redux {
             const MomfbdJob& job;
             
             redux::util::Array<double> window, noiseWindow;
-            size_t nFreeParameters;
-            std::shared_ptr<double> alpha, grad_alpha,saved_alpha;
-            gsl_vector *beta, *grad_beta, *beta_init;
-            gsl_vector alpha_init;
             
-            grad_t gradient;
+            uint16_t nModes;
+            uint32_t nParameters;
+            uint32_t nFreeParameters;
+            
+            uint16_t *modeNumbers;
+            uint16_t *enabledModes;
+            double *alpha,*grad_alpha;
+            
+            grad_t gradientMethod;
             
         };
 

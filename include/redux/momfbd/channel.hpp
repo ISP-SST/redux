@@ -47,7 +47,7 @@ namespace redux {
             void getFileNames(std::vector<std::string>&) const;
             size_t nImages(void) const { return images.size(); } 
             void getPatchData(ChannelData&, const PatchData&) const;
-            void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
+            
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
@@ -96,6 +96,7 @@ namespace redux {
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
+            bpx::ptime startT, endT;
             /*****************************************************/
             
             /*************   Local variables for   ***************/
@@ -115,6 +116,7 @@ namespace redux {
             double frequencyCutoff, pupilRadiusInPixels;
 
             uint16_t ID;
+            Point16 imgSize;
             Object& myObject;
             MomfbdJob& myJob;
 

@@ -139,11 +139,6 @@ size_t Object::nImages(void) const {
 }
 
 
-void Object::calcPatchPositions(const std::vector<uint16_t>& y, const std::vector<uint16_t>& x) {
-    for( shared_ptr<Channel>& ch : channels ) ch->calcPatchPositions(y,x);
-}
-
-
 void Object::initProcessing( WorkSpace::Ptr ws ) {
     //cout << "Object::initProcessing(" << hexString(this) << ")" << endl;
     if( patchSize && pupilPixels ) {
@@ -215,14 +210,22 @@ void Object::getResults(ObjectData& od) {
         uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
         od.psf.resize(nPSF, patchSize, patchSize);
         od.psf.zero();
+        size_t nElements = patchSize*patchSize;
         if( nPSF > 1 ) {
             Array<float> view(od.psf,0,0,0,patchSize-1,0,patchSize-1);
+            static int count(0);
+            int count2(0);
             for( shared_ptr<Channel>& ch: channels) {
                 for ( shared_ptr<SubImage>& si: ch->subImages) {
-                    view = si->getPSF();
+                    Array<complex_t> psf = si->getPSF<complex_t>();
+                    //memcpy(view.ptr(), psf.get(), nElements*sizeof(float));
+                    view.assign(psf); //si->getPSF());
+                    //Ana::write("psf_"+to_string(count)+"_"+to_string(count2)+".f0", psf);
+                    //Ana::write("psf_cube_"+to_string(count)+"_"+to_string(count2++)+".f0", od.psf);
                     view.shift(0,1);
                 }
             }
+            count++;
         } else if( nPSF == 1 ) {
             for( shared_ptr<Channel>& ch: channels) {
                 for ( shared_ptr<SubImage>& si: ch->subImages) {
@@ -241,7 +244,7 @@ void Object::getResults(ObjectData& od) {
             Array<float> view(od.cobj,0,0,0,patchSize-1,0,patchSize-1);
             for( shared_ptr<Channel>& ch: channels) {
                 for ( shared_ptr<SubImage>& si: ch->subImages) {
-                    view = si->convolveImage(od.img);
+                    view.assign(si->convolveImage(od.img));
                     view.shift(0,1);
                 }
             }
@@ -260,7 +263,7 @@ void Object::getResults(ObjectData& od) {
                 Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1);
                 for( shared_ptr<Channel>& ch: channels) {
                     for ( shared_ptr<SubImage>& si: ch->subImages) {
-                        view = si->convolvedResidual(cview);
+                        view.assign(si->convolvedResidual(cview));
                         view.shift(0,1);
                         cview.shift(0,1);
                     }
@@ -268,7 +271,7 @@ void Object::getResults(ObjectData& od) {
             } else {
                 for( shared_ptr<Channel>& ch: channels) {
                     for ( shared_ptr<SubImage>& si: ch->subImages) {
-                        view = si->residual(od.img);
+                        view.assign(si->residual(od.img));
                         view.shift(0,1);
                     }
                 }
@@ -342,6 +345,16 @@ void Object::addToFT( const redux::image::FourierTransform& ft, double rg ) {
     for (size_t ind = 0; ind < ftSum.nElements(); ++ind) {
         ftsPtr[ind] += norm (ftPtr[ind]);
     }
+}
+
+
+void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft, double rg ) {
+    unique_lock<mutex> lock( mtx );
+    reg_gamma += 0.10*rg;///nImages;
+    const complex_t* oftPtr = oldft.get();
+    transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
+              [&oftPtr](const double& a, const complex_t& b) { return a+norm(b)-norm(*oftPtr++); }
+             );
 }
 
 
@@ -541,12 +554,44 @@ void Object::loadData( boost::asio::io_service& service ) {
         ch->loadData( service );
     }
 }
+/*
+Point16 Object::getImageSize (void) {
+    if( imgSize == 0 ) {
+        for (shared_ptr<Channel>& ch : channels) {
+            Point16 tmp = ch->getImageSize();
+            if (imgSize == 0) {
+                imgSize = tmp;
+            } else if (tmp != imgSize) {
+                throw std::logic_error ("The images have different sizes for the different channels, please verify the ALIGN_CLIP values.");
+            }
+        }
+    }
+    return imgSize;
+}
+*/
+
 
 
 void Object::preprocessData (boost::asio::io_service& service) {
     nObjectImages = nImages();
+    startT = bpx::pos_infin;
+    endT = bpx::neg_infin;
+    alphaToPixels = 0;
+    pixelsToAlpha = 0;
+    int count(0);
     for (shared_ptr<Channel>& ch : channels) {
         ch->preprocessData (service);
+        if(startT.is_special()) startT = ch->startT;
+        else startT = std::min(startT,ch->startT);
+        if(endT.is_special()) endT = ch->endT;
+        else endT = std::max(endT,ch->endT);
+        alphaToPixels += ch->alphaToPixels;
+        pixelsToAlpha += ch->pixelsToAlpha;
+        count++;
+    }
+    if( count ) {
+        alphaToPixels /= count;
+        pixelsToAlpha /= count;
     }
 }
 
@@ -740,8 +785,18 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     info->version = atof (info->versionString.c_str());
 
     info->dateString = myJob.observationDate;
-    info->timeString = "FIXME";
-
+    if(startT.is_special() && endT.is_special()) {
+        info->timeString = "N/A";
+    } else if(startT.is_special()) {
+        info->timeString = bpx::to_simple_string(endT.time_of_day());
+    } else if(endT.is_special()) {
+        info->timeString = bpx::to_simple_string(startT.time_of_day());
+    } else {
+        bpx::time_duration obs_interval = (endT - startT);
+        info->timeString = bpx::to_simple_string((startT+obs_interval/2).time_of_day());
+    }
+    
+    
     int32_t nChannels = info->nChannels = channels.size();
     info->clipStartX = sharedArray<int16_t> (nChannels);
     info->clipEndX = sharedArray<int16_t> (nChannels);
@@ -801,10 +856,9 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
         }
     }
 
-    /*
-    info->pix2cf = pix2cf;              // FIXME
-    info->cf2pix = cf2pix;
-    */
+    
+    info->pix2cf = pixelsToAlpha;
+    info->cf2pix = alphaToPixels;
     info->nPatchesY = patchesData.dimSize (0);
     info->nPatchesX = patchesData.dimSize (1);
     info->patches.resize(info->nPatchesX, info->nPatchesY);
@@ -816,10 +870,10 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
             patchesData(y,x)->cacheLoad(true);
-            info->patches(x,y).region[0] = patchesData(y,x)->roi.first.x;
-            info->patches(x,y).region[1] = patchesData(y,x)->roi.last.x;
-            info->patches(x,y).region[2] = patchesData(y,x)->roi.first.y;
-            info->patches(x,y).region[3] = patchesData(y,x)->roi.last.y;
+            info->patches(x,y).region[0] = patchesData(y,x)->roi.first.x+1;         // store as 1-based indices
+            info->patches(x,y).region[1] = patchesData(y,x)->roi.last.x+1;
+            info->patches(x,y).region[2] = patchesData(y,x)->roi.first.y+1;
+            info->patches(x,y).region[3] = patchesData(y,x)->roi.last.y+1;
             info->patches(x,y).nChannels = nChannels;
             info->patches(x,y).nim = sharedArray<int32_t> (nChannels); //dummy;
             info->patches(x,y).dx = sharedArray<int32_t> (nChannels); //dummy;
@@ -934,27 +988,22 @@ size_t Object::sizeOfPatch (uint32_t npixels) const {
 
 
 Point16 Object::getImageSize (void) {
-    Point16 sizes;
-    for (shared_ptr<Channel>& ch : channels) {
-        Point16 tmp = ch->getImageSize();
-        if (sizes.x == 0) {
-            sizes = tmp;
-        } else if (tmp != sizes) {
-            throw std::logic_error ("The images have different sizes for the different channels, please verify the ALIGN_CLIP values.");
+    if( imgSize == 0 ) {
+        for (shared_ptr<Channel>& ch : channels) {
+            Point16 tmp = ch->getImageSize();
+            if (imgSize == 0) {
+                imgSize = tmp;
+            } else if (tmp != imgSize) {
+                throw std::logic_error ("The images have different sizes for the different channels, please verify the ALIGN_CLIP values.");
+            }
         }
     }
-    return sizes;
+    return imgSize;
 }
 
 
 void Object::dump (std::string tag) {
-//    cout << "Dumping object  #" << ID << "  this=" << hexString (this) << " with tag=" << tag << endl;
-    tag += "_obj_" + to_string (ID);
     Ana::write (tag + "_ftsum.f0", ftSum);
     Ana::write (tag + "_q.f0", Q);
     Ana::write (tag + "_p.f0", P);
-    for (shared_ptr<Channel>& ch : channels) {
-        ch->dump (tag);
-    }
-
 }

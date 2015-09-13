@@ -26,8 +26,8 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double a
         Array<double>::operator=(1.0);
     } else {
         double** modePtr = makePointers(get(), nPoints, nPoints);
-        makeZernike_thi(modePtr,modeNumber,nPoints,r_c,angle);   //FIXME: using MvN's Zernike-generator for comparisons
-        //makeZernike_mvn(modePtr,modeNumber,nPoints,r_c,angle);
+        //makeZernike_thi(modePtr,modeNumber,nPoints,r_c,angle);   //FIXME: using MvN's Zernike-generator for comparisons
+        makeZernike_mvn(modePtr,modeNumber,nPoints,r_c,angle);
         delPointers(modePtr);
     }
 

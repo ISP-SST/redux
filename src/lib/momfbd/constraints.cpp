@@ -398,7 +398,7 @@ void Constraints::sortConstraints( bool blockwise ) {
 
 
 uint64_t Constraints::size( void ) const {
-    uint64_t sz = sizeof(nParameters) + sizeof(nConstrainedParameters);
+    uint64_t sz = sizeof(nParameters) + sizeof(nFreeParameters);
     sz += sizeof(uint64_t) + ns_entries.size()*(Point16::size()+sizeof(double));
     return sz;
 }
@@ -407,7 +407,7 @@ uint64_t Constraints::size( void ) const {
 uint64_t Constraints::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = pack( ptr, nParameters );
-    count += pack( ptr+count, nConstrainedParameters );
+    count += pack( ptr+count, nFreeParameters );
     count += pack( ptr+count, (uint64_t)ns_entries.size() );
     for(auto& it: ns_entries) {
         count += it.first.pack( ptr+count );
@@ -420,7 +420,7 @@ uint64_t Constraints::pack( char* ptr ) const {
 uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = unpack( ptr, nParameters, swap_endian );
-    count += unpack( ptr+count, nConstrainedParameters, swap_endian );
+    count += unpack( ptr+count, nFreeParameters, swap_endian );
     uint64_t nEntries;
     count += unpack( ptr+count, nEntries, swap_endian );
     while(nEntries--) {
@@ -449,7 +449,7 @@ void Constraints::init( void ) {
     parameterOrder.reset( new uint32_t[nParameters] );
     uint32_t n = 0;
     generate( parameterOrder.get(), parameterOrder.get()+nParameters, [&] { return n++; } );
-
+    
     if( nParameters ) {
         
         //const vector<shared_ptr<Object>>& objects = job.getObjects();
@@ -506,7 +506,7 @@ void Constraints::init( void ) {
 
         //cout << "Constraints::Constraints()  " << constraints.size() << "x" << nParameters << endl;
         
-        nConstrainedParameters = nParameters - constraints.size();
+        nFreeParameters = nParameters - constraints.size();
 
         //dump( "constraints" );
 
@@ -574,11 +574,11 @@ Array<int16_t> Constraints::getMatrix( void ) const {
 Array<double> Constraints::getNullMatrix( void ) const {
 
     //uint32_t nConstraints = constraints.size();
-    if( nConstrainedParameters == 0 || nParameters == 0 ) {
+    if( nFreeParameters == 0 || nParameters == 0 ) {
         return Array<double>();
     }
 
-    Array<double> ns( nParameters, nConstrainedParameters );
+    Array<double> ns( nParameters, nFreeParameters );
     ns.zero();
     
     for( auto &it: ns_entries ) {

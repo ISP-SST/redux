@@ -74,7 +74,6 @@ namespace redux {
             void preProcess( boost::asio::io_service& );
             void initCache( void );
             void initPatchData( PatchData::Ptr );
-            void runMain( WorkSpace& );
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             void postProcess( boost::asio::io_service& );
 

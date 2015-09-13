@@ -3,6 +3,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/object.hpp"
 #include "redux/momfbd/subimage.hpp"
+#include "redux/momfbd/util.hpp"
 #include "redux/momfbd/wavefront.hpp"
 
 #include "redux/constants.hpp"
@@ -96,6 +97,7 @@ namespace {
             redux::file::readFile(filename, img);
             
             LOG_DEBUG << boost::format ("Loaded file \"%s\"  (%s)") % filename % printArray(clip,"clip");
+ 
             if( clip.size() == 4 ) {
                 bool flipX = false, flipY = false;
                 vector<int16_t> alignClip = clip;
@@ -129,6 +131,7 @@ namespace {
                     if (flipY) reverseY(imgPtr, sy, sx);
                 }
             }
+
         }
 
         template <typename T>
@@ -485,6 +488,7 @@ void Channel::initCache (void) {
 
     //LOG_DETAIL << "wavelength = " << myObject.wavelength << "   patchSize = " << patchSize << "  telescopeD = " << myJob.telescopeD << "  arcSecsPerPixel = " << arcSecsPerPixel;
     calculatePupilSize (frequencyCutoff, pupilRadiusInPixels, pupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel);
+    
     myJob.patchSize = myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
     myJob.pupilPixels = myObject.pupilPixels = pupilPixels;
     size_t otfPixels = 2 * pupilPixels;
@@ -522,6 +526,7 @@ void Channel::initCache (void) {
 
     Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
 
+    bool needTiltCoeffs(false);
     for (uint i = 0; i < diversityModes.size(); ++i) {
         uint16_t modeNumber = diversityModes[i];
         Cache::ModeID id2 = id;
@@ -534,6 +539,7 @@ void Channel::initCache (void) {
 
     for (uint16_t & it : myJob.modeNumbers) {
         Cache::ModeID id2 = id;
+        if(it == 2 || it == 3) needTiltCoeffs = true;
         if (myJob.modeBasis == ZERNIKE || it == 2 || it == 3) {     // force use of Zernike modes for all tilts
             id2.firstMode = id2.lastMode = 0;
         }
@@ -542,6 +548,18 @@ void Channel::initCache (void) {
         modes.emplace (it, myJob.globalData->fetch (id2));
     }
 
+    if( needTiltCoeffs ) {
+        id.firstMode = id.lastMode = 0;
+        id.modeNumber = 2;
+        const PupilMode::Ptr mode = myJob.globalData->fetch (id);
+        double dxdp = (*mode)(pupilPixels/2,pupilPixels/2+1) - (*mode)(pupilPixels/2,pupilPixels/2);
+        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*dxdp);
+        alphaToPixels = 1.0/pixelsToAlpha;
+    }
+    
+    defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
+    alphaToDefocus = 1.0/pixelsToAlpha;
+    
 }
 
 
@@ -627,8 +645,6 @@ void Channel::loadData (boost::asio::io_service& service) {
 
     size_t nImages = imageNumbers.size();
     if (nImages) {
-        images.resize(nImages);
-        imageStats.resize(nImages);
         for (size_t i = 0; i < nImages; ++i) {
             imageStats[i].reset (new ArrayStats());
             service.post( [this,i](){
@@ -637,9 +653,7 @@ void Channel::loadData (boost::asio::io_service& service) {
                         imageStats[i]->getStats(myJob.borderClip, images[i], ST_VALUES);  // only get min/max/mean
                        });
         }
-    } else  {
-        images.resize(1);
-        imageStats.resize(1);
+    } else {            // No numbers, load template as single file
         imageStats[0].reset (new ArrayStats());
         service.post( [this](){
                     bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
@@ -654,14 +668,21 @@ void Channel::loadData (boost::asio::io_service& service) {
 
 void Channel::preprocessData (boost::asio::io_service& service) {
 
-    size_t nImages = imageNumbers.size();
+    size_t nImages = images.size();
     if( nImages ) {
         double avgMean = 0.0;
+        startT = bpx::pos_infin;
+        endT = bpx::neg_infin;
         for (size_t i = 0; i < nImages; ++i) {
             avgMean += imageStats[i]->mean;
+            if(images[i].meta) {
+                if(startT.is_special()) startT = images[i].meta->getStartTime();
+                else startT = std::min(startT,images[i].meta->getStartTime());
+                if(endT.is_special()) endT = images[i].meta->getEndTime();
+                else endT = std::max(endT,images[i].meta->getEndTime());
+            }
         }
         avgMean /= static_cast<double> (nImages);
-
         for (size_t i = 0; i < nImages; ++i) {
             service.post(std::bind (&Channel::preprocessImage, this, i, avgMean));
         }
@@ -869,11 +890,13 @@ void Channel::preprocessImage (size_t index, double avgMean) {
     double imgMean = imageStats[index]->mean;
     bool modified = false;
 
-    Image<double> tmpImg;
-    images[index].copy(tmpImg);
+    Array<double> tmpImg;
+    tmpImg = images[index].copy<double>();
+    //images[index].copy(tmpImg);
     bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
     LOG_TRACE << boost::format ("Pre-processing image %s") % fn;
-    
+    redux::file::Ana::write(fn.string()+"_raw.f0", images[index]);
+    redux::file::Ana::write(fn.string()+"_copy.f0", tmpImg);
     // Michiel's method for detecting bitshifted Sarnoff images.
     if (imgMean > 4 * avgMean) {
         LOG_WARN << boost::format ("Image bit shift detected for image %s (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!") % fn;
@@ -898,12 +921,20 @@ void Channel::preprocessImage (size_t index, double avgMean) {
             LOG_WARN << boost::format ("Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!") % printArray (ccdResponse.dimensions(), "") % printArray (tmpImg.dimensions(), "");
             ccdResponse.resize();
         }
-
-        tmpImg -= dark;
+        double n;
+        if(dark.meta && ((n=dark.meta->getNumberOfFrames()) > 1)) {
+            tmpImg.subtract(dark,1.0/n);
+        } else {
+            tmpImg -= dark;
+        }
+        //tmpImg -= reinterpret_cast<const redux::util::Array<float>&>(dark);
         modified = true;
+    redux::file::Ana::write(fn.string()+"_dark.f0", dark);
+    redux::file::Ana::write(fn.string()+"_dark2.f0", reinterpret_cast<redux::util::Array<float>&>(dark));
+    redux::file::Ana::write(fn.string()+"_darked.f0", tmpImg);
         
         if (ccdResponse.valid()) {   // correct for the detector response (this should not contain the gain correction and must be done before descattering)
-            tmpImg *= ccdResponse;
+            //tmpImg *= ccdResponse;
         }
 
         if (ccdScattering.valid() && psf.valid()) {           // apply backscatter correction
@@ -917,6 +948,10 @@ void Channel::preprocessImage (size_t index, double avgMean) {
         }
 
         tmpImg *= gain;
+        //tmpImg *= gain;
+        //tmpImg *= reinterpret_cast<const redux::util::Array<float>&>(gain);
+    redux::file::Ana::write(fn.string()+"_gain.f0", gain);
+    redux::file::Ana::write(fn.string()+"_gained.f0", tmpImg);
 
         namespace sp = std::placeholders;
         size_t sy = tmpImg.dimSize(0);
@@ -944,6 +979,7 @@ void Channel::preprocessImage (size_t index, double avgMean) {
         }
 
     }
+    redux::file::Ana::write(fn.string()+"_filled.f0", tmpImg);
 
     imageStats[index]->getStats(myJob.borderClip, tmpImg);     // get stats for corrected data
     tmpImg.copy(images[index]);
@@ -953,8 +989,6 @@ void Channel::preprocessImage (size_t index, double avgMean) {
         LOG_DETAIL << boost::format ("Saving flat/dark corrected file %s") % fn.string();
         redux::file::Ana::write (fn.string(), images[index]);   // TODO: other formats
     }
-
-
 
 }
 
@@ -1018,15 +1052,7 @@ void Channel::getPatchData (ChannelData& chData, const PatchData& patch) const {
 
 }
 
-
-void Channel::calcPatchPositions (const std::vector<uint16_t>& y, const std::vector<uint16_t>& x) {
-    // For now just copy the anchor positions.
-    // TODO: use calibration to map the pixelcoordinates for each channel to allow for non-identical hardware & image scales in different objects/channels.
-    subImagePosY = y;
-    subImagePosX = x;
-}
-
-
+/*
 Point16 Channel::getImageSize(void) {
 
     Point16 ret(0,0);

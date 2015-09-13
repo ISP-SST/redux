@@ -320,7 +320,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
 
 
 uint64_t ChannelCfg::size(void) const {
-    uint64_t sz = 6*sizeof(double);          // telescopeF, arcSecsPerPixel, pixelSize, rotationAngle, weight, noiseFudge
+    uint64_t sz = 10*sizeof(double);          // telescopeF, arcSecsPerPixel, pixelSize, rotationAngle, alphaToPixels, pixelsToAlpha, alphaToDefocus, defocusToAlpha, weight, noiseFudge
     sz += 5*sizeof(uint16_t)+3;             // borderClip, maxLocalShift, minimumOverlap, patchSize, pupilSize, incomplete, mmRow, mmWidth
     sz += sizeof(uint32_t);                 // imageNumberOffset
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
@@ -348,6 +348,10 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, arcSecsPerPixel);
     count += pack(ptr+count, pixelSize);
     count += pack(ptr+count, rotationAngle);
+    count += pack(ptr+count, alphaToPixels);
+    count += pack(ptr+count, pixelsToAlpha);
+    count += pack(ptr+count, alphaToDefocus);
+    count += pack(ptr+count, defocusToAlpha);
     count += pack(ptr+count, noiseFudge);
     count += pack(ptr+count, weight);
     count += pack(ptr+count, diversity);
@@ -390,6 +394,10 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, arcSecsPerPixel, swap_endian);
     count += unpack(ptr+count, pixelSize, swap_endian);
     count += unpack(ptr+count, rotationAngle, swap_endian);
+    count += unpack(ptr+count, alphaToPixels, swap_endian);
+    count += unpack(ptr+count, pixelsToAlpha, swap_endian);
+    count += unpack(ptr+count, alphaToDefocus, swap_endian);
+    count += unpack(ptr+count, defocusToAlpha, swap_endian);
     count += unpack(ptr+count, noiseFudge, swap_endian);
     count += unpack(ptr+count, weight, swap_endian);
     count += unpack(ptr+count, diversity, swap_endian);

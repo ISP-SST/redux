@@ -46,58 +46,43 @@ namespace redux {
             void setPath(const std::string&);
             template<class T>
             static int erase(const T& entry) {
-                Cache& c = get();
-                auto& s = c.getSet<T>();
-                int ret = s.erase(entry);
-                //if ( ret ) std::cout << "Cache::get<T>(): erased value " << entry << "  new sSize = " << s.size() << printArray(s,"set") << std::endl; 
+                auto s = get().getSet<T>();
+                int ret = s.second.erase(entry);
                 return ret;
-                
             }
             template<class KeyT, class T>
             static int erase(const T& key) {
-                Cache& c = get();
-                auto& m = c.getMap<KeyT,T>();
-                int ret = m.erase(key);
-                //if ( ret ) std::cout << "Cache::get<T>(): erased value " << entry << "  new sSize = " << s.size() << printArray(s,"set") << std::endl; 
+                auto m = get().getMap<KeyT,T>();
+                int ret = m.second.erase(key);
                 return ret;
-                
             }
             template<class KeyT, class T>
             static T& get(const KeyT& key, const T& val) {
-                Cache& c = get();
-                auto& m = c.getMap<KeyT,T>();
-                auto ret = m.emplace(key,val);
-                //std::cout << "CacheItem::get<KeyT,T>(): returning item " << hexString(ret.first->second.get()) << "   mSize = " << m.size() << std::endl; 
+                auto m = get().getMap<KeyT,T>();        // m.first is a unique_lock for the map in m.second
+                auto ret = m.second.emplace(key,val);
                 return ret.first->second;
-                
             }
             template<class T>
             static const std::shared_ptr<T>& get(const std::shared_ptr<T>& entry) {
-                Cache& c = get();
-                auto& s = c.getSet<std::shared_ptr<T>,ptrcomp>();
-                auto ret = s.emplace(entry);
-                //std::cout << "Cache::get<T>(): returning ptr " << hexString(ret.first->get()) << "   sSize = " << s.size() << std::endl; 
+                auto s = get().getSet<std::shared_ptr<T>,ptrcomp>();
+                auto ret = s.second.emplace(entry);
                 return *ret.first;
-                
             }
             template<class T>
             static const T& get(const T& entry) {
-                Cache& c = get();
-                auto& s = c.getSet<T>();
-                auto ret = s.emplace(entry);
-               // if ( ret.second ) std::cout << "Cache::get<T>(): inserted value " << *ret.first << "  new sSize = " << s.size() << printArray(s,"set") << std::endl; 
+                auto s = get().getSet<T>();
+                auto ret = s.second.emplace(entry);
                 return *ret.first;
-                
             }
             template<class KeyT, class T>
             void clear(void) {
-                auto& m = getMap<KeyT,T>();
-                m.clear();
+                auto m = getMap<KeyT,T>();
+                m.second.clear();
             }
             template<class T>
             void clear(void) {
-                auto& s = getSet<T>();
-                s.clear();
+                auto s = getSet<T>();
+                s.second.clear();
             }
             /*template<class T, class KeyT, class... Args>
             static std::shared_ptr<T>& get(const KeyT& key, Args... args) {
@@ -109,30 +94,36 @@ namespace redux {
                 
             }*/
             template<class KeyT, class T>
-            std::map<KeyT,T>& getMap(void) {
+            std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> getMap(void) {
                 static std::map<KeyT,T>& m = initMap<KeyT,T>();
-                return m;
+                static std::mutex mtx;
+                std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> ret(std::unique_lock<std::mutex>(mtx),m);
+                return std::move(ret);
             }
             template<class T, class U=std::less<T>>
-            std::set<T,U>& getSet(void) {
+            std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> getSet(void) {
                 static std::set<T,U>& s = initSet<T,U>();
-                return s;
+                static std::mutex mtx;
+                std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> ret(std::unique_lock<std::mutex>(mtx),s);
+                return std::move(ret);
             }
 
         private:
             Cache(){};
             template<class KeyT, class T>
-            void mapMaintenance(std::map<KeyT,T>& m) {
-                std::cout << "mapMaintenance:  &m = " << redux::util::hexString(&m) << "   m.sz = " << m.size() << std::endl;
+            void mapMaintenance(void) {
+                auto m = getMap<KeyT,T>();
+                std::cout << "mapMaintenance:  &m = " << redux::util::hexString(&m.second) << "   m.sz = " << m.second.size() << std::endl;
             }
             template<class T, class U>
-            void setMaintenance(std::set<T,U>& s) {
-                std::cout << "setMaintenance:  &m = " << redux::util::hexString(&s) << "   s.sz = " << s.size() << std::endl;
+            void setMaintenance(void) {
+                auto s = getSet<T,U>();
+                std::cout << "setMaintenance:  &m = " << redux::util::hexString(&s.second) << "   s.sz = " << s.second.size() << std::endl;
             }
             template<class KeyT, class T>
             std::map<KeyT,T>& initMap(void) {       // called only once when a new KeyT/T pair is used.
                 static std::map<KeyT,T> m;
-                std::function<void(void)> func = std::bind(&Cache::mapMaintenance<KeyT,T>,this,std::ref(m));
+                std::function<void(void)> func = std::bind(&Cache::mapMaintenance<KeyT,T>,this);
                 std::unique_lock<std::mutex> lock(cacheMutex);
                 funcs.push_back(func);
                 return m;
@@ -140,7 +131,7 @@ namespace redux {
             template<class T, class U>
             std::set<T,U>& initSet(void) {       // called only once when a new KeyT/T pair is used.
                 static std::set<T,U> s;
-                std::function<void(void)> func = std::bind(&Cache::setMaintenance<T,U>,this,std::ref(s));
+                std::function<void(void)> func = std::bind(&Cache::setMaintenance<T,U>,this);
                 std::unique_lock<std::mutex> lock(cacheMutex);
                 funcs.push_back(func);
                 return s;

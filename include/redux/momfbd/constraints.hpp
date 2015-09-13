@@ -110,7 +110,7 @@ namespace redux {
             uint64_t unpack (const char*, bool);
             
             template <typename T> void apply(const T* in, T* out) const {
-                memset(out,0,nConstrainedParameters*sizeof(T));
+                memset(out,0,nFreeParameters*sizeof(T));
                 for( auto& it: ns_entries ) {
                     out[it.first.x] += it.second * in[it.first.y];
                 }
@@ -144,10 +144,9 @@ namespace redux {
             bool blockified;
 
             uint32_t nParameters;
-            uint32_t nConstrainedParameters;
-            //std::vector<uint32_t> parameterOrder;
+            uint32_t nFreeParameters;
             std::unique_ptr<uint32_t[]> parameterOrder;
-            std::map<redux::Point16, double> ns_entries;  //!< (row,col) and value of (non-zero) nullspace-matrix elements
+            std::map<redux::Point16, double> ns_entries;        //!< (row,col) and value of (non-zero) nullspace-matrix elements
 
         };
 

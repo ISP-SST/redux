@@ -42,7 +42,6 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             
             size_t nImages(void) const;
-            void calcPatchPositions(const std::vector<uint16_t>&, const std::vector<uint16_t>&);
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };
             const MomfbdJob& getJob(void) const { return myJob; };
@@ -58,6 +57,7 @@ namespace redux {
             void initPQ(void);
             void addAllFT(void);
             void addToFT(const redux::image::FourierTransform&, double);
+            void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft, double );
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
             void slask(void);
@@ -102,7 +102,9 @@ namespace redux {
             /*****************************************************/
 
             uint16_t ID;
+            Point16 imgSize;
             uint32_t nObjectImages;
+            bpx::ptime startT, endT;
             friend class MomfbdJob;
             friend class Channel;
 

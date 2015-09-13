@@ -66,7 +66,14 @@ namespace redux {
             void addAlphas(const double* a);
             void setAlphas(const double* a);
             void setAlphas(const std::vector<uint16_t>& modes, const double* a);
-            void getAlphas(float* a) const;
+
+            template <typename T>
+            void getAlphas(T* alphas) const {
+                size_t cnt (0);
+                for (auto& it: alpha) {
+                    alphas[cnt++] = static_cast<T>(it.second);
+                }
+            }
             
             void resetPhi(redux::util::Array<double>&p) const;
             void resetPhi(void);
@@ -78,14 +85,46 @@ namespace redux {
             void calcPFOTF(redux::util::Array<complex_t>& pf, redux::util::Array<complex_t>& otf) const { calcPFOTF(pf.get(), otf.get(), phi.get()); }
             void calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiPtr) const;
             
-            void addPSF(redux::util::Array<float>& out);
-            redux::util::Array<double> getPSF(void);
+            template <typename T>
+            void addPSF(redux::util::Array<T>& out) const {
+                static int count(0);
+                redux::util::Array<T> tmp;
+                OTF.inv(tmp,redux::image::FT_REORDER);
+                out += tmp;
+            }
+
+            template <typename T=float>
+            redux::util::Array<T> getPSF (void) const {
+                using namespace redux::image;
+                redux::util::Array<T> tmp;
+                OTF.inv(tmp,FT_REORDER|FT_NORMALIZE);
+                return std::move(tmp);
+            }
+
             
             template <typename T>
-            redux::util::Array<T> convolveImage(const redux::util::Array<T>& im) { return std::move(OTF.convolve(im)); }
+            redux::util::Array<T> convolveImage(const redux::util::Array<T>& im) {
+                using namespace redux::image;
+                FourierTransform imFT(im, FT_REORDER|FT_FULLCOMPLEX|FT_NORMALIZE);
+                imFT *= OTF;
+                imFT.reorder();
+                imFT.directInverse(tmpOTF);
+                FourierTransform::reorder(tmpOTF);
+                return std::move(tmpOTF.copy<T>());
+            }
             
             template <typename T>
-            redux::util::Array<T> residual(const redux::util::Array<T>& im) { return std::move(OTF.convolve(im)-img); }
+            redux::util::Array<T> residual(const redux::util::Array<T>& im) {
+                using namespace redux::image;
+                FourierTransform imFT(im, FT_REORDER|FT_FULLCOMPLEX|FT_NORMALIZE);
+                imFT *= OTF;
+                imFT.reorder();
+                imFT.directInverse(tmpOTF);
+                FourierTransform::reorder(tmpOTF);
+                redux::util::Array<T> tmp = tmpOTF.copy<T>();
+                tmp -= img;
+                return std::move(tmp);
+            }
             template <typename T>
             redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) { return std::move(cim-img); }
             
@@ -98,6 +137,7 @@ namespace redux {
             const PointI offset;                                //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
             PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, otfSize;
+            double oldRG;
             
             Object& object;
             const Channel& channel;
@@ -111,11 +151,11 @@ namespace redux {
             bool newOTF;
             std::mutex mtx;
             
-            redux::util::Array<double> img;             //!< Working copy of the current subimage. (apodized)     size = patchSize
+            redux::util::Array<double> img,tmpImg;      //!< Working copy of the current subimage. (apodized)     size = patchSize
             redux::util::Array<double> phi,tmpPhi;      //!< Array containing the phase of this OTF               size = pupilsize
             redux::image::FourierTransform PF;          //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
             redux::image::FourierTransform OTF,tmpOTF;  //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
-            redux::image::FourierTransform imgFT;       //!< Fourier transform of img.                            size = 2*pupilsize
+            redux::image::FourierTransform imgFT,tmpFT; //!< Fourier transform of img.                            size = 2*pupilsize
             redux::util::Array<double> vogel;           //!< used for the Vogel-method of gradient computaion     size = pupilsize
             redux::util::ArrayStats stats;
             

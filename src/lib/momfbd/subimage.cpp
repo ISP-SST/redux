@@ -6,6 +6,7 @@
 #include "redux/file/fileana.hpp"
 #include "redux/logger.hpp"
 #include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <algorithm>
 
@@ -74,49 +75,75 @@ SubImage::~SubImage (void) {
 
 
 void SubImage::init (void) {
-    
-    
-   // stats.getStats (*this, ST_VALUES );               // get statistics
 
-    string str = "SubImage::init(" + to_string (index) + "):  mean=" + to_string (stats.mean);
-
-    auto wit = window.begin();
-    auto nwit = noiseWwindow.begin();
-    Array<float>::const_iterator dit = this->begin();
+    memcpy(tmpFT.get(),imgFT.get(),imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
+    
+    copy(img);                                                                                  // copy current cut-out to (double) working copy.
+    stats.getStats(img, ST_VALUES);                                                             // get statistics before windowing
+    double avg = stats.mean;
+    string str = "init(" + to_string(index) + "): mean1=" + to_string (stats.mean);
+    
+    transform(img.get(), img.get()+img.nElements(), window.get(), img.get(),
+              [avg](const double& a, const double& b) { return (a-avg)*b+avg; }
+             );
+    
+    stats.getStats(img, ST_VALUES | ST_RMS);                                                    // get statistics after windowing
+    str += " mean2=" + to_string (stats.mean) + " std=" + to_string (stats.stddev);
+    avg = stats.mean;
+    transpose(img.get(),imgSize,imgSize);                                                       // to match MvN
+    
     size_t noiseSize = noiseWwindow.dimSize(0);
-
-    for (auto & iit : img) {                    // windowing: subtract and re-add mean afterwards
-        iit = static_cast<int16_t>(*dit++);     // FIXME: this cast is just to mimic old momfbd code for testing.
-    }
-
-     stats.getStats(img, ST_VALUES);               // get statistics before windowing
-     double avg = stats.mean;
-    dit = this->begin();
-    for (auto & iit : img) {                    // windowing: subtract and re-add mean afterwards
-        iit = (static_cast<int16_t>(*dit++) - avg) * *wit++ + avg;
-    }
-    stats.getStats(img, ST_VALUES | ST_RMS);               // get statistics after windowing
-
-    transpose(img.get(),imgSize,imgSize);     // to match MvN
-
- //   Ana::write("img_windowed"+to_string(cnt)+".f0", img);
-    if (imgSize == noiseSize) {                                                       // imgSize = 2*pupilSize
-        Array<double> tmp = img.copy();
-        tmp -= stats.mean;
-        tmp *= noiseWwindow;
-        //imgFT.reset(tmp.get(), imgSize, imgSize, FT_FULLCOMPLEX|FT_NORMALIZE );   // full-complex for now, perhaps half-complex later for performance
-  //  Ana::write("img_noise"+to_string(cnt)+".f0", tmp);
-
-        stats.getStats(tmp,ST_NOISE);
-    } else {                                                                        // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
+    if (imgSize == noiseSize) {
+        img.copy(tmpImg);
+        transform(tmpImg.get(), tmpImg.get()+tmpImg.nElements(), noiseWwindow.get(), tmpImg.get(),
+                [avg](const double& a, const double& b) { return (a-avg)*b; }
+                );
+        stats.getNoise(tmpImg);
+    } else {
         size_t offset = (imgSize-noiseSize) / 2;
         Array<double> tmp(img, offset, offset+noiseSize-1, offset ,offset+noiseSize-1);
         tmp.trim();
-        tmp -= stats.mean;
-        tmp *= noiseWwindow;
-        //imgFT.reset (tmp.get(), noiseSize, noiseSize, FT_FULLCOMPLEX|FT_NORMALIZE );   // full-complex for now, perhaps half-complex later for performance
-        stats.getStats(tmp,ST_NOISE);
+        transform(tmp.get(), tmp.get()+tmp.nElements(), noiseWwindow.get(), tmp.get(),
+                [avg](const double& a, const double& b) { return (a-avg)*b; }
+                );
+        stats.getNoise(tmp);
     }
+    
+    if (imgSize == otfSize) {                                                                   // imgSize = 2*pupilSize
+        imgFT.reset(img.get(), imgSize, imgSize, FT_FULLCOMPLEX );                              // full-complex for now, perhaps half-complex later for performance
+    } else {                                                                                    // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
+        int offset = (otfSize - imgSize) / 2;
+        Array<double> tmp (otfSize, otfSize);
+        tmp.zero();
+        double* imgPtr = img.get();
+        double* tmpPtr = tmp.get();
+        for (int i = 0; i < imgSize; ++i) {
+            memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));
+        }
+        imgFT.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX );                             // full-complex for now, perhaps half-complex later for performance
+    }
+   
+  
+    FourierTransform::reorder (imgFT);                                                          // keep FT in centered form
+    stats.noise *= channel.noiseFudge;
+    str += " noise=" + to_string (stats.noise) + " rg=" + to_string (stats.noise/stats.stddev);
+    
+    object.addDiffToFT( imgFT, tmpFT, stats.noise/stats.stddev-oldRG );
+    oldRG = stats.noise/stats.stddev;
+    LOG_TRACE << str << (string)offsetShift;
+    
+//     auto wit = window.begin();
+//     auto nwit = noiseWwindow.begin();
+//     Array<float>::const_iterator dit = this->begin();
+// 
+// 
+//     dit = this->begin();
+//     for (auto & iit : img) {                    // windowing: subtract and re-add mean afterwards
+//         iit = (static_cast<int16_t>(*dit++) - avg) * *wit++ + avg;
+//     }
+
+
+ //   Ana::write("img_windowed"+to_string(cnt)+".f0", img);
 
    // FourierTransform::reorder(imgFT);                             // keep FT in centered form
    // Ana::write("img_noiseft"+to_string(cnt)+".f0", imgFT);
@@ -128,31 +155,10 @@ void SubImage::init (void) {
 //     }
 //     stats.getStats (img, ST_VALUES | ST_RMS);               // get statistics after windowing
 
-    str += "  avg=" + to_string (avg) + "  mean2=" + to_string (stats.mean) + "  std=" + to_string (stats.stddev) + "  sum=" + to_string (stats.sum);
-    str += "  noise=" + to_string (stats.noise) + "  rg=" + to_string (stats.noise/stats.stddev);
-    if (imgSize == otfSize) {                                                       // imgSize = 2*pupilSize
-        imgFT.reset (img.get(), imgSize, imgSize, FT_FULLCOMPLEX );   // full-complex for now, perhaps half-complex later for performance
-    } else {                                                                        // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
-        int offset = (otfSize - imgSize) / 2;
-        Array<double> tmp (otfSize, otfSize);
-        tmp.zero();
-        double* imgPtr = img.get();
-        double* tmpPtr = tmp.get();
-        for (int i = 0; i < imgSize; ++i) {
-            memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));
-        }
-        imgFT.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX );   // full-complex for now, perhaps half-complex later for performance
-    }
 
-    FourierTransform::reorder (imgFT);                             // keep FT in centered form
-    stats.noise *= channel.noiseFudge;
 //    Ana::write("img_ft"+to_string(cnt)+".f0", imgFT);
 
    // str += "  noise=" + to_string (stats.noise) + "  rg=" + to_string (stats.noise/stats.stddev);
-    object.addToFT( imgFT, stats.noise/stats.stddev );
-vogel.zero();
-    
-resetPhi();
 
  //   cout << str << printArray (dimensions(), "  dims") << endl;
 
@@ -412,6 +418,7 @@ void SubImage::adjustOffset(void) {
     
 }
 
+
 void SubImage::addAlpha(uint16_t m, double a) {
     
     unique_lock<mutex> lock (mtx);
@@ -470,13 +477,6 @@ void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
 }
 
 
-void SubImage::getAlphas(float* alphas) const {
-    size_t cnt (0);
-    for (auto& it: alpha) {
-        alphas[cnt++] = it.second;
-    }
-    //LOG_TRACE << "SubImage::getAlphas(" << hexString(this) << ")  " << printArray(alphas,alpha.size(),"alphas");
-}
 
 
 void SubImage::resetPhi(void) {
@@ -543,15 +543,16 @@ void SubImage::calcOTF (complex_t* otfPtr, const double* phiPtr) const {
 
 void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiPtr) const {
     
- //   cout << "o" << flush;
 //    cout << "SubImage::calcPFOTF(" << hexString(this) << ")" << endl;
 //  Array<double> awrapper(const_cast<double*>(phiPtr), pupilSize, pupilSize);
 //  Ana::write("phisum2.f0", awrapper);
     memset (pfPtr, 0, pupilSize * pupilSize * sizeof (complex_t));
     memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
 //    redux::file::Ana::write("blu_pup.f0", channel.pupil.first);
-    const double* pupilPtr = channel.pupil.first.ptr();
+    const double* pupilPtr = channel.pupil.first.get();
     double normalization = sqrt(1.0 / channel.pupil.second);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    //double normalization = (1.0 / channel.pupil.second);   // normalize OTF by pupil-area
+    //double normalization = (1.0 / OTF.nElements());   // TODO: normalize OTF by OTF-area
     //double norm = 1.0 / channel.pupil.second;   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
     for (auto & ind : channel.pupilInOTF) {
  //       double tmp = fmod(phiPtr[ind.first],pi_x_2);
@@ -572,9 +573,11 @@ void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiP
         otfPtr[ind.second] = normalization*pfPtr[ind.first];
       //  if(ind.first%1000 == 0) cout << tmpStr << endl;
     }
+
 //    redux::file::Ana::write("blu_pf.f0", PF);
 //    redux::file::Ana::write("blu_phi.f0", phi);
     FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
+
  //   cout << "SubImage::calcPFOTF(" << hexString(this) << ")  norm = " << normalization << endl;
 //     for (auto & ind : channel.pupilInOTF) {
 //         otfPtr[ind.second] *= norm;
@@ -583,20 +586,6 @@ void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiP
 //Ana::write("potf.f0", OTF);
 //   Ana::write("potfP.f0", object.P);
 //   Ana::write("potfQ.f0", object.Q);
-}
-
-
-void SubImage::addPSF(Array<float>& out) {
-    Array<complex_t> tmp(OTF.dimensions());
-    OTF.directInverse (tmp);
-    out += tmp;
-}
-
-
-Array<double> SubImage::getPSF (void) {
-    Array<complex_t> tmp(OTF.dimensions());
-    OTF.directInverse(tmp);
-    return tmp.copy<double>();
 }
 
 
