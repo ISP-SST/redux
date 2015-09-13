@@ -46,6 +46,12 @@ namespace redux {
             std::string getText( void ) {
                 return m_Header.txt + m_ExtendedHeader;
             }
+            
+            size_t getNumberOfFrames(void);
+            bpx::ptime getStartTime(void);
+            bpx::ptime getEndTime(void);
+            bpx::ptime getAverageTime(void);
+            bpx::time_duration getExposureTime(void);
 
             struct raw_header {                    // first block for ana files
                 uint32_t synch_pattern;

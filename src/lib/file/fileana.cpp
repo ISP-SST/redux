@@ -6,7 +6,8 @@
 #include "redux/file/anacompress.hpp"
 #include "redux/file/anadecompress.hpp"
 
-#include <regex>
+#include <boost/regex.hpp>
+#include <boost/lexical_cast.hpp>
 
 using namespace redux::file;
 using namespace redux::util;
@@ -212,6 +213,66 @@ void Ana::write( ofstream& file ) {
         }
     }
 
+
+}
+
+// TBD: These "parsers" should probably be in the sst namespace with other telescope/hardware specific functions...
+size_t redux::file::Ana::getNumberOfFrames(void) {
+    
+    std::string hdr = getText();
+    boost::regex re ("(\\d+)[ .]+SUM[= ]+");
+    boost::smatch match;
+    if (boost::regex_search (hdr, match, re)) {
+        size_t nFrames = boost::lexical_cast<size_t> (match[1]);
+        if (nFrames > 1) {
+            return nFrames;
+        }
+    }
+    return 1;
+    
+}
+
+bpx::ptime redux::file::Ana::getStartTime(void) {
+    
+    std::string hdr = getText();
+    bpx::ptime startT;
+    
+    boost::regex re("Ts=([0-9.\\-: ]+)");
+    boost::smatch match;
+    if (boost::regex_search (hdr, match, re)) {
+        startT = bpx::time_from_string(match[1]);
+    }
+
+    return startT;
+    
+}
+
+bpx::ptime redux::file::Ana::getEndTime(void) {
+    
+    std::string hdr = getText();
+    bpx::ptime endT;
+    
+    boost::regex re("Te=([0-9.\\-: ]+)");
+    boost::smatch match;
+    if (boost::regex_search (hdr, match, re)) {
+        endT = bpx::time_from_string(match[1]);
+    }
+
+    return endT;
+    
+}
+
+bpx::ptime redux::file::Ana::getAverageTime(void) {
+
+    bpx::ptime startT = getStartTime();
+    bpx::time_duration td = (getEndTime()-startT)/2;
+    return (startT+td);
+    
+}
+
+bpx::time_duration redux::file::Ana::getExposureTime(void) {
+    
+    return (getEndTime()-getStartTime());
 
 }
 

@@ -9,8 +9,10 @@
 #include <map>
 
 #include <boost/property_tree/ptree.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace bpt = boost::property_tree;
+namespace bpx = boost::posix_time;
 
 
 
@@ -33,6 +35,12 @@ namespace redux {
             virtual ~FileMeta ( void ) = default;
             
             virtual std::string getText( void ) { return ""; }
+            virtual size_t getNumberOfFrames(void) { return 1; }
+            virtual bpx::ptime getStartTime(void) { return bpx::ptime(); };
+            virtual bpx::ptime getEndTime(void) { return bpx::ptime(); };
+            virtual bpx::ptime getAverageTime(void) { return bpx::ptime(); };
+            virtual bpx::time_duration getExposureTime(void) { return bpx::time_duration(); };
+            
             std::string& at(const std::string& key) { return list[key]; };
             //const std::string& at (const std::string& key) const { return list[key]; };
             void clearList(void) { list.clear(); }
