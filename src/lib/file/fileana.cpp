@@ -529,9 +529,7 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
         throw invalid_argument( "Ana::write(): the ANA/f0 format does not support more dimensions than 16." );
     }
 
-    if( hdr->m_Header.datyp > 5 ) {
-        hdr->m_Header.datyp = getDatyp<T>();
-    }
+    hdr->m_Header.datyp = getDatyp<T>();
 
     size_t textSize = hdr->m_ExtendedHeader.length();
     size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
