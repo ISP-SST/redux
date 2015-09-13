@@ -44,18 +44,25 @@ namespace {
 
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind, const Array<float>& stack,
-                    uint32_t index, uint16_t firstY, uint16_t firstX, uint16_t patchSize, uint16_t pupilSize)
-    : Array<float> (stack, index, index, firstY, firstY + patchSize - 1, firstX, firstX + patchSize - 1),
-      index (index), imgSize (patchSize), pupilSize (pupilSize), otfSize (2 * pupilSize), object (obj),
-      channel (ch), window (wind), noiseWwindow(nwind), newPhi(false), newOTF(false) {
+                    uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize)
+    : Array<float>(stack, index, index, offset.y, offset.y+patchSize-1, offset.x, offset.x+patchSize-1),
+      index(index), offset(offset), offsetShift(0,0), imgSize(patchSize), pupilSize(pupilSize), otfSize(2*pupilSize), oldRG(0), object (obj),
+      channel(ch), window (wind), noiseWwindow(nwind), newPhi(false), newOTF(false), OTF(otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX) {
 
     img.resize (imgSize, imgSize);
+    tmpImg.resize (imgSize, imgSize);
+    imgFT.resize (imgSize, imgSize);
+    tmpFT.resize (imgSize, imgSize);
     phi.resize (pupilSize, pupilSize);
     tmpPhi.resize (pupilSize, pupilSize);
     PF.resize (pupilSize, pupilSize);
-    OTF.resize (otfSize, otfSize);                  // big enough for autocorrelation of the PF
+    //OTF.resize (otfSize, otfSize);                  // big enough for autocorrelation of the PF
     tmpOTF.resize (otfSize, otfSize);
     vogel.resize (pupilSize, pupilSize);
+
+    vogel.zero();
+    imgFT.zero();
+    resetPhi();
 
     static int dummy UNUSED = initSineLUT(); 
 }
@@ -367,6 +374,44 @@ void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const d
 }
 
 
+void SubImage::adjustOffset(void) {
+    bool adjusted(false);
+    if( alpha.count(2) ) {
+        double dadjust = alpha[2]*channel.alphaToPixels;
+        int adjust = lround(alpha[2]*channel.alphaToPixels);
+        int oadjust = adjust;
+        if( adjust ) {
+            adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
+            if(adjust) {
+                offsetShift.x += adjust;        // Noll-index = 2 corresponds to x-tilt.
+                double oldval = alpha[2];
+                double vshift = adjust*channel.pixelsToAlpha;
+                alpha[2] -= vshift;
+                LOG_TRACE << "adjustOffset:  mode 2 was adjusted.  from " << oldval << " to " << alpha[2] << "  (" << adjust<< " pixels)";
+                adjusted = true;
+            }
+        }
+    }
+    if( alpha.count(3) ) {
+        double dadjust = alpha[2]*channel.alphaToPixels;
+        int adjust = lround(alpha[3]*channel.alphaToPixels);
+        int oadjust = adjust;
+        if( adjust ) {
+            adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
+            if(adjust) {
+                offsetShift.y += adjust;        // Noll-index = 3 corresponds to y-tilt.
+                double oldval = alpha[3];
+                double vshift = adjust*channel.pixelsToAlpha;
+                alpha[3] -= adjust*channel.pixelsToAlpha;
+                LOG_TRACE << "adjustOffset:  mode 3 was adjusted.  from " << oldval << " to " << alpha[3] << "  (" << adjust<< " pixels)";
+                adjusted = true;
+            }
+        }
+    }
+    if(adjusted) init();
+    
+}
+
 void SubImage::addAlpha(uint16_t m, double a) {
     
     unique_lock<mutex> lock (mtx);
@@ -568,14 +613,13 @@ void SubImage::dump (std::string tag) const {
 
  //   cout << "    dumping image:  this=" << hexString(this) << " with tag=" << tag << endl;
  //   cout << "                  phiPtr=" << hexString(phi.get()) << endl;
+    Ana::write (tag + "_rimg.f0", *this);
     Ana::write (tag + "_img.f0", img);
     Ana::write (tag + "_phi.f0", phi);
     Ana::write (tag + "_pf.f0", PF);
     Ana::write (tag + "_otf.f0", OTF);
     Ana::write (tag + "_imgFT.f0", imgFT);
     Ana::write (tag + "_window.f0", window);
-    Ana::write (tag + "_P.f0", object.P);
-    Ana::write (tag + "_Q.f0", object.Q);
     Ana::write (tag + "_vogel.f0", vogel);
 
 }

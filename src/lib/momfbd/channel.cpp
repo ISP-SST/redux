@@ -96,9 +96,6 @@ namespace {
             redux::file::readFile(filename, img);
             
             LOG_DEBUG << boost::format ("Loaded file \"%s\"  (%s)") % filename % printArray(clip,"clip");
-            
-            if(normalize) normalizeIfMultiFrames(img);
-
             if( clip.size() == 4 ) {
                 bool flipX = false, flipY = false;
                 vector<int16_t> alignClip = clip;
@@ -301,8 +298,6 @@ bool Channel::checkCfg (void) {
     if (!checkImageScale (telescopeF, arcSecsPerPixel, pixelSize)) {
         return false;
     }
-
-    //calculatePupilSize( lim_freq, r_c, pupilSize, wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
 
     // Do we have a correct filename template ?
     if (imageTemplate.empty()) {
@@ -578,6 +573,7 @@ void Channel::loadData (boost::asio::io_service& service) {
         if (nWild == 0 || darkNumbers.empty()) {
             ClippedFile::load(dark,darkTemplate,alignClip,true);
         } else {
+            size_t nFrames = 1;
             Image<float> tmp;
             for (size_t di = 0; di < darkNumbers.size(); ++di) {
                 bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
@@ -586,12 +582,14 @@ void Channel::loadData (boost::asio::io_service& service) {
                 } else {
                     ClippedFile::load(tmp,fn.string(),alignClip,true);
                     dark += tmp;
+                    nFrames++;
                 }
             }
-            dark *= (1.0/darkNumbers.size());
+            
+            //   NOTE: no normalization here, modify metadata instead. TODO: += operator for meta to add frames??
+
         }
-        dark.meta.reset();       // TODO: properly set hdr-type to float etc. rather than clearing it.
-        dark.normalize();
+
     }
 
 
@@ -747,7 +745,7 @@ void Channel::initPatch (ChannelData& cd) {
     }
     for (uint16_t i = 0; i < imageNumbers.size(); ++i) {
         uint32_t imageNumber = imageNumbers[i];
-        std::shared_ptr<SubImage> simg (new SubImage (myObject, *this, workspace->window, workspace->noiseWindow, cd.images, i, maxLocalShift, maxLocalShift,
+        std::shared_ptr<SubImage> simg (new SubImage (myObject, *this, workspace->window, workspace->noiseWindow, cd.images, i, cd.offset,
                                         patchSize, pupilPixels));   // TODO: fix offsets
         subImages.push_back (simg);
         simg->init();
@@ -986,8 +984,6 @@ void Channel::getPatchData (ChannelData& chData, const PatchData& patch) const {
         RegionI imgBoundary(0,0,images[0].dimSize(0)-1,images[0].dimSize(1)-1);
         RegionI desiredCutout = patch.roi;
         desiredCutout.grow(maxLocalShift);
-        //desiredCutout.last += ;
-        //desiredCutout.first -= maxLocalShift;
         RegionI actualCutout = desiredCutout;
         actualCutout.restrict(imgBoundary);
         if (xOffset.valid()) {
@@ -1000,28 +996,16 @@ void Channel::getPatchData (ChannelData& chData, const PatchData& patch) const {
             stats.getStats (Image<int16_t> (yOffset, actualCutout.first.y, actualCutout.last.y, actualCutout.first.x, actualCutout.last.x), ST_VALUES);
             chData.residualOffset.y = stats.mean/100.0;
         }
+
         chData.shift = PointI(lround(chData.residualOffset.y),lround(chData.residualOffset.x));
         chData.shift -= imgBoundary.outside(actualCutout+chData.shift);             // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
         actualCutout += chData.shift;
         chData.residualOffset -= chData.shift;
         chData.offset = maxLocalShift;
-//         chData.offset.x = maxLocalShift - (actualCutout.first.x-desiredCutout.first.x);
-//         chData.offset.y = maxLocalShift - (actualCutout.first.y-desiredCutout.first.y);
         if (actualCutout != desiredCutout) {
             chData.offset -= (actualCutout.first - desiredCutout.first - chData.shift);
-//             RegionI actualROI = patch.roi; // - chData.offset;
-//             RegionI effectiveMaxLocalShift( actualROI.first.y-actualCutout.first.y,
-//                                       actualROI.first.x-actualCutout.first.x,
-//                                       actualCutout.last.y-actualROI.last.y,
-//                                       actualCutout.last.x-actualROI.last.x);
-//             if( shift != PointI(0,0) ) {
-//             LOG_WARN << boost::format ("Patch %s, %s  imgSize: %s desiredCutout: %s  actualCutout: %s \n offset: %s  rOffset: %s") % patch.index % patch.roi % imgBoundary % desiredCutout
-//                                   % actualCutout % chData.offset % chData.residualOffset;
-//             LOG_WARN << boost::format ("Patch %s, %s is too close to the border so the effective maxLocalShift will be reduced from %d to (%d,%d,%d,%d)")
-//                     % patch.index % patch.roi % maxLocalShift % effectiveMaxLocalShift.first.y % effectiveMaxLocalShift.first.x % effectiveMaxLocalShift.last.y % effectiveMaxLocalShift.last.x;
-//             }
         }
-        //imgSize = last-first+1;
+
         PointI pSize = actualCutout.last - actualCutout.first + 1;
         chData.images.resize(nImages, pSize.y, pSize.x);
         Array<float> patchImg(chData.images, 0, 0, 0, pSize.y-1, 0, pSize.x-1);
@@ -1061,21 +1045,38 @@ Point16 Channel::getImageSize(void) {
 }
 
 
+*/
+
+Point16 Channel::getImageSize(void) {
+ 
+
+    if( imgSize == 0 ) {
+        size_t nImages = imageNumbers.size();
+        bfs::path fn;
+        if(nImages) {
+            fn = bfs::path(imageDataDir) / bfs::path(boost::str (boost::format (imageTemplate) % imageNumbers[0]));
+        } else {
+            nImages = 1;
+            fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
+        }
+        images.resize(nImages);
+        imageStats.resize(nImages);
+        ClippedFile::load(images[0],fn.string(),alignClip);
+        if( images[0].nDimensions() == 2 ) {
+            imgSize = Point16(images[0].dimSize(0),images[0].dimSize(1));
+        }
+    }   
+    return imgSize;
+ 
+}
+
+
 void Channel::dump (std::string tag) {
 
-    //cout << "Dumping channel #" << ID << "  this=" << hexString (this) << " with tag=" << tag << endl;
-
-    tag += "_ch_" + to_string (ID);
     Ana::write (tag + "_pupil.f0", pupil.first);
     Ana::write (tag + "_fittedplane.f0", fittedPlane);
     Ana::write (tag + "_phi_fixed.f0", phi_fixed);
     Ana::write (tag + "_phi_channel.f0", phi_channel);
-    for (uint i = 0; i < subImages.size(); ++i) {
-        subImages[i]->dump (tag + "_" + to_string (i));
-    }
-    for (auto & m : modes) {
-        Ana::write (tag + "_mode_" + to_string (m.first) + ".f0", *m.second);
-    }
 
 }
 

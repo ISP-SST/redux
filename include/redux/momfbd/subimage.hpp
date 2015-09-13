@@ -32,7 +32,7 @@ namespace redux {
             
             SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind,
                      const redux::util::Array<float>& stack,
-                     uint32_t index, uint16_t firstY, uint16_t firstX, uint16_t patchSize, uint16_t pupilSize);
+                     uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);
             ~SubImage(void);
             
             void init(void);
@@ -56,6 +56,8 @@ namespace redux {
             void addModes(size_t nModes, uint16_t* modes, const double* a) { addModes(phi.get(), nModes, modes, a); }
             void addModes(double* phiPtr, size_t nModes, uint16_t* modes, const double* a) const;
             
+            void adjustOffset(void);
+
             void addPhases(const double* a) { addPhases(phi.get(), a); };
             void addPhases(double* phiPtr, const double* a) const;
             
@@ -93,6 +95,8 @@ namespace redux {
             void dump( std::string tag ) const;
 
             uint32_t index;
+            const PointI offset;                                //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
+            PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, otfSize;
             
             Object& object;
