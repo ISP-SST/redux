@@ -116,19 +116,22 @@ FourierTransform::Plan::Ptr FourierTransform::getPlan (const std::vector<size_t>
 }
 
 
-FourierTransform::FourierTransform() : centered (false), halfComplex (false), normalized (false) {
+FourierTransform::FourierTransform() : centered (false), halfComplex (false), normalized(true) {
 
 }
 
 
 FourierTransform::FourierTransform (size_t ySize, size_t xSize, int flags, uint8_t nT) :
-    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized (flags & FT_NORMALIZE), nThreads(nT), inputSize(ySize*xSize) {
+    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized(flags & FT_NORMALIZE), nThreads(nT), inputSize(ySize*xSize) {
+
     if (halfComplex) {
         Array<complex_t>::resize (ySize, xSize / 2 + 1);
     } else {
         Array<complex_t>::resize (ySize, xSize);
     }
+
     init();
+
 }
 
 
@@ -320,6 +323,7 @@ void FourierTransform::inv (Array<T>& out, int flags) const {
             FourierTransform tmp(*this);
             tmp.reorder();
             tmp.inv(out,flags);
+            return;
         }
         Array<complex_t> tmp(dims);
         complex_t* dataPtr = const_cast<complex_t*> (ptr());
@@ -328,7 +332,11 @@ void FourierTransform::inv (Array<T>& out, int flags) const {
     }
 
     if (flags & FT_REORDER) {
-        reorder (out);
+        reorder(out);
+    }
+
+    if (flags & FT_NORMALIZE) {
+        out *= (1.0/out.nElements());
     }
 
 }
@@ -351,6 +359,7 @@ namespace redux {
                     FourierTransform tmp(*this);
                     tmp.reorder();
                     tmp.inv(out,flags);
+                    return;
                 }
                 Array<complex_t> tmp(dims);
                 complex_t* dataPtr = const_cast<complex_t*> (ptr());
@@ -362,6 +371,10 @@ namespace redux {
                 reorder (out);
             }
 
+            if (flags & FT_NORMALIZE) {
+                out *= (1.0/out.nElements());
+            }
+        
         }
     }
 }
@@ -396,9 +409,10 @@ template Array<complex_t> FourierTransform::correlate (const Array<complex_t>&) 
 
 
 void FourierTransform::autocorrelate (void) {
-    for (auto & it : *this) {
-        it = norm(it);         // = re*re + im*im
-    }
+
+    // FourierTransform is dense by construction, so this should always be ok
+    transform( get(), get()+nElements(), get(),[](const complex_t&a){ return norm(a); } );
+
 }
 
 
@@ -427,11 +441,8 @@ template void FourierTransform::autocorrelate (const Array<complex_t>&, Array<co
 
 Array<double> FourierTransform::power (void) const {
     Array<double> tmp (dimensions());
-    auto it = tmp.begin();
-    for (auto & it2 : *this) {
-        *it++ = norm (it2);
-    }
-    return tmp;
+    transform( get(), get()+nElements(), tmp.get(),[](const complex_t&a){ return norm(a); } );
+    return std::move(tmp);
 }
 
 

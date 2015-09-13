@@ -83,10 +83,24 @@ namespace redux {
 
             template <typename T>
             redux::util::Array<T> convolve( const redux::util::Array<T>& in ) const {
-                redux::util::Array<T> tmp;
-                in.copy(tmp);
-                convolveInPlace( tmp );
-                return std::move(tmp);
+                int flags = FT_NORMALIZE;
+                auto dims = in.dimensions();
+                if (halfComplex) {            // for half-complex, the last dimension has half size (n/2+1)
+                    dims.back() >>= 1;
+                    dims.back() += 1;
+                } else flags |= FT_FULLCOMPLEX;
+                
+                if (dims != dimensions()) {
+                    return Array<T>();
+                }
+                redux::util::Array<double> tmp(in.dimensions());
+                if (centered) {
+                    flags |= FT_REORDER;
+                }
+                FourierTransform inFT (in, flags);
+                inFT *= *this;
+                inFT.directInverse(tmp);
+                return std::move(tmp.copy<T>());
             }
             
             static void normalize( FourierTransform& );

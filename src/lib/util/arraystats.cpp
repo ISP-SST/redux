@@ -90,6 +90,8 @@ void redux::util::ArrayStats::getNoise(const Array<T>& data, int smooth) {
     }
 
 }
+template void redux::util::ArrayStats::getNoise(const Array<float>& data, int);
+template void redux::util::ArrayStats::getNoise(const Array<double>& data, int);
 
 
 template <typename T>

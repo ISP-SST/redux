@@ -549,7 +549,7 @@ namespace redux {
                     }
                 }
                 else {
-                    throw std::invalid_argument( "Array-dimensions does not match." );
+                    throw std::invalid_argument( "Array::assign<v>:  dimensions does not match." );
                 }
                 return *this;
             }
@@ -565,7 +565,7 @@ namespace redux {
                         }
                     }
                 } else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
+                    throw std::invalid_argument( "Array<T>::assign:  dimensions does not match: " + printArray(dimensions(),"dims")
                                                  + printArray(rhs.dimensions(),"  rhsdims") );
                 }
             }
@@ -579,7 +579,7 @@ namespace redux {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::assign<T,U>());
                     }
                 } else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
+                    throw std::invalid_argument( "Array<U>::assign:  dimensions does not match: " + printArray(dimensions(),"dims")
                                                  + printArray(rhs.dimensions(),"  rhsdims") );
                 }
             }
@@ -588,7 +588,15 @@ namespace redux {
             template <typename ...S>
             void assign( S ...values ) {   assign( std::vector<T>({static_cast<T>( values )...}) ); }
 
-            
+
+            /*!
+             *   Assignment operators. The default assignment will make a shallow copy (shared datablock)
+             */
+            Array<T>& operator=( const Array<T>& rhs ) = default;
+
+            /*!
+             *  Move assignment.
+             */
             Array<T>& operator=( Array<T>&& rhs )  {
                 dimSizes = std::move(rhs.dimSizes);
                 dimStrides = std::move(rhs.dimStrides);
@@ -605,95 +613,140 @@ namespace redux {
                 return *this;
             }
             
-            Array<T>& operator=( const Array<T>& rhs ) = default;
-
+            /*!
+             *  Scalar assignment
+             */
+            const Array<T>& operator=( T rhs ) {
+                    if(dense()) {
+                        std::fill(get()+begin_, get()+end_, rhs);
+                    } else {
+                        std::fill(begin(), end(), rhs);
+                    }
+                return *this;
+            }
+            
+            /*!
+             *  Array assignment.
+             */
             template <typename U>
             const Array<T>& operator=( const Array<U>& rhs ) {
-                if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
+                if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );                // TBD: should the array be silently resized, or warn/throw when sizes doesn't match?
                 if( dense() && rhs.dense() ) {
-                    std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::assign<T,U>());
+                    const U* rawPtr = rhs.get();
+                    //std::transform(rawPtr, rawPtr+nElements_, rhs.get(), rawPtr, redux::math::assign<T,U>());
+                    std::copy(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_);
                } else {
-                    std::transform(begin(), end(), rhs.begin(), begin(), redux::math::assign<T,U>());
-                }
-                return *this;
-            }
-
-            template <typename U>
-            const Array<T>& operator+=( const Array<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
-                        std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::add<T,U>());
-                    } else {
-                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::add<T,U>());
-                    }
-                }
-                else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
-                                                 + printArray(rhs.dimensions(),"  rhsdims") );
-                }
-                return *this;
-            }
-
-            template <typename U>
-            const Array<T>& operator-=( const Array<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
-                        std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::subtract<T,U>());
-                    } else {
-                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::subtract<T,U>());
-                    }
-                }
-                else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
-                                                 + printArray(rhs.dimensions(),"  rhsdims") );
-                }
-                return *this;
-            }
-
-            template <typename U>
-            const Array<T>& operator*=( const Array<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
-                        std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::multiply<T,U>());
-                    } else {
-                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::multiply<T,U>());
-                    }
-                }
-                else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
-                                                 + printArray(rhs.dimensions(),"  rhsdims") );
-                }
-                return *this;
-            }
-
-            template <typename U>
-            const Array<T>& operator/=( const Array<U>& rhs ) {
-                if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
-                        std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::divide<T,U>());
-                    } else {
-                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::divide<T,U>());
-                    }
-                }
-                else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
-                                                 + printArray(rhs.dimensions(),"  rhsdims") );
+                    std::transform(begin(), end(), rhs.begin(), begin(), redux::math::assign<T,U>());           // using the (slow) iterators defined above.
                 }
                 return *this;
             }
             
+            
+            /*!
+             *  Scalar operations
+             */
+            Array<T> operator+( const T& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                return std::move(tmp+=rhs);
+            }
+            const Array<T>& operator+=( T rhs ) {
+                if(dense()) {
+                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::plus<T>(),rhs));
+                } else {
+                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::plus<T>(),rhs));
+                }
+                return *this;
+            }
+
+            Array<T> operator-( const T& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                return std::move(tmp-=rhs);
+            }
+            const Array<T>& operator-=( T rhs ) {
+                if(dense()) {
+                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::minus<T>(),rhs));
+                } else {
+                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::minus<T>(),rhs));
+                }
+                return *this;
+            }
+            
+            Array<T> operator*( const T& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                return std::move(tmp*=rhs);
+            }
+            const Array<T>& operator*=( const T& rhs ) {
+                if(dense()) {
+                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::multiplies<T>(),rhs));
+                } else {
+                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::multiplies<T>(),rhs));
+                }
+                return *this;
+            }
+            
+            Array<T> operator/( const T& rhs ) {
+                Array<T> tmp;
+                this->copy(tmp);
+                return std::move(tmp/=rhs);
+            }
+            const Array<T>& operator/=( const T& rhs ) {
+                if(dense()) {
+                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::divides<T>(),rhs));
+                } else {
+                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::divides<T>(),rhs));
+                }
+                return *this;
+            }
+
+            
+            /*!
+             *  Array operations
+             */
             template <typename U>
             Array<T> operator+( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
                 return std::move(tmp+=rhs);
             }
-
+            template <typename U>
+            const Array<T>& operator+=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    if(dense() && rhs.dense()) {
+                        std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::add<T,U>());
+                    } else {
+                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::add<T,U>());
+                    }
+                }
+                else {
+                    throw std::invalid_argument( "Array:+=  dimensions does not match: " + printArray(dimensions(),"dims")
+                                                 + printArray(rhs.dimensions(),"  rhsdims") );
+                }
+                return *this;
+            }
+            
             template <typename U>
             Array<T> operator-( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
                 return std::move(tmp-=rhs);
+            }
+            template <typename U>
+            const Array<T>& operator-=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    if(dense() && rhs.dense()) {
+                        std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::subtract<T,U>());
+                    } else {
+                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::subtract<T,U>());
+                    }
+                }
+                else {
+                    throw std::invalid_argument( "Array:-=  dimensions does not match: " + printArray(dimensions(),"dims")
+                                                 + printArray(rhs.dimensions(),"  rhsdims") );
+                }
+                return *this;
             }
 
             template <typename U>
@@ -702,106 +755,44 @@ namespace redux {
                 this->copy(tmp);
                 return std::move(tmp*=rhs);
             }
+            template <typename U>
+            const Array<T>& operator*=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    if(dense() && rhs.dense()) {
+                        std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::multiply<T,U>());
+                    } else {
+                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::multiply<T,U>());
+                    }
+                }
+                else {
+                    throw std::invalid_argument( "Array:*=  dimensions does not match: " + printArray(dimensions(),"dims")
+                                                 + printArray(rhs.dimensions(),"  rhsdims") );
+                }
+                return *this;
+            }
 
-           template <typename U>
+            template <typename U>
             Array<T> operator/( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
                 return std::move(tmp/=rhs);
             }
-            
-            
-            // operators with scalars
-            //template <typename U>
-            const Array<T>& operator= ( const T& rhs ) { for( auto & it : *this ) it  = rhs; return *this; };
-            /*{
-                 if(dense()) {
-                    std::transform(ptr(), ptr()+nElements_, ptr(), [](const T& a){return a;});
-                    //std::fill(ptr(), ptr()+nElements_, ptr(), rhs);
-                } else {
-                    std::transform(begin(), end(), begin(), [](const T& a){return a;});
-                }
-                return *this;
-            }*/
-            
-            /*template <typename U>
-            const Array<T>& operator= ( const U& rhs ) {
-                 if(dense()) {
-                    std::transform(ptr(), ptr()+nElements_, ptr(), std::bind2nd<>(redux::math::assign<T,U>(),rhs));
-                } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(redux::math::assign<T,U>(),rhs));
-                }
-                return *this;
-            }*/
-
-            
             template <typename U>
-            const Array<T>& operator+=( const U& rhs ) {
-                if(dense()) {
-                    std::transform(ptr(), ptr()+nElements_, ptr(), std::bind2nd<>(redux::math::add<T,U>(),rhs));
-                } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(redux::math::add<T,U>(),rhs));
+            const Array<T>& operator/=( const Array<U>& rhs ) {
+                if( this->sameSize( rhs ) ) {
+                    if(dense() && rhs.dense()) {
+                        std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::divide<T,U>());
+                    } else {
+                        std::transform(begin(), end(), rhs.begin(), begin(), redux::math::divide<T,U>());
+                    }
+                }
+                else {
+                    throw std::invalid_argument( "Array:/=  dimensions does not match: " + printArray(dimensions(),"dims")
+                                                 + printArray(rhs.dimensions(),"  rhsdims") );
                 }
                 return *this;
             }
             
-            template <typename U>
-            const Array<T>& operator-=( const U& rhs ) {
-                if(dense()) {
-                    std::transform(ptr(), ptr()+nElements_, ptr(), std::bind2nd<>(redux::math::subtract<T,U>(),rhs));
-                } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(redux::math::subtract<T,U>(),rhs));
-                }
-                return *this;
-            }
-            
-            template <typename U>
-            const Array<T>& operator*=( const U& rhs ) {
-                if(dense()) {
-                    std::transform(ptr(), ptr()+nElements_, ptr(), std::bind2nd<>(redux::math::multiply<T,U>(),rhs));
-                } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(redux::math::multiply<T,U>(),rhs));
-                }
-                return *this;
-            }
-            
-            template <typename U>
-            const Array<T>& operator/=( const U& rhs ) {
-                if(dense()) {
-                    std::transform(ptr(), ptr()+nElements_, ptr(), std::bind2nd<>(redux::math::divide<T,U>(),rhs));
-                } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(redux::math::divide<T,U>(),rhs));
-                }
-                return *this;
-            }
-            
-            template <typename U>
-            Array<T> operator+( const U& rhs ) {
-                Array<T> tmp;
-                this->copy(tmp);
-                return tmp += rhs;
-            }
-
-            template <typename U>
-            Array<T> operator-( const U& rhs ) {
-                Array<T> tmp;
-                this->copy(tmp);
-                return tmp -= rhs;
-            }
-
-            template <typename U>
-            Array<T> operator*( const U& rhs ) {
-                Array<T> tmp;
-                this->copy(tmp);
-                return tmp *= rhs;
-            }
-
-            template <typename U>
-            Array<T> operator/( const U& rhs ) {
-                Array<T> tmp;
-                this->copy(tmp);
-                return tmp /= rhs;
-            }
             
             
             virtual void zero( void ) { if( nElements_ ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
@@ -815,7 +806,7 @@ namespace redux {
                     for( auto & it : *this ) it += (*rhsit++ * *wit++);
                 }
                 else {
-                    throw std::invalid_argument( "Array-dimensions does not match." );
+                    throw std::invalid_argument( "Array::add  dimensions does not match." );
                 }
                 return *this;
             }
@@ -827,7 +818,7 @@ namespace redux {
                     for( auto & it : *this ) it += (*rhsit++ * weight);
                 }
                 else {
-                    throw std::invalid_argument( "Array-dimensions does not match." );
+                    throw std::invalid_argument( "Array::add<U,V>  dimensions does not match." );
                 }
                 return *this;
             }
@@ -839,8 +830,24 @@ namespace redux {
                     for( auto & rhsit : rhs ) rhsit += (*it++ * weight);
                 }
                 else {
-                    throw std::invalid_argument( "Array-dimensions does not match." );
+                    throw std::invalid_argument( "Array::addTo  dimensions does not match." );
                 }
+            }
+
+            template <typename U, typename V>
+            const Array<T>& subtract( const Array<U>& rhs, V weight ) {
+                if( this->sameSize( rhs ) ) {
+                    if(dense() && rhs.dense()) {
+                        std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, [weight](const T& a, const U& b) { return a-b*weight; } );
+                    } else {
+                        std::transform(begin(), end(), rhs.begin(), begin(), [weight](const T& a, const U& b) { return a-b*weight; } );
+                    }
+                }
+                else {
+                    throw std::invalid_argument( "Array::subtract  dimensions does not match: " + printArray(dimensions(),"dims")
+                                                 + printArray(rhs.dimensions(),"  rhsdims") );
+                }
+                return *this;
             }
 
             
@@ -851,7 +858,7 @@ namespace redux {
                     for( auto & it : *this ) it *= (*rhsit++ * weight);
                 }
                 else {
-                    throw std::invalid_argument( "Array-dimensions does not match: " + printArray(dimensions(),"dims")
+                    throw std::invalid_argument( "Array::mult  dimensions does not match: " + printArray(dimensions(),"dims")
                                                  + printArray(rhs.dimensions(),"  rhsdims") );
                 }
                 return *this;
@@ -1155,7 +1162,7 @@ namespace redux {
         inline const Array<double>& Array<double>::operator=( const Array<redux::complex_t>& rhs ) {
             if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
             if(dense() && rhs.dense()) {
-                std::transform(rhs.ptr(), rhs.ptr()+rhs.nElements(), begin(), [](complex_t d) { return std::real(d); } );
+                std::transform(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_, [](complex_t d) { return std::real(d); } );
             } else {
                 std::transform(rhs.begin(), rhs.end(), begin(), [](complex_t d) { return std::real(d); } );
             }
@@ -1166,13 +1173,13 @@ namespace redux {
         inline const Array<float>& Array<float>::operator=( const Array<redux::complex_t>& rhs ) {
             if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
             if(dense() && rhs.dense()) {
-                std::transform(rhs.ptr(), rhs.ptr()+rhs.nElements(), begin(), [](complex_t d) { return std::real(d); } );
+                std::transform(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_, [](complex_t d) { return std::real(d); } );
             } else {
                 std::transform(rhs.begin(), rhs.end(), begin(), [](complex_t d) { return std::real(d); } );
             }
             return *this;
         }
-
+        
 
         /*! @} */
 
