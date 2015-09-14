@@ -76,6 +76,9 @@ namespace redux {
             void cleanup(void);
             
             void loadData(boost::asio::io_service&);
+            void unloadData(void);
+            void unloadCalib(void);
+
             void preprocessData(boost::asio::io_service&);
             void normalizeData(boost::asio::io_service&, double value);
 

@@ -449,7 +449,9 @@ void MomfbdJob::initCache(void) {
     if(!globalData) {       // create GlobalData if they don't exist
         globalData.reset(new GlobalData(*this));
     }
-
+    
+    globalData->constraints.init();
+ 
     for( shared_ptr<Object>& obj: objects ) {
         obj->initCache();
     }

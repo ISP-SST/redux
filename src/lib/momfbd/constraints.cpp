@@ -344,8 +344,6 @@ void Constraints::Group::mapNullspace(void) {
 
 Constraints::Constraints( const MomfbdJob& j ) : job( j ), blockified(false) {
 
-    init();
-
 }
 
 

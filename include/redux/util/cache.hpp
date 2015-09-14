@@ -51,7 +51,7 @@ namespace redux {
                 return ret;
             }
             template<class KeyT, class T>
-            static int erase(const T& key) {
+            static int erase(const KeyT& key) {
                 auto m = get().getMap<KeyT,T>();
                 int ret = m.second.erase(key);
                 return ret;
