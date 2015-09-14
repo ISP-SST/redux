@@ -1115,7 +1115,7 @@ Point16 Channel::getImageSize(void) {
 
     if( imgSize == 0 ) {
         if( alignClip.size() == 4 ) {
-            imgSize = Point16(alignClip[3]-alignClip[2]+1, alignClip[1]-alignClip[0]+1);
+            imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
             return imgSize;
         }
         size_t nImages = imageNumbers.size();
@@ -1131,7 +1131,7 @@ Point16 Channel::getImageSize(void) {
         if( tmp.nDimensions() == 2 ) {
             imgSize = Point16(tmp.dimSize(0),tmp.dimSize(1));
         }
-    }   
+    }
     return imgSize;
  
 }

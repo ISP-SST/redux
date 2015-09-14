@@ -338,7 +338,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     Point16 imageSizes;
     for( shared_ptr<Object>& obj : objects ) {
         Point16 tmp = obj->getImageSize();
-        if(imageSizes.x == 0) {
+        if(imageSizes == 0) {
             imageSizes = tmp;
         } else if( tmp != imageSizes ) {    // TBD: allow for different patchsizes (i.e. pixelsize/ccd-size) for different objects/channels.
             throw std::logic_error("The clipped images have different sizes for the different objects, please verify the ALIGN_CLIP values.");

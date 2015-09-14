@@ -41,6 +41,8 @@ void ChannelData::initPatch(void) {
 
 void ChannelData::collectResults(void) {
     myChannel->getResults(*this);
+    images.clear();         // don't need input data anymore.
+    isLoaded = false;
 }
 
 
@@ -67,6 +69,8 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     count += offset.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
     count += images.unpack(ptr+count, swap_endian);
+    if( images.size() > sizeof(uint64_t) ) isLoaded = true;
+    else isLoaded = false;
     return count;
 }
 
@@ -106,6 +110,8 @@ void ObjectData::initPatch(void) {
 
 void ObjectData::collectResults(void) {
     myObject->getResults(*this);
+    if(size()>6*sizeof(uint64_t)) isLoaded = true;
+    else isLoaded = false;
     for( ChannelData& ch: channels ) {
         ch.collectResults();
     }
@@ -149,6 +155,8 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     count += res.unpack(ptr+count,swap_endian);
     count += alpha.unpack(ptr+count,swap_endian);
     count += div.unpack(ptr+count,swap_endian);
+    if( count > 6*sizeof(uint64_t) ) isLoaded = true;
+    else isLoaded = false;
     channels.clear();
     for( auto& it: myObject->getChannels() ) {
         ChannelData chan(it,path());
@@ -182,7 +190,12 @@ void ObjectData::cclear(void) {
     for( ChannelData& cd: channels ) {
         cd.cclear();
     }
-    //channels.clear();
+    img.clear();
+    psf.clear();
+    cobj.clear();
+    res.clear();
+    alpha.clear();
+    div.clear();
 }
 
 
@@ -263,7 +276,6 @@ void PatchData::cclear(void) {
     for( ObjectData& obj: objects ) {
         obj.cclear();
     }
-    //objects.clear();
 }
 
 bool PatchData::cacheLoad(bool removeAfterLoad) {
