@@ -144,13 +144,11 @@ namespace redux {
         };
         
         
-        
-        //template<class KeyT, class T>
-        class CacheItem /*: public std::enable_shared_from_this<CacheItem>*/ {
+        class CacheItem {
         public:
-            CacheItem() : isLoaded(false) {};
+            CacheItem(const std::string& path="") : itemPath(path), isLoaded(false) {};
+            CacheItem(const CacheItem&);
             
-            //template<class... Args>
             /***** Methods to be overloaded *****/
             virtual size_t csize(void) const { return 0; };                //!< returns the necessary buffer size for the call to "cpack"
             virtual uint64_t cpack(char*) const { return 0; };             //!< put all relevant data into a char-array
@@ -158,58 +156,11 @@ namespace redux {
             virtual void cclear(void) {};                                  //!< free whatever memory possible, while being able to restore with "cunpack"
             /************************************/
             
-            void cacheTouch(void) { lastAccessed = 0; }
-            bool cacheLoad(bool removeAfterLoad=false){
-                if(!isLoaded) {
-                    std::unique_lock<std::mutex> lock(itemMutex);
-                    if ( bfs::exists(itemPath) ) {
-                        std::ifstream in(itemPath.c_str(), std::ofstream::binary|std::ios_base::ate);
-                        if( in.good() ) {
-                            size_t sz = in.tellg();
-                            std::unique_ptr<char[]> buf( new char[sz] );
-                            in.seekg(0, std::ios_base::beg);
-                            in.clear();
-                            in.read(buf.get(), sz);
-                            size_t psz = cunpack(buf.get(),false);
-                            if(psz == sz) {
-                                isLoaded = true;
-                                if(removeAfterLoad) {
-                                    in.close();
-                                    bfs::remove(itemPath);
-                                }
-                                return true;
-                            } else std::cout << "CacheItem::cacheLoad() " << psz << " != " << sz << " !!!" << std::endl;
-                        } else std::cout << "CacheItem::cacheLoad() in.good() == false !!!" << std::endl;
-                    } // else std::cout << "CacheItem::cacheLoad() " << itemPath << " doesn't exist. !!!" << std::endl;
-                }
-                return false;
-            }
-            bool cacheStore(bool clearAfterStore=false){
-                if(isLoaded) {
-                    std::unique_lock<std::mutex> lock(itemMutex);
-                    bfs::create_directories(itemPath.parent_path());
-                    size_t sz = csize();
-                    std::unique_ptr<char[]> buf( new char[sz] );
-                    size_t psz = cpack(buf.get());
-                    if(psz == sz) {
-                        std::ofstream out(itemPath.c_str(), std::ofstream::binary);
-                        if( out.good() ) {
-                            out.write( buf.get(), sz );
-                            if(clearAfterStore) {
-                                cclear();
-                                isLoaded = false;
-                            }
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-            
-            void setPath(const std::string& path) {
-                Cache& c = Cache::get();
-                itemPath = bfs::path(c.path()) / bfs::path(path);
-            }
+            virtual void cacheTouch(void);
+            virtual bool cacheLoad(bool removeAfterLoad=false);
+            virtual bool cacheStore(bool clearAfterStore=false);
+            virtual void setPath(const std::string& path);
+            std::string path(void) const { return itemPath.string(); };
             
         protected:
             bfs::path itemPath;
@@ -218,6 +169,7 @@ namespace redux {
             int options;
             std::mutex itemMutex;
             bool isLoaded;
+            
         };
         
         

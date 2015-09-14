@@ -30,9 +30,10 @@ namespace redux {
                 
         class Channel;
         struct PatchData;
-        struct ChannelData {
+        struct ChannelData : public redux::util::CacheItem {
             
-            ChannelData( std::shared_ptr<Channel> c );
+            ChannelData( std::shared_ptr<Channel> c, const std::string& cachePath );
+            ChannelData( const ChannelData& ) = default;
             
             /***** PreProcessing (manager) *****/
             void getPatchData(const PatchData&);
@@ -53,6 +54,9 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
             uint64_t unpack(const char*, bool);
+            size_t csize(void) const { return size(); };
+            uint64_t cpack(char* p) const { return pack(p); };
+            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
             void cclear(void);
 
             std::shared_ptr<Channel> myChannel;
@@ -61,17 +65,22 @@ namespace redux {
 
         
         class Object;
-        struct ObjectData {
+        struct ObjectData : public redux::util::CacheItem {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
-            ObjectData( std::shared_ptr<Object> o );
+            ObjectData( std::shared_ptr<Object> o, const std::string& cachePath );
             void getPatchData(const PatchData& patch);
             void initPatch(void);
             void collectResults(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
+            size_t csize(void) const { return size(); };
+            uint64_t cpack(char* p) const { return pack(p); };
+            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
+            bool cacheLoad(bool removeAfterLoad=false);
+            bool cacheStore(bool clearAfterStore=false);
             void cclear(void);
             
             std::vector<ChannelData> channels;
@@ -107,6 +116,9 @@ namespace redux {
             uint64_t cpack(char* p) const { return pack(p); };
             uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
             void cclear(void);
+            bool cacheLoad(bool removeAfterLoad=false);
+            bool cacheStore(bool clearAfterStore=false);
+
             bool operator==(const PatchData&);
         };
        

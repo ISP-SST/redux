@@ -21,13 +21,16 @@ const std::string thisChannel = "data";
 }
 
 
-ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
-
+ChannelData::ChannelData( std::shared_ptr<Channel> c, const std::string& cachePath ) : myChannel(c) {
+    string path = cachePath + "_" + to_string(c->id());
+    setPath(path);
 }
 
 
 void ChannelData::getPatchData(const PatchData& patch) {
     myChannel->getPatchData(*this,patch);
+    isLoaded = true;
+    cacheStore(true);
 }
 
 
@@ -73,10 +76,12 @@ void ChannelData::cclear(void) {
 }
 
 
-ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
+ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& cachePath ) : myObject(o) {
 
+    string path = cachePath + "_" + to_string(o->id());
+    setPath(path);
     for( auto& it: o->getChannels() ) {
-        channels.push_back(ChannelData(it));
+        channels.push_back(ChannelData(it,path));
     }
 
 }
@@ -146,7 +151,7 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     count += div.unpack(ptr+count,swap_endian);
     channels.clear();
     for( auto& it: myObject->getChannels() ) {
-        ChannelData chan(it);
+        ChannelData chan(it,path());
         count += chan.unpack( ptr+count, swap_endian );
         channels.push_back(chan);
     }
@@ -154,20 +159,42 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
+bool ObjectData::cacheLoad(bool removeAfterLoad) {
+    bool loaded(false);
+    for( ChannelData& cd: channels ) {
+        loaded |= cd.cacheLoad(removeAfterLoad);
+    }
+    loaded |= CacheItem::cacheLoad(removeAfterLoad);
+    return loaded;      // true if any part was loaded, TODO better control of partial fails.
+}
+
+
+bool ObjectData::cacheStore(bool clearAfterStore) {
+    bool stored(false);
+    for( ChannelData& cd: channels ) {
+        stored |= cd.cacheStore(clearAfterStore);
+    }
+    stored |= CacheItem::cacheStore(clearAfterStore);      // true if any part was stored, TODO better control of partial fails.
+}
+
+
 void ObjectData::cclear(void) {
     for( ChannelData& cd: channels ) {
         cd.cclear();
     }
-    channels.clear();
+    //channels.clear();
 }
 
 
 PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
     
+    string path = to_string(j.info.id)+"/patch_"+(string)index;
+    setPath(path); 
     for( auto& it: j.getObjects() ) {
-        objects.push_back(ObjectData(it));
+        objects.push_back(ObjectData(it,path));
     }
 
+    
 }
 
 
@@ -224,7 +251,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += roi.unpack(ptr+count, swap_endian);
     objects.clear();
     for( auto& it: myJob.getObjects() ) {
-        ObjectData obj(it);
+        ObjectData obj(it,path());
         count += obj.unpack( ptr+count, swap_endian );
         objects.push_back(obj);
     }
@@ -236,9 +263,26 @@ void PatchData::cclear(void) {
     for( ObjectData& obj: objects ) {
         obj.cclear();
     }
-    objects.clear();
+    //objects.clear();
 }
 
+bool PatchData::cacheLoad(bool removeAfterLoad) {
+    bool loaded(false);
+    for( ObjectData& obj: objects ) {
+        loaded |= obj.cacheLoad(removeAfterLoad);
+    }
+    //loaded |= CacheItem::cacheLoad(removeAfterLoad);
+    return loaded;
+}
+
+bool PatchData::cacheStore(bool clearAfterStore) {
+    bool stored(false);
+    for( ObjectData& obj: objects ) {
+        stored |= obj.cacheStore(clearAfterStore);
+    }
+    //stored |= CacheItem::cacheStore(clearAfterStore);
+    return stored;
+}
 
 bool PatchData::operator==(const PatchData& rhs) {
     if(Part::operator==(rhs)) {

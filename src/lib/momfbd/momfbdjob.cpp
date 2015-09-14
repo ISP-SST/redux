@@ -424,7 +424,6 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     for( uint y=0; y<subImagePosY.size(); ++y ) {
         for( uint x=0; x<subImagePosX.size(); ++x ) {
             PatchData::Ptr patch( new PatchData(*this, y, x ) );
-            patch->setPath(to_string(info.id)+"/patch_"+(string)patch->index);      // will cache PatchData in sysDataDir/jobID/patch_(?,?)
             patch->step = JSTEP_QUEUED;
             patch->roi.first = Point16(subImagePosY[y]-halfPatchSize-1, subImagePosX[x]-halfPatchSize-1);   // subImagePosX/Y is 1-based
             patch->roi.last = patch->roi.first+ps-1;
