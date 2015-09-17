@@ -195,7 +195,7 @@ namespace redux {
             };
 
             template <typename ...S>
-            Array( T* ptr, S ...sizes ) {
+            Array( T* ptr, S ...sizes ) : begin_(0), end_(0) {
                 wrap( ptr, sizes... );
             }
 
@@ -264,6 +264,11 @@ namespace redux {
              */
             template <typename ...S> explicit Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
 
+            virtual ~Array() {};
+            
+            long int use_count(void) const { return datablock.use_count(); };
+            
+            inline bool empty( void ) const { return (nElements_ == 0); };
             
             /*! @brief Get the @e packed size of this array
              *  @details This is only for getting the size needed to store the packed array.
@@ -286,7 +291,15 @@ namespace redux {
                 uint64_t count = pack( ptr, size() );
                 if( nElements_ ) {
                     count += pack( ptr+count, dimensions() );
-                    count += pack( ptr+count, get(), nElements_ );
+                    if(dense_) {
+                        count += pack( ptr+count, get(), nElements_ );
+                    } else {
+                        T* dptr = new T[nElements_];
+                        std::transform(begin(), end(), dptr, [](const T& a) { return a; });
+                        //std::copy(begin(), end(), dptr);
+                        count += pack( ptr+count, dptr, nElements_ );
+                        delete[] dptr;
+                    }
                 }
                 return count;
 
