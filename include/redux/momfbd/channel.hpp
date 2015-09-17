@@ -7,6 +7,8 @@
 #include <redux/image/image.hpp>
 #include <redux/util/arraystats.hpp>
 
+#include <future>
+
 #include <boost/asio.hpp>
 #include <boost/property_tree/ptree.hpp>
 namespace bpt = boost::property_tree;
@@ -46,9 +48,10 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&) const;
-            size_t nImages(void) const { return images.size(); } 
-            void getPatchData(ChannelData&, const PatchData&) const;
-            
+            size_t nImages(void) const { return imageNumbers.size(); } 
+            void adjustCutout(ChannelData&, const Region16&) const;
+            void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
+            void storePatchData(boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>&);          
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
@@ -76,18 +79,19 @@ namespace redux {
             void initCache(void);
             void cleanup(void);
             
-            void loadData(boost::asio::io_service&);
+            void loadCalib(boost::asio::io_service&);
+            void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void unloadData(void);
             void unloadCalib(void);
 
-            void preprocessData(boost::asio::io_service&);
+            void preprocessData(void);
             void normalizeData(boost::asio::io_service&, double value);
 
-            void loadImage(size_t index);
-            void preprocessImage(size_t index, double avgMean);
+            void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
+            void loadImage(size_t index, redux::util::Array<PatchData::Ptr>&);
+            void preprocessImage(size_t index, redux::image::Image<float>& img, redux::util::Array<PatchData::Ptr>&);
             void normalizeImage(size_t index, double value);
-            
-            size_t sizeOfPatch(uint32_t) const;
+            void copyImagesToPatch(ChannelData&);          
             
             Point16 getImageSize(void);
 
@@ -95,12 +99,13 @@ namespace redux {
             /*************   Local variables for   ***************/
             /************* PreProcessing on master ***************/
             std::vector<redux::util::ArrayStats::Ptr> imageStats;
-            std::vector<redux::image::Image<float>> images;
+            redux::image::Image<float> images;
             redux::image::Image<float> dark, gain;
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
             bpx::ptime startT, endT;
+            std::future<bool> patchWriteFail;
             /*****************************************************/
             
             /*************   Local variables for   ***************/
@@ -124,6 +129,7 @@ namespace redux {
             MomfbdJob& myJob;
 
             friend class Object;
+            friend class MomfbdJob;
             friend struct Tilts;
             friend class WorkSpace;
             friend struct SubImage;

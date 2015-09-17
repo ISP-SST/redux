@@ -29,8 +29,8 @@ namespace redux {
             typedef std::shared_ptr<WorkSpace> Ptr;
 
             const std::vector<std::shared_ptr<Object>>& objects;
-            std::map<uint32_t, std::shared_ptr<WaveFront>> wavefronts;              //!< Constrained groups, using imageNumber/wf_num as identifier.
-            std::map<uint16_t, std::shared_ptr<Tilts>> tilts;                        //!< Constrained tilts.
+            //std::map<uint32_t, std::shared_ptr<WaveFront>> wavefronts;              //!< Constrained groups, using imageNumber/wf_num as identifier.
+            //std::map<uint16_t, std::shared_ptr<Tilts>> tilts;                        //!< Constrained tilts.
             
             WorkSpace(const redux::momfbd::MomfbdJob&);
             ~WorkSpace();

@@ -583,9 +583,9 @@ namespace {
 }
 
 
-void Channel::loadData (boost::asio::io_service& service) {
+void Channel::loadCalib(boost::asio::io_service& service) {
 
-    LOG_TRACE << "Channel::loadData()";
+    LOG_TRACE << "Channel::loadCalib()";
     // TODO: absolute/relative paths
     // TODO: cache files and just fetch shared_ptr
 
@@ -634,6 +634,7 @@ void Channel::loadData (boost::asio::io_service& service) {
     }
 
     if (!pupilFile.empty()) {
+        // FIXME
     }
 
     if (!mmFile.empty()) {
@@ -647,30 +648,53 @@ void Channel::loadData (boost::asio::io_service& service) {
     if (!yOffsetFile.empty()) {
         service.post(std::bind(ClippedFile::load<int16_t>, std::ref(yOffset), yOffsetFile, alignClip, false/*norm*/, false/*symclip*/));
     }
-
-    size_t nImages = std::max<size_t>(1,imageNumbers.size());       // If no numbers, load template as single file
     
-    images.resize(nImages);
+}
+
+
+void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
+
+    LOG_TRACE << "Channel::loadData()";
+    size_t nImages = std::max<size_t>(1,imageNumbers.size());       // If no numbers, load template as single file
+
+    startT = bpx::pos_infin;
+    endT = bpx::neg_infin;
+    
+    // Prepare needed storage
+    images.resize(nImages,imgSize.y,imgSize.x);
     imageStats.resize(nImages);
-
-    if (imageNumbers.empty()) {
-        imageStats[0].reset (new ArrayStats());
-        service.post( [this](){
-                    bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
-                    ClippedFile::load(images[0],fn.string(),alignClip);
-                    imageStats[0]->getStats(myJob.borderClip, images[0], ST_VALUES);  // only get min/max/mean
-                   });
-    } else {
-        for (size_t i = 0; i < nImages; ++i) {
-            imageStats[i].reset (new ArrayStats());
-            service.post( [this,i](){
-                        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[i]));
-                        ClippedFile::load(images[i],fn.string(),alignClip);
-                        imageStats[i]->getStats(myJob.borderClip, images[i], ST_VALUES);  // only get min/max/mean
-                       });
-        }
+    service.post(std::bind(&Channel::adjustCutouts, this, std::ref(patches)));
+    
+    // load data (and preprocess)
+    imageStats[0].reset(new ArrayStats());
+    service.post(std::bind(&Channel::loadImage, this, 0, std::ref(patches)));
+    for (size_t i = 1; i < nImages; ++i) {
+        imageStats[i].reset (new ArrayStats());
+        service.post(std::bind(&Channel::loadImage, this, i, std::ref(patches)));
     }
+    runThreadsAndWait(service, myJob.info.maxThreads);
+    
+    patchWriteFail = std::async( launch::async, [this,&patches](){
+        size_t nPatchesY = patches.dimSize(0);
+        size_t nPatchesX = patches.dimSize(1);
+        for(uint py=0; py<nPatchesY; ++py) {
+            for(uint px=0; px<nPatchesX; ++px) {
+                ChannelData& chData(patches(py,px)->objects[myObject.ID].channels[ID]);
+                copyImagesToPatch(chData);
+                chData.cacheStore(true);    // store to disk and clear array
+            }
+        }
+        images.clear();
+        return false;   // TODO return true if any error
+    });
 
+    
+    //service.post(std::bind(&Channel::copyImagesToPatches, this, std::ref(patches)));
+    runThreadsAndWait(service, myJob.info.maxThreads);
+    
+    //storePatchData(service,patches);
+    //runThreadsAndWait(service, myJob.info.maxThreads);
+    //Ana::write("chan_img_"+to_string(ID)+".f0",images);
 
 }
 
@@ -687,7 +711,7 @@ void Channel::unloadData(void) {
         bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
         ClippedFile::unload<float>(fn.string(),alignClip);
     }
-    images.clear();
+    //images.clear();
   
 }
 
@@ -723,8 +747,8 @@ void Channel::unloadCalib(void) {
 
 }
 
-void Channel::preprocessData (boost::asio::io_service& service) {
-
+void Channel::preprocessData(void) {
+/*
     size_t nImages = images.size();
     if( nImages ) {
         double avgMean = 0.0;
@@ -741,10 +765,10 @@ void Channel::preprocessData (boost::asio::io_service& service) {
         }
         avgMean /= static_cast<double> (nImages);
         for (size_t i = 0; i < nImages; ++i) {
-            service.post(std::bind (&Channel::preprocessImage, this, i, avgMean));
+            preprocessImage(i, avgMean);
         }
     }
-
+*/
 }
 
 
@@ -771,7 +795,7 @@ void Channel::initProcessing (WorkSpace::Ptr ws) {
     workspace = ws;
     initCache();        // this will initialize modes & pupil for this channel
     initPhiFixed();
-    for (auto & m : modes) {           // check if the tilts are present
+ /*   for (auto & m : modes) {           // check if the tilts are present
         if (m.first == 2 || m.first == 3) {
             shared_ptr<Tilts> tilts (new Tilts (*this, m.first));
             auto ret = workspace->tilts.emplace (m.first, tilts);
@@ -795,7 +819,7 @@ void Channel::initProcessing (WorkSpace::Ptr ws) {
             }
         }
     }
-
+*/
 }
 
 
@@ -822,9 +846,6 @@ void Channel::initPatch (ChannelData& cd) {
                                         patchSize, pupilPixels));   // TODO: fix offsets
         subImages.push_back (simg);
         simg->init();
-        std::shared_ptr<WaveFront>& wf = workspace->wavefronts[imageNumber];
-        if (!wf) cout << "Channel::initPatch(): wf = NULL for imageNumber = " << imageNumber << endl;
-        wf->addImage (simg);
     }
 }
 
@@ -928,28 +949,70 @@ void Channel::normalizeData (boost::asio::io_service& service, double value) {
 }
 
 
-void Channel::loadImage (size_t index) {
-/*    Image<double> subimg (images, index, index, 0, images.dimSize (1) - 1, 0, images.dimSize (2) - 1);
-    bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
-    redux::file::readFile (fn.string(), subimg);
-    LOG_DETAIL << boost::format ("Loaded file %s") % fn;
-    imageStats[index]->getStats (myJob.borderClip, subimg, ST_VALUES);                       // only get min/max/mean
-*/}
+void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd ) {
+
+    unique_lock<mutex> lock(mtx);
+    
+    if(startT.is_special()) startT = newStart;
+    else startT = std::min( startT, newStart );
+    if(endT.is_special()) endT = newEnd;
+    else endT = std::max( endT, newEnd );
+
+}
 
 
-void Channel::preprocessImage (size_t index, double avgMean) {
+void Channel::loadImage(size_t i, Array<PatchData::Ptr>& patches) {
+    
+    bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[i]));
+    ClippedFile cf(fn.string(),alignClip,false);
+    //for( int i=0; i< 10; ++i ) {
+    //Image<double> tmpImg;
+    Image<float> tmpImg;
+    Image<float> view(images,i,i,0,imgSize.y-1,0,imgSize.x-1);
+//    static atomic<int> cnt;
+//    cout << "Channel::loadImage: " << __LINE__ << "  loading file viewget=" << hexString(view.get()) << endl;
+    cf.loadImage(tmpImg,false);
+    if(tmpImg.meta) {
+        addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
+    }
 
-    double imgMean = imageStats[index]->mean;
-    bool modified = false;
+//    ClippedFile::load(tmpImg,fn.string(),alignClip);
+//    cout << "Channel::loadImage: " << __LINE__ << "  loading file tmpget=" << hexString(tmpImg.get()) << endl;
+//    Ana::write("chan_"+to_string(ID)+"_tmpimg_"+to_string(i)+".f0",tmpImg);
+ //   cout << "Channel::loadImage: " << __LINE__ << "  loading file get=" << hexString(tmpImg.get()) << endl;
+    view.assign(reinterpret_cast<redux::util::Array<float>&>(tmpImg));
+ //   cout << "Channel::loadImage: " << __LINE__ << "  loading file viewget2=" << hexString(view.get()) << endl;
+ //   Ana::write("chan_"+to_string(ID)+"_view_"+to_string(i)+".f0",view);
+     preprocessImage(i, view, patches);
+//    Ana::write("chan_"+to_string(ID)+"_view2_"+to_string(i)+".f0",view);
+ //   cout << "Channel::loadImage: " << __LINE__ << "  loading file viewget3=" << hexString(view.get()) << endl;
+          imageStats[i]->getStats(myJob.borderClip, view);     // get stats for corrected data
+   // }
+//     cout << "Channel::loadImage: " << __LINE__  << "  img=" << hexString(tmpImg.get()) << endl;
+//     //ClippedFile::load(images[i],fn.string(),alignClip);
+//     //imageStats[i]->getStats(myJob.borderClip, tmpImg, ST_VALUES);  // only get min/max/mean
+//     preprocessImage(i, tmpImg, patches);
+//     cout << "Channel::loadImage: " << __LINE__  << endl;
+//     imageStats[i]->getStats(myJob.borderClip, tmpImg);     // get stats for corrected data
+//     cout << "Channel::loadImage: " << __LINE__  << endl;
+//    ClippedFile::unload<float>(fn.string(),alignClip);
+//     cout << "Channel::loadImage: " << __LINE__ << "  unloaded file #" << cnt-- << "   use_count = " << tmpImg.use_count() << endl;
+//   
+}
 
+
+void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData::Ptr>& patches) {
+
+   // double imgMean = imageStats[index]->mean;
     Array<double> tmpImg;
-    tmpImg = images[index].copy<double>();
-    //images[index].copy(tmpImg);
+    tmpImg = img.copy<double>();
+    /*bool modified = false;
+
+
     bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
     LOG_TRACE << boost::format ("Pre-processing image %s") % fn;
-    redux::file::Ana::write(fn.string()+"_raw.f0", images[index]);
-    redux::file::Ana::write(fn.string()+"_copy.f0", tmpImg);
-    // Michiel's method for detecting bitshifted Sarnoff images.
+
+    // Michiel's method for detecting bitshifted Sarnoff images.    TODO make this an SST-specific "filter" to be applied on raw data
     if (imgMean > 4 * avgMean) {
         LOG_WARN << boost::format ("Image bit shift detected for image %s (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!") % fn;
         tmpImg *= 0.625;
@@ -958,7 +1021,7 @@ void Channel::preprocessImage (size_t index, double avgMean) {
         LOG_WARN << boost::format ("Image bit shift detected for image %s (mean < 0.25*avgMean). adjust factor=16 (keep your fingers crossed)!") % fn;
         tmpImg *= 16;
         modified = true;
-    }
+    }*/
 
     if (dark.valid() && gain.valid()) {
         if (! tmpImg.sameSize (dark)) {
@@ -979,11 +1042,6 @@ void Channel::preprocessImage (size_t index, double avgMean) {
         } else {
             tmpImg -= dark;
         }
-        //tmpImg -= reinterpret_cast<const redux::util::Array<float>&>(dark);
-        modified = true;
-    redux::file::Ana::write(fn.string()+"_dark.f0", dark);
-    redux::file::Ana::write(fn.string()+"_dark2.f0", reinterpret_cast<redux::util::Array<float>&>(dark));
-    redux::file::Ana::write(fn.string()+"_darked.f0", tmpImg);
         
         if (ccdResponse.valid()) {   // correct for the detector response (this should not contain the gain correction and must be done before descattering)
             //tmpImg *= ccdResponse;
@@ -999,11 +1057,9 @@ void Channel::preprocessImage (size_t index, double avgMean) {
             }
         }
 
+   // cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
         tmpImg *= gain;
-        //tmpImg *= gain;
-        //tmpImg *= reinterpret_cast<const redux::util::Array<float>&>(gain);
-    redux::file::Ana::write(fn.string()+"_gain.f0", gain);
-    redux::file::Ana::write(fn.string()+"_gained.f0", tmpImg);
+  //  cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
 
         namespace sp = std::placeholders;
         size_t sy = tmpImg.dimSize(0);
@@ -1031,79 +1087,117 @@ void Channel::preprocessImage (size_t index, double avgMean) {
         }
 
     }
-    redux::file::Ana::write(fn.string()+"_filled.f0", tmpImg);
 
-    imageStats[index]->getStats(myJob.borderClip, tmpImg);     // get stats for corrected data
-    tmpImg.copy(images[index]);
-    
-    if (modified && (myObject.saveMask & SF_SAVE_FFDATA)) {
+     img.assign(tmpImg);
+     
+ //   cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
+ //   copyImageToPatches(index, tmpImg, patches);
+  //  cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
+  
+    if((myObject.saveMask & SF_SAVE_FFDATA)) {
+        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
         fn = bfs::path (fn.leaf().string() + ".cor");
         LOG_DETAIL << boost::format ("Saving flat/dark corrected file %s") % fn.string();
-        redux::file::Ana::write (fn.string(), images[index]);   // TODO: other formats
+        redux::file::Ana::write (fn.string(), tmpImg.copy<float>());   // TODO: other formats
     }
+
 
 }
 
 
 void Channel::normalizeImage (size_t index, double value) {
-    images[index] *= (value / imageStats[index]->mean);
+    //images[index] *= (value / imageStats[index]->mean);
     double noise1 = imageStats[index]->noise;
-    imageStats[index]->getStats(images[index]);
+    //imageStats[index]->getStats(images[index]);
     LOG_TRACE << boost::format("Normalizing image (%d,%d,%d):  noise1 = %f   noise2 = %f") % myObject.ID % ID % (index) % noise1 % imageStats[index]->noise;
 }
 
 
-size_t Channel::sizeOfPatch (uint32_t npixels) const {
-    size_t sz = sizeof (size_t) + imageStats.size() * sizeof (float);
-    sz += npixels * images.size() * sizeof (float);
-    return sz;
+void Channel::copyImagesToPatch(ChannelData& chData) {
+    
+    size_t nImages = std::max<size_t>(1,imageNumbers.size());
+    Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nImages-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
+    //redux::file::Ana::write ("chan_"+to_string(ID)+((string)chData.cutout)+"_block.f0", block);   // TODO: other formats
+    chData.images = std::move(block);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
+    //redux::file::Ana::write ("chan_"+to_string(ID)+((string)chData.cutout)+"_cd.f0", chData.images);   // TODO: other formats
+    chData.setLoaded();
+    
 }
 
 
-void Channel::getPatchData (ChannelData& chData, const PatchData& patch) const {
+void Channel::adjustCutout(ChannelData& chData, const Region16& origCutout) const {
 
-    size_t nImages = images.size();
+    RegionI desiredCutout = origCutout;
+    desiredCutout.grow(maxLocalShift);
+
+    chData.cutout = desiredCutout;
     chData.offset = 0;
     chData.residualOffset = 0;
     
-    if (nImages && (images[0].nDimensions() == 2)) {
-        RegionI imgBoundary(0,0,images[0].dimSize(0)-1,images[0].dimSize(1)-1);
-        RegionI desiredCutout = patch.roi;
-        desiredCutout.grow(maxLocalShift);
-        RegionI actualCutout = desiredCutout;
-        actualCutout.restrict(imgBoundary);
-        if (xOffset.valid()) {
-            ArrayStats stats;
-            stats.getStats (Image<int16_t> (xOffset, actualCutout.first.y, actualCutout.last.y, actualCutout.first.x, actualCutout.last.x), ST_VALUES);
-            chData.residualOffset.x = stats.mean/100.0;
-        }
-        if (yOffset.valid()) {
-            ArrayStats stats;
-            stats.getStats (Image<int16_t> (yOffset, actualCutout.first.y, actualCutout.last.y, actualCutout.first.x, actualCutout.last.x), ST_VALUES);
-            chData.residualOffset.y = stats.mean/100.0;
-        }
+    if( imgSize == 0 ) {
+        LOG_ERR << "No valid imgSize when adjusting cutout, that should not happen...";
+        return;
+    }
+    
+    RegionI imgBoundary(0,0,imgSize.y-1, imgSize.x-1);
+    chData.cutout.restrict(imgBoundary);
 
-        chData.shift = PointI(lround(chData.residualOffset.y),lround(chData.residualOffset.x));
-        chData.shift -= imgBoundary.outside(actualCutout+chData.shift);             // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
-        actualCutout += chData.shift;
-        chData.residualOffset -= chData.shift;
-        chData.offset = maxLocalShift;
-        if (actualCutout != desiredCutout) {
-            chData.offset -= (actualCutout.first - desiredCutout.first - chData.shift);
-        }
-
-        PointI pSize = actualCutout.last - actualCutout.first + 1;
-        chData.images.resize(nImages, pSize.y, pSize.x);
-        Array<float> patchImg(chData.images, 0, 0, 0, pSize.y-1, 0, pSize.x-1);
-        for( uint i=0; i<nImages; ++i) {
-            Image<float> tmpImage(images[i], actualCutout.first.y, actualCutout.last.y, actualCutout.first.x, actualCutout.last.x);
-            patchImg.assign(reinterpret_cast<const redux::util::Array<float>&>(tmpImage));
-            patchImg.shift(0,1);
-        }
+    if (xOffset.valid()) {
+        ArrayStats stats;
+        stats.getStats (Image<int16_t> (xOffset, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x), ST_VALUES);
+        chData.residualOffset.x = stats.mean/100.0;
+    }
+    if (yOffset.valid()) {
+        ArrayStats stats;
+        stats.getStats (Image<int16_t> (yOffset, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x), ST_VALUES);
+        chData.residualOffset.y = stats.mean/100.0;
     }
 
+    chData.shift = PointI(lround(chData.residualOffset.y),lround(chData.residualOffset.x));     // possibly apply shift from offsetfiles.
+    chData.shift -= imgBoundary.outside(chData.cutout+chData.shift);                            // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
+    chData.cutout += chData.shift;
+    chData.residualOffset -= chData.shift;
+    chData.offset = maxLocalShift;
+    if (chData.cutout != desiredCutout) {
+        chData.offset -= (chData.cutout.first - desiredCutout.first - chData.shift);
+    }
+    
 }
 
+
+void Channel::adjustCutouts(Array<PatchData::Ptr>& patches) {
+    
+    if( patches.nDimensions() == 2 ) {
+        size_t nPatchesY = patches.dimSize(0);
+        size_t nPatchesX = patches.dimSize(1);
+        for(uint py=0; py<nPatchesY; ++py) {
+            for(uint px=0; px<nPatchesX; ++px) {
+                PatchData& patch(*patches(py,px));
+                ChannelData& chData = patch.objects[myObject.ID].channels[ID];
+                adjustCutout(chData,patch.roi);
+            }
+        }
+    }
+    
+}
+
+
+void Channel::storePatchData(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
+    
+    if( patches.nDimensions() == 2 ) {
+        size_t nPatchesY = patches.dimSize(0);
+        size_t nPatchesX = patches.dimSize(1);
+        cout << "storing (" << nPatchesY << "x" << nPatchesX << ") patches..." << endl;
+        for(uint py=0; py<nPatchesY; ++py) {
+            for(uint px=0; px<nPatchesX; ++px) {
+                PatchData& patch(*patches(py,px));
+                ChannelData& chData = patch.objects[myObject.ID].channels[ID];
+                service.post(std::bind(&ChannelData::cacheStore,std::ref(chData),true));
+            }
+        }
+    }
+    
+}
 
 Point16 Channel::getImageSize(void) {
 

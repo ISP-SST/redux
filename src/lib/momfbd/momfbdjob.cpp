@@ -7,6 +7,8 @@
 #include "redux/util/bitoperations.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <thread>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 using boost::algorithm::iequals;
@@ -343,43 +345,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
             throw std::logic_error("The clipped images have different sizes for the different objects, please verify the ALIGN_CLIP values.");
         }
     }
-    service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
-    //runThreadsAndWait(service, 1); //info.maxThreads);
+    //service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
+    std::thread initcache(std::bind( &MomfbdJob::initCache, this));     // run in background while loading data.
     
-    // load shared files synchronously (dark,gain,psf,offset...)
-    /*if( pupil.nDimensions() < 2 && pupilFile != "" ) {
-        service.post( std::bind( util::loadPupil, pupilFile, std::ref(pupil), 0 ) );
-    }*/
-    for( shared_ptr<Object>& obj : objects ) {
-        obj->loadData(service);
-    }
-
-    //info.maxThreads = 12;
-    runThreadsAndWait(service, info.maxThreads);
-
-    // Done loading files -> start the preprocessing (flatfielding etc.)
-    for( shared_ptr<Object>& obj : objects ) {
-        obj->preprocessData(service);
-    }
-    runThreadsAndWait(service, info.maxThreads);
-    
-    // Done pre-processing -> normalize within each object
-    for( shared_ptr<Object>& obj : objects) {
-        obj->normalize(service);
-    }
-    
-    // Done normalizing -> collect images to master-stack
-    
-    /*imageStack.resize(nTotalImages,imageSizes.y,imageSizes.x);
-    for( shared_ptr<Object>& obj : objects ) {
-        obj->collectImages(imageStack);
-    }
-    redux::file::Ana::write( "masterstack.f0", imageStack );
-    */
-    
-    // Done normalizing -> split in patches
-    
-    //int patchSeparation = 3 * patchSize / 4 - minimumOverlap; // target separation
     uint16_t halfPatchSize = patchSize/2;
     uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
     // TODO: do split per channel instead, to allow for different image-scales and/or hardware
@@ -416,7 +384,6 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
             pos = adjustedPos;
         }
     }
-
     uint64_t count(0);
     patches.resize(subImagePosY.size(),subImagePosX.size());
     Point16 ps(patchSize,patchSize);
@@ -427,19 +394,30 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
             patch->roi.first = Point16(subImagePosY[y]-halfPatchSize-1, subImagePosX[x]-halfPatchSize-1);   // subImagePosX/Y is 1-based
             patch->roi.last = patch->roi.first+ps-1;
             patch->id = ++count;
-            service.post( std::bind( &PatchData::getData, patch.get() ) );
             patches(y,x) = patch;
         }
     }
 
-    //service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
+
+    for( shared_ptr<Object>& obj : objects ) {
+        //service.post( std::bind( &Object::loadData, obj.get(), patches ) );
+        obj->loadData(service, patches);
+    }
     
-    LOG_DETAIL << "MomfbdJob::preProcess()  nPatches = " << patches.nElements();
-    runThreadsAndWait(service, info.maxThreads);
+
+    initcache.join();           // wait for background jobs.
+    bool writeFailed(false);
+    for( shared_ptr<Object>& obj : objects ) {
+        for( shared_ptr<Channel>& ch : obj->channels ) {
+            writeFailed |= ch->patchWriteFail.get();            // FIXME only used as a synch-point atm. It should deal with errors eventually.
+        }
+    }
+    if(writeFailed) LOG_ERR<< "MomfbdJob::preProcess()  Hmmmmm, that's odd, I haven't implemented any error-reporting yet.";
+
+    LOG_DETAIL << "MomfbdJob::preProcess()  Done.  nPatches = " << patches.nElements();
 
     info.step.store( JSTEP_QUEUED );
 
-    LOG_DETAIL << "MomfbdJob::preProcess()  Done.";
 }
 
 void MomfbdJob::initCache(void) {

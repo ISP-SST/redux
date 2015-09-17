@@ -90,7 +90,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 
 size_t Object::size(void) const {
     size_t sz = ObjectCfg::size();
-    sz += 2*sizeof(uint16_t);                   // channels.size() + ID
+    sz += 2*sizeof(uint16_t) + sizeof(double);                   // channels.size() + ID + maxMean
     for( const shared_ptr<Channel>& ch : channels ) {
         sz += ch->size();
     }
@@ -103,6 +103,7 @@ uint64_t Object::pack(char* ptr) const {
     using redux::util::pack;
     uint64_t count = ObjectCfg::pack(ptr);
     count += pack(ptr+count, ID);
+    count += pack(ptr+count, objMaxMean);
     count += pack(ptr+count, (uint16_t)channels.size());
     for( const shared_ptr<Channel>& ch : channels ) {
         count += ch->pack(ptr+count);
@@ -120,6 +121,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 
     uint64_t count = ObjectCfg::unpack(ptr, swap_endian);
     count += unpack(ptr+count, ID, swap_endian);
+    count += unpack(ptr+count, objMaxMean, swap_endian);
     uint16_t tmp;
     count += unpack(ptr+count, tmp, swap_endian);
     channels.resize(tmp);
@@ -157,12 +159,16 @@ void Object::initProcessing( WorkSpace::Ptr ws ) {
     } else {
         LOG_ERR << "Object patchSize is 0 !!!";
     }
+    
 }
 
 
 void Object::initPatch( ObjectData& od ) {
     unique_lock<mutex> lock (mtx);
-//    cout << "Object::initPatch(" << hexString (this) << ")  reg_gamma = " << myJob.reg_gamma << endl;
+    for(int i=0; i< channels.size(); ++i) {
+        
+    }
+// //    cout << "Object::initPatch(" << hexString (this) << ")  reg_gamma = " << myJob.reg_gamma << endl;
     reg_gamma = 0;
     ftSum.zero();
 }
@@ -449,6 +455,7 @@ void Object::fitAvgPlane(ObjectData& od) {
 }
 
 
+
 void Object::calcMetric (void) {
     
    // cout << "Object::calcMetric(" << hexString(this) << ")  " << __LINE__ << "   otfsz = " << otfIndices.size() << endl;
@@ -602,38 +609,25 @@ void Object::cleanup( void ) {
 }
 
 
-void Object::loadData( boost::asio::io_service& service ) {
-    for( shared_ptr<Channel>& ch : channels ) {
-        ch->loadData( service );
-    }
-}
-/*
-Point16 Object::getImageSize (void) {
-    if( imgSize == 0 ) {
-        for (shared_ptr<Channel>& ch : channels) {
-            Point16 tmp = ch->getImageSize();
-            if (imgSize == 0) {
-                imgSize = tmp;
-            } else if (tmp != imgSize) {
-                throw std::logic_error ("The images have different sizes for the different channels, please verify the ALIGN_CLIP values.");
-            }
-        }
-    }
-    return imgSize;
-}
-*/
-
-
-
-void Object::preprocessData (boost::asio::io_service& service) {
+void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& patches ) {
+    
     nObjectImages = nImages();
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
     alphaToPixels = 0;
     pixelsToAlpha = 0;
+    
     int count(0);
     for (shared_ptr<Channel>& ch : channels) {
-        ch->preprocessData (service);
+        ch->loadCalib(service);
+    }
+    runThreadsAndWait(service, myJob.info.maxThreads);
+    
+    objMaxMean = std::numeric_limits<double>::lowest();
+    for (shared_ptr<Channel>& ch : channels) {
+        ch->loadData(service, patches);
+        runThreadsAndWait(service, myJob.info.maxThreads);
+        objMaxMean = std::max(objMaxMean,ch->getMaxMean());
         if(startT.is_special()) startT = ch->startT;
         else startT = std::min(startT,ch->startT);
         if(endT.is_special()) endT = ch->endT;
@@ -642,148 +636,18 @@ void Object::preprocessData (boost::asio::io_service& service) {
         pixelsToAlpha += ch->pixelsToAlpha;
         count++;
     }
+    
     if( count ) {
         alphaToPixels /= count;
         pixelsToAlpha /= count;
     }
-}
-
-
-void Object::normalize(boost::asio::io_service& service ) {
-
-    double maxMean = std::numeric_limits<double>::lowest();
-    for( shared_ptr<Channel>& ch : channels ) {
-        double mM = ch->getMaxMean();
-        if( mM > maxMean ) maxMean = mM;
-    }
-    for( shared_ptr<Channel>& ch : channels ) {
-        ch->normalizeData(service, maxMean);
-    }
-}
-
-
-void Object::prepareStorage (void) {
-
-    bfs::path fn = bfs::path (outputFileName + ".momfbd");      // TODO: fix storage properly
-
-    LOG << "Preparing file " << fn << " for temporary, and possibly final, storage.";
-
-    std::shared_ptr<FileMomfbd> info (new FileMomfbd());
-
-    // Extract date/time from the git commit.
-    int day, month, year, hour;
-    char buffer [15];
-    sscanf (reduxCommitTime, "%4d-%2d-%2d %2d", &year, &month, &day, &hour);
-    sprintf (buffer, "%4d%02d%02d.%02d", year, month, day, hour);
-    info->versionString = buffer;
-    info->version = atof (info->versionString.c_str());
-
-    info->dateString = "FIXME";
-    info->timeString = "FIXME";
-//     if(false) {
-//         for( auto& it: channels ) {
-//             info->fileNames.push_back ( "FIXME" );
-//         }
-//         info->dataMask |= MOMFBD_NAMES;
-//     }
-    info->nFileNames = info->fileNames.size();
-
-    int32_t n_img = nImages();
-    int32_t nChannels = info->nChannels = channels.size();
-    info->clipStartX = sharedArray<int16_t> (nChannels);
-    info->clipEndX = sharedArray<int16_t> (nChannels);
-    info->clipStartY = sharedArray<int16_t> (nChannels);
-    info->clipEndY = sharedArray<int16_t> (nChannels);
-    for (int i = 0; i < nChannels; ++i) {
-        info->clipStartX.get() [ i ] = channels[i]->alignClip[0];
-        info->clipEndX.get() [ i ] = channels[i]->alignClip[1];
-        info->clipStartY.get() [ i ] = channels[i]->alignClip[2];
-        info->clipEndY.get() [ i ] = channels[i]->alignClip[3];
-    }
-
-    info->nPH = pupilPixels;
-
-    Array<float> tmp;
-
-    if (saveMask & SF_SAVE_MODES && (info->nPH > 0)) {
-        double pupilRadiusInPixels = pupilPixels / 2.0;
-        if (channels.size()) pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
-        tmp.resize (myJob.modeNumbers.size() + 1, info->nPH, info->nPH);            // +1 to also fit pupil in the array
-        tmp.zero();
-        Array<float> tmp_slice (tmp, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1);     // subarray
-        tmp_slice.assign(myJob.globalData->fetch (pupilPixels, pupilRadiusInPixels).first);     // store pupil at index 0
-        info->phOffset = 0;
-        if (myJob.modeNumbers.size()) {
-            Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-            info->nModes = myJob.modeNumbers.size();
-            info->modesOffset = pupilPixels * pupilPixels * sizeof (float);
-            for (uint16_t & it : myJob.modeNumbers) {   // Note: globalData might also contain modes we don't want to save here, e.g. PhaseDiversity modes.
-                if (it > 3 && myJob.modeBasis != ZERNIKE) {       // use Zernike modes for the tilts
-                    id.firstMode = myJob.klMinMode;
-                    id.lastMode = myJob.klMaxMode;
-                } else id.firstMode = id.lastMode = 0;
-                tmp_slice.shift (0, 1);     // shift subarray 1 step
-                id.modeNumber = it;
-                tmp_slice.assign(reinterpret_cast<const Array<double>&> (*myJob.globalData->fetch(id)));
-
-            }
-        }
-    }
-
-    /*
-    info->pix2cf = pix2cf;
-    info->cf2pix = cf2pix;
-    */
-    info->nPatchesX = 0;//nPatchesX;
-    info->nPatchesY = 0;//nPatchesY;
-    info->patches.resize (info->nPatchesX, info->nPatchesY);
-
-    auto dummy = sharedArray<int32_t> (nChannels);
-    for (int x = 0; x < info->nPatchesX; ++x) {
-        for (int y = 0; y < info->nPatchesY; ++y) {
-            info->patches(x,y).region[0] = info->patches(x,y).region[2] = 1;
-            info->patches(x,y).region[1] = info->patches(x,y).region[3] = patchSize;
-            info->patches(x,y).nChannels = nChannels;
-            info->patches(x,y).nim = sharedArray<int32_t> (nChannels); //dummy;
-            info->patches(x,y).dx = sharedArray<int32_t> (nChannels); //dummy;
-            info->patches(x,y).dy = sharedArray<int32_t> (nChannels);; //dummy;
-            for (int i = 0; i < nChannels; ++i) {
-                info->patches(x,y).nim.get() [i] = 1000 + x * 100 + y * 10 + i;
-                info->patches(x,y).dx.get() [i] = 2000 + x * 100 + y * 10 + i;
-                info->patches(x,y).dy.get() [i] = 3000 + x * 100 + y * 10 + i;
-            }
-            info->patches(x,y).npsf = n_img;
-            info->patches(x,y).nobj = n_img;
-            info->patches(x,y).nres = n_img;
-            info->patches(x,y).nalpha = n_img;
-            info->patches(x,y).ndiv = n_img;
-            info->patches(x,y).nm = info->nModes;
-            info->patches(x,y).nphx = info->nPH;
-            info->patches(x,y).nphy = info->nPH;
-
-        }   // y-loop
-    }   // x-loop
-
-
-
-    uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
-    if (saveMask & SF_SAVE_PSF || saveMask & SF_SAVE_PSF_AVG)    writeMask |= MOMFBD_PSF;
-    if (saveMask & SF_SAVE_COBJ)    writeMask |= MOMFBD_OBJ;
-    if (saveMask & SF_SAVE_RESIDUAL)    writeMask |= MOMFBD_RES;
-    if (saveMask & SF_SAVE_ALPHA)    writeMask |= MOMFBD_ALPHA;
-    if (saveMask & SF_SAVE_DIVERSITY)    writeMask |= MOMFBD_DIV;
-    if (saveMask & SF_SAVE_MODES)    writeMask |= MOMFBD_MODES;
-
-    //cout << "prepareStorage: " << bitString(writeMask) << endl;
-    info->write (fn.string(), reinterpret_cast<char*> (tmp.ptr()), writeMask);
-    //cout << "prepareStorage done."  << endl;
-
+    
 }
 
 
 void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
-    LOG << "Writing output to ANA.   baseName=\"" << outputFileName << "\"";
+    LOG << "BARELY writing output to ANA.   baseName=\"" << outputFileName << "\"";
     
     LOG_WARN << "Writing to ANA still not properly implemented...";
 
@@ -816,7 +680,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
 void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
     bfs::path fn = bfs::path (outputFileName + ".fits");
-    LOG << "Writing output to file: " << fn;
+    LOG << "NOT writing output to file: " << fn;
     LOG_ERR << "Writing to FITS still not implemented...";
 }
 
@@ -904,7 +768,6 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
                 tmp_slice.shift (0, 1);     // shift subarray 1 step
                 id.modeNumber = it;
                 tmp_slice.assign(reinterpret_cast<const Array<double>&>(*myJob.globalData->fetch(id)));
-
             }
         }
     }
@@ -912,8 +775,8 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     
     info->pix2cf = pixelsToAlpha;
     info->cf2pix = alphaToPixels;
-    info->nPatchesY = patchesData.dimSize (0);
-    info->nPatchesX = patchesData.dimSize (1);
+    info->nPatchesY = patchesData.dimSize(0);
+    info->nPatchesX = patchesData.dimSize(1);
     info->patches.resize(info->nPatchesX, info->nPatchesY);
 
     size_t modeSize = modes.nElements()*sizeof (float);
@@ -1031,15 +894,6 @@ void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service
 }
 
 
-size_t Object::sizeOfPatch (uint32_t npixels) const {
-    size_t sz (0);
-    for (const shared_ptr<Channel>& ch : channels) {
-        sz += ch->sizeOfPatch (npixels);
-    }
-    return sz;
-}
-
-
 Point16 Object::getImageSize (void) {
     if( imgSize == 0 ) {
         for (shared_ptr<Channel>& ch : channels) {
@@ -1059,4 +913,5 @@ void Object::dump (std::string tag) {
     Ana::write (tag + "_ftsum.f0", ftSum);
     Ana::write (tag + "_q.f0", Q);
     Ana::write (tag + "_p.f0", P);
+    Ana::write (tag + "_fittedplane.f0", fittedPlane);
 }

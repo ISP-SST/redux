@@ -52,9 +52,9 @@ namespace redux {
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
-            void initProcessing(WorkSpace::Ptr);
-            void initPatch(ObjectData&);
-            void getResults(ObjectData&);
+            void initProcessing(WorkSpace::Ptr);                        //!< Called once per job, to set up storage etc.
+            void initPatch(ObjectData&);                                //!< Called once per patch, normalize, fit plane etc.
+            void getResults(ObjectData&);                               //!< Called on patch-completion, gather up what is going back to the master.
             void initPQ(void);
             void addAllFT(void);
             void addToFT(const redux::image::FourierTransform&, double);
@@ -76,17 +76,12 @@ namespace redux {
             void init(void);
             void initCache(void);
             void cleanup(void);
-            void loadData(boost::asio::io_service&);
-            void preprocessData(boost::asio::io_service&);
+            void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
             void writeResults(const redux::util::Array<PatchData::Ptr>&);
-            void normalize(boost::asio::io_service&);
-            void prepareStorage(void);
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
-            
-            size_t sizeOfPatch(uint32_t) const;
             
             Point16 getImageSize(void);
             
