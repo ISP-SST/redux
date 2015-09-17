@@ -93,7 +93,6 @@ namespace redux {
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/
             std::mutex mtx;
-            //redux::image::FourierTransform ftSum;                //! Fourier-transform of the approximate object (sum of FTs of all images)
             redux::util::Array<double>  ftSum;                //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;
@@ -104,6 +103,7 @@ namespace redux {
             /*****************************************************/
 
             uint16_t ID;
+            double objMaxMean;
             Point16 imgSize;
             uint32_t nObjectImages;
             bpx::ptime startT, endT;

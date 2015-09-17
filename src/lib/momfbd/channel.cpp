@@ -260,7 +260,7 @@ bpt::ptree Channel::getPropertyTree (bpt::ptree& tree) {
 size_t Channel::size (void) const {
 
     size_t sz = ChannelCfg::size();
-    sz += sizeof (uint16_t);        // ID;
+    sz += sizeof (uint16_t);          // ID
     //sz += sizeof (uint32_t);        // dataOffset;
     sz += dark.size();
     sz += imageStats.size() * ArrayStats::size() + sizeof (uint16_t);
@@ -272,7 +272,6 @@ uint64_t Channel::pack (char* ptr) const {
     using redux::util::pack;
     uint64_t count = ChannelCfg::pack (ptr);
     count += pack (ptr + count, ID);
-    //count += pack (ptr + count, dataOffset);
     count += dark.pack (ptr + count);
     uint16_t statSize = imageStats.size();
     count += pack (ptr + count, statSize);
@@ -289,7 +288,6 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
 
     uint64_t count = ChannelCfg::unpack (ptr, swap_endian);
     count += unpack (ptr + count, ID, swap_endian);
-    //count += unpack (ptr + count, dataOffset, swap_endian);
     count += dark.unpack (ptr + count, swap_endian);
     uint16_t statSize;
     count += unpack (ptr + count, statSize, swap_endian);
@@ -556,11 +554,12 @@ void Channel::initCache (void) {
 
     if( needTiltCoeffs ) {
         id.firstMode = id.lastMode = 0;
-        id.modeNumber = 2;
+        id.modeNumber = 3;
         const PupilMode::Ptr mode = myJob.globalData->fetch (id);
-        double dxdp = (*mode)(pupilPixels/2,pupilPixels/2+1) - (*mode)(pupilPixels/2,pupilPixels/2);
-        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*dxdp);
+        double ddx = (*mode)(pupilPixels/2,pupilPixels/2+1) - (*mode)(pupilPixels/2,pupilPixels/2);
+        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*ddx);
         alphaToPixels = 1.0/pixelsToAlpha;
+        
     }
     
     defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
@@ -749,10 +748,10 @@ void Channel::preprocessData (boost::asio::io_service& service) {
 }
 
 
-double Channel::getMaxMean (void) const {
+double Channel::getMaxMean(void) {
     double maxMean = std::numeric_limits<double>::lowest();
     for (ArrayStats::Ptr imStat : imageStats) {
-        if (imStat->mean > maxMean) maxMean = imStat->mean;
+        maxMean = std::max(maxMean,imStat->mean);
     }
     return maxMean;
 }
@@ -1135,7 +1134,6 @@ Point16 Channel::getImageSize(void) {
 void Channel::dump (std::string tag) {
 
     Ana::write (tag + "_pupil.f0", pupil.first);
-    Ana::write (tag + "_fittedplane.f0", fittedPlane);
     Ana::write (tag + "_phi_fixed.f0", phi_fixed);
     Ana::write (tag + "_phi_channel.f0", phi_channel);
 
