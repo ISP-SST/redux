@@ -105,6 +105,7 @@ void ObjectData::initPatch(void) {
     }
     myObject->initPQ();
     myObject->addAllPQ();
+    myObject->fitAvgPlane(*this);
 }
 
 

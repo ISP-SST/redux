@@ -110,7 +110,6 @@ namespace redux {
             std::map<uint16_t, const PupilMode::Ptr> modes;                 //!< modes used in this channel
             std::pair<redux::util::Array<double>, double> pupil;            //!< pupil & area of pupil
             std::vector<std::shared_ptr<SubImage>> subImages;
-            redux::util::Array<float> fittedPlane;
             redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
             redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel
             std::set<size_t> pupilIndices, otfIndices;                      //!< Arrays with the offsets where the pupil/otf are greater than some threshold

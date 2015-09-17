@@ -802,27 +802,22 @@ void Channel::initProcessing (WorkSpace::Ptr ws) {
 
 void Channel::initPatch (ChannelData& cd) {
 
-    if (imageNumbers.size() != cd.images.dimSize()) {
-        LOG_ERR << "Number of images in stack does not match the imageNumbers.";
+    size_t nImages = cd.images.dimSize();
+    if (imageNumbers.empty() || imageNumbers.size() != nImages) {
+        LOG_ERR << "Number of images in stack does not match the imageNumbers.  " << imageNumbers.size() << "!=" << printArray(cd.images.dimensions(),"dims");
+        return;
     }
 
+    if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
+        Array<float> view( cd.images, 0, 0, 0, cd.images.dimSize(1)-1, 0, cd.images.dimSize(2)-1 );
+        for( uint16_t i=0; i<nImages; ++i ) {
+            view *= (myObject.objMaxMean/imageStats[i]->mean);
+            view.shift(0,1);
+        }
+    }
+    
     subImages.clear();
-    vector<int64_t> first = cd.images.first();
-    vector<int64_t> last = cd.images.last();
-    last[0] = first[0];                         // only select first image
-    Array<float> view (cd.images, first, last);
-    view.copy(fittedPlane);
-    for (uint16_t i = 1; i < imageNumbers.size(); ++i) {
-        view.shift (0, 1);                      // shift view to next image in stack
-        fittedPlane += view;
-    }
-    fittedPlane /= imageNumbers.size();
-    fittedPlane = fitPlane (fittedPlane);       // fit plane to the average image
-    for (uint16_t i = 0; i < imageNumbers.size(); ++i) {
-        //view -= fittedPlane;                    // subract fitted plane from all images
-        view.shift (0, -1);                     // shift view to previous image in stack
-    }
-    for (uint16_t i = 0; i < imageNumbers.size(); ++i) {
+    for (uint16_t i=0; i < nImages; ++i) {
         uint32_t imageNumber = imageNumbers[i];
         std::shared_ptr<SubImage> simg (new SubImage (myObject, *this, workspace->window, workspace->noiseWindow, cd.images, i, cd.offset,
                                         patchSize, pupilPixels));   // TODO: fix offsets

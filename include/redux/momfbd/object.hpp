@@ -61,7 +61,7 @@ namespace redux {
             void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft, double );
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
-            void slask(void);
+            void fitAvgPlane(ObjectData&);
             void calcMetric(void);
             double metric(void) const { return currentMetric; };
             /*****************************************************/
@@ -97,6 +97,7 @@ namespace redux {
             redux::util::Array<double>  ftSum;                //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;
+            redux::util::Array<float> fittedPlane;
             std::set<size_t> pupilIndices, otfIndices;                   //!< Arrays with the offsets where the pupil/otf are greater than some threshold
             double currentMetric;
             double reg_gamma;

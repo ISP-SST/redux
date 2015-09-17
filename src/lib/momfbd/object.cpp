@@ -8,6 +8,7 @@
 #include "redux/file/filemomfbd.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/translators.hpp"
+#include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/constants.hpp"
 #include "redux/logger.hpp"
@@ -199,11 +200,16 @@ void Object::getResults(ObjectData& od) {
     }
     
     avgObjFT.directInverse(tmpC.get());
-
-    // TODO: implement add/subtract plane properly
-
     od.img.resize(patchSize, patchSize);
     od.img.assign(tmpC);
+    
+    if( fittedPlane.sameSize(od.img) ) {
+        od.img += fittedPlane;
+    } else if( !fittedPlane.empty() ) {
+        LOG_WARN << "Size mismatch when re-adding fitted plane.";
+    }
+
+    
 
     // PSF
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
@@ -385,14 +391,61 @@ void Object::addAllPQ(void) {
 }
 
 
-void Object::slask(void) {
-//    cout << "Object::slask(void)" << endl;
-//     static int bla(0);
-//     unique_lock<mutex> lock( mtx );
-//     redux::file::Ana::write( "ftsum_" + to_string( bla++ ) + ".f0", ftSum );
-//     Array<double> img;
-//     ftSum.inv(img);
-//     redux::file::Ana::write( "ftsuminv_" + to_string( bla ) + ".f0", img );
+void Object::fitAvgPlane(ObjectData& od) {
+    
+    if( od.channels.size() && od.channels[0].images.nDimensions() == 3 ) {
+        
+        size_t count(0);
+        size_t ySize = od.channels[0].images.dimSize(1);
+        size_t xSize = od.channels[0].images.dimSize(2);
+        
+        fittedPlane.resize(ySize,xSize);
+        fittedPlane.zero();
+        
+        for( ChannelData& cd : od.channels ) {
+            size_t nImages = cd.images.dimSize(0);
+            vector<int64_t> first = cd.images.first();
+            vector<int64_t> last = cd.images.last();
+            last[0] = first[0];                         // only select first image
+            Array<float> view(cd.images, first, last);
+            for( int i=0; i<nImages; ++i ) {
+                if( ! view.sameSize(fittedPlane) ) {
+                    LOG_ERR << "Size mismatch when fitting average plane for object #" << ID;
+                    fittedPlane.clear();
+                    return;
+                }
+                fittedPlane += view;
+                view.shift(0,1);
+                count++;
+            }
+        }
+        
+        if(count) {
+            fittedPlane /= count;
+            fittedPlane = fitPlane(fittedPlane, true);          // fit plane to the average image, and subtract average
+        } else {
+            fittedPlane.clear();
+            return;
+        }
+        
+        for( ChannelData& cd : od.channels ) {
+            size_t nImages = cd.images.dimSize(0);
+            vector<int64_t> first = cd.images.first();
+            vector<int64_t> last = cd.images.last();
+            last[0] = first[0];                         // only select first image
+            Array<float> view(cd.images, first, last);
+            for( int i=0; i<nImages; ++i ) {
+                view -= fittedPlane;                    // subract fitted plane from all images
+                view.shift(0, 1);                       // shift view to next image in stack
+            }
+        }
+        
+        fittedPlane.setLimits( myJob.maxLocalShift, myJob.maxLocalShift+myJob.patchSize-1, myJob.maxLocalShift, myJob.maxLocalShift+myJob.patchSize-1);
+        fittedPlane.trim();             // we fit/subtract the whole cutout area, but only re-add it for the patch, so store it in that size.
+        transpose(fittedPlane.get(),fittedPlane.dimSize(0),fittedPlane.dimSize(1));                 // to match the transposed subimage.
+    }
+
+
 }
 
 
