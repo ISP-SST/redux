@@ -39,24 +39,24 @@ namespace redux {
             struct Constraint {
                 Constraint (const Constraint& rhs) : entries (rhs.entries) {};
                 Constraint (Constraint && rhs) : entries (std::move (rhs.entries)) {};
-                Constraint (uint32_t i, int8_t v) { entries[i] = v; }
-                void addEntry (uint32_t i, int8_t v) { entries[i] = v; }
-                uint32_t firstEntry (void) { return entries.begin()->first; }
-                int8_t entry (uint32_t ind) { return (entries.find (ind) != entries.end()) ? entries[ind] : 0.0; }
-                bool has (uint32_t ind) { return (entries.find (ind) != entries.end()); }
-                void replaceIndices (const std::map<uint32_t, uint32_t>& indexMap);
+                Constraint (int32_t i, int8_t v) { entries[i] = v; }
+                void addEntry (int32_t i, int8_t v) { entries[i] = v; }
+                int32_t firstEntry (void) { return entries.begin()->first; }
+                int8_t entry (int32_t ind) { return (entries.find (ind) != entries.end()) ? entries[ind] : 0.0; }
+                bool has (int32_t ind) { return (entries.find (ind) != entries.end()); }
+                void replaceIndices (const std::map<int32_t, int32_t>& indexMap);
                 bool operator> (const Constraint& rhs) const;
-                std::map<uint32_t, int8_t> entries;      //!< Index and value of non-zero matrix elements
+                std::map<int32_t, int8_t> entries;      //!< Index and value of non-zero matrix elements
             };
             
             
             struct NullSpace : public redux::util::CacheItem {
                 
-                NullSpace(const std::map<uint32_t, int8_t>& e, uint32_t np, uint32_t nc);
+                NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc);
                 
                 void mapNullspace(void);
                 void calculateNullspace(bool store=true);
-                bool verify(const std::map<uint32_t, int8_t>&, uint32_t, uint32_t);
+                bool verify(const std::map<int32_t, int8_t>&, int32_t, int32_t);
                 
                 size_t csize(void) const;
                 uint64_t cpack(char*) const;
@@ -64,10 +64,10 @@ namespace redux {
                 void cclear(void);
                 bool operator<(const NullSpace&);
 
-                std::map<uint32_t, int8_t> c_entries;                       //!< Index and value of (non-zero) constraint-matrix elements
+                std::map<int32_t, int8_t> c_entries;                       //!< Index and value of (non-zero) constraint-matrix elements
                 size_t entriesHash;
-                uint32_t nParameters;
-                uint32_t nConstraints;
+                int32_t nParameters;
+                int32_t nConstraints;
                 redux::util::Array<double> ns;
                 std::map<redux::Point16, double> ns_entries;  //!< (row,col) and value of (non-zero) nullspace-matrix elements
                 
@@ -82,17 +82,17 @@ namespace redux {
                 
                 void add (const std::shared_ptr<Constraint>& con);
                 void addConnectedConstraints (std::vector<std::shared_ptr<Constraint>>& cons);
-                void blockify (uint32_t* columnOrdering, uint32_t& cOffset, uint32_t& rOffset);
+                void blockify (int32_t* columnOrdering, int32_t& cOffset, int32_t& rOffset);
                 void sortRows(void);
                 bool dense (void) const;
 
                 void mapNullspace(void);
                 
                 std::vector<std::shared_ptr<Constraint>> constraints;
-                std::set<uint32_t> indices;
-                std::map<uint32_t, int8_t> entries;                         //!< Index and value of (non-zero) constraint-matrix elements
+                std::set<int32_t> indices;
+                std::map<int32_t, int8_t> entries;                         //!< Index and value of (non-zero) constraint-matrix elements
                 std::map<redux::Point16, double> ns_entries;                //!< (row,col) and value of (non-zero) nullspace-matrix elements
-                uint32_t nParameters;
+                int32_t nParameters;
                 Point16 groupOffset;                                        //!< Offset of this group in the nullspace matrix (y=row,x=col)
                 size_t entriesHash;
                 std::shared_ptr<NullSpace> nullspace;
@@ -124,12 +124,12 @@ namespace redux {
 
             std::string name (const std::string& base) const;
 
-            uint32_t nConstraints (void) const { return constraints.size(); };
+            int32_t nConstraints (void) const { return constraints.size(); };
 
             void init (void);
-            redux::util::Array<int16_t> getMatrix (void) const;
+            redux::util::Array<int16_t> getMatrix (bool blocked=false) const;
             redux::util::Array<double> getNullMatrix (void) const;
-            redux::util::Array<int16_t> getSubMatrix (uint32_t groupID) const;
+            redux::util::Array<int16_t> getSubMatrix (int32_t groupID) const;
             void read (void);
             void write (void);
 
@@ -143,9 +143,9 @@ namespace redux {
             const MomfbdJob& job;
             bool blockified;
 
-            uint32_t nParameters;
-            uint32_t nFreeParameters;
-            std::unique_ptr<uint32_t[]> parameterOrder;
+            int32_t nParameters;
+            int32_t nFreeParameters;
+            std::unique_ptr<int32_t[]> parameterOrder;
             std::map<redux::Point16, double> ns_entries;        //!< (row,col) and value of (non-zero) nullspace-matrix elements
 
         };

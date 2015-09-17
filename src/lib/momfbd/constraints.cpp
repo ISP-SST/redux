@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include <boost/functional/hash.hpp>
+#include <boost/iterator/counting_iterator.hpp>
 
 using namespace redux::momfbd;
 using namespace redux::file;
@@ -27,8 +28,8 @@ namespace {
 }
 
 
-void Constraints::Constraint::replaceIndices( const map<uint32_t, uint32_t>& indexMap ) {
-    map<uint32_t, int8_t> newEntries;
+void Constraints::Constraint::replaceIndices( const map<int32_t, int32_t>& indexMap ) {
+    map<int32_t, int8_t> newEntries;
     for( auto & it : entries ) {
         newEntries[indexMap.at( it.first )] = it.second;
     }
@@ -57,7 +58,7 @@ bool Constraints::Constraint::operator>( const Constraint& rhs ) const {
 }
 
 
-Constraints::NullSpace::NullSpace(const std::map<uint32_t, int8_t>& e, uint32_t np, uint32_t nc) :
+Constraints::NullSpace::NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc) :
     c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc) {
         
 }
@@ -75,8 +76,7 @@ void Constraints::NullSpace::mapNullspace(void) {
         }
         count++;
     }
-    //static int cnt(0);
-    //Ana::write( "nullmatrix" + to_string( cnt++ ) + ".f0", ns );
+
 }
 #undef NS_THRESHOLD
 
@@ -116,7 +116,7 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
 #undef NS_ANALYTIC
 
 
-bool Constraints::NullSpace::verify(const std::map<uint32_t, int8_t>& e, uint32_t nP, uint32_t nC) {
+bool Constraints::NullSpace::verify(const std::map<int32_t, int8_t>& e, int32_t nP, int32_t nC) {
     
     if(nP != nParameters || nC != nConstraints || c_entries != e) return false;
     
@@ -144,7 +144,7 @@ bool Constraints::NullSpace::verify(const std::map<uint32_t, int8_t>& e, uint32_
 
 size_t Constraints::NullSpace::csize(void) const {
     size_t sz = sizeof(entriesHash) + sizeof(nParameters) + sizeof(nConstraints);
-    sz += c_entries.size()*(sizeof(uint32_t)+sizeof(int8_t)) + sizeof(uint64_t);
+    sz += c_entries.size()*(sizeof(int32_t)+sizeof(int8_t)) + sizeof(uint64_t);
     sz += ns.size();
     return sz;
 }
@@ -222,13 +222,13 @@ void Constraints::Group::addConnectedConstraints( vector<shared_ptr<Constraint>>
  *  Swap column order so that this group has all entries in consecutive columns
  *  This makes the constraint matrix block-diagonal.
  */
-void Constraints::Group::blockify( uint32_t* columnOrdering, uint32_t& rOffset, uint32_t& cOffset ) {
+void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, int32_t& cOffset ) {
 
     groupOffset.y = rOffset;    // store the offset of this group (in the nullspace matrix).
     groupOffset.x = cOffset;
     
-    set<uint32_t> tmpIndices;
-    map<uint32_t, uint32_t> indexMap;
+    set<int32_t> tmpIndices;
+    map<int32_t, int32_t> indexMap;
     for( auto ind : indices ) {
         tmpIndices.insert( rOffset );
         indexMap[ind] = rOffset;
@@ -237,13 +237,12 @@ void Constraints::Group::blockify( uint32_t* columnOrdering, uint32_t& rOffset, 
     indices = std::move( tmpIndices );
     nParameters = indices.size();
     
-    std::map<uint32_t, int8_t> tmpEntries;
-    uint32_t indexOffset = 0;
-    uint32_t firstIndex = *indices.begin();
+    std::map<int32_t, int8_t> tmpEntries;
+    int32_t indexOffset = 0;
+    int32_t firstIndex = *indices.begin();
     for( auto & it : constraints ) {
         it->replaceIndices( indexMap );
         for( auto & ind : it->entries ) {
-            //tmpEntries.insert(make_pair(ind.first-indexOffset,ind.second));
             tmpEntries.insert(make_pair(indexOffset-firstIndex+ind.first,ind.second));
         }
         indexOffset += nParameters;     // next row
@@ -255,38 +254,7 @@ void Constraints::Group::blockify( uint32_t* columnOrdering, uint32_t& rOffset, 
     
     mapNullspace();
     
-    
-
- 
-    // Now that this group is "dense", sort columns by column-sum.
-//     for( auto ind1: indices ) {
-//         for( auto ind2: indices ) {
-//             if ( ind1 != ind2) {
-//                 float colSum1(0);
-//                 float colSum2(0);
-//                 for( auto &it: constraints ) {
-//                     colSum1 += it->entry(ind1);
-//                     colSum2 += it->entry(ind2);
-//                 }
-//                 if( colSum1 > colSum2 ) {
-//                     for( auto &it: constraints ) {
-//                         it->swap(ind1,ind2);
-//                         //std::swap(columnOrdering[ind1],columnOrdering[ind2]);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-    // ...and rows by number of first entry -> nEntries -> value
-//     std::sort( constraints.begin(), constraints.end(),
-//             []( const shared_ptr<Constraint> &lhs, const shared_ptr<Constraint> &rhs ) {
-//                 return ( (*lhs) > (*rhs) );
-//             }
-//         );
-
-//    cout << "SortE: " << offset << printArray(columnOrdering,"  currentOrdering") << printArray(indices,"  indices") << endl;
-}
+ }
 
 
 void Constraints::Group::sortRows(void) {
@@ -303,8 +271,8 @@ void Constraints::Group::sortRows(void) {
 
 bool Constraints::Group::dense( void ) const {
 
-    uint32_t first = *indices.begin();
-    uint32_t last = *indices.rbegin();
+    int32_t first = *indices.begin();
+    int32_t last = *indices.rbegin();
     return ( ( last - first + 1 ) == indices.size() );
 
 }
@@ -353,17 +321,41 @@ Constraints::~Constraints() {
 
 
 void Constraints::blockifyGroups( void ) {
-    uint32_t cOffset = 0;
-    uint32_t rOffset = 0;
-    const uint32_t* colMap = parameterOrder.get();
+    int32_t cOffset = 0;
+    int32_t rOffset = 0;
+    const int32_t* colMap = parameterOrder.get();
+    std::set<int32_t> unused1(boost::counting_iterator<int32_t>(0), boost::counting_iterator<int32_t>(nParameters));            // Initializes set with values 0, ... , (nParameters-1)
+    std::set<int32_t> unused2(boost::counting_iterator<int32_t>(0), boost::counting_iterator<int32_t>(nFreeParameters));
     for( auto & g : groups ) {
         g.blockify( parameterOrder.get(), cOffset, rOffset );
-        for( auto& it: g.ns_entries ) {     // map indices back to original parameter order, so ns_entries can be applied directly to alpha.
+        for( auto& it: g.ns_entries ) {
             auto index = it.first;
-            index.y = colMap[index.y];
+            index.y = colMap[index.y];     // map parameter-index back to original order, so ns_entries can be applied directly to alpha.
             ns_entries.insert(make_pair(index,it.second));
+            unused1.erase(index.y);
+            unused2.erase(index.x);
         }
     }
+
+    // These should always be the same size, corresponding to the number of "unconstrained" parameters (i.e. image-numbers existing only in 1 channel)
+    if( unused1.size() == unused2.size() ) {
+        if(unused1.size() > 0 ) {
+            auto it1 = unused1.begin();
+            for( auto & it2: unused2) {
+                Point16 index(*it1++,it2);
+                ns_entries.insert(make_pair(index,1.0));
+            }
+            std::vector <int32_t> output;
+            std::copy(unused1.begin(), unused1.end(), std::back_inserter(output));
+            redux::file::Ana::write("unused1",output);
+            output.clear();
+            std::copy(unused2.begin(), unused2.end(), std::back_inserter(output));
+            redux::file::Ana::write("unused2",output);
+        }
+    } else {
+        LOG_ERR << "Size mismatch in Constraints::blockifyGroups(). This should *never* happen, so go looking for the bug. :-P";
+    }
+    
     blockified = true;
 }
 
@@ -441,11 +433,11 @@ std::string Constraints::name( const string& base ) const {
 
 void Constraints::init( void ) {
     
-    uint32_t nModes = job.modeNumbers.size();
+    int32_t nModes = job.modeNumbers.size();
     nParameters = job.nImages() * nModes;
 
-    parameterOrder.reset( new uint32_t[nParameters] );
-    uint32_t n = 0;
+    parameterOrder.reset( new int32_t[nParameters] );
+    int32_t n = 0;
     generate( parameterOrder.get(), parameterOrder.get()+nParameters, [&] { return n++; } );
     
     if( nParameters ) {
@@ -453,7 +445,7 @@ void Constraints::init( void ) {
         //const vector<shared_ptr<Object>>& objects = job.getObjects();
         for( uint modeIndex = 0; modeIndex < job.modeNumbers.size(); ++modeIndex ) {
             uint16_t modeNumber = job.modeNumbers[modeIndex];
-            uint32_t imageCount = 0;
+            int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
                 shared_ptr<Constraint> c( new Constraint( imageCount * nModes + modeIndex, 1 ) );
                 for( auto wf UNUSED: job.getObjects()[0]->getChannels()[0]->imageNumbers ) {  // only for first object and channel
@@ -462,12 +454,12 @@ void Constraints::init( void ) {
                 }
                 constraints.push_back( c );
 
-                map<uint32_t, Constraint> wfCons;
-                uint32_t kOffset = 0;
+                map<int32_t, Constraint> wfCons;
+                int32_t kOffset = 0;
                 for( auto obj : job.getObjects() ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
                     for( auto ch : obj->getChannels() ) {
                         if( kOffset ) { // skip reference channel
-                            uint32_t tOffset = 0;
+                            int32_t tOffset = 0;
                             for( auto wf UNUSED: ch->imageNumbers ) {
                                 if( tOffset ) { // skip reference wavefront
                                     shared_ptr<Constraint> c( new Constraint( modeIndex, 1 ) ); // \alpha_{11m}
@@ -484,11 +476,11 @@ void Constraints::init( void ) {
                 }
 
             } else {                // for non-tilts, the mode coefficients are the same for co-temporal images (same wavefront)
-                map<uint32_t, Constraint> wfCons;
+                map<int32_t, Constraint> wfCons;
                 for( auto obj : job.getObjects() ) {
                     for( auto ch : obj->getChannels() ) {
                         for( auto wf : ch->imageNumbers ) {
-                            uint32_t parameterOffset = imageCount * nModes;
+                            int32_t parameterOffset = imageCount * nModes;
                             auto ret = wfCons.insert( make_pair( wf, Constraint( parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
                                 shared_ptr<Constraint> c( new Constraint( ret.first->second ) );
@@ -501,56 +493,50 @@ void Constraints::init( void ) {
                 }
             }
         }
-
-        //cout << "Constraints::Constraints()  " << constraints.size() << "x" << nParameters << endl;
         
         nFreeParameters = nParameters - constraints.size();
-
-        //dump( "constraints" );
 
         groupConnectedVariables();
         
         blockifyGroups();
 
-        //dump( "blockified" );
-
     }
 }
 
 
-Array<int16_t> Constraints::getMatrix( void ) const {
+Array<int16_t> Constraints::getMatrix( bool blocked ) const {
 
-    uint32_t nConstraints = constraints.size();
+    int32_t nConstraints = constraints.size();
     if( nConstraints == 0 || nParameters == 0 ) {
         return Array<int16_t>();
     }
 
     Array<int16_t> c( nConstraints, nParameters );
     c.zero();
-    if( !blockified || groups.empty() ) {
+    const int32_t* colMap = parameterOrder.get();
+    if( !blocked || groups.empty() ) {
         for( uint i = 0; i < nConstraints; ++i ) {
             for( auto & entry : constraints[i]->entries ) {
-                c( i, entry.first ) = entry.second;
+                c( i, colMap[entry.first] ) = entry.second;
             }
         }
     } else {
-        uint32_t rowEnd = 0;
-        uint32_t colEnd = 0;
+        int32_t rowEnd = 0;
+        int32_t colEnd = 0;
         //int cnt = 0;
         for( auto &group : groups ) {
             if( ! group.dense() ) {
                 // TODO: Silent for now, but should throw or warn.
             }
-            uint32_t nConstr = group.constraints.size();
-            uint32_t nPar = group.indices.size();
-            uint32_t firstIndex = *group.indices.begin();
-            uint32_t rowBegin = rowEnd;
-            uint32_t colBegin = colEnd;
+            int32_t nConstr = group.constraints.size();
+            int32_t nPar = group.indices.size();
+            int32_t firstIndex = *group.indices.begin();
+            int32_t rowBegin = rowEnd;
+            int32_t colBegin = colEnd;
             rowEnd = rowBegin + nConstr - 1;
             colEnd = colBegin + nPar - 1;
             Array<int16_t> cc( c, rowBegin, rowEnd, colBegin, colEnd );  // sub-array of c
             for( uint i = 0; i < nConstr; ++i ) {
-                //uint32_t col = 0;
                 for( auto & entry : group.constraints[i]->entries ) {
                     if( entry.first - firstIndex >= nPar ) {
                         // TODO: Skip silently for now, but should throw or warn.
@@ -571,7 +557,6 @@ Array<int16_t> Constraints::getMatrix( void ) const {
 
 Array<double> Constraints::getNullMatrix( void ) const {
 
-    //uint32_t nConstraints = constraints.size();
     if( nFreeParameters == 0 || nParameters == 0 ) {
         return Array<double>();
     }
@@ -588,7 +573,7 @@ Array<double> Constraints::getNullMatrix( void ) const {
 }
 
 
-Array<int16_t> Constraints::getSubMatrix( uint32_t groupID ) const {
+Array<int16_t> Constraints::getSubMatrix( int32_t groupID ) const {
 
     if( groupID >= groups.size() ) {
         return Array<int16_t>();
@@ -599,18 +584,13 @@ Array<int16_t> Constraints::getSubMatrix( uint32_t groupID ) const {
         return Array<int16_t>();
     }
 
-    uint32_t nConstr = g.constraints.size();
-    uint32_t nPar = g.indices.size();
-    uint32_t first = *g.indices.begin();
-    //uint32_t last = *g.indices.rbegin();
-    //cout << "Constraints::getSubMatrix(" << groupID << ")  " << nConstr << "x" << nPar << "   first = " << first << "   last = " << last << endl;
+    int32_t nConstr = g.constraints.size();
+    int32_t nPar = g.indices.size();
+    int32_t first = *g.indices.begin();
     Array<int16_t> c( nConstr, nPar );
     c.zero();
     for( uint i = 0; i < nConstr; ++i ) {
-        //  cout << "Constraints::getSubMatrix(" << groupID << ")  i = " << i << endl;
-       // uint32_t col = 0;
         for( auto & entry : g.constraints[i]->entries ) {
-            //      cout << "Constraints::getSubMatrix(" << groupID << ")  e = " << entry.first << endl;
             c( i, entry.first - first ) = entry.second;
         }
     }
@@ -632,13 +612,12 @@ void Constraints::write( void ) {
 
 void Constraints::dump( string tag ) {
 
-    cout << "Dumping constraints." << endl;
-    cout << printArray( parameterOrder.get(), nParameters, "ordering" ) << endl;
+    LOG_DEBUG << "Dumping constraints.";
+    Ana::write( tag + "_order.f0", parameterOrder.get(), nParameters );
     Ana::write( tag + ".f0", getMatrix() );
+    if( blockified ) Ana::write( tag + "2.f0", getMatrix(true) );
     Ana::write( tag + "_ns.f0", getNullMatrix() );
-    for( uint i = 0; i < groups.size(); ++i ) {
-        Ana::write( tag + "_sub_" + to_string( i ) + ".f0", getSubMatrix( i ) );
-    }
+
 }
 
 

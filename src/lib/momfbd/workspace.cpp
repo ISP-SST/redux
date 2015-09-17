@@ -227,7 +227,7 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
     std::function<gsl_fdf_t> wrapped_fdf = std::bind( &WorkSpace::my_fdf, this, std::ref( service ), sp::_1, sp::_2, sp::_3 , sp::_4);
 
     gsl_fdf_wrapper<decltype( wrapped_f ), decltype( wrapped_df ), decltype( wrapped_fdf )>
-    my_func( job.globalData->constraints.nFreeParameters, wrapped_f, wrapped_df, wrapped_fdf );
+    my_func( nFreeParameters, wrapped_f, wrapped_df, wrapped_fdf );
     
     double init_step = 1e-1; //1e-18;
     double init_tol = 0.1;
@@ -268,9 +268,10 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
 
     double previousMetric(0), thisMetric, gradNorm;
     uint16_t nModeIncrement = job.nModeIncrement;
-    int dumpCount(0);
+
     size_t totalIterations(0);
     size_t maxIterations(1);            // only 1 iteration while increasing modes, job.maxIterations for the last step.
+    
 
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
@@ -340,33 +341,22 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
         
         LOG_DEBUG << boost::format("After %d iteration%s  metric=%g norm(grad)=%g  using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
                 s->f % gradNorm % activeModes.size() % job.modeNumbers.size();
-        
-        /*int imgIndex=0;
-        dumpCount++;
-        for( const ObjectData& o: data->objects ) {
-            service.post(
-                [&o,dumpCount](){
-                    o.myObject->dump((boost::format("%d_%d")%dumpCount%o.myObject->ID).str());
-                } );
-            for( const ChannelData& c: o.myObject->channels ) {
-                service.post(
-                    [&o,&c,dumpCount](){
-                        c.myChannel->dump((boost::format("%d_%d_%d")%dumpCount%o.myObject->ID%c.myChannel->ID).str());
-                    } );
-                for( const shared_ptr<SubImage>& im: c.myChannel->getSubImages() ) {
-                    service.post(
-                        [&p,&o,&c,&im,imgIndex,dumpCount](){
-                            //im->adjustOffset();
-                            im->dump((boost::format("%s_%d_%d_%d_%d")%p->index%dumpCount%o.myObject->ID%c.myChannel->ID%imgIndex).str());
-                        } );
-                    imgIndex++;
+                
+        //  GSL_MULTIMIN_FN_EVAL_F(&my_func,s->x)
+
+/*      FIXME the shifting does not work as expected, will look at it soon.
+        for( const auto& o: job.objects ) {
+            for( const auto& c: o->channels ) {
+                for( const auto& im: c->getSubImages() ) {
+                    service.post( [&im](){ im->adjustOffset(); } );
                 }
             }
         }
         runThreadsAndWait( service, job.info.maxThreads );
-       */
+*/       
         getAlpha();
         job.globalData->constraints.apply(alpha,beta_init->data);
+
     }
   
     job.globalData->constraints.reverse(s->x->data,alpha);
