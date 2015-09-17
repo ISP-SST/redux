@@ -54,14 +54,8 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap
     }
     return count;
 }
-/*
-    for( shared_ptr<Object>& obj: objects ) {
-        ObjectData::Ptr objData(new ObjectData(obj));
-        patch->data.push_back(objData);
-        objData->init(patch->index.y,patch->index.x);
-        //obj->applyLocalOffsets(objData);
-    }
-*/
+
+
 void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
 
     Job::parsePropertyTree( vm, tree );
@@ -251,8 +245,6 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 }
 
 
-#include "redux/file/fileana.hpp"
-
 void MomfbdJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
@@ -260,26 +252,9 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
         PatchData::Ptr patch = static_pointer_cast<PatchData>( it );
         patch->step = JSTEP_POSTPROCESS;
         patches(patch->index.y,patch->index.x) = patch;
-        patch->cacheStore(true);
-        //patches[it->id]->result = patch->result;
-    //redux::file::Ana::write( "patch_" + to_string(patch->index.x) + "_" + to_string(patch->index.y) + ".f0", patch->images );
     }
     wip.parts.clear();
     checkParts();
-}
-
-
-void MomfbdJob::init(void) {
-    for( shared_ptr<Object>& obj: objects ) {
-        obj->init();
-    }
-}
-
-
-void MomfbdJob::cleanup(void) {
-    for( shared_ptr<Object>& obj: objects ) {
-        obj->cleanup();
-    }
 }
 
 
@@ -293,8 +268,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     }
     else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
         uint8_t nThreads = std::min( maxThreads, info.maxThreads);
-        if( patchStep == JSTEP_POSTPROCESS ) {      // store results
-            //storePatches(wip, service, nThreads);
+        if( patchStep == JSTEP_POSTPROCESS ) {      // patch-wise post-processing, do we need any for momfbd?  the filtering etc. is done on the slaves.
         } else {                                    // main processing
             if(!globalData) {
                  globalData.reset( new GlobalData(*this) );
@@ -400,7 +374,6 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
 
     for( shared_ptr<Object>& obj : objects ) {
-        //service.post( std::bind( &Object::loadData, obj.get(), patches ) );
         obj->loadData(service, patches);
     }
     
@@ -434,40 +407,6 @@ void MomfbdJob::initCache(void) {
 
     LOG_DETAIL << "MomfbdJob::initCache()  Done.";
 }
-
-void MomfbdJob::initPatchData( PatchData::Ptr patch ) {
-    
-    //LOG << "MomfbdJob::applyLocalOffsets() #" << patch->id;
-//     size_t totalPatchSize(0);
-//     for( auto & it : objects ) {
-//         totalPatchSize += it->sizeOfPatch(patch->nPixels());
-//     }
-// 
-//     patch->dataSize = totalPatchSize;
-//     patch->data = sharedArray<char>(totalPatchSize);
-//     char* ptr = patch->data.get();
-//     uint64_t count(0);
-//     patch->objects.resize(objects.size());
-//     auto it = patch->objects.begin();
-//     for( shared_ptr<Object>& obj: objects ) {
-//         it->channels.resize(obj->channels.size());
-//         auto it2 = it->channels.begin();
-//         for( const shared_ptr<Channel>& ch : obj->channels ) {
-//             ch->getPatchData(*it2++,patch->index.y,patch->index.x);
-//         }
-// //         ObjectData::Ptr objData(new ObjectData(obj));
-// //         patch->objects.push_back(objData);
-// //         it->init(patch->index.y,patch->index.x);
-//         it++;
-//         //obj->applyLocalOffsets(objData);
-//     }
-//     
-//     if(count != totalPatchSize) {
-//         LOG_WARN << "Estimation of patch data-size was wrong:  est = " << totalPatchSize << "  real = " << ptrdiff_t(ptr-patch->data.get());
-//     }
-    // TODO: compress and store in swapfile
- //   LOG_TRACE << "MomfbdJob::applyLocalOffsets() #" << patch->id << "  All done !!";
-}
  
 
 void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& service, uint8_t nThreads) {
@@ -493,95 +432,6 @@ void MomfbdJob::postProcess( boost::asio::io_service& service ) {
     }
     runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
     
-//     auto image = sharedArray<int16_t>( ySize, xSize );
-//     int16_t** img = image.get();
-//
-//     int64_t minPID, maxPID, minID, maxID, minSID, maxSID;
-//     minPID = minID = minSID = UINT32_MAX;
-//     maxPID = maxID = maxSID = 0;
-//     for( auto & it : jobParts ) {
-//
-//         auto ptr = static_pointer_cast<DebugPart>( it.second );
-//
-//         uint32_t sizeX = ptr->xPixelH - ptr->xPixelL + 1;
-//         uint32_t sizeY = ptr->yPixelH - ptr->yPixelL + 1;
-//
-//         auto blaha = reshapeArray( ptr->result.ptr( 0 ), sizeY, sizeX );
-//         auto res = blaha.get();
-//
-//         for( uint32_t ix = 0; ix < sizeX; ++ix ) {
-//             for( uint32_t iy = 0; iy < sizeY; ++iy ) {
-//                 int64_t tmp = res[iy][ix];
-//                 if( tmp < 0 ) {
-//                     continue;      // to skip the contour for the normalization
-//                 }
-//                 if( ix < iy ) {
-//                     if( tmp > maxSID ) maxSID = tmp;
-//                     if( tmp < minSID ) minSID = tmp;
-//                 }
-//                 else if( ix > ( sizeY - iy ) ) {
-//                     if( tmp > maxID ) maxID = tmp;
-//                     if( tmp < minID ) minID = tmp;
-//                 }
-//                 else {
-//                     if( tmp > maxPID ) maxPID = tmp;
-//                     if( tmp < minPID ) minPID = tmp;
-//                 }
-//             }
-//         }
-//     }
-//
-//     for( auto & it : jobParts ) {
-//
-//         auto ptr = static_pointer_cast<DebugPart>( it.second );
-//
-//         uint32_t sizeX = ptr->xPixelH - ptr->xPixelL + 1;
-//         uint32_t sizeY = ptr->yPixelH - ptr->yPixelL + 1;
-//
-//         auto blaha = reshapeArray( ptr->result.ptr( 0 ), sizeY, sizeX );
-//         auto res = blaha.get();
-//
-//         for( uint32_t ix = 0; ix < sizeX; ++ix ) {
-//             for( uint32_t iy = 0; iy < sizeY; ++iy ) {
-//                 size_t tmp = res[iy][ix];
-//
-//                 if( tmp < 0 ) {
-//                     img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-//                     continue;
-//                 }
-//
-//                 if( ix < iy ) {
-//                     if( maxSID == minSID ) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-//                     else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = ( tmp - minSID + 1 ) * 1.0 / ( maxSID - minSID + 1 ) * INT16_MAX;
-//                 }
-//                 else if( ix > ( sizeY - iy ) ) {
-//                     if( maxID == minID ) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-//                     else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = ( tmp - minID + 1 ) * 1.0 / ( maxID - minID + 1 ) * INT16_MAX;
-//                 }
-//                 else {
-//                     if( maxPID == minPID ) img[ptr->yPixelL + iy][ptr->xPixelL + ix] = 0;
-//                     else img[ptr->yPixelL + iy][ptr->xPixelL + ix] = ( tmp - minPID + 1 ) * 1.0 / ( maxPID - minPID + 1 ) * INT16_MAX;
-//                 }
-//
-//             }
-//         }
-//
-//     }
-//
-//
-//     Ana::Ptr hdr( new Ana() );
-//
-//     hdr->m_ExtendedHeader = "DebugJob";
-//     hdr->m_Header.datyp = Ana::ANA_WORD;
-//
-//     hdr->m_Header.ndim = 2;
-//     hdr->m_Header.dim[0] = xSize;
-//     hdr->m_Header.dim[1] = ySize;
-//
-//     std::ofstream file( "debugjob_output.f0" );
-//
-//     Ana::write( file, reinterpret_cast<char*>( *img ), hdr );
-
     info.step.store( JSTEP_COMPLETED );
     info.state.store( 0 );
 

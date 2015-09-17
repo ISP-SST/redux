@@ -33,9 +33,7 @@ void ChannelData::initPatch(void) {
 
 
 void ChannelData::collectResults(void) {
-    myChannel->getResults(*this);
     images.clear();         // don't need input data anymore.
-    isLoaded = false;
 }
 
 

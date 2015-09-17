@@ -73,9 +73,7 @@ namespace redux {
             bool checkCfg(void);
             bool checkData(void);
 
-            void init(void);
             void initCache(void);
-            void cleanup(void);
             void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);

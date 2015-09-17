@@ -5,6 +5,7 @@
 #include "redux/momfbd/data.hpp"
 #include "redux/momfbd/util.hpp"
 
+#include "redux/file/fileana.hpp"
 #include "redux/file/filemomfbd.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/translators.hpp"
@@ -14,7 +15,6 @@
 #include "redux/logger.hpp"
 #include "redux/revision.hpp"
 
-#include "redux/file/fileana.hpp"
 #include <cstdio>
 #include <limits>
 #include <string>
@@ -143,7 +143,7 @@ size_t Object::nImages(void) const {
 
 
 void Object::initProcessing( WorkSpace::Ptr ws ) {
-    //cout << "Object::initProcessing(" << hexString(this) << ")" << endl;
+
     if( patchSize && pupilPixels ) {
         P.resize(2*pupilPixels,2*pupilPixels);
         Q.resize(2*pupilPixels,2*pupilPixels);
@@ -165,10 +165,6 @@ void Object::initProcessing( WorkSpace::Ptr ws ) {
 
 void Object::initPatch( ObjectData& od ) {
     unique_lock<mutex> lock (mtx);
-    for(int i=0; i< channels.size(); ++i) {
-        
-    }
-// //    cout << "Object::initPatch(" << hexString (this) << ")  reg_gamma = " << myJob.reg_gamma << endl;
     reg_gamma = 0;
     ftSum.zero();
 }
@@ -225,19 +221,13 @@ void Object::getResults(ObjectData& od) {
         size_t nElements = patchSize*patchSize;
         if( nPSF > 1 ) {
             Array<float> view(od.psf,0,0,0,patchSize-1,0,patchSize-1);
-            static int count(0);
-            int count2(0);
             for( shared_ptr<Channel>& ch: channels) {
                 for ( shared_ptr<SubImage>& si: ch->subImages) {
-                    Array<complex_t> psf = si->getPSF<complex_t>();
-                    //memcpy(view.ptr(), psf.get(), nElements*sizeof(float));
-                    view.assign(psf); //si->getPSF());
-                    //Ana::write("psf_"+to_string(count)+"_"+to_string(count2)+".f0", psf);
-                    //Ana::write("psf_cube_"+to_string(count)+"_"+to_string(count2++)+".f0", od.psf);
+                    //Array<complex_t> psf = si->getPSF<complex_t>();
+                    view.assign(si->getPSF<complex_t>()); //si->getPSF());
                     view.shift(0,1);
                 }
             }
-            count++;
         } else if( nPSF == 1 ) {
             for( shared_ptr<Channel>& ch: channels) {
                 for ( shared_ptr<SubImage>& si: ch->subImages) {
@@ -331,23 +321,10 @@ void Object::getResults(ObjectData& od) {
 
 
 void Object::initPQ (void) {
-//    cout << "i" << flush;
- //   cout << "Object::initPQ(" << hexString(this) << ")  reg_gamma = " << myJob.reg_gamma << endl;
     P.zero();
     Q = (reg_gamma); // * 0.1 / nImages);
 }
 
-/*
-void Object::addAllFT( void ) {
-    unique_lock<mutex> lock( mtx );
-    ftSum.zero();
-    for( shared_ptr<Channel>& ch : channels ) {
-        for( shared_ptr<SubImage>& im : ch->subImages ) {
-            im->addFT(ftSum);
-        }
-    }
-}
-*/
 
 void Object::addToFT( const redux::image::FourierTransform& ft, double rg ) {
     unique_lock<mutex> lock( mtx );
@@ -373,7 +350,6 @@ void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& ol
 void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<complex_t>& otf, const Array<complex_t>& oldotf) {
 
     unique_lock<mutex> lock (mtx);
-//    cout << "Object::addDiffToPQ()" << endl;
     double *qPtr = Q.get();
     complex_t *pPtr = P.get();
     const complex_t *ftPtr = ft.get();
@@ -458,27 +434,18 @@ void Object::fitAvgPlane(ObjectData& od) {
 
 void Object::calcMetric (void) {
     
-   // cout << "Object::calcMetric(" << hexString(this) << ")  " << __LINE__ << "   otfsz = " << otfIndices.size() << endl;
-//cout << "c" << flush;
-    currentMetric = 0.0;
     const double* ftsPtr = ftSum.get();
     const complex_t* pPtr = P.get();
     const double* qPtr = Q.get();
     
     unique_lock<mutex> lock (mtx);
- //   Ana::write ("Qm.f0", Q);
- //   Ana::write ("Pm.f0", P);
- //   Ana::write ("FTm.f0", ftSum);
     size_t N = 4*pupilPixels*pupilPixels;
     for (size_t ind=0; ind<N; ++ind) {
     //for (auto & ind : otfIndices) {
         currentMetric += (ftsPtr[ind] - norm (pPtr[ind]) / qPtr[ind]);
     }
-   // cout << "Object::calcMetric(" << hexString(this) << ")   m1 = " << currentMetric << endl;
-    //currentMetric *= (weight / otfIndices.size());
-    currentMetric *= (weight / N);
 
-   // cout << "Object::calcMetric(" << hexString(this) << ")   m = " << setprecision(12) << currentMetric << endl;
+    currentMetric *= (weight / N);
 
 }
 
@@ -567,45 +534,14 @@ bool Object::checkData (void) {
 }
 
 
-void Object::init( void ) {
-
-    for( shared_ptr<Channel>& ch : channels ) {
-        ch->init();
-    }
-
-//   init( KL_cfg* kl_cfg, double lambda, double r_c, int nph_in, int basis, int nm, int *mode_num,
-//              int nch, int *ndo, int **dorder, int **dtype, int kl_min_mode, int kl_max_mode, double svd_reg, double angle, double **pupil_in )
-
-//    modes.init(coeff,lambda,r_c,nph,myJob.basis,myJob.modes);
-
-    /*    for( int o = 1; o <= nObjects; ++o ) {
-            mode[o] = new modes( kl_cfs, cfg->lambda[o], cfg->lim_freq[o] / 2.0, cfg->nph[o], cfg->basis, cfg->nModes, cfg->mode_num, nChannels[o], cfg->nDiversityOrders[o], cfg->dorder[o], cfg->dtype[o], cfg->kl_min_mode, cfg->kl_max_mode, cfg->svd_reg, cfg->angle[o], cfg->pupil[o], io );
-    //              cfg->pix2cf[o]/=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
-    //              cfg->cf2pix[o]*=0.5*cfg->lambda[o]*cfg->lim_freq[o]*(mode[o]->mode[0][2][cfg->nph[o]/2+1][cfg->nph[o]/2]-mode[o]->mode[0][2][cfg->nph[o]/2][cfg->nph[o]/2]);
-            cfg->pix2cf[o] /= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
-            cfg->cf2pix[o] *= 0.5 * cfg->lambda[o] * cfg->lim_freq[o] * mode[o]->mode[0][2]->ddx();
-        }
-    */
-
-
-}
-
-
 void Object::initCache (void) {
+    
     for (shared_ptr<Channel>& ch : channels) {
         ch->initCache();
-        //size_t sz = pupilIndices.size();
-        pupilIndices.insert (ch->pupilIndices.begin(), ch->pupilIndices.end());
-        //if (sz != pupilIndices.size()) cout << "Added to pupilIndices: " << sz << " -> " <<  pupilIndices.size() << endl;
-        //sz = otfIndices.size();
-        otfIndices.insert (ch->otfIndices.begin(), ch->otfIndices.end());
-        //if (sz != otfIndices.size()) cout << "Added to otfIndices: " << sz << " -> " <<  otfIndices.size() << endl;
+        pupilIndices.insert(ch->pupilIndices.begin(), ch->pupilIndices.end());
+        otfIndices.insert(ch->otfIndices.begin(), ch->otfIndices.end());
     }
-}
-
-
-void Object::cleanup( void ) {
-
+    
 }
 
 
@@ -665,15 +601,10 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size());
         for( auto& it: patches ) {
             Array<float> subalpha(alpha, it->index.y, it->index.y, it->index.x, it->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1);
-           it->objects[ID].alpha.copy(subalpha);
+            it->objects[ID].alpha.copy(subalpha);
        }
-        Ana::write(fn.string(), alpha);
+       Ana::write(fn.string(), alpha);
     }
-    
-    for (shared_ptr<Channel>& ch : channels) {
-        ch->writeAna(patches);
-    }
-    
     
 }
 
@@ -782,7 +713,6 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     size_t modeSize = modes.nElements()*sizeof (float);
     size_t blockSize = modeSize;
 
-    auto dummy = sharedArray<int32_t> (nChannels);
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
             patchesData(y,x)->cacheLoad(true);
@@ -791,9 +721,9 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
             info->patches(x,y).region[2] = patchesData(y,x)->roi.first.y+1;
             info->patches(x,y).region[3] = patchesData(y,x)->roi.last.y+1;
             info->patches(x,y).nChannels = nChannels;
-            info->patches(x,y).nim = sharedArray<int32_t> (nChannels); //dummy;
-            info->patches(x,y).dx = sharedArray<int32_t> (nChannels); //dummy;
-            info->patches(x,y).dy = sharedArray<int32_t> (nChannels);; //dummy;
+            info->patches(x,y).nim = sharedArray<int32_t> (nChannels);
+            info->patches(x,y).dx = sharedArray<int32_t> (nChannels);
+            info->patches(x,y).dy = sharedArray<int32_t> (nChannels);
             for (int i = 0; i < nChannels; ++i) {
                 info->patches(x,y).nim.get()[i] = channels[i]->nImages();
                 info->patches(x,y).dx.get()[i] = patchesData(y,x)->objects[ID].channels[i].shift.x;

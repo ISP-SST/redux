@@ -57,8 +57,6 @@ namespace redux {
             void ungetWork( WorkInProgress& );
             void returnResults( WorkInProgress& );
 
-            void init(void);
-            void cleanup(void);
             bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
             
             bool check(void);
@@ -73,17 +71,11 @@ namespace redux {
             void checkParts( void );
             void preProcess( boost::asio::io_service& );
             void initCache( void );
-            void initPatchData( PatchData::Ptr );
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             void postProcess( boost::asio::io_service& );
 
             std::vector<std::shared_ptr<Object>> objects;
 
-            //redux::util::Array<double> pupil;
-            //redux::util::Array<float> imageStack;
-            //std::map<uint32_t, const PupilMode::Ptr> modes;
-
-            //std::map<size_t,PatchData::Ptr> patches;
             redux::util::Array<PatchData::Ptr> patches;
             
             GlobalData::Ptr globalData;

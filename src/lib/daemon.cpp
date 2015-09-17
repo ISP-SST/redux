@@ -507,12 +507,11 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     
     WorkInProgress& wip = it->second;
     if( blockSize ) {
-        //LOG_DEBUG << "putParts():  blockSize = " << blockSize;
-        //LOG_DEBUG << "putParts():  wip = " << wip.print();
         wip.unpack( buf.get(), conn->getSwapEndian() );
-        //LOG_DEBUG << "putParts(): wip2 = " << wip.print();
         wip.job->returnResults( wip );
-        //LOG_DEBUG << "putParts(): wip3 = " << wip.print();
+        for( Part::Ptr& it : wip.parts ) {
+            it->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)
+        }
     } else {
         LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
     }

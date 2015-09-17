@@ -57,9 +57,7 @@ namespace redux {
             /*************         Methods         ***************/
             void initProcessing(WorkSpace::Ptr);
             void initPatch(ChannelData&);
-            void getResults(ChannelData&);
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
-            void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void initPhiFixed(void);
             void computePhi(void);
             void addMode(redux::util::Array<double>&, uint16_t, double) const;
@@ -75,22 +73,15 @@ namespace redux {
             bool checkCfg(void);
             bool checkData(void);
             
-            void init(void);
             void initCache(void);
-            void cleanup(void);
             
             void loadCalib(boost::asio::io_service&);
             void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
-            void unloadData(void);
             void unloadCalib(void);
-
-            void preprocessData(void);
-            void normalizeData(boost::asio::io_service&, double value);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
             void loadImage(size_t index, redux::util::Array<PatchData::Ptr>&);
             void preprocessImage(size_t index, redux::image::Image<float>& img, redux::util::Array<PatchData::Ptr>&);
-            void normalizeImage(size_t index, double value);
             void copyImagesToPatch(ChannelData&);          
             
             Point16 getImageSize(void);

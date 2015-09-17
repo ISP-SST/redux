@@ -170,62 +170,7 @@ Channel::~Channel() {
 
 void Channel::parsePropertyTree (bpt::ptree& tree) {
 
-    ChannelCfg::parseProperties (tree, myObject);
-
-    /*if( !alignClip.empty() && alignClip.size() != 4 ) {
-        LOG_ERR << "argument to ALIGN_CLIP could not be translated to 4 integers. Whole image area will be used !!";
-        alignClip.clear();
-    }*/
-
-    /*if( imageDataDir.length() == 0 ) {
-        imageDataDir = cleanPath( "./" );      // Nothing specified in cfg file, use current directory.
-    }*/
-
-    if (imageTemplate.length() == 0) {
-        LOG_ERR << "no filename template specified.";
-    }
-
-    /*    if( darkTemplate.length() > 0 ) {
-            if( darkNumbers.size() == 0 ) {
-                LOG_ERR << "darkfield template specified but no dark numbers.";
-            }
-        }
-        else if( darkNumbers.size() > 0 ) {
-            LOG_ERR << "darkfield dark numbers specified but no darkfield template.";
-        }
-    */
-    if (gainFile.length() > 0) {
-        if (darkTemplate.length() == 0) {
-            LOG_ERR << "a gain file name but no dark field was specified.";
-        }
-    } else if (darkTemplate.length() > 0) {
-        LOG_ERR << "a dark field name but no gain file was specified.";
-    }
-
-    if ( (responseFile.length() > 0) && (gainFile.length() == 0)) {
-        LOG_ERR << "detector response correction only possible when flatfielding.";
-    }
-
-
-
-    //MomfbdJob::maybeOverride( tree.get<bool>( "NO_RESTORE", flags & MFBD_NO_RESTORE ), flags, MFBD_NO_RESTORE );
-
-    size_t p;
-    if ( (p = imageTemplate.find_first_of ('%')) != string::npos) {
-        /*     if( sequenceNumber > 0 ) {
-                 size_t q;
-                 if( ( q = imageTemplate.find_first_of( '%', p + 1 ) ) != string::npos ) {
-                     string tmpString = boost::str( boost::format( imageTemplate.substr( 0, q ) ) % sequenceNumber );
-                     imageTemplate = tmpString + imageTemplate.substr( q );
-                 }
-                 else  LOG_WARN << boost::format( "file name template %s does not contain a 2nd format specifier (needs 2)" ) % imageTemplate;
-             }*/
-    } else {
-        //LOG_WARN << boost::format( "file name template %s does not contain a format specifier (needs %d)" ) % imageTemplate % ( 1 + ( sequenceNumber >= 0 ) );
-    }
-
-
-    //LOG_DEBUG << "Channel::parseProperties() done.";
+    ChannelCfg::parseProperties (tree, myObject);       // parse using our parent-object as default-values.
 
 }
 
@@ -234,24 +179,8 @@ void Channel::parsePropertyTree (bpt::ptree& tree) {
 bpt::ptree Channel::getPropertyTree (bpt::ptree& tree) {
 
     bpt::ptree node;
-
-    /*
-        if( sequenceNumber != myObject.sequenceNumber ) node.put( "SEQUENCE_NUM", sequenceNumber );
-        if( mmRow ) node.put( "MMROW", mmRow );
-        if( mmWidth ) node.put( "MMWIDTH", mmWidth );
-        if( stokesWeights != myObject.stokesWeights ) node.put( "VECTOR", stokesWeights );
-        if( !diversity.empty() ) node.put( "DIVERSITY", diversity );
-        if( !diversityOrders.empty() ) node.put( "DIV_ORDERS", diversityOrders ); // TODO types missing
-        if( image_num_offs != 0 ) node.put( "DT", image_num_offs );
-        uint32_t dflags = flags ^ myObject.flags;
-        if( dflags & MFBD_NO_RESTORE ) node.put( "NO_RESTORE", ( bool )( flags & MFBD_NO_RESTORE ) );
-        if( dflags & MFBD_SAVE_FFDATA ) node.put( "SAVE_FFDATA", ( bool )( flags & MFBD_SAVE_FFDATA ) );
-        // TODO "INCOMPLETE"
-    */
-    ChannelCfg::getProperties (node, myObject);
-
+    ChannelCfg::getProperties (node, myObject);         // generate using our parent-object as default-values.
     tree.push_back (bpt::ptree::value_type ("channel", node));
-
     return node;
 
 }
@@ -261,7 +190,6 @@ size_t Channel::size (void) const {
 
     size_t sz = ChannelCfg::size();
     sz += sizeof (uint16_t);          // ID
-    //sz += sizeof (uint32_t);        // dataOffset;
     sz += dark.size();
     sz += imageStats.size() * ArrayStats::size() + sizeof (uint16_t);
     return sz;
@@ -323,23 +251,35 @@ bool Channel::checkCfg (void) {
         return false;
     }*/
 
-    // Do we have a correct dark template ?
-    if (darkTemplate.empty()) {
-        LOG_ERR << "No filename template specified.";
-        return false;
-    }
-    nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
-    if (nWild > 1) {
-        LOG_ERR << "Dark template contains too many wildcards: \"" << darkTemplate << "\"";
-        return false;
-    } else if (nWild == 1 && darkNumbers.empty()) {
-        LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)";
-        return false;
-    } else if (nWild == 0 && darkNumbers.size()) {
-        LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename.";
-        darkNumbers.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
-    }
 
+    if( darkTemplate.empty() != gainFile.empty() ) {
+        LOG_ERR << "Either BOTH or NONE of DARK_TEMPLATE/GAIN_FILE has to be specified!!!";
+        return false;
+    } else if (darkTemplate.empty()) {
+        LOG_WARN << "No dark/gain files specified, assuming the data is pre-processed already.";
+        if ( !responseFile.empty() ) {
+            LOG_ERR << "Detector response correction only possible when flatfielding, It will NOT be performed!!!";
+        }
+    } else {
+        nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
+        if (nWild > 1) {
+            LOG_ERR << "Dark template contains too many wildcards: \"" << darkTemplate << "\"";
+            return false;
+        } else if (nWild == 1 && darkNumbers.empty()) {
+            LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)";
+            return false;
+        } else if (nWild == 0 && darkNumbers.size()) {
+            LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename.";
+            darkNumbers.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
+        }
+    }
+    
+    if( !alignClip.empty() && alignClip.size() != 4 ) {
+        LOG_WARN << "ALIGN_CLIP does not seem to contain 4 integers. Whole image area will be used.";
+        alignClip.clear();
+    }
+    
+    
     return true;
 
 }
@@ -481,9 +421,6 @@ bool Channel::checkData (void) {
     return true;
 }
 
-void Channel::init (void) {
-
-}
 
 //#define INDEX_THRESHOLD  0
 #define INDEX_THRESHOLD  1E-12      // cutoff to get rid of some fft noise
@@ -568,29 +505,12 @@ void Channel::initCache (void) {
 }
 
 
-void Channel::cleanup (void) {
-
-}
-
-
-
-namespace {
-    template <typename T>
-    void loadWrapper (const string& fn, T& img) {
-        redux::file::readFile (fn, img);
-        LOG_DETAIL << boost::format ("Loaded file \"%s\"") % fn;
-    }
-}
-
-
-void Channel::loadCalib(boost::asio::io_service& service) {
+void Channel::loadCalib(boost::asio::io_service& service) {     // load through cache-functionality, so the same data is recycled for other objects
 
     LOG_TRACE << "Channel::loadCalib()";
     // TODO: absolute/relative paths
     // TODO: cache files and just fetch shared_ptr
 
-    //ClippedFile tmpFile(alignClip,"",false);
-    
     if (!darkTemplate.empty()) {        // needs to be read synchronously because of adding/normalization
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
@@ -667,15 +587,15 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
     
     // load data (and preprocess)
     imageStats[0].reset(new ArrayStats());
-    service.post(std::bind(&Channel::loadImage, this, 0, std::ref(patches)));
+    service.post(std::bind(&Channel::loadImage, this, 0, std::ref(patches)));           // will *not* be loaded through the cahche, so only saved in "images"
     for (size_t i = 1; i < nImages; ++i) {
         imageStats[i].reset (new ArrayStats());
-        service.post(std::bind(&Channel::loadImage, this, i, std::ref(patches)));
+        service.post(std::bind(&Channel::loadImage, this, i, std::ref(patches)));       // will *not* be loaded through the cahche, so only saved in "images"
     }
     runThreadsAndWait(service, myJob.info.maxThreads);
     
-    patchWriteFail = std::async( launch::async, [this,&patches](){
-        size_t nPatchesY = patches.dimSize(0);
+    patchWriteFail = std::async( launch::async, [this,&patches](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
+        size_t nPatchesY = patches.dimSize(0);                                          // we will synchronize all the "patchWriteFail" futures at the end of MomfbdJob::preProcess
         size_t nPatchesX = patches.dimSize(1);
         for(uint py=0; py<nPatchesY; ++py) {
             for(uint px=0; px<nPatchesX; ++px) {
@@ -684,39 +604,17 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
                 chData.cacheStore(true);    // store to disk and clear array
             }
         }
-        images.clear();
+        images.clear();                                                                 // release resources after storing the patch-data.
         return false;   // TODO return true if any error
     });
 
     
-    //service.post(std::bind(&Channel::copyImagesToPatches, this, std::ref(patches)));
     runThreadsAndWait(service, myJob.info.maxThreads);
-    
-    //storePatchData(service,patches);
-    //runThreadsAndWait(service, myJob.info.maxThreads);
-    //Ana::write("chan_img_"+to_string(ID)+".f0",images);
 
 }
 
 
-void Channel::unloadData(void) {
-    
-    size_t nImages = imageNumbers.size();
-    if (nImages) {
-        for (size_t i = 0; i < nImages; ++i) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[i]));
-            ClippedFile::unload<float>(fn.string(),alignClip);
-        }
-    } else  {
-        bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
-        ClippedFile::unload<float>(fn.string(),alignClip);
-    }
-    //images.clear();
-  
-}
-
-
-void Channel::unloadCalib(void) {
+void Channel::unloadCalib(void) {               // unload what was accessed through the cache, this should be called when all objects are done pre-processing.
     
     if (!darkTemplate.empty()) {
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
@@ -747,30 +645,6 @@ void Channel::unloadCalib(void) {
 
 }
 
-void Channel::preprocessData(void) {
-/*
-    size_t nImages = images.size();
-    if( nImages ) {
-        double avgMean = 0.0;
-        startT = bpx::pos_infin;
-        endT = bpx::neg_infin;
-        for (size_t i = 0; i < nImages; ++i) {
-            avgMean += imageStats[i]->mean;
-            if(images[i].meta) {
-                if(startT.is_special()) startT = images[i].meta->getStartTime();
-                else startT = std::min(startT,images[i].meta->getStartTime());
-                if(endT.is_special()) endT = images[i].meta->getEndTime();
-                else endT = std::max(endT,images[i].meta->getEndTime());
-            }
-        }
-        avgMean /= static_cast<double> (nImages);
-        for (size_t i = 0; i < nImages; ++i) {
-            preprocessImage(i, avgMean);
-        }
-    }
-*/
-}
-
 
 double Channel::getMaxMean(void) {
     double maxMean = std::numeric_limits<double>::lowest();
@@ -792,34 +666,11 @@ void Channel::getFileNames(std::vector<std::string>& files) const {
 
 
 void Channel::initProcessing (WorkSpace::Ptr ws) {
+    
     workspace = ws;
     initCache();        // this will initialize modes & pupil for this channel
     initPhiFixed();
- /*   for (auto & m : modes) {           // check if the tilts are present
-        if (m.first == 2 || m.first == 3) {
-            shared_ptr<Tilts> tilts (new Tilts (*this, m.first));
-            auto ret = workspace->tilts.emplace (m.first, tilts);
-            if (ret.second) {       // new tiltmode, i.e. this will be the reference channel
-                tilts->nFreeAlpha = imageNumbers.size();
-                tilts->anchorChannel = true;
-            } else {                // existing tiltmode, this channel is added as a "relative tilt"
-                ret.first->second->addRelativeTilt (tilts);
-            }
-            tilts->init();
-        }
-    }
 
-    for (uint16_t i = 0; i < imageNumbers.size(); ++i) {
-        uint32_t imageNumber = imageNumbers[i];
-        std::shared_ptr<WaveFront>& wf = workspace->wavefronts[imageNumber];
-        if (!wf) wf.reset (new WaveFront());
-        for (auto & m : modes) {
-            if (m.first > 3) {      // tilts are treated separately
-                wf->addWeight (m.first, 1.0 / (m.second->atm_rms * myObject.wavelength * myObject.wavelength));
-            }
-        }
-    }
-*/
 }
 
 
@@ -848,18 +699,6 @@ void Channel::initPatch (ChannelData& cd) {
         simg->init();
     }
 }
-
-
-void Channel::getResults (ChannelData& cd) {
-    
-}
-
-
-void Channel::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
-
-     
-}
-
 
 
 void Channel::initPhiFixed (void) {
@@ -941,14 +780,6 @@ double Channel::metric (void) {
 }
 
 
-void Channel::normalizeData (boost::asio::io_service& service, double value) {
-    size_t nImages = imageNumbers.size();
-    for (size_t i = 0; i < nImages; ++i) {
-        service.post (std::bind (&Channel::normalizeImage, this, i, value));
-    }
-}
-
-
 void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd ) {
 
     unique_lock<mutex> lock(mtx);
@@ -965,53 +796,28 @@ void Channel::loadImage(size_t i, Array<PatchData::Ptr>& patches) {
     
     bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[i]));
     ClippedFile cf(fn.string(),alignClip,false);
-    //for( int i=0; i< 10; ++i ) {
-    //Image<double> tmpImg;
+    
     Image<float> tmpImg;
     Image<float> view(images,i,i,0,imgSize.y-1,0,imgSize.x-1);
-//    static atomic<int> cnt;
-//    cout << "Channel::loadImage: " << __LINE__ << "  loading file viewget=" << hexString(view.get()) << endl;
+    
     cf.loadImage(tmpImg,false);
     if(tmpImg.meta) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
     }
-
-//    ClippedFile::load(tmpImg,fn.string(),alignClip);
-//    cout << "Channel::loadImage: " << __LINE__ << "  loading file tmpget=" << hexString(tmpImg.get()) << endl;
-//    Ana::write("chan_"+to_string(ID)+"_tmpimg_"+to_string(i)+".f0",tmpImg);
- //   cout << "Channel::loadImage: " << __LINE__ << "  loading file get=" << hexString(tmpImg.get()) << endl;
     view.assign(reinterpret_cast<redux::util::Array<float>&>(tmpImg));
- //   cout << "Channel::loadImage: " << __LINE__ << "  loading file viewget2=" << hexString(view.get()) << endl;
- //   Ana::write("chan_"+to_string(ID)+"_view_"+to_string(i)+".f0",view);
+
      preprocessImage(i, view, patches);
-//    Ana::write("chan_"+to_string(ID)+"_view2_"+to_string(i)+".f0",view);
- //   cout << "Channel::loadImage: " << __LINE__ << "  loading file viewget3=" << hexString(view.get()) << endl;
-          imageStats[i]->getStats(myJob.borderClip, view);     // get stats for corrected data
-   // }
-//     cout << "Channel::loadImage: " << __LINE__  << "  img=" << hexString(tmpImg.get()) << endl;
-//     //ClippedFile::load(images[i],fn.string(),alignClip);
-//     //imageStats[i]->getStats(myJob.borderClip, tmpImg, ST_VALUES);  // only get min/max/mean
-//     preprocessImage(i, tmpImg, patches);
-//     cout << "Channel::loadImage: " << __LINE__  << endl;
-//     imageStats[i]->getStats(myJob.borderClip, tmpImg);     // get stats for corrected data
-//     cout << "Channel::loadImage: " << __LINE__  << endl;
-//    ClippedFile::unload<float>(fn.string(),alignClip);
-//     cout << "Channel::loadImage: " << __LINE__ << "  unloaded file #" << cnt-- << "   use_count = " << tmpImg.use_count() << endl;
-//   
+     imageStats[i]->getStats(myJob.borderClip, view);     // get stats for corrected data
+ 
 }
 
 
 void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData::Ptr>& patches) {
 
-   // double imgMean = imageStats[index]->mean;
-    Array<double> tmpImg;
+    Array<double> tmpImg;       // local temporary with double-precision
     tmpImg = img.copy<double>();
-    /*bool modified = false;
-
-
-    bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
-    LOG_TRACE << boost::format ("Pre-processing image %s") % fn;
-
+    
+    /*
     // Michiel's method for detecting bitshifted Sarnoff images.    TODO make this an SST-specific "filter" to be applied on raw data
     if (imgMean > 4 * avgMean) {
         LOG_WARN << boost::format ("Image bit shift detected for image %s (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!") % fn;
@@ -1036,6 +842,7 @@ void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData:
             LOG_WARN << boost::format ("Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!") % printArray (ccdResponse.dimensions(), "") % printArray (tmpImg.dimensions(), "");
             ccdResponse.resize();
         }
+        
         double n;
         if(dark.meta && ((n=dark.meta->getNumberOfFrames()) > 1)) {
             tmpImg.subtract(dark,1.0/n);
@@ -1044,7 +851,7 @@ void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData:
         }
         
         if (ccdResponse.valid()) {   // correct for the detector response (this should not contain the gain correction and must be done before descattering)
-            //tmpImg *= ccdResponse;
+            tmpImg *= ccdResponse;
         }
 
         if (ccdScattering.valid() && psf.valid()) {           // apply backscatter correction
@@ -1057,9 +864,7 @@ void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData:
             }
         }
 
-   // cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
         tmpImg *= gain;
-  //  cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
 
         namespace sp = std::placeholders;
         size_t sy = tmpImg.dimSize(0);
@@ -1088,28 +893,17 @@ void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData:
 
     }
 
-     img.assign(tmpImg);
-     
- //   cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
- //   copyImageToPatches(index, tmpImg, patches);
-  //  cout << "Channel::preprocessImage: " << __LINE__  << "   tmpUC= " << tmpImg.use_count() << endl;
+    img.assign(tmpImg);         // copy back to image
   
+    // save corrected data if specified.
     if((myObject.saveMask & SF_SAVE_FFDATA)) {
         bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
-        fn = bfs::path (fn.leaf().string() + ".cor");
+        fn = bfs::path(fn.leaf().string() + ".cor");
         LOG_DETAIL << boost::format ("Saving flat/dark corrected file %s") % fn.string();
-        redux::file::Ana::write (fn.string(), tmpImg.copy<float>());   // TODO: other formats
+        redux::file::Ana::write(fn.string(), tmpImg.copy<float>());   // TODO: other formats
     }
 
 
-}
-
-
-void Channel::normalizeImage (size_t index, double value) {
-    //images[index] *= (value / imageStats[index]->mean);
-    double noise1 = imageStats[index]->noise;
-    //imageStats[index]->getStats(images[index]);
-    LOG_TRACE << boost::format("Normalizing image (%d,%d,%d):  noise1 = %f   noise2 = %f") % myObject.ID % ID % (index) % noise1 % imageStats[index]->noise;
 }
 
 
@@ -1117,9 +911,7 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
     
     size_t nImages = std::max<size_t>(1,imageNumbers.size());
     Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nImages-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
-    //redux::file::Ana::write ("chan_"+to_string(ID)+((string)chData.cutout)+"_block.f0", block);   // TODO: other formats
     chData.images = std::move(block);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
-    //redux::file::Ana::write ("chan_"+to_string(ID)+((string)chData.cutout)+"_cd.f0", chData.images);   // TODO: other formats
     chData.setLoaded();
     
 }
