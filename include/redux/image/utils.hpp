@@ -53,7 +53,7 @@ namespace redux {
 
         
         template <typename T>
-        redux::util::Array<T> fitPlane( const redux::util::Array<T>& in );
+        redux::util::Array<T> fitPlane( const redux::util::Array<T>& in, bool subtract_mean=false );
 
         template <typename T>
         double total( const redux::util::Array<T>& in ) {

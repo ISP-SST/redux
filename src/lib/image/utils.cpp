@@ -378,14 +378,14 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         if (m) {                                  // m!=0
             double sf = sqrt ( (double) (2 * (n + 1)));
             if (j % 2)                              // odd
-                for (uint x = 0; x < nph; ++x) {
-                    for (uint y = 0; y < nph; ++y) {
+                for (int x = 0; x < nph; ++x) {
+                    for (int y = 0; y < nph; ++y) {
                         mode[x][y] *= sf * sin ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
                     }
                 }
             else {                                   // even
-                for (uint x = 0; x < nph; ++x) {
-                    for (uint y = 0; y < nph; ++y) {
+                for (int x = 0; x < nph; ++x) {
+                    for (int y = 0; y < nph; ++y) {
                         mode[x][y] *= sf * cos ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
                     }
                 }
@@ -433,11 +433,11 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
 
 
 template <typename T>
-redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in) {
+redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, bool subtract_mean) {
 
-    int ySize = in.dimSize (0);
-    int xSize = in.dimSize (1);
-    redux::util::Array<T> ret (ySize, xSize);
+    int ySize = in.dimSize(0);
+    int xSize = in.dimSize(1);
+    redux::util::Array<T> ret(ySize, xSize);
 
     int n = ySize * xSize;
     int nParams = 3;                                                        //   fit a plane as:   z = a*x + b*y + c
@@ -447,11 +447,13 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in) {
     gsl_matrix *X = gsl_matrix_alloc (n, nParams);
     gsl_matrix *covar = gsl_matrix_alloc (nParams, nParams);
 
+    int yHalf = ySize/2;
+    int xHalf = xSize/2;
     const T* inPtr = in.ptr();
     for (int i = 0; i < ySize; ++i) {
-        double y = static_cast<double> (i) / (ySize - 1) - 0.5;             // x,y \in [-0.5, 0.5]
+        double y = i-yHalf;
         for (int j = 0; j < xSize; ++j) {
-            double x = static_cast<double> (j) / (xSize - 1) - 0.5;
+            double x = j-xHalf;
             int offset = i * xSize + j;
             gsl_matrix_set (X, offset, 0, x);
             gsl_matrix_set (X, offset, 1, y);
@@ -475,6 +477,9 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in) {
     gsl_matrix_free (covar);
 
     T* retPtr = ret.ptr();
+    if (subtract_mean) {
+        c = 0;                                          // ignore c-coefficient (mean), to just fit the tilts, not the offset.
+    }
     for (int i = 0; i < ySize; ++i) {
         double y = static_cast<double> (i) / (ySize - 1) - 0.5;
         for (int j = 0; j < xSize; ++j) {
@@ -486,8 +491,8 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in) {
 
     return ret;
 }
-template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&);
-template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&);
+template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&, bool);
+template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&, bool);
 
 
 template <typename T>
@@ -651,21 +656,21 @@ double redux::image::horizontalInterpolation (T** array, size_t sizeY, size_t si
     int val = 0;
     if ( (posX > 1)) val |= ( (ptr[posX - 2] > 0) << 4);
     if ( (posX > 0))   val |= ( (ptr[posX - 1] > 0) << 3);
-    if ( (posX < sizeX))   val |= ( (ptr[posX + 1] > 0) << 1);
-    if ( (posX < sizeX - 1)) val |= ( (ptr[posX + 2] > 0));
+    if ( (posX+1 < sizeX))   val |= ( (ptr[posX + 1] > 0) << 1);
+    if ( (posX+2 < sizeX)) val |= ( (ptr[posX + 2] > 0));
     //now select based on the number
     switch (val) {
         case (10) :     // = 0 1 x 1 0
         case (11) :     // = 0 1 x 1 1
         case (26) :     // = 1 1 x 1 0
         case (27) :     // = 1 1 x 1 1
-            return (ptr[posX - 1] + ptr[posX + 1]) / 2;
+            return (ptr[posX-1] + ptr[posX+1]) / 2;
         case (18) :     // = 1 0 x 1 0
         case (19) :     // = 1 0 x 1 1
-            return (ptr[posX - 2] + 2 * ptr[posX + 1]) / 3;
+            return (ptr[posX-2] + 2 * ptr[posX+1]) / 3;
         case (9) :      // = 0 1 x 0 1
         case (25) :     // = 1 1 x 0 1
-            return (2 * ptr[posX - 1] + ptr[posX + 2]) / 3;
+            return (2 * ptr[posX-1] + ptr[posX+2]) / 3;
         default:
             return inverseDistanceWeight<T> (array, sizeY, sizeX, posY, posX);
     }
