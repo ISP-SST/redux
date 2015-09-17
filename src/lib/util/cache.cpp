@@ -8,7 +8,7 @@
 using namespace redux::util;
 using namespace std;
 
-std::string Cache::cachePath = "/tmp/redux/";
+string Cache::cachePath = "/scratch/tomas/redux/";
 
 
 Cache& Cache::get(void) {
@@ -17,83 +17,109 @@ Cache& Cache::get(void) {
 }
 
 
-std::string Cache::path(void) {
+string Cache::path(void) {
     unique_lock<mutex> lock(cacheMutex);
     return cachePath;
 }
 
 
-void Cache::setPath(const std::string& path) {
+void Cache::setPath(const string& path) {
     unique_lock<mutex> lock(cacheMutex);
     cachePath = path;
 }
 
+CacheItem::CacheItem(void) : itemPath(""), isLoaded(true) {
+}
+
+CacheItem::CacheItem(const string& path) : itemPath(path), isLoaded(true) {
+    unique_lock<mutex> lock(itemMutex);
+    if ( bfs::exists(itemPath) ) {
+        bfs::remove(itemPath);      // HACK  for now we just delete pre-existing file, later we want to recover after crash...
+    }
+}
 
 CacheItem::CacheItem(const CacheItem& rhs) : itemPath(rhs.itemPath), timeout(rhs.timeout), lastAccessed(rhs.lastAccessed),
  options(rhs.options), isLoaded(rhs.isLoaded) {
-    
 }
 
 
 void CacheItem::cacheTouch(void) {
+    unique_lock<mutex> lock(itemMutex);
     lastAccessed = 0;
 }
 
 
 bool CacheItem::cacheLoad(bool removeAfterLoad) {
+    
+    bool ret(false);
     if(!isLoaded) {
-        std::unique_lock<std::mutex> lock(itemMutex);
+        unique_lock<mutex> lock(itemMutex);
         if ( bfs::exists(itemPath) ) {
-            std::ifstream in(itemPath.c_str(), std::ofstream::binary|std::ios_base::ate);
+            ifstream in(itemPath.c_str(), ofstream::binary|ios_base::ate);
             if( in.good() ) {
                 size_t sz = in.tellg();
-                std::unique_ptr<char[]> buf( new char[sz] );
-                in.seekg(0, std::ios_base::beg);
+                unique_ptr<char[]> buf( new char[sz] );
+                in.seekg(0, ios_base::beg);
                 in.clear();
                 in.read(buf.get(), sz);
                 size_t psz = cunpack(buf.get(),false);
                 if(psz == sz) {
                     isLoaded = true;
-                    if(removeAfterLoad) {
-                        in.close();
-                        bfs::remove(itemPath);
-                    }
-                    //std::cout << "CacheItem::cacheLoad() " << itemPath << "   OK  removed=" << removeAfterLoad << std::endl;
-                    return true;
-                } else std::cout << "CacheItem::cacheLoad() " << psz << " != " << sz << " !!!" << std::endl;
-            } else std::cout << "CacheItem::cacheLoad() in.good() == false !!!" << std::endl;
-        } //else std::cout << "CacheItem::cacheLoad() " << itemPath << " doesn't exist !!!" << std::endl;
-    } //else std::cout << "CacheItem::cacheLoad()  " << itemPath << "   already Loaded !!!" << std::endl;
-    return false;
+                    //cout << hexString(this) << "  CacheItem::cacheLoad() " << itemPath << "   OK  removed=" << removeAfterLoad << endl;
+                    ret = true;
+                } else cout << hexString(this) << "  CacheItem::cacheLoad() " << psz << " != " << sz << " !!!" << endl;
+            } else cout << hexString(this) << "  CacheItem::cacheLoad() in.good() == false !!!" << endl;
+        } //else cout << hexString(this) << "  CacheItem::cacheLoad() " << itemPath << " doesn't exist !!!" << endl;
+    } //else cout << hexString(this) << "  CacheItem::cacheLoad()  " << itemPath << "   already Loaded !!!" << endl;
+    
+    if(isLoaded && removeAfterLoad) {
+        bfs::remove(itemPath);
+    }
+    
+    return ret;
 }
 
 
 bool CacheItem::cacheStore(bool clearAfterStore){
+    
+    bool ret(false);
     if(isLoaded) {
-        std::unique_lock<std::mutex> lock(itemMutex);
+        unique_lock<mutex> lock(itemMutex);
         bfs::create_directories(itemPath.parent_path());
         size_t sz = csize();
-        std::unique_ptr<char[]> buf( new char[sz] );
+        unique_ptr<char[]> buf( new char[sz] );
         size_t psz = cpack(buf.get());
         if(psz == sz) {
-            std::ofstream out(itemPath.c_str(), std::ofstream::binary);
+            ofstream out(itemPath.c_str(), ofstream::binary);
             if( out.good() ) {
                 out.write( buf.get(), sz );
-                if(clearAfterStore) {
-                    cclear();
-                    isLoaded = false;
-                }
-                //std::cout << "CacheItem::cacheStore() " << itemPath << "   OK  cleared=" << clearAfterStore << std::endl;
-                return true;
-            } else std::cout << "CacheItem::cacheStore() out.good() == false !!!" << std::endl;
-        } std::cout << "CacheItem::cacheStore() " << psz << " != " << sz << " !!!" << std::endl;
-    } //else std::cout << "CacheItem::cacheStore()  " << itemPath << "   not Loaded !!!" << std::endl;
-    return false;
+                //cout << hexString(this) << "  CacheItem::cacheStore() " << itemPath << "   OK  cleared=" << clearAfterStore << endl;
+                ret = true;
+            } else cout << hexString(this) << "  CacheItem::cacheStore() out.good() == false !!!" << endl;
+        } else cout << hexString(this) << "  CacheItem::cacheStore() " << psz << " != " << sz << " !!!" << endl;
+    } //else cout << hexString(this) << "  CacheItem::cacheStore()  " << itemPath << "   not Loaded !!!" << endl;
+    
+    if(clearAfterStore) {
+        cclear();
+        isLoaded = false;
+    }
+    return ret;
 }
 
 
-void CacheItem::setPath(const std::string& path) {
+void CacheItem::setLoaded(bool il) {
+    
+    unique_lock<mutex> lock(itemMutex);
+    isLoaded = il;
+    
+}
+
+
+void CacheItem::setPath(const string& path) {
+    
+    unique_lock<mutex> lock(itemMutex);
     Cache& c = Cache::get();
     itemPath = bfs::path(c.path()) / bfs::path(path);
+    
 }
         

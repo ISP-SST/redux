@@ -219,7 +219,6 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
             for( auto & it : patches ) {
                 if( it->step == JSTEP_QUEUED ) {
                     it->step = JSTEP_RUNNING;
-                    it->cacheLoad(true);
                     wip.parts.push_back( it );
                     if(wip.previousJob.get() != this) {     // First time for this slave -> include global data
                         wip.parts.push_back( globalData );

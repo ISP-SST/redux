@@ -27,7 +27,7 @@ namespace redux {
         class Channel;
         class WaveFront;
 
-        struct SubImage : public redux::util::Array<float>, public std::enable_shared_from_this<SubImage> {
+        struct SubImage : public redux::util::Array<float> {
             typedef std::shared_ptr<SubImage> Ptr;
             
             SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind,

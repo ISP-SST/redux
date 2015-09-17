@@ -393,6 +393,9 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     for( Job::JobPtr& job : jobs ) {
         if( job->check() && job->getWork( wip, nThreads ) ) {
             wip.job = job;
+            for( auto& it: wip.parts ) {
+                it->cacheLoad(false);
+            }
             break;
         }
     }
@@ -474,7 +477,9 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     uint64_t count = pack( ptr, blockSize );
     if(wip.job) {
         count += wip.packWork( ptr+count );
-
+        for(auto& it: wip.parts) {
+            it->cacheStore(true);
+        }
     }
     conn->writeAndCheck( data, blockSize+sizeof(uint64_t) );
 

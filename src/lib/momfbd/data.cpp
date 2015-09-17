@@ -21,16 +21,9 @@ const std::string thisChannel = "data";
 }
 
 
-ChannelData::ChannelData( std::shared_ptr<Channel> c, const std::string& cachePath ) : myChannel(c) {
-    string path = cachePath + "_" + to_string(c->id());
-    setPath(path);
-}
-
-
-void ChannelData::getPatchData(const PatchData& patch) {
-    myChannel->getPatchData(*this,patch);
-    isLoaded = true;
-    cacheStore(true);
+ChannelData::ChannelData( std::shared_ptr<Channel> c, const std::string& inPath ) : myChannel(c) {
+    string mypath = inPath + "_" + to_string(c->id());
+    setPath(mypath);
 }
 
 
@@ -80,21 +73,14 @@ void ChannelData::cclear(void) {
 }
 
 
-ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& cachePath ) : myObject(o) {
+ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& inPath ) : myObject(o) {
 
-    string path = cachePath + "_" + to_string(o->id());
-    setPath(path);
+    string mypath = inPath + "_" + to_string(o->id());
+    setPath(mypath);
     for( auto& it: o->getChannels() ) {
-        channels.push_back(ChannelData(it,path));
+        channels.push_back(ChannelData(it,mypath));
     }
 
-}
-
-
-void ObjectData::getPatchData(const PatchData& patch) {
-    for( ChannelData& ch: channels ) {
-        ch.getPatchData(patch);
-    }
 }
 
 
@@ -184,6 +170,7 @@ bool ObjectData::cacheStore(bool clearAfterStore) {
         stored |= cd.cacheStore(clearAfterStore);
     }
     stored |= CacheItem::cacheStore(clearAfterStore);      // true if any part was stored, TODO better control of partial fails.
+    return stored;
 }
 
 
@@ -201,23 +188,14 @@ void ObjectData::cclear(void) {
 
 
 PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
-    
-    string path = to_string(j.info.id)+"/patch_"+(string)index;
-    setPath(path); 
+
+    string mypath = to_string(j.info.id)+"/patch_"+(string)index;
+    setPath(mypath); 
     for( auto& it: j.getObjects() ) {
-        objects.push_back(ObjectData(it,path));
+        objects.push_back(ObjectData(it,mypath));
     }
 
     
-}
-
-
-void PatchData::getData(void) {
-    for( ObjectData& obj: objects ) {
-        obj.getPatchData(*this);
-    }
-    isLoaded = true;
-    cacheStore(true);
 }
 
 
@@ -284,7 +262,6 @@ bool PatchData::cacheLoad(bool removeAfterLoad) {
     for( ObjectData& obj: objects ) {
         loaded |= obj.cacheLoad(removeAfterLoad);
     }
-    //loaded |= CacheItem::cacheLoad(removeAfterLoad);
     return loaded;
 }
 

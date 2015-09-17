@@ -270,8 +270,9 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
     uint16_t nModeIncrement = job.nModeIncrement;
     int dumpCount(0);
     size_t totalIterations(0);
+    size_t maxIterations(1);            // only 1 iteration while increasing modes, job.maxIterations for the last step.
 
-    for( uint16_t modeCount=600/*job.nInitialModes*/; modeCount; ) {
+    for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
         modeCount = min<uint16_t>(modeCount,job.modeNumbers.size());
         std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
@@ -281,8 +282,9 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
                  );
         
         if( modeCount == job.modeNumbers.size() ) {                                     // final loop
-            modeCount = 0;
+            modeCount = 0;                      // we use 0 to exit the eternal loop
             init_tol = job.FTOL;
+            maxIterations = job.maxIterations;
         } else {
             //nModeIncrement += job.nModeIncrement;                                     // first 5 modes, then 15, then 30 ... 
             modeCount += nModeIncrement;
@@ -308,8 +310,8 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
                 double relativeChange = 2.0 * fabs(thisMetric-previousMetric) / (fabs(thisMetric)+fabs(previousMetric)+job.EPS);
                 if(relativeChange < job.FTOL) {      // count consecutive "marginal decreases" in metric
                     if( successCount++ >= job.targetIterations ) { // exit after targetIterations consecutive improvements.
-                        LOG_DEBUG << alignRight(to_string(iter),7) << ":   metric = " << thisMetric << "   norm(grad) = " << gradNorm
-                     << "  rC = " << relativeChange << "  successCount = " << successCount << "   I would like to exit now!.";
+//                         LOG_DEBUG << alignRight(to_string(iter),7) << ":   metric = " << thisMetric << "   norm(grad) = " << gradNorm
+//                      << "  rC = " << relativeChange << "  successCount = " << successCount << "   I would like to exit now!.";
                      successCount = 0;
                      done = true;
                     }
@@ -318,7 +320,7 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
                      << "  rC = " << relativeChange << "  successCount = " << successCount;
                     successCount = 0;
                 }
-            } else LOG_DEBUG << "Initial:   metric = " << thisMetric << "   norm(grad) = " << gradNorm;
+            } //else LOG_DEBUG << "Initial:   metric = " << thisMetric << "   norm(grad) = " << gradNorm;
             previousMetric = thisMetric;
 
             status = gsl_multimin_test_gradient( s->gradient, 1e-9 );
@@ -332,12 +334,12 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
     //        cout << "  thisMetric = " << thisMetric << printArray(s->x->data,s->x->size,"\n  alpha")
     //             << printArray(s->gradient->data,s->gradient->size,"\n  grad") << endl;
 
-        } while( status == GSL_CONTINUE && (!done || iter < job.minIterations) && iter < job.maxIterations );
+        } while( status == GSL_CONTINUE && (!done || iter < job.minIterations) && iter < maxIterations );
         
         totalIterations += iter;
         
-        LOG_DEBUG << boost::format("After %d iterations.  metric=%g  f=%g  norm(grad)=%g  %s") % totalIterations % GSL_MULTIMIN_FN_EVAL_F(&my_func,s->x)
-            % s->f % gradNorm % printArray(activeModes,"modes");
+        LOG_DEBUG << boost::format("After %d iteration%s  metric=%g norm(grad)=%g  using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
+                s->f % gradNorm % activeModes.size() % job.modeNumbers.size();
         
         /*int imgIndex=0;
         dumpCount++;
@@ -435,7 +437,7 @@ double WorkSpace::coefficientMetric( boost::asio::io_service& service ) {
 
     double sum( 0 );
 
-    for( auto & it : wavefronts ) {
+/*    for( auto & it : wavefronts ) {
         if( it.second ) {
             // service.post( [it,&sum] {
             //sum.fetch_add(it.second->coefficientMetric());
@@ -443,7 +445,7 @@ double WorkSpace::coefficientMetric( boost::asio::io_service& service ) {
             // } );
         } else LOG << "WorkSpace::coefficientMetric()  it.second is NULL";
     }
-
+*/
     //runThreadsAndWait(service, job.info.maxThreads);
 //    cout << "WorkSpace::coefficientMetric()   sum = " << sum << endl;
     return sum;
@@ -452,7 +454,7 @@ double WorkSpace::coefficientMetric( boost::asio::io_service& service ) {
 
 void WorkSpace::calcOTFs( boost::asio::io_service& service ) {
 
-    for( auto & it : wavefronts ) {
+ /*   for( auto & it : wavefronts ) {
         if( it.second ) {
             //it.second->setAlpha(alpha_init);
             it.second->setAlphasAndUpdate( service, true );
@@ -460,7 +462,7 @@ void WorkSpace::calcOTFs( boost::asio::io_service& service ) {
     }
 
     runThreadsAndWait( service, job.info.maxThreads );
-
+*/
 }
 
 

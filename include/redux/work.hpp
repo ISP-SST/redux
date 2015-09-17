@@ -2,6 +2,7 @@
 #define REDUX_WORK_HPP
 
 #include "redux/network/tcpconnection.hpp"
+#include "redux/util/cache.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -15,7 +16,7 @@ namespace redux {
 
     class Job;
 
-    struct Part {
+    struct Part : public redux::util::CacheItem {
         typedef std::shared_ptr<Part> Ptr;
         Part();
         //Part(const Part&) = delete;
@@ -23,6 +24,9 @@ namespace redux {
         virtual uint64_t size( void ) const;
         virtual uint64_t pack( char* ) const;
         virtual uint64_t unpack( const char*, bool swap_endian=false );
+        size_t csize(void) const { return size(); };
+        uint64_t cpack(char* p) const { return pack(p); };
+        uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
         uint64_t id;
         uint8_t step, nRetries, partType;

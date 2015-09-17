@@ -57,7 +57,7 @@ namespace redux {
                 return ret;
             }
             template<class KeyT, class T>
-            static T& get(const KeyT& key, const T& val) {
+            static T& get(const KeyT& key, T& val) {
                 auto m = get().getMap<KeyT,T>();        // m.first is a unique_lock for the map in m.second
                 auto ret = m.second.emplace(key,val);
                 return ret.first->second;
@@ -146,7 +146,8 @@ namespace redux {
         
         class CacheItem {
         public:
-            CacheItem(const std::string& path="") : itemPath(path), isLoaded(false) {};
+            CacheItem(void);
+            CacheItem(const std::string& path);
             CacheItem(const CacheItem&);
             
             /***** Methods to be overloaded *****/
@@ -159,6 +160,7 @@ namespace redux {
             virtual void cacheTouch(void);
             virtual bool cacheLoad(bool removeAfterLoad=false);
             virtual bool cacheStore(bool clearAfterStore=false);
+            void setLoaded(bool il=true);
             virtual void setPath(const std::string& path);
             std::string path(void) const { return itemPath.string(); };
             

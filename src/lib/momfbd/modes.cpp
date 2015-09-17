@@ -3,7 +3,6 @@
 #include "redux/constants.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/momfbd/cache.hpp"
-//#include "redux/momfbd/legacy.hpp"
 #include "redux/util/arrayutil.hpp"
 
 #include <cmath>
@@ -11,7 +10,6 @@
 
 using namespace redux::image;
 using namespace redux::momfbd;
-//using namespace redux::momfbd::legacy;
 using namespace redux::util;
 using namespace std;
 
@@ -33,11 +31,10 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double a
 
     atm_rms = sqrt(Cache::getCache().zernikeCovariance(modeNumber,modeNumber));
 
+
 }
 
-namespace {
-    const int signs[] = {1, 1, -1, -1, -1, -1, -1, 1, 1, -1, -1, 1, 1, 1, -1, -1, -1, -1, 1, 1, -1, -1};
-}
+
 PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double angle, double cutoff) :
      Array<double> (nPoints, nPoints), atm_rms(0) {
 
@@ -64,8 +61,6 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
         }
     }
 
-    if(klModeNumber<22) *this *= signs[klModeNumber];   // FIXME: making signs the same as MvN for testing.
-    
     atm_rms = sqrt(kle->covariance);
 
 }
