@@ -269,6 +269,7 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
     double previousMetric(0), thisMetric, gradNorm;
     uint16_t nModeIncrement = job.nModeIncrement;
 
+    size_t failCount(0);
     size_t totalIterations(0);
     size_t maxIterations(1);            // only 1 iteration while increasing modes, job.maxIterations for the last step.
     
@@ -289,21 +290,26 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
         } else {
             //nModeIncrement += job.nModeIncrement;                                     // first 5 modes, then 15, then 30 ... 
             modeCount += nModeIncrement;
+            failCount = 0;              // we don't worry until we have tried with all modes.
         }
         
         gsl_multimin_fdfminimizer_set( s, static_cast<gsl_multimin_function_fdf*>(&my_func), beta_init, init_step, init_tol );
         
         size_t iter = 0;
-        int status, successCount(0);
+        int status(0), successCount(0);
         bool done(false);
         
         do {
             status = gsl_multimin_fdfminimizer_iterate( s );
             if( status == GSL_ENOPROG ) {
                 //LOG_WARN << "iteration: " << iter << "  GSL reports no progress:  quitting loop.";
+                failCount++;
+                if( iter == 0 && (modeCount == job.nInitialModes)) {
+                    status = GSL_FAILURE;           // could not get started, add modes and try again...
+                }
                 break;
             } else if( status ) {
-                LOG_WARN << "iteration: " << iter << "  GSL reports status: " << gsl_strerror(status);
+                LOG_WARN << "GSL error in iteration " << iter << ".  type: " << gsl_strerror(status);
             }
             thisMetric = s->f;
             gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric*thisMetric);
@@ -338,11 +344,12 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
         } while( status == GSL_CONTINUE && (!done || iter < job.minIterations) && iter < maxIterations );
         
         totalIterations += iter;
-        
-        LOG_DEBUG << boost::format("After %d iteration%s  metric=%g norm(grad)=%g  using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
-                s->f % gradNorm % activeModes.size() % job.modeNumbers.size();
-                
-        //  GSL_MULTIMIN_FN_EVAL_F(&my_func,s->x)
+        double val = GSL_MULTIMIN_FN_EVAL_F(&my_func,s->x);
+        if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
+            LOG_DETAIL << boost::format("After %d iteration%s  metric=%g norm(grad)=%g f=%g using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
+                s->f % val % gradNorm % activeModes.size() % job.modeNumbers.size();
+        }  
+        //  
 
 /*      FIXME the shifting does not work as expected, will look at it soon.
         for( const auto& o: job.objects ) {

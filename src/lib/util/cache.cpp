@@ -50,8 +50,9 @@ void CacheItem::cacheTouch(void) {
 
 
 bool CacheItem::cacheLoad(bool removeAfterLoad) {
-    
+
     bool ret(false);
+    if(itemPath.empty()) return ret;
     if(!isLoaded) {
         unique_lock<mutex> lock(itemMutex);
         if ( bfs::exists(itemPath) ) {
@@ -81,8 +82,9 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
 
 
 bool CacheItem::cacheStore(bool clearAfterStore){
-    
+
     bool ret(false);
+    if(itemPath.empty()) return ret;
     if(isLoaded) {
         unique_lock<mutex> lock(itemMutex);
         bfs::create_directories(itemPath.parent_path());

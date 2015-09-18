@@ -480,6 +480,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         for(auto& it: wip.parts) {
             it->cacheStore(true);
         }
+        wip.previousJob = wip.job;
     }
     conn->writeAndCheck( data, blockSize+sizeof(uint64_t) );
 
@@ -504,10 +505,11 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     if( it == peerWIP.end() ) {
         LOG_ERR << "Received results from unknown host.";
     }
+
     
     WorkInProgress& wip = it->second;
     if( blockSize ) {
-        wip.unpack( buf.get(), conn->getSwapEndian() );
+        wip.unpackWork( buf.get(), conn->getSwapEndian() );
         wip.job->returnResults( wip );
         for( Part::Ptr& it : wip.parts ) {
             it->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)

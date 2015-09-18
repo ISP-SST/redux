@@ -49,9 +49,8 @@ size_t DebugJob::jobType = Job::registerJob( "DebugJob", createDebugJob );
 uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {
 
     using redux::util::unpack;
-    size_t nParts;
-    uint64_t count = unpack( ptr, nParts, swap_endian );
-    wip.parts.resize( nParts );
+    uint64_t count(0);
+    wip.parts.resize( wip.nParts );
     for( auto& it : wip.parts ) {
         if(!it) it.reset( new DebugPart() );
         count += it->unpack( ptr+count, swap_endian );
@@ -226,12 +225,14 @@ bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     if( step == JSTEP_RUNNING ) {
         unique_lock<mutex> lock( jobMutex );
         size_t nParts = std::min( nThreads, info.maxThreads) * 2;
-        for( auto & it : jobParts ) {
-            if( it.second->step == JSTEP_QUEUED ) {
-                it.second->step = JSTEP_RUNNING;
-                wip.parts.push_back( it.second );
-                info.state.store( JSTATE_ACTIVE );
-                if( wip.parts.size() == nParts ) break;
+        if(wip.connection) {
+            for( auto & it : jobParts ) {
+                if( it.second->step == JSTEP_QUEUED ) {
+                    it.second->step = JSTEP_RUNNING;
+                    wip.parts.push_back( it.second );
+                    info.state.store( JSTATE_ACTIVE );
+                    if( wip.parts.size() == nParts ) break;
+                }
             }
         }
         checkParts();
@@ -283,7 +284,7 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8
         }
         
         boost::thread_group pool;
-        size_t nThreads = std::min( maxThreads, info.maxThreads)*2;
+        size_t nThreads = std::min( maxThreads, info.maxThreads);
         for( size_t t = 0; t < nThreads; ++t ) {
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
         }
@@ -422,6 +423,7 @@ void DebugJob::postProcess( void ) {
     int64_t minPID, maxPID, minID, maxID, minSID, maxSID;
     minPID = minID = minSID = UINT32_MAX;
     maxPID = maxID = maxSID = 0;
+
     for( auto & it : jobParts ) {
 
         auto ptr = static_pointer_cast<DebugPart>( it.second );
@@ -429,9 +431,7 @@ void DebugJob::postProcess( void ) {
         uint32_t sizeX = ptr->xPixelH - ptr->xPixelL + 1;
         uint32_t sizeY = ptr->yPixelH - ptr->yPixelL + 1;
 
-        auto blaha = reshapeArray( ptr->result.ptr( 0 ), sizeY, sizeX );
-        auto res = blaha.get();
-
+        auto res = reshapeArray( ptr->result.get(), sizeY, sizeX ).get();
         for( uint32_t ix = 0; ix < sizeX; ++ix ) {
             for( uint32_t iy = 0; iy < sizeY; ++iy ) {
                 int64_t tmp = res[iy][ix];
@@ -452,6 +452,7 @@ void DebugJob::postProcess( void ) {
                 }
             }
         }
+
     }
 
     for( auto & it : jobParts ) {
@@ -461,9 +462,7 @@ void DebugJob::postProcess( void ) {
         uint32_t sizeX = ptr->xPixelH - ptr->xPixelL + 1;
         uint32_t sizeY = ptr->yPixelH - ptr->yPixelL + 1;
 
-        auto blaha = reshapeArray( ptr->result.ptr( 0 ), sizeY, sizeX );
-        auto res = blaha.get();
-
+        auto res = reshapeArray( ptr->result.get(), sizeY, sizeX ).get();
         for( uint32_t ix = 0; ix < sizeX; ++ix ) {
             for( uint32_t iy = 0; iy < sizeY; ++iy ) {
                 int64_t tmp = res[iy][ix];
@@ -489,6 +488,7 @@ void DebugJob::postProcess( void ) {
             }
         }
 
+
     }
 
 
@@ -502,6 +502,7 @@ void DebugJob::postProcess( void ) {
     hdr->m_Header.dim[1] = ySize;
 
     Ana::write( "debugjob_output.f0", reinterpret_cast<char*>( *img ), hdr );
+
 
     info.step.store( JSTEP_COMPLETED );
     info.state.store( JSTATE_IDLE );
