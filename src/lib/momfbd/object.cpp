@@ -206,6 +206,7 @@ void Object::getResults(ObjectData& od) {
     od.img.assign(tmpC);
     
     if( fittedPlane.sameSize(od.img) ) {
+        LOG_DETAIL << "Re-adding fitted plane to result.";
         od.img += fittedPlane;
     } else if( !fittedPlane.empty() ) {
         LOG_WARN << "Size mismatch when re-adding fitted plane.";
@@ -375,7 +376,7 @@ void Object::addAllPQ(void) {
 
 void Object::fitAvgPlane(ObjectData& od) {
     
-    if( od.channels.size() && od.channels[0].images.nDimensions() == 3 ) {
+    if( (myJob.runFlags&RF_FIT_PLANE) && od.channels.size() && od.channels[0].images.nDimensions() == 3 ) {
         
         size_t count(0);
         size_t ySize = od.channels[0].images.dimSize(1);
@@ -409,6 +410,8 @@ void Object::fitAvgPlane(ObjectData& od) {
             fittedPlane.clear();
             return;
         }
+        
+        LOG_DETAIL << "Subtracting average plane before processing.";
         
         for( ChannelData& cd : od.channels ) {
             size_t nImages = cd.images.dimSize(0);
