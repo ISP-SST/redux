@@ -18,31 +18,50 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define ANGULAR_SAMPLES    1000000                          // angular sampling points for sine/cosine lookup table
 #define lg Logger::mlg
-namespace {
 
+#define USE_LUT
+
+namespace {
+    
     const std::string thisChannel = "subimage";
 
-    const uint32_t total_samples(5*ANGULAR_SAMPLES/4);     // extend by pi/2 to fit sine/cosine in one table (cos(x) = sin(x+pi/2))
-    double SineLUT[total_samples];
-    double* const CosineLUT = SineLUT + ANGULAR_SAMPLES/4;
+#ifdef USE_LUT
+#define QUADRANT_SAMPLES    1000000       // angular sampling points (per quadrant) for the sine/cosine lookup table
+    const size_t total_samples(5*QUADRANT_SAMPLES);             // extend by pi/2 to fit sine/cosine in one table (cos(x) = sin(x+pi/2))
+    double SineLUT[total_samples+1];                            // ...and add 1 to make room for the case of exactly 2*PI when truncating
+    double* const CosineLUT = SineLUT + QUADRANT_SAMPLES;
     const double pi_x_2(2*M_PI);
-    const double angular_step(2 * M_PI/(ANGULAR_SAMPLES-1));
-    const double angular_step_inv(1.0/angular_step);
+    const size_t period_samples( QUADRANT_SAMPLES<<2 );
+    const double angular_step( pi_x_2/(period_samples) );
+    const double angular_step_inv( 1.0/angular_step );
+    
     int initSineLUT (void) {
-        for (uint i = 0; i < total_samples; ++i) {
-            SineLUT[i] = sin(i * angular_step);
-        }
-    Array<double> slaskD(SineLUT, total_samples);
-    Ana::write("sine_lut.f0", slaskD);
-    slaskD.wrap(CosineLUT,ANGULAR_SAMPLES);
-    Ana::write("cosine_lut.f0", slaskD);
+        memset(SineLUT,0,total_samples*sizeof(double));
+        long double previousPhi(0), thisPhi(0);
+        transform( SineLUT, SineLUT+period_samples, SineLUT,    // initialize LUT at i as average of values at i & i+1
+            [&previousPhi,&thisPhi](const double&){             // so we can just truncate instead of round. 
+                thisPhi += angular_step;
+                long double val = 0.5L*previousPhi;
+                previousPhi = sin(thisPhi);
+                val += 0.5L*previousPhi;
+                return val;
+            }
+        );
+        memcpy( SineLUT+period_samples, SineLUT, (QUADRANT_SAMPLES+1)*sizeof(double));
         return 0;
     }
 
-}
+    inline complex_t getPolar(double magnitude, double phase) {
+        double idxD = phase - pi_x_2 * floor( phase / pi_x_2 );
+        size_t idx = static_cast<size_t> (idxD*angular_step_inv);
+        return std::move( complex_t(magnitude*CosineLUT[idx], magnitude*SineLUT[idx]) );
+    }
+#undef QUADRANT_SAMPLES
+#endif
 
+    
+}
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind, const Array<float>& stack,
                     uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize)
@@ -65,7 +84,9 @@ SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, c
     imgFT.zero();
     resetPhi();
 
+#ifdef USE_LUT
     static int dummy UNUSED = initSineLUT(); 
+#endif
 }
 
 
@@ -520,14 +541,12 @@ void SubImage::calcOTF (complex_t* otfPtr, const double* phiPtr) const {
     double norm = sqrt(1.0 / channel.pupil.second);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
     //double norm = 1.0 / channel.pupil.second;   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
     for (auto & ind : channel.pupilInOTF) {
-        double tmp = fmod(phiPtr[ind.first],pi_x_2);
-        if( tmp < 0 ) tmp += pi_x_2;
-        //uint32_t idx = static_cast<uint32_t> (tmp*angular_step_inv + 0.5);
+#ifdef USE_LUT
+        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*norm, phiPtr[ind.first]);
+#else
         otfPtr[ind.second] = polar(pupilPtr[ind.first]*norm, phiPtr[ind.first]);
-//         otfPtr[ind.second] = complex_t( pupilPtr[ind.first]*cos(phiPtr[ind.first]),
-//                                         pupilPtr[ind.first]*sin(phiPtr[ind.first]) );
-//         otfPtr[ind.second] = complex_t( pupilPtr[ind.first]*CosineLUT[idx],
-//                                         pupilPtr[ind.first]*SineLUT[idx] );
+#endif
+
     }
     FourierTransform::autocorrelate (otfPtr, otfSize, otfSize);
 //     for (auto & ind : channel.pupilInOTF) {
@@ -555,23 +574,12 @@ void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiP
     //double normalization = (1.0 / OTF.nElements());   // TODO: normalize OTF by OTF-area
     //double norm = 1.0 / channel.pupil.second;   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
     for (auto & ind : channel.pupilInOTF) {
- //       double tmp = fmod(phiPtr[ind.first],pi_x_2);
-       // string tmpStr = "phi = " + to_string(phiPtr[ind.first]) + "  tmp = " + to_string(tmp);
- //       if( tmp < 0 ) {
-//            tmp += pi_x_2;
-          //  tmpStr += "  ntmp = " + to_string(tmp);
- //       }
- //       uint32_t idx = static_cast<uint32_t> (tmp*angular_step_inv + 0.5);
-      //  tmpStr += "  idx = " + to_string(idx);
-       pfPtr[ind.first] = polar(pupilPtr[ind.first], phiPtr[ind.first]);
-        //pfPtr[ind.first].real(pupilPtr[ind.first]*cos(phiPtr[ind.first]));
-        //pfPtr[ind.first].imag(pupilPtr[ind.first]*sin(phiPtr[ind.first]));
-//         pfPtr[ind.first] = complex_t( pupilPtr[ind.first]*cos(phiPtr[ind.first]),
-//                                       pupilPtr[ind.first]*sin(phiPtr[ind.first]) );
-//        pfPtr[ind.first] = complex_t( pupilPtr[ind.first]*CosineLUT[idx],
-//                                        pupilPtr[ind.first]*SineLUT[idx] );
+#ifdef USE_LUT
+        pfPtr[ind.first] = getPolar( pupilPtr[ind.first], phiPtr[ind.first]);
+#else
+        pfPtr[ind.first] = polar(pupilPtr[ind.first], phiPtr[ind.first]);
+#endif
         otfPtr[ind.second] = normalization*pfPtr[ind.first];
-      //  if(ind.first%1000 == 0) cout << tmpStr << endl;
     }
 
 //    redux::file::Ana::write("blu_pf.f0", PF);
