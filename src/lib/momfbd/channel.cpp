@@ -507,7 +507,7 @@ void Channel::initCache (void) {
 
 void Channel::loadCalib(boost::asio::io_service& service) {     // load through cache-functionality, so the same data is recycled for other objects
 
-    LOG_TRACE << "Channel::loadCalib()";
+    //LOG_TRACE << "Channel::loadCalib()";
     // TODO: absolute/relative paths
     // TODO: cache files and just fetch shared_ptr
 
@@ -574,7 +574,7 @@ void Channel::loadCalib(boost::asio::io_service& service) {     // load through 
 
 void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
 
-    LOG_TRACE << "Channel::loadData()";
+   //LOG_TRACE << "Channel::loadData()";
     size_t nImages = std::max<size_t>(1,imageNumbers.size());       // If no numbers, load template as single file
 
     startT = bpx::pos_infin;

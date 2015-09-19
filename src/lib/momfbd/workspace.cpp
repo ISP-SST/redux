@@ -31,8 +31,8 @@ namespace {
     const std::string thisChannel = "workspace";
 
     grad_t gradientMethods[] = { nullptr,
-        std::bind(&SubImage::gradFiniteDifference, sp::_1, sp::_2, sp::_3),
-        std::bind(&SubImage::gradVogel, sp::_1, sp::_2, sp::_3)
+        std::bind(&SubImage::gradientFiniteDifference, sp::_1, sp::_2, sp::_3),
+        std::bind(&SubImage::gradientVogel, sp::_1, sp::_2, sp::_3)
     };
 
 }

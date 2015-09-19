@@ -3,7 +3,6 @@
 
 #include "redux/momfbd/cache.hpp"
 
-#include "redux/file/fileana.hpp"
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/util/arraystats.hpp"
@@ -43,10 +42,8 @@ namespace redux {
             void restore(complex_t* avg_obj, double* norm) const;
             
             double metricChange(const complex_t* newOTF) const;
-            double gradientFiniteDifference(uint16_t, double, complex_t*, double*) const;
-            double gradFiniteDifference(uint16_t mode, double dalpha) { return gradientFiniteDifference(mode,dalpha,tmpOTF.get(),tmpPhi.get()); };
-            double gradientVogel(uint16_t mode, double dalpha, complex_t* tmpOTF, double* tmpPhi) const;
-            double gradVogel(uint16_t mode, double dalpha) { return gradientVogel(mode,dalpha,tmpOTF.get(),tmpPhi.get()); };
+            double gradientFiniteDifference(uint16_t, double);
+            double gradientVogel(uint16_t mode, double dalpha) const;
             void calcVogelWeight(void);
             
             void addScaledMode(uint16_t m, double a) { addScaledMode(phi.get(), m, a); }
@@ -79,14 +76,13 @@ namespace redux {
             void resetPhi(void);
             void calcPhi(void);
 
+            void calcOTF(complex_t* otf, const double* phi);
             void calcOTF(void);
-            void calcOTF(redux::util::Array<complex_t>& otf) const { calcOTF(otf.get(), phi.get()); }
-            void calcOTF(complex_t* otfPtr, const double* phiPtr) const;
-            void calcPFOTF(redux::util::Array<complex_t>& pf, redux::util::Array<complex_t>& otf) const { calcPFOTF(pf.get(), otf.get(), phi.get()); }
-            void calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiPtr) const;
+            void calcPFOTF(void);
             
             template <typename T>
             void addPSF(redux::util::Array<T>& out) const {
+                static int count(0);
                 redux::util::Array<T> tmp;
                 OTF.inv(tmp,redux::image::FT_REORDER);
                 out += tmp;
@@ -150,6 +146,7 @@ namespace redux {
             bool newOTF;
             std::mutex mtx;
             
+            redux::util::Array<complex_t> tmpC,tmpC2;   //!< Temporary arrays.                                     size = otfSize
             redux::util::Array<double> img,tmpImg;      //!< Working copy of the current subimage. (apodized)     size = patchSize
             redux::util::Array<double> phi,tmpPhi;      //!< Array containing the phase of this OTF               size = pupilsize
             redux::image::FourierTransform PF;          //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize

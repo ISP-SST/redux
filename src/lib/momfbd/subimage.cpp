@@ -11,7 +11,6 @@
 #include <algorithm>
 
 using namespace redux::file;
-
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
@@ -20,7 +19,7 @@ using namespace std;
 
 #define lg Logger::mlg
 
-#define USE_LUT
+//#define USE_LUT
 
 namespace {
     
@@ -67,8 +66,11 @@ SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, c
                     uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize)
     : Array<float>(stack, index, index, offset.y, offset.y+patchSize-1, offset.x, offset.x+patchSize-1),
       index(index), offset(offset), offsetShift(0,0), imgSize(patchSize), pupilSize(pupilSize), otfSize(2*pupilSize), oldRG(0), object (obj),
-      channel(ch), window (wind), noiseWwindow(nwind), newPhi(false), newOTF(false), OTF(otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX) {
+      channel(ch), window (wind), noiseWwindow(nwind), newPhi(false), newOTF(false),
+      OTF(otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX), tmpOTF(otfSize, otfSize, FT_FULLCOMPLEX) {
 
+    tmpC.resize(otfSize, otfSize);
+    tmpC2.resize(otfSize, otfSize);
     img.resize (imgSize, imgSize);
     tmpImg.resize (imgSize, imgSize);
     imgFT.resize (imgSize, imgSize);
@@ -76,8 +78,6 @@ SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, c
     phi.resize (pupilSize, pupilSize);
     tmpPhi.resize (pupilSize, pupilSize);
     PF.resize (pupilSize, pupilSize);
-    //OTF.resize (otfSize, otfSize);                  // big enough for autocorrelation of the PF
-    tmpOTF.resize (otfSize, otfSize);
     vogel.resize (pupilSize, pupilSize);
 
     vogel.zero();
@@ -153,36 +153,6 @@ void SubImage::init (void) {
     oldRG = stats.noise/stats.stddev;
     LOG_TRACE << str << (string)offsetShift;
     
-//     auto wit = window.begin();
-//     auto nwit = noiseWwindow.begin();
-//     Array<float>::const_iterator dit = this->begin();
-// 
-// 
-//     dit = this->begin();
-//     for (auto & iit : img) {                    // windowing: subtract and re-add mean afterwards
-//         iit = (static_cast<int16_t>(*dit++) - avg) * *wit++ + avg;
-//     }
-
-
- //   Ana::write("img_windowed"+to_string(cnt)+".f0", img);
-
-   // FourierTransform::reorder(imgFT);                             // keep FT in centered form
-   // Ana::write("img_noiseft"+to_string(cnt)+".f0", imgFT);
-   // stats.noise = channel.noiseFudge * imgFT.noise (-1, -1);       // mask/cutoff < 0 will revert to hardcoded values used by MvN
-
-//     dit = this->begin();
-//     for (auto & iit : img) {                    // windowing: subtract and re-add mean afterwards
-//         iit = (*dit++ - avg) * *wit++ + avg;
-//     }
-//     stats.getStats (img, ST_VALUES | ST_RMS);               // get statistics after windowing
-
-
-//    Ana::write("img_ft"+to_string(cnt)+".f0", imgFT);
-
-   // str += "  noise=" + to_string (stats.noise) + "  rg=" + to_string (stats.noise/stats.stddev);
-
- //   cout << str << printArray (dimensions(), "  dims") << endl;
-
 }
 
 
@@ -197,7 +167,6 @@ void SubImage::addFT(Array<double>& ftsum) const {
 
 void SubImage::addPQ (const complex_t* otf, complex_t* P, double* Q) const {
 
-  //  cout << "-" << flush;
     const complex_t* ftPtr = imgFT.get();
     //for (auto & ind : channel.otfIndices) {
     size_t N = imgSize*imgSize;
@@ -249,122 +218,80 @@ double SubImage::metricChange(const complex_t* newOTF) const {
 }
 
 
-double SubImage::gradientFiniteDifference(uint16_t mode, double dalpha, complex_t* myOtf, double* myPhi) const {
-    memcpy(myPhi, phi.get(), pupilSize*pupilSize*sizeof(double));
-    //cout << "d" << flush;
-    //memset(myPhi, 0, pupilSize*pupilSize*sizeof(double));
-    addMode(myPhi, mode, dalpha);
-    calcOTF(myOtf, myPhi);
-    double ret = metricChange(myOtf) / object.wavelength / dalpha;     // FIXME: multiply by lambda to match old MvN code.
-//    Array<complex_t> cwrapper (tmpOTF, otfSize, otfSize);
-//Ana::write("gm_"+to_string(mode)+"_tmpotf.f0", cwrapper);
-//dump("gm"+to_string(mode));
-// cout << "SubImage::gradientFiniteDifference  dalpha = " <<  dalpha << "  mode = " << mode << "  part_der = " << ret << endl;
+double SubImage::gradientFiniteDifference( uint16_t mode, double dalpha ) {
+    
+    complex_t* otfPtr = tmpC.get();
+    double* phiPtr = tmpPhi.get();
+    
+    memcpy(phiPtr, phi.get(), pupilSize*pupilSize*sizeof(double));
+    addMode(phiPtr, mode, dalpha);
+    calcOTF(otfPtr, phiPtr);
+    double ret = metricChange(otfPtr) / object.wavelength / dalpha;     // FIXME: multiply by lambda to match old MvN code.
+
     return ret;
 }
 
 
-double SubImage::gradientVogel(uint16_t mode, double dalpha, complex_t* tmpOTF, double* tmpPhi) const {
+double SubImage::gradientVogel(uint16_t mode, double dalpha) const {
     double ret = 0;
-    //cout << "v" << flush;
     const double* modePtr = channel.modes.at(mode)->get();
     const double* vogPtr = vogel.get();
     double scale = -2.0/object.wavelength * channel.pupil.second / (imgSize*imgSize) ;
     for (auto & ind : channel.pupilIndices) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }
-    //cout << "SubImage::gradientVogel(" << hexString(this) << ")   g = " << ret << endl;
     return ret;
 }
 
 
 void SubImage::calcVogelWeight(void) {
-    
-   // cout << "SubImage::calcVogelWeight(" << hexString(this) << ")"  << endl;
-    //cout << "V" << flush;
-    int offset = max ( (otfSize - pupilSize) / 2, 0);
-
-    FourierTransform pj (otfSize, otfSize, FT_FULLCOMPLEX | FT_REORDER );    // input is already centered, so set the flag
-    FourierTransform glFT (otfSize, otfSize, FT_FULLCOMPLEX | FT_REORDER);
-    Array<complex_t> hj (otfSize, otfSize);
-    Array<complex_t> gl (otfSize, otfSize);
-    pj.zero();
-
-    const complex_t* pfPtr = PF.get();
-    complex_t* pjPtr = pj.ptr (offset, offset);
-    for (uint i = 0; i < pupilSize; ++i) {
-        memcpy (pjPtr + i * otfSize, pfPtr + i * pupilSize, pupilSize * sizeof (complex_t));
-    }
-//   transform(pjPtr,pjPtr+otfSize*otfSize, pjPtr,
-//             [](complex_t a){
-//                 return conj(a);
-//             });
-
-//  Ana::write("vogel_pj.f0", pj);
-    pj.directInverse(hj);      // note: this will first reorder pj
-//  Ana::write("vogel_hj.f0", pj);
-//  Ana::write("vogel_hj2.f0", hj);
-
+  
     const complex_t* pPtr = object.P.get();
     const double* qPtr = object.Q.get();
     const complex_t* otfPtr = OTF.get();
     const complex_t* ftPtr = imgFT.get();
-    complex_t* glFTPtr = glFT.get();
-    complex_t* glPtr = gl.get();
-    complex_t* hjPtr = hj.get();
+    const complex_t* pfPtr = PF.get();
+    
+    complex_t* tmpOtfPtr = tmpOTF.get();
+    complex_t* glPtr = tmpC.get();
+    complex_t* hjPtr = tmpC2.get();
 
-    glFT.zero();
-    size_t N = otfSize*otfSize;
-    for (size_t ind=0; ind < N; ++ind) {
-    //for (auto & ind : channel.otfIndices) {
+    size_t otf2 = otfSize*otfSize;
+    
+    tmpOTF.zero();
+    FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
+    tmpOTF.ift(hjPtr);
+    tmpOTF.zero();
+    for (size_t ind=0; ind < otf2; ++ind) {
+    //for( const auto& ind : channel.otfIndices) {
         complex_t pq = pPtr[ind] * qPtr[ind];
-        //complex_t pq = conj(pPtr[ind]) * qPtr[ind];     // to match MvN
         double ps = norm (pPtr[ind]);
         double qs = qPtr[ind] * qPtr[ind];
-        //glFTPtr[ind] = (pq*conj(ftPtr[ind]) - ps*otfPtr[ind]) / qs;
-        glFTPtr[ind] = (pq*ftPtr[ind] - ps*otfPtr[ind]) / qs;
-        //glFTPtr[ind] = (conj(pq*conj(ftPtr[ind])) - ps*otfPtr[ind]) / qs;     // to match MvN
+        tmpOtfPtr[ind] = (pq*ftPtr[ind] - ps*otfPtr[ind]) / qs;
     }
-//  Ana::write("vogel_glft.f0", glFT);
+    FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
+    tmpOTF.ift(glPtr);
+    
+    tmpOTF.zero();
+    double normalization = 1.0/(otf2*otf2);
+    transform( glPtr, glPtr+otf2, hjPtr, glPtr,
+              [normalization](const complex_t& g,const complex_t& h) {
+                  return normalization * h * g.real();
+              });
 
-    glFT.directInverse(gl);      // note: this will first reorder glFT
- // Ana::write("vogel_gl.f0", gl);
-    glFT.zero();
-   for (size_t ind=0; ind < N; ++ind) {
-    //for (auto & ind : channel.otfIndices) {
-        //glFTPtr[ind] = real(hjPtr[ind] * glPtr[ind]);     // eq. 22 in Vogel
-        glFTPtr[ind] = hjPtr[ind] * glPtr[ind].real();     //  from appendix (eq 34.5) matches MvN
-    }
-    memcpy (glPtr, glFTPtr, glFT.nElements() *sizeof (complex_t));
- // Ana::write("vogel_gl2.f0", gl);
+    tmpOTF.ft( glPtr );
+    FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
 
-    glFT.reset (gl.get(), otfSize, otfSize, FT_FULLCOMPLEX );
-    glFT.reorder();
-  //Ana::write("vogel_glft2.f0", glFT);
-    glFTPtr = glFT.get();
     double* vogPtr = vogel.get();
-    //const double* pupPtr = channel.pupil.first.get();
-    //double scale = -2/object.wavelength;
-    for (auto & ind : channel.pupilInOTF) {
-        //vogPtr[ind.first] = -2.0*imag(pfPtr[ind.first]*conj(glFTPtr[ind.second]))*pupPtr[ind.first];
-        vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*glFTPtr[ind.second]);//*pupPtr[ind.first];
-        //vogPtr[ind.first] = imag(pfPtr[ind.first]*glFTPtr[ind.second]);
-    }
-  
- // Ana::write("vogel_p.f0", object.P);
- // Ana::write("vogel_q.f0", object.Q);
- // Ana::write("vogel_raw.f0", vogel);
-//     std::vector<double> v;
-//     for( auto& it : currentAlpha) v.push_back(it.second);
-//     cout << printArray(v,"alpha") << endl;
-//   cout << "BLA " << __LINE__ << endl;
 
+    for (auto & ind : channel.pupilInOTF) {
+        vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*tmpOtfPtr[ind.second]);//*pupPtr[ind.first];
+    }
 
 }
 
 
 void SubImage::resetPhi (Array<double>&p) const {
- //   cout << "SubImage::resetPhi(" << hexString(this) << ")"  << endl;
     memset(p.get(), 0, pupilSize*pupilSize*sizeof (double));    // FIXME: use phi_fixed
     //memcpy(p.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements() *sizeof (double));
 }
@@ -372,29 +299,23 @@ void SubImage::resetPhi (Array<double>&p) const {
 
 #define ALPHA_CUTOFF 1E-12
 void SubImage::addScaledMode(double* phiPtr, uint16_t m, double a) const {
- //   cout << "a" << flush;
  //   if( fabs(a) > 0 ) cout << "SubImage::addScaledMode(" << hexString(this) << ")  m = " << m << "  a = " << a << "\n";
     addMode(phiPtr, m, a/object.wavelength);
 }
 
 
 void SubImage::addMode (double* phiPtr, uint16_t m, double a) const {
-  //  cout << "SubImage::addMode(" << hexString(this) << ")  m = " << m << "   a = " << a << endl;
+
     //if(fabs(a) < ALPHA_CUTOFF) return;
-    //memset(phiPtr,0,pupilSize*pupilSize*sizeof(double));
     const double* modePtr = channel.modes.at(m)->get();
-    for (auto & ind : channel.pupilIndices) {
+    for (auto & ind : channel.pupilIndices ) {
         phiPtr[ind] += a * modePtr[ind];
     }
-//     Array<double> awrapper(phiPtr, pupilSize, pupilSize);
-//     Ana::write("phi_"+hexString(this)+"_"+to_string(m)+".f0", awrapper);
-//     awrapper.wrap(const_cast<double*>(modePtr), pupilSize, pupilSize);
-//     Ana::write("mode_"+hexString(this)+"_"+to_string(m)+".f0", awrapper);
+
 }
 
 
 void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const double* alphas) const {
-//    cout << "SubImage::addModes(" << hexString(this) << ")  " << printArray(alphas,nModes,"alphas") << endl;
     for (size_t m = 0; m < nModes; ++m) {
         addMode (phiPtr, modes[m], alphas[m]);
     }
@@ -404,9 +325,7 @@ void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const d
 void SubImage::adjustOffset(void) {
     bool adjusted(false);
     if( alpha.count(2) ) {
-        //double dadjust = alpha[2]*channel.alphaToPixels;
         int adjust = lround(alpha[2]*channel.alphaToPixels);
-        //int oadjust = adjust;
         if( adjust ) {
             adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
@@ -419,9 +338,7 @@ void SubImage::adjustOffset(void) {
         }
     }
     if( alpha.count(3) ) {
-        //double dadjust = alpha[2]*channel.alphaToPixels;
         int adjust = lround(alpha[3]*channel.alphaToPixels);
-        //int oadjust = adjust;
         if( adjust ) {
             adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
@@ -441,7 +358,6 @@ void SubImage::adjustOffset(void) {
 void SubImage::addAlpha(uint16_t m, double a) {
     
     unique_lock<mutex> lock (mtx);
-   // std::cout << "addA: m="<<m<<"  a=" << a << std::endl;
     alpha[m] += a;
     
 }
@@ -450,7 +366,6 @@ void SubImage::addAlpha(uint16_t m, double a) {
 void SubImage::setAlpha(uint16_t m, double a) {
     
     unique_lock<mutex> lock (mtx);
-   // std::cout << "setA: m="<<m<<"  a=" << a << std::endl;
     alpha[m] = a;
     
 }
@@ -459,7 +374,6 @@ void SubImage::setAlpha(uint16_t m, double a) {
 void SubImage::addAlphas(const double* alphas) {
     if (wf) {
         size_t cnt (0);
-  //  cout << "SubImage::addAlphas(" << hexString(this) << ")  " << printArray(alphas,wf->modes.size(),"alphas") << endl;
         for (auto &it : wf->modes) {
             addAlpha(it.first, alphas[cnt++]);
         }
@@ -470,7 +384,6 @@ void SubImage::addAlphas(const double* alphas) {
 void SubImage::setAlphas(const double* alphas) {
     if (wf) {
         size_t cnt (0);
-   // cout << "SubImage::setAlphas(" << hexString(this) << ")  " << printArray(alphas,wf->modes.size(),"alphas") << endl;
         for (auto & it : wf->modes) {
             setAlpha(it.first, alphas[cnt++]);
         }
@@ -478,13 +391,8 @@ void SubImage::setAlphas(const double* alphas) {
 }
 
 
-namespace {
-    mutex gmtx;
-}
-
 void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
-  //  unique_lock<mutex> lock (gmtx);
-    //LOG_TRACE << "SubImage::setAlphas(" << hexString(this) << ")  " << printArray(a,modes.size(),"alphas");
+
     int cnt=0;
     for (auto & m : modes) {
         //if( m > 2 ) {
@@ -504,73 +412,95 @@ void SubImage::resetPhi(void) {
         it.second = 0;
     }
     currentAlpha = alpha;
-    calcPFOTF(PF.get(), OTF.get(), phi.get());
+    calcPFOTF();
     newPhi = false;
     newOTF = true;
 }
 
 void SubImage::calcPhi(void) {
-  //  unique_lock<mutex> lock (gmtx);
+
     memset(phi.get(), 0, pupilSize*pupilSize*sizeof (double));
     for( auto& it: alpha ) {
-     //   if( fabs(it.second) > 0 ) cout << "SubImage::calcPhi():  adding mode " <<  it.first << " - " << it.second << endl;
         addScaledMode( it.first, it.second );  // only add difference
     }
     newPhi = true;
 }
 
 
-void SubImage::calcOTF(void) {
-    if(newPhi) {
-        calcPFOTF(PF.get(), OTF.get(), phi.get());
-        newPhi = false;
-        newOTF = true;
-    }
-}
+void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
 
-
-void SubImage::calcOTF (complex_t* otfPtr, const double* phiPtr) const {
-
- //   cout << "SubImage::calcOTF(" << hexString(this) << ")" << endl;
-// Array<double> awrapper(const_cast<double*>(phiPtr), pupilSize, pupilSize);
-//  Ana::write("phisum.f0", awrapper);
     memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
-    const double* pupilPtr = channel.pupil.first.ptr();
-    double norm = sqrt(1.0 / channel.pupil.second);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-    //double norm = 1.0 / channel.pupil.second;   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-    for (auto & ind : channel.pupilInOTF) {
-#ifdef USE_LUT
-        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*norm, phiPtr[ind.first]);
-#else
-        otfPtr[ind.second] = polar(pupilPtr[ind.first]*norm, phiPtr[ind.first]);
-#endif
 
-    }
-    FourierTransform::autocorrelate (otfPtr, otfSize, otfSize);
-//     for (auto & ind : channel.pupilInOTF) {
-//         otfPtr[ind.second] *= norm;
-//     }
-
-//   Ana::write("otf.f0", OTF);
-//   Ana::write("otfP.f0", object.P);
-//   Ana::write("otfQ.f0", object.Q);
-
-}
-
-
-void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiPtr) const {
-    
-//    cout << "SubImage::calcPFOTF(" << hexString(this) << ")" << endl;
-//  Array<double> awrapper(const_cast<double*>(phiPtr), pupilSize, pupilSize);
-//  Ana::write("phisum2.f0", awrapper);
-    memset (pfPtr, 0, pupilSize * pupilSize * sizeof (complex_t));
-    memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
-//    redux::file::Ana::write("blu_pup.f0", channel.pupil.first);
     const double* pupilPtr = channel.pupil.first.get();
     double normalization = sqrt(1.0 / channel.pupil.second);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-    //double normalization = (1.0 / channel.pupil.second);   // normalize OTF by pupil-area
-    //double normalization = (1.0 / OTF.nElements());   // TODO: normalize OTF by OTF-area
-    //double norm = 1.0 / channel.pupil.second;   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+
+    for (auto & ind : channel.pupilInOTF) {
+#ifdef USE_LUT
+        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
+#else
+        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
+#endif
+    }
+    
+    //tmpOTF.ft(otfPtr);
+    //tmpOTF.autocorrelate(1.0/(otfSize*otfSize));
+    //tmpOTF.ift(otfPtr);
+    //FourierTransform::reorder(otfPtr, otfSize, otfSize);
+    FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
+
+    newPhi = false;
+    newOTF = true;
+
+}
+
+
+void SubImage::calcOTF(void) {
+    
+    //if( !newPhi ) return;
+   //     LOG_TRACE << "SubImage::calcOTF(" << hexString(this) << ")";
+    
+    complex_t* otfPtr = OTF.get();
+    const double* phiPtr = phi.get();
+
+    memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
+    
+    const double* pupilPtr = channel.pupil.first.get();
+    double normalization = sqrt(1.0 / channel.pupil.second);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+
+    for (auto & ind : channel.pupilInOTF) {
+#ifdef USE_LUT
+        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
+#else
+        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
+#endif
+    }
+    
+    //tmpOTF.ft(otfPtr);
+    //tmpOTF.autocorrelate(1.0/(otfSize*otfSize));
+    //tmpOTF.ift(otfPtr);
+    //FourierTransform::reorder(otfPtr, otfSize, otfSize);
+    FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
+
+    newPhi = false;
+    newOTF = true;
+
+}
+
+
+void SubImage::calcPFOTF(void) {
+    
+    //    LOG_TRACE << "SubImage::calcPFOTF(" << hexString(this) << ")";
+    complex_t* pfPtr = PF.get();
+    complex_t* otfPtr = OTF.get();
+    const double* phiPtr = phi.get();
+   // memcpy(tmpC.get(),otfPtr,otfSize*otfSize*sizeof(complex_t));
+    
+    memset (pfPtr, 0, pupilSize * pupilSize * sizeof (complex_t));
+    memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
+    
+    const double* pupilPtr = channel.pupil.first.get();
+    double normalization = sqrt(1.0 / channel.pupil.second);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+
     for (auto & ind : channel.pupilInOTF) {
 #ifdef USE_LUT
         pfPtr[ind.first] = getPolar( pupilPtr[ind.first], phiPtr[ind.first]);
@@ -580,18 +510,13 @@ void SubImage::calcPFOTF(complex_t* pfPtr, complex_t* otfPtr, const double* phiP
         otfPtr[ind.second] = normalization*pfPtr[ind.first];
     }
 
-//    redux::file::Ana::write("blu_pf.f0", PF);
-//    redux::file::Ana::write("blu_phi.f0", phi);
-    FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
-
- //   cout << "SubImage::calcPFOTF(" << hexString(this) << ")  norm = " << normalization << endl;
-//     for (auto & ind : channel.pupilInOTF) {
-//         otfPtr[ind.second] *= norm;
-//     }
-//Array<complex_t> bwrapper(otfPtr, otfSize, otfSize);
-//Ana::write("potf.f0", OTF);
-//   Ana::write("potfP.f0", object.P);
-//   Ana::write("potfQ.f0", object.Q);
+    tmpOTF.ft(otfPtr);
+    tmpOTF.autocorrelate(1.0/(otfSize*otfSize));
+    tmpOTF.ift(otfPtr);
+    FourierTransform::reorder(otfPtr, otfSize, otfSize);
+    //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
+    //object.addToPQ(imgFT,OTF,tmpC);
+    
 }
 
 
