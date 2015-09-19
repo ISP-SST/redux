@@ -87,7 +87,6 @@ namespace redux {
             
             template <typename T>
             void addPSF(redux::util::Array<T>& out) const {
-                static int count(0);
                 redux::util::Array<T> tmp;
                 OTF.inv(tmp,redux::image::FT_REORDER);
                 out += tmp;

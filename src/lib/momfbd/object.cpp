@@ -219,12 +219,10 @@ void Object::getResults(ObjectData& od) {
         uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
         od.psf.resize(nPSF, patchSize, patchSize);
         od.psf.zero();
-        size_t nElements = patchSize*patchSize;
         if( nPSF > 1 ) {
             Array<float> view(od.psf,0,0,0,patchSize-1,0,patchSize-1);
             for( shared_ptr<Channel>& ch: channels) {
                 for ( shared_ptr<SubImage>& si: ch->subImages) {
-                    //Array<complex_t> psf = si->getPSF<complex_t>();
                     view.assign(si->getPSF<complex_t>()); //si->getPSF());
                     view.shift(0,1);
                 }
@@ -391,7 +389,7 @@ void Object::fitAvgPlane(ObjectData& od) {
             vector<int64_t> last = cd.images.last();
             last[0] = first[0];                         // only select first image
             Array<float> view(cd.images, first, last);
-            for( int i=0; i<nImages; ++i ) {
+            for( uint i=0; i<nImages; ++i ) {
                 if( ! view.sameSize(fittedPlane) ) {
                     LOG_ERR << "Size mismatch when fitting average plane for object #" << ID;
                     fittedPlane.clear();
@@ -419,7 +417,7 @@ void Object::fitAvgPlane(ObjectData& od) {
             vector<int64_t> last = cd.images.last();
             last[0] = first[0];                         // only select first image
             Array<float> view(cd.images, first, last);
-            for( int i=0; i<nImages; ++i ) {
+            for( uint i=0; i<nImages; ++i ) {
                 view -= fittedPlane;                    // subract fitted plane from all images
                 view.shift(0, 1);                       // shift view to next image in stack
             }

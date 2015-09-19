@@ -404,31 +404,29 @@ void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const d
 void SubImage::adjustOffset(void) {
     bool adjusted(false);
     if( alpha.count(2) ) {
-        double dadjust = alpha[2]*channel.alphaToPixels;
+        //double dadjust = alpha[2]*channel.alphaToPixels;
         int adjust = lround(alpha[2]*channel.alphaToPixels);
-        int oadjust = adjust;
+        //int oadjust = adjust;
         if( adjust ) {
             adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.x += adjust;        // Noll-index = 2 corresponds to x-tilt.
                 double oldval = alpha[2];
-                double vshift = adjust*channel.pixelsToAlpha;
-                alpha[2] -= vshift;
+                alpha[2] -= adjust*channel.pixelsToAlpha;
                 LOG_TRACE << "adjustOffset:  mode 2 was adjusted.  from " << oldval << " to " << alpha[2] << "  (" << adjust<< " pixels)";
                 adjusted = true;
             }
         }
     }
     if( alpha.count(3) ) {
-        double dadjust = alpha[2]*channel.alphaToPixels;
+        //double dadjust = alpha[2]*channel.alphaToPixels;
         int adjust = lround(alpha[3]*channel.alphaToPixels);
-        int oadjust = adjust;
+        //int oadjust = adjust;
         if( adjust ) {
             adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.y += adjust;        // Noll-index = 3 corresponds to y-tilt.
                 double oldval = alpha[3];
-                double vshift = adjust*channel.pixelsToAlpha;
                 alpha[3] -= adjust*channel.pixelsToAlpha;
                 LOG_TRACE << "adjustOffset:  mode 3 was adjusted.  from " << oldval << " to " << alpha[3] << "  (" << adjust<< " pixels)";
                 adjusted = true;

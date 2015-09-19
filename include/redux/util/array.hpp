@@ -123,15 +123,26 @@ namespace redux {
                 bool operator< ( const const_iterator& rhs ) const { return pos_ < rhs.pos_; }
 
             protected:
-                void fastDecrement( void ) { --pos_; }
-                void fastIncrement( void ) { ++pos_; }
+                void fastDecrement( void ) {
+                    if(pos_ <= begin_) throw std::out_of_range("Array::iterator:  Iterating past begin().");
+                    --pos_;
+                }
+                void fastIncrement( void ) { 
+                    if(pos_ >= end_) {
+                        std::cout << "pos=" << pos_ << "  end=" << end_ << std::endl;
+                        throw std::out_of_range("Array::iterator:  Iterating past end().");
+                    }
+                    ++pos_;
+                }
 
                 void sparseDecrement( void ) {
+                    if(pos_ <= begin_) throw std::out_of_range("Array::iterator:  Iterating past begin().");
                     --pos_;
                     trimDown();
                 }
 
                 void sparseIncrement( void ) {
+                    if(pos_ >= end_) throw std::out_of_range("Array::iterator:  Iterating past end().");
                     ++pos_;
                     trimUp();
                 }
@@ -145,7 +156,7 @@ namespace redux {
                             pos_ += padding[d];
                         }
                     }
-
+                    pos_ = std::min(pos_,end_);
                 }
                 void trimDown(void) {
                     for( int d = m_ConstArrayPtr->nDims_ - 1; d > 0; --d ) {
@@ -156,6 +167,7 @@ namespace redux {
                             pos_ -= padding[d];
                         }
                     }
+                    pos_ = std::max(pos_,begin_);
                 }
                 
                 int64_t pos_, begin_, end_;
@@ -195,8 +207,8 @@ namespace redux {
             };
 
             template <typename ...S>
-            Array( T* ptr, S ...sizes ) : begin_(0), end_(0) {
-                wrap( ptr, sizes... );
+            Array( T* data, S ...sizes ) : begin_(0), end_(0) {
+                wrap( data, sizes... );
             }
 
             /*! @name Copy constructors
@@ -240,7 +252,7 @@ namespace redux {
                 } else {
                     begin_ = getOffset( dimFirst );
                     auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
-                    end_ = ( ++it ).pos();  // 1 step after last element;
+                    end_ = it.pos()+1;  // 1 step after last element;
                 }
             }
             /*! @brief The copy will be a sub-array.
@@ -286,18 +298,18 @@ namespace redux {
              *  @details For sub-arrays, only the accessed region is packed, so the receiving end will unpack it into a dense array
              *  of the same dimensions as the sub-array. Trivial dimensions (size=1) will be stripped in the packing.
              */
-            uint64_t pack( char* ptr ) const {
+            uint64_t pack( char* dataPtr ) const {
                 using redux::util::pack;
-                uint64_t count = pack( ptr, size() );
+                uint64_t count = pack( dataPtr, size() );
                 if( nElements_ ) {
-                    count += pack( ptr+count, dimensions() );
+                    count += pack( dataPtr+count, dimensions() );
                     if(dense_) {
-                        count += pack( ptr+count, get(), nElements_ );
+                        count += pack( dataPtr+count, get()+begin_, nElements_ );
                     } else {
                         T* dptr = new T[nElements_];
                         std::transform(begin(), end(), dptr, [](const T& a) { return a; });
                         //std::copy(begin(), end(), dptr);
-                        count += pack( ptr+count, dptr, nElements_ );
+                        count += pack( dataPtr+count, dptr, nElements_ );
                         delete[] dptr;
                     }
                 }
@@ -308,15 +320,15 @@ namespace redux {
             /*! @brief Unpack an array from a string of characters, swapping endianess if necessary.
              *  @details It is always the receiving/unpacking side which checks/fixes the endianess.
              */
-            uint64_t unpack( const char* ptr, bool swap_endian ) {
+            uint64_t unpack( const char* dataPtr, bool swap_endian ) {
                 using redux::util::unpack;
                 uint64_t sz;
-                uint64_t count = unpack( ptr, sz, swap_endian );
+                uint64_t count = unpack( dataPtr, sz, swap_endian );
                 if( sz > sizeof(uint64_t) ) {          // 8 means an empty array was transferred
                     std::vector<size_t> tmp;
-                    count += unpack( ptr+count, tmp, swap_endian );
+                    count += unpack( dataPtr+count, tmp, swap_endian );
                     resize( tmp );
-                    count += unpack( ptr+count, datablock.get(), nElements_, swap_endian );
+                    count += unpack( dataPtr+count, datablock.get(), nElements_, swap_endian );
                 } else resize();
                 return count;
             }
@@ -343,14 +355,14 @@ namespace redux {
              */
             //@{
             template <typename ...S>
-            void wrap( T* ptr, S ...sizes ) {
+            void wrap( T* data, S ...sizes ) {
                 setSizes( sizes... );
                 setStrides();
                 countElements();
                 if( dataSize ) {
-                    datablock.reset( ptr, []( T * p ) {} );
+                    datablock.reset( data, []( T * p ) {} );
                 }
-                //dense_ = true;
+                dense_ = true;
             }
             //@}
 
@@ -379,8 +391,8 @@ namespace redux {
                 setStrides();
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
-                end_ = ( ++it ).pos();  // 1 step after last element;
-                //dense_ = ((begin_+nElements_) == end_);
+                end_ = it.pos()+1;      // 1 step after last element;
+                dense_ = (int64_t(begin_+nElements_) == end_);
             }
             
             template <typename ...S> void permuteDimensions( S ...dims ) { permuteDimensions( {static_cast<size_t>( dims )...} ); }
@@ -416,10 +428,10 @@ namespace redux {
                 T* dptr = nullptr;
                 if( nElements_ ) {
                     dptr = new T[nElements_];
-                    if( dense() ) {
-                        std::copy(ptr(),ptr()+nElements_,dptr);
+                    if( dense_ ) {
+                        std::copy( get()+begin_, get()+end_, dptr );
                     } else {
-                        std::transform(begin(), end(), dptr, dptr, [](const T& a, const T& b) { return a; });
+                        std::transform( begin(), end(), dptr, dptr, [](const T& a, const T& b) { return a; } );
                     }
                 }
                 return dptr;
@@ -428,13 +440,22 @@ namespace redux {
             template <typename U>
             void copyFrom( const void* data ) {
                 const U* dptr = reinterpret_cast<const U*>( data );
-                std::transform(begin(), end(), dptr, begin(), [](const T& a, const U& b) { return static_cast<T>(b); });
+                if( dense_ ) {
+                    std::transform( get()+begin_, get()+end_, dptr, get()+begin_, [](const T& a, const T& b) { return static_cast<T>(b); } );
+                } else {
+                    std::transform( begin(), end(), dptr, begin(), [](const T& a, const T& b) { return static_cast<T>(b); }  );
+                }
             }
 
             template <typename U>
             void copyTo( void* data ) {
                 U* dptr = reinterpret_cast<U*>( data );
-                std::transform(begin(), end(), dptr, dptr, [](const T& a, const U& b) { return static_cast<U>(a); });
+                if( dense_ ) {
+                    std::copy( get()+begin_, get()+end_, dptr );
+                    //std::transform( get()+begin_, get()+end_, dptr, get()+begin_, [](const T& a, const T& b) { return static_cast<T>(b); } );
+                } else {
+                    std::transform( begin(), end(), dptr, dptr, [](const T& a, const T& b) { return static_cast<U>(a); }  );
+                }
             }
 
             template <typename U = T>
@@ -450,8 +471,8 @@ namespace redux {
             void copy( Array<T>& out ) const {
                 if( this == &out ) return;                                 // check for self-assignment
                 if( (get() == out.get()) || !sameSizes( out ) ) out.resize(dimensions(true));     // if shared or wrong size: re-allocate
-                if( dense() && out.dense() ) {
-                    std::copy(ptr(),ptr()+nElements_,out.ptr());
+                if( dense_ && out.dense_ ) {
+                    std::copy( get()+begin_, get()+end_, out.get()+out.begin_ );
                 } else {
                     std::transform(begin(), end(), out.begin(), out.begin(), [](const T& a, const T& b) { return a; });
                 }
@@ -460,8 +481,9 @@ namespace redux {
             template <typename U>
             void copy( Array<U>& out ) const {
                 if( !sameSizes( out ) ) out.resize(dimensions(true));
-                if( dense() && out.dense() ) {
-                    std::transform(out.ptr(), out.ptr()+nElements_, ptr(), out.ptr(), redux::math::assign<U,T>());
+                if( dense_ && out.dense_ ) {
+                    std::copy( get()+begin_, get()+end_, out.get()+out.begin_ );
+                    //std::transform(out.ptr(), out.ptr()+nElements_, get()+begin_, out.ptr(), redux::math::assign<U,T>());
                 } else {
                     std::transform(out.begin(), out.end(), begin(), out.begin(), redux::math::assign<U,T>());
                 }
@@ -477,7 +499,7 @@ namespace redux {
 
             template <typename U> 
             T* ptr( const std::vector<U>& indices ) {
-                int64_t offset = getOffset( indices, dimFirst );
+                int64_t offset = begin_ + getOffset( indices, dimFirst );
                 if( offset < 0 || offset > dataSize ) {
                     throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
                 }
@@ -487,7 +509,7 @@ namespace redux {
 
             template <typename ...S>
             T* ptr( S ...s ) {
-                uint64_t offset = getOffset<uint64_t>( {static_cast<uint64_t>( s )...}, dimFirst );
+                uint64_t offset = begin_ + getOffset<uint64_t>( {static_cast<uint64_t>( s )...}, dimFirst );
                 if( offset > dataSize ) {
                     throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
                 }
@@ -538,8 +560,8 @@ namespace redux {
 
             void assign( const std::vector<T>& values ) {
                 if( values.size() <= nElements_ ) {
-                    if(dense()) {
-                        std::copy(values.begin(),values.end(),ptr());
+                    if(dense_) {
+                        std::copy( values.begin(), values.end(), get()+begin_);
                     } else {
                         //std::copy(rhs.begin(), rhs.end(), begin());
                         std::transform(values.begin(), values.end(), begin(), begin(), [](const T& a, const T& b) { return a; });
@@ -554,8 +576,8 @@ namespace redux {
             const Array<T>& assign( const Array<U>& rhs, V weight ) {
                 if( sameSize( rhs ) ) {
                    if( this != &rhs ) {
-                        if(dense() && rhs.dense()) {
-                            std::transform(rhs.ptr(),rhs.ptr()+nElements_, rhs.ptr(), begin(), [weight](const T& a, const T& b) { return b*weight; });
+                        if(dense_ && rhs.dense_) {
+                            std::transform(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_, get()+begin_, [weight](const T& a, const T& b) { return b*weight; });
                         } else {
                             std::transform(begin(), end(), rhs.begin(), begin(), [weight](const T& a, const T& b) { return b*weight; });
                         }
@@ -570,8 +592,8 @@ namespace redux {
             void assign( const Array<T>& rhs ) {
                 if( sameSize( rhs ) ) {
                     if( this != &rhs ) {
-                        if(dense() && rhs.dense()) {
-                            std::copy(rhs.ptr(),rhs.ptr()+nElements_,ptr());
+                        if( dense_ && rhs.dense_ ) {
+                            std::copy(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_);
                         } else {
                             //std::copy(rhs.begin(), rhs.end(), begin());
                             std::transform(begin(), end(), rhs.begin(), begin(), [](const T& a, const T& b) { return b; });
@@ -586,8 +608,9 @@ namespace redux {
             template <typename U>
             void assign( const Array<U>& rhs ) {
                 if( sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
-                        std::transform(ptr(), ptr()+nElements_, rhs.ptr(), ptr(), redux::math::assign<T,U>());
+                    if( dense_ && rhs.dense_ ) {
+                       //std::copy(rhs.ptr(),rhs.ptr()+nElements_,get()+begin_);
+                       std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::assign<T,U>());
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::assign<T,U>());
                     }
@@ -602,6 +625,26 @@ namespace redux {
             void assign( S ...values ) {   assign( std::vector<T>({static_cast<T>( values )...}) ); }
 
 
+            template <typename Predicate>
+            void fill( T val, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+                if( dense_ ) {
+                    std::fill(get()+begin_, get()+end_, val );
+                } else {
+                    //std::copy(rhs.begin(), rhs.end(), begin());
+                    std::transform(begin(), end(), begin(), [val](const T& a){ return val; } );
+                }
+            }
+            
+            template <typename FillFunction, typename Predicate>
+            void fill( FillFunction* filler, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+                if( dense_ ) {
+                    std::transform(get()+begin_, get()+end_, get()+begin_, filler );
+                } else {
+                    //std::copy(rhs.begin(), rhs.end(), begin());
+                    std::transform(begin(), end(), begin(), filler);
+                }
+            }
+            
             /*!
              *   Assignment operators. The default assignment will make a shallow copy (shared datablock)
              */
@@ -630,10 +673,10 @@ namespace redux {
              *  Scalar assignment
              */
             const Array<T>& operator=( T rhs ) {
-                    if(dense()) {
-                        std::fill(get()+begin_, get()+end_, rhs);
+                    if( dense_ ) {
+                        std::fill( get()+begin_, get()+end_, rhs );
                     } else {
-                        std::fill(begin(), end(), rhs);
+                        std::fill( begin(), end(), rhs );
                     }
                 return *this;
             }
@@ -644,8 +687,7 @@ namespace redux {
             template <typename U>
             const Array<T>& operator=( const Array<U>& rhs ) {
                 if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );                // TBD: should the array be silently resized, or warn/throw when sizes doesn't match?
-                if( dense() && rhs.dense() ) {
-                    const U* rawPtr = rhs.get();
+                if( dense_ && rhs.dense_ ) {
                     //std::transform(rawPtr, rawPtr+nElements_, rhs.get(), rawPtr, redux::math::assign<T,U>());
                     std::copy(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_);
                } else {
@@ -664,7 +706,7 @@ namespace redux {
                 return std::move(tmp+=rhs);
             }
             const Array<T>& operator+=( T rhs ) {
-                if(dense()) {
+                if(dense_) {
                     std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::plus<T>(),rhs));
                 } else {
                     std::transform(begin(), end(), begin(), std::bind2nd<>(std::plus<T>(),rhs));
@@ -678,7 +720,7 @@ namespace redux {
                 return std::move(tmp-=rhs);
             }
             const Array<T>& operator-=( T rhs ) {
-                if(dense()) {
+                if(dense_) {
                     std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::minus<T>(),rhs));
                 } else {
                     std::transform(begin(), end(), begin(), std::bind2nd<>(std::minus<T>(),rhs));
@@ -692,7 +734,7 @@ namespace redux {
                 return std::move(tmp*=rhs);
             }
             const Array<T>& operator*=( const T& rhs ) {
-                if(dense()) {
+                if(dense_) {
                     std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::multiplies<T>(),rhs));
                 } else {
                     std::transform(begin(), end(), begin(), std::bind2nd<>(std::multiplies<T>(),rhs));
@@ -706,7 +748,7 @@ namespace redux {
                 return std::move(tmp/=rhs);
             }
             const Array<T>& operator/=( const T& rhs ) {
-                if(dense()) {
+                if(dense_) {
                     std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::divides<T>(),rhs));
                 } else {
                     std::transform(begin(), end(), begin(), std::bind2nd<>(std::divides<T>(),rhs));
@@ -727,7 +769,7 @@ namespace redux {
             template <typename U>
             const Array<T>& operator+=( const Array<U>& rhs ) {
                 if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
+                    if(dense_ && rhs.dense_) {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::add<T,U>());
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::add<T,U>());
@@ -749,7 +791,7 @@ namespace redux {
             template <typename U>
             const Array<T>& operator-=( const Array<U>& rhs ) {
                 if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
+                    if(dense_ && rhs.dense_) {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::subtract<T,U>());
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::subtract<T,U>());
@@ -771,7 +813,7 @@ namespace redux {
             template <typename U>
             const Array<T>& operator*=( const Array<U>& rhs ) {
                 if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
+                    if(dense_ && rhs.dense_) {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::multiply<T,U>());
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::multiply<T,U>());
@@ -793,7 +835,7 @@ namespace redux {
             template <typename U>
             const Array<T>& operator/=( const Array<U>& rhs ) {
                 if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
+                    if(dense_ && rhs.dense_) {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::divide<T,U>());
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::divide<T,U>());
@@ -850,7 +892,7 @@ namespace redux {
             template <typename U, typename V>
             const Array<T>& subtract( const Array<U>& rhs, V weight ) {
                 if( this->sameSize( rhs ) ) {
-                    if(dense() && rhs.dense()) {
+                    if(dense_ && rhs.dense_) {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, [weight](const T& a, const U& b) { return a-b*weight; } );
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), [weight](const T& a, const U& b) { return a-b*weight; } );
@@ -882,7 +924,7 @@ namespace redux {
                 if( ! sameSize( rhs ) ) {
                     return false;
                 }
-                if( ptr() == rhs.ptr() ) {      // shared data, check if it is the same sub-array.
+                if( get() == rhs.get() ) {      // shared data, check if it is the same sub-array.
                     if( dimFirst == rhs.dimFirst ) {
                         return true;
                     }
@@ -907,7 +949,8 @@ namespace redux {
             }
             template <typename ...S>
             const_iterator pos( S ...indices ) const { return const_cast<Array<T>*>( this )->pos( indices... ); }
-
+        //private:
+            
             iterator begin( void ) {
                 return iterator( *this, begin_, begin_, end_ );
             }
@@ -920,7 +963,7 @@ namespace redux {
 
             iterator end( void ) { return iterator( *this, end_ , begin_, end_ ); }
             const_iterator end( void ) const { return const_iterator( *this, end_ , begin_, end_ ); }
-
+        public:
 
             /*!
              * @name Get a raw pointer to the datablock
@@ -975,13 +1018,15 @@ namespace redux {
                     dimFirst[i] = tmpFirst;
                     if( dimFirst[i] > dimLast[i] ) std::swap( dimFirst[i], dimLast[i] );
                     currentSizes[i] = ( dimLast[i] - dimFirst[i] + 1 );
-                    if( i > 0 && ( dimStrides[i - 1] > currentSizes[i] ) ) dense_ = false;
+                   // if( i > 0 && ( dimStrides[i - 1] > currentSizes[i] ) ) dense_ = false;
                     nElements_ *= currentSizes[i];
                 }
                 begin_ = getOffset( dimFirst );
-                auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
-                end_ = ( ++it ).pos();  // 1 step after last element;
-                //dense_ = ((begin_+nElements_) == end_);
+                auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) );
+                end_ = it.pos()+1;  // 1 step after last element;
+                dense_ = (int64_t(begin_+nElements_) == end_);
+                //std::cout << "Arr::SetLimits:  begin=" << begin_ << "  end=" << end_ << "  nEl=" << nElements_
+                //<< " lastOff=" << getOffset( dimLast ) << " dense=" << dense_ << std::endl;
             }
             
             template <typename U>
@@ -1007,12 +1052,10 @@ namespace redux {
             
             void resetLimits( void ) {
                 nElements_ = 1;
-                dense_ = true;
                 for( size_t i = 1; i < nDims_; ++i ) {
                     currentSizes[i] = dimStrides[i-1];
                     dimFirst[i] = 0;
                     dimLast[i] = currentSizes[i]-1;
-                    if( ( dimStrides[i - 1] > currentSizes[i] ) ) dense_ = false;
                     nElements_ *= currentSizes[i];
                 }
                 currentSizes[0] = dataSize/nElements_;
@@ -1021,8 +1064,8 @@ namespace redux {
                 nElements_ *= currentSizes[0];
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
-                end_ = ( ++it ).pos();  // 1 step after last element;
-                //dense_ = ((begin_+nElements_) == end_);
+                end_ = it.pos()+1;  // 1 step after last element;
+                dense_ = (int64_t(begin_+nElements_) == end_);
             }
             
 
@@ -1047,8 +1090,8 @@ namespace redux {
                 
                 begin_ = getOffset( dimFirst );
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
-                end_ = ( ++it ).pos();  // 1 step after last element;
-                //dense_ = ((begin_+nElements_) == end_);         // should not change with shift, but it's a cheap calculation anyway...
+                end_ = it.pos()+1;  // 1 step after last element;
+                //dense_ = (int64_t(begin_+nElements_) == end_);         // should not change with shift, but it's a cheap calculation anyway...
                
                 return n;   // return 
             }
@@ -1174,7 +1217,7 @@ namespace redux {
         template <> template <>
         inline const Array<double>& Array<double>::operator=( const Array<redux::complex_t>& rhs ) {
             if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
-            if(dense() && rhs.dense()) {
+            if(dense_ && rhs.dense_) {
                 std::transform(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_, [](complex_t d) { return std::real(d); } );
             } else {
                 std::transform(rhs.begin(), rhs.end(), begin(), [](complex_t d) { return std::real(d); } );
@@ -1185,7 +1228,7 @@ namespace redux {
         template <> template <>
         inline const Array<float>& Array<float>::operator=( const Array<redux::complex_t>& rhs ) {
             if( !sameSize( rhs ) ) this->resize( rhs.currentSizes );
-            if(dense() && rhs.dense()) {
+            if(dense_ && rhs.dense_) {
                 std::transform(rhs.get()+rhs.begin_, rhs.get()+rhs.end_, get()+begin_, [](complex_t d) { return std::real(d); } );
             } else {
                 std::transform(rhs.begin(), rhs.end(), begin(), [](complex_t d) { return std::real(d); } );

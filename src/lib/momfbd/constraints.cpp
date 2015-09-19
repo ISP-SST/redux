@@ -273,7 +273,7 @@ bool Constraints::Group::dense( void ) const {
 
     int32_t first = *indices.begin();
     int32_t last = *indices.rbegin();
-    return ( ( last - first + 1 ) == indices.size() );
+    return ( ( last - first + 1 ) == (int32_t)indices.size() );
 
 }
 
@@ -515,7 +515,7 @@ Array<int16_t> Constraints::getMatrix( bool blocked ) const {
     c.zero();
     const int32_t* colMap = parameterOrder.get();
     if( !blocked || groups.empty() ) {
-        for( uint i = 0; i < nConstraints; ++i ) {
+        for( int i = 0; i < nConstraints; ++i ) {
             for( auto & entry : constraints[i]->entries ) {
                 c( i, colMap[entry.first] ) = entry.second;
             }
@@ -536,7 +536,7 @@ Array<int16_t> Constraints::getMatrix( bool blocked ) const {
             rowEnd = rowBegin + nConstr - 1;
             colEnd = colBegin + nPar - 1;
             Array<int16_t> cc( c, rowBegin, rowEnd, colBegin, colEnd );  // sub-array of c
-            for( uint i = 0; i < nConstr; ++i ) {
+            for( int i = 0; i < nConstr; ++i ) {
                 for( auto & entry : group.constraints[i]->entries ) {
                     if( entry.first - firstIndex >= nPar ) {
                         // TODO: Skip silently for now, but should throw or warn.
@@ -575,7 +575,7 @@ Array<double> Constraints::getNullMatrix( void ) const {
 
 Array<int16_t> Constraints::getSubMatrix( int32_t groupID ) const {
 
-    if( groupID >= groups.size() ) {
+    if( groupID >= (int32_t)groups.size() ) {
         return Array<int16_t>();
     }
 
@@ -589,7 +589,7 @@ Array<int16_t> Constraints::getSubMatrix( int32_t groupID ) const {
     int32_t first = *g.indices.begin();
     Array<int16_t> c( nConstr, nPar );
     c.zero();
-    for( uint i = 0; i < nConstr; ++i ) {
+    for( int i = 0; i < nConstr; ++i ) {
         for( auto & entry : g.constraints[i]->entries ) {
             c( i, entry.first - first ) = entry.second;
         }

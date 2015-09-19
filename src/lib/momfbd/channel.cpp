@@ -692,7 +692,6 @@ void Channel::initPatch (ChannelData& cd) {
     
     subImages.clear();
     for (uint16_t i=0; i < nImages; ++i) {
-        uint32_t imageNumber = imageNumbers[i];
         std::shared_ptr<SubImage> simg (new SubImage (myObject, *this, workspace->window, workspace->noiseWindow, cd.images, i, cd.offset,
                                         patchSize, pupilPixels));   // TODO: fix offsets
         subImages.push_back (simg);
