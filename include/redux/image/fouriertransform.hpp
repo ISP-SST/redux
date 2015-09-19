@@ -67,6 +67,7 @@ namespace redux {
             redux::util::Array<T> correlate( const redux::util::Array<T>& ) const;
             
             void autocorrelate( void );
+            void autocorrelate( double scale );
             template <typename T>
             static void autocorrelate( T*, size_t, size_t );
             template <typename T>
@@ -110,6 +111,8 @@ namespace redux {
 
             void reorder(void);
             template <typename T>
+            static void reorderInto( const T* inSmall, size_t inSizeY, size_t inSizeX, T* outBig, size_t outSizeY, size_t outSizeX);
+            template <typename T>
             static void reorder( T*, size_t, size_t );
             template <typename T>
             static void reorder( redux::util::Array<T>& in ) { reorder(in.get(), in.dimSize(0), in.dimSize(1)); }
@@ -129,8 +132,12 @@ namespace redux {
             const FourierTransform& operator*=( const T& val ) { Array<complex_t>::operator*=(val); return *this; }
             
 
-            void set( redux::util::Array<double>&);
-            void set( redux::util::Array<complex_t>&);
+            void ft( double* );         //!< NOTE use of these requires FT and input to be properly sized already !!
+            void ft( complex_t* );
+            void ift( double* );        //!> NOTE fftw:c2r is destructive, so only use these direct functions in one-shot contexts.
+            void ift( complex_t* );
+            
+            
             void init(void);
             void init(const double*, size_t, size_t);
             void init(const complex_t*, size_t, size_t);

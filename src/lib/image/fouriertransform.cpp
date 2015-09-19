@@ -234,13 +234,31 @@ namespace redux {
 }
 
 
-void FourierTransform::set(Array<double>& rhs) {
-    fftw_execute_dft_r2c (plan->forward_plan, rhs.ptr(), reinterpret_cast<fftw_complex*> (ptr()));
+void FourierTransform::ft( double* data ) {
+
+    fftw_execute_dft_r2c( plan->forward_plan, data, reinterpret_cast<fftw_complex*>(get()) );
+
 }
 
 
-void FourierTransform::set(Array<complex_t>& rhs) {
-    fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (rhs.ptr()), reinterpret_cast<fftw_complex*> (ptr()));
+void FourierTransform::ft( complex_t* data ) {
+
+    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(data), reinterpret_cast<fftw_complex*>(get()) );
+
+}
+
+
+void FourierTransform::ift( double* out ) {
+
+    fftw_execute_dft_c2r( plan->backward_plan, reinterpret_cast<fftw_complex*>(get()), out);
+
+}
+
+
+void FourierTransform::ift( complex_t* out ) {
+
+    fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(get()), reinterpret_cast<fftw_complex*>(out) );
+
 }
 
 
@@ -385,18 +403,16 @@ template void FourierTransform::inv (Array<complex_t>& out, int flags) const;
 
 template <typename T>
 Array<T> FourierTransform::correlate (const Array<T>& in) const {
+    
     int f = FT_REORDER;
-
     if (centered) {
         f = 0;
     }
 
     FourierTransform inFT (in, f);
-    auto it = inFT.begin();
-
-    for (auto & it2 : *this) {
-        *it++ *= conj (it2);
-    }
+    
+    transform( get(), get()+nElements(), inFT.get(), inFT.get(),
+        [](const complex_t& a, const complex_t& b) { return b*conj(a); } );
 
     Array<T> out (in.dimensions());
     inFT.inv (out, FT_REORDER);
@@ -408,10 +424,18 @@ template Array<double> FourierTransform::correlate (const Array<double>&) const;
 template Array<complex_t> FourierTransform::correlate (const Array<complex_t>&) const;
 
 
-void FourierTransform::autocorrelate (void) {
+void FourierTransform::autocorrelate(void) {
 
     // FourierTransform is dense by construction, so this should always be ok
-    transform( get(), get()+nElements(), get(),[](const complex_t&a){ return norm(a); } );
+    transform( get(), get()+nElements(), get(), [](const complex_t&a){ return norm(a); } );
+
+}
+
+
+void FourierTransform::autocorrelate( double scale ) {
+
+    // FourierTransform is dense by construction, so this should always be ok
+    transform( get(), get()+nElements(), get(), [scale](const complex_t&a){ return scale*norm(a); } );
 
 }
 
@@ -548,30 +572,64 @@ void FourierTransform::normalize (FourierTransform& in) {
 
 
 template <typename T>
+void FourierTransform::reorderInto( const T* inSmall, size_t inSizeY, size_t inSizeX, T* outBig, size_t outSizeY, size_t outSizeX) {
+
+    size_t inHalfY = inSizeY / 2;
+    size_t inHalfX = inSizeX / 2;
+    
+    size_t chunkSize = inHalfX * sizeof (T);
+
+    const T* southEastIn = inSmall + inHalfX;
+    const T* northWestIn = inSmall + inHalfY*inSizeX;
+    const T* northEastIn = inSmall + inHalfY*inSizeX + inHalfX;
+    T* southEastOut = outBig + outSizeX - inHalfX;
+    T* northWestOut = outBig + (outSizeY-inHalfY)*outSizeX;
+    T* northEastOut = southEastOut + (outSizeY-inHalfY)*outSizeX;
+
+    for (size_t y = 0; y < inHalfY; ++y) {
+        memcpy (northEastOut, inSmall, chunkSize);
+        memcpy (northWestOut, southEastIn, chunkSize);
+        memcpy (outBig, northEastIn, chunkSize);
+        memcpy (southEastOut, northWestIn, chunkSize);
+        inSmall += inSizeX;
+        northEastIn += inSizeX;
+        southEastIn += inSizeX;
+        northWestIn += inSizeX;
+        outBig += outSizeX;
+        northWestOut += outSizeX;
+        southEastOut += outSizeX;
+        northEastOut += outSizeX;
+    }
+
+}
+template void FourierTransform::reorderInto( const double*, size_t, size_t, double*, size_t, size_t);
+template void FourierTransform::reorderInto( const float*, size_t, size_t, float*, size_t, size_t);
+template void FourierTransform::reorderInto( const complex_t*, size_t, size_t, complex_t*, size_t, size_t);
+
+
+template <typename T>
 void FourierTransform::reorder(T* in, size_t ySize, size_t xSize) {
 
     size_t halfY = ySize / 2;
     size_t halfX = xSize / 2;
-    size_t stride = xSize;
     size_t chunkSize = halfX * sizeof (T);
     char *buf = new char[chunkSize];
 
-    T* southWest = in;
     T* southEast = in + halfX;
-    T* northWest = in + halfY*stride;
-    T* northEast = in + halfY*stride + halfX;
+    T* northWest = in + halfY*xSize;
+    T* northEast = in + halfY*xSize + halfX;
 
     for (size_t y = 0; y < halfY; ++y) {
-        memcpy (buf, southWest, chunkSize);
-        memcpy (southWest, northEast, chunkSize);
+        memcpy (buf, in, chunkSize);
+        memcpy (in, northEast, chunkSize);
         memcpy (northEast, buf, chunkSize);
-        southWest += stride;
-        northEast += stride;
+        in += xSize;
+        northEast += xSize;
         memcpy (buf, southEast, chunkSize);
         memcpy (southEast, northWest, chunkSize);
         memcpy (northWest, buf, chunkSize);
-        southEast += stride;
-        northWest += stride;
+        southEast += xSize;
+        northWest += xSize;
     }
 
     delete[] buf;
