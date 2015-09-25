@@ -28,6 +28,22 @@ namespace redux {
 
     struct WorkInProgress;
     
+    class job_check_failed: public std::exception {
+        
+    public:
+        explicit job_check_failed(const char* message) : msg_(message) { }
+        explicit job_check_failed(const std::string& message) : msg_(message) { }
+        virtual ~job_check_failed() throw () {}
+
+        virtual const char* what() const throw () { return msg_.c_str(); }
+
+    protected:
+        std::string msg_;
+
+    };
+        
+
+    
     /*! Base class for a "job" to be processed by the redux framework.
      * 
      */
