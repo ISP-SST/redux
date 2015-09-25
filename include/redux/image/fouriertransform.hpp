@@ -119,8 +119,7 @@ namespace redux {
 
             FourierTransform reordered(void) const;
             
-            void resize(const std::vector<size_t>& sizes);
-            template <typename ...S> void resize( S ...sizes ) { resize( {static_cast<size_t>( sizes )...} ); }
+            void resize(size_t ySize, size_t xSize, int flags=0, uint8_t nT=1);
             
             operator const redux::util::Array<complex_t>&() const { return reinterpret_cast<const redux::util::Array<complex_t>&>(*this); }
             const FourierTransform& operator*=( const FourierTransform& rhs );

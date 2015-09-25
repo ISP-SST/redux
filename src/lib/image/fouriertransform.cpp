@@ -654,16 +654,33 @@ FourierTransform FourierTransform::reordered (void) const {
 }
 
 
-void FourierTransform::resize (const std::vector<size_t>& sizes) {
-
-    Array<complex_t>::resize (sizes);
-
-    if (halfComplex) {
-        plan = getPlan (sizes, Plan::R2C, nThreads);
-    } else {
-        plan = getPlan (sizes, Plan::C2C, nThreads);
+void FourierTransform::resize( size_t ySize, size_t xSize, int flags, uint8_t nT ) {
+    
+    if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
+        Array<complex_t>::resize(ySize,xSize);
     }
 
+    inputSize = ySize*xSize;
+    normalized = false;
+    centered = false;
+    nThreads = nT;
+
+    if (flags & FT_FULLCOMPLEX) {
+        halfComplex = false;
+        plan = getPlan( {ySize, xSize}, Plan::C2C, nThreads);
+    } else {
+        halfComplex = true;
+        plan = getPlan( {ySize, xSize}, Plan::R2C, nThreads);
+    }
+
+    if (flags & FT_NORMALIZE) {
+        normalized = true;
+    }
+
+    if (flags & FT_REORDER) {
+        centered = true;
+    }
+    
 }
 
 
