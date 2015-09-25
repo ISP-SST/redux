@@ -354,6 +354,25 @@ namespace redux {
              *  @brief Set the array to wrap a new raw datablock with the specified sizes
              */
             //@{
+            template <typename U>
+            void wrap( const Array<T>& rhs, const std::vector<U>& indices ) {
+                *this = rhs;
+                size_t nIndices = indices.size();
+                if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
+                    throw std::logic_error("Array: wrap: Too many indices or odd number of indices.");
+                }
+
+                if ( nIndices ) {
+                    setLimits(indices);
+                } else {
+                    begin_ = getOffset( dimFirst );
+                    auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) + nElements_ );
+                    end_ = it.pos()+1;  // 1 step after last element;
+                }
+            }
+            template <typename ...S>
+            void wrap( const Array<T>& rhs, S ...s ) { wrap( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ); }
+
             template <typename ...S>
             void wrap( T* data, S ...sizes ) {
                 setSizes( sizes... );
@@ -839,6 +858,24 @@ namespace redux {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_, redux::math::divide<T,U>());
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(), redux::math::divide<T,U>());
+                    }
+                }
+                else {
+                    throw std::invalid_argument( "Array:/=  dimensions does not match: " + printArray(dimensions(),"dims")
+                                                 + printArray(rhs.dimensions(),"  rhsdims") );
+                }
+                return *this;
+            }
+            
+            template <typename U>
+            const Array<T>& safeDivide( const Array<U>& rhs, double eps=0 ) {
+                if( this->sameSize( rhs ) ) {
+                    if(dense_ && rhs.dense_) {
+                        std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_,
+                                       [eps]( const complex_t& a, const complex_t& b) { if( fabs(b)>eps ) return static_cast<T>(a/b); return T(0); } );
+                    } else {
+                        std::transform(begin(), end(), rhs.begin(), begin(),
+                                       [eps]( const complex_t& a, const complex_t& b) { if( fabs(b)>eps ) return static_cast<T>(a/b); return T(0); } );
                     }
                 }
                 else {
