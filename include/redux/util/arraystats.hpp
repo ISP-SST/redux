@@ -48,7 +48,7 @@ namespace redux {
             int clip;
             double cutoff;
             double min, max, median;
-            double sum, mean, rms, stddev;
+            double sum, norm, mean, rms, stddev;
             double noise, noiseRMS;
 
         };
