@@ -28,16 +28,20 @@ namespace redux {
         struct SubImage : public redux::util::Array<float> {
             typedef std::shared_ptr<SubImage> Ptr;
             
-            SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind,
+            SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind);
+            /*SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind,
                      const redux::util::Array<float>& stack,
-                     uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);
+                     uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);*/
             ~SubImage(void);
             
+            void setPatchInfo(uint32_t, const PointI&, const PointI&, uint16_t, uint16_t, uint16_t);
             void init(void);
+            void newCutout(void);
             
             void addFT(redux::util::Array<double>& ftsum) const;
             void addPQ(complex_t* P, double* Q) const { addPQ(OTF.get(),P,Q); };
             void addPQ(const complex_t* otf, complex_t* P, double* Q) const;
+            void addToPQ(void) const;
             void restore(complex_t* avg_obj, double* norm) const;
             
             double metricChange(const complex_t* newOTF) const;
@@ -45,12 +49,11 @@ namespace redux {
             double gradientVogel(uint16_t mode, double dalpha) const;
             void calcVogelWeight(void);
             
-            void addScaledMode(uint16_t m, double a) { addScaledMode(phi.get(), m, a); }
-            void addScaledMode(double* phiPtr, uint16_t m, double a) const;
-            void addMode(uint16_t m, double a) { addMode(phi.get(), m, a); }
-            void addMode(double* phiPtr, uint16_t m, double a) const;
-            void addModes(size_t nModes, uint16_t* modes, const double* a) { addModes(phi.get(), nModes, modes, a); }
-            void addModes(double* phiPtr, size_t nModes, uint16_t* modes, const double* a) const;
+            //void addScaledMode( double* modePtr, double a );
+            
+            void addMode(double* phiPtr, const double* modePtr, double a) const;
+            //void addModes(size_t nModes, uint16_t* modes, const double* a) { addModes(phi.get(), nModes, modes, a); }
+            //void addModes(double* phiPtr, size_t nModes, uint16_t* modes, const double* a) const;
             
             void adjustOffset(void);
 
@@ -71,9 +74,8 @@ namespace redux {
                 }
             }
             
-            void resetPhi(redux::util::Array<double>&p) const;
             void resetPhi(void);
-            void calcPhi(void);
+            void calcPhi(const double* a);
 
             void calcOTF(complex_t* otf, const double* phi);
             void calcOTF(void);
@@ -81,7 +83,6 @@ namespace redux {
             
             template <typename T>
             void addPSF(redux::util::Array<T>& out) const {
-                static int count(0);
                 redux::util::Array<T> tmp;
                 OTF.inv(tmp,redux::image::FT_REORDER);
                 out += tmp;
@@ -122,23 +123,25 @@ namespace redux {
             template <typename T>
             redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) { return std::move(cim-img); }
             
-            
-            void update(bool newVogel=false);
+            //void update(bool newVogel=false);
             void dump( std::string tag ) const;
 
             uint32_t index;
-            const PointI offset;                                //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
+            PointI offset;                                      //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
             PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
-            uint16_t imgSize, pupilSize, otfSize;
+            uint16_t imgSize, pupilSize, nModes;
+            uint32_t otfSize, pupilSize2;
             double oldRG;
             
             Object& object;
             const Channel& channel;
+            const ModeSet& modes;
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;
             
             std::map<uint16_t, double> alpha;
-            std::map<uint16_t, double> currentAlpha;
+            double** alphaRef;
+            std::vector<double> currentAlpha;
             bool newPhi;
             bool newOTF;
             std::mutex mtx;
