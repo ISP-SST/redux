@@ -279,7 +279,7 @@ void descatter (int szY, int szX, const T* img, const T* gain, const T* psf, T* 
         for (int y = 0; y < szY; ++y) for (int x = 0; x < szX; ++x)  cim[y + padding][x + padding] *= g[y][x];
 
         // convolve
-        ft.set (tmp);
+        //ft.set (tmp); FIXME
         ft *= otf;
         ft.directInverse (tmp);
 

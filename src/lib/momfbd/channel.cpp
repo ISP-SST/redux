@@ -4,7 +4,6 @@
 #include "redux/momfbd/object.hpp"
 #include "redux/momfbd/subimage.hpp"
 #include "redux/momfbd/util.hpp"
-#include "redux/momfbd/wavefront.hpp"
 
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
@@ -665,10 +664,10 @@ void Channel::initPatch (ChannelData& cd) {
 void Channel::initPhiFixed (void) {
     phi_fixed.resize (myObject.pupilPixels, myObject.pupilPixels);
     phi_fixed.zero();
-    Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+    ModeInfo id (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
     uint16_t modeNumber;
     for (uint i = 0; i < diversityModes.size(); ++i) {
-        Cache::ModeID id2 = id;
+        ModeInfo id2 = id;
         modeNumber = diversityModes[i];
         cout << "Channel::initPhiFixed()  i=" << i << endl;
         if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {

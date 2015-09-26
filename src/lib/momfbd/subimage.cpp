@@ -372,21 +372,17 @@ void SubImage::setAlpha(uint16_t m, double a) {
 
 
 void SubImage::addAlphas(const double* alphas) {
-    if (wf) {
-        size_t cnt (0);
-        for (auto &it : wf->modes) {
-            addAlpha(it.first, alphas[cnt++]);
-        }
+    unique_lock<mutex> lock (mtx);
+    for(uint m=0; m<nModes; ++m) {
+        alpha[m] += alphas[m];
     }
 }
 
 
 void SubImage::setAlphas(const double* alphas) {
-    if (wf) {
-        size_t cnt (0);
-        for (auto & it : wf->modes) {
-            setAlpha(it.first, alphas[cnt++]);
-        }
+    unique_lock<mutex> lock (mtx);
+    for(uint m=0; m<nModes; ++m) {
+        alpha[m] = alphas[m];
     }
 }
 

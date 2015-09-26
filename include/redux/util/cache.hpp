@@ -75,13 +75,13 @@ namespace redux {
                 return *ret.first;
             }
             template<class KeyT, class T>
-            void clear(void) {
-                auto m = getMap<KeyT,T>();
+            static void clear(void) {
+                auto m = get().getMap<KeyT,T>();
                 m.second.clear();
             }
             template<class T>
-            void clear(void) {
-                auto s = getSet<T>();
+            static void clear(void) {
+                auto s = get().getSet<T>();
                 s.second.clear();
             }
             /*template<class T, class KeyT, class... Args>

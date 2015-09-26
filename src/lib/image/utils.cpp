@@ -1,8 +1,9 @@
 #include "redux/image/utils.hpp"
 
 #include "redux/image/fouriertransform.hpp"
+#include "redux/image/grid.hpp"
 #include "redux/image/pupil.hpp"
-#include "redux/momfbd/cache.hpp"
+#include "redux/image/zernike.hpp"
 
 #include "redux/file/fileana.hpp"
 #include "redux/math/functions.hpp"
@@ -106,44 +107,6 @@ static __inline T sqr (T x) {
 }
 
 
-Grid::Grid (uint32_t nPoints) : size (nPoints, nPoints), origin (nPoints / 2, nPoints / 2) {
-    if (! (nPoints % 2)) {  // for nPoints even, place origin between mid-points
-        origin.x += 0.5;
-        origin.y += 0.5;
-    }
-    init();
-}
-
-Grid::Grid (uint32_t nPoints, float originY, float originX) : size (nPoints, nPoints), origin (originY, originX) {
-    init();
-}
-
-Grid::Grid (uint32_t nPointsY, uint32_t nPointsX, float originY, float originX) : size (nPointsY, nPointsX), origin (originY, originX) {
-    init();
-}
-
-void Grid::init (void) {
-
-    distance = sharedArray<float> (size.y, size.x);
-    angle = sharedArray<float> (size.y, size.x);
-    float** distPtr = distance.get();
-    float** anglePtr = angle.get();
-    for (uint y = 0; y < size.y; ++y) {
-        double yDist = y - origin.y;
-        double y2 = sqr (yDist);
-        for (uint x = 0; x < size.x; ++x) {
-            double xDist = x - origin.x;
-            if (yDist || xDist) {
-                double x2 = sqr (xDist);
-                distPtr[y][x] = sqrt (y2 + x2);
-                anglePtr[y][x] = atan2 (yDist, xDist);      // note: slow index is Y, fast is X
-            } else distPtr[y][x] = anglePtr[y][x] = 0;      // this pixel is at the origin -> set the angle to 0.
-        }
-    }
-
-}
-
-
 double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double radius) {
     //cout << "makePupil_thi:   nph = " << nPoints << "  r_c = " << radius << endl;
 
@@ -156,7 +119,7 @@ double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double rad
         // TODO: warn or throw if nPoints is odd.
     }
 
-    Grid grid (mid + 1, origin, origin);
+    const Grid& grid = Grid::get(mid + 1, origin, origin);
     float** distPtr = grid.distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
     // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
     double val;
@@ -244,15 +207,14 @@ double redux::image::makePupil_mvn (double** pupil, int nph, double r_c) {
 
 
 void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle) {
-using redux::momfbd::Cache;
-    static Cache& cache = Cache::getCache();
+
     redux::image::Pupil pupil(nPoints, r_c);
 
     int m, n;
     noll_to_mn (modeNumber, m, n);
 
-    const vector<double>& coeff = cache.zernikeRadialPolynomial (m, n);
-    const redux::image::Grid& grid = cache.grid (nPoints, redux::PointF (nPoints / 2, nPoints / 2));
+    const vector<double>& coeff = Zernike::radialPolynomial (m, n);
+    const Grid& grid = Grid::get(nPoints, nPoints/2.0, nPoints/2.0);
     float** distPtr = grid.distance.get();  // distance from pixels to centre (pupil & modes are centered on pixel (mid,mid))
     float** aPtr = grid.angle.get();
 

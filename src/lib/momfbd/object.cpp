@@ -7,6 +7,7 @@
 
 #include "redux/file/fileana.hpp"
 #include "redux/file/filemomfbd.hpp"
+#include "redux/image/utils.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/datautil.hpp"

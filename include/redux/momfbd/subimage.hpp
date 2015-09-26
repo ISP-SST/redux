@@ -1,7 +1,7 @@
 #ifndef REDUX_MOMFBD_SUBIMAGE_HPP
 #define REDUX_MOMFBD_SUBIMAGE_HPP
 
-#include "redux/momfbd/cache.hpp"
+#include "redux/momfbd/modes.hpp"
 
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
@@ -24,7 +24,6 @@ namespace redux {
          */
         class Object;
         class Channel;
-        class WaveFront;
 
         struct SubImage : public redux::util::Array<float> {
             typedef std::shared_ptr<SubImage> Ptr;
@@ -123,7 +122,6 @@ namespace redux {
             template <typename T>
             redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) { return std::move(cim-img); }
             
-            void setWaveFront( std::shared_ptr<WaveFront> w ) { wf = w; };
             
             void update(bool newVogel=false);
             void dump( std::string tag ) const;
@@ -137,8 +135,7 @@ namespace redux {
             Object& object;
             const Channel& channel;
             const redux::util::Array<double>& window;
-            const redux::util::Array<double>& noiseWwindow;
-            std::shared_ptr<WaveFront> wf;
+            const redux::util::Array<double>& noiseWindow;
             
             std::map<uint16_t, double> alpha;
             std::map<uint16_t, double> currentAlpha;

@@ -3,6 +3,7 @@
 #include "redux/logger.hpp"
 #include "redux/file/fileio.hpp"
 #include "redux/image/fouriertransform.hpp"
+#include "redux/image/grid.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/channel.hpp"
@@ -39,7 +40,7 @@ namespace {
             // TODO: warn or throw if nPoints is odd.
         }
 
-        Grid grid (mid + 1, origin, origin);
+        const Grid& grid = Grid::get(mid + 1, origin, origin);
         float** distPtr = grid.distance.get();              // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
                                                             // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
         double val;

@@ -7,7 +7,7 @@
 #include "redux/logger.hpp"
 #include "redux/file/fileio.hpp"
 #include "redux/image/utils.hpp"
-#include "redux/momfbd/cache.hpp"
+#include "redux/image/zernike.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/cache.hpp"
 #include "redux/util/stringutil.hpp"
@@ -121,7 +121,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double a
         delPointers(modePtr);
     }
 
-    atm_rms = sqrt(Cache::getCache().zernikeCovariance(modeNumber,modeNumber));
+    atm_rms = sqrt(Zernike::covariance(modeNumber,modeNumber));
 
 
 }
@@ -140,15 +140,17 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
 
     zero();
         
-    static Cache& cache = Cache::getCache();
-    const PupilMode::KLPtr& kle = cache.karhunenLoeveExpansion(firstMode, lastMode).at(klModeNumber);
+    const Zernike::KLPtr& kle = Zernike::karhunenLoeveExpansion(firstMode, lastMode).at(klModeNumber);
     double c;
-
+    
+    ModeInfo z_info(0, 0, 0, nPoints, r_c, angle, cutoff);
     for(auto & it : kle->zernikeWeights) {
         if(fabs(c = it.second) >= cutoff) {
-            uint16_t zernikeModeIndex = it.first;
- //     cout << zernikeModeIndex << ":" << c << " " << flush;
-            const PupilMode::Ptr& mode = cache.mode(zernikeModeIndex, nPoints, r_c, angle);
+            z_info.modeNumber = it.first;
+            PupilMode::Ptr& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( z_info, PupilMode::Ptr() );
+            if( !mode ) {
+                mode.reset( new PupilMode( it.first, nPoints, r_c, angle ) );    // generate Zernike
+            }
             this->add(*mode, c);
         }
     }

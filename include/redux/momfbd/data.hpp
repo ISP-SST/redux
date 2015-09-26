@@ -1,8 +1,8 @@
 #ifndef REDUX_MOMFBD_DATA_HPP
 #define REDUX_MOMFBD_DATA_HPP
 
-#include "redux/momfbd/cache.hpp"
 #include "redux/momfbd/constraints.hpp"
+#include "redux/momfbd/modes.hpp"
 
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"

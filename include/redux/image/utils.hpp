@@ -13,23 +13,6 @@ namespace redux {
 
     namespace image {
         
-
-        /*! Container for an equidistant grid. Distances to origin (in pixels) and angles (in radians) are stored in
-         *  shared arrays. By default the origin is centered in the grid (between points for a grid with even points).
-         */
-        struct Grid {
-            Point size;
-            PointF origin;
-            std::shared_ptr<float*> distance;
-            std::shared_ptr<float*> angle;
-            Grid( uint32_t nPoints );
-            Grid( uint32_t nPoints, float originY, float originX );
-            Grid( uint32_t nPoints, PointF origin ) : Grid(nPoints,origin.y,origin.x) {};
-            Grid( uint32_t nPointsY, uint32_t nPointsX, float originY, float originX );
-            void init(void);
-            bool operator<( const Grid& rhs ) const { if( size == rhs.size ) return (origin < rhs.origin); return ( size < rhs.size ); }
-        };
-        
         double makePupil_thi( double** pupil, uint32_t nPoints, double radius);
         double makePupil_mvn( double** pupil, int nPoints, double radius );
         template <typename T>
