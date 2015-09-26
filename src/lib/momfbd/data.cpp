@@ -1,7 +1,7 @@
 #include "redux/momfbd/data.hpp"
 
 #include "redux/momfbd/momfbdjob.hpp"
-#include "redux/momfbd/workspace.hpp"
+#include "redux/momfbd/solver.hpp"
 
 #include "redux/image/utils.hpp"
 

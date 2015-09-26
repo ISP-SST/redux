@@ -51,7 +51,7 @@ namespace redux {
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
-            void initProcessing( const WorkSpace& );                        //!< Called once per job, to set up storage etc.
+            void initProcessing( const Solver& );                        //!< Called once per job, to set up storage etc.
             void initPatch(ObjectData&);                                //!< Called once per patch, normalize, fit plane etc.
             void getResults(ObjectData&);                               //!< Called on patch-completion, gather up what is going back to the master.
             void initPQ(void);

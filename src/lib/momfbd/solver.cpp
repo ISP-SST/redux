@@ -1,4 +1,4 @@
-#include "redux/momfbd/workspace.hpp"
+#include "redux/momfbd/solver.hpp"
 
 #include "redux/momfbd/momfbdjob.hpp"
 
@@ -27,7 +27,7 @@ namespace sp=std::placeholders;
 #define lg Logger::mlg
 namespace {
 
-    const std::string thisChannel = "workspace";
+    const std::string thisChannel = "solver";
 
     grad_t gradientMethods[] = { nullptr,
         std::bind(&SubImage::gradientFiniteDifference, sp::_1, sp::_2, sp::_3),
@@ -37,19 +37,19 @@ namespace {
 }
 
 
-WorkSpace::WorkSpace( const MomfbdJob& j ) : objects( j.getObjects() ), job(j), nFreeParameters(0), modeNumbers(nullptr), enabledModes(nullptr), alpha(nullptr), grad_alpha(nullptr) {
+Solver::Solver( const MomfbdJob& j ) : objects( j.getObjects() ), job(j), nFreeParameters(0), modeNumbers(nullptr), enabledModes(nullptr), alpha(nullptr), grad_alpha(nullptr) {
 
 }
 
 
-WorkSpace::~WorkSpace() {
+Solver::~Solver() {
     
     clear();
     
 }
 
 
-void WorkSpace::init( void ) {
+void Solver::init( void ) {
     
     clear();
 
@@ -86,7 +86,7 @@ void WorkSpace::init( void ) {
 }
 
 
-void WorkSpace::getMetric( boost::asio::io_service& service, uint8_t nThreads ) {
+void Solver::getMetric( boost::asio::io_service& service, uint8_t nThreads ) {
 
     for( auto & it : job.getObjects() ) {
         it->metric();
@@ -95,7 +95,7 @@ void WorkSpace::getMetric( boost::asio::io_service& service, uint8_t nThreads ) 
 }
 
 
-void WorkSpace::resetAll( boost::asio::io_service& service ) {
+void Solver::resetAll( boost::asio::io_service& service ) {
     for( auto& oit: job.getObjects() ) {
         for( auto& cit: oit->channels ) {
             for( auto& it: cit->subImages ) {
@@ -106,7 +106,7 @@ void WorkSpace::resetAll( boost::asio::io_service& service ) {
         service.post( std::bind(&Object::addAllPQ, oit.get() ) );
     }
 }
-void WorkSpace::dumpImages( boost::asio::io_service& service, string tag ) {
+void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
     for( auto& oit: job.getObjects() ) {
         for( auto& cit: oit->channels ) {
             for( auto& it: cit->subImages ) {
@@ -117,7 +117,7 @@ void WorkSpace::dumpImages( boost::asio::io_service& service, string tag ) {
 }
 
 
-double WorkSpace::my_f( boost::asio::io_service& service, const gsl_vector* x, void* params ) {
+double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void* params ) {
 
     double* alphaPtr = alpha;
     
@@ -146,7 +146,7 @@ double WorkSpace::my_f( boost::asio::io_service& service, const gsl_vector* x, v
                 o->calcMetric();
                 sum += o->metric();
             } );
-        } else LOG_ERR << "WorkSpace::my_f()  object is NULL";
+        } else LOG_ERR << "my_f()  object is NULL";
     }
     runThreadsAndWait( service, job.info.maxThreads );
 
@@ -155,7 +155,7 @@ double WorkSpace::my_f( boost::asio::io_service& service, const gsl_vector* x, v
 }
 
 
-void WorkSpace::my_df( boost::asio::io_service& service, const gsl_vector* x, void* params, gsl_vector* df ) {
+void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void* params, gsl_vector* df ) {
     
     double* alphaPtr = alpha;
     double* gAlphaPtr = grad_alpha;
@@ -207,7 +207,7 @@ void WorkSpace::my_df( boost::asio::io_service& service, const gsl_vector* x, vo
 
 }
 
-void WorkSpace::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void* params, double* f, gsl_vector* df ) {
+void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void* params, double* f, gsl_vector* df ) {
     
     double* alphaPtr = alpha;
     double* gAlphaPtr = grad_alpha;
@@ -269,16 +269,16 @@ void WorkSpace::my_fdf( boost::asio::io_service& service, const gsl_vector* x, v
 }
 
 
-void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nThreads ) {
+void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nThreads ) {
 
     p->initPatch();
     data = p;
 
-    LOG << "WorkSpace::run()  patch#" << data->id << "   index=" << data->index << " region=" << data->roi;
+    LOG << "run()  patch#" << data->id << "   index=" << data->index << " region=" << data->roi;
 
-    std::function<gsl_f_t> wrapped_f = std::bind( &WorkSpace::my_f, this, std::ref( service ), sp::_1, sp::_2 );
-    std::function<gsl_df_t> wrapped_df = std::bind( &WorkSpace::my_df, this, std::ref( service ), sp::_1, sp::_2, sp::_3 );
-    std::function<gsl_fdf_t> wrapped_fdf = std::bind( &WorkSpace::my_fdf, this, std::ref( service ), sp::_1, sp::_2, sp::_3 , sp::_4);
+    std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, std::ref( service ), sp::_1, sp::_2 );
+    std::function<gsl_df_t> wrapped_df = std::bind( &Solver::my_df, this, std::ref( service ), sp::_1, sp::_2, sp::_3 );
+    std::function<gsl_fdf_t> wrapped_fdf = std::bind( &Solver::my_fdf, this, std::ref( service ), sp::_1, sp::_2, sp::_3 , sp::_4);
 
     gsl_fdf_wrapper<decltype( wrapped_f ), decltype( wrapped_df ), decltype( wrapped_fdf )>
     my_func( nFreeParameters, wrapped_f, wrapped_df, wrapped_fdf );
@@ -465,7 +465,7 @@ void WorkSpace::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t
 
 
 
-double WorkSpace::objectMetric( boost::asio::io_service& service ) {
+double Solver::objectMetric( boost::asio::io_service& service ) {
 
     for( const shared_ptr<Object>& o : objects ) {
         if( o ) {
@@ -475,7 +475,7 @@ double WorkSpace::objectMetric( boost::asio::io_service& service ) {
                 o->addAllPQ();
                 o->calcMetric();
             } );
-        } else LOG << "WorkSpace::objectMetric()  object is NULL";
+        } else LOG << "objectMetric()  object is NULL";
     }
     runThreadsAndWait( service, job.info.maxThreads );
     
@@ -490,7 +490,7 @@ double WorkSpace::objectMetric( boost::asio::io_service& service ) {
 
 
 
-void WorkSpace::clear( void ) {
+void Solver::clear( void ) {
     
     delete[] modeNumbers;
     delete[] enabledModes;
@@ -502,7 +502,7 @@ void WorkSpace::clear( void ) {
 }
 
 
-void WorkSpace::getAlpha(void) {
+void Solver::getAlpha(void) {
 
     double* alphaPtr = alpha;
     for( const shared_ptr<Object>& o: objects ) {
@@ -517,7 +517,7 @@ void WorkSpace::getAlpha(void) {
 }
 
 
-void WorkSpace::dump( string tag ) {
+void Solver::dump( string tag ) {
 
     for( auto & it : job.getObjects() ) {
         it->dump(tag);

@@ -2,7 +2,7 @@
 #define REDUX_MOMFBD_CHANNEL_HPP
 
 #include "redux/momfbd/config.hpp"
-#include "redux/momfbd/workspace.hpp"
+#include "redux/momfbd/solver.hpp"
 
 #include <redux/image/image.hpp>
 #include <redux/util/arraystats.hpp>
@@ -24,7 +24,7 @@ namespace redux {
         
         class MomfbdJob;
         class Object;
-        class WorkSpace;
+        class Solver;
         struct ChannelData;
         struct SubImage;
         struct Tilts;
@@ -55,7 +55,7 @@ namespace redux {
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
-            void initProcessing( const WorkSpace& );
+            void initProcessing( const Solver& );
             void initPatch(ChannelData&);
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
@@ -117,7 +117,7 @@ namespace redux {
             friend class Object;
             friend class MomfbdJob;
             friend struct ModeSet;
-            friend class WorkSpace;
+            friend class Solver;
             friend struct SubImage;
             
         };

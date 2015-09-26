@@ -1,7 +1,6 @@
 #include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/momfbd/util.hpp"
-#include "redux/momfbd/workspace.hpp"
 
 #include "redux/logger.hpp"
 #include "redux/util/bitoperations.hpp"
@@ -273,13 +272,13 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
             if(!globalData) {
                  globalData.reset( new GlobalData(*this) );
             }
-            if( !proc ) {
-                proc.reset( new WorkSpace(*this) );            // Initialize, allocations, etc.
-                proc->init();
+            if( !solver ) {
+                solver.reset( new Solver(*this) );            // Initialize, allocations, etc.
+                solver->init();
             }
             for( Part::Ptr& it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 // Run main processing
-                proc->run(static_pointer_cast<PatchData>(it), service, nThreads);
+                solver->run(static_pointer_cast<PatchData>(it), service, nThreads);
                 // Get results
                 //it = proc->result;
             }

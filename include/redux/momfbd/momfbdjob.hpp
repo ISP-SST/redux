@@ -4,7 +4,7 @@
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/object.hpp"
 
-#include "redux/momfbd/workspace.hpp"
+#include "redux/momfbd/solver.hpp"
 
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
@@ -79,11 +79,11 @@ namespace redux {
             redux::util::Array<PatchData::Ptr> patches;
             
             GlobalData::Ptr globalData;
-            WorkSpace::Ptr proc;
+            Solver::Ptr solver;
         
             friend class Object;
             friend class Channel;
-            friend class WorkSpace;
+            friend class Solver;
             friend struct ModeSet;
             friend struct redux::image::Pupil;
 

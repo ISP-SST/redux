@@ -170,7 +170,7 @@ size_t Object::nImages(void) const {
 }
 
 
-void Object::initProcessing( const WorkSpace& ws ) {
+void Object::initProcessing( const Solver& ws ) {
 
     if( patchSize && pupilPixels ) {
         P.resize(2*pupilPixels,2*pupilPixels);

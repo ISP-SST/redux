@@ -1,5 +1,5 @@
-#ifndef REDUX_MOMFBD_WORKSPACE_HPP
-#define REDUX_MOMFBD_WORKSPACE_HPP
+#ifndef REDUX_MOMFBD_SOLVER_HPP
+#define REDUX_MOMFBD_SOLVER_HPP
 
 
 #include "redux/momfbd/data.hpp"
@@ -23,14 +23,14 @@ namespace redux {
         class SubImage;
          /*! Container used during processing. Basically temporary arrays and reorganized references to original data.
          */
-        struct WorkSpace {
+        struct Solver {
             
-            typedef std::shared_ptr<WorkSpace> Ptr;
+            typedef std::shared_ptr<Solver> Ptr;
 
             const std::vector<std::shared_ptr<Object>>& objects;
             
-            WorkSpace(const redux::momfbd::MomfbdJob&);
-            ~WorkSpace();
+            Solver(const redux::momfbd::MomfbdJob&);
+            ~Solver();
             
             void init(void);
             
@@ -75,4 +75,4 @@ namespace redux {
 
 }
 
-#endif  // REDUX_MOMFBD_WORKSPACE_HPP
+#endif  // REDUX_MOMFBD_SOLVER_HPP

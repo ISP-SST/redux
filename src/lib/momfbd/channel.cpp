@@ -621,14 +621,14 @@ void Channel::getFileNames(std::vector<std::string>& files) const {
 }
 
 
-void Channel::initProcessing( const WorkSpace& workspace ) {
+void Channel::initProcessing( const Solver& solver ) {
     
     initPhiFixed();
 
     size_t nImages = imageNumbers.size();
     subImages.resize(nImages);
     for (uint16_t i=0; i < nImages; ++i) {
-        if( !subImages[i] ) subImages[i].reset( new SubImage(myObject, *this, workspace.window, workspace.noiseWindow) );
+        if( !subImages[i] ) subImages[i].reset( new SubImage(myObject, *this, solver.window, solver.noiseWindow) );
     }
     
 }
