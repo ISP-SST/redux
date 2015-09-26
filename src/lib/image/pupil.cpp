@@ -158,8 +158,10 @@ void Pupil::calculatePupilSize (double &frequencyCutoff, double &pupilRadiusInPi
 
 
 Pupil::Pupil( uint16_t pixels, double pupilRadius )
-    : nPixels(pixels), radius(pupilRadius), area(0){
+    : nPixels(pixels), radius(pupilRadius), area(0) {
 
+    generate(pixels,pupilRadius);
+    
 }
 
 Pupil::Pupil(Pupil&& rhs) : redux::util::Array<double>(std::move(reinterpret_cast<redux::util::Array<double>&>(rhs))),
@@ -176,9 +178,6 @@ Pupil::Pupil(const Pupil& rhs) : redux::util::Array<double>(reinterpret_cast<con
     
 }
 
-            uint16_t nPixels;
-            double radius;
-            double area;
 
 uint64_t Pupil::size( void ) const {
     uint64_t sz = Array<double>::size();

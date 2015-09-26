@@ -565,22 +565,29 @@ void arrayTest( void ) {
     array3x3 = array4x5;
     BOOST_CHECK( array3x3 == array4x5 );
     // verify that data is shared
-    BOOST_CHECK( array3x3.ptr() == array4x5.ptr() );
+    BOOST_CHECK( array3x3.get() == array4x5.get() );
 
     // deep copy
     array3x3 = array4x5.copy();
     BOOST_CHECK( array3x3 == array4x5 );
     // verify that data is not shared
-    BOOST_CHECK( array3x3.ptr() != array4x5.ptr() );
+    BOOST_CHECK( array3x3.get() != array4x5.get() );
 
-    // test sub-array constructor
-    Array<int> subarray( array4x5, 1, 3, 1, 3 ); // 3x3 sub-array, with offset (1,1)
-    
     BOOST_CHECK( array4x5.dense() );
+
+    // test sub-array
+    Array<int> subarray( array4x5, 0, 0, 0, 4 ); // 1x5 sub-array (slice)
+    for( uint i=0; i<4; ++i ) {
+        BOOST_CHECK( subarray.get() == array4x5.get() );
+        BOOST_CHECK( subarray.dense() );
+        subarray.shift(0,1);
+    }
+
+    subarray.wrap( array4x5, 1, 3, 1, 3 ); // 3x3 sub-array, with offset (1,1)
     BOOST_CHECK( !subarray.dense() );
 
     // verify that data is shared
-    BOOST_CHECK( subarray.ptr() == array4x5.ptr() );
+    BOOST_CHECK( subarray.get() == array4x5.get() );
     // define an array equal to the center 3x3 elements of the 5x5 array above for reference
     array3x3.resize( 3, 3 );
     array3x3.assign( 7,  8,  9,
@@ -624,11 +631,11 @@ void arrayTest( void ) {
         it = ++cnt;
     }
     BOOST_CHECK_EQUAL( cnt, 120 );
-    
+
     {
         // arbitrary subarray.
         Array<int> subarray( array4x5x6, 1, 2, 2, 3, 3, 4 );
-        
+ 
         // check that the subarray is accessing the right elements.
         for( size_t i = 0; i < 2; ++i ) {
             for( size_t j = 0; j < 2; ++j ) {

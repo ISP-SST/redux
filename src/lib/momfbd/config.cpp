@@ -399,7 +399,8 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
            (subImagePosX == rhs.subImagePosX) &&
            (subImagePosY == rhs.subImagePosY) &&
            (imageDataDir == rhs.imageDataDir) &&
-           (imageNumberOffset == rhs.imageNumberOffset) &&
+           (imageDataDir == rhs.imageDataDir) &&
+           (imageTemplate == rhs.imageTemplate) &&
            (imageNumbers == rhs.imageNumbers) &&
            (wfIndex == rhs.wfIndex) &&
            (darkNumbers == rhs.darkNumbers);
@@ -409,7 +410,10 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
 
 /********************   Object  ********************/
 
-ObjectCfg::ObjectCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5), maxLocalShift(5), minimumOverlap(16), 
+ObjectCfg::ObjectCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5),
+                         alphaToPixels(0), pixelsToAlpha(0),
+                         alphaToDefocus(0), defocusToAlpha(0),
+                         maxLocalShift(5), minimumOverlap(16), 
                          patchSize(128), pupilPixels(64), saveMask(0), wavelength(0) {
 
 }
@@ -423,7 +427,6 @@ ObjectCfg::~ObjectCfg() {
 void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     
     const ObjectCfg& defaults = reinterpret_cast<const ObjectCfg&>(def);
-    ChannelCfg::parseProperties(tree, defaults);
 
     telescopeF = tree.get<double>("TELESCOPE_F", defaults.telescopeF);
     arcSecsPerPixel = tree.get<double>("ARCSECPERPIX", defaults.arcSecsPerPixel);
@@ -455,6 +458,7 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
         LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
     }
 
+    ChannelCfg::parseProperties(tree, defaults);
 
 }
 
@@ -589,7 +593,6 @@ GlobalCfg::~GlobalCfg() {
 void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     
     const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
-    ObjectCfg::parseProperties(tree, defaults);
 
     if( tree.get<bool>( "CALIBRATE", false ) )             runFlags |= RF_CALIBRATE;
     if( tree.get<bool>( "DONT_MATCH_IMAGE_NUMS", false ) ) runFlags |= RF_DONT_MATCH_IMAGE_NUMS;
@@ -707,6 +710,8 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
         saveMask |= SF_SAVE_ALPHA; // necessary for calibration runs.
         outputFileType |= FT_ANA;
     }
+    
+    ObjectCfg::parseProperties(tree, defaults);
 
 }
 

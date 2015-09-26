@@ -605,10 +605,10 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
     if( sliceSize > 0 ) {
         if( hdr->m_Header.ndim == 2 ) {
             if( data.dense() ) {
-                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.ptr() ), nElements, hdr, sliceSize );
+                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.get() ), nElements, hdr, sliceSize );
             }
             else {
-                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.copy().ptr() ), nElements, hdr, sliceSize );
+                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.copy().get() ), nElements, hdr, sliceSize );
             }
             if( compressedSize < totalSize ) {
                 int tmp = static_cast<int>( compressedSize );
@@ -634,10 +634,10 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
     }
     else {
         if( data.dense() ) {
-            file.write( reinterpret_cast<const char*>( data.ptr() ), totalSize );
+            file.write( reinterpret_cast<const char*>( data.get() ), totalSize );
         }
         else {
-            file.write( reinterpret_cast<const char*>( data.copy().ptr() ), totalSize );
+            file.write( reinterpret_cast<const char*>( data.copy().get() ), totalSize );
         }
     }
 

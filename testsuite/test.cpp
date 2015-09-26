@@ -23,11 +23,11 @@ test_suite* init_unit_test_suite(int /*argc*/, char* /*argv*/[]) {
 
 	//test_suite* reduxTestSuite = BOOST_TEST_SUITE("REDUX Tests");
     
-    //testsuite::file::fileTest();
+    testsuite::file::fileTest();
     testsuite::image::imageTest();
-    //testsuite::math::mathTest();
+    testsuite::math::mathTest();
     testsuite::momfbd::momfbdTest();
-    //testsuite::util::utilTest();
+    testsuite::util::utilTest();
 
     return nullptr;
 }

@@ -4,6 +4,7 @@
 #include "redux/file/fileana.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/image/image.hpp"
+#include "redux/image/grid.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/util/stringutil.hpp"
@@ -302,7 +303,7 @@ void gridTest( void ) {
     int64_t nPoints = 50;
     float originX = 11;
     float originY = 11.5;
-    Grid grid(nPoints,originY,originX);
+    Grid grid = Grid::get(nPoints,originY,originX);
     float** distPtr = grid.distance.get();
     float** anglePtr = grid.angle.get();
     for( int i = 0; i < nPoints; ++i ) {

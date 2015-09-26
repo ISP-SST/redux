@@ -518,7 +518,7 @@ namespace redux {
 
             template <typename U> 
             T* ptr( const std::vector<U>& indices ) {
-                int64_t offset = begin_ + getOffset( indices, dimFirst );
+                int64_t offset = getOffset( indices, dimFirst );
                 if( offset < 0 || offset > dataSize ) {
                     throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
                 }
@@ -528,7 +528,7 @@ namespace redux {
 
             template <typename ...S>
             T* ptr( S ...s ) {
-                uint64_t offset = begin_ + getOffset<uint64_t>( {static_cast<uint64_t>( s )...}, dimFirst );
+                uint64_t offset = getOffset<uint64_t>( {static_cast<uint64_t>( s )...}, dimFirst );
                 if( offset > dataSize ) {
                     throw std::out_of_range( "Offset out of range: " + std::to_string( offset ) );
                 }

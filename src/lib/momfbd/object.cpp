@@ -633,7 +633,7 @@ void Object::initCache (void) {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet).";
             }
         }
-    } else LOG_ERR << "No such file: " << pupilFile;
+    }
     
     if( pupil.empty() ) {
         PupilInfo info(pupilPixels, pupilRadiusInPixels);
@@ -675,7 +675,7 @@ void Object::initCache (void) {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet).";
             }
         }
-    } else LOG_ERR << "No such file: " << modeFile;
+    }
     
     if( modes.empty() ) {
         ModeInfo info(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);

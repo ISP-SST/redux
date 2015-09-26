@@ -1,7 +1,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include "redux/momfbd/modes.hpp"
-#include "redux/momfbd/cache.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/constants.hpp"
@@ -9,7 +8,9 @@
 #include "redux/file/fileana.hpp"
 #include "redux/math/linalg.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/image/grid.hpp"
 #include "redux/image/utils.hpp"
+#include "redux/image/zernike.hpp"
 
 //#include "io.h"
 //#include "modes.h"
@@ -33,20 +34,17 @@ namespace {
 void cfgTest( void ) {
 
     bpt::ptree tree;
-    stringstream cfg;
-
+    
     ChannelCfg ccfg;
     {
         // Set some non-default values for ChannelCfg
-        ccfg.telescopeF = ccfg.arcSecsPerPixel = ccfg.pixelSize = ccfg.rotationAngle = 137;
-        ccfg.noiseFudge = ccfg.weight = 138;
+        ccfg.noiseFudge = ccfg.weight = ccfg.rotationAngle = 138;
         ccfg.diversity = {10.5,32.2};
         ccfg.diversityModes = {11,33};
         ccfg.diversityTypes = {12,34};
         ccfg.alignClip = {13,34,14,35};
-        ccfg.borderClip = ccfg.maxLocalShift = ccfg.minimumOverlap = 139;
+        ccfg.borderClip = 139;
         ccfg.incomplete = true;
-        ccfg.patchSize = ccfg.pupilPixels = 140;
         ccfg.subImagePosX = {88,99,111,122};
         ccfg.subImagePosY = {89,98,112,121};
         ccfg.imageDataDir = "path/to/data/";
@@ -56,7 +54,6 @@ void cfgTest( void ) {
         ccfg.responseFile = "responseFile.ext";
         ccfg.backgainFile = "backgainFile.ext";
         ccfg.psfFile = "psfFile.ext";
-        ccfg.pupilFile = "pupilfile.ext";
         ccfg.mmFile = "mmFile.ext";
         ccfg.mmRow = ccfg.imageNumberOffset = 141;
         ccfg.mmWidth = 4;
@@ -69,7 +66,7 @@ void cfgTest( void ) {
         // export settings as config file and parse/compare
         tree.clear();
         ccfg.getProperties(tree);
-        cfg.clear();
+        stringstream cfg;
         bpt::write_info( cfg, tree );   // test that the ptree is valid
         bpt::read_info( cfg, tree );
         ChannelCfg tmp;                 // default values
@@ -86,7 +83,7 @@ void cfgTest( void ) {
         BOOST_CHECK_EQUAL( count, ccfg.size() );
         BOOST_CHECK_EQUAL( count, tmp.size() );
         BOOST_CHECK( ccfg == tmp );
-        tmp.arcSecsPerPixel = 15;       // modify
+        tmp.borderClip = 15;       // modify
         BOOST_CHECK( !(ccfg == tmp) );
         tmp = ccfg;                     // assign
         BOOST_CHECK( ccfg == tmp );
@@ -95,12 +92,19 @@ void cfgTest( void ) {
     ObjectCfg ocfg;
     {
         // Set some non-default values for ObjectCfg
+        ocfg.telescopeF = ocfg.arcSecsPerPixel = ocfg.pixelSize = 137;
+        ocfg.alphaToPixels = ocfg.pixelsToAlpha = 138.33;
+        ocfg.alphaToDefocus = ocfg.defocusToAlpha = 138.66;
+        ocfg.maxLocalShift = ocfg.minimumOverlap = 139;
+        ocfg.patchSize = ocfg.pupilPixels = 140;
         ocfg.saveMask = ocfg.wavelength = 58;
+        ocfg.pupilFile = "pupilfile.ext";
+        ocfg.modeFile = "modefile.ext";
         ocfg.outputFileName = "filename.ext";
         // export settings as config file and parse/compare
         tree.clear();
         ocfg.getProperties(tree);
-        cfg.clear();
+        stringstream cfg;
         bpt::write_info( cfg, tree );   // test that the ptree is valid
         bpt::read_info( cfg, tree );
         ObjectCfg tmp;                  // default values
@@ -122,7 +126,7 @@ void cfgTest( void ) {
         BOOST_CHECK( !(ocfg == tmp) );
         tmp = ocfg;                     // assign
         BOOST_CHECK( ocfg == tmp );
-        tmp.arcSecsPerPixel = 15;       // modify ChannelCfg
+        tmp.noiseFudge = 15;            // modify some ChannelCfg parameter
         BOOST_CHECK( !(ocfg == tmp) );
         tmp = ChannelCfg();             // assign default ChannelCfg
         BOOST_CHECK( ocfg == tmp );
@@ -134,7 +138,7 @@ void cfgTest( void ) {
         gcfg.runFlags = 4095;
         gcfg.modeBasis = 2;
         gcfg.klMinMode = gcfg.klMaxMode = gcfg.klCutoff = gcfg.nInitialModes = gcfg.nModeIncrement = 118;
-        gcfg.telescopeD = gcfg.minIterations = gcfg.maxIterations = 119;
+        gcfg.telescopeD = gcfg.minIterations = gcfg.maxIterations = gcfg.targetIterations = 119;
         gcfg.fillpixMethod = gcfg.getstepMethod = 3;
         gcfg.gradientMethod = 2;
         gcfg.badPixelThreshold = gcfg.FTOL = gcfg.EPS = gcfg.reg_gamma = gcfg.sequenceNumber = 117;
@@ -147,7 +151,7 @@ void cfgTest( void ) {
         // export settings as config file and parse/compare
         tree.clear();
         gcfg.getProperties(tree);
-        cfg.clear();
+        stringstream cfg;
         bpt::write_info( cfg, tree );   // test that the ptree is valid
         bpt::read_info( cfg, tree );
         GlobalCfg tmp;                  // default values
@@ -173,7 +177,7 @@ void cfgTest( void ) {
         BOOST_CHECK( !(gcfg == tmp) );
         tmp = ObjectCfg();              // assign default ObjectCfg
         BOOST_CHECK( gcfg == tmp );
-        tmp.arcSecsPerPixel = 15;       // modify ChannelCfg
+        tmp.noiseFudge = 15;            // modify ChannelCfg
         BOOST_CHECK( !(gcfg == tmp) );
         tmp = ChannelCfg();             // assign default ChannelCfg
         BOOST_CHECK( gcfg == tmp );
@@ -300,23 +304,22 @@ void modeTest(void) {
     int last_mode = 50;
     int nModes = last_mode - first_mode + 1;
 
-    static redux::momfbd::Cache& cache = redux::momfbd::Cache::getCache();
-    const redux::image::Grid& grid = cache.grid(nPixels);
-    auto& pupil = cache.pupil(nPixels,rc);
+    const redux::image::Grid& grid = redux::image::Grid::get(nPixels);
+    Pupil pupil(nPixels,rc);
     float** aPtr = grid.angle.get();
     Array<float> awrapper(*aPtr, nPixels, nPixels);
     redux::file::Ana::write("modetest_angle.f0", awrapper);
     awrapper.wrap(*grid.distance.get(),nPixels, nPixels);
     redux::file::Ana::write("grid_distance.f0", awrapper);
-    redux::file::Ana::write("modetest_pupil.f0", pupil.first);
+    redux::file::Ana::write("modetest_pupil.f0", pupil);
     
-    cout << "PupilArea = " << pupil.second << endl;
+    cout << "PupilArea = " << pupil.area << endl;
     //PupilMode::KL_cfg* m_new_cfg = legacy::klConfig(first_mode, last_mode);
     //klmc* m_cfg = kl_cfg(first_mode, last_mode);
 
     //const std::map<int, Modes::KL_cfg>& kle = cache.karhunenLoeveExpansion( first_mode, last_mode );
-    auto kle = cache.karhunenLoeveExpansion(first_mode, last_mode);
-    auto kle2 = cache.karhunenLoeveExpansion(first_mode, last_mode + 1);
+    auto kle = Zernike::karhunenLoeveExpansion(first_mode, last_mode);
+    auto kle2 = Zernike::karhunenLoeveExpansion(first_mode, last_mode + 1);
 
 
     for(int m = 0; m < nModes; ++m) {
@@ -335,14 +338,14 @@ void modeTest(void) {
     // use temporary storage z to avoid recomputing too many Zernikes
     //mde **z = new mde* [nModes];
     //memset(z, 0, nModes * sizeof(mde*));
-    Array<float> newZModes(nModes,nPixels,nPixels);
-    Array<float> newKLModes(nModes,nPixels,nPixels);
-    //Array<float> oldZModes(nModes,nPixels,nPixels);
-    //Array<float> oldKLModes(nModes,nPixels,nPixels);
-    Array<float> newz_slice(newZModes, 0, 0, 0, nPixels-1, 0, nPixels-1);          // subarray @ first mode
-    Array<float> newkl_slice(newKLModes, 0, 0, 0, nPixels-1, 0, nPixels-1);        // subarray @ first mode
-    //Array<float> oldz_slice(oldZModes, 0, 0, 0, nPixels-1, 0, nPixels-1);          // subarray @ first mode
-    //Array<float> oldkl_slice(oldKLModes, 0, 0, 0, nPixels-1, 0, nPixels-1);        // subarray @ first mode
+    Array<double> newZModes(nModes,nPixels,nPixels);
+    Array<double> newKLModes(nModes,nPixels,nPixels);
+    Array<double> oldZModes(nModes,nPixels,nPixels);
+    Array<double> oldKLModes(nModes,nPixels,nPixels);
+    Array<double> newz_slice(newZModes, 0, 0, 0, nPixels-1, 0, nPixels-1);          // subarray @ first mode
+    Array<double> newkl_slice(newKLModes, 0, 0, 0, nPixels-1, 0, nPixels-1);        // subarray @ first mode
+    Array<double> oldz_slice(oldZModes, 0, 0, 0, nPixels-1, 0, nPixels-1);          // subarray @ first mode
+    Array<double> oldkl_slice(oldKLModes, 0, 0, 0, nPixels-1, 0, nPixels-1);        // subarray @ first mode
 
     for(int j = first_mode; j <= last_mode; ++j) {
 
@@ -354,12 +357,16 @@ void modeTest(void) {
         //Array<double> zwrapper(*(oldzmode.mode + 1) + 1, nPixels, nPixels);
         //Array<double> klwrapper(*(oldklmode.mode + 1) + 1, nPixels, nPixels);
         
-        newz_slice = zmode;
-        newz_slice *= pupil.first;
+        //newz_slice = zmode.copy();
+        zmode.copy(newz_slice);
+        newz_slice *= pupil;
+        newz_slice /= lambda;
         newz_slice.shift(0,1);
         
-        newkl_slice = klmode;
-        newkl_slice *= pupil.first;
+        //newkl_slice = klmode.copy();
+        klmode.copy(newkl_slice);
+        newkl_slice *= pupil;
+        newkl_slice /= lambda;
         newkl_slice.shift(0,1);
         
 //         oldz_slice = zwrapper;
@@ -577,7 +584,7 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
     nPixels = 150;
     double radius = 0.4321*nPixels;
     Array<double> aperture;
-    double area = makePupil(aperture,nPixels,radius);
+    double area = makePupil_old(aperture,nPixels,radius);
     //redux::file::Ana::write("aperture.f0", aperture);
 
     double** ap = makePointers(aperture.ptr(), nPixels, nPixels);
@@ -585,7 +592,7 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
     //redux::file::Ana::write("aperture2.f0", aperture);
     delPointers(ap);
 
-    auto pup_pair = cache.pupil(nPixels,radius);
+    Pupil pup(nPixels,radius);
     //redux::file::Ana::write("aperture3.f0", pup_pair.first);
 
     cout << "Area = " << area << "  Area_mvn  = " << area_mvn << "  ratio  = " << (area/area_mvn) << "   r^2*PI = " << (radius*radius*redux::PI) << endl;
