@@ -87,7 +87,7 @@ namespace redux {
             template <class T>
             void writeAndCheck( const T& data ) {
                auto tmp = std::make_shared<T>(data);
-                strand.post( boost::bind( &TcpConnection::strandWrite<T>, this, tmp, 1 ) );
+                strand.post( boost::bind( &TcpConnection::strandWrite<T>, this, tmp, sizeof(T) ) );
             }
 
             tcp::socket& socket() { return mySocket; }
@@ -116,7 +116,7 @@ namespace redux {
             boost::asio::strand strand;
 
         };
-
+        
     }   // network
 
 }   // redux

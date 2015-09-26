@@ -181,6 +181,9 @@ bool Worker::getWork( void ) {
             }
             wip.previousJob = wip.job;
         } else LOG_DEBUG << "Starting new part of the same job: " + wip.print();
+        for( auto& it: wip.parts ) {
+            it->cacheLoad(false);               // load data for local jobs, but don't delete the storage
+        }
         return true;
     }
     

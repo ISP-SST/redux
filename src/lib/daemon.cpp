@@ -146,11 +146,14 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
         conn->setCallback( bind( &Daemon::activity, this, std::placeholders::_1 ) );
         *conn << CMD_OK;           // all ok
         conn->idle();
+        return;
     }
     catch( const exception& e ) {
-        LOG_ERR << "connected() Failed to process new connection.";
+        LOG_ERR << "connected() Failed to process new connection. Reason: " << e.what();
+    } catch( ... ) {
+        LOG_ERR << "Daemon::connected() Unhandled exception.";
     }
-
+    conn->socket().close();
 }
 
 
@@ -274,39 +277,60 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
 
     const char* ptr = buf.get();
     uint64_t count(0);
-    vector<size_t> ids( 1, 0 );
+    uint16_t nJobs(0);                  // count all jobs present in cfg-file.
+    vector<uint64_t> ids( 1, 0 );       // first element in the vector will store number of successfully parsed jobs, the rest are job IDs.
+    vector<string> messages;
     bool swap_endian = conn->getSwapEndian();
     try {
         while( count < blockSize ) {
             string tmpS = string( ptr+count );
             Job::JobPtr job = Job::newJob( tmpS );
             if( job ) {
-                count += job->unpack( ptr+count, swap_endian );
-                if( !job->check() ) throw invalid_argument( "Sanity check failed for Job: \"" + tmpS + "\"" );
-                unique_lock<mutex> lock( jobMutex );
-                job->info.id = ++jobCounter;
-                job->info.name = "job_" + to_string( job->info.id );
-                job->info.submitTime = boost::posix_time::second_clock::local_time();
-                ids.push_back( jobCounter );
-                ids[0]++;
-                jobs.push_back( job );
+                nJobs++;
+                try {
+                    count += job->unpack( ptr+count, swap_endian );
+                    if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job #" + to_string(nJobs) );
+                    unique_lock<mutex> lock( jobMutex );
+                    job->info.id = ++jobCounter;
+                    job->info.name = "job_" + to_string( job->info.id );
+                    job->info.submitTime = boost::posix_time::second_clock::local_time();
+                    ids.push_back( jobCounter );
+                    ids[0]++;
+                    jobs.push_back( job );
+                } catch( const job_check_failed& e ) {
+                    messages.push_back( e.what() );
+                }
             } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
         }
-    }
-    catch( const exception& e ) {
+    } catch( const exception& e ) {
         LOG_ERR << "addJobs: Exception caught while parsing block: " << e.what();
+    } catch( ... ) {
+        LOG_ERR << "addJobs: Unrecognized exception thrown when parsing cfg file.";
     }
 
     if( count == blockSize ) {
-        LOG << "Received " << ids[0] << " jobs.";
+        if( ids[0] ) LOG << "Received " << ids[0] << " jobs." << printArray(ids.data()+1,ids[0],"  IDs");
         *conn << CMD_OK;           // all ok, return IDs
-        if( swap_endian ) swapEndian( ids.data(), ids.size() );
         conn->writeAndCheck( ids );
-    }
-    else {
+    } else {
         LOG_ERR << "addJobs: Parsing of datablock failed, count = " << count << "   blockSize = " << blockSize << "  bytes.";
         *conn << CMD_ERR;
     }
+
+    // send any messages back
+    uint64_t messagesSize(0);
+    if( messages.size() ) {
+        messagesSize = redux::util::size( messages );
+        shared_ptr<char> tmp = sharedArray<char>(messagesSize+sizeof(uint64_t));
+        char* ptr = tmp.get();
+        ptr += redux::util::pack( ptr, messagesSize );
+        redux::util::pack( ptr, messages );
+        conn->writeAndCheck( tmp, messagesSize+sizeof(uint64_t) );
+    } else {
+        conn->writeAndCheck( messagesSize );
+    }
+
+
 
 }
 
