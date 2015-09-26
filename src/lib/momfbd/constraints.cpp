@@ -60,7 +60,9 @@ bool Constraints::Constraint::operator>( const Constraint& rhs ) const {
 
 Constraints::NullSpace::NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc) :
     c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc) {
-        
+    
+    isLoaded = false;
+    
 }
 
 
@@ -282,7 +284,6 @@ void Constraints::Group::mapNullspace(void) {
     
     shared_ptr<NullSpace> tmpNS( new NullSpace(entries,nParameters,constraints.size()) );
     nullspace = redux::util::Cache::get( entriesHash, tmpNS );
-    
     bool storeNS = true;
     if( !nullspace->verify(entries,nParameters,constraints.size()) ) {
         LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance.";
