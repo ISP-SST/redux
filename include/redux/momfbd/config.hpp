@@ -36,8 +36,8 @@ namespace redux {
         enum GetstepMethod { GSM_SDSC=1, GSM_CNJG, GSM_BFGS, GSM_BFGS_inv };
         extern const std::map<std::string, int> getstepMap;
         
-
-
+        
+        
         
         /*!
          * Settings with channel scope
@@ -60,12 +60,7 @@ namespace redux {
             
             
             /********* Hardware **********/
-            double telescopeF;                       //!< Telescope focal length  (or Ratio?)
-            double arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
-            double pixelSize;                        //!< Physical size of pixels (default: 10\mu)
             double rotationAngle;                    //!< Tilt of this camera relative to "anchor channel" (default: 0)
-            double alphaToPixels,pixelsToAlpha;      //!< Conversion factors for the tilt-modes. Derived from arcSecsPerPixel & telescopeD.
-            double alphaToDefocus,defocusToAlpha;    //!< Conversion factors for the focus-mode. Derived from telescopeD. (defocus in meters)
             /*****************************/
             
             /**** Numerical settings *****/
@@ -83,11 +78,7 @@ namespace redux {
             /******* Data settings *******/
             std::vector<int16_t> alignClip;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
             uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
-            uint16_t maxLocalShift;                 //!< How much are the patches allowed to be shifted (default: 5 pixels)
-            uint16_t minimumOverlap;                //!< Desired width of blending zone in pixels (default: 16 pixels)
             uint8_t incomplete;                     //!< Some files might not exist, just skip those.
-            uint16_t patchSize;                     //!< (default: 128)
-            uint16_t pupilPixels;                     //!< (default: 64)
             std::vector<uint16_t> subImagePosX, subImagePosY;
             /*****************************/
 
@@ -99,7 +90,6 @@ namespace redux {
             std::string responseFile;
             std::string backgainFile;
             std::string psfFile;
-            std::string pupilFile;
             std::string mmFile;                     //!< Modulation matrix
             uint8_t mmRow;                          //!< Number of rows in modulation matrix
             uint8_t mmWidth;                        //!< Number of cols in modulation matrix
@@ -140,11 +130,24 @@ namespace redux {
             const ObjectCfg& operator=(const ChannelCfg&);
             bool operator==(const ObjectCfg&) const;
             
+            /********* Hardware **********/
+            double telescopeF;                       //!< Telescope focal length  (or Ratio?)
+            double arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
+            double pixelSize;                        //!< Physical size of pixels (default: 10\mu)
+            double alphaToPixels,pixelsToAlpha;      //!< Conversion factors for the tilt-modes. Derived from arcSecsPerPixel & telescopeD.
+            double alphaToDefocus,defocusToAlpha;    //!< Conversion factors for the focus-mode. Derived from telescopeD. (defocus in meters)
+            /*****************************/
             
             /******* Data settings *******/
-            uint16_t saveMask;              //!< (default: 0)
+            uint16_t maxLocalShift;                 //!< How much are the patches allowed to be shifted (default: 5 pixels)
+            uint16_t minimumOverlap;                //!< Desired width of blending zone in pixels (default: 16 pixels)
+            uint16_t patchSize;                     //!< (default: 128)
+            uint16_t pupilPixels;                   //!< (default: 64)
+            uint16_t saveMask;                      //!< (default: 0)
             std::string outputFileName;
-            double wavelength;               //!< (default: 0, has to be specified)
+            std::string modeFile;
+            std::string pupilFile;
+            double wavelength;                      //!< (default: 0, has to be specified)
             /*****************************/
             
         };

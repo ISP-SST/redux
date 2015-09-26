@@ -52,13 +52,15 @@ namespace redux {
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
-            void initProcessing(WorkSpace::Ptr);                        //!< Called once per job, to set up storage etc.
+            void initProcessing( const WorkSpace& );                        //!< Called once per job, to set up storage etc.
             void initPatch(ObjectData&);                                //!< Called once per patch, normalize, fit plane etc.
             void getResults(ObjectData&);                               //!< Called on patch-completion, gather up what is going back to the master.
             void initPQ(void);
             void addAllFT(void);
-            void addToFT(const redux::image::FourierTransform&, double);
-            void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft, double );
+            void addRegGamma(double);
+            void addToFT(const redux::image::FourierTransform&);
+            void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft );
+            void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&);
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
             void fitAvgPlane(ObjectData&);
@@ -86,13 +88,15 @@ namespace redux {
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/
             std::mutex mtx;
-            redux::util::Array<double>  ftSum;                //! Sum of the norm of all images' fourier-transforms
+            redux::util::Array<double>  ftSum;                              //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;
             redux::util::Array<float> fittedPlane;
-            std::set<size_t> pupilIndices, otfIndices;                   //!< Arrays with the offsets where the pupil/otf are greater than some threshold
+            redux::image::Pupil pupil;
+            ModeSet modes;                                                  //!< modes used in this object
             double currentMetric;
             double reg_gamma;
+            double frequencyCutoff, pupilRadiusInPixels;
             /*****************************************************/
 
             uint16_t ID;

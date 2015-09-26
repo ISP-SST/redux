@@ -38,47 +38,7 @@ using namespace std;
 namespace {
 
     const string thisChannel = "channel";
-
-    bool checkImageScale (double& F, double& A, double& P) {
-
-        double rad2asec = 180.0 * 3600.0 / redux::PI;
-        size_t count = F > 0 ? 1 : 0;
-        count += A > 0 ? 1 : 0;
-        count += P > 0 ? 1 : 0;
-        if (count > 2) {
-            LOG_WARN << "Too many parameters specified: replacing telescope focal length (" << F
-                     << ") with computed value (" << (P * rad2asec / A) << ")";
-            F = P * rad2asec / A;
-            return true;
-        } else if (count < 2) {
-            LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
-        } else {    // count == 2
-            if (F <= 0) {
-                F = P * rad2asec / A;
-            } else if (A <= 0) {
-                A = P * rad2asec / F;
-            } else if (P <= 0) {
-                P = F * A / rad2asec;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    void calculatePupilSize (double &frequencyCutoff, double &pupilRadiusInPixels, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel) {
-        static double radians_per_arcsec = redux::PI / (180.0 * 3600.0);         // (2.0*redux::PI)/(360.0*3600.0)
-        double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
-        double q_number = wavelength / (radians_per_pixel * telescopeDiameter);
-        frequencyCutoff = (double) nPixels / q_number;
-        nPupilPixels = nPixels >> 2;
-        pupilRadiusInPixels = frequencyCutoff / 2.0;                   // telescope radius in pupil pixels...
-        if (nPupilPixels < pupilRadiusInPixels) {            // this should only be needed for oversampled images
-            uint16_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
-            for (int i = 0; (nPupilPixels = max (goodsizes[i], nPupilPixels)) < pupilRadiusInPixels; ++i);     // find right size
-        }
-        nPupilPixels <<= 1;
-    }
-
+    
     struct ClippedFile {
         ClippedFile(const string& fn, const vector<int16_t>& cl, bool sym=false) :
             filename(fn), clip(cl), symmetricClip(sym) { }
@@ -230,10 +190,6 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
 
 bool Channel::checkCfg (void) {
 
-    if (!checkImageScale (telescopeF, arcSecsPerPixel, pixelSize)) {
-        return false;
-    }
-
     // Do we have a correct filename template ?
     if (imageTemplate.empty()) {
         LOG_ERR << "No filename template specified.";
@@ -279,7 +235,6 @@ bool Channel::checkCfg (void) {
         alignClip.clear();
     }
     
-    
     return true;
 
 }
@@ -288,14 +243,14 @@ bool Channel::checkCfg (void) {
 bool Channel::checkData (void) {
 
     // Images
-    if (incomplete) {   // check if files are present
+    if ( incomplete ) {   // check if files are present
         for (size_t i (0); i < imageNumbers.size();) {
             bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
             if (!bfs::exists (fn)) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
                 if (!bfs::exists (fn)) {
-                    LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
-                    imageNumbers.erase (imageNumbers.begin() + i);
+                    //LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
+                    imageNumbers.erase(imageNumbers.begin() + i);
                     continue;
                 }
             }
@@ -329,8 +284,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (darkTemplate))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (darkTemplate);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Dark-file %s not found!") % darkTemplate;
-                return false;
+                logAndThrow("Dark-file " + darkTemplate + " not found!");
             } else darkTemplate = fn.c_str();
         }
     } else {                            // template
@@ -339,8 +293,7 @@ bool Channel::checkData (void) {
             if (!bfs::exists (fn)) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % it));
                 if (!bfs::exists (fn)) {
-                    LOG_ERR << boost::format ("Dark-file %s not found!") % boost::str (boost::format (darkTemplate) % it);
-                    return false;
+                    logAndThrow("Dark-file " + (boost::format(darkTemplate) % it).str() + " not found!");
                 } else darkTemplate = fn.c_str();
             }
         }
@@ -352,8 +305,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (gainFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (gainFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Gain-file %s not found!") % gainFile;
-                return false;
+                logAndThrow("Gain-file " + gainFile + " not found!");
             } else gainFile = fn.c_str();
         }
     }
@@ -362,8 +314,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (responseFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (responseFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Response-file %s not found!") % responseFile;
-                return false;
+                logAndThrow("Response-file " + responseFile + " not found!");
             } else responseFile = fn.c_str();
         }
     }
@@ -372,8 +323,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (backgainFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (backgainFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Backgain-file %s not found!") % backgainFile;
-                return false;
+                logAndThrow("Backgain-file " + backgainFile + " not found!");
             } else backgainFile = fn.c_str();
         }
     }
@@ -382,8 +332,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (psfFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (psfFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("PSF-file %s not found!") % psfFile;
-                return false;
+                logAndThrow("PSF-file " + psfFile + " not found!");
             } else psfFile = fn.c_str();
         }
     }
@@ -392,8 +341,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (mmFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (mmFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Modulation-matrix file %s not found!") % mmFile;
-                return false;
+                logAndThrow("Modulation-matrix file " + mmFile + " not found!");
             } else mmFile = fn.c_str();
         }
     }
@@ -402,8 +350,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (xOffsetFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (xOffsetFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Offset-file %s not found!") % xOffsetFile;
-                return false;
+                logAndThrow("Offset-file " + xOffsetFile + " not found!");
             } else xOffsetFile = fn.c_str();
         }
     }
@@ -412,8 +359,7 @@ bool Channel::checkData (void) {
         if (! bfs::exists (bfs::path (yOffsetFile))) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (yOffsetFile);
             if (! bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Offset-file %s not found!") % yOffsetFile;
-                return false;
+                logAndThrow("Offset-file " + yOffsetFile + " not found!");
             } else yOffsetFile = fn.c_str();
         }
     }
@@ -428,15 +374,15 @@ bool Channel::checkData (void) {
 void Channel::initCache (void) {
 
     //LOG_DETAIL << "wavelength = " << myObject.wavelength << "   patchSize = " << patchSize << "  telescopeD = " << myJob.telescopeD << "  arcSecsPerPixel = " << arcSecsPerPixel;
-    calculatePupilSize (frequencyCutoff, pupilRadiusInPixels, pupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel);
-    
-    myJob.patchSize = myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
-    myJob.pupilPixels = myObject.pupilPixels = pupilPixels;
-    size_t otfPixels = 2 * pupilPixels;
+//     Pupil::calculatePupilSize (frequencyCutoff, pupilRadiusInPixels, pupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel);
+//     
+//     myJob.patchSize = myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
+//     myJob.pupilPixels = myObject.pupilPixels = pupilPixels;
+    //size_t otfPixels = 2 * pupilPixels;
     //LOG_DETAIL << "frequencyCutoff = " << frequencyCutoff << "  pupilSize = " << pupilPixels << "  pupilRadiusInPixels = " << pupilRadiusInPixels;
-    pupil = myJob.globalData->fetch (pupilPixels, pupilRadiusInPixels);
+    //pupil = myJob.globalData->fetch (pupilPixels, pupilRadiusInPixels);
     // Create a temporary OTF and store the indices where the OTF/pupil are non-zero. This will be used in loops to skip irrelevant evaluations.
-    Array<double> tmpImg (2 * pupilPixels, 2 * pupilPixels);
+    /*Array<double> tmpImg (2 * pupilPixels, 2 * pupilPixels);
     tmpImg.zero();
     Array<double> tmpSubImg (tmpImg, 0, pupilPixels - 1, 0, pupilPixels - 1);
     pupil.first.copy(tmpSubImg);
@@ -464,7 +410,12 @@ void Channel::initCache (void) {
     //Ana::write ("otfsupport.f0", tmpImg);
 
     LOG_DEBUG << "Generated otfIndices with " << otfIndices.size() << " elements. (full size = " << tmpImg.nElements() << ")";
-
+    */
+  
+    
+    
+    
+/*
     Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
 
     bool needTiltCoeffs(false);
@@ -478,16 +429,26 @@ void Channel::initCache (void) {
         myJob.globalData->fetch (id2);
     }
 
-    for (uint16_t & it : myJob.modeNumbers) {
-        Cache::ModeID id2 = id;
-        if(it == 2 || it == 3) needTiltCoeffs = true;
-        if (myJob.modeBasis == ZERNIKE || it == 2 || it == 3) {     // force use of Zernike modes for all tilts
-            id2.firstMode = id2.lastMode = 0;
-        }
-        id2.modeNumber = it;
-        const PupilMode::Ptr mode = myJob.globalData->fetch (id2);
-        modes.emplace (it, myJob.globalData->fetch (id2));
+    bfs::path fn = bfs::path("mvn_modes.f0");
+    Array<double> debugModes;
+    if ( bfs::exists (fn)) {
+        redux::file::readFile(fn.string(), debugModes);
     }
+    
+    
+    if ( !modeFile.empty() ) {
+        modes.setPupilSize( pupilPixels, 0.0, 0.0 );
+        modes.loadFile( modeFile );
+    }
+    
+    if( modes.nPupilPixels != pupilPixels ) {
+        modes.setPupilSize( pupilPixels, pupilRadiusInPixels, rotationAngle );
+        modes.generate( myJob );
+        // TODO generate
+    }
+    
+    modeNumbers.clear();
+    cnt = 0;
 
     if( needTiltCoeffs ) {
         id.firstMode = id.lastMode = 0;
@@ -498,9 +459,9 @@ void Channel::initCache (void) {
         alphaToPixels = 1.0/pixelsToAlpha;
         
     }
-    
-    defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
-    alphaToDefocus = 1.0/pixelsToAlpha;
+    */
+    //defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
+    //alphaToDefocus = 1.0/pixelsToAlpha;
     
 }
 
@@ -551,10 +512,6 @@ void Channel::loadCalib(boost::asio::io_service& service) {     // load through 
 
     if (!psfFile.empty()) {
         service.post(std::bind(ClippedFile::load<float>, std::ref(psf), psfFile, alignClip, false/*norm*/, true/*symclip*/));
-    }
-
-    if (!pupilFile.empty()) {
-        // FIXME
     }
 
     if (!mmFile.empty()) {
@@ -665,12 +622,16 @@ void Channel::getFileNames(std::vector<std::string>& files) const {
 }
 
 
-void Channel::initProcessing (WorkSpace::Ptr ws) {
+void Channel::initProcessing( const WorkSpace& workspace ) {
     
-    workspace = ws;
-    initCache();        // this will initialize modes & pupil for this channel
     initPhiFixed();
 
+    size_t nImages = imageNumbers.size();
+    subImages.resize(nImages);
+    for (uint16_t i=0; i < nImages; ++i) {
+        if( !subImages[i] ) subImages[i].reset( new SubImage(myObject, *this, workspace.window, workspace.noiseWindow) );
+    }
+    
 }
 
 
@@ -682,6 +643,7 @@ void Channel::initPatch (ChannelData& cd) {
         return;
     }
 
+
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         Array<float> view( cd.images, 0, 0, 0, cd.images.dimSize(1)-1, 0, cd.images.dimSize(2)-1 );
         for( uint16_t i=0; i<nImages; ++i ) {
@@ -689,21 +651,21 @@ void Channel::initPatch (ChannelData& cd) {
             view.shift(0,1);
         }
     }
-    
-    subImages.clear();
+    uint16_t patchSize = myObject.patchSize;
     for (uint16_t i=0; i < nImages; ++i) {
-        std::shared_ptr<SubImage> simg (new SubImage (myObject, *this, workspace->window, workspace->noiseWindow, cd.images, i, cd.offset,
-                                        patchSize, pupilPixels));   // TODO: fix offsets
-        subImages.push_back (simg);
-        simg->init();
+        subImages[i]->setPatchInfo( i, cd.offset, cd.shift, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
+        subImages[i]->wrap( cd.images, i, i, cd.offset.y, cd.offset.y+patchSize-1, cd.offset.x, cd.offset.x+patchSize-1 );
+        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), cd.images.dimSize(1)*cd.images.dimSize(2), ST_VALUES|ST_RMS );
+        subImages[i]->init();
+        //subImages[i]->dump("o"+to_string(myObject.ID)+"_c"+to_string(ID)+"_im"+to_string(i));
     }
 }
 
 
 void Channel::initPhiFixed (void) {
-    phi_fixed.resize (pupilPixels, pupilPixels);
+    phi_fixed.resize (myObject.pupilPixels, myObject.pupilPixels);
     phi_fixed.zero();
-    Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+    Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
     uint16_t modeNumber;
     for (uint i = 0; i < diversityModes.size(); ++i) {
         Cache::ModeID id2 = id;
@@ -713,9 +675,9 @@ void Channel::initPhiFixed (void) {
             id2.firstMode = id2.lastMode = 0;
         }
         id2.modeNumber = modeNumber;
-        const PupilMode::Ptr mode = myJob.globalData->fetch (id2);
+        //const PupilMode::Ptr mode = myJob.globalData->fetch (id2);
         //redux::file::Ana::write ("mode_" + to_string (modeNumber) + "_" + to_string (i) + ".f0", *mode);
-        phi_fixed.add (*mode, diversity[i]);
+        //phi_fixed.add (*mode, diversity[i]);
         //redux::file::Ana::write ("phi-mode_" + to_string (modeNumber) + "_" + to_string (i) + ".f0", phi_fixed);
     }
     computePhi();   // no tilts for now, just initialize once
@@ -732,7 +694,7 @@ void Channel::computePhi (void) {
     // TODO: add tilt corrections
 }
 
-
+/*
 void Channel::addMode (redux::util::Array<double>& phi, uint16_t modenumber, double weight) const {
     const PupilMode::Ptr mode = modes.at (modenumber);
     // cout << "Channel::addMode()  mode = " << modenumber << "  weight = " << weight << endl;
@@ -757,11 +719,17 @@ void Channel::getPhi (redux::util::Array<double>& phi, const WaveFront& wf) cons
         }
     }
 }
-
+*/
 
 void Channel::addAllFT (redux::util::Array<double>& ftsum) {
     for (shared_ptr<SubImage>& it : subImages) {
         it->addFT (ftsum);
+    }
+}
+
+void Channel::addAllPQ(void) const {
+    for (const shared_ptr<SubImage>& it : subImages) {
+        myObject.addToPQ( it->imgFT, it->OTF );
     }
 }
 
@@ -919,7 +887,7 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
 void Channel::adjustCutout(ChannelData& chData, const Region16& origCutout) const {
 
     RegionI desiredCutout = origCutout;
-    desiredCutout.grow(maxLocalShift);
+    desiredCutout.grow(myObject.maxLocalShift);
 
     chData.cutout = desiredCutout;
     chData.offset = 0;
@@ -948,7 +916,7 @@ void Channel::adjustCutout(ChannelData& chData, const Region16& origCutout) cons
     chData.shift -= imgBoundary.outside(chData.cutout+chData.shift);                            // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
     chData.cutout += chData.shift;
     chData.residualOffset -= chData.shift;
-    chData.offset = maxLocalShift;
+    chData.offset = myObject.maxLocalShift;
     if (chData.cutout != desiredCutout) {
         chData.offset -= (chData.cutout.first - desiredCutout.first - chData.shift);
     }
@@ -1016,11 +984,24 @@ Point16 Channel::getImageSize(void) {
 }
 
 
-void Channel::dump (std::string tag) {
+void Channel::logAndThrow( string msg ) {
+    msg = to_string(myObject.ID)+":"+to_string(ID)+": "+msg;
+    LOG_ERR << msg;
+    throw job_check_failed(msg);
+    
+}
 
-    Ana::write (tag + "_pupil.f0", pupil.first);
+
+void Channel::dump (std::string tag) {
+    
+    tag += "_c"+to_string(ID);
+    
     Ana::write (tag + "_phi_fixed.f0", phi_fixed);
     Ana::write (tag + "_phi_channel.f0", phi_channel);
+    int cnt(0);
+    for( auto& im: subImages ) {
+        im->dump(tag+"_im"+to_string(cnt++));
+    }
 
 }
 

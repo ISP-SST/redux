@@ -2,7 +2,6 @@
 
 #include "redux/constants.hpp"
 #include "redux/math/linalg.hpp"
-//#include "redux/momfbd/legacy.hpp"
 #include "redux/util/arrayutil.hpp"
 
 #include <cmath>
@@ -11,8 +10,6 @@ using redux::momfbd::Cache;
 using redux::util::Array;
 
 using namespace redux::momfbd;
-//using namespace redux::momfbd::legacy;
-//using namespace redux::util;
 using namespace redux;
 
 using namespace std;
@@ -139,18 +136,6 @@ const redux::image::Grid& Cache::grid(uint32_t sz, PointF origin) {
     auto it = grids.find(make_pair(sz,origin));
     if(it != grids.end()) return it->second;
     return grids.emplace(make_pair(sz,origin), redux::image::Grid(sz,origin)).first->second;
-
-}
-
-
-const std::pair<Array<double>, double>& Cache::pupil(uint32_t nPoints, double radius) {
-
-    unique_lock<mutex> lock(mtx);
-    auto it = pupils.find( make_pair(nPoints,radius) );
-    if(it != pupils.end()) return it->second;
-    Array<double> pup;
-    double area = redux::image::makePupil(pup,nPoints,radius);
-    return pupils.emplace(make_pair(nPoints,radius), make_pair(pup,area)).first->second;
 
 }
 
@@ -340,7 +325,7 @@ const PupilMode::Ptr Cache::mode(const ModeID& idx) {
 
     PupilMode::Ptr ptr;
     if( idx.firstMode == 0 || idx.lastMode == 0 ) ptr.reset(new PupilMode(idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle));    // Zernike
-    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle, idx.cutoff));                // K-L
+    else ptr.reset(new PupilMode(idx.firstMode, idx.lastMode, idx.modeNumber, idx.nPoints, idx.pupilRadius, idx.angle, idx.cutoff));    // K-L
     
     unique_lock<mutex> lock(mtx);
     return modes.emplace(idx, ptr).first->second;

@@ -35,7 +35,6 @@ namespace redux {
             void clear( void );
 
             const redux::image::Grid& grid( uint32_t sz, PointF=0 );
-            const std::pair<redux::util::Array<double>, double>& pupil( uint32_t nPoints, double radius );
             double zernikeCovariance( int32_t m, int32_t n );
             const std::vector<double>& zernikeRadialPolynomial( int32_t m, int32_t n );
             const std::map<uint16_t, PupilMode::KLPtr>& karhunenLoeveExpansion( uint16_t first_mode, uint16_t last_mode );
@@ -45,7 +44,6 @@ namespace redux {
             const PupilMode::Ptr mode ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
             const PupilMode::Ptr mode ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
             
-//             ~Cache() { std::cout << "~Cache(): nModes = "<< modes.size() << std::endl; }
         private:
             Cache() {}
             Cache( const Cache& ) {}

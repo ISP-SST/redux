@@ -55,15 +55,16 @@ namespace redux {
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
-            void initProcessing(WorkSpace::Ptr);
+            void initProcessing( const WorkSpace& );
             void initPatch(ChannelData&);
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
             void computePhi(void);
-            void addMode(redux::util::Array<double>&, uint16_t, double) const;
-            void getPhi(redux::util::Array<double>&, const WaveFront&) const;
+            //void addMode(redux::util::Array<double>&, uint16_t, double) const;
+            //void getPhi(redux::util::Array<double>&, const WaveFront&) const;
             //void addAllFT(redux::image::FourierTransform&);
             void addAllFT(redux::util::Array<double>&);
+            void addAllPQ(void) const;
             double metric(void);
             /*****************************************************/
 
@@ -85,6 +86,7 @@ namespace redux {
             void copyImagesToPatch(ChannelData&);          
             
             Point16 getImageSize(void);
+            void logAndThrow( std::string );
 
 
             /*************   Local variables for   ***************/
@@ -102,18 +104,11 @@ namespace redux {
             /*************   Local variables for   ***************/
             /*************   Processing on slave   ***************/
             std::mutex mtx;
-            WorkSpace::Ptr workspace;
-            std::map<uint16_t, const PupilMode::Ptr> modes;                 //!< modes used in this channel
-            std::pair<redux::util::Array<double>, double> pupil;            //!< pupil & area of pupil
             std::vector<std::shared_ptr<SubImage>> subImages;
             redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
             redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel
-            std::set<size_t> pupilIndices, otfIndices;                      //!< Arrays with the offsets where the pupil/otf are greater than some threshold
-            std::set<std::pair<size_t,size_t>> pupilInOTF;                  //!< Arrays with the offsets where the pupil/img are located/centered in the OTF grid
             /*****************************************************/
             
-            double frequencyCutoff, pupilRadiusInPixels;
-
             uint16_t ID;
             Point16 imgSize;
             Object& myObject;
@@ -121,7 +116,7 @@ namespace redux {
 
             friend class Object;
             friend class MomfbdJob;
-            friend struct Tilts;
+            friend struct ModeSet;
             friend class WorkSpace;
             friend struct SubImage;
             

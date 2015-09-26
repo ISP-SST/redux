@@ -3,8 +3,7 @@
 
 
 #include "redux/momfbd/data.hpp"
-#include "redux/momfbd/tilts.hpp"
-#include "redux/momfbd/wavefront.hpp"
+#include "redux/momfbd/subimage.hpp"
 
 #include "redux/util/gsl.hpp"
 
@@ -24,13 +23,11 @@ namespace redux {
         class SubImage;
          /*! Container used during processing. Basically temporary arrays and reorganized references to original data.
          */
-        struct WorkSpace : public std::enable_shared_from_this<WorkSpace> {
+        struct WorkSpace {
             
             typedef std::shared_ptr<WorkSpace> Ptr;
 
             const std::vector<std::shared_ptr<Object>>& objects;
-            //std::map<uint32_t, std::shared_ptr<WaveFront>> wavefronts;              //!< Constrained groups, using imageNumber/wf_num as identifier.
-            //std::map<uint16_t, std::shared_ptr<Tilts>> tilts;                        //!< Constrained tilts.
             
             WorkSpace(const redux::momfbd::MomfbdJob&);
             ~WorkSpace();
@@ -46,18 +43,14 @@ namespace redux {
             void my_fdf( boost::asio::io_service&, const gsl_vector*, void*, double*, gsl_vector* );
             void run(PatchData::Ptr, boost::asio::io_service&, uint8_t nThreads);
             
-            double coefficientMetric(boost::asio::io_service&);
-            void calcOTFs(boost::asio::io_service&);
+
             double objectMetric(boost::asio::io_service&);
-           
             
             void clear(void);
             void getAlpha(void);
-           // PatchResult::Ptr& getResult(void);
             
             void dump( std::string tag );
             PatchData::Ptr data;
-           // PatchResult::Ptr result;
             
             const MomfbdJob& job;
             

@@ -57,7 +57,7 @@ namespace redux {
                 return ret;
             }
             template<class KeyT, class T>
-            static T& get(const KeyT& key, T& val) {
+            static T& get(const KeyT& key, const T& val) {
                 auto m = get().getMap<KeyT,T>();        // m.first is a unique_lock for the map in m.second
                 auto ret = m.second.emplace(key,val);
                 return ret.first->second;

@@ -38,7 +38,34 @@ using boost::algorithm::iequals;
 namespace {
 
     const string thisChannel = "object";
+    
+    bool checkImageScale (double& F, double& A, double& P) {
 
+        double rad2asec = 180.0 * 3600.0 / redux::PI;
+        size_t count = F > 0 ? 1 : 0;
+        count += A > 0 ? 1 : 0;
+        count += P > 0 ? 1 : 0;
+        if (count > 2) {
+            LOG_WARN << "Too many parameters specified: replacing telescope focal length (" << F
+                     << ") with computed value (" << (P * rad2asec / A) << ")";
+            F = P * rad2asec / A;
+            return true;
+        } else if (count < 2) {
+            LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
+        } else {    // count == 2
+            if (F <= 0) {
+                F = P * rad2asec / A;
+            } else if (A <= 0) {
+                A = P * rad2asec / F;
+            } else if (P <= 0) {
+                P = F * A / rad2asec;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    
 }
 
 
@@ -142,20 +169,16 @@ size_t Object::nImages(void) const {
 }
 
 
-void Object::initProcessing( WorkSpace::Ptr ws ) {
+void Object::initProcessing( const WorkSpace& ws ) {
 
     if( patchSize && pupilPixels ) {
         P.resize(2*pupilPixels,2*pupilPixels);
         Q.resize(2*pupilPixels,2*pupilPixels);
         ftSum.resize(patchSize,patchSize);          // full-complex for now
         for( auto& ch : channels ) {
-            if( patchSize == ch->patchSize && pupilPixels == ch->pupilPixels) {
-                ch->initProcessing(ws);
-            } else {
-                LOG_ERR << "Different sub-field sizes not supported....yet.  obj.patchSize=" << patchSize
-                << "  ch.patchSize=" << ch->patchSize << "  obj.pupilPixels=" << pupilPixels << "  ch.pupilPixels=" << ch->pupilPixels;
-            }
+            ch->initProcessing(ws);
         }
+        modes.init( myJob, *this );                 // will get modes from globalData
     } else {
         LOG_ERR << "Object patchSize is 0 !!!";
     }
@@ -182,20 +205,16 @@ void Object::getResults(ObjectData& od) {
     complex_t* aoPtr = avgObjFT.get();
     double* dPtr = tmpD.get();
     double avgNoiseVariance = 0.0;
-    double frequencyCutoff = sqrt(patchSize*patchSize);
     for (shared_ptr<Channel>& ch : channels) {
         for (shared_ptr<SubImage>& im : ch->subImages) {
             im->restore(aoPtr, dPtr);
             avgNoiseVariance += sqr(im->stats.noise);
         }
-        if (ch->frequencyCutoff < frequencyCutoff ) frequencyCutoff = ch->frequencyCutoff;
     }
     avgNoiseVariance /= nObjectImages;
-    for (auto & ind : otfIndices) {
-        if( fabs(dPtr[ind]) > 0 ) {
-            aoPtr[ind] /= dPtr[ind];
-        } else aoPtr[ind] = dPtr[ind] = 0;
-    }
+    
+    avgObjFT.safeDivide(tmpD);
+    
     if (!(myJob.runFlags&RF_NO_FILTER)) {
         LOG_TRACE << boost::format("Applying Scharmer filter with frequency-cutoff = %f and noise-variance = %f") % (0.9*frequencyCutoff) % avgNoiseVariance;
         ScharmerFilter(aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
@@ -302,10 +321,8 @@ void Object::getResults(ObjectData& od) {
     if( saveMask & SF_SAVE_DIVERSITY) {
         int nCh = channels.size();
         if( nCh  ) {
-            int nP = channels[0]->pupilPixels;
-            LOG_TRACE << "Getting diversity results...  ";
-            od.div.resize(nCh, nP, nP);
-            Array<float> view(od.div,0,0,0,nP-1,0,nP-1);
+            od.div.resize(nCh, pupilPixels, pupilPixels);
+            Array<float> view(od.div,0,0,0,pupilPixels-1,0,pupilPixels-1);
             for( shared_ptr<Channel>& ch: channels) {
                 view = ch->phi_fixed;
                 view.shift(0,1);
@@ -321,24 +338,27 @@ void Object::getResults(ObjectData& od) {
 
 void Object::initPQ (void) {
     P.zero();
-    Q = (reg_gamma); // * 0.1 / nImages);
+    Q = reg_gamma;
 }
 
 
-void Object::addToFT( const redux::image::FourierTransform& ft, double rg ) {
+void Object::addRegGamma( double rg ) {
     unique_lock<mutex> lock( mtx );
-    reg_gamma += 0.10*rg;///nImages;
-    const complex_t* ftPtr = ft.get();
-    double* ftsPtr = ftSum.get();
-    for (size_t ind = 0; ind < ftSum.nElements(); ++ind) {
-        ftsPtr[ind] += norm (ftPtr[ind]);
-    }
+    reg_gamma += 0.10*rg/nObjectImages;
 }
 
 
-void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft, double rg ) {
+void Object::addToFT( const redux::image::FourierTransform& ft ) {
     unique_lock<mutex> lock( mtx );
-    reg_gamma += 0.10*rg;///nImages;
+    transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
+              [](const double& a, const complex_t& b) { return a+norm(b); }
+             );
+
+}
+
+
+void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft ) {
+    unique_lock<mutex> lock( mtx );
     const complex_t* oftPtr = oldft.get();
     transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
               [&oftPtr](const double& a, const complex_t& b) { return a+norm(b)-norm(*oftPtr++); }
@@ -355,10 +375,26 @@ void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<c
     const complex_t *otfPtr = otf.get();
     const complex_t *ootfPtr = oldotf.get();
 
-    for( auto ind: otfIndices ) {
+    for( auto ind: pupil.otfSupport ) {
         qPtr[ind] += norm(otfPtr[ind]) - norm(ootfPtr[ind]);
-        pPtr[ind] += ftPtr[ind] * conj(otfPtr[ind] - ootfPtr[ind]);
+        pPtr[ind] += conj(ftPtr[ind]) * (otfPtr[ind] - ootfPtr[ind]);
     }
+}
+
+
+void Object::addToPQ(const redux::image::FourierTransform& ft, const Array<complex_t>& otf) {
+
+    unique_lock<mutex> lock (mtx);
+    double *qPtr = Q.get();
+    complex_t *pPtr = P.get();
+    const complex_t *ftPtr = ft.get();
+    const complex_t *otfPtr = otf.get();
+
+    for( auto ind: pupil.otfSupport ) {
+        qPtr[ind] += norm(otfPtr[ind]);
+        pPtr[ind] += conj(ftPtr[ind]) * otfPtr[ind];
+    }
+    
 }
 
 
@@ -464,6 +500,10 @@ bool Object::checkCfg (void) {
         if (!ch->checkCfg()) return false;
     }
 
+    if (!checkImageScale (telescopeF, arcSecsPerPixel, pixelSize)) {
+        return false;
+    }
+
     if (outputFileName.empty()) {   // TODO: clean this up
         string tpl = channels[0]->imageTemplate;
         size_t p = tpl.find_first_of ('%');
@@ -491,6 +531,12 @@ bool Object::checkCfg (void) {
             }
         } else LOG_CRITICAL << boost::format ("first filename template \"%s\" does not contain valid format specifier.") % tpl;
     }
+    
+    /*if( !modeFile.empty() && !modeNumbers.empty() ) {
+        LOG_WARN << "A modefile was specified together with mode-numbers. BE AWARE that these numbers will be interpreted as indices in the supplied file and NOT Zernike/KL indices!!";
+        return false;
+    }*/
+    
 
     return true;
 }
@@ -530,6 +576,29 @@ bool Object::checkData (void) {
     for (shared_ptr<Channel>& ch : channels) {
         if (!ch->checkData()) return false;
     }
+    
+    if (!pupilFile.empty()) {
+        if (! bfs::exists (bfs::path (pupilFile))) {
+            bfs::path fn = bfs::path (imageDataDir) / bfs::path (pupilFile);
+            if (! bfs::exists (fn)) {
+                //logAndThrow("Pupil-file " + pupilFile + " not found!");
+                LOG_CRITICAL << boost::format ("Pupil-file %s not found!") % pupilFile;
+                return false;
+            } else pupilFile = fn.c_str();
+        }
+    }
+
+    if (!modeFile.empty()) {
+        if (! bfs::exists (bfs::path (modeFile))) {
+            bfs::path fn = bfs::path (imageDataDir) / bfs::path (modeFile);
+            if (! bfs::exists (fn)) {
+                //logAndThrow("Mode-file " + modeFile + " not found!");
+                LOG_CRITICAL << boost::format ("Mode-file %s not found!") % modeFile;
+                return false;
+            } else modeFile = fn.c_str();
+        }
+    }
+
 
     return true;
 }
@@ -539,9 +608,126 @@ void Object::initCache (void) {
     
     for (shared_ptr<Channel>& ch : channels) {
         ch->initCache();
-        pupilIndices.insert(ch->pupilIndices.begin(), ch->pupilIndices.end());
-        otfIndices.insert(ch->otfIndices.begin(), ch->otfIndices.end());
     }
+    
+    Pupil::calculatePupilSize (frequencyCutoff, pupilRadiusInPixels, pupilPixels, wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel);
+    
+    myJob.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
+    myJob.pupilPixels = pupilPixels;
+
+    if ( bfs::exists( bfs::path( pupilFile ) ) ) {
+        PupilInfo info( pupilFile, pupilPixels );
+        Pupil& ret = myJob.globalData->get(info);
+        unique_lock<mutex> lock(ret.mtx);
+        if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
+            if( ret.load( pupilFile, pupilPixels ) ) {
+                LOG_DEBUG << "Loaded Pupil-file " << pupilFile;
+                pupil = ret;
+            } else LOG_ERR << "Failed to load Pupil-file " << pupilFile;
+        } else {
+            if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
+                LOG_TRACE << "Cloning Pupil.";
+                pupil = ret;
+            } else {
+                LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet).";
+            }
+        }
+    } else LOG_ERR << "No such file: " << pupilFile;
+    
+    if( pupil.empty() ) {
+        PupilInfo info(pupilPixels, pupilRadiusInPixels);
+        Pupil& ret = myJob.globalData->get(info);
+        unique_lock<mutex> lock(ret.mtx);
+        if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
+            ret.generate( pupilPixels, pupilRadiusInPixels );
+            if( ret.nDimensions() != 2 || ret.dimSize(0) != pupilPixels || ret.dimSize(1) != pupilPixels ) {    // mismatch
+                LOG_ERR << "Generated Pupil does not match. This should NOT happen!!";
+            } else {
+                LOG_DEBUG << "Generated pupil (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
+                pupil = ret; 
+            }
+        } else {
+            if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
+                LOG_TRACE << "Cloning Pupil.";
+                pupil = ret;
+            } else {
+                LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!";
+            }
+        }
+    }
+
+    if ( bfs::exists( bfs::path( modeFile ) ) ) {
+        ModeInfo info( modeFile, pupilPixels );
+        ModeSet& ret = myJob.globalData->get(info);
+        unique_lock<mutex> lock(ret.mtx);
+        if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
+            if( ret.load( modeFile, pupilPixels ) ) {
+                LOG_DEBUG << "Loaded Mode-file " << modeFile;
+                ret.normalize( pupil );
+                modes = ret;
+              } else LOG_ERR << "Failed to load Mode-file " << modeFile;
+        } else {
+            if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
+                LOG_TRACE << "Cloning ModeSet.";
+                modes = ret;
+            } else {
+                LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet).";
+            }
+        }
+    } else LOG_ERR << "No such file: " << modeFile;
+    
+    if( modes.empty() ) {
+        ModeInfo info(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+        if (myJob.modeBasis == ZERNIKE) {     // force use of Zernike modes for all tilts
+            info.firstMode = info.lastMode = 0;
+        }
+        ModeSet& ret = myJob.globalData->get(info);
+        unique_lock<mutex> lock(ret.mtx);
+        if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
+            if(myJob.modeBasis == ZERNIKE) {
+                ret.generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+            } else {
+                ret.generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+            }
+            if( ret.nDimensions() != 3 || ret.dimSize(1) != pupilPixels || ret.dimSize(2) != pupilPixels ) {    // mismatch
+                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
+            } else {
+                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
+                ret.normalize( pupil );
+                modes = ret; 
+            }
+        } else {
+            if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
+                LOG_DEBUG << "Cloning ModeSet.";
+                modes = ret;
+            } else {
+                LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!";
+            }
+        }
+    }
+    
+    
+    pixelsToAlpha =  alphaToPixels = 0;
+    if( modeFile.empty() ) {    // if loaded from file, we don't know if there are tilts...or where in the array they are.
+        for( uint i=0; i<modes.modeNumbers.size(); ++i ) {
+            if( modes.modeNumbers[i] == 2 ) {
+                double delta = modes(i,pupilPixels/2+1,pupilPixels/2) - modes(i,pupilPixels/2,pupilPixels/2);
+                pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
+                break;
+            }
+            if( modes.modeNumbers[i] == 3 ) {
+                double delta = modes(i,pupilPixels/2,pupilPixels/2+1) - modes(i,pupilPixels/2,pupilPixels/2);
+                pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
+                break;
+            }
+        }
+        if( fabs(pixelsToAlpha) > 0 ) {
+            alphaToPixels = 1.0/pixelsToAlpha;
+        }
+    }
+    
+    defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
+    alphaToDefocus = 1.0/defocusToAlpha;
     
 }
 
@@ -551,10 +737,7 @@ void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& 
     nObjectImages = nImages();
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
-    alphaToPixels = 0;
-    pixelsToAlpha = 0;
     
-    int count(0);
     for (shared_ptr<Channel>& ch : channels) {
         ch->loadCalib(service);
     }
@@ -569,15 +752,8 @@ void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& 
         else startT = std::min(startT,ch->startT);
         if(endT.is_special()) endT = ch->endT;
         else endT = std::max(endT,ch->endT);
-        alphaToPixels += ch->alphaToPixels;
-        pixelsToAlpha += ch->pixelsToAlpha;
-        count++;
     }
-    
-    if( count ) {
-        alphaToPixels /= count;
-        pixelsToAlpha /= count;
-    }
+
     
 }
 
@@ -679,28 +855,30 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     if( saveMask & SF_SAVE_ALPHA ) writeMask |= MOMFBD_ALPHA;
     if( saveMask & SF_SAVE_DIVERSITY ) writeMask |= MOMFBD_DIV;
     
-    Array<float> modes;
+    Array<float> tmpModes;
     if ( writeMask&MOMFBD_MODES ) {     // copy modes from local cache
-        double pupilRadiusInPixels = pupilPixels / 2.0;
-        if (channels.size()) pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
-        modes.resize (myJob.modeNumbers.size() + 1, info->nPH, info->nPH);            // +1 to also fit pupil in the array
-        modes.zero();
-        Array<float> tmp_slice (modes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1);     // subarray
-        tmp_slice.assign(myJob.globalData->fetch (pupilPixels, pupilRadiusInPixels).first);
+        //double pupilRadiusInPixels = pupilPixels / 2.0;
+        //if (channels.size()) pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
+        tmpModes.resize (myJob.modeNumbers.size() + 1, info->nPH, info->nPH);            // +1 to also fit pupil in the array
+        tmpModes.zero();
+        Array<float> tmp_slice (tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1);     // subarray
+        tmp_slice.assign(reinterpret_cast<const Array<double>&>(pupil));
         info->phOffset = 0;
+        tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1);
+        tmp_slice.assign(reinterpret_cast<const Array<double>&>(modes));
         if (myJob.modeNumbers.size()) {
-            Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+            //ModeInfo id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
             info->nModes = myJob.modeNumbers.size();
             info->modesOffset = pupilPixels * pupilPixels * sizeof (float);
-            for (uint16_t & it : myJob.modeNumbers) {   // Note: globalData might also contain modes we don't want to save here, e.g. PhaseDiversity modes.
+            /*for (uint16_t & it : myJob.modeNumbers) {   // Note: globalData might also contain modes we don't want to save here, e.g. PhaseDiversity modes.
                 if (it > 3 && myJob.modeBasis != ZERNIKE) {       // use Zernike modes for the tilts
                     id.firstMode = myJob.klMinMode;
                     id.lastMode = myJob.klMaxMode;
                 } else id.firstMode = id.lastMode = 0;
                 tmp_slice.shift (0, 1);     // shift subarray 1 step
                 id.modeNumber = it;
-                tmp_slice.assign(reinterpret_cast<const Array<double>&>(*myJob.globalData->fetch(id)));
-            }
+                tmp_slice.assign(reinterpret_cast<const Array<double>&>(myJob.globalData->get(id)));
+            }*/
         }
     }
 
@@ -711,7 +889,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     info->nPatchesX = patchesData.dimSize(1);
     info->patches.resize(info->nPatchesX, info->nPatchesY);
 
-    size_t modeSize = modes.nElements()*sizeof (float);
+    size_t modeSize = tmpModes.nElements()*sizeof (float);
     size_t blockSize = modeSize;
 
     for (int x = 0; x < info->nPatchesX; ++x) {
@@ -769,7 +947,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
 
     auto tmp = sharedArray<char> (blockSize);
-    memcpy(tmp.get(), modes.get(), modeSize);
+    memcpy(tmp.get(), tmpModes.get(), modeSize);
     char* tmpPtr = tmp.get();
     int64_t offset = modeSize;
     for (int x = 0; x < info->nPatchesX; ++x) {
@@ -841,8 +1019,15 @@ Point16 Object::getImageSize (void) {
 
 
 void Object::dump (std::string tag) {
+    tag += "_o"+to_string(ID);
     Ana::write (tag + "_ftsum.f0", ftSum);
     Ana::write (tag + "_q.f0", Q);
     Ana::write (tag + "_p.f0", P);
     Ana::write (tag + "_fittedplane.f0", fittedPlane);
+    Ana::write (tag + "_pupil.f0", pupil);
+    Ana::write (tag + "_modes.f0", modes);
+    for (shared_ptr<Channel>& ch : channels) {
+        ch->dump(tag);
+    }
+
 }

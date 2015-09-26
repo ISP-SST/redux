@@ -1,6 +1,7 @@
 #include "redux/image/utils.hpp"
 
 #include "redux/image/fouriertransform.hpp"
+#include "redux/image/pupil.hpp"
 #include "redux/momfbd/cache.hpp"
 
 #include "redux/file/fileana.hpp"
@@ -245,7 +246,7 @@ double redux::image::makePupil_mvn (double** pupil, int nph, double r_c) {
 void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle) {
 using redux::momfbd::Cache;
     static Cache& cache = Cache::getCache();
-    const std::pair<Array<double>, double>& pupil = cache.pupil (nPoints, r_c);
+    redux::image::Pupil pupil(nPoints, r_c);
 
     int m, n;
     noll_to_mn (modeNumber, m, n);
@@ -257,7 +258,7 @@ using redux::momfbd::Cache;
 
     memset (*modePtr, 0, nPoints * nPoints * sizeof (double));
 
-    const double** pupPtr = makePointers (pupil.first.ptr(), nPoints, nPoints);
+    double** pupPtr = makePointers (pupil.ptr(), nPoints, nPoints);
 
     shared_ptr<double*> r = sharedArray<double> (nPoints, nPoints);     // normalized distance ^{some order}
     shared_ptr<double*> r2 = sharedArray<double> (nPoints, nPoints);    // normalized distance squared
@@ -325,7 +326,7 @@ using redux::momfbd::Cache;
     }
 
     // normalize
-    normalization = 1.0 / (sqrt (normalization / pupil.second));
+    normalization = 1.0 / (sqrt (normalization / pupil.area));
     for (uint y = 0; y < nPoints; ++y) {
         for (uint x = 0; x < nPoints; ++x) {
             //if(pupPtr[y][x]>0) {

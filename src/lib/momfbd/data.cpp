@@ -84,12 +84,12 @@ ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& inPath ) :
 
 void ObjectData::initPatch(void) {
     myObject->initPatch(*this);
+    myObject->fitAvgPlane(*this);
     for( ChannelData& ch: channels ) {
         ch.initPatch();
     }
     myObject->initPQ();
     myObject->addAllPQ();
-    myObject->fitAvgPlane(*this);
 }
 
 
@@ -198,7 +198,6 @@ PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j)
 
 
 void PatchData::initPatch(void) {
-    //cout << "Initializing patch # " << index << endl;
     for( ObjectData& obj: objects ) {
         obj.initPatch();
     }
@@ -280,29 +279,40 @@ bool PatchData::operator==(const PatchData& rhs) {
 }
 
 
-const pair<Array<double>, double>& GlobalData::fetch(uint16_t pupilPixels, double pupilRadiusInPixels ) {
-    //cout << "GlobalData::fetch():   pupilPixels=" << pupilPixels << "  pupilRadiusInPixels=" << pupilRadiusInPixels << endl;
+ModeSet& GlobalData::get(const ModeInfo& id, const ModeSet& ms) {
+
     unique_lock<mutex> lock(mtx);
-    //cout << "GlobalData::fetch2():   pupilPixels=" << pupilPixels << "  pupilRadiusInPixels=" << pupilRadiusInPixels << "  pupils.sz=" << pupils.size() << endl;
-    return pupils.emplace( make_pair(pupilPixels,pupilRadiusInPixels),
-                           Cache::getCache().pupil(pupilPixels, pupilRadiusInPixels) ).first->second;
+    auto it = modes.find(id);
+    if( it == modes.end() ){
+        ModeSet& ret = redux::util::Cache::get<ModeInfo,ModeSet>(id, ms);
+        return modes.emplace(id, ret).first->second;
+    } else return it->second;
 
 }
 
 
-const PupilMode::Ptr GlobalData::fetch(const Cache::ModeID& id) {
-//cout << " GlobalData::fetch1(mode)  id=" << id.modeNumber << endl;
+
+Pupil& GlobalData::get(const PupilInfo& id, const Pupil& ms) {
+
     unique_lock<mutex> lock(mtx);
-    Cache& cache = Cache::getCache();
-    return modes.emplace( id, cache.mode(id) ).first->second;
+    auto it = pupils.find(id);
+    if( it == pupils.end() ){
+        Pupil& ret = redux::util::Cache::get<PupilInfo,Pupil>(id, ms);
+        return pupils.emplace(id, ret).first->second;
+    } else return it->second;
+
 }
 
 
 uint64_t GlobalData::size( void ) const {
-    uint64_t sz = sizeof(uint16_t); // nModes
+    uint64_t sz = 2*sizeof(uint16_t); // nModes & nPupils
     for( auto& it: modes) {
         sz += it.first.size();
-        sz += it.second->size();
+        sz += it.second.size();
+    }
+    for( auto& it: pupils) {
+        sz += it.first.size();
+        sz += it.second.size();
     }
     sz += constraints.size();
     return sz;
@@ -314,9 +324,13 @@ uint64_t GlobalData::pack( char* ptr ) const {
     uint64_t count = pack(ptr,(uint16_t)modes.size());
     for(auto& it: modes) {
         count += it.first.pack(ptr+count);
-        count += it.second->pack(ptr+count);
+        count += it.second.pack(ptr+count);
     }
-  //  cout << "GlobalData::pack():  packed " << modes.size() << " modes." << endl;
+    count += pack(ptr,(uint16_t)pupils.size());
+    for(auto& it: pupils) {
+        count += it.first.pack(ptr+count);
+        count += it.second.pack(ptr+count);
+    }
     count += constraints.pack(ptr+count);
     return count;
 }
@@ -327,15 +341,26 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     uint16_t tmp;
     uint64_t count = unpack(ptr,tmp,swap_endian);
     if(tmp) {
-        Cache::ModeID id;
-        PupilMode::Ptr mode(new PupilMode);
+        ModeInfo id("");
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
-            count += mode->unpack(ptr+count,swap_endian);
-            modes.emplace(id, mode);
+            ModeSet dummy;
+            ModeSet& ms = redux::util::Cache::get<ModeInfo,ModeSet>(id, dummy);
+            count += ms.unpack(ptr+count,swap_endian);
+            modes.emplace(id, ms);
         }
     }
- //   cout << "GlobalData::unpack():  got " << modes.size() << " modes." << endl;
+    count += unpack(ptr,tmp,swap_endian);
+    if(tmp) {
+        PupilInfo id("");
+        while( tmp-- > 0 ) {
+            count += id.unpack(ptr+count,swap_endian);
+            Pupil dummy;
+            Pupil& pup = redux::util::Cache::get<PupilInfo,Pupil>(id, dummy);
+            count += pup.unpack(ptr+count,swap_endian);
+            pupils.emplace(id, pup);
+        }
+    }
     count += constraints.unpack(ptr+count,swap_endian);
     return count;
 }

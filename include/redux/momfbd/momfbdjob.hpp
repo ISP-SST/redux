@@ -84,6 +84,8 @@ namespace redux {
             friend class Object;
             friend class Channel;
             friend class WorkSpace;
+            friend struct ModeSet;
+            friend struct redux::image::Pupil;
 
 
         };

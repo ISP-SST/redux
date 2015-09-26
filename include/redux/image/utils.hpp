@@ -33,7 +33,7 @@ namespace redux {
         double makePupil_thi( double** pupil, uint32_t nPoints, double radius);
         double makePupil_mvn( double** pupil, int nPoints, double radius );
         template <typename T>
-        double makePupil( util::Array<T>& pupil, uint32_t nPoints, double radius) {
+        double makePupil_old( util::Array<T>& pupil, uint32_t nPoints, double radius) {
             pupil.resize(nPoints,nPoints);
             T **ptr = redux::util::makePointers(pupil.get(),nPoints,nPoints);
             double area = makePupil_mvn(ptr,nPoints,radius); // FIXME: temporarily using MvN pupilmaker for easier debugging.

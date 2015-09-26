@@ -6,6 +6,7 @@
 
 #include "redux/types.hpp"
 #include "redux/image/fouriertransform.hpp"
+#include "redux/image/pupil.hpp"
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
 
@@ -121,12 +122,12 @@ namespace redux {
         struct GlobalData : public Part {   // Used for sending e.g. modes/pupils to the slaves.
             typedef std::shared_ptr<GlobalData> Ptr;
             std::mutex mtx;
-            std::map<std::pair<uint32_t, double>, const std::pair<redux::util::Array<double>, double>&> pupils;
-            std::map<Cache::ModeID, const PupilMode::Ptr> modes;
+            std::map<ModeInfo, ModeSet&> modes;
+            std::map<redux::image::PupilInfo, redux::image::Pupil&> pupils;
             Constraints constraints;
             GlobalData(const MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
-            const std::pair<redux::util::Array<double>, double>& fetch(uint16_t,double);
-            const PupilMode::Ptr fetch(const Cache::ModeID&);
+            ModeSet& get(const ModeInfo&, const ModeSet& ms=ModeSet());
+            redux::image::Pupil& get(const redux::image::PupilInfo&, const redux::image::Pupil& ms=redux::image::Pupil());
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);

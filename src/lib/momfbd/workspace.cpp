@@ -46,9 +46,9 @@ WorkSpace::WorkSpace( const MomfbdJob& j ) : objects( j.getObjects() ), job(j), 
 
 
 WorkSpace::~WorkSpace() {
+    
     clear();
-    //  std::cout << "~WorkSpace():  1   wfsz = " << wavefronts.size() << " osz = " << objects.size() << std::endl;
-
+    
 }
 
 
@@ -83,7 +83,7 @@ void WorkSpace::init( void ) {
     }
 
     for( auto & it : job.getObjects() ) {
-        it->initProcessing( shared_from_this() );
+        it->initProcessing( *this );
     }
     
 }
