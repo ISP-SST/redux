@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <math.h>
 
 namespace redux {
 
@@ -82,6 +83,41 @@ namespace redux {
             return true;
         }
 
+        template <typename T>
+        inline bool checkAllSmaller(const T* ptr, size_t count, double eps=1E-10 ) {
+            for(size_t i=0; i<count; ++i ) if( fabs(ptr[i]) > eps ) return false;
+            return true;
+        }
+
+        
+         /*! @name size
+         *  @brief Return the proper size needed for packing/unpacking certain types/structures.
+         */
+        //@{
+        inline uint64_t size( const std::vector<std::string>& data ) {
+            uint64_t sz = sizeof(uint64_t);
+            for (auto &it: data) {
+                sz += it.length() + 1;      // pack as zero-terminated c-style string
+            }
+            return sz;
+        }
+       
+        template <typename T>
+        inline uint64_t size( const std::vector<T>& data ) {
+            return data.size()*sizeof(T) + sizeof(uint64_t);
+        }
+       
+        template <class T, class U, class Comp, class Alloc>
+        inline uint64_t size(const std::map<T,U,Comp,Alloc>& in) {
+            uint64_t sz = sizeof(uint64_t);
+            for (auto &it: in) {
+                sz += sizeof(T) + sizeof(U);
+            }
+            return sz;
+        }
+       
+
+        //@}
         
         /*! @name pack
          *  @brief Pack the data into a dense string of characters, suitable for sending across the network or write to file.
@@ -90,6 +126,18 @@ namespace redux {
          *  @param   count Number of elements to pack
          */
         //@{
+
+        inline uint64_t pack(char* ptr, const std::vector<std::string>& in) {
+            uint64_t count = in.size();
+            *reinterpret_cast<uint64_t*>(ptr) = count;
+            uint64_t totalSize = sizeof(uint64_t);
+            for ( auto &it: in ) {
+                strncpy( ptr+totalSize, it.c_str(), it.length() + 1 );
+                totalSize += it.length() + 1;
+            }
+            return totalSize;
+        }
+        
         template <typename T>
         inline uint64_t pack(char* ptr, const std::vector<T>& in) {
             uint64_t sz = in.size();
@@ -140,6 +188,18 @@ namespace redux {
          *  @param   swap_endian Should the endianess be swapped ?
          */
         //@{
+        inline uint64_t unpack(const char* ptr, std::vector<std::string>& out, bool swap_endian) {
+            uint64_t count = *reinterpret_cast<const uint64_t*>(ptr);
+            if(swap_endian) swapEndian(count);
+            out.resize(count);
+            uint64_t totalSize = sizeof(uint64_t);
+            for( std::string& it: out ) {
+                it = std::string(ptr+totalSize);
+                totalSize += it.length()+1;
+            }
+            return totalSize;
+        }
+        
         template <typename T>
         inline uint64_t unpack(const char* ptr, std::vector<T>& out, bool swap_endian=false) {
             uint64_t sz = *reinterpret_cast<const uint64_t*>(ptr);
