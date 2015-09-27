@@ -627,7 +627,6 @@ void Object::initCache (void) {
             } else LOG_ERR << "Failed to load Pupil-file " << pupilFile;
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
-                LOG_TRACE << "Cloning Pupil.";
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet).";
@@ -649,7 +648,6 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
-                LOG_TRACE << "Cloning Pupil.";
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!";
@@ -669,7 +667,6 @@ void Object::initCache (void) {
               } else LOG_ERR << "Failed to load Mode-file " << modeFile;
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
-                LOG_TRACE << "Cloning ModeSet.";
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet).";
@@ -699,7 +696,6 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
-                LOG_DEBUG << "Cloning ModeSet.";
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!";

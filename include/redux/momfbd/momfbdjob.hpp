@@ -90,7 +90,7 @@ namespace redux {
 
         };
 
-        const size_t dummy = MomfbdJob::jobType;       // this will trigger the registration of MomfbdJob in Job::jobMap
+        const size_t dummy UNUSED = MomfbdJob::jobType;       // this will trigger the registration of MomfbdJob in Job::jobMap
 
         /*! @} */
 
