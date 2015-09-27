@@ -28,19 +28,16 @@ using namespace std;
 namespace {
 
     const int maxDistance = 32;
+    const int maxDistance2 = maxDistance*maxDistance;
     const double deltasqr = 4;
     const double beta = 2;
+    
+    double distMap[maxDistance2+1];
 
-    map<int, double> getDistanceMap (void) {
-        map<int, double> tmp;
-        for (int i = 0; i <= maxDistance; ++i) {
-            int i2 = i * i;
-            for (int j = 0; j <= maxDistance; ++j) {
-                int j2 = j * j;
-                tmp.insert (pair<int, double> (i2 + j2, pow (i2 + j2 + deltasqr, -beta)));
-            }
-        }
-        return tmp;
+    const double* getDistanceMap (void) {
+        memset(distMap,0,(maxDistance2+1)*sizeof(double));
+        for(int i=1; i<=maxDistance2; ++i) distMap[i] = pow (i + deltasqr, -beta);
+        return distMap;
     }
 
 
@@ -584,28 +581,31 @@ double redux::image::inv_dist_wght (float **a, size_t sizeY, size_t sizeX, size_
 template <typename T>
 double redux::image::inverseDistanceWeight (T** array, size_t sizeY, size_t sizeX, size_t posY, size_t posX) {
 
-    static map<int, double> inverseDistanceSquared = getDistanceMap();
+    static const double* inverseDistanceSquared = getDistanceMap();     // will only be initialized once.
 
     // TODO: verify this function, results look weird
-
     int64_t beginX = std::max (0L, static_cast<int64_t> (posX - maxDistance));
-    int64_t endX = std::min (sizeX, posX + maxDistance + 1);
+    int64_t endX = std::min (sizeX, posX + maxDistance+1);
     int64_t beginY = std::max (0L, static_cast<int64_t> (posY - maxDistance));
-    int64_t endY = std::min (sizeY, posY + maxDistance + 1);
+    int64_t endY = std::min (sizeY, posY + maxDistance+1);
 
     double normalization = 0.0, weightedSum = 0.0;
-    for (int y = beginY; y < endY; ++y) {
-        int y2 = (y - posY) * (y - posY);
+    for (int y=beginY; y < endY; ++y) {
+        int y2 = (y-posY)*(y-posY);
         for (int x = beginX; x < endX; ++x) {
-            int x2 = (x - posX) * (x - posX);
+            int x2 = (x-posX)*(x-posX);
+            if( x2+y2 > maxDistance2 ) break;
             if (array[y][x] > 0) {
-                double tmp = inverseDistanceSquared.at (y2 + x2);
+                double tmp = inverseDistanceSquared[y2+x2];
                 weightedSum += tmp * array[y][x];
                 normalization += tmp;
             }
         }
     }
-    return weightedSum / normalization;
+    if( normalization > 0 ) {
+        return weightedSum / normalization;
+    }
+    return 0.0;
 }
 template double redux::image::inverseDistanceWeight (float**, size_t, size_t, size_t, size_t);
 template double redux::image::inverseDistanceWeight (double**, size_t, size_t, size_t, size_t);
