@@ -361,7 +361,7 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
     size_t failCount(0);
     size_t totalIterations(0);
     size_t maxIterations(1);            // only 1 iteration while increasing modes, job.maxIterations for the last step.
-    size_t maxFails(10);
+    size_t maxFails(3);         // TODO make into a cfg parameter
     int status(0);
 
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
@@ -390,15 +390,11 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
         bool done(false);
         
         do {
+            iter++;
             status = gsl_multimin_fdfminimizer_iterate( s );
             if( status == GSL_ENOPROG ) {
                 LOG_TRACE << "iteration: " << iter << "  GSL reports no progress.";
-                if( ++failCount > maxFails ) {
-                    LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")";
-                    status = GSL_FAILURE;
-                    modeCount = 0;                  // exit outer loop.
-                    done = true;                    // exit inner loop.
-                }
+                failCount++;
                 if( iter == 0 ) {           // could not get started, perturb coefficients and try again...
                     for(uint i=0; i<nFreeParameters; ++i) {
                         s->x->data[i] += dist(re);
@@ -410,8 +406,19 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
                 LOG_WARN << "GSL error in iteration " << iter << ".  type: " << gsl_strerror(status);
             }
             thisMetric = s->f;
+            if( std::isnan(thisMetric) || std::isinf(thisMetric) ) {
+                failCount++;
+            } 
+            if( failCount > maxFails ) {
+                LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")";
+                status = GSL_FAILURE;
+                modeCount = 0;                  // exit outer loop.
+                done = true;                    // exit inner loop.
+                dump("fail");
+                exit(0);
+            }
             gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric);
-            if (iter++) {
+            if (iter) {
                 double relativeChange = 2.0 * fabs(thisMetric-previousMetric) / (fabs(thisMetric)+fabs(previousMetric)+job.EPS);
                 if(relativeChange < job.FTOL) {      // count consecutive "marginal decreases" in metric
                     if( successCount++ >= job.targetIterations ) { // exit after targetIterations consecutive improvements.
