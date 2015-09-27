@@ -55,8 +55,6 @@ namespace {
 
             redux::file::readFile(filename, img);
             
-            LOG_DEBUG << boost::format ("Loaded file \"%s\"  (%s)") % filename % printArray(clip,"clip");
- 
             if( clip.size() == 4 ) {
                 bool flipX = false, flipY = false;
                 vector<int16_t> alignClip = clip;
@@ -766,6 +764,7 @@ void Channel::loadImage(size_t i, Array<PatchData::Ptr>& patches) {
     Image<float> tmpImg;
     Image<float> view(images,i,i,0,imgSize.y-1,0,imgSize.x-1);
     
+    LOG_DEBUG << boost::format ("Loading image %s  (%d:%d:%d  %s)") % fn % myObject.ID % ID % i % printArray(alignClip,"clip");
     cf.loadImage(tmpImg,false);
     if(tmpImg.meta) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
