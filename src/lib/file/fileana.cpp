@@ -281,7 +281,7 @@ void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nEleme
 
     size_t compressedSize = hdr->m_CompressedHeader.tsize - 14;
 
-    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize], []( uint8_t * p ) { delete[] p; } );
+    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize+1], []( uint8_t * p ) { delete[] p; } );        // bug in anadecompress makes it go out-of-bounds by 1
 
     file.read( reinterpret_cast<char*>( tmp.get() ), compressedSize );
     if( !file.good() ) {
