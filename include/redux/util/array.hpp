@@ -207,7 +207,7 @@ namespace redux {
             };
 
             template <typename ...S>
-            Array( T* data, S ...sizes ) : begin_(0), end_(0) {
+            Array( T* data, S ...sizes ) : dense_(true), begin_(0), end_(0) {
                 wrap( data, sizes... );
             }
 
@@ -274,7 +274,7 @@ namespace redux {
             /*! Construct from a generic list of dimension-sizes.
              * @note This has to be last in the header because of it's "catch all" properties.
              */
-            template <typename ...S> explicit Array( S ...sizes ) : begin_(0) { resize( sizes... ); }
+            template <typename ...S> explicit Array( S ...sizes ) : dense_(true), begin_(0), end_(0) { resize( sizes... ); }
 
             virtual ~Array() {};
             
