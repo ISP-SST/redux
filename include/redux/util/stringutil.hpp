@@ -128,11 +128,11 @@ namespace redux {
          *  00010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
          *  @endcode
          */
-        template <typename T> std::string bitString( T* var, size_t n ) {
+        template <typename T> std::string bitString( const T* var, size_t n ) {
 
             std::string tmp;
-            uint8_t* begin = reinterpret_cast<uint8_t*>( var );
-            uint8_t* end = begin + n * sizeof( T ) - 1;
+            const uint8_t* begin = reinterpret_cast<const uint8_t*>( var );
+            const uint8_t* end = begin + n * sizeof( T ) - 1;
 
             while( end >= begin ) {
                 for( uint8_t j( 128 ); j; j >>= 1 ) {
@@ -171,12 +171,12 @@ namespace redux {
          *            ------------------------            
          *  @endcode
          */
-        template <typename T> inline std::string printBits( T* var, size_t n = 1 ) {
+        template <typename T> inline std::string printBits( const T* var, size_t n = 1 ) {
 
             std::ostringstream oss;
             oss << "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n";
-            unsigned char* ptr = reinterpret_cast<unsigned char*>( var );
-            unsigned char* end = ptr + n * sizeof( T ) - 1;
+            const unsigned char* ptr = reinterpret_cast<const unsigned char*>( var );
+            const unsigned char* end = ptr + n * sizeof( T ) - 1;
             
             std::ios_base::fmtflags ff = oss.flags();
             
@@ -282,7 +282,7 @@ namespace redux {
         std::string printArray( T** data, size_t firstY, size_t lastY, size_t firstX, size_t lastX, const std::string& name = "matrix", const std::vector<std::string>& delimiters = {",",","}, int d = 3 ) {
             std::ostringstream oss;
             oss.precision( d );
-            oss << name << " = [";
+            oss << name << "=[";
             bool rowSeparator( false );
             for( size_t i = firstY; i <= lastY; ++i ) {
                 bool elementSeparator( false );
@@ -325,7 +325,7 @@ namespace redux {
         std::string printArray( T** data, size_t m, size_t n, const std::string& name = "matrix", const std::vector<std::string>& delimiters = {",",","}, int d = 3 ) {
             std::ostringstream oss;
             oss.precision( d );
-            oss << name << " = [";
+            oss << name << "=[";
             bool rowSeparator( false );
             for( size_t i = 0; i < m; ++i ) {
                 bool elementSeparator( false );
@@ -366,7 +366,7 @@ namespace redux {
 
             std::ostringstream oss;
             oss.precision( d );
-            oss << name << " = [";
+            oss << name << "=[";
             bool separator( false );
             for( size_t i = 0; i < n; ++i ) {
                 if( separator ) {
@@ -398,7 +398,7 @@ namespace redux {
         inline std::string printArray( const std::map<T,U>& data, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
-            oss << std::setprecision( d ) << name << " = [";
+            oss << std::setprecision( d ) << name << "=[";
             bool separator( false );
             for( auto & it : data ) {
                 if( separator ) {
@@ -426,7 +426,7 @@ namespace redux {
         inline std::string printArray( const T& data, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
-            oss << std::setprecision( d ) << name << " = [";
+            oss << std::setprecision( d ) << name << "=[";
             bool separator( false );
             for( auto & it : data ) {
                 if( separator ) {

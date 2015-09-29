@@ -24,7 +24,7 @@ namespace redux {
 
         public:
             
-            struct Plan : public std::enable_shared_from_this<const Plan>  {
+            struct Plan {
                 typedef std::shared_ptr<const Plan> Ptr;
                 enum TYPE { R2C=1, C2C };
                 struct Index {

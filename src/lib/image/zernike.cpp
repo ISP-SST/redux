@@ -110,8 +110,6 @@ const std::map<uint16_t, Zernike::KLPtr>& Zernike::karhunenLoeveExpansion(uint16
     unique_lock<mutex> lock(globalMutex);
     
     if( kle.empty() ) { // not calulated yet
-        
-        cout << "Calculating KL-expansion (" << first_mode << "," << last_mode << ")" << endl;;
 
         map<uint16_t, uint16_t> mapping, reverse_mapping;
         map<uint16_t, double> values;

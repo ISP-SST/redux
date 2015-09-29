@@ -96,6 +96,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointI& shift
         pupilSize = pupSz;
         pupilSize2 = pupilSize*pupilSize;
         otfSize = 2*pupilSize;
+        otfSize2 = otfSize*otfSize;
         phi.resize( pupilSize, pupilSize );
         tmpPhi.resize( pupilSize, pupilSize );
         PF.resize( pupilSize, pupilSize );
@@ -482,7 +483,7 @@ void SubImage::calcPhi( const double* a ) {
 
 void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
 
-    memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
+    memset (otfPtr, 0, otfSize2*sizeof (complex_t));
 
     const double* pupilPtr = object.pupil.get();
     double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
@@ -496,7 +497,7 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
     }
     
     tmpOTF.ft(otfPtr);
-    tmpOTF.autocorrelate(1.0/(otfSize*otfSize));
+    tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
@@ -515,7 +516,7 @@ void SubImage::calcOTF(void) {
     complex_t* otfPtr = OTF.get();
     const double* phiPtr = phi.get();
 
-    memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
+    memset(otfPtr, 0, otfSize2*sizeof (complex_t));
     
     const double* pupilPtr = object.pupil.get();
     double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
@@ -529,7 +530,7 @@ void SubImage::calcOTF(void) {
     }
     
     tmpOTF.ft(otfPtr);
-    tmpOTF.autocorrelate(1.0/(otfSize*otfSize));
+    tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
@@ -551,8 +552,8 @@ void SubImage::calcPFOTF(void) {
     const double* phiPtr = phi.get();
    // memcpy(tmpC.get(),otfPtr,otfSize*otfSize*sizeof(complex_t));
     
-    memset (pfPtr, 0, pupilSize * pupilSize * sizeof (complex_t));
-    memset (otfPtr, 0, otfSize * otfSize * sizeof (complex_t));
+    memset (pfPtr, 0, pupilSize2*sizeof (complex_t));
+    memset (otfPtr, 0, otfSize2*sizeof (complex_t));
     
     const double* pupilPtr = object.pupil.get();
     double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
@@ -567,7 +568,7 @@ void SubImage::calcPFOTF(void) {
     }
 
     tmpOTF.ft(otfPtr);
-    tmpOTF.autocorrelate(1.0/(otfSize*otfSize));
+    tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);

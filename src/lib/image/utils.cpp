@@ -510,7 +510,7 @@ void redux::image::ScharmerFilter (T** data, double** q2_inv, size_t sizeY, size
     std::transform (*pt, *pt + sizeY * sizeX, *pt, [noiseFactor](const double& a){ return noiseFactor/a;} );
     
     for (uint y=0; y<sizeY; ++y) {
-        rr[y][1] = pt[y][1];
+        rr[y][0] = pt[y][0];
         for (uint x=1; x<sizeX; ++x) {
             rr[y][x] = pt[y][sizeX-x];
         }

@@ -291,7 +291,7 @@ void ModeSet::init( const MomfbdJob& job, const Object& obj ) {
         } else {
             ret.generate( obj.pupilPixels, obj.pupilRadiusInPixels, obj.rotationAngle, job.klMinMode, job.klMaxMode, job.modeNumbers, job.klCutoff );
         }
-        if( ret.nDimensions() != 3 || ret.dimSize(1) != obj.pupilPixels || ret.dimSize(1) != obj.pupilPixels ) {    // mismatch
+        if( ret.nDimensions() != 3 || ret.dimSize(1) != obj.pupilPixels || ret.dimSize(2) != obj.pupilPixels ) {    // mismatch
             LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
         } else {
            *this = ret; 

@@ -70,7 +70,8 @@ namespace {
 }
 
 
-Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg (j), myJob (j), ID (id), nObjectImages(0) {
+Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg (j), myJob (j), currentMetric(0), reg_gamma(0),
+    frequencyCutoff(0),pupilRadiusInPixels(0), ID (id), objMaxMean(0), imgSize(0), nObjectImages(0) {
 
 
 }
@@ -118,10 +119,11 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 
 size_t Object::size(void) const {
     size_t sz = ObjectCfg::size();
-    sz += 2*sizeof(uint16_t) + sizeof(double);                   // channels.size() + ID + maxMean
+    sz += 2*sizeof(uint16_t) + 4*sizeof(double);                   // channels.size() + ID + maxMean
     for( const shared_ptr<Channel>& ch : channels ) {
         sz += ch->size();
     }
+    sz += imgSize.size();
     sz += sizeof(nObjectImages);
     return sz;
 }
@@ -131,7 +133,11 @@ uint64_t Object::pack(char* ptr) const {
     using redux::util::pack;
     uint64_t count = ObjectCfg::pack(ptr);
     count += pack(ptr+count, ID);
+    count += pack(ptr+count, currentMetric);
+    count += pack(ptr+count, frequencyCutoff);
+    count += pack(ptr+count, pupilRadiusInPixels);
     count += pack(ptr+count, objMaxMean);
+    count += imgSize.pack(ptr+count);
     count += pack(ptr+count, (uint16_t)channels.size());
     for( const shared_ptr<Channel>& ch : channels ) {
         count += ch->pack(ptr+count);
@@ -149,7 +155,11 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 
     uint64_t count = ObjectCfg::unpack(ptr, swap_endian);
     count += unpack(ptr+count, ID, swap_endian);
+    count += unpack(ptr+count, currentMetric, swap_endian);
+    count += unpack(ptr+count, frequencyCutoff, swap_endian);
+    count += unpack(ptr+count, pupilRadiusInPixels, swap_endian);
     count += unpack(ptr+count, objMaxMean, swap_endian);
+    count += imgSize.unpack(ptr+count, swap_endian);
     uint16_t tmp;
     count += unpack(ptr+count, tmp, swap_endian);
     channels.resize(tmp);
@@ -305,11 +315,14 @@ void Object::getResults(ObjectData& od) {
     // Mode coefficients
     if( saveMask & SF_SAVE_ALPHA) {
         if( nObjectImages  ) {
+            size_t nModes = myJob.modeNumbers.size();
             od.alpha.resize(nObjectImages, myJob.modeNumbers.size());
-            int imgCount=0;
-            for( shared_ptr<Channel>& ch: channels) {
-                for ( shared_ptr<SubImage>& si: ch->subImages) {
-                    si->getAlphas(od.alpha.ptr(imgCount++,0));
+            od.alpha.zero();
+            float* alphaPtr = od.alpha.get();
+            for( shared_ptr<Channel>& ch: channels ) {
+                for ( shared_ptr<SubImage>& si: ch->subImages ) {
+                    si->getAlphas(alphaPtr);
+                    alphaPtr += nModes;
                 }
             }
         } else {
@@ -763,7 +776,6 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
     for (uint y = 0; y < patches.dimSize(0); ++y) {
         for (uint x = 0; x < patches.dimSize(1); ++x) {
-            patches(y,x)->cacheLoad(true);
             bfs::path fn = bfs::path (outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
             Ana::write(fn.string(), patches(y,x)->objects[ID].img);
         }
@@ -891,7 +903,6 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
-            patchesData(y,x)->cacheLoad(true);
             info->patches(x,y).region[0] = patchesData(y,x)->roi.first.x+1;         // store as 1-based indices
             info->patches(x,y).region[1] = patchesData(y,x)->roi.last.x+1;
             info->patches(x,y).region[2] = patchesData(y,x)->roi.first.y+1;

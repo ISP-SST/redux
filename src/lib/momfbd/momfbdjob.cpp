@@ -252,7 +252,6 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
         patch->step = JSTEP_POSTPROCESS;
         patches(patch->index.y,patch->index.x) = patch;
     }
-    wip.parts.clear();
     checkParts();
 }
 
@@ -376,7 +375,12 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
         obj->loadData(service, patches);
     }
     
-
+    for( shared_ptr<Object>& obj : objects ) {
+        for (shared_ptr<Channel>& ch : obj->channels) {
+            ch->unloadCalib();
+        }
+    }
+    
     initcache.join();           // wait for background jobs.
     bool writeFailed(false);
     for( shared_ptr<Object>& obj : objects ) {
@@ -426,10 +430,15 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
 void MomfbdJob::postProcess( boost::asio::io_service& service ) {
 
     LOG << "MomfbdJob::postProcess()";
+    for( auto& it: patches ) {
+        it->cacheLoad(true);        // load and erase cache-file.
+    }
     for( shared_ptr<Object>& obj : objects ) {
         service.post( std::bind( &Object::writeResults, obj.get(), patches ) );
     }
     runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
+    
+    patches.clear();
     
     info.step.store( JSTEP_COMPLETED );
     info.state.store( 0 );

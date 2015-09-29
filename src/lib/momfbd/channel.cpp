@@ -94,8 +94,7 @@ namespace {
         template <typename T>
         static void load(Image<T>& img, const string& fn, const vector<int16_t>& cl, bool norm=false, bool sym=false) {
             ClippedFile cf(fn,cl,sym);
-            img.resize();
-            Image<T>& cimg = redux::util::Cache::get<ClippedFile, Image<T> >(cf,img);
+            Image<T>& cimg = redux::util::Cache::get<ClippedFile, Image<T> >(cf);
             {
                 unique_lock<mutex> lock(cimg.imgMutex);
                 if(cimg.nElements() == 0) cf.loadImage(cimg,norm);
@@ -106,7 +105,7 @@ namespace {
         template <typename T>
         static void unload(const string& fn, const vector<int16_t>& cl, bool sym=false) {
             ClippedFile cf(fn,cl,sym);
-            redux::util::Cache::erase<ClippedFile, Image<T> >(cf);
+            redux::util::Cache::erase<ClippedFile, Image<T>>(cf);
         }
 
         string filename;
@@ -147,7 +146,7 @@ size_t Channel::size (void) const {
 
     size_t sz = ChannelCfg::size();
     sz += sizeof (uint16_t);          // ID
-    sz += dark.size();
+    sz += imgSize.size();
     sz += imageStats.size() * ArrayStats::size() + sizeof (uint16_t);
     return sz;
 }
@@ -157,7 +156,7 @@ uint64_t Channel::pack (char* ptr) const {
     using redux::util::pack;
     uint64_t count = ChannelCfg::pack (ptr);
     count += pack (ptr + count, ID);
-    count += dark.pack (ptr + count);
+    count += imgSize.pack (ptr + count);
     uint16_t statSize = imageStats.size();
     count += pack (ptr + count, statSize);
     for (auto & it : imageStats) count += it->pack (ptr + count);
@@ -173,7 +172,7 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
 
     uint64_t count = ChannelCfg::unpack (ptr, swap_endian);
     count += unpack (ptr + count, ID, swap_endian);
-    count += dark.unpack (ptr + count, swap_endian);
+    count += imgSize.unpack (ptr + count, swap_endian);
     uint16_t statSize;
     count += unpack (ptr + count, statSize, swap_endian);
     imageStats.resize (statSize);
@@ -541,10 +540,10 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
     
     // load data (and preprocess)
     imageStats[0].reset(new ArrayStats());
-    service.post(std::bind(&Channel::loadImage, this, 0, std::ref(patches)));           // will *not* be loaded through the cahche, so only saved in "images"
+    service.post(std::bind(&Channel::loadImage, this, 0));           // will *not* be loaded through the cahche, so only saved in "images"
     for (size_t i = 1; i < nImages; ++i) {
         imageStats[i].reset (new ArrayStats());
-        service.post(std::bind(&Channel::loadImage, this, i, std::ref(patches)));       // will *not* be loaded through the cahche, so only saved in "images"
+        service.post(std::bind(&Channel::loadImage, this, i));       // will *not* be loaded through the cahche, so only saved in "images"
     }
     runThreadsAndWait(service, myJob.info.maxThreads);
     
@@ -581,13 +580,14 @@ void Channel::unloadCalib(void) {               // unload what was accessed thro
             }
         }
     }
-    ClippedFile::unload<float>(gainFile, alignClip);
-    ClippedFile::unload<float>(responseFile, alignClip);
-    ClippedFile::unload<float>(backgainFile, alignClip);
-    ClippedFile::unload<float>(psfFile, alignClip, true);
-    ClippedFile::unload<float>(mmFile, alignClip);
-    ClippedFile::unload<int16_t>(xOffsetFile, alignClip);
-    ClippedFile::unload<int16_t>(yOffsetFile, alignClip);
+    if( !gainFile.empty() ) ClippedFile::unload<float>(gainFile, alignClip);
+    if( !responseFile.empty() ) ClippedFile::unload<float>(responseFile, alignClip);
+    if( !backgainFile.empty() ) ClippedFile::unload<float>(backgainFile, alignClip);
+    if( !psfFile.empty() ) ClippedFile::unload<float>(psfFile, alignClip, true);
+    if( !mmFile.empty() ) ClippedFile::unload<float>(mmFile, alignClip);
+    if( !xOffsetFile.empty() ) ClippedFile::unload<int16_t>(xOffsetFile, alignClip);
+    if( !yOffsetFile.empty() ) ClippedFile::unload<int16_t>(yOffsetFile, alignClip);
+    
     dark.clear();
     gain.clear();
     ccdResponse.clear();
@@ -656,6 +656,7 @@ void Channel::initPatch (ChannelData& cd) {
         subImages[i]->init();
         //subImages[i]->dump("o"+to_string(myObject.ID)+"_c"+to_string(ID)+"_im"+to_string(i));
     }
+//cout << "Ch::initP   modes @ " << hexString(myObject.modes.get()) << "   uc=" << myObject.modes.use_count() << endl;
 }
 
 
@@ -756,7 +757,7 @@ void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEn
 }
 
 
-void Channel::loadImage(size_t i, Array<PatchData::Ptr>& patches) {
+void Channel::loadImage(size_t i) {
     
     bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[i]));
     ClippedFile cf(fn.string(),alignClip,false);
@@ -769,15 +770,14 @@ void Channel::loadImage(size_t i, Array<PatchData::Ptr>& patches) {
     if(tmpImg.meta) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
     }
+    preprocessImage(i, tmpImg);
+    imageStats[i]->getStats(borderClip, tmpImg);     // get stats for corrected data
     view.assign(reinterpret_cast<redux::util::Array<float>&>(tmpImg));
-
-     preprocessImage(i, view, patches);
-     imageStats[i]->getStats(myJob.borderClip, view);     // get stats for corrected data
  
 }
 
 
-void Channel::preprocessImage (size_t index, Image<float>& img, Array<PatchData::Ptr>& patches) {
+void Channel::preprocessImage( size_t index, Image<float>& img ) {
 
     Array<double> tmpImg;       // local temporary with double-precision
     tmpImg = img.copy<double>();

@@ -45,8 +45,6 @@ FourierTransform::Plan::~Plan() {
 
 void FourierTransform::Plan::init (void) {
     
-    //cout << "Generating plan with size = (" << id.sizes[0] << "," << id.sizes[1] << ")  nT = " << (int)id.nThreads << endl;
-    
     fftw_plan_with_nthreads(id.nThreads);
     
     if (id.tp == R2C) {
@@ -89,34 +87,40 @@ void FourierTransform::Plan::init (void) {
 
 
 namespace {
-    struct PlanCompare {
-        bool operator() (const FourierTransform::Plan::Ptr &a, const FourierTransform::Plan::Ptr &b) const {
-            return (*a < *b);
-        }
+    
+    struct PlansContainer {  // using a static instance below ensures that fftw_init_threads is called only once, and cleanup is done when program exits.
+        PlansContainer() { fftw_init_threads(); };
+        ~PlansContainer(){
+            for( auto& it : plans) {
+                if( it.second ) {
+                    it.second.reset();
+                }
+            }
+            fftw_cleanup_threads();
+        };
+        std::map<FourierTransform::Plan::Index, FourierTransform::Plan::Ptr> plans;
     };
-    struct InitCleanup {  // using a static instance below ensures that fftw_init_threads is called only once, and cleanup is done when program exits.
-        InitCleanup(){ /*cout << "InitCleanup()" << endl;*/ fftw_init_threads(); };
-        ~InitCleanup(){ /*cout << "~InitCleanup()" << endl;*/ fftw_cleanup_threads(); };
-    };
+    
 }
 
 
 FourierTransform::Plan::Ptr FourierTransform::getPlan (const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads) {
-    static std::map<Plan::Index, Plan::Ptr> plans;
-    static InitCleanup icSingleton;
+
+    static PlansContainer pc;
+    
     static mutex mtx;
     unique_lock<mutex> lock (mtx);
-    auto plan = plans.emplace (Plan::Index(dims, tp, nThreads), nullptr);
+    auto plan = pc.plans.emplace( Plan::Index(dims, tp, nThreads), nullptr );
 
     if (plan.second) {  // insertion successful, i.e. new plan -> initialize it
-        plan.first->second.reset (new Plan (plan.first->first));
+        plan.first->second.reset( new Plan( plan.first->first ) );
     }
 
     return plan.first->second;
 }
 
 
-FourierTransform::FourierTransform() : centered (false), halfComplex (false), normalized(true) {
+FourierTransform::FourierTransform() : centered(false), halfComplex(false), normalized(true), nThreads(1), inputSize(0) {
 
 }
 
@@ -143,15 +147,11 @@ FourierTransform::FourierTransform (const FourierTransform& rhs) : plan (rhs.pla
 
 template <typename T>
 FourierTransform::FourierTransform (const Array<T>& rhs, int flags, uint8_t nT) :
-    centered (false), halfComplex (false), normalized (false) {
+    centered (false), halfComplex (false), normalized (false), nThreads(nT), inputSize(0) {
 
     vector<size_t> dims = rhs.dimensions(true);
-    if (dims.empty()) {
-        throw logic_error ("FourierTransform initialized with no non-trivial dimensions: " + printArray (rhs.dimensions(), "dims"));
-    } else {
-        if (dims.size() > 2) {
-            throw logic_error ("FourierTransform only supports 1&2 dimensions at the moment: " + printArray (dimensions(), "dims"));
-        }
+    if (dims.size() != 2 ) {
+        throw logic_error ("FourierTransform only supports 2 dimensions at the moment: " + printArray (dimensions(), "dims"));
     }
 
     reset(rhs.ptr(), dims[0], dims[1], flags, nT);
@@ -472,14 +472,19 @@ Array<double> FourierTransform::power (void) const {
 
 double FourierTransform::noise (int mask, double limit) const {
 
-    Array<double> pwr = power();
-
     double noise_power = 0.0;
 
     int N = 0;
     double xx, yy;
-    int npY = dimSize (0);
-    int npX = dimSize (1);
+    int npY = dimSize(0);
+    int npX = dimSize(1);
+    
+    int64_t nElements = npY*npX;
+    if(halfComplex) {
+        nElements = npY*(npX/2+1);
+    }
+    
+    const complex_t* dataPtr = get();
 
     if (mask < 0) {         // specifying mask < 0 will match MvN's noise_level computation   ( mask = (np/6) )
         mask = std::max (npY, npX) / 6 + 1;
@@ -499,7 +504,6 @@ double FourierTransform::noise (int mask, double limit) const {
 
     if (mask > 0) {
         endY = npY - mask + 1;
-
         if (!halfComplex) {
             endX = npX - mask + 1;
         }
@@ -517,17 +521,13 @@ double FourierTransform::noise (int mask, double limit) const {
 
         for (int y = mask; y < endY; ++y) {
             yy = std::min (y, npY - y);
-
             if ( (xx + yy * yy) < limits) continue;         // inside region to ignore
-
-            noise_power += count * pwr (y, x);
+            noise_power += count * norm(dataPtr[y*npX+x]);
             N += count;
-
         }
     }
-
-    return std::sqrt (noise_power / (N * inputSize)); // normalize both by elementcount and total elements
-    // (because the power-spectrum was not normalized first)
+    if( N && nElements ) noise_power = std::sqrt (noise_power / (N * nElements));
+    return noise_power;
 
 }
 

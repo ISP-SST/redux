@@ -130,7 +130,7 @@ namespace redux {
             PointI offset;                                      //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
             PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, nModes;
-            uint32_t otfSize, pupilSize2;
+            uint32_t otfSize, pupilSize2, otfSize2;
             double oldRG;
             
             Object& object;

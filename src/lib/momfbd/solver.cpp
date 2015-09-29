@@ -120,6 +120,7 @@ void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
 double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void* params ) {
 
     double* alphaPtr = alpha;
+    memset(alphaPtr,0,nParameters*sizeof(double));
     
     job.globalData->constraints.reverse(x->data, alphaPtr);
     
@@ -320,6 +321,11 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
     gsl_vector *beta_init = gsl_vector_alloc( nFreeParameters );
     memset(beta_init->data,0,nFreeParameters*sizeof(double));
     
+    memset(s->x->data,0,nFreeParameters*sizeof(double));
+    memset(s->dx->data,0,nFreeParameters*sizeof(double));
+    memset(s->gradient->data,0,nFreeParameters*sizeof(double));
+    s->f = 0;
+    
     uniform_real_distribution<double> dist(-1E-8, 1E-8);
     default_random_engine re;
   /*  
@@ -355,7 +361,7 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
     
     boost::timer::auto_cpu_timer timer;
 
-    double previousMetric(0), thisMetric, gradNorm;
+    double previousMetric(0), thisMetric(0), gradNorm(0);
     uint16_t nModeIncrement = job.nModeIncrement;
 
     size_t failCount(0);

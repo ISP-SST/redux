@@ -184,6 +184,7 @@ void FileSink::init( void ) {
     }
 
     sink->set_formatter( log_format );
+    sink->locked_backend()->auto_flush(true);
 
     blog::core::get()->add_sink( sink );
 
@@ -221,6 +222,7 @@ void StreamSink::init( void ) {
     sink->set_filter( expr::attr< severity_level >( "Severity" ).or_default( sev_normal ) >= minSeverity );
 
     sink->set_formatter( log_format );
+    sink->locked_backend()->auto_flush(true);
 
     blog::core::get()->add_sink( sink );
 

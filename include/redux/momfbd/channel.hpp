@@ -81,8 +81,8 @@ namespace redux {
             void unloadCalib(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
-            void loadImage(size_t index, redux::util::Array<PatchData::Ptr>&);
-            void preprocessImage(size_t index, redux::image::Image<float>& img, redux::util::Array<PatchData::Ptr>&);
+            void loadImage(size_t index);
+            void preprocessImage(size_t index, redux::image::Image<float>& img);
             void copyImagesToPatch(ChannelData&);          
             
             Point16 getImageSize(void);
