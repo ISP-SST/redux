@@ -57,7 +57,7 @@ namespace redux {
                 return ret;
             }
             template<class KeyT, class T>
-            static T& get(const KeyT& key, const T& val) {
+            static T& get(const KeyT& key, const T& val=T()) {
                 auto m = get().getMap<KeyT,T>();        // m.first is a unique_lock for the map in m.second
                 auto ret = m.second.emplace(key,val);
                 return ret.first->second;
@@ -83,6 +83,16 @@ namespace redux {
             static void clear(void) {
                 auto s = get().getSet<T>();
                 s.second.clear();
+            }
+            template<class KeyT, class T>
+            static size_t size(void) {
+                auto m = get().getMap<KeyT,T>();
+                return m.second.size();
+            }
+            template<class T>
+            static size_t size(void) {
+                auto s = get().getSet<T>();
+                return s.second.size();
             }
             /*template<class T, class KeyT, class... Args>
             static std::shared_ptr<T>& get(const KeyT& key, Args... args) {
@@ -149,6 +159,7 @@ namespace redux {
             CacheItem(void);
             CacheItem(const std::string& path);
             CacheItem(const CacheItem&);
+            virtual ~CacheItem();
             
             /***** Methods to be overloaded *****/
             virtual size_t csize(void) const { return 0; };                //!< returns the necessary buffer size for the call to "cpack"
@@ -157,6 +168,7 @@ namespace redux {
             virtual void cclear(void) {};                                  //!< free whatever memory possible, while being able to restore with "cunpack"
             /************************************/
             
+            void cacheRemove(void);
             virtual void cacheTouch(void);
             virtual bool cacheLoad(bool removeAfterLoad=false);
             virtual bool cacheStore(bool clearAfterStore=false);

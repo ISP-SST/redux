@@ -9,6 +9,7 @@
 #include "redux/image/pupil.hpp"
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
+#include "redux/util/compress.hpp"
 
 #include <memory>
 #include <mutex>
@@ -34,6 +35,7 @@ namespace redux {
         struct ChannelData : public redux::util::CacheItem {
             
             explicit ChannelData( std::shared_ptr<Channel> c, const std::string& cachePath );
+            ~ChannelData();
             
             /**** Local processing (slaves) ****/
             void initPatch(void);
@@ -48,9 +50,9 @@ namespace redux {
             PointF residualOffset;                              //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
             /*************************/
             
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
-            uint64_t unpack(const char*, bool);
+            virtual uint64_t size(void) const;
+            virtual uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
+            virtual uint64_t unpack(const char*, bool);
             size_t csize(void) const { return size(); };
             uint64_t cpack(char* p) const { return pack(p); };
             uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
@@ -67,11 +69,12 @@ namespace redux {
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
             ObjectData( std::shared_ptr<Object> o, const std::string& cachePath );
+            ~ObjectData();
             void initPatch(void);
             void collectResults(void);
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            virtual uint64_t size(void) const;
+            virtual uint64_t pack(char*) const;
+            virtual uint64_t unpack(const char*, bool);
             size_t csize(void) const { return size(); };
             uint64_t cpack(char* p) const { return pack(p); };
             uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
@@ -79,7 +82,7 @@ namespace redux {
             bool cacheStore(bool clearAfterStore=false);
             void cclear(void);
             
-            std::vector<ChannelData> channels;
+            std::vector<redux::util::Compressed<ChannelData,5>> channels;
             
             /********* Results ********/
             redux::util::Array<float> img;              //!< Restored image.
@@ -98,7 +101,7 @@ namespace redux {
         struct PatchData : public Part {
             typedef std::shared_ptr<PatchData> Ptr;
             const MomfbdJob& myJob;
-            std::vector<ObjectData> objects;
+            std::vector<redux::util::Compressed<ObjectData,5>> objects;
             Point16 index;                      //! Patch-index in mozaic
             Region16 roi;                       //! Region/position of this patch in the full image
             PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
@@ -106,9 +109,9 @@ namespace redux {
 
             void initPatch(void);
             void collectResults(void);
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            virtual uint64_t size(void) const;
+            virtual uint64_t pack(char*) const;
+            virtual uint64_t unpack(const char*, bool);
             size_t csize(void) const { return size(); };
             uint64_t cpack(char* p) const { return pack(p); };
             uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };

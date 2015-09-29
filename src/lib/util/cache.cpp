@@ -28,8 +28,11 @@ void Cache::setPath(const string& path) {
     cachePath = path;
 }
 
+
 CacheItem::CacheItem(void) : itemPath(""), isLoaded(true) {
+    
 }
+
 
 CacheItem::CacheItem(const string& path) : itemPath(path), isLoaded(true) {
     unique_lock<mutex> lock(itemMutex);
@@ -38,10 +41,22 @@ CacheItem::CacheItem(const string& path) : itemPath(path), isLoaded(true) {
     }
 }
 
+
 CacheItem::CacheItem(const CacheItem& rhs) : itemPath(rhs.itemPath), timeout(rhs.timeout), lastAccessed(rhs.lastAccessed),
- options(rhs.options), isLoaded(rhs.isLoaded) {
+     options(rhs.options), isLoaded(rhs.isLoaded) {
+         
 }
 
+
+CacheItem::~CacheItem() {
+    
+}
+
+
+void CacheItem::cacheRemove(void) {
+    unique_lock<mutex> lock(itemMutex);
+    bfs::remove(itemPath);
+}
 
 void CacheItem::cacheTouch(void) {
     unique_lock<mutex> lock(itemMutex);
@@ -64,16 +79,17 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                 in.clear();
                 in.read(buf.get(), sz);
                 size_t psz = cunpack(buf.get(),false);
-                if(psz == sz) {
+                if( psz >= sz ) {
                     isLoaded = true;
                     //cout << hexString(this) << "  CacheItem::cacheLoad() " << itemPath << "   OK  removed=" << removeAfterLoad << endl;
                     ret = true;
-                } else cout << hexString(this) << "  CacheItem::cacheLoad() " << psz << " != " << sz << " !!!" << endl;
+                } else cout << hexString(this) << "  CacheItem::cacheLoad() " << psz << " < " << sz << " !!!" << endl;
             } else cout << hexString(this) << "  CacheItem::cacheLoad() in.good() == false !!!" << endl;
         } //else cout << hexString(this) << "  CacheItem::cacheLoad() " << itemPath << " doesn't exist !!!" << endl;
     } //else cout << hexString(this) << "  CacheItem::cacheLoad()  " << itemPath << "   already Loaded !!!" << endl;
     
     if(isLoaded && removeAfterLoad) {
+        unique_lock<mutex> lock(itemMutex);
         bfs::remove(itemPath);
     }
     
@@ -91,14 +107,14 @@ bool CacheItem::cacheStore(bool clearAfterStore){
         size_t sz = csize();
         unique_ptr<char[]> buf( new char[sz] );
         size_t psz = cpack(buf.get());
-        if(psz == sz) {
+        if( psz <= sz ) {
             ofstream out(itemPath.c_str(), ofstream::binary);
             if( out.good() ) {
                 out.write( buf.get(), sz );
                 //cout << hexString(this) << "  CacheItem::cacheStore() " << itemPath << "   OK  cleared=" << clearAfterStore << endl;
                 ret = true;
             } else cout << hexString(this) << "  CacheItem::cacheStore() out.good() == false !!!" << endl;
-        } else cout << hexString(this) << "  CacheItem::cacheStore() " << psz << " != " << sz << " !!!" << endl;
+        } else cout << hexString(this) << "  CacheItem::cacheStore() " << psz << " > " << sz << " !!!" << endl;
     } //else cout << hexString(this) << "  CacheItem::cacheStore()  " << itemPath << "   not Loaded !!!" << endl;
     
     if(clearAfterStore) {

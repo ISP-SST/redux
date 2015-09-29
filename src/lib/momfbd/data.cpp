@@ -27,6 +27,13 @@ ChannelData::ChannelData( std::shared_ptr<Channel> c, const std::string& inPath 
 }
 
 
+ChannelData::~ChannelData() {
+    cacheRemove();        // remove cache file
+    cclear();
+}
+
+
+
 void ChannelData::initPatch(void) {
     myChannel->initPatch(*this);
 }
@@ -82,10 +89,16 @@ ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& inPath ) :
 }
 
 
+ObjectData::~ObjectData() {
+    cacheRemove();        // remove cache file
+    cclear();
+}
+
+
 void ObjectData::initPatch(void) {
     myObject->initPatch(*this);
     myObject->fitAvgPlane(*this);
-    for( ChannelData& ch: channels ) {
+    for( auto& ch: channels ) {
         ch.initPatch();
     }
     myObject->initPQ();
@@ -97,7 +110,7 @@ void ObjectData::collectResults(void) {
     myObject->getResults(*this);
     if(size()>6*sizeof(uint64_t)) isLoaded = true;
     else isLoaded = false;
-    for( ChannelData& ch: channels ) {
+    for( auto& ch: channels ) {
         ch.collectResults();
     }
 }
@@ -110,7 +123,7 @@ uint64_t ObjectData::size( void ) const {
     sz += res.size();
     sz += alpha.size();
     sz += div.size();
-    for( const ChannelData& cd: channels ) {
+    for( const auto& cd: channels ) {
         sz += cd.size();
     }
     return sz;
@@ -125,7 +138,7 @@ uint64_t ObjectData::pack( char* ptr ) const {
     count += res.pack(ptr+count);
     count += alpha.pack(ptr+count);
     count += div.pack(ptr+count);
-    for( const ChannelData& cd: channels ) {
+    for( const auto& cd: channels ) {
         count += cd.pack( ptr+count );
     }
     return count;
@@ -144,7 +157,7 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     else isLoaded = false;
     channels.clear();
     for( auto& it: myObject->getChannels() ) {
-        ChannelData chan(it,path());
+        Compressed<ChannelData> chan( it, path() );
         count += chan.unpack( ptr+count, swap_endian );
         channels.push_back(chan);
     }
@@ -154,7 +167,7 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
 
 bool ObjectData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
-    for( ChannelData& cd: channels ) {
+    for( auto& cd: channels ) {
         loaded |= cd.cacheLoad(removeAfterLoad);
     }
     loaded |= CacheItem::cacheLoad(removeAfterLoad);
@@ -164,7 +177,7 @@ bool ObjectData::cacheLoad(bool removeAfterLoad) {
 
 bool ObjectData::cacheStore(bool clearAfterStore) {
     bool stored(false);
-    for( ChannelData& cd: channels ) {
+    for( auto& cd: channels ) {
         stored |= cd.cacheStore(clearAfterStore);
     }
     stored |= CacheItem::cacheStore(clearAfterStore);      // true if any part was stored, TODO better control of partial fails.
@@ -173,7 +186,7 @@ bool ObjectData::cacheStore(bool clearAfterStore) {
 
 
 void ObjectData::cclear(void) {
-    for( ChannelData& cd: channels ) {
+    for( auto& cd: channels ) {
         cd.cclear();
     }
     img.clear();
