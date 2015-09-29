@@ -168,7 +168,7 @@ bool Worker::getWork( void ) {
     if( wip.connection ) {            // remote work: return parts.
         returnWork();
     } else if ( wip.parts.size() ) {
-        wip.job->returnResults( wip );
+        daemon.returnResults( wip );
     }
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote

@@ -469,6 +469,17 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 }
 
 
+void Daemon::returnResults( WorkInProgress& wip ) {
+    
+    wip.job->returnResults( wip );
+    for( Part::Ptr& it : wip.parts ) {
+        it->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)
+    }
+    wip.parts.clear();
+
+}
+
+
 void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
     Host::Ptr h = connections[conn];
@@ -534,10 +545,7 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     WorkInProgress& wip = it->second;
     if( blockSize ) {
         wip.unpackWork( buf.get(), conn->getSwapEndian() );
-        wip.job->returnResults( wip );
-        for( Part::Ptr& it : wip.parts ) {
-            it->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)
-        }
+        returnResults( wip );
     } else {
         LOG_DEBUG << "putParts():  EMPTY   blockSize = " << blockSize;
     }
