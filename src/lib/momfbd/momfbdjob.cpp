@@ -44,7 +44,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap
     uint64_t count(0);
     if( wip.nParts ) {
         wip.parts.resize(1);
-        if(!wip.parts[0]) wip.parts[0].reset(new PatchData(*this));
+        wip.parts[0].reset(new PatchData(*this));
         count += wip.parts[0]->unpack( ptr+count, swap_endian );
         if( wip.nParts > 1 ) {
             globalData.reset( new GlobalData(*this) );
@@ -210,7 +210,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
                 ret = true;
             }
         }*/
-        if(!ret /*&& wip.connection*/) {
+        if(!ret && wip.connection) {
             for( auto & it : patches ) {
                 if( it->step == JSTEP_QUEUED ) {
                     it->step = JSTEP_RUNNING;
@@ -362,11 +362,12 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     for( uint y=0; y<subImagePosY.size(); ++y ) {
         for( uint x=0; x<subImagePosX.size(); ++x ) {
             PatchData::Ptr patch( new PatchData(*this, y, x ) );
+            patch->setPath(to_string(info.id));
             patch->step = JSTEP_QUEUED;
             patch->roi.first = Point16(subImagePosY[y]-halfPatchSize-1, subImagePosX[x]-halfPatchSize-1);   // subImagePosX/Y is 1-based
             patch->roi.last = patch->roi.first+ps-1;
             patch->id = ++count;
-            patches(y,x) = patch;
+            patches(y,x) = std::move(patch);
         }
     }
 
