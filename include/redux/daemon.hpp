@@ -59,7 +59,7 @@ namespace redux {
         std::mutex jobMutex;
         size_t jobCounter;
         std::vector<Job::JobPtr> jobs;
-        uint8_t nQueuedJobs;
+        uint16_t nQueuedJobs;
         uint32_t hostTimeout;
         
         std::mutex peerMutex;

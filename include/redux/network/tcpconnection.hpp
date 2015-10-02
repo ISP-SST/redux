@@ -30,7 +30,6 @@ namespace redux {
                     }
                 }
                 else {
-                    std::cout << "ERRRR " << std::endl;
                     if( ( error == error::eof ) || ( error == error::connection_reset ) ) {
                         // TODO handle reconnects...
                     }

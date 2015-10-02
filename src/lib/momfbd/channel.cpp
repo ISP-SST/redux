@@ -540,10 +540,10 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
     
     // load data (and preprocess)
     imageStats[0].reset(new ArrayStats());
-    service.post(std::bind(&Channel::loadImage, this, 0));           // will *not* be loaded through the cahche, so only saved in "images"
+    service.post(std::bind(&Channel::loadImage, this, 0));           // will *not* be loaded through the cache, so only saved in "images"
     for (size_t i = 1; i < nImages; ++i) {
         imageStats[i].reset (new ArrayStats());
-        service.post(std::bind(&Channel::loadImage, this, i));       // will *not* be loaded through the cahche, so only saved in "images"
+        service.post(std::bind(&Channel::loadImage, this, i));       // will *not* be loaded through the cache, so only saved in "images"
     }
     runThreadsAndWait(service, myJob.info.maxThreads);
     

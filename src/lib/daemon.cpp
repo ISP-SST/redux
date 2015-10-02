@@ -699,4 +699,5 @@ void Daemon::updateLoadAvg( void ) {
     }
 
     myInfo->status.loadAvg = loadAvg[0] / myInfo->info.nCores * 100.0;
+    //LOG_TRACE << "updateLoadAvg()  = " << myInfo->status.loadAvg;
 }

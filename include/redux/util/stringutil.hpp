@@ -171,7 +171,7 @@ namespace redux {
          *            ------------------------            
          *  @endcode
          */
-        template <typename T> inline std::string printBits( const T* var, size_t n = 1 ) {
+        template <typename T> inline std::string printBits( T* var, size_t n = 1 ) {
 
             std::ostringstream oss;
             oss << "     MSB <<  7  6  5  4  3  2  1  0  << LSB\n";
@@ -183,7 +183,7 @@ namespace redux {
             while( end >= ptr )  {
                 bool alpha = ( *end > 31 && *end < 126 );
                 oss << "  Byte ";
-                oss.setf ( std::ios::right );
+                oss.setf ( std::ios::left );
                 oss << std::setw(5) << std::to_string( ( int )( end - ptr ) );
                 oss.flags( ff );
 
@@ -228,7 +228,7 @@ namespace redux {
             while( end >= ptr )  {
                 bool alpha = ( *end > 31 && *end < 126 );
                 oss << "  Byte ";
-                oss.setf ( std::ios::right );
+                oss.setf ( std::ios::left );
                 oss << std::setw(5) << std::to_string( ( int )( end - ptr ) );
                 oss.flags ( ff );
 

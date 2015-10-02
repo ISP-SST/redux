@@ -309,8 +309,6 @@ void SubImage::calcVogelWeight(void) {
     complex_t* tmpOtfPtr = tmpOTF.get();
     complex_t* glPtr = tmpC.get();
     complex_t* hjPtr = tmpC2.get();
-
-    size_t otf2 = otfSize*otfSize;
     
     tmpOTF.zero();
     FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
@@ -325,9 +323,8 @@ void SubImage::calcVogelWeight(void) {
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
     tmpOTF.ift(glPtr);
     
-    tmpOTF.zero();
-    double normalization = 1.0/(otf2*otf2);
-    transform( glPtr, glPtr+otf2, hjPtr, glPtr,
+    double normalization = 1.0/(otfSize2*otfSize2);
+    transform( glPtr, glPtr+otfSize2, hjPtr, glPtr,
               [normalization](const complex_t& g,const complex_t& h) {
                   return normalization * h * g.real();
               });

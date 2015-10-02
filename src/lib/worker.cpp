@@ -172,7 +172,6 @@ bool Worker::getWork( void ) {
     }
 
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-        //cout << " Worker::getWork()   got local work." << endl; 
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
             LOG_DEBUG << "Initializing new job: " + wip.print();
             wip.job->init();
