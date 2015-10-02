@@ -124,14 +124,14 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), priority(10), verbosity(0), maxThreads(255), maxPartRetries(1),
+Job::Info::Info(void) : id(0), timeout(1000), priority(10), verbosity(0), maxThreads(255), maxPartRetries(1),
          step(0), state(JSTATE_IDLE) {
 
 }
 
 
 uint64_t Job::Info::size(void) const {
-    uint64_t sz = sizeof(uint32_t) + 6;
+    uint64_t sz = 2*sizeof(uint32_t) + 6;
     sz += typeString.length() + name.length() + user.length() + host.length() + logFile.length() + 5;
     sz += 3*sizeof(time_t);
     return sz;
@@ -142,6 +142,7 @@ uint64_t Job::Info::pack(char* ptr) const {
     using redux::util::pack;
     uint64_t count = pack(ptr, typeString);    // NB: the type-string has to be first in the packed block,
     count += pack(ptr+count, id);              //   it is used to identify which job-class to instantiate on the receiving side.
+    count += pack(ptr+count, timeout);
     count += pack(ptr+count, priority);
     count += pack(ptr+count, verbosity);
     count += pack(ptr+count, maxThreads);
@@ -163,6 +164,7 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     using redux::util::unpack;
     uint64_t count = unpack(ptr, typeString);
     count += unpack(ptr+count, id, swap_endian);
+    count += unpack(ptr+count, timeout);
     count += unpack(ptr+count, priority);
     count += unpack(ptr+count, verbosity);
     count += unpack(ptr+count, maxThreads);
@@ -205,6 +207,7 @@ std::string Job::Info::print(void) {
 
 void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
     
+    info.timeout = tree.get<uint32_t>("TIMEOUT", globalDefaults.timeout);
     info.priority = tree.get<uint8_t>("PRIORITY", globalDefaults.priority);
     info.verbosity = tree.get<uint8_t>("VERBOSITY", globalDefaults.verbosity);
     info.maxThreads = tree.get<uint8_t>("MAX_THREADS", globalDefaults.maxThreads);
@@ -216,6 +219,7 @@ void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
 
 bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
     bpt::ptree tree;
+    if(info.timeout != globalDefaults.timeout) tree.put("TIMEOUT", info.timeout);
     if(info.priority != globalDefaults.priority) tree.put("PRIORITY", info.priority);
     if(info.verbosity != globalDefaults.verbosity) tree.put("VERBOSITY", info.verbosity);
     if(info.maxThreads != globalDefaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);

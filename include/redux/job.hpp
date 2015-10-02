@@ -75,7 +75,7 @@ namespace redux {
         static std::string stateTag(uint8_t);
         
         struct Info {
-            uint32_t id;
+            uint32_t id, timeout;
             uint8_t priority, verbosity, maxThreads, maxPartRetries;
             std::atomic<uint8_t> step;
             std::atomic<uint8_t> state;

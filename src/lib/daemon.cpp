@@ -35,7 +35,8 @@ namespace {
 }
 
 
-Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ), timer( ioService ), worker( *this ) {
+Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
+    hostTimeout(1000), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
@@ -240,28 +241,69 @@ void Daemon::removeConnection( TcpConnection::Ptr& conn ) {
 // TODO a timeout to allow a peer to reconnect before removing it (which would clear stats/id when/if it reconnects).
 void Daemon::cleanup( void ) {
 
-    unique_lock<mutex> lock( peerMutex );
+    {
+        unique_lock<mutex> lock( peerMutex );
+        for( auto it=connections.begin(); it != connections.end(); ) {
+            if( it->first && !it->first->socket().is_open() ) {
+                it->second->nConnections--;
+                connections.erase( it++ );          // N.B iterator is invalidated on erase, so the postfix increment is necessary.
+            } else ++it;
+        }
 
-    for( auto it=connections.begin(); it != connections.end(); ) {
-        if( it->first && !it->first->socket().is_open() ) {
-            it->second->nConnections--;
-            connections.erase( it++ );          // N.B iterator is invalidated on erase, so the postfix increment is necessary.
-        } else ++it;
-    }
-
-    for( auto it=peers.begin(); it != peers.end(); ) {
-        if( it->second->nConnections < 1 ) {
-            auto wip = peerWIP.find( it->second );
-            if( wip != peerWIP.end() ) {
-                if( wip->second.job ) {
-                    LOG_DETAIL << "Peer #" << it->first << " disconnected, returning unfinished work to queue: " << wip->second.print();
-                    wip->second.job->ungetWork( wip->second );
+        for( auto it=peers.begin(); it != peers.end(); ) {
+            if( it->second->nConnections < 1 ) {
+                auto wip = peerWIP.find( it->second );
+                if( wip != peerWIP.end() ) {
+                    if( wip->second.job ) {
+                        LOG_DETAIL << "Peer #" << it->first << " disconnected, returning unfinished work to queue: " << wip->second.print();
+                        wip->second.job->ungetWork( wip->second );
+                    }
+                    peerWIP.erase(wip);
                 }
-                peerWIP.erase(wip);
+                peers.erase( it++ );
+            } else ++it;
+        }
+        
+        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        for( auto it=peerWIP.begin(); it != peerWIP.end(); ) {
+            Job::JobPtr job = it->second.job;
+            if( job ) {
+                bool timedOut(false);
+                boost::posix_time::time_duration elapsed = (now - it->first->status.lastSeen);
+                if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
+                    LOG_DETAIL << "Peer has not been active in " << to_simple_string(elapsed) << ", returning unfinished work to queue: " << it->second.print();
+                    it->second.job->ungetWork( it->second );
+                    timedOut = true;
+                }
+                elapsed = (now - it->second.workStarted);
+                if( elapsed > boost::posix_time::seconds( it->second.job->info.timeout ) ) {
+                    LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ", returning unfinished work to queue: " << it->second.print();
+                    it->second.job->ungetWork( it->second );
+                    timedOut = true;
+                }
+                
+                if( timedOut ) {
+                    peerWIP.erase(it++);
+                    continue;
+                }
             }
-            peers.erase( it++ );
-        } else ++it;
+            it++;
+        }
     }
+    
+/*    {
+        unique_lock<mutex> lock( jobMutex );
+
+        for( auto& it : jobs ) {
+            if( it->info.step >= 32 ) {
+                LOG_DEBUG << "Job " << it->info.id << " (" << it->info.name << ") is completed, removing from queue.  uc=" << it.use_count() << endl;
+                it.reset();
+            }
+        }
+        jobs.erase(std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){return (j == nullptr);}), jobs.end());
+    }
+*/
+}
 
 }
 
@@ -420,6 +462,7 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
             for( auto& it: wip.parts ) {
                 it->cacheLoad(false);
             }
+            wip.workStarted = boost::posix_time::second_clock::local_time();
             break;
         }
     }
@@ -503,7 +546,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
        // if(!previousJob || *wip.job != *previousJob) {
        //     includeJob = true;
        // }
-        LOG_DEBUG << (includeJob?"(new job) ":"") << " to host: " << host->info.name << ":" << host->info.pid;
+        LOG_DEBUG << "Sending work" << (includeJob?"(new job) ":"") << " to host:pid = " << host->info.name << ":" << host->info.pid;
        // blockSize = wip.size( includeJob );
     }
 

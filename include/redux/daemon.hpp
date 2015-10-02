@@ -60,6 +60,7 @@ namespace redux {
         size_t jobCounter;
         std::vector<Job::JobPtr> jobs;
         uint8_t nQueuedJobs;
+        uint32_t hostTimeout;
         
         std::mutex peerMutex;
         network::Host::Ptr myInfo;

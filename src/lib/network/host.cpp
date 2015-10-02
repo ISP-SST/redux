@@ -52,6 +52,8 @@ Host::HostInfo::HostInfo( void ) : peerType(0) {
 
 Host::HostStatus::HostStatus( void ) : currentJob( 0 ), nThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
     loadAvg( 0 ), progress( 0 ) {
+        
+    lastSeen = boost::posix_time::second_clock::local_time(); 
 
 }
 
