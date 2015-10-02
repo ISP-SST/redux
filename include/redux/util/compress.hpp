@@ -23,8 +23,9 @@ namespace redux {
         class Compressed : public T {
             
         public:
-            template <class... S> Compressed(S... s) : T(s...), isCompressed(false), compressionLevel(LVL),
-                    compressedSize(0), uncompressedSize(0) { }
+            template <class... S> Compressed(S&& ... s) : T(std::forward<S>(s)...),
+                isCompressed(false), compressionLevel(LVL),
+                compressedSize(0), uncompressedSize(0) { }
             
             static inline uint64_t metaSize(void) { return 2*sizeof(uLongf)+1; }
             uint64_t size(void) const { return T::size() + metaSize(); };
