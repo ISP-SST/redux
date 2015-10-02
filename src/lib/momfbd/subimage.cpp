@@ -380,33 +380,37 @@ void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const d
 
 void SubImage::adjustOffset(void) {
     bool adjusted(false);
-    if( alpha.count(2) ) {
-        int adjust = lround(alpha[2]*object.alphaToPixels);
+    int32_t mIndex = object.modes.xTiltIndex;
+    if( mIndex >= 0 ) {
+        int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
         if( adjust ) {
             adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.x += adjust;        // Noll-index = 2 corresponds to x-tilt.
-                double oldval = alpha[2];
-                alpha[2] -= adjust*object.pixelsToAlpha;
-                LOG_TRACE << "adjustOffset:  mode 2 was adjusted.  from " << oldval << " to " << alpha[2] << "  (" << adjust<< " pixels)";
+                double oldval = currentAlpha[mIndex];
+                currentAlpha[mIndex] -= adjust*object.pixelsToAlpha;
+                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
+                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
                 adjusted = true;
             }
         }
     }
-    if( alpha.count(3) ) {
-        int adjust = lround(alpha[3]*object.alphaToPixels);
+    mIndex = object.modes.yTiltIndex;
+    if( mIndex >= 0 ) {
+        int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
         if( adjust ) {
             adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.y += adjust;        // Noll-index = 3 corresponds to y-tilt.
-                double oldval = alpha[3];
-                alpha[3] -= adjust*object.pixelsToAlpha;
-                LOG_TRACE << "adjustOffset:  mode 3 was adjusted.  from " << oldval << " to " << alpha[3] << "  (" << adjust<< " pixels)";
+                double oldval = currentAlpha[mIndex];
+                currentAlpha[mIndex] -= adjust*object.pixelsToAlpha;
+                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
+                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
                 adjusted = true;
             }
         }
     }
-    if(adjusted) init();
+    if(adjusted) newCutout();
     
 }
 
@@ -550,8 +554,7 @@ void SubImage::calcPFOTF(void) {
     complex_t* pfPtr = PF.get();
     complex_t* otfPtr = OTF.get();
     const double* phiPtr = phi.get();
-   // memcpy(tmpC.get(),otfPtr,otfSize*otfSize*sizeof(complex_t));
-    
+
     memset (pfPtr, 0, pupilSize2*sizeof (complex_t));
     memset (otfPtr, 0, otfSize2*sizeof (complex_t));
     

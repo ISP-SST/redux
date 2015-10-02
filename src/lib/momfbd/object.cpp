@@ -718,27 +718,21 @@ void Object::initCache (void) {
     
     
     pixelsToAlpha =  alphaToPixels = 0;
-    if( modeFile.empty() ) {    // if loaded from file, we don't know if there are tilts...or where in the array they are.
-        for( uint i=0; i<modes.modeNumbers.size(); ++i ) {
-            if( modes.modeNumbers[i] == 2 ) {
-                double delta = modes(i,pupilPixels/2+1,pupilPixels/2) - modes(i,pupilPixels/2,pupilPixels/2);
-                pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
-                break;
-            }
-            if( modes.modeNumbers[i] == 3 ) {
-                double delta = modes(i,pupilPixels/2,pupilPixels/2+1) - modes(i,pupilPixels/2,pupilPixels/2);
-                pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
-                break;
-            }
-        }
-        if( fabs(pixelsToAlpha) > 0 ) {
-            alphaToPixels = 1.0/pixelsToAlpha;
-        }
+    if( modes.yTiltIndex >= 0 ) {
+        double delta = modes(modes.yTiltIndex,pupilPixels/2+1,pupilPixels/2) - modes(modes.yTiltIndex,pupilPixels/2,pupilPixels/2);
+        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
+    } else if ( modes.xTiltIndex >= 0 ) {
+        double delta = modes(modes.xTiltIndex,pupilPixels/2,pupilPixels/2+1) - modes(modes.xTiltIndex,pupilPixels/2,pupilPixels/2);
+        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
     }
     
+    if( fabs(pixelsToAlpha) > 0 ) {
+        alphaToPixels = 1.0/pixelsToAlpha;
+    }
+
     defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
     alphaToDefocus = 1.0/defocusToAlpha;
-    
+
 }
 
 

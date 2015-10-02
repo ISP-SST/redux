@@ -76,6 +76,7 @@ namespace redux {
             
             ModeInfo info;
             
+            int32_t xTiltIndex, yTiltIndex;
             std::vector<uint16_t> modeNumbers;
             std::vector<double*> modePointers;
             std::mutex mtx;
