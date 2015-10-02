@@ -551,8 +551,8 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     }
 
     data = sharedArray<char>(blockSize+sizeof(uint64_t));
-    char* ptr = data.get();
-    uint64_t count = pack( ptr, blockSize );
+    char* ptr = data.get()+sizeof(uint64_t);
+    uint64_t count(0); 
     if(wip.job) {
         count += wip.packWork( ptr+count );
         for(auto& it: wip.parts) {
@@ -560,7 +560,8 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         }
         wip.previousJob = wip.job;
     }
-    conn->writeAndCheck( data, blockSize+sizeof(uint64_t) );
+    pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)
+    conn->writeAndCheck( data, count+sizeof(uint64_t) );
 
     
 /*    auto buf = sharedArray<char>( blockSize + sizeof( size_t ) );
