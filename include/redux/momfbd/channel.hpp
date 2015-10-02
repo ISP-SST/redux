@@ -48,7 +48,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&) const;
-            size_t nImages(void) const { return imageNumbers.size(); } 
+            uint32_t nImages(void) const { return imageNumbers.size(); } 
             void adjustCutout(ChannelData&, const Region16&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
             void storePatchData(boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>&);          

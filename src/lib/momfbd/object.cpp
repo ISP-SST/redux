@@ -172,11 +172,10 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 }
 
 
-size_t Object::nImages(void) const {
+uint32_t Object::nImages(void) const {
     if(nObjectImages) return nObjectImages;
-    size_t objImages = 0;        // reset image-count
-    for (const shared_ptr<Channel>& ch : channels) objImages += ch->nImages();
-    return objImages;
+    for (const shared_ptr<Channel>& ch : channels) nObjectImages += ch->nImages();
+    return nObjectImages;
 }
 
 

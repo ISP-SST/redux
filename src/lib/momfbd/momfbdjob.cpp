@@ -383,14 +383,16 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     
     initcache.join();           // wait for background jobs.
     bool writeFailed(false);
+    uint32_t nTotalImages(0);
     for( shared_ptr<Object>& obj : objects ) {
         for( shared_ptr<Channel>& ch : obj->channels ) {
             writeFailed |= ch->patchWriteFail.get();            // FIXME only used as a synch-point atm. It should deal with errors eventually.
         }
+        nTotalImages += obj->nImages();
     }
     if(writeFailed) LOG_ERR<< "MomfbdJob::preProcess()  Hmmmmm, that's odd, I haven't implemented any error-reporting yet.";
 
-    LOG_DETAIL << "MomfbdJob::preProcess()  Done.  nPatches = " << patches.nElements();
+    LOG_DETAIL << "MomfbdJob::preProcess()  Done.  nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << "   nImages = " << nTotalImages;
 
     info.step.store( JSTEP_QUEUED );
 
