@@ -173,11 +173,13 @@ namespace redux {
             virtual bool cacheLoad(bool removeAfterLoad=false);
             virtual bool cacheStore(bool clearAfterStore=false);
             void setLoaded(bool il=true);
-            virtual void setPath(const std::string& path);
+            virtual const std::string& getFullPath(void) { return fullPath.string(); }
+            virtual void setPath( const std::string& path );
             std::string path(void) const { return itemPath.string(); };
             
         protected:
             bfs::path itemPath;
+            bfs::path fullPath;
             int timeout;
             int lastAccessed;
             int options;

@@ -21,9 +21,8 @@ const std::string thisChannel = "data";
 }
 
 
-ChannelData::ChannelData( std::shared_ptr<Channel> c, const std::string& inPath ) : myChannel(c) {
-    string mypath = inPath + "_" + to_string(c->id());
-    setPath(mypath);
+ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
+
 }
 
 
@@ -32,6 +31,11 @@ ChannelData::~ChannelData() {
     cclear();
 }
 
+
+void ChannelData::setPath(const std::string& path) {
+    string mypath = path + "_" + to_string(myChannel->id());
+    CacheItem::setPath(mypath);
+}
 
 
 void ChannelData::initPatch(void) {
@@ -78,13 +82,7 @@ void ChannelData::cclear(void) {
 }
 
 
-ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& inPath ) : myObject(o) {
-
-    string mypath = inPath + "_" + to_string(o->id());
-    setPath(mypath);
-    for( auto& it: o->getChannels() ) {
-        channels.push_back(ChannelData(it,mypath));
-    }
+ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o), channels(o->getChannels().begin(),o->getChannels().end()) {
 
 }
 
@@ -92,6 +90,15 @@ ObjectData::ObjectData( std::shared_ptr<Object> o, const std::string& inPath ) :
 ObjectData::~ObjectData() {
     cacheRemove();        // remove cache file
     cclear();
+}
+
+
+void ObjectData::setPath(const std::string& path) {
+    string mypath = path + "_" + to_string(myObject->id());
+    CacheItem::setPath(mypath);
+    for( auto& it: channels ) {
+        it.setPath(mypath);
+    }
 }
 
 
@@ -123,8 +130,9 @@ uint64_t ObjectData::size( void ) const {
     sz += res.size();
     sz += alpha.size();
     sz += div.size();
-    for( const auto& cd: channels ) {
-        sz += cd.size();
+    for( auto& cd: channels ) {
+        // use explicit scope to bypass compression (only compress the patch, not the individual channels)
+        sz += cd.ChannelData::size();
     }
     return sz;
 }
@@ -138,8 +146,9 @@ uint64_t ObjectData::pack( char* ptr ) const {
     count += res.pack(ptr+count);
     count += alpha.pack(ptr+count);
     count += div.pack(ptr+count);
-    for( const auto& cd: channels ) {
-        count += cd.pack( ptr+count );
+    for( auto& cd: channels ) {
+        // use explicit scope to bypass compression (only compress the patch, not the individual channels)
+        count += cd.ChannelData::pack( ptr+count );
     }
     return count;
 }
@@ -155,11 +164,9 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     count += div.unpack(ptr+count,swap_endian);
     if( count > 6*sizeof(uint64_t) ) isLoaded = true;
     else isLoaded = false;
-    channels.clear();
-    for( auto& it: myObject->getChannels() ) {
-        Compressed<ChannelData> chan( it, path() );
-        count += chan.unpack( ptr+count, swap_endian );
-        channels.push_back(chan);
+    for( auto& chan: channels ) {
+        // use explicit scope to bypass compression (only compress the patch, not the individual channels)
+        count += chan.ChannelData::unpack( ptr+count, swap_endian );
     }
     return count;
 }
@@ -186,9 +193,6 @@ bool ObjectData::cacheStore(bool clearAfterStore) {
 
 
 void ObjectData::cclear(void) {
-    for( auto& cd: channels ) {
-        cd.cclear();
-    }
     img.clear();
     psf.clear();
     cobj.clear();
@@ -198,15 +202,21 @@ void ObjectData::cclear(void) {
 }
 
 
-PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
-
-    string mypath = to_string(j.info.id)+"/patch_"+(string)index;
-    setPath(mypath); 
-    for( auto& it: j.getObjects() ) {
-        objects.push_back(ObjectData(it,mypath));
-    }
-
+PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), objects( j.getObjects().begin(), j.getObjects().end() ), index(yid,xid) {
     
+}
+
+
+PatchData::~PatchData() {
+}
+
+
+void PatchData::setPath(const std::string& path) {
+    string mypath = path+"/patch_"+(string)index;
+    CacheItem::setPath(mypath);
+    for( auto& it: objects ) {
+        it.setPath(mypath);
+    }
 }
 
 
@@ -227,8 +237,9 @@ void PatchData::collectResults(void) {
 uint64_t PatchData::size( void ) const {
     uint64_t sz = Part::size();
     sz += index.size() + roi.size();
-    for( const ObjectData& obj: objects ) {
-        sz += obj.size();
+    for( auto& obj: objects ) {
+        // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
+        sz += obj.ObjectData::size();
     }
     return sz;
 }
@@ -239,8 +250,9 @@ uint64_t PatchData::pack( char* ptr ) const {
     uint64_t count = Part::pack(ptr);
     count += index.pack(ptr+count);
     count += roi.pack(ptr+count);
-    for( const ObjectData& obj: objects ) {
-        count += obj.pack(ptr+count);
+    for( auto& obj: objects ) {
+        // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
+        count += obj.ObjectData::pack(ptr+count);
     }
     return count;
 }
@@ -251,11 +263,9 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = Part::unpack(ptr, swap_endian);
     count += index.unpack(ptr+count, swap_endian);
     count += roi.unpack(ptr+count, swap_endian);
-    objects.clear();
-    for( auto& it: myJob.getObjects() ) {
-        ObjectData obj(it,path());
-        count += obj.unpack( ptr+count, swap_endian );
-        objects.push_back(obj);
+    for( auto& obj: objects ) {
+        // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
+        count += obj.ObjectData::unpack( ptr+count, swap_endian );
     }
     return count;
 }

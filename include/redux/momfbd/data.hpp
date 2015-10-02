@@ -34,8 +34,10 @@ namespace redux {
         struct PatchData;
         struct ChannelData : public redux::util::CacheItem {
             
-            explicit ChannelData( std::shared_ptr<Channel> c, const std::string& cachePath );
+            explicit ChannelData( std::shared_ptr<Channel> c );
             ~ChannelData();
+            
+            void setPath(const std::string& path);
             
             /**** Local processing (slaves) ****/
             void initPatch(void);
@@ -68,8 +70,10 @@ namespace redux {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
-            ObjectData( std::shared_ptr<Object> o, const std::string& cachePath );
+            ObjectData( std::shared_ptr<Object> o );
             ~ObjectData();
+            
+            void setPath(const std::string& path);
             void initPatch(void);
             void collectResults(void);
             virtual uint64_t size(void) const;
@@ -105,8 +109,10 @@ namespace redux {
             Point16 index;                      //! Patch-index in mozaic
             Region16 roi;                       //! Region/position of this patch in the full image
             PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
-            PatchData(const PatchData&) = delete;
+            PatchData( const PatchData& ) = delete;
+            ~PatchData();
 
+            void setPath(const std::string& path);
             void initPatch(void);
             void collectResults(void);
             virtual uint64_t size(void) const;
