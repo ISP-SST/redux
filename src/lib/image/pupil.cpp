@@ -209,8 +209,8 @@ uint64_t Pupil::pack( char* data ) const {
 uint64_t Pupil::unpack( const char* data, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = Array<double>::unpack(data,swap_endian);
-    count += unpack(data+count,radius,swap_endian);
     count += unpack(data+count,nPixels,swap_endian);
+    count += unpack(data+count,radius,swap_endian);
     count += unpack(data+count,area,swap_endian);
     count += unpack(data+count,pupilSupport,swap_endian);
     count += unpack(data+count,otfSupport,swap_endian);
