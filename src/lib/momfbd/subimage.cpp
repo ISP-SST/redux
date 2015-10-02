@@ -165,7 +165,7 @@ void SubImage::init (void) {
         imgFT.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX );                             // full-complex for now, perhaps half-complex later for performance
     }
    
-  
+ 
     FourierTransform::reorder(imgFT);                                                          // keep FT in centered form
     stats.noise *= channel.noiseFudge;
     double rg = stats.noise/stats.stddev;
@@ -183,6 +183,8 @@ void SubImage::newCutout(void) {
     memcpy(tmpFT.get(),imgFT.get(),imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
     
     copy(img);                                                                                  // copy current cut-out to (double) working copy.
+
+    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
 
     double avg = stats.mean;
     transform(img.get(), img.get()+img.nElements(), window.get(), img.get(),
@@ -272,8 +274,7 @@ double SubImage::metricChange(const complex_t* newOTF) const {
 double SubImage::gradientFiniteDifference( uint16_t modeIndex, double dalpha ) {
     complex_t* otfPtr = tmpC.get();
     double* phiPtr = tmpPhi.get();
-    dalpha *= object.wavelength;                           // the scaling is arbitrary, just pick something "small enough" for numerical differentiaiton
-    double scale = 1.0 / (dalpha * object.wavelength); //  TODO: fix normalization & tweak solver, should not be scaled by wavelength.
+    double scale = 1.0/(dalpha * object.wavelength); //  TODO: fix normalization & tweak solver, should not be scaled by wavelength.
     memcpy(phiPtr, phi.get(), pupilSize2*sizeof(double));
     addMode(phiPtr, modes.modePointers[modeIndex], dalpha);
     calcOTF(otfPtr, phiPtr);
@@ -286,7 +287,7 @@ double SubImage::gradientVogel(uint16_t modeIndex, double dalpha) const {
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
-    double scale = -2.0 / (object.wavelength * object.pupil.area); // TODO: fix normalization
+    double scale = -2.0 / (object.wavelength*object.pupil.area); // TODO: fix normalization
     for (auto & ind : object.pupil.pupilSupport) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }

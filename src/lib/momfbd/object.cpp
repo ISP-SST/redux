@@ -188,7 +188,8 @@ void Object::initProcessing( const Solver& ws ) {
         for( auto& ch : channels ) {
             ch->initProcessing(ws);
         }
-        modes.init( myJob, *this );                 // will get modes from globalData
+        initCache();
+        //modes.init( myJob, *this );                 // will get modes from globalData
     } else {
         LOG_ERR << "Object patchSize is 0 !!!";
     }

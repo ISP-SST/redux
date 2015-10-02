@@ -401,7 +401,7 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
             if( status == GSL_ENOPROG ) {
                 LOG_TRACE << "iteration: " << iter << "  GSL reports no progress.";
                 failCount++;
-                if( iter == 0 ) {           // could not get started, perturb coefficients and try again...
+                if( iter == 1 ) {           // could not get started, perturb coefficients and try again...
                     for(uint i=0; i<nFreeParameters; ++i) {
                         s->x->data[i] += dist(re);
                     }
