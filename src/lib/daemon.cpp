@@ -305,8 +305,6 @@ void Daemon::cleanup( void ) {
 */
 }
 
-}
-
 
 void Daemon::addJobs( TcpConnection::Ptr& conn ) {
 

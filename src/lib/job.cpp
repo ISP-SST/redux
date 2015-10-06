@@ -153,9 +153,9 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, user);
     count += pack(ptr+count, host);
     count += pack(ptr+count, logFile);
-    count += pack(ptr+count, to_time_t(submitTime));
-    count += pack(ptr+count, to_time_t(startedTime));
-    count += pack(ptr+count, to_time_t(completedTime));
+    count += pack(ptr+count, redux::util::to_time_t(submitTime));
+    count += pack(ptr+count, redux::util::to_time_t(startedTime));
+    count += pack(ptr+count, redux::util::to_time_t(completedTime));
     return count;
 }
 

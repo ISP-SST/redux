@@ -120,58 +120,6 @@ FourierTransform::Plan::Ptr FourierTransform::getPlan (const std::vector<size_t>
 }
 
 
-FourierTransform::FourierTransform() : centered(false), halfComplex(false), normalized(true), nThreads(1), inputSize(0) {
-
-}
-
-
-FourierTransform::FourierTransform (size_t ySize, size_t xSize, int flags, uint8_t nT) :
-    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized(flags & FT_NORMALIZE), nThreads(nT), inputSize(ySize*xSize) {
-
-    if (halfComplex) {
-        Array<complex_t>::resize (ySize, xSize / 2 + 1);
-    } else {
-        Array<complex_t>::resize (ySize, xSize);
-    }
-
-    init();
-
-}
-
-
-FourierTransform::FourierTransform (const FourierTransform& rhs) : plan (rhs.plan), centered (rhs.centered),
-    halfComplex (rhs.halfComplex), normalized (rhs.normalized), nThreads (rhs.nThreads), inputSize (rhs.inputSize) {
-    rhs.copy (*this);
-}
-
-
-template <typename T>
-FourierTransform::FourierTransform (const Array<T>& rhs, int flags, uint8_t nT) :
-    centered (false), halfComplex (false), normalized (false), nThreads(nT), inputSize(0) {
-
-    vector<size_t> dims = rhs.dimensions(true);
-    if (dims.size() != 2 ) {
-        throw logic_error ("FourierTransform only supports 2 dimensions at the moment: " + printArray (dimensions(), "dims"));
-    }
-
-    reset(rhs.ptr(), dims[0], dims[1], flags, nT);
-
-}
-
-
-template <typename T>
-FourierTransform::FourierTransform (const T* rhs, size_t ySize, size_t xSize, int flags, uint8_t nT) :
-    centered (false), halfComplex (false), normalized (false) {
-        
-    reset(rhs, ySize, xSize, flags, nT);
-
-}
-template FourierTransform::FourierTransform (const float*, size_t, size_t, int, uint8_t);
-template FourierTransform::FourierTransform (const double*, size_t, size_t, int, uint8_t);
-template FourierTransform::FourierTransform (const complex_t*, size_t, size_t, int, uint8_t);
-template FourierTransform::FourierTransform (const int32_t*, size_t, size_t, int, uint8_t);
-
-
 template <typename T>
 void FourierTransform::reset (const T* rhs, size_t ySize, size_t xSize, int flags, uint8_t nT) {
 
@@ -232,6 +180,58 @@ namespace redux {
         }
     }
 }
+
+
+FourierTransform::FourierTransform() : centered(false), halfComplex(false), normalized(true), nThreads(1), inputSize(0) {
+
+}
+
+
+FourierTransform::FourierTransform (size_t ySize, size_t xSize, int flags, uint8_t nT) :
+    centered (flags & FT_REORDER), halfComplex (! (flags & FT_FULLCOMPLEX)), normalized(flags & FT_NORMALIZE), nThreads(nT), inputSize(ySize*xSize) {
+
+    if (halfComplex) {
+        Array<complex_t>::resize (ySize, xSize / 2 + 1);
+    } else {
+        Array<complex_t>::resize (ySize, xSize);
+    }
+
+    init();
+
+}
+
+
+FourierTransform::FourierTransform (const FourierTransform& rhs) : plan (rhs.plan), centered (rhs.centered),
+    halfComplex (rhs.halfComplex), normalized (rhs.normalized), nThreads (rhs.nThreads), inputSize (rhs.inputSize) {
+    rhs.copy (*this);
+}
+
+
+template <typename T>
+FourierTransform::FourierTransform (const Array<T>& rhs, int flags, uint8_t nT) :
+    centered (false), halfComplex (false), normalized (false), nThreads(nT), inputSize(0) {
+
+    vector<size_t> dims = rhs.dimensions(true);
+    if (dims.size() != 2 ) {
+        throw logic_error ("FourierTransform only supports 2 dimensions at the moment: " + printArray (dimensions(), "dims"));
+    }
+
+    reset(rhs.ptr(), dims[0], dims[1], flags, nT);
+
+}
+
+
+template <typename T>
+FourierTransform::FourierTransform (const T* rhs, size_t ySize, size_t xSize, int flags, uint8_t nT) :
+    centered (false), halfComplex (false), normalized (false) {
+        
+    reset(rhs, ySize, xSize, flags, nT);
+
+}
+template FourierTransform::FourierTransform (const float*, size_t, size_t, int, uint8_t);
+template FourierTransform::FourierTransform (const double*, size_t, size_t, int, uint8_t);
+template FourierTransform::FourierTransform (const complex_t*, size_t, size_t, int, uint8_t);
+template FourierTransform::FourierTransform (const int32_t*, size_t, size_t, int, uint8_t);
 
 
 void FourierTransform::ft( double* data ) {
