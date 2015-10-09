@@ -491,7 +491,7 @@ void FileMomfbd::read ( std::ifstream& file ) {
             swapEndian ( nFileNames );
         }
         filenameOffset = file.tellg();
-    } catch ( ... ) {
+    } catch ( const std::ios_base::failure& e ) {
         nFileNames = 0;
     }
 

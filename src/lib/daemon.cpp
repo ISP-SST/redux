@@ -410,7 +410,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             if( cnt ) LOG << "Removed " << printArray(ids,"jobs");
             return;
         }
-        catch( ... ) {}      // catch and ignore bad_lexical_cast
+        catch( const boost::bad_lexical_cast& e ) {
+            // ignore
+	}
 
         try {
             vector<string> jobList;
@@ -430,7 +432,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             if( cnt ) LOG << "Removed " << printArray(deletedList,"jobs");
             return;
         }
-        catch( ... ) {}      // catch and ignore bad_lexical_cast
+        catch( const boost::bad_lexical_cast& e ) {
+            // ignore
+	}
 
 
     }
