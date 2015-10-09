@@ -720,7 +720,7 @@ void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Arr
         return;
     }
 
-    for (auto & it : dims) it *= 2;
+    for (auto & dim : dims) dim *= 2;
 
     Array<double> img (dims);                   // Twice the size of input
     Array<double> img_center (img, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with img.

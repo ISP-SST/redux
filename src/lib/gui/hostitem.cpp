@@ -51,11 +51,11 @@ void HostItem::reset(Host::Ptr h) {
 
 void HostItem::appendChild(const Host::Ptr& h) {
     
-    for( auto& it: children ) {
-        if (*(it->host) == *h) {
-            it->host->info = h->info;
-            it->host->status = h->status;
-            it->reset();
+    for( auto& child: children ) {
+        if (*(child->host) == *h) {
+            child->host->info = h->info;
+            child->host->status = h->status;
+            child->reset();
             return;
         }
     }

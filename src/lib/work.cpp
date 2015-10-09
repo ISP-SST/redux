@@ -136,9 +136,9 @@ uint64_t WorkInProgress::packWork( char* ptr ) const {
     if(newJob) {
         count += job->pack(ptr+count);
     }
-    for( auto& it: parts ) {
-        if( it ) {
-            count += it->pack(ptr+count);
+    for( auto& part: parts ) {
+        if( part ) {
+            count += part->pack(ptr+count);
         }
     }
     return count;
@@ -172,9 +172,9 @@ std::string WorkInProgress::print( void ) {
     string ret = "\"" + ( job ? job->info.name : string( "undefined" ) ) + "\"";
     if( parts.size() ) {
         ret += " (" + to_string( nCompleted ) + "/" + to_string( nParts ) + " part(s):";
-        for( auto & it : parts ) {
-            if( it ) {
-                ret += " " + to_string( it->id );
+        for( auto & part : parts ) {
+            if( part ) {
+                ret += " " + to_string( part->id );
             }
         }
         ret += ")";

@@ -400,10 +400,10 @@ namespace {
             tmpDims[1] = info->nPatchesY;       // fast index first
             tmpDims[2] = info->nPatchesX;
             appendTag ( tags, "PATCH", tmpDims, ( void* ) ds );
-            for ( auto & it : patchTags ) { // delete the "dims" array for the tags that has them
-                if ( it.dims ) {
-                    delete[] it.dims;
-                    it.dims = 0;
+            for ( auto & tag : patchTags ) { // delete the "dims" array for the tags that has them
+                if ( tag.dims ) {
+                    delete[] tag.dims;
+                    tag.dims = 0;
                 }
             }
 
@@ -701,10 +701,10 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         createTags ( allTags, info->dataMask, info.get() );
         IDL_StructDefPtr allStruct = IDL_MakeStruct ( 0, allTags.data() );
         // Clean up the "dims" array for the tags that has them
-        for ( auto & it : allTags ) {
-            if ( it.dims ) {
-                delete[] it.dims;
-                it.dims = 0;
+        for ( auto & tag : allTags ) {
+            if ( tag.dims ) {
+                delete[] tag.dims;
+                tag.dims = 0;
             }
         }
         v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, 0, 0, allStruct );
@@ -718,10 +718,10 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
     IDL_StructDefPtr myStruct = IDL_MakeStruct ( 0, tags.data() );              // Generate the IDL structure defined above
     // Clean up the "dims" array for the tags that has them
-    for ( auto & it : tags ) {
-        if ( it.dims ) {
-            delete[] it.dims;
-            it.dims = 0;
+    for ( auto & tag : tags ) {
+        if ( tag.dims ) {
+            delete[] tag.dims;
+            tag.dims = 0;
         }
     }
 

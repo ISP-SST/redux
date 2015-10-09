@@ -140,13 +140,13 @@ void JobModel::refreshTree( void ) {
     
     static Job::JobSet cache;
 
-    for( auto &it: jobs ) {
-        rootItem->appendChild( it );
-        cache.erase(it);
+    for( auto &job: jobs ) {
+        rootItem->appendChild( job );
+        cache.erase(job);
     }
 
-    for( auto &it: cache ) { // delete items that was removed between updates
-        rootItem->removeChild( it );
+    for( auto &job: cache ) { // delete items that was removed between updates
+        rootItem->removeChild( job );
     }
 
     cache = jobs;      // remember until next update

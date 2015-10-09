@@ -91,9 +91,9 @@ namespace {
     struct PlansContainer {  // using a static instance below ensures that fftw_init_threads is called only once, and cleanup is done when program exits.
         PlansContainer() { fftw_init_threads(); };
         ~PlansContainer(){
-            for( auto& it : plans) {
-                if( it.second ) {
-                    it.second.reset();
+            for( auto& plan : plans) {
+                if( plan.second ) {
+                    plan.second.reset();
                 }
             }
             fftw_cleanup_threads();

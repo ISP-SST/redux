@@ -198,9 +198,9 @@ uint64_t Pupil::pack( char* data ) const {
     count += pack(data+count,pupilSupport);
     count += pack(data+count,otfSupport);
     count += pack(data+count,(uint64_t)pupilInOTF.size());
-    for( const auto& it: pupilInOTF ) {
-        count += pack(data+count,it.first);
-        count += pack(data+count,it.second);
+    for( const auto& index: pupilInOTF ) {
+        count += pack(data+count,index.first);
+        count += pack(data+count,index.second);
     }
     return count;
 }
@@ -217,9 +217,9 @@ uint64_t Pupil::unpack( const char* data, bool swap_endian ) {
     uint64_t tmp;
     count += unpack(data+count,tmp,swap_endian);
     pupilInOTF.resize(tmp);
-    for( auto& it: pupilInOTF ) {
-        count += unpack(data+count,it.first,swap_endian);
-        count += unpack(data+count,it.second,swap_endian);
+    for( auto& index: pupilInOTF ) {
+        count += unpack(data+count,index.first,swap_endian);
+        count += unpack(data+count,index.second,swap_endian);
     }
     return count;
 }
@@ -277,12 +277,12 @@ void Pupil::generateSupport(double threshold){
     
     size_t cnt(0);
     area = 0;
-    for (auto & it: subOTF) {                                           // find the indices where the pupil is > threshold
-        if( it > threshold ) {
+    for (auto & value: subOTF) {                                           // find the indices where the pupil is > threshold
+        if( value > threshold ) {
             pupilSupport.push_back(cnt);
             size_t otfOffset = (cnt / nPixels) * otfPixels + (cnt % nPixels) + (nPixels / 2) + (nPixels / 2) * otfPixels;
             pupilInOTF.push_back(make_pair (cnt, otfOffset));
-            area += it;
+            area += value;
         }
         cnt++;
     }

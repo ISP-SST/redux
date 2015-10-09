@@ -61,12 +61,12 @@ void JobItem::reset(Job::JobPtr j) {
 
 void JobItem::appendChild( const Job::JobPtr& j ) {
     
-    for( auto& it: children ) {
-        if (!(*(it->job) != *j)) {
-            it->job = j;
-            //it->job->info = h->info;
-            //it->job->status = h->status;
-            it->reset();
+    for( auto& child: children ) {
+        if (!(*(child->job) != *j)) {
+            child->job = j;
+            //child->job->info = h->info;
+            //child->job->status = h->status;
+            child->reset();
             return;
         }
     }

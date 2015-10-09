@@ -116,8 +116,8 @@ bool Daemon::doWork( void ) {
         ioService.run();
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
         LOG_TRACE << "Waiting for all threads to terminate.";
-        for( auto & it : threads ) {
-            it->join();
+        for( auto & t : threads ) {
+            t->join();
         }
         myInfo->info.peerType = 0;
         threads.clear();
@@ -294,10 +294,10 @@ void Daemon::cleanup( void ) {
 /*    {
         unique_lock<mutex> lock( jobMutex );
 
-        for( auto& it : jobs ) {
-            if( it->info.step >= 32 ) {
-                LOG_DEBUG << "Job " << it->info.id << " (" << it->info.name << ") is completed, removing from queue.  uc=" << it.use_count() << endl;
-                it.reset();
+        for( auto& job : jobs ) {
+            if( job->info.step >= 32 ) {
+                LOG_DEBUG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue.  uc=" << job.use_count() << endl;
+                job.reset();
             }
         }
         jobs.erase(std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){return (j == nullptr);}), jobs.end());
@@ -398,10 +398,10 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             int cnt = 0;
             unique_lock<mutex> lock( jobMutex );
             vector<size_t> ids; 
-            for( auto & it : jobList ) {
+            for( auto & jobId : jobList ) {
                 for( auto it2 = jobs.begin(); it2 < jobs.end(); ++it2 ) {
-                    if( ( *it2 )->info.id == it ) {
-                        ids.push_back(it);
+                    if( ( *it2 )->info.id == jobId ) {
+                        ids.push_back(jobId);
                         jobs.erase( it2 );
                         cnt++;
                     }
@@ -420,10 +420,10 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             int cnt = 0;
             unique_lock<mutex> lock( jobMutex );
             vector<string> deletedList;
-            for( auto & it : jobList ) {
+            for( auto & jobId : jobList ) {
                 for( auto it2 = jobs.begin(); it2 < jobs.end(); ++it2 ) {
-                    if( ( *it2 )->info.name == it ) {
-                        deletedList.push_back(it);
+                    if( ( *it2 )->info.name == jobId ) {
+                        deletedList.push_back(jobId);
                         jobs.erase( it2 );
                         cnt++;
                     }
@@ -442,14 +442,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 }
 
 /*Job::JobPtr Daemon::selectJob( bool localRequest ) {
-    Job::JobPtr job;
-    for( auto & it : jobs ) {
-        if( it->info.step.load() < Job::JSTEP_RUNNING ) {
-            job = it;
-            break;
-        }
-    }
-    return job;
+    for( auto & job : jobs )
+        if( it->info.step.load() < Job::JSTEP_RUNNING )
+	    return job;
 }*/
 
 bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
@@ -461,8 +456,8 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     for( Job::JobPtr& job : jobs ) {
         if( job->check() && job->getWork( wip, nThreads ) ) {
             wip.job = job;
-            for( auto& it: wip.parts ) {
-                it->cacheLoad(false);
+            for( auto& part: wip.parts ) {
+                part->cacheLoad(false);
             }
             wip.workStarted = boost::posix_time::second_clock::local_time();
             break;
@@ -557,8 +552,8 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     uint64_t count(0); 
     if(wip.job) {
         count += wip.packWork( ptr+count );
-        for(auto& it: wip.parts) {
-            it->cacheStore(true);
+        for(auto& part: wip.parts) {
+            part->cacheStore(true);
         }
         wip.previousJob = wip.job;
     }
@@ -605,15 +600,15 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
 
     uint64_t blockSize = 0;
     unique_lock<mutex>( jobMutex );
-    for( auto & it : jobs ) {
-        blockSize += it->size();
+    for( auto & job : jobs ) {
+        blockSize += job->size();
     }
     auto buf = sharedArray<char>( blockSize + sizeof( uint64_t ) );         // blockSize will be sent before block
     char* ptr = buf.get();
     uint64_t count = pack( ptr, blockSize );                                // store blockSize
     blockSize += sizeof( uint64_t );                                        // ...and add sizeof(blockSize) to make verification & write correct below.
-    for( auto & it : jobs ) {
-        count += it->pack( ptr+count );
+    for( auto & job : jobs ) {
+        count += job->pack( ptr+count );
     }
     if( count != blockSize ) {
         LOG_ERR << "sendJobList(): Mismatch when packing joblist:  count = " << count << "   blockSize = " << blockSize << "  bytes.";
@@ -645,15 +640,15 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 
     size_t blockSize = 0;
     unique_lock<mutex>( jobMutex );
-    for( auto & it : jobs ) {
-        blockSize += it->info.size();
+    for( auto & job : jobs ) {
+        blockSize += job->info.size();
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
     char* ptr = buf.get();
     uint64_t count = pack( ptr, blockSize );
-    for( auto & it : jobs ) {
-        count += it->info.pack( ptr+count );
+    for( auto & job : jobs ) {
+        count += job->info.pack( ptr+count );
     }
     if( count != totalSize ) {
         LOG_ERR << "sendJobStats(): Packing of job infos failed:  count = " << count << "  totalSize = " << totalSize << " bytes.";
@@ -668,16 +663,16 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
 
     size_t blockSize = myInfo->size();
-    for( auto & it : peers ) {
-        blockSize += it.second->size();
+    for( auto & peer : peers ) {
+        blockSize += peer.second->size();
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
     char* ptr =  buf.get();
     uint64_t count = pack(ptr, blockSize );
     count += myInfo->pack( ptr+count );
-    for( auto & it : peers ) {
-        count += it.second->pack( ptr+count );
+    for( auto & peer : peers ) {
+        count += peer.second->pack( ptr+count );
     }
     if( count != totalSize ) {
         LOG_ERR << "Packing of peers infos failed:  count = " << count << "   totalSize = " << totalSize << "  bytes.";

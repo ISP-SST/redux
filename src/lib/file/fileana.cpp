@@ -566,13 +566,12 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
     }
 
     size_t nElements = 1;
-    auto end = data.dimensions().rend();
     int nDims = 0;
 
-    for( auto it = data.dimensions().rbegin(); it != end; ++it ) {
-        if( *it > 0 ) {     // TBD: should we always discard dimensions of size 1, or leave it to the user ??
-            hdr->m_Header.dim[nDims++] = *it;
-            nElements *= *it;
+    for( auto &dim: data.dimensions() ) {
+        if( dim > 0 ) {     // TBD: should we always discard dimensions of size 1, or leave it to the user ??
+            hdr->m_Header.dim[nDims++] = dim;
+            nElements *= dim;
         }
     }
     

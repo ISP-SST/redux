@@ -70,15 +70,15 @@ Logger::Logger( bpo::variables_map& vm ) {
     else if( vm.count( "log-file" ) ) {
         vector<string> logfiles = vm["log-file"].as<vector<string>>();
         bool hasDefault = false;
-        for( auto & it : logfiles ) {
-            if( it == "" ) {
+        for( auto & filename : logfiles ) {
+            if( filename == "" ) {
                 if( hasDefault ) {
                     continue;
                 }
-                it = vm["name"].as<string>() + ".log";
+                filename = vm["name"].as<string>() + ".log";
                 hasDefault = true;
             }
-            addFileLog( it );
+            addFileLog( filename );
         }
     }
 

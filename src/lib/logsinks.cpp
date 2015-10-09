@@ -108,13 +108,13 @@ void LogSink::parseFilter( string f ) {
 
     vector<string> parts;
     boost::split(parts, f, boost::is_any_of(":") );
-    for( auto & it : parts ) {
-        severity_level tmp = parseSeverity( boost::to_upper_copy( it ) );
+    for( auto & part : parts ) {
+        severity_level tmp = parseSeverity( boost::to_upper_copy( part ) );
         if( tmp ) {
             minSeverity = tmp;
         }
         else {
-            channels.push_back( it );
+            channels.push_back( part );
         }
     }
 
@@ -174,8 +174,8 @@ void FileSink::init( void ) {
     if( channels.size() ) {         // this logfile has specific "channels" specified.
         typedef expr::channel_severity_filter_actor< std::string, severity_level > min_severity_filter;
         min_severity_filter min_severity = expr::channel_severity_filter( channel, severity );
-        for( auto & it : channels ) {
-            min_severity[it] = minSeverity;
+        for( auto & ch : channels ) {
+            min_severity[ch] = minSeverity;
         }
         sink->set_filter( min_severity );
     }

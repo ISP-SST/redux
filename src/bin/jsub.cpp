@@ -101,8 +101,8 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
    
     // all ok, upload jobs.
     size_t bufferSize = 0;
-    for( auto &it: jobs ) {
-        bufferSize += it->size();
+    for( auto &job: jobs ) {
+        bufferSize += job->size();
     }
     
     auto buf = sharedArray<char>( bufferSize+sizeof(size_t)+1 );
@@ -111,8 +111,8 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
     packedBytes += pack(ptr+packedBytes,bufferSize);
 
     bufferSize += sizeof(size_t)+1;
-    for( auto &it: jobs ) {
-        packedBytes += it->pack(ptr+packedBytes);
+    for( auto &job: jobs ) {
+        packedBytes += job->pack(ptr+packedBytes);
     }
     if( packedBytes != bufferSize ) {
         LOG_ERR << "Packing of jobs failed:  bufferSize = " << bufferSize << "  packedBytes = " << packedBytes;
@@ -152,11 +152,11 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
             vector<string> messages;
             unpack(ptr, messages,swap_endian);
             if( !messages.empty() ) {
-                string msg = "Server messages:";
-                for( auto& it: messages ) {
-                    msg += "\n\t" + it;
+                string msgText = "Server messages:";
+                for( auto& msg: messages ) {
+                    msgText += "\n\t" + msg;
                 }
-                LOG << msg;
+                LOG << msgText;
             }
         }
     }
@@ -231,8 +231,8 @@ int main (int argc, char *argv[]) {
 
         if (vm.count ("print")) {       // dump configuration to console and exit
             bpt::ptree dump;
-            for( auto & it : jobs ) {
-                it->getPropertyTree( &dump );
+            for( auto & job : jobs ) {
+                job->getPropertyTree( &dump );
             }
             bpt::write_info( cout<<endl, dump );
             return EXIT_SUCCESS;
@@ -256,8 +256,8 @@ int main (int argc, char *argv[]) {
             //ioservice.run();
             //t.join();
             //tt.join();
-            for( auto & it : threads ) {
-                it->join();
+            for( auto & t : threads ) {
+                t->join();
             }
         }
 

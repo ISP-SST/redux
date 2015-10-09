@@ -51,9 +51,9 @@ uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_
     using redux::util::unpack;
     uint64_t count(0);
     wip.parts.resize( wip.nParts );
-    for( auto& it : wip.parts ) {
-        if(!it) it.reset( new DebugPart() );
-        count += it->unpack( ptr+count, swap_endian );
+    for( auto& part : wip.parts ) {
+        if(!part) part.reset( new DebugPart() );
+        count += part->unpack( ptr+count, swap_endian );
     }
     return count;
 }
@@ -166,12 +166,12 @@ uint64_t DebugJob::unpack( const char* ptr, bool swap_endian ) {
 void DebugJob::checkParts( void ) {
     
     uint8_t mask = 0;
-    for( auto & it : jobParts ) {
-        /*if( it.second->step & JSTEP_ERR && (it.second->nRetries<info.maxPartRetries)) {    // TODO: handle failed parts.
-            it.second->nRetries++;
-            it.second->step &= ~JSTEP_ERR;
+    for( auto & part : jobParts ) {
+        /*if( part.second->step & JSTEP_ERR && (part.second->nRetries<info.maxPartRetries)) {    // TODO: handle failed parts.
+            part.second->nRetries++;
+            part.second->step &= ~JSTEP_ERR;
         }*/
-        mask |= it.second->step;
+        mask |= part.second->step;
     }
 
 #ifdef DEBUG_
@@ -226,10 +226,10 @@ bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         unique_lock<mutex> lock( jobMutex );
         size_t nParts = std::min( nThreads, info.maxThreads) * 2;
         if(wip.connection) {
-            for( auto & it : jobParts ) {
-                if( it.second->step == JSTEP_QUEUED ) {
-                    it.second->step = JSTEP_RUNNING;
-                    wip.parts.push_back( it.second );
+            for( auto & part : jobParts ) {
+                if( part.second->step == JSTEP_QUEUED ) {
+                    part.second->step = JSTEP_RUNNING;
+                    wip.parts.push_back( part.second );
                     info.state.store( JSTATE_ACTIVE );
                     if( wip.parts.size() == nParts ) break;
                 }
@@ -243,8 +243,8 @@ bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
 void DebugJob::ungetWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
-    for( auto & it : wip.parts ) {
-        it->step = JSTEP_QUEUED;
+    for( auto & part : wip.parts ) {
+        part->step = JSTEP_QUEUED;
     }
     wip.parts.clear();
 }
@@ -253,10 +253,10 @@ void DebugJob::ungetWork( WorkInProgress& wip ) {
 void DebugJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
-    for( auto & it : wip.parts ) {
-        auto dpart = static_pointer_cast<DebugPart>( it );
-        jobParts[it->id]->step = dpart->step;
-        jobParts[it->id]->result = std::move(dpart->result);
+    for( auto & part : wip.parts ) {
+        auto dpart = static_pointer_cast<DebugPart>( part );
+        jobParts[part->id]->step = dpart->step;
+        jobParts[part->id]->result = std::move(dpart->result);
     }
     wip.parts.clear();
     checkParts();
@@ -279,8 +279,8 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
         service.reset();
-        for( auto & it : wip.parts ) {
-            service.post( boost::bind( &DebugJob::runMain, this, boost::ref( it ) ) );
+        for( auto & part : wip.parts ) {
+            service.post( boost::bind( &DebugJob::runMain, this, boost::ref( part ) ) );
         }
         
         boost::thread_group pool;
@@ -341,9 +341,9 @@ void DebugJob::preProcess( void ) {
 
     std::random_shuffle( indices.begin(), indices.end() );
     count = 0;
-    for( auto & it : pts ) {
-        it->id = indices[count++];
-        jobParts.insert( pair<size_t, PartPtr>( it->id, it ) );
+    for( auto & part : pts ) {
+        part->id = indices[count++];
+        jobParts.insert( pair<size_t, PartPtr>( part->id, part ) );
     }
     info.step.store( JSTEP_QUEUED );
 
@@ -424,9 +424,9 @@ void DebugJob::postProcess( void ) {
     minPID = minID = minSID = UINT32_MAX;
     maxPID = maxID = maxSID = 0;
 
-    for( auto & it : jobParts ) {
+    for( auto & part : jobParts ) {
 
-        auto ptr = static_pointer_cast<DebugPart>( it.second );
+        auto ptr = static_pointer_cast<DebugPart>( part.second );
 
         uint32_t sizeX = ptr->xPixelH - ptr->xPixelL + 1;
         uint32_t sizeY = ptr->yPixelH - ptr->yPixelL + 1;
@@ -455,9 +455,9 @@ void DebugJob::postProcess( void ) {
 
     }
 
-    for( auto & it : jobParts ) {
+    for( auto & part : jobParts ) {
 
-        auto ptr = static_pointer_cast<DebugPart>( it.second );
+        auto ptr = static_pointer_cast<DebugPart>( part.second );
 
         uint32_t sizeX = ptr->xPixelH - ptr->xPixelL + 1;
         uint32_t sizeY = ptr->yPixelH - ptr->yPixelL + 1;

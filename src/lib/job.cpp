@@ -62,12 +62,12 @@ size_t Job::registerJob(const string& name, JobCreator f) {
 vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, bool check) {
     vector<JobPtr> tmp;
     std::unique_lock<mutex> lock(globalJobMutex);
-    for(auto & it : tree) {
-        string name = it.first;
+    for(auto & property : tree) {
+        string name = property.first;
         auto it2 = getMap().find(boost::to_upper_copy(name));       // check if the current tag matches a registered (Job-derived) class.
         if(it2 != getMap().end()) {
             Job* tmpJob = it2->second.second();
-            tmpJob->parsePropertyTree(vm, it.second);
+            tmpJob->parsePropertyTree(vm, property.second);
             if(!check || tmpJob->check()) {
                 tmp.push_back(shared_ptr<Job>(tmpJob));
             } else LOG_WARN << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";

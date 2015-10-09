@@ -143,13 +143,13 @@ void HostModel::refreshTree( void ) {
     
     static Host::Set cache;
 
-    for( auto &it: hosts ) {
-        rootItem->appendChild( it );
-        cache.erase(it);
+    for( auto &host: hosts ) {
+        rootItem->appendChild( host );
+        cache.erase(host);
     }
 
-    for( auto &it: cache ) { // delete items that was removed between updates
-        rootItem->removeChild( it );
+    for( auto &host: cache ) { // delete items that was removed between updates
+        rootItem->removeChild( host );
     }
 
     cache = hosts;      // remember until next update
