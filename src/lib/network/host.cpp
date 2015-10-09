@@ -163,7 +163,7 @@ uint64_t Host::HostInfo::pack( char* ptr ) const {
     count += pack(ptr+count,pid);
     count += pack(ptr+count,peerType);
     count += pack(ptr+count,nCores);
-    count += pack(ptr+count,to_time_t( startedAt ));
+    count += pack(ptr+count,redux::util::to_time_t( startedAt ));
     count += pack(ptr+count,name);
     count += pack(ptr+count,os);
     count += pack(ptr+count,arch);
@@ -216,7 +216,7 @@ uint64_t Host::HostStatus::pack( char* ptr ) const {
     count += pack(ptr+count,currentJob);
     count += pack(ptr+count,loadAvg);
     count += pack(ptr+count,progress);
-    count += pack(ptr+count,to_time_t( lastSeen ));
+    count += pack(ptr+count,redux::util::to_time_t( lastSeen ));
     
     return count;
     
