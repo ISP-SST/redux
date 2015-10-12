@@ -91,21 +91,21 @@ uint64_t ModeInfo::unpack( const char* ptr, bool swap_endian ) {
 
 
 bool ModeInfo::operator<(const ModeInfo& rhs) const {
-    if(filename == rhs.filename) {
-        if(firstMode == rhs.firstMode) {
-            if(lastMode == rhs.lastMode) {
-                if(modeNumber == rhs.modeNumber) {
-                    if(nPupilPixels == rhs.nPupilPixels) {
-                        if(pupilRadius == rhs.pupilRadius) {
-                            if(angle == rhs.angle) {
-                                return (cutoff < rhs.cutoff);
-                            } else return (angle < rhs.angle);
-                        } else return (pupilRadius < rhs.pupilRadius);
-                    } else return (nPupilPixels < rhs.nPupilPixels);
-                } else return (modeNumber < rhs.modeNumber);
-            } else return (lastMode < rhs.lastMode);
-        } else return (firstMode < rhs.firstMode);
-    } else return (filename < rhs.filename);
+    if(filename != rhs.filename)
+        return filename < rhs.filename;
+    if(firstMode != rhs.firstMode)
+        return firstMode < rhs.firstMode;
+    if(lastMode != rhs.lastMode)
+        return lastMode < rhs.lastMode;
+    if(modeNumber != rhs.modeNumber)
+        return modeNumber < rhs.modeNumber;
+    if(nPupilPixels != rhs.nPupilPixels)
+        return nPupilPixels < rhs.nPupilPixels;
+    if(pupilRadius != rhs.pupilRadius)
+        return pupilRadius < rhs.pupilRadius;
+    if(angle != rhs.angle)
+        return angle < rhs.angle;
+    return cutoff < rhs.cutoff;
 }
 
 
