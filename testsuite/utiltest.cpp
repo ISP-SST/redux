@@ -105,17 +105,17 @@ namespace {
         
         // test operators with scalars
         array = 1;
-        for( auto it : array ) { BOOST_CHECK_EQUAL( it, 1 ); }
+        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 1 ); }
         array += 10;
-        for( auto it : array ) { BOOST_CHECK_EQUAL( it, 11 ); }
+        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 11 ); }
         array -= 1;
-        for( auto it : array ) { BOOST_CHECK_EQUAL( it, 10 ); }
+        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 10 ); }
         array *= 2;
-        for( auto it : array ) { BOOST_CHECK_EQUAL( it, 20 ); }
+        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 20 ); }
         array /= 5;
-        for( auto it : array ) { BOOST_CHECK_EQUAL( it, 4 ); }
+        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 4 ); }
         array.zero();
-        for( auto it : array ) { BOOST_CHECK_EQUAL( it, 0 ); }
+        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 0 ); }
 
         /***** test iterators *****/
         {
@@ -215,13 +215,13 @@ namespace {
 
             // set/check values via auto.
             int cnt = 0;
-            for( auto & ait : array ) {
-                ait = ++cnt;
+            for( auto & value : array ) {
+                value = ++cnt;
             }
 
             cnt = 0;
-            for( auto ait : array ) {
-                BOOST_CHECK_EQUAL( ait, ++cnt );
+            for( auto value : array ) {
+                BOOST_CHECK_EQUAL( value, ++cnt );
             }
 
         }
@@ -243,13 +243,13 @@ namespace {
 
             // scalar assign to subarray
             array = 2;
-            for( auto it : array ) {
-                BOOST_CHECK_EQUAL( it, 2 );
+            for( auto value : array ) {
+                BOOST_CHECK_EQUAL( value, 2 );
             }
             subarray = 13;
-            for( auto it : subarray ) {
+            for( auto value : subarray ) {
                 //cout << "  it = " << it << endl;
-                BOOST_CHECK_EQUAL( (int)it, 13 );
+                BOOST_CHECK_EQUAL( (int)value, 13 );
             }
             
             typename Array<T>::iterator ait = array.begin();
@@ -270,12 +270,12 @@ namespace {
             
             // elementwise modification
             array = 2;
-            for( auto it : array ) {
-                BOOST_CHECK_EQUAL( it, 2 );
+            for( auto value : array ) {
+                BOOST_CHECK_EQUAL( value, 2 );
             }
 
-            for( auto it : subarray ) {
-                BOOST_CHECK_EQUAL( it, 2 );
+            for( auto value : subarray ) {
+                BOOST_CHECK_EQUAL( value, 2 );
             }
             
             ait = array.begin();
@@ -372,7 +372,7 @@ namespace {
         Array<T> array( sizeZ, sizeY, sizeX );
         
         T cnt(0);
-        for(auto& it: array) it = (cnt+=1);
+        for(auto& value: array) value = (cnt+=1);
     
         // check values
         for( int i = 0; i < sizeZ; ++i ) {
@@ -557,8 +557,8 @@ void arrayTest( void ) {
 
     // test with std auto iterator (by reference)
     int i = 1;
-    for( auto & ait : array4x5 ) {
-        BOOST_CHECK_EQUAL( ait, i++ );
+    for( auto & value : array4x5 ) {
+        BOOST_CHECK_EQUAL( value, i++ );
     }
 
     // shallow copy (shared data)
@@ -627,8 +627,8 @@ void arrayTest( void ) {
 
     Array<int> array4x5x6( 4, 5, 6 );
     size_t cnt( 0 );
-    for( auto & it : array4x5x6 ) {
-        it = ++cnt;
+    for( auto & value : array4x5x6 ) {
+        value = ++cnt;
     }
     BOOST_CHECK_EQUAL( cnt, 120 );
 
@@ -666,8 +666,8 @@ void arrayTest( void ) {
     {
         // test access as raw multidimensional array
         cnt=0;
-        for( auto & it : array4x5x6 ) {
-            it = ++cnt;
+        for( auto & value : array4x5x6 ) {
+            value = ++cnt;
         }
         shared_ptr<int**> raiiArray = array4x5x6.reshape(4,5,6);
         int*** rawArray = raiiArray.get();

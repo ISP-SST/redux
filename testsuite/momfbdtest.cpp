@@ -329,7 +329,8 @@ void modeTest(void) {
         //for(auto &it : m_new_cfg[m].zernikeWeights ) coeffs.push_back(it.second);
         //cout << "ned:  #" << (first_mode+m) << printArray(coeffs,"  coeffs") << endl;
         //coeffs.clear();
-        for(auto & it : kle[first_mode + m]->zernikeWeights) coeffs.push_back(it.second);
+        for(auto & weight : kle[first_mode + m]->zernikeWeights)
+            coeffs.push_back(weight.second);
         //cout << "new:  #" << (first_mode + m) << printArray(coeffs, "  coeffs") << endl;
         //cout << "      v = " << m_cfg[first_mode + m].v << "    cov = " << kle[first_mode + m]->covariance << endl;
     }

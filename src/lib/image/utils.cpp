@@ -742,9 +742,9 @@ void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Arr
     redux::image::FourierTransform otf (psf, FT_REORDER | FT_NORMALIZE);
 
     Array<double>::const_iterator itg = gain.begin();
-    for (auto & it : img_center) {
+    for (auto & value : img_center) {
         double g = *itg++;
-        it /= (1.0 + g * g);
+        value /= (1.0 + g * g);
     }
 
     Array<double> tmp (dims);                  // Twice the size of input
@@ -762,10 +762,10 @@ void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Arr
         metric = 0.0;
         typename Array<T>::const_iterator in_it = data.begin();
         Array<double>::const_iterator tmp_it = tmp_center.begin();
-        for (auto & img_it : img_center) {
-            double new_img = (*in_it++ - *tmp_it++);
-            metric += (img_it - new_img) * (img_it - new_img);
-            img_it = new_img;
+        for (auto & value : img_center) {
+            double new_value = (*in_it++ - *tmp_it++);
+            metric += (value - new_value) * (value - new_value);
+            value = new_value;
         }
         metric /= data.nElements();
         delta /= metric;

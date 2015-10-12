@@ -127,8 +127,8 @@ const std::map<uint16_t, Zernike::KLPtr>& Zernike::karhunenLoeveExpansion(uint16
             }
         }
 
-        for(auto & it : mapping) {
-            reverse_mapping[it.second] = it.first;
+        for(auto & element : mapping) {
+            reverse_mapping[element.second] = element.first;
         }
 
         int nBlocks(1);

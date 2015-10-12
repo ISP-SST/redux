@@ -30,8 +30,8 @@ namespace {
 
 void Constraints::Constraint::replaceIndices( const map<int32_t, int32_t>& indexMap ) {
     map<int32_t, int8_t> newEntries;
-    for( auto & it : entries ) {
-        newEntries[indexMap.at( it.first )] = it.second;
+    for( auto & entry : entries ) {
+        newEntries[indexMap.at( entry.first )] = entry.second;
     }
     entries = std::move( newEntries );
 }
@@ -72,9 +72,9 @@ void Constraints::NullSpace::mapNullspace(void) {
     int nCols = nParameters - nConstraints;
     LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace.";
     int count = 0;
-    for( auto &it: ns ) {
-        if( abs(it) > NS_THRESHOLD ) {
-            ns_entries.insert(make_pair(Point16(count/nCols,count%nCols),it));
+    for( auto &value: ns ) {
+        if( abs(value) > NS_THRESHOLD ) {
+            ns_entries.insert(make_pair(Point16(count/nCols,count%nCols),value));
         }
         count++;
     }
@@ -196,8 +196,8 @@ Constraints::Group::Group( shared_ptr<Constraint>& con ) : nParameters(0), entri
 void Constraints::Group::add( const shared_ptr<Constraint>& con ) {
     if( find( constraints.begin(), constraints.end(), con ) == constraints.end() ) { // don't add the same row twice
         constraints.push_back( con );
-        for( auto it : con->entries ) {
-            indices.insert( it.first );
+        for( auto entry : con->entries ) {
+            indices.insert( entry.first );
         }
     }
 }
@@ -242,9 +242,9 @@ void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, in
     std::map<int32_t, int8_t> tmpEntries;
     int32_t indexOffset = 0;
     int32_t firstIndex = *indices.begin();
-    for( auto & it : constraints ) {
-        it->replaceIndices( indexMap );
-        for( auto & ind : it->entries ) {
+    for( auto & constraint : constraints ) {
+        constraint->replaceIndices( indexMap );
+        for( auto & ind : constraint->entries ) {
             tmpEntries.insert(make_pair(indexOffset-firstIndex+ind.first,ind.second));
         }
         indexOffset += nParameters;     // next row
@@ -302,8 +302,8 @@ void Constraints::Group::mapNullspace(void) {
     }
     
     ns_entries.clear();
-    for( auto& it: nullspace->ns_entries ) {
-        ns_entries.insert(make_pair(it.first + groupOffset,it.second));
+    for( auto& entry: nullspace->ns_entries ) {
+        ns_entries.insert(make_pair(entry.first + groupOffset,entry.second));
     }
 
 
@@ -329,10 +329,10 @@ void Constraints::blockifyGroups( void ) {
     std::set<int32_t> unused2(boost::counting_iterator<int32_t>(0), boost::counting_iterator<int32_t>(nFreeParameters));
     for( auto & g : groups ) {
         g.blockify( parameterOrder.get(), cOffset, rOffset );
-        for( auto& it: g.ns_entries ) {
-            auto index = it.first;
+        for( auto& entry: g.ns_entries ) {
+            auto index = entry.first;
             index.y = colMap[index.y];     // map parameter-index back to original order, so ns_entries can be applied directly to alpha.
-            ns_entries.insert(make_pair(index,it.second));
+            ns_entries.insert(make_pair(index,entry.second));
             unused1.erase(index.y);
             unused2.erase(index.x);
         }
@@ -400,9 +400,9 @@ uint64_t Constraints::pack( char* ptr ) const {
     uint64_t count = pack( ptr, nParameters );
     count += pack( ptr+count, nFreeParameters );
     count += pack( ptr+count, (uint64_t)ns_entries.size() );
-    for(auto& it: ns_entries) {
-        count += it.first.pack( ptr+count );
-        count += pack( ptr+count, it.second );
+    for(auto& entry: ns_entries) {
+        count += entry.first.pack( ptr+count );
+        count += pack( ptr+count, entry.second );
     }
     return count;
 }
@@ -565,8 +565,8 @@ Array<double> Constraints::getNullMatrix( void ) const {
     Array<double> ns( nParameters, nFreeParameters );
     ns.zero();
     
-    for( auto &it: ns_entries ) {
-        ns(it.first.y,it.first.x) = it.second;
+    for( auto &entry: ns_entries ) {
+        ns(entry.first.y,entry.first.x) = entry.second;
     }
     
     return ns;

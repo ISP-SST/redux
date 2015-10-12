@@ -111,14 +111,14 @@ namespace redux {
             
             template <typename T> void apply(const T* in, T* out) const {
                 memset(out,0,nFreeParameters*sizeof(T));
-                for( auto& it: ns_entries ) {
-                    out[it.first.x] += it.second * in[it.first.y];
+                for( auto& entry: ns_entries ) {
+                    out[entry.first.x] += entry.second * in[entry.first.y];
                 }
             }
             template <typename T> void reverse(const T* in, T* out) const {
                 memset(out,0,nParameters*sizeof(T));
-                for( auto& it: ns_entries ) {
-                    out[it.first.y] += it.second * in[it.first.x];
+                for( auto& entry: ns_entries ) {
+                    out[entry.first.y] += entry.second * in[entry.first.x];
                 }
             }
 

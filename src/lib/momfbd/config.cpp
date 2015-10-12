@@ -172,10 +172,10 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
                 diversityTypes.resize( 1,  ZERNIKE );
             }
         } else {
-            vector<string> tmp;
-            boost::split( tmp, tmpString, boost::is_any_of( "," ) );
-            for( auto & it : tmp ) {
-                parseSegment( diversityModes, diversityTypes, it );
+            vector<string> tokens;
+            boost::split( tokens, tmpString, boost::is_any_of( "," ) );
+            for( auto & token : tokens ) {
+                parseSegment( diversityModes, diversityTypes, token );
             }
         }
 
@@ -849,8 +849,8 @@ uint64_t GlobalCfg::pack(char* ptr) const {
     count += pack(ptr+count, observationDate);
     count += pack(ptr+count, tmpDataDir);
     count += pack( ptr+count, (uint16_t)outputFiles.size() );
-    for( auto & it : outputFiles ) {
-        count += pack( ptr+count, it );
+    for( auto & filename : outputFiles ) {
+        count += pack( ptr+count, filename );
     }
 
     return count;
@@ -889,8 +889,8 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     uint16_t tmp;
     count += unpack( ptr+count, tmp, swap_endian );
     outputFiles.resize( tmp );
-    for( string& it : outputFiles ) {
-        count += unpack( ptr+count, it, swap_endian );
+    for( auto& filename : outputFiles ) {
+        count += unpack( ptr+count, filename, swap_endian );
     }
 
     return count;

@@ -424,9 +424,9 @@ namespace redux {
             const std::vector<size_t> dimensions( bool skipTrivialDims ) const {
                 if(skipTrivialDims) {
                     std::vector<size_t> newDimSizes;
-                    for( auto & it : currentSizes ) {
-                        if( it > 1 || !skipTrivialDims) {
-                            newDimSizes.push_back( it );
+                    for( auto & size : currentSizes ) {
+                        if( size > 1 || !skipTrivialDims) {
+                            newDimSizes.push_back( size );
                         }
                     }
                     return std::move(newDimSizes);
@@ -895,7 +895,7 @@ namespace redux {
                 if( this->sameSize( rhs ) && this->sameSize( weight )) {
                     typename Array<U>::const_iterator rhsit = rhs.begin();
                     typename Array<V>::const_iterator wit = weight.begin();
-                    for( auto & it : *this ) it += (*rhsit++ * *wit++);
+                    for( auto & value : *this ) value += (*rhsit++ * *wit++);
                 }
                 else {
                     throw std::invalid_argument( "Array::add  dimensions does not match." );
@@ -907,7 +907,7 @@ namespace redux {
             const Array<T>& add( const Array<U>& rhs, V weight ) {
                 if( this->sameSize( rhs ) ) {
                     typename Array<U>::const_iterator rhsit = rhs.begin();
-                    for( auto & it : *this ) it += (*rhsit++ * weight);
+                    for( auto & value : *this ) value += (*rhsit++ * weight);
                 }
                 else {
                     throw std::invalid_argument( "Array::add<U,V>  dimensions does not match." );
@@ -919,7 +919,7 @@ namespace redux {
             void addTo( Array<U>& rhs, V weight ) const {
                 if( this->sameSize( rhs ) ) {
                     typename Array<U>::const_iterator it = begin();
-                    for( auto & rhsit : rhs ) rhsit += (*it++ * weight);
+                    for( auto & value : rhs ) value += (*it++ * weight);
                 }
                 else {
                     throw std::invalid_argument( "Array::addTo  dimensions does not match." );
@@ -947,7 +947,7 @@ namespace redux {
             const Array<T>& mult( const Array<U>& rhs, V weight ) {
                 if( this->sameSize( rhs ) ) {
                     typename Array<U>::const_iterator rhsit = rhs.begin();
-                    for( auto & it : *this ) it *= (*rhsit++ * weight);
+                    for( auto & value : *this ) value *= (*rhsit++ * weight);
                 }
                 else {
                     throw std::invalid_argument( "Array::mult  dimensions does not match: " + printArray(dimensions(),"dims")
@@ -968,8 +968,8 @@ namespace redux {
                 }
                 // compare data.
                 const_iterator rhsit = rhs.begin();
-                for( const auto & it : *this ) {
-                    if( it != *rhsit++ ) return false;
+                for( const auto & value : *this ) {
+                    if( value != *rhsit++ ) return false;
                 }
 
                 return true;

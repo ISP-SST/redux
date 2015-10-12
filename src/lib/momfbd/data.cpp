@@ -96,8 +96,8 @@ ObjectData::~ObjectData() {
 void ObjectData::setPath(const std::string& path) {
     string mypath = path + "_" + to_string(myObject->id());
     CacheItem::setPath(mypath);
-    for( auto& it: channels ) {
-        it.setPath(mypath);
+    for( auto& ch: channels ) {
+        ch.setPath(mypath);
     }
 }
 
@@ -214,8 +214,8 @@ PatchData::~PatchData() {
 void PatchData::setPath(const std::string& path) {
     string mypath = path+"/patch_"+(string)index;
     CacheItem::setPath(mypath);
-    for( auto& it: objects ) {
-        it.setPath(mypath);
+    for( auto& obj: objects ) {
+        obj.setPath(mypath);
     }
 }
 
@@ -329,13 +329,13 @@ Pupil& GlobalData::get(const PupilInfo& id, const Pupil& ms) {
 
 uint64_t GlobalData::size( void ) const {
     uint64_t sz = 2*sizeof(uint16_t); // nModes & nPupils
-    for( auto& it: modes) {
-        sz += it.first.size();
-        sz += it.second.size();
+    for( auto& mode: modes) {
+        sz += mode.first.size();
+        sz += mode.second.size();
     }
-    for( auto& it: pupils) {
-        sz += it.first.size();
-        sz += it.second.size();
+    for( auto& pupil: pupils) {
+        sz += pupil.first.size();
+        sz += pupil.second.size();
     }
     sz += constraints.size();
     return sz;
@@ -345,14 +345,14 @@ uint64_t GlobalData::size( void ) const {
 uint64_t GlobalData::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = pack(ptr,(uint16_t)modes.size());
-    for(auto& it: modes) {
-        count += it.first.pack(ptr+count);
-        count += it.second.pack(ptr+count);
+    for(auto& mode: modes) {
+        count += mode.first.pack(ptr+count);
+        count += mode.second.pack(ptr+count);
     }
     count += pack(ptr,(uint16_t)pupils.size());
-    for(auto& it: pupils) {
-        count += it.first.pack(ptr+count);
-        count += it.second.pack(ptr+count);
+    for(auto& pupil: pupils) {
+        count += pupil.first.pack(ptr+count);
+        count += pupil.second.pack(ptr+count);
     }
     count += constraints.pack(ptr+count);
     return count;

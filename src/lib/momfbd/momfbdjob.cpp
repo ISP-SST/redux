@@ -71,10 +71,10 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
     GlobalCfg::parseProperties(tree);
 
     uint16_t nObj(0);
-    for( auto & it : tree ) {
-        if( iequals( it.first, "OBJECT" ) ) {
+    for( auto & property : tree ) {
+        if( iequals( property.first, "OBJECT" ) ) {
             Object* tmpObj = new Object( *this, nObj );
-            tmpObj->parsePropertyTree( it.second );
+            tmpObj->parsePropertyTree( property.second );
             if( nObj < outputFiles.size() ) {
                 tmpObj->outputFileName = outputFiles[nObj];
             }
@@ -160,12 +160,12 @@ size_t MomfbdJob::nImages(void) const {
 void MomfbdJob::checkParts( void ) {
 
     uint8_t mask = 0;
-    for( auto & it : patches ) {
-        /*if( (it.second->step & JSTEP_ERR) && (it.second->nRetries<info.maxPartRetries)) {
-            it.second->nRetries++;
-            it.second->step &= ~JSTEP_ERR;
+    for( auto & patch : patches ) {
+        /*if( (patch.second->step & JSTEP_ERR) && (patch.second->nRetries<info.maxPartRetries)) {
+            patch.second->nRetries++;
+            patch.second->step &= ~JSTEP_ERR;
         }*/
-        mask |= it->step;
+        mask |= patch->step;
     }
 
     if( mask & JSTEP_ERR ) {    // TODO: handle failed parts.
@@ -199,10 +199,10 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 //         size_t nParts = wip.peer->status.nThreads;
 //         if( info.nThreads ) nParts = std::min( wip.peer->status.nThreads, info.nThreads );
        /* if(!wip.connection) {   // local worker, check if there are results to write
-            for( auto & it : patches ) {
-                if( it->step & JSTEP_POSTPROCESS ) {
-                    LOG_DEBUG << "getWork(): PP-patch   step = " << bitString(it->step);
-                    wip.parts.push_back( it );
+            for( auto & patch : patches ) {
+                if( patch->step & JSTEP_POSTPROCESS ) {
+                    LOG_DEBUG << "getWork(): PP-patch   step = " << bitString(patch->step);
+                    wip.parts.push_back( patch );
                 }
             }
             if( wip.parts.size() ) {
@@ -211,10 +211,10 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
             }
         }*/
         if(!ret && wip.connection) {
-            for( auto & it : patches ) {
-                if( it->step == JSTEP_QUEUED ) {
-                    it->step = JSTEP_RUNNING;
-                    wip.parts.push_back( it );
+            for( auto & patch : patches ) {
+                if( patch->step == JSTEP_QUEUED ) {
+                    patch->step = JSTEP_RUNNING;
+                    wip.parts.push_back( patch );
                     if(wip.previousJob.get() != this) {     // First time for this slave -> include global data
                         wip.parts.push_back( globalData );
                     }
@@ -433,8 +433,8 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
 void MomfbdJob::postProcess( boost::asio::io_service& service ) {
 
     LOG << "MomfbdJob::postProcess()";
-    for( auto& it: patches ) {
-        it->cacheLoad(true);        // load and erase cache-file.
+    for( auto& patch: patches ) {
+        patch->cacheLoad(true);        // load and erase cache-file.
     }
     for( shared_ptr<Object>& obj : objects ) {
         service.post( std::bind( &Object::writeResults, obj.get(), patches ) );

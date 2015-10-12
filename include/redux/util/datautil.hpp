@@ -96,8 +96,8 @@ namespace redux {
         //@{
         inline uint64_t size( const std::vector<std::string>& data ) {
             uint64_t sz = sizeof(uint64_t);
-            for (auto &it: data) {
-                sz += it.length() + 1;      // pack as zero-terminated c-style string
+            for (auto &str: data) {
+                sz += str.length() + 1;      // pack as zero-terminated c-style string
             }
             return sz;
         }
@@ -110,9 +110,7 @@ namespace redux {
         template <class T, class U, class Comp, class Alloc>
         inline uint64_t size(const std::map<T,U,Comp,Alloc>& in) {
             uint64_t sz = sizeof(uint64_t);
-            for (auto &it: in) {
-                sz += sizeof(T) + sizeof(U);
-            }
+	    sz += (sizeof(T) + sizeof(U)) * in.size();
             return sz;
         }
        
@@ -131,9 +129,9 @@ namespace redux {
             uint64_t count = in.size();
             *reinterpret_cast<uint64_t*>(ptr) = count;
             uint64_t totalSize = sizeof(uint64_t);
-            for ( auto &it: in ) {
-                strncpy( ptr+totalSize, it.c_str(), it.length() + 1 );
-                totalSize += it.length() + 1;
+            for ( auto &str: in ) {
+                strncpy( ptr+totalSize, str.c_str(), str.length() + 1 );
+                totalSize += str.length() + 1;
             }
             return totalSize;
         }
@@ -151,10 +149,10 @@ namespace redux {
             uint64_t count = in.size();
             *reinterpret_cast<uint64_t*>(ptr) = count;
             uint64_t totalSize = sizeof(uint64_t);
-            for (auto &it: in) {
-                *reinterpret_cast<T*>(ptr+totalSize) = it.first;
+            for (auto &element: in) {
+                *reinterpret_cast<T*>(ptr+totalSize) = element.first;
                 totalSize += sizeof(T);
-                *reinterpret_cast<U*>(ptr+totalSize) = it.second;
+                *reinterpret_cast<U*>(ptr+totalSize) = element.second;
                 totalSize += sizeof(U);
             }
             return totalSize;

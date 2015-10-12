@@ -41,8 +41,8 @@ namespace redux {
         template <typename T>
         double total( const redux::util::Array<T>& in ) {
             double sum( 0 );
-            for( auto it : in ) {
-                sum += it;
+            for( auto &value : in ) {
+                sum += value;
             }
             return sum;
         }
@@ -55,8 +55,8 @@ namespace redux {
             }
             double sum( 0 );
             typename redux::util::Array<U>::const_iterator wit = weight.begin();
-            for( auto it : in ) {
-                sum += it * *wit;
+            for( auto &value : in ) {
+                sum += value * *wit;
                 ++wit;
             }
             return sum;
@@ -67,11 +67,7 @@ namespace redux {
         double mean( const redux::util::Array<T>& in ) {
             size_t nElements = in.nElements();
             if( nElements == 0 ) return 0;
-            double sum( 0 );
-            for( auto it : in ) {
-                sum += it;
-            }
-            return sum / static_cast<double>( nElements );
+            return total( in ) / static_cast<double>( nElements );
         }
 
 
@@ -147,8 +143,8 @@ namespace redux {
             if( nElements == 0 ) return 0.0;
             double chisq = 0;
             typename redux::util::Array<U>::const_iterator bit = b.begin();
-            for( auto ait : a ) {
-                double tmp = ait - *bit++;
+            for( auto &avalue : a ) {
+                double tmp = avalue - *bit++;
                 chisq += tmp * tmp;
             }
             return chisq / static_cast<double>( nElements );
@@ -164,9 +160,9 @@ namespace redux {
             typename redux::util::Array<U>::const_iterator bit = b.begin();
             typename redux::util::Array<V>::const_iterator wit = weight.begin()--;
             size_t count(0);
-            for( auto ait : a ) {
+            for( auto &avalue : a ) {
                 if( *++wit ) {
-                    tmp = ( ait - *bit++ ) * ( *wit );
+                    tmp = ( avalue - *bit++ ) * ( *wit );
                     chisq += tmp * tmp;
                     ++count;
                 }
@@ -178,8 +174,8 @@ namespace redux {
 
         template <typename T, typename Predicate>
         void fillPixels( redux::util::Array<T>& array, T fillValue, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
-            for( auto & it : array ) {
-                if( predicate( it ) ) it = fillValue;
+            for( auto & value : array ) {
+                if( predicate( value ) ) value = fillValue;
             }
         }
 
@@ -196,7 +192,7 @@ namespace redux {
                 }
             }
             size_t cnt = 0;
-            for( auto it : tmp ) {
+            for( auto &it : tmp ) {
                 ptr[it.first] = it.second;
                 ++cnt;
             }

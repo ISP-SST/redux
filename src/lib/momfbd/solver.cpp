@@ -79,8 +79,8 @@ void Solver::init( void ) {
         mPtr += nModes;
     }
 
-    for( auto & it : job.getObjects() ) {
-        it->initProcessing( *this );
+    for( auto & object : job.getObjects() ) {
+        object->initProcessing( *this );
     }
     
 }
@@ -88,29 +88,29 @@ void Solver::init( void ) {
 
 void Solver::getMetric( boost::asio::io_service& service, uint8_t nThreads ) {
 
-    for( auto & it : job.getObjects() ) {
-        it->metric();
+    for( auto & object : job.getObjects() ) {
+        object->metric();
     }
 
 }
 
 
 void Solver::resetAll( boost::asio::io_service& service ) {
-    for( auto& oit: job.getObjects() ) {
-        for( auto& cit: oit->channels ) {
-            for( auto& it: cit->subImages ) {
-                service.post( std::bind((void(SubImage::*)(void))&SubImage::resetPhi, it.get() ) );
+    for( auto& object: job.getObjects() ) {
+        for( auto& ch: object->channels ) {
+            for( auto& subimage: ch->subImages ) {
+                service.post( std::bind((void(SubImage::*)(void))&SubImage::resetPhi, subimage.get() ) );
             }
         }
-        service.post( std::bind(&Object::initPQ, oit.get() ) );
-        service.post( std::bind(&Object::addAllPQ, oit.get() ) );
+        service.post( std::bind(&Object::initPQ, object.get() ) );
+        service.post( std::bind(&Object::addAllPQ, object.get() ) );
     }
 }
 void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
-    for( auto& oit: job.getObjects() ) {
-        for( auto& cit: oit->channels ) {
-            for( auto& it: cit->subImages ) {
-                service.post( std::bind((void(SubImage::*)(string))&SubImage::dump, it.get(), tag ) );
+    for( auto& object: job.getObjects() ) {
+        for( auto& ch: object->channels ) {
+            for( auto& subimage: ch->subImages ) {
+                service.post( std::bind((void(SubImage::*)(string))&SubImage::dump, subimage.get(), tag ) );
             }
         }
     }
@@ -532,8 +532,8 @@ void Solver::getAlpha(void) {
 
 void Solver::dump( string tag ) {
 
-    for( auto & it : job.getObjects() ) {
-        it->dump(tag);
+    for( auto & object : job.getObjects() ) {
+        object->dump(tag);
     }
 
     Ana::write (tag + "_window.f0", window);

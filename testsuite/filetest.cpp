@@ -175,7 +175,7 @@ void anaTest( void ) {
     // test writing subimage
     image.resize(7,7);
     int cnt=0;
-    for(auto& it: image) it = ++cnt;
+    for(auto& value: image) value = ++cnt;
     Image<int32_t> subimage(image,1,5,1,5);
     writeAndVerifyAna(subimage);            
     writeAndVerifyCompressedAna(subimage);

@@ -400,20 +400,20 @@ namespace redux {
             std::ostringstream oss;
             oss << std::setprecision( d ) << name << "=[";
             bool separator( false );
-            for( auto & it : data ) {
+            for( auto & element : data ) {
                 if( separator ) {
                     oss << ", ";
                 }
                 //if( std::is_integral<T>::value ) {
-                //    oss << +it.first;   // trick to promote char to int before output to avoid interpretation as character
+                //    oss << +element.first;   // trick to promote char to int before output to avoid interpretation as character
                 //} else {
-                    oss << it.first;                    
+                    oss << element.first;                    
                 //}
                 oss << "->";
                 if( std::is_integral<U>::value ) {
-                    oss << +it.second;   // trick to promote char to int before output to avoid interpretation as character
+                    oss << +element.second;   // trick to promote char to int before output to avoid interpretation as character
                 } else {
-                    oss << it.second;                    
+                    oss << element.second;                    
                 }
                 separator = true;
             }
@@ -428,14 +428,14 @@ namespace redux {
             std::ostringstream oss;
             oss << std::setprecision( d ) << name << "=[";
             bool separator( false );
-            for( auto & it : data ) {
+            for( auto & element : data ) {
                 if( separator ) {
                     oss << ", ";
                 }
                 //if( std::is_integral<decltype(it)>::value ) {
                 //    oss << +it;   // FIXME for some reason it=string passes as integer...weird
                 //} else {
-                    oss << it;
+                    oss << element;
                 //}
                 separator = true;
             }

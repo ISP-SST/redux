@@ -87,10 +87,10 @@ void Object::parsePropertyTree( bpt::ptree& tree ) {
     ObjectCfg::parseProperties(tree, myJob);
 
     uint16_t nCh(0);
-    for( auto & it : tree ) {
-        if( iequals( it.first, "CHANNEL" ) ) {
+    for( auto & property : tree ) {
+        if( iequals( property.first, "CHANNEL" ) ) {
             Channel* tmpCh = new Channel( *this, myJob, nCh++ );
-            tmpCh->parsePropertyTree( it.second );
+            tmpCh->parsePropertyTree( property.second );
             channels.push_back( shared_ptr<Channel>( tmpCh ) );
         }
     }
@@ -779,9 +779,9 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
         bfs::path fn = bfs::path (outputFileName + ".alpha.f0");
         LOG << "Saving alpha-coefficients to: " << fn;
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size());
-        for( auto& it: patches ) {
-            Array<float> subalpha(alpha, it->index.y, it->index.y, it->index.x, it->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1);
-            it->objects[ID].alpha.copy(subalpha);
+        for( auto& patch: patches ) {
+            Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1);
+            patch->objects[ID].alpha.copy(subalpha);
        }
        Ana::write(fn.string(), alpha);
     }
@@ -995,8 +995,8 @@ void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service
 
     LOG_DEBUG << "storePatches()";
 
-    for (auto & it : wip.parts) {
-        PatchData::Ptr patch = static_pointer_cast<PatchData> (it);
+    for (auto & part : wip.parts) {
+        PatchData::Ptr patch = static_pointer_cast<PatchData> (part);
         LOG_DEBUG << "storePatches() index: (" << patch->index.x << "," << patch->index.y << ")  offset = "
                   << info->patches (patch->index.x , patch->index.y).offset;
         patch->step = MomfbdJob::JSTEP_COMPLETED;

@@ -119,15 +119,15 @@ namespace redux {
         external_type get_value(const internal_type& str) {
             external_type result;
             if(!str.empty()) {
-                std::vector<std::string> tok;
-                boost::split(tok, str, boost::is_any_of(","));
+                std::vector<std::string> tokens;
+                boost::split(tokens, str, boost::is_any_of(","));
                 if(std::numeric_limits<T>::is_integer && !std::numeric_limits<T>::is_signed) {    // only expand '-' & ':' for unsigned integers
-                    for(auto & it : tok) {
-                        parseSegment(result, it);
+                    for(auto & token : tokens) {
+                        parseSegment(result, token);
                     }
                 }
                 else {
-                    std::transform(tok.begin(), tok.end(), back_inserter(result), boost::lexical_cast<T, internal_type>);
+                    std::transform(tokens.begin(), tokens.end(), back_inserter(result), boost::lexical_cast<T, internal_type>);
                 }
             }
             return result;
@@ -229,10 +229,10 @@ namespace redux {
         boost::optional<external_type> get_value(const internal_type& str) {
             external_type result;
             if(!str.empty()) {
-                std::vector<std::string> tok;
-                boost::split(tok, str, boost::is_any_of(","));
-                for(auto & it : tok) {
-                    parseSegment(result, it);
+                std::vector<std::string> tokens;
+                boost::split(tokens, str, boost::is_any_of(","));
+                for(auto & token : tokens) {
+                    parseSegment(result, token);
                 }
             }
             return boost::optional<external_type>(result);

@@ -39,8 +39,13 @@ namespace {
     const string thisChannel = "channel";
     
     struct ClippedFile {
+        string filename;
+        const vector<int16_t> clip;
+        bool symmetricClip;
+
         ClippedFile(const string& fn, const vector<int16_t>& cl, bool sym=false) :
             filename(fn), clip(cl), symmetricClip(sym) { }
+
         bool operator<(const ClippedFile& rhs) const {
             if(filename == rhs.filename) {
                 if(symmetricClip == rhs.symmetricClip) {
@@ -50,6 +55,7 @@ namespace {
             }
             return (filename < rhs.filename);
         }
+
         template <typename T>
         void loadImage(Image<T>& img, bool normalize=false) const {
 
@@ -66,7 +72,8 @@ namespace {
                     std::swap (alignClip[2], alignClip[3]);
                     flipY = true;
                 }
-                for (auto & it : alignClip) --it;       // NOTE: momfbd cfg files uses 1-based indexes, internally we start with 0.
+                for (auto & index : alignClip)
+                    --index;       // NOTE: momfbd cfg files uses 1-based indexes, internally we start with 0.
                 size_t sy = alignClip[3] - alignClip[2] + 1;
                 size_t sx = alignClip[1] - alignClip[0] + 1;
                 if(symmetricClip) {
@@ -107,10 +114,6 @@ namespace {
             ClippedFile cf(fn,cl,sym);
             redux::util::Cache::erase<ClippedFile, Image<T>>(cf);
         }
-
-        string filename;
-        const vector<int16_t> clip;
-        bool symmetricClip;
     };
 
 }
@@ -159,7 +162,8 @@ uint64_t Channel::pack (char* ptr) const {
     count += imgSize.pack (ptr + count);
     uint16_t statSize = imageStats.size();
     count += pack (ptr + count, statSize);
-    for (auto & it : imageStats) count += it->pack (ptr + count);
+    for (auto & stat : imageStats)
+        count += stat->pack (ptr + count);
     if (count != size()) {
         LOG_ERR << "(" << hexString (this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size();
     }
@@ -176,9 +180,9 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
     uint16_t statSize;
     count += unpack (ptr + count, statSize, swap_endian);
     imageStats.resize (statSize);
-    for (auto & it : imageStats) {
-        it.reset (new ArrayStats());
-        count += it->unpack (ptr + count, swap_endian);
+    for (auto & stat : imageStats) {
+        stat.reset (new ArrayStats());
+        count += stat->unpack (ptr + count, swap_endian);
     }
     return count;
 }
@@ -264,10 +268,10 @@ bool Channel::checkData (void) {
             return false;
         }
     } else {                            // template + numbers
-        for (auto & it : imageNumbers) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + it)));
+        for (auto & number : imageNumbers) {
+            bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)));
             if (!bfs::exists (fn)) {
-                LOG_ERR << boost::format ("Image-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + it));
+                LOG_ERR << boost::format ("Image-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
                 return false;
             }
         }
@@ -284,12 +288,12 @@ bool Channel::checkData (void) {
             } else darkTemplate = fn.c_str();
         }
     } else {                            // template
-        for (auto & it : darkNumbers) {
-            bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % it));
+        for (auto & number : darkNumbers) {
+            bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % number));
             if (!bfs::exists (fn)) {
-                fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % it));
+                fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % number));
                 if (!bfs::exists (fn)) {
-                    logAndThrow("Dark-file " + (boost::format(darkTemplate) % it).str() + " not found!");
+                    logAndThrow("Dark-file " + (boost::format(darkTemplate) % number).str() + " not found!");
                 } else darkTemplate = fn.c_str();
             }
         }

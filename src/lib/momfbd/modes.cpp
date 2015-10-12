@@ -144,12 +144,12 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
     double c;
     
     ModeInfo z_info(0, 0, 0, nPoints, r_c, angle, cutoff);
-    for(auto & it : kle->zernikeWeights) {
-        if(fabs(c = it.second) >= cutoff) {
-            z_info.modeNumber = it.first;
+    for(auto & weight : kle->zernikeWeights) {
+        if(fabs(c = weight.second) >= cutoff) {
+            z_info.modeNumber = weight.first;
             PupilMode::Ptr& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( z_info, PupilMode::Ptr() );
             if( !mode ) {
-                mode.reset( new PupilMode( it.first, nPoints, r_c, angle ) );    // generate Zernike
+                mode.reset( new PupilMode( weight.first, nPoints, r_c, angle ) );    // generate Zernike
             }
             this->add(*mode, c);
         }
