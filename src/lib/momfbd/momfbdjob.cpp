@@ -96,7 +96,7 @@ bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
 
     GlobalCfg::getProperties(tree);
 
-    for( shared_ptr<Object>& obj: objects ) {
+    for( auto& obj: objects ) {
         obj->getPropertyTree( tree );
     }
 
@@ -112,7 +112,7 @@ uint64_t MomfbdJob::size( void ) const {
     uint64_t sz = Job::size();
     sz += GlobalCfg::size();
     sz += sizeof(uint16_t);           // objects.size()
-    for( const shared_ptr<Object>& obj: objects ) {
+    for( const auto& obj: objects ) {
         sz += obj->size();
     }
     return sz;
@@ -124,7 +124,7 @@ uint64_t MomfbdJob::pack( char* ptr ) const {
     uint64_t count = Job::pack( ptr );
     count += GlobalCfg::pack( ptr+count );
     count += pack( ptr+count, (uint16_t)objects.size() );
-    for( const shared_ptr<Object>& obj: objects ) {
+    for( const auto& obj: objects ) {
         count += obj->pack( ptr+count );
     }
     
@@ -140,7 +140,7 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
     uint16_t tmp;
     count += unpack( ptr+count, tmp, swap_endian );
     objects.resize( tmp );
-    for( shared_ptr<Object>& obj: objects ) {
+    for( auto& obj: objects ) {
         obj.reset(new Object(*this));
         count += obj->unpack( ptr+count, swap_endian );
     }
@@ -150,7 +150,7 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
 
 size_t MomfbdJob::nImages(void) const {
     size_t nTotalImages(0);
-    for( const shared_ptr<Object>& obj : objects) {
+    for( const auto& obj : objects) {
         nTotalImages += obj->nImages();
     }
     return nTotalImages;
@@ -237,8 +237,8 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
 void MomfbdJob::ungetWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
-    for( Part::Ptr& it : wip.parts ) {
-        it->step = JSTEP_QUEUED;
+    for( auto& part : wip.parts ) {
+        part->step = JSTEP_QUEUED;
     }
     wip.parts.clear();
 }
@@ -247,8 +247,8 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 void MomfbdJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
-    for( Part::Ptr& it : wip.parts ) {
-        PatchData::Ptr patch = static_pointer_cast<PatchData>( it );
+    for( auto& part : wip.parts ) {
+        PatchData::Ptr patch = static_pointer_cast<PatchData>( part );
         patch->step = JSTEP_POSTPROCESS;
         patches(patch->index.y,patch->index.x) = patch;
     }
@@ -275,9 +275,9 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
                 solver.reset( new Solver(*this) );            // Initialize, allocations, etc.
                 solver->init();
             }
-            for( Part::Ptr& it : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
+            for( auto& part : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 // Run main processing
-                solver->run(static_pointer_cast<PatchData>(it), service, nThreads);
+                solver->run(static_pointer_cast<PatchData>(part), service, nThreads);
                 // Get results
                 //it = proc->result;
             }
@@ -309,7 +309,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
     
     Point16 imageSizes;
-    for( shared_ptr<Object>& obj : objects ) {
+    for( auto& obj : objects ) {
         Point16 tmp = obj->getImageSize();
         if(imageSizes == 0) {
             imageSizes = tmp;
@@ -372,12 +372,12 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     }
 
 
-    for( shared_ptr<Object>& obj : objects ) {
+    for( auto& obj : objects ) {
         obj->loadData(service, patches);
     }
     
-    for( shared_ptr<Object>& obj : objects ) {
-        for (shared_ptr<Channel>& ch : obj->channels) {
+    for( auto& obj : objects ) {
+        for (auto& ch : obj->channels) {
             ch->unloadCalib();
         }
     }
@@ -385,8 +385,8 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     initcache.join();           // wait for background jobs.
     bool writeFailed(false);
     uint32_t nTotalImages(0);
-    for( shared_ptr<Object>& obj : objects ) {
-        for( shared_ptr<Channel>& ch : obj->channels ) {
+    for( auto& obj : objects ) {
+        for( auto& ch : obj->channels ) {
             writeFailed |= ch->patchWriteFail.get();            // FIXME only used as a synch-point atm. It should deal with errors eventually.
         }
         nTotalImages += obj->nImages();
@@ -407,7 +407,7 @@ void MomfbdJob::initCache(void) {
     
     globalData->constraints.init();
  
-    for( shared_ptr<Object>& obj: objects ) {
+    for( auto& obj: objects ) {
         obj->initCache();
     }
 
@@ -417,11 +417,11 @@ void MomfbdJob::initCache(void) {
 
 void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& service, uint8_t nThreads) {
     LOG << "MomfbdJob::storePatches()";
-    for( shared_ptr<Object>& obj: objects ) {
+    for( auto& obj: objects ) {
         obj->storePatches(wip, service, nThreads);
     }
     
-    for( Part::Ptr& part: wip.parts ) {
+    for( auto& part: wip.parts ) {
         //PatchData::Ptr patch = static_pointer_cast<PatchData>(part);
         part->step = JSTEP_COMPLETED;
     }
@@ -436,7 +436,7 @@ void MomfbdJob::postProcess( boost::asio::io_service& service ) {
     for( auto& patch: patches ) {
         patch->cacheLoad(true);        // load and erase cache-file.
     }
-    for( shared_ptr<Object>& obj : objects ) {
+    for( auto& obj : objects ) {
         service.post( std::bind( &Object::writeResults, obj.get(), patches ) );
     }
     runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
@@ -475,7 +475,7 @@ bool MomfbdJob::checkCfg(void) {
     }
     if( objects.empty() ) return false;     // need at least 1 object
     
-    for( shared_ptr<Object>& obj: objects ) {
+    for( auto& obj: objects ) {
         if( !obj->checkCfg() ) return false;
     }
     
@@ -485,7 +485,7 @@ bool MomfbdJob::checkCfg(void) {
 
 bool MomfbdJob::checkData(void) {
 
-    for( shared_ptr<Object>& obj: objects ) {
+    for( auto& obj: objects ) {
         if( !obj->checkData() ) return false;
     }
     

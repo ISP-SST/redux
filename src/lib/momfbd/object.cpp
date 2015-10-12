@@ -104,7 +104,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 
     bpt::ptree node;
 
-    for( shared_ptr<Channel>& ch : channels ) {
+    for( auto& ch : channels ) {
         ch->getPropertyTree( node );
     }
 
@@ -120,7 +120,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ) {
 size_t Object::size(void) const {
     size_t sz = ObjectCfg::size();
     sz += 2*sizeof(uint16_t) + 4*sizeof(double);                   // channels.size() + ID + maxMean
-    for( const shared_ptr<Channel>& ch : channels ) {
+    for( const auto& ch : channels ) {
         sz += ch->size();
     }
     sz += imgSize.size();
@@ -139,7 +139,7 @@ uint64_t Object::pack(char* ptr) const {
     count += pack(ptr+count, objMaxMean);
     count += imgSize.pack(ptr+count);
     count += pack(ptr+count, (uint16_t)channels.size());
-    for( const shared_ptr<Channel>& ch : channels ) {
+    for( const auto& ch : channels ) {
         count += ch->pack(ptr+count);
     }
     count += pack (ptr + count, nObjectImages);
@@ -163,7 +163,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
     uint16_t tmp;
     count += unpack(ptr+count, tmp, swap_endian);
     channels.resize(tmp);
-    for( shared_ptr<Channel>& ch : channels ) {
+    for( auto& ch : channels ) {
         ch.reset(new Channel(*this,myJob));
         count += ch->unpack(ptr+count, swap_endian);
     }
@@ -174,7 +174,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 
 uint32_t Object::nImages(void) const {
     if(nObjectImages) return nObjectImages;
-    for (const shared_ptr<Channel>& ch : channels) nObjectImages += ch->nImages();
+    for (const auto& ch : channels) nObjectImages += ch->nImages();
     return nObjectImages;
 }
 
@@ -216,8 +216,8 @@ void Object::getResults(ObjectData& od) {
     complex_t* aoPtr = avgObjFT.get();
     double* dPtr = tmpD.get();
     double avgNoiseVariance = 0.0;
-    for (shared_ptr<Channel>& ch : channels) {
-        for (shared_ptr<SubImage>& im : ch->subImages) {
+    for (auto& ch : channels) {
+        for (auto& im : ch->subImages) {
             im->restore(aoPtr, dPtr);
             avgNoiseVariance += sqr(im->stats.noise);
         }
@@ -251,15 +251,15 @@ void Object::getResults(ObjectData& od) {
         od.psf.zero();
         if( nPSF > 1 ) {
             Array<float> view(od.psf,0,0,0,patchSize-1,0,patchSize-1);
-            for( shared_ptr<Channel>& ch: channels) {
-                for ( shared_ptr<SubImage>& si: ch->subImages) {
+            for( auto& ch: channels) {
+                for ( auto& si: ch->subImages) {
                     view.assign(si->getPSF<complex_t>()); //si->getPSF());
                     view.shift(0,1);
                 }
             }
         } else if( nPSF == 1 ) {
-            for( shared_ptr<Channel>& ch: channels) {
-                for ( shared_ptr<SubImage>& si: ch->subImages) {
+            for( auto& ch: channels) {
+                for ( auto& si: ch->subImages) {
                     si->addPSF(od.psf);
                 }
             }
@@ -273,8 +273,8 @@ void Object::getResults(ObjectData& od) {
             od.cobj.resize(nObjectImages, patchSize, patchSize);
             od.cobj.zero();
             Array<float> view(od.cobj,0,0,0,patchSize-1,0,patchSize-1);
-            for( shared_ptr<Channel>& ch: channels) {
-                for ( shared_ptr<SubImage>& si: ch->subImages) {
+            for( auto& ch: channels) {
+                for ( auto& si: ch->subImages) {
                     view.assign(si->convolveImage(od.img));
                     view.shift(0,1);
                 }
@@ -292,16 +292,16 @@ void Object::getResults(ObjectData& od) {
             Array<float> view(od.res,0,0,0,patchSize-1,0,patchSize-1);
             if( od.cobj.sameSizes(od.res) ) {
                 Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1);
-                for( shared_ptr<Channel>& ch: channels) {
-                    for ( shared_ptr<SubImage>& si: ch->subImages) {
+                for( auto& ch: channels) {
+                    for ( auto& si: ch->subImages) {
                         view.assign(si->convolvedResidual(cview));
                         view.shift(0,1);
                         cview.shift(0,1);
                     }
                 }
             } else {
-                for( shared_ptr<Channel>& ch: channels) {
-                    for ( shared_ptr<SubImage>& si: ch->subImages) {
+                for( auto& ch: channels) {
+                    for ( auto& si: ch->subImages) {
                         view.assign(si->residual(od.img));
                         view.shift(0,1);
                     }
@@ -319,8 +319,8 @@ void Object::getResults(ObjectData& od) {
             od.alpha.resize(nObjectImages, myJob.modeNumbers.size());
             od.alpha.zero();
             float* alphaPtr = od.alpha.get();
-            for( shared_ptr<Channel>& ch: channels ) {
-                for ( shared_ptr<SubImage>& si: ch->subImages ) {
+            for( auto& ch: channels ) {
+                for ( auto& si: ch->subImages ) {
                     si->getAlphas(alphaPtr);
                     alphaPtr += nModes;
                 }
@@ -337,7 +337,7 @@ void Object::getResults(ObjectData& od) {
         if( nCh  ) {
             od.div.resize(nCh, pupilPixels, pupilPixels);
             Array<float> view(od.div,0,0,0,pupilPixels-1,0,pupilPixels-1);
-            for( shared_ptr<Channel>& ch: channels) {
+            for( auto& ch: channels) {
                 view = ch->phi_fixed;
                 view.shift(0,1);
             }
@@ -413,8 +413,8 @@ void Object::addToPQ(const redux::image::FourierTransform& ft, const Array<compl
 
 
 void Object::addAllPQ(void) {
-    for( shared_ptr<Channel>& ch : channels ) {
-        for( shared_ptr<SubImage>& im : ch->subImages ) {
+    for( auto& ch : channels ) {
+        for( auto& im : ch->subImages ) {
             unique_lock<mutex> lock( mtx );
             im->addPQ(P.get(),Q.get());
         }
@@ -433,7 +433,7 @@ void Object::fitAvgPlane(ObjectData& od) {
         fittedPlane.resize(ySize,xSize);
         fittedPlane.zero();
         
-        for( ChannelData& cd : od.channels ) {
+        for( auto& cd : od.channels ) {
             size_t nImages = cd.images.dimSize(0);
             vector<int64_t> first = cd.images.first();
             vector<int64_t> last = cd.images.last();
@@ -461,7 +461,7 @@ void Object::fitAvgPlane(ObjectData& od) {
         
         LOG_DETAIL << "Subtracting average plane before processing.";
         
-        for( ChannelData& cd : od.channels ) {
+        for( auto& cd : od.channels ) {
             size_t nImages = cd.images.dimSize(0);
             vector<int64_t> first = cd.images.first();
             vector<int64_t> last = cd.images.last();
@@ -510,7 +510,7 @@ bool Object::checkCfg (void) {
         LOG_CRITICAL << "Each object must have at least 1 channel specified.";
     }
 
-    for (shared_ptr<Channel>& ch : channels) {
+    for (auto& ch : channels) {
         if (!ch->checkCfg()) return false;
     }
 
@@ -587,7 +587,7 @@ bool Object::checkData (void) {
         }
     }
 
-    for (shared_ptr<Channel>& ch : channels) {
+    for (auto& ch : channels) {
         if (!ch->checkData()) return false;
     }
     
@@ -620,7 +620,7 @@ bool Object::checkData (void) {
 
 void Object::initCache (void) {
     
-    for (shared_ptr<Channel>& ch : channels) {
+    for (auto& ch : channels) {
         ch->initCache();
     }
     
@@ -742,13 +742,13 @@ void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& 
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
     
-    for (shared_ptr<Channel>& ch : channels) {
+    for (auto& ch : channels) {
         ch->loadCalib(service);
     }
     runThreadsAndWait(service, myJob.info.maxThreads);
     
     objMaxMean = std::numeric_limits<double>::lowest();
-    for (shared_ptr<Channel>& ch : channels) {
+    for (auto& ch : channels) {
         ch->loadData(service, patches);
         runThreadsAndWait(service, myJob.info.maxThreads);
         objMaxMean = std::max(objMaxMean,ch->getMaxMean());
@@ -1007,7 +1007,7 @@ void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service
 
 Point16 Object::getImageSize (void) {
     if( imgSize == 0 ) {
-        for (shared_ptr<Channel>& ch : channels) {
+        for (auto& ch : channels) {
             Point16 tmp = ch->getImageSize();
             if (imgSize == 0) {
                 imgSize = tmp;
@@ -1028,7 +1028,7 @@ void Object::dump (std::string tag) {
     Ana::write (tag + "_fittedplane.f0", fittedPlane);
     Ana::write (tag + "_pupil.f0", pupil);
     Ana::write (tag + "_modes.f0", modes);
-    for (shared_ptr<Channel>& ch : channels) {
+    for (auto& ch : channels) {
         ch->dump(tag);
     }
 

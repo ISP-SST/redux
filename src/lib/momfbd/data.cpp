@@ -221,14 +221,14 @@ void PatchData::setPath(const std::string& path) {
 
 
 void PatchData::initPatch(void) {
-    for( ObjectData& obj: objects ) {
+    for( auto& obj: objects ) {
         obj.initPatch();
     }
 }
 
 
 void PatchData::collectResults(void) {
-    for( ObjectData& obj: objects ) {
+    for( auto& obj: objects ) {
         obj.collectResults();
     }
 }
@@ -272,14 +272,14 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
 
 
 void PatchData::cclear(void) {
-    for( ObjectData& obj: objects ) {
+    for( auto& obj: objects ) {
         obj.cclear();
     }
 }
 
 bool PatchData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
-    for( ObjectData& obj: objects ) {
+    for( auto& obj: objects ) {
         loaded |= obj.cacheLoad(removeAfterLoad);
     }
     return loaded;
@@ -287,7 +287,7 @@ bool PatchData::cacheLoad(bool removeAfterLoad) {
 
 bool PatchData::cacheStore(bool clearAfterStore) {
     bool stored(false);
-    for( ObjectData& obj: objects ) {
+    for( auto& obj: objects ) {
         stored |= obj.cacheStore(clearAfterStore);
     }
     //stored |= CacheItem::cacheStore(clearAfterStore);

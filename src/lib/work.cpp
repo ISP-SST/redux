@@ -118,10 +118,10 @@ uint64_t WorkInProgress::workSize(void) {
         sz += job->size();
     }
     nParts = 0;
-    for( const Part::Ptr& it: parts ) {
-        if( it ) {
+    for( const auto& part: parts ) {
+        if( part ) {
             nParts++;
-            sz += it->size();
+            sz += part->size();
         }
     }
     return sz;

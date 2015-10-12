@@ -606,8 +606,8 @@ void Channel::unloadCalib(void) {               // unload what was accessed thro
 
 double Channel::getMaxMean(void) {
     double maxMean = std::numeric_limits<double>::lowest();
-    for (ArrayStats::Ptr imStat : imageStats) {
-        maxMean = std::max(maxMean,imStat->mean);
+    for (auto &stat : imageStats) {
+        maxMean = std::max(maxMean,stat->mean);
     }
     return maxMean;
 }
@@ -724,21 +724,21 @@ void Channel::getPhi (redux::util::Array<double>& phi, const WaveFront& wf) cons
 */
 
 void Channel::addAllFT (redux::util::Array<double>& ftsum) {
-    for (shared_ptr<SubImage>& it : subImages) {
-        it->addFT (ftsum);
+    for (auto& subimage : subImages) {
+        subimage->addFT (ftsum);
     }
 }
 
 void Channel::addAllPQ(void) const {
-    for (const shared_ptr<SubImage>& it : subImages) {
-        myObject.addToPQ( it->imgFT, it->OTF );
+    for (const auto& subimage : subImages) {
+        myObject.addToPQ( subimage->imgFT, subimage->OTF );
     }
 }
 
 double Channel::metric (void) {
 
     double sum = 0.0;
-//   for(shared_ptr<SubImage> &im: subImages) {
+//   for(auto &im: subImages) {
 //       for( auto& a: im->wf->alpha) {
 //           double coeff = a.second.first;
 //           sum += coeff*coeff * modes.at(a.first)->inv_atm_rms;

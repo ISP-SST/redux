@@ -651,7 +651,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
             fillpixMethod = tmpInt;
         } else {
             string msg = "Unrecognized FPMETHOD value \"" + tmpString + "\"\n  Valid entries are: ";
-            for(const pair<string,int>& it: fillpixMap) msg += "\"" + it.first + "\" ";
+            for(const auto& entry: fillpixMap) msg += "\"" + entry.first + "\" ";
             LOG_ERR << msg;
         }
     }
@@ -663,7 +663,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
             gradientMethod = tmpInt;
         } else {
             string msg = "Unrecognized GRADIENT value \"" + tmpString + "\"\n  Valid entries are: ";
-            for(const pair<string,int>& it: gradientMap) msg += "\"" + it.first + "\" ";
+            for(const auto& entry: gradientMap) msg += "\"" + entry.first + "\" ";
             LOG_ERR << msg;
         }
     }
@@ -675,7 +675,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
             getstepMethod = tmpInt;
         } else {
             string msg = "Unrecognized GETSTEP value \"" + tmpString + "\"\n  Valid entries are: ";
-            for(const pair<string,int>& it: getstepMap) msg += "\"" + it.first + "\" ";
+            for(const auto& entry: getstepMap) msg += "\"" + entry.first + "\" ";
             LOG_ERR << msg;
         }
     }
@@ -813,8 +813,8 @@ uint64_t GlobalCfg::size(void) const {
     sz += observationTime.length() + 1;
     sz += observationDate.length() + 1;
     sz += tmpDataDir.length() + 1;
-    for( const string& it : outputFiles ) {
-        sz += it.length() + 1;
+    for( const auto& filename : outputFiles ) {
+        sz += filename.length() + 1;
     }
     return sz;
 }

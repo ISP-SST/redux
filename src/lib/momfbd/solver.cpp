@@ -125,10 +125,10 @@ double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void
     job.globalData->constraints.reverse(x->data, alphaPtr);
     
     size_t nModes = job.modeNumbers.size();
-    for( const shared_ptr<Object>& o: objects ) {
+    for( const auto& o: objects ) {
         o->initPQ();
-        for( const shared_ptr<Channel>& c: o->getChannels() ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
                 service.post ([&im, alphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcOTF();
@@ -141,7 +141,7 @@ double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void
     runThreadsAndWait( service, job.info.maxThreads );
     
     double sum( 0 );
-    for( const shared_ptr<Object>& o : objects ) {
+    for( const auto& o : objects ) {
         if( o ) {
             service.post( [&sum,o] {
                 o->calcMetric();
@@ -172,10 +172,10 @@ void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void*
         gradientMethod = gradientMethods[GM_VOGEL];  //gradientMethods[job.gradientMethod];
     }
 
-    for( const shared_ptr<Object>& o: objects ) {
+    for( const auto& o: objects ) {
         o->initPQ();
-        for( const shared_ptr<Channel>& c: o->getChannels() ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
                 service.post([this, &im, alphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcPFOTF();
@@ -187,9 +187,9 @@ void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void*
     }
     runThreadsAndWait( service, job.info.maxThreads );
     
-    for( const shared_ptr<Object>& o: objects ) {
-        for( const shared_ptr<Channel>& c: o->getChannels() ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+    for( const auto& o: objects ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
                 service.post ([this, &im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcVogelWeight();
                     for ( uint16_t m=0; m<nModes; ++m ) {
@@ -224,10 +224,10 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
        gradientMethod = gradientMethods[GM_VOGEL];  //gradientMethods[job.gradientMethod];
    }
 
-    for( const shared_ptr<Object>& o: objects ) {
+    for( const auto& o: objects ) {
         o->initPQ();
-        for( const shared_ptr<Channel>& c: o->getChannels() ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
                 service.post([this, &im, alphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcPFOTF();
@@ -240,9 +240,9 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
     runThreadsAndWait( service, job.info.maxThreads );
     
     double sum=0;
-    for( const shared_ptr<Object>& o: objects ) {
-        for( const shared_ptr<Channel>& c: o->getChannels() ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+    for( const auto& o: objects ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
                 service.post ([this, &im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcVogelWeight();
                     for ( uint16_t m=0; m<nModes; ++m ) {
@@ -480,7 +480,7 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
 
 double Solver::objectMetric( boost::asio::io_service& service ) {
 
-    for( const shared_ptr<Object>& o : objects ) {
+    for( const auto& o : objects ) {
         if( o ) {
             // async: clear and accumulate P & Q for all objects (blockwise?)
             service.post( [o] {
@@ -493,7 +493,7 @@ double Solver::objectMetric( boost::asio::io_service& service ) {
     runThreadsAndWait( service, job.info.maxThreads );
     
     double sum( 0 );
-    for( const shared_ptr<Object>& o : objects ) {
+    for( const auto& o : objects ) {
         if( o ) {
             sum += o->metric();
         }
@@ -518,9 +518,9 @@ void Solver::clear( void ) {
 void Solver::getAlpha(void) {
 
     double* alphaPtr = alpha;
-    for( const shared_ptr<Object>& o: objects ) {
-        for( const shared_ptr<Channel>& c: o->getChannels() ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+    for( const auto& o: objects ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
                 im->getAlphas(alphaPtr);
                 alphaPtr += nModes;
             }

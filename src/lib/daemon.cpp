@@ -453,7 +453,7 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     wip.previousJob = wip.job;
     wip.job.reset();
     // TODO: sort by priority
-    for( Job::JobPtr& job : jobs ) {
+    for( auto& job : jobs ) {
         if( job->check() && job->getWork( wip, nThreads ) ) {
             wip.job = job;
             for( auto& part: wip.parts ) {
@@ -512,8 +512,8 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 void Daemon::returnResults( WorkInProgress& wip ) {
     
     wip.job->returnResults( wip );
-    for( Part::Ptr& it : wip.parts ) {
-        it->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)
+    for( auto& part : wip.parts ) {
+        part->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)
     }
     wip.parts.clear();
 

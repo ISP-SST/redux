@@ -191,9 +191,9 @@ namespace redux {
             if(swap_endian) swapEndian(count);
             out.resize(count);
             uint64_t totalSize = sizeof(uint64_t);
-            for( std::string& it: out ) {
-                it = std::string(ptr+totalSize);
-                totalSize += it.length()+1;
+            for( auto& str: out ) {
+                str = ptr+totalSize;
+                totalSize += str.length()+1;
             }
             return totalSize;
         }
