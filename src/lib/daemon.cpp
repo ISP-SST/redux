@@ -399,7 +399,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             vector<size_t> ids; 
             for( auto & jobId : jobList ) {
-                for( auto it2 = jobs.begin(); it2 < jobs.end(); ) {
+                for( auto it2 = jobs.begin(); it2 != jobs.end(); ) {
                     if( ( *it2 )->info.id == jobId ) {
                         ids.push_back(jobId);
                         jobs.erase( it2++ );
@@ -423,7 +423,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             vector<string> deletedList;
             for( auto & jobId : jobList ) {
-                for( auto it2 = jobs.begin(); it2 < jobs.end(); ) {
+                for( auto it2 = jobs.begin(); it2 != jobs.end(); ) {
                     if( ( *it2 )->info.name == jobId ) {
                         deletedList.push_back(jobId);
                         jobs.erase( it2++ );

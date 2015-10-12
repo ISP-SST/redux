@@ -207,7 +207,7 @@ void ReduxWidget::open() {
     char* buf = new char[sz];
 
     QStringList::Iterator it = files.begin();
-    while( it < files.end() ) {
+    while( it != files.end() ) {
         memset( buf, 0, sz * sizeof( char ) );
         if( ( ! it->isEmpty() ) && realpath( it->toStdString().c_str(), buf ) ) {
             dumpMsg( QString( "Opening LogFile : " ) + *it );
@@ -245,7 +245,7 @@ void ReduxWidget::close() {
 //     char buf[sz];
 // 
 //     QStringList::Iterator it = files.begin();
-//     while( it < files.end() ) {
+//     while( it != files.end() ) {
 //         memset( buf, 0, sz * sizeof( char ) );
 //         /*if ( (! it->isEmpty()) && realpath ( it->toStdString().c_str(), buf ) ) {
 //         dumpMsg( QString("Opening LogFile : ")+*it);
@@ -377,7 +377,7 @@ void ReduxWidget::removeHost( void ) {
     /*   QModelIndexList selection = hostTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for ( QList<QModelIndex>::iterator i=selection.begin(); i<selection.end(); i++ ) {
+    for ( QList<QModelIndex>::iterator i=selection.begin(); i!=selection.end(); i++ ) {
        if ( i->column() != 0 ) continue;
        j = i->row();
        cout << "selected row = " << j << endl;
@@ -438,7 +438,7 @@ void ReduxWidget::moveJobUp( void ) {
     /*   QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for ( QList<QModelIndex>::iterator i=selection.begin(); i<selection.end(); i++ ) {
+    for ( QList<QModelIndex>::iterator i=selection.begin(); i!=selection.end(); i++ ) {
        if ( i->column() != 0 ) continue;
        j = i->row();
        if ( i->parent().flags() ) j++;
@@ -447,7 +447,7 @@ void ReduxWidget::moveJobUp( void ) {
     std::sort ( indices.begin(), indices.end() );
 
     vector<int>::iterator it;
-    for ( it = indices.begin(); it < indices.end(); ++it ) {
+    for ( it = indices.begin(); it != indices.end(); ++it ) {
        if (*it > 0) ROYAC::swap( &myJobs[*it], &myJobs[*it - 1]);
     }
 
@@ -462,7 +462,7 @@ void ReduxWidget::moveJobDown( void ) {
     /*   QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for ( QList<QModelIndex>::iterator i=selection.begin(); i<selection.end(); i++ ) {
+    for ( QList<QModelIndex>::iterator i=selection.begin(); i!=selection.end(); i++ ) {
        if ( i->column() != 0 ) continue;
        j = i->row();
        if ( i->parent().flags() ) j++;
@@ -473,7 +473,7 @@ void ReduxWidget::moveJobDown( void ) {
     std::reverse( indices.begin(), indices.end() );
 
     vector<int>::iterator it;
-    for ( it = indices.begin(); it < indices.end(); ++it ) {
+    for ( it = indices.begin(); it != indices.end(); ++it ) {
        if (*it < myJobs.size()-1) ROYAC::swap( &myJobs[*it], &myJobs[*it + 1]);
     }
 
@@ -488,7 +488,7 @@ void ReduxWidget::removeJob( void ) {
     /*   QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for ( QList<QModelIndex>::iterator i=selection.begin(); i<selection.end(); i++ ) {
+    for ( QList<QModelIndex>::iterator i=selection.begin(); i!=selection.end(); i++ ) {
        if ( i->column() != 0 ) continue;
        j = i->row();
        if ( i->parent().flags() ) j++;

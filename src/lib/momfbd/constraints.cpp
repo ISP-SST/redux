@@ -204,7 +204,7 @@ void Constraints::Group::add( const shared_ptr<Constraint>& con ) {
 
 
 void Constraints::Group::addConnectedConstraints( vector<shared_ptr<Constraint>>& cons ) {
-    for( auto it = cons.begin(); it < cons.end(); ) {
+    for( auto it = cons.begin(); it != cons.end(); ) {
         bool connected( false );
         for( auto& entry : ( *it )->entries ) {  // if one of the column-indices matches this group, add the constraint to group.
             if( indices.find( entry.first ) != indices.end() ) {

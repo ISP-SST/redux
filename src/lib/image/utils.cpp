@@ -240,7 +240,7 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
     }
 
     // generate polynomial part
-    for (auto it = coeff.begin() + 1; it < coeff.end(); it++) {
+    for (auto it = coeff.begin() + 1; it != coeff.end(); it++) {
         for (uint y = 0; y < nPoints; ++y) {
             for (uint x = 0; x < nPoints; ++x) {
                 //if(pupPtr[y][x]>0) {

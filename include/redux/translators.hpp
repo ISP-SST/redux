@@ -139,7 +139,7 @@ namespace redux {
             if(!vec.empty()) {
                 if( std::numeric_limits<T>::is_integer && !std::numeric_limits<T>::is_signed ) {    // only expand '-' & ':' for unsigned integers
                     auto first = vec.begin();
-                    while(first < vec.end()) {
+                    while(first != vec.end()) {
                         
                         auto last = first + 1;
                         if(last == vec.end()) { // last element in vector
@@ -150,7 +150,7 @@ namespace redux {
                         int step = *last - *first;
                         T next = *last + step;
                         size_t count = 2;
-                        while(++last < vec.end() && *last == next) {
+                        while(++last != vec.end() && *last == next) {
                             next += step;
                             count++;
                         }
@@ -162,7 +162,7 @@ namespace redux {
                             oss << *first;
                             last--;
                         }
-                        if(last < vec.end()) oss << ",";
+                        if(last != vec.end()) oss << ",";
                         first = last;
 
                     }
@@ -241,7 +241,7 @@ namespace redux {
         // Converts a vector to a comma-separated string
         boost::optional<internal_type> put_value(const external_type& vec) {
             std::ostringstream oss;
-            for(auto it = vec.begin(); it < vec.end() - 1; it++) {
+            for(auto it = vec.begin(); it != vec.end() - 1; it++) {
                 oss << elementTranslator.put_value(*it) << ",";
             }
             //         if( !vec.empty() ) {
