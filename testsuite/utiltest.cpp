@@ -105,17 +105,17 @@ namespace {
         
         // test operators with scalars
         array = 1;
-        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 1 ); }
+        for( auto& value : array ) { BOOST_CHECK_EQUAL( value, 1 ); }
         array += 10;
-        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 11 ); }
+        for( auto& value : array ) { BOOST_CHECK_EQUAL( value, 11 ); }
         array -= 1;
-        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 10 ); }
+        for( auto& value : array ) { BOOST_CHECK_EQUAL( value, 10 ); }
         array *= 2;
-        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 20 ); }
+        for( auto& value : array ) { BOOST_CHECK_EQUAL( value, 20 ); }
         array /= 5;
-        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 4 ); }
+        for( auto& value : array ) { BOOST_CHECK_EQUAL( value, 4 ); }
         array.zero();
-        for( auto value : array ) { BOOST_CHECK_EQUAL( value, 0 ); }
+        for( auto& value : array ) { BOOST_CHECK_EQUAL( value, 0 ); }
 
         /***** test iterators *****/
         {
@@ -220,7 +220,7 @@ namespace {
             }
 
             cnt = 0;
-            for( auto value : array ) {
+            for( auto& value : array ) {
                 BOOST_CHECK_EQUAL( value, ++cnt );
             }
 
@@ -243,11 +243,11 @@ namespace {
 
             // scalar assign to subarray
             array = 2;
-            for( auto value : array ) {
+            for( auto& value : array ) {
                 BOOST_CHECK_EQUAL( value, 2 );
             }
             subarray = 13;
-            for( auto value : subarray ) {
+            for( auto& value : subarray ) {
                 //cout << "  it = " << it << endl;
                 BOOST_CHECK_EQUAL( (int)value, 13 );
             }
@@ -270,11 +270,11 @@ namespace {
             
             // elementwise modification
             array = 2;
-            for( auto value : array ) {
+            for( auto& value : array ) {
                 BOOST_CHECK_EQUAL( value, 2 );
             }
 
-            for( auto value : subarray ) {
+            for( auto& value : subarray ) {
                 BOOST_CHECK_EQUAL( value, 2 );
             }
             

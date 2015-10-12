@@ -389,7 +389,7 @@ void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<c
     const complex_t *otfPtr = otf.get();
     const complex_t *ootfPtr = oldotf.get();
 
-    for( auto ind: pupil.otfSupport ) {
+    for( auto& ind: pupil.otfSupport ) {
         qPtr[ind] += norm(otfPtr[ind]) - norm(ootfPtr[ind]);
         pPtr[ind] += conj(ftPtr[ind]) * (otfPtr[ind] - ootfPtr[ind]);
     }
@@ -404,7 +404,7 @@ void Object::addToPQ(const redux::image::FourierTransform& ft, const Array<compl
     const complex_t *ftPtr = ft.get();
     const complex_t *otfPtr = otf.get();
 
-    for( auto ind: pupil.otfSupport ) {
+    for( auto& ind: pupil.otfSupport ) {
         qPtr[ind] += norm(otfPtr[ind]);
         pPtr[ind] += conj(ftPtr[ind]) * otfPtr[ind];
     }

@@ -72,7 +72,7 @@ void Constraints::NullSpace::mapNullspace(void) {
     int nCols = nParameters - nConstraints;
     LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace.";
     int count = 0;
-    for( auto &value: ns ) {
+    for( auto& value: ns ) {
         if( abs(value) > NS_THRESHOLD ) {
             ns_entries.insert(make_pair(Point16(count/nCols,count%nCols),value));
         }
@@ -196,7 +196,7 @@ Constraints::Group::Group( shared_ptr<Constraint>& con ) : nParameters(0), entri
 void Constraints::Group::add( const shared_ptr<Constraint>& con ) {
     if( find( constraints.begin(), constraints.end(), con ) == constraints.end() ) { // don't add the same row twice
         constraints.push_back( con );
-        for( auto entry : con->entries ) {
+        for( auto & entry : con->entries ) {
             indices.insert( entry.first );
         }
     }
@@ -206,7 +206,7 @@ void Constraints::Group::add( const shared_ptr<Constraint>& con ) {
 void Constraints::Group::addConnectedConstraints( vector<shared_ptr<Constraint>>& cons ) {
     for( auto it = cons.begin(); it < cons.end(); ) {
         bool connected( false );
-        for( auto entry : ( *it )->entries ) {  // if one of the column-indices matches this group, add the constraint to group.
+        for( auto& entry : ( *it )->entries ) {  // if one of the column-indices matches this group, add the constraint to group.
             if( indices.find( entry.first ) != indices.end() ) {
                 connected = true;
             }
@@ -449,7 +449,7 @@ void Constraints::init( void ) {
             int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
                 shared_ptr<Constraint> c( new Constraint( imageCount * nModes + modeIndex, 1 ) );
-                for( auto wf UNUSED: job.getObjects()[0]->getChannels()[0]->imageNumbers ) {  // only for first object and channel
+                for( auto& wf UNUSED: job.getObjects()[0]->getChannels()[0]->imageNumbers ) {  // only for first object and channel
                     c->addEntry( imageCount * nModes + modeIndex, 1.0 );
                     imageCount++;
                 }
@@ -457,11 +457,11 @@ void Constraints::init( void ) {
 
                 map<int32_t, Constraint> wfCons;
                 int32_t kOffset = 0;
-                for( auto obj : job.getObjects() ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
-                    for( auto ch : obj->getChannels() ) {
+                for( auto& obj : job.getObjects() ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
+                    for( auto& ch : obj->getChannels() ) {
                         if( kOffset ) { // skip reference channel
                             int32_t tOffset = 0;
-                            for( auto wf UNUSED: ch->imageNumbers ) {
+                            for( auto& wf UNUSED: ch->imageNumbers ) {
                                 if( tOffset ) { // skip reference wavefront
                                     shared_ptr<Constraint> c( new Constraint( modeIndex, 1 ) ); // \alpha_{11m}
                                     c->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
@@ -478,9 +478,9 @@ void Constraints::init( void ) {
 
             } else {                // for non-tilts, the mode coefficients are the same for co-temporal images (same wavefront)
                 map<int32_t, Constraint> wfCons;
-                for( auto obj : job.getObjects() ) {
-                    for( auto ch : obj->getChannels() ) {
-                        for( auto wf : ch->imageNumbers ) {
+                for( auto& obj : job.getObjects() ) {
+                    for( auto& ch : obj->getChannels() ) {
+                        for( auto& wf : ch->imageNumbers ) {
                             int32_t parameterOffset = imageCount * nModes;
                             auto ret = wfCons.insert( make_pair( wf, Constraint( parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
@@ -517,7 +517,7 @@ Array<int16_t> Constraints::getMatrix( bool blocked ) const {
     const int32_t* colMap = parameterOrder.get();
     if( !blocked || groups.empty() ) {
         for( int i = 0; i < nConstraints; ++i ) {
-            for( auto & entry : constraints[i]->entries ) {
+            for( auto& entry : constraints[i]->entries ) {
                 c( i, colMap[entry.first] ) = entry.second;
             }
         }
@@ -525,7 +525,7 @@ Array<int16_t> Constraints::getMatrix( bool blocked ) const {
         int32_t rowEnd = 0;
         int32_t colEnd = 0;
         //int cnt = 0;
-        for( auto &group : groups ) {
+        for( auto& group : groups ) {
             if( ! group.dense() ) {
                 // TODO: Silent for now, but should throw or warn.
             }
@@ -538,7 +538,7 @@ Array<int16_t> Constraints::getMatrix( bool blocked ) const {
             colEnd = colBegin + nPar - 1;
             Array<int16_t> cc( c, rowBegin, rowEnd, colBegin, colEnd );  // sub-array of c
             for( int i = 0; i < nConstr; ++i ) {
-                for( auto & entry : group.constraints[i]->entries ) {
+                for( auto& entry : group.constraints[i]->entries ) {
                     if( entry.first - firstIndex >= nPar ) {
                         // TODO: Skip silently for now, but should throw or warn.
                         continue;
@@ -565,7 +565,7 @@ Array<double> Constraints::getNullMatrix( void ) const {
     Array<double> ns( nParameters, nFreeParameters );
     ns.zero();
     
-    for( auto &entry: ns_entries ) {
+    for( auto& entry: ns_entries ) {
         ns(entry.first.y,entry.first.x) = entry.second;
     }
     
