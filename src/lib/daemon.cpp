@@ -287,7 +287,7 @@ void Daemon::cleanup( void ) {
                     continue;
                 }
             }
-            it++;
+            ++it;
         }
     }
     
@@ -399,12 +399,14 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             vector<size_t> ids; 
             for( auto & jobId : jobList ) {
-                for( auto it2 = jobs.begin(); it2 < jobs.end(); ++it2 ) {
+                for( auto it2 = jobs.begin(); it2 < jobs.end(); ) {
                     if( ( *it2 )->info.id == jobId ) {
                         ids.push_back(jobId);
-                        jobs.erase( it2 );
+                        jobs.erase( it2++ );
                         cnt++;
-                    }
+                    } else {
+                        ++it2;
+		    }
                 }
             }
             if( cnt ) LOG << "Removed " << printArray(ids,"jobs");
@@ -421,12 +423,14 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             vector<string> deletedList;
             for( auto & jobId : jobList ) {
-                for( auto it2 = jobs.begin(); it2 < jobs.end(); ++it2 ) {
+                for( auto it2 = jobs.begin(); it2 < jobs.end(); ) {
                     if( ( *it2 )->info.name == jobId ) {
                         deletedList.push_back(jobId);
-                        jobs.erase( it2 );
+                        jobs.erase( it2++ );
                         cnt++;
-                    }
+                    } else {
+                        ++it2;
+		    }
                 }
             }
             if( cnt ) LOG << "Removed " << printArray(deletedList,"jobs");
