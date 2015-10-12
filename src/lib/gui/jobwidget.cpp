@@ -467,17 +467,16 @@ void JobWidget::removeHost( void ) {
     QModelIndexList selection = peerTree->selectedIndexes();
     vector<uint> indices;
     uint j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i != selection.end(); ++i ) {
-        if( i->column() != 0 ) continue;
-        j = i->row();
+    for( auto &item: selection ) {
+        if( item.column() != 0 ) continue;
+        j = item.row();
         cout << "selected row = " << j << endl;
-        if( i->parent().flags() ) j++;
+        if( item.parent().flags() ) j++;
         indices.push_back( j );
     }
     std::sort( indices.begin(), indices.end() );
 
-    vector<uint>::iterator it;
-    for( it = indices.end() - 1; it >= indices.begin(); --it ) {
+    for( auto it = indices.end() - 1; it >= indices.begin(); --it ) {
         //myNet.hosts.erase( myNet.hosts.begin() + *it );
         if( *it < activeHost ) activeHost--;
         else if( *it == activeHost ) activeHost = -1;
@@ -527,16 +526,15 @@ void JobWidget::moveJobUp( void ) {
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i != selection.end(); ++i ) {
-        if( i->column() != 0 ) continue;
-        j = i->row();
-        if( i->parent().flags() ) j++;
+    for( auto &item: selection ) {
+        if( item.column() != 0 ) continue;
+        j = item.row();
+        if( item.parent().flags() ) j++;
         indices.push_back( j );
     }
     std::sort( indices.begin(), indices.end() );
 
-    vector<int>::iterator it;
-    for( it = indices.begin(); it != indices.end(); ++it ) {
+    for( auto it = indices.begin(); it != indices.end(); ++it ) {
         // if( *it > 0 ) swap( &myJobs[*it], &myJobs[*it - 1] );
     }
 
@@ -551,18 +549,17 @@ void JobWidget::moveJobDown( void ) {
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<int> indices;
     int j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i != selection.end(); ++i ) {
-        if( i->column() != 0 ) continue;
-        j = i->row();
-        if( i->parent().flags() ) j++;
+    for( auto &item: selection ) {
+        if( item.column() != 0 ) continue;
+        j = item.row();
+        if( item.parent().flags() ) j++;
         indices.push_back( j );
     }
 
     std::sort( indices.begin(), indices.end() );
     std::reverse( indices.begin(), indices.end() );
 
-    vector<int>::iterator it;
-    for( it = indices.begin(); it != indices.end(); ++it ) {
+    for( auto it = indices.begin(); it != indices.end(); ++it ) {
         //if( *it < myJobs.size() - 1 ) ROYAC::swap( &myJobs[*it], &myJobs[*it + 1] );
     }
 
@@ -577,16 +574,15 @@ void JobWidget::removeJob( void ) {
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<uint> indices;
     uint j;
-    for( QList<QModelIndex>::iterator i = selection.begin(); i != selection.end(); ++i ) {
-        if( i->column() != 0 ) continue;
-        j = i->row();
-        if( i->parent().flags() ) j++;
+    for( auto &item: selection ) {
+        if( item.column() != 0 ) continue;
+        j = item.row();
+        if( item.parent().flags() ) j++;
         indices.push_back( j );
     }
     std::sort( indices.begin(), indices.end() );
 
-    vector<uint>::iterator it;
-    for( it = indices.end() - 1; it >= indices.begin(); --it ) {
+    for( auto it = indices.end() - 1; it >= indices.begin(); --it ) {
         cout << "removing job #" << *it << endl;
         //jobs.erase( jobs.begin() + *it );
         if( *it < activeJob ) activeJob--;

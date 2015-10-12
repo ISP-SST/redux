@@ -157,7 +157,7 @@ string redux::util::cleanPath(string in, string base) {
         fn = ain.filename();
         ain = ain.parent_path();
     }
-    bf::path::iterator it = ain.begin();
+    auto it = ain.begin();
     if(in[0] != '/' && !base.empty()) {
         result = bf::absolute(base);
         if(!bf::is_directory(result)) return in;

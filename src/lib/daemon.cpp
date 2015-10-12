@@ -528,7 +528,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
     auto h = connections[conn];
     
-    map<Host::Ptr, WorkInProgress>::iterator it = peerWIP.find(h);
+    auto it = peerWIP.find(h);
     if( it == peerWIP.end() ) {
         auto rit = peerWIP.emplace( connections[conn], WorkInProgress( conn ) );
         if( !rit.second ) {
@@ -581,7 +581,7 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     size_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    map<Host::Ptr, WorkInProgress>::iterator it = peerWIP.find(connections[conn]);
+    auto it = peerWIP.find(connections[conn]);
     if( it == peerWIP.end() ) {
         LOG_ERR << "Received results from unknown host.";
     }
