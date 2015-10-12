@@ -31,29 +31,23 @@ namespace {
     const size_t total_samples(5*QUADRANT_SAMPLES);             // extend by pi/2 to fit sine/cosine in one table (cos(x) = sin(x+pi/2))
     double SineLUT[total_samples+1];                            // ...and add 1 to make room for the case of exactly 2*PI when truncating
     double* const CosineLUT = SineLUT + QUADRANT_SAMPLES;
-    const double pi_x_2(2*M_PI);
     const size_t period_samples( QUADRANT_SAMPLES<<2 );
-    const double angular_step( pi_x_2/(period_samples) );
+    const double angular_step( M_2_PI/(period_samples) );
     const double angular_step_inv( 1.0/angular_step );
     
     int initSineLUT (void) {
-        memset(SineLUT,0,total_samples*sizeof(double));
-        long double previousPhi(0), thisPhi(0);
-        transform( SineLUT, SineLUT+period_samples, SineLUT,    // initialize LUT at i as average of values at i & i+1
-            [&previousPhi,&thisPhi](const double&){             // so we can just truncate instead of round. 
-                thisPhi += angular_step;
-                long double val = 0.5L*previousPhi;
-                previousPhi = sin(thisPhi);
-                val += 0.5L*previousPhi;
-                return val;
-            }
-        );
-        memcpy( SineLUT+period_samples, SineLUT, (QUADRANT_SAMPLES+1)*sizeof(double));
+        double previousVal = 0, phi = 0;
+        for ( int i = 0; i < total_samples + 1; i++ ) {
+            phi += angular_step;
+            double newVal = sin( phi );
+            SineLUT[i] = ( previousVal + newVal ) * 0.5;
+            previousVal = newVal;
+        }
         return 0;
     }
 
     inline complex_t getPolar(double magnitude, double phase) {
-        double idxD = phase - pi_x_2 * floor( phase / pi_x_2 );
+        double idxD = phase - M_2_PI * floor( phase / M_2_PI );
         size_t idx = static_cast<size_t> (idxD*angular_step_inv);
         return std::move( complex_t(magnitude*CosineLUT[idx], magnitude*SineLUT[idx]) );
     }
