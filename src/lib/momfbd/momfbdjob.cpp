@@ -248,7 +248,7 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
     checkParts();
     for( auto& part : wip.parts ) {
-        PatchData::Ptr patch = static_pointer_cast<PatchData>( part );
+        auto patch = static_pointer_cast<PatchData>( part );
         patch->step = JSTEP_POSTPROCESS;
         patches(patch->index.y,patch->index.x) = patch;
     }
@@ -422,7 +422,7 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
     }
     
     for( auto& part: wip.parts ) {
-        //PatchData::Ptr patch = static_pointer_cast<PatchData>(part);
+        //auto patch = static_pointer_cast<PatchData>(part);
         part->step = JSTEP_COMPLETED;
     }
 

@@ -147,7 +147,7 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
     for(auto & weight : kle->zernikeWeights) {
         if(fabs(c = weight.second) >= cutoff) {
             z_info.modeNumber = weight.first;
-            PupilMode::Ptr& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( z_info, PupilMode::Ptr() );
+            auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( z_info, PupilMode::Ptr() );
             if( !mode ) {
                 mode.reset( new PupilMode( weight.first, nPoints, r_c, angle ) );    // generate Zernike
             }
@@ -341,8 +341,7 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
             info.firstMode = info.lastMode = 0;
         }
         info.modeNumber = it;
-        PupilMode::Ptr tmp;
-        PupilMode::Ptr& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info, tmp );
+        auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
         if( !mode ) {
             mode.reset( new PupilMode( it, pixels, radius, angle ) );    // Zernike
         }
@@ -383,8 +382,7 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
             info.firstMode = info.lastMode = 0;
         }
         info.modeNumber = it;
-        PupilMode::Ptr tmp;
-        PupilMode::Ptr& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info, tmp );
+        auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
         if( !mode ) {
             if( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
                 mode.reset( new PupilMode( it, pixels, radius, angle ) );    // Zernike

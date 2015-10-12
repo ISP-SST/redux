@@ -19,8 +19,7 @@ TcpServer::TcpServer( boost::asio::io_service& io_service, uint16_t port )
 }
 
 void TcpServer::accept(void) {
-    TcpConnection::Ptr nextConnection =
-        TcpConnection::newPtr( acceptor.get_io_service() );
+    auto nextConnection = TcpConnection::newPtr( acceptor.get_io_service() );
 
     acceptor.async_accept( nextConnection->socket(),
                            boost::bind( &TcpServer::onAccept, this, nextConnection,

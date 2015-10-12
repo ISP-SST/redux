@@ -207,7 +207,7 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
         return;
     }
     
-    Host::Ptr& host = connections[conn];
+    auto& host = connections[conn];
     if( host == nullptr ) { // not found
         uint64_t id = 1; // start indexing peers with 1
         while( peers.find( id ) != peers.end() ) id++;
@@ -228,7 +228,7 @@ void Daemon::removeConnection( TcpConnection::Ptr& conn ) {
     
     unique_lock<mutex> lock( peerMutex );
     conn->socket().close();
-    Host::Ptr& host = connections[conn];
+    auto& host = connections[conn];
     if( host ) {
         LOG << "removeConnection(): nConn = " << host->nConnections;
         if(--host->nConnections == 0) {
@@ -526,7 +526,7 @@ void Daemon::returnResults( WorkInProgress& wip ) {
 
 void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
-    Host::Ptr h = connections[conn];
+    auto h = connections[conn];
     
     map<Host::Ptr, WorkInProgress>::iterator it = peerWIP.find(h);
     if( it == peerWIP.end() ) {
@@ -537,7 +537,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         it = rit.first;
     }
     WorkInProgress& wip = it->second;
-    Host::Ptr host = it->first;
+    auto host = it->first;
 
     uint64_t blockSize = 0;
     bool includeJob = false;

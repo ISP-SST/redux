@@ -239,7 +239,7 @@ int main (int argc, char *argv[]) {
         }
 
         boost::asio::io_service ioservice;
-        TcpConnection::Ptr conn = TcpConnection::newPtr(ioservice);
+        auto conn = TcpConnection::newPtr(ioservice);
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {

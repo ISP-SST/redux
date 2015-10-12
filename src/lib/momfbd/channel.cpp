@@ -453,7 +453,7 @@ void Channel::initCache (void) {
     if( needTiltCoeffs ) {
         id.firstMode = id.lastMode = 0;
         id.modeNumber = 3;
-        const PupilMode::Ptr mode = myJob.globalData->fetch (id);
+        const auto mode = myJob.globalData->fetch (id);
         double ddx = (*mode)(pupilPixels/2,pupilPixels/2+1) - (*mode)(pupilPixels/2,pupilPixels/2);
         pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*ddx);
         alphaToPixels = 1.0/pixelsToAlpha;
@@ -677,7 +677,7 @@ void Channel::initPhiFixed (void) {
             id2.firstMode = id2.lastMode = 0;
         }
         id2.modeNumber = modeNumber;
-        //const PupilMode::Ptr mode = myJob.globalData->fetch (id2);
+        //const auto mode = myJob.globalData->fetch (id2);
         //redux::file::Ana::write ("mode_" + to_string (modeNumber) + "_" + to_string (i) + ".f0", *mode);
         //phi_fixed.add (*mode, diversity[i]);
         //redux::file::Ana::write ("phi-mode_" + to_string (modeNumber) + "_" + to_string (i) + ".f0", phi_fixed);
@@ -698,7 +698,7 @@ void Channel::computePhi (void) {
 
 /*
 void Channel::addMode (redux::util::Array<double>& phi, uint16_t modenumber, double weight) const {
-    const PupilMode::Ptr mode = modes.at (modenumber);
+    const auto mode = modes.at (modenumber);
     // cout << "Channel::addMode()  mode = " << modenumber << "  weight = " << weight << endl;
     //redux::file::Ana::write ("mode_" + to_string (modenumber) + ".f0", *mode);
     //redux::file::Ana::write ("pupil.f0", pupil.first);
@@ -714,7 +714,7 @@ void Channel::getPhi (redux::util::Array<double>& phi, const WaveFront& wf) cons
     //cout << "Channel::getPhi()" << endl;
     for (auto & it : wf.modes) {
         //cout << "Channel::getPhi()  it.first = " << it.first << endl;
-        const PupilMode::Ptr mode = modes.at (it.first);
+        const auto mode = modes.at (it.first);
         if (mode) {  //&& it.second.second ) { // TODO: possibility to enable/disable modes
             //cout << "Channel::getPhi()  mode = " << hexString(mode.get()) << endl;
             phi.add (*mode, *it.second.value);

@@ -87,7 +87,7 @@ QModelIndex JobModel::index( int row, int column, const QModelIndex &parent ) co
     }
     
     if(parentItem) {
-        JobItem::Ptr childItem = parentItem->child( row );
+        auto childItem = parentItem->child( row );
         if( childItem ) {
             return createIndex( row, column, childItem.get() );
         }
@@ -102,9 +102,9 @@ QModelIndex JobModel::parent( const QModelIndex &index ) const {
    
     if( index.isValid() ) {
         JobItem* jiPtr = static_cast<JobItem*>(index.internalPointer());
-        JobItem::Ptr childItem = jiPtr->shared();
+        auto childItem = jiPtr->shared();
         if(childItem) {
-            JobItem::Ptr parentItem = childItem->parent();
+            auto parentItem = childItem->parent();
             if( parentItem != rootItem ) {
                 return createIndex( parentItem->indexOf(childItem), 0, parentItem.get() );
             }
@@ -125,7 +125,7 @@ int JobModel::rowCount( const QModelIndex &parent ) const {
     if( parent.isValid() ) {
         JobItem* pPtr = static_cast<JobItem*>(parent.internalPointer());
         if( pPtr ) {
-            JobItem::Ptr parentItem = pPtr->shared();
+            auto parentItem = pPtr->shared();
             return parentItem->childCount();
         }
     }

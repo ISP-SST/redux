@@ -91,7 +91,7 @@ QModelIndex HostModel::index( int row, int column, const QModelIndex &parent ) c
     }
     
     if(parentItem) {
-        HostItem::Ptr childItem = parentItem->child( row );
+        auto childItem = parentItem->child( row );
         if( childItem ) {
             return createIndex( row, column, childItem.get() );
         }
@@ -106,9 +106,9 @@ QModelIndex HostModel::parent( const QModelIndex &index ) const {
     
     if( index.isValid() ) {
         HostItem* hiPtr = static_cast<HostItem*>(index.internalPointer());
-        HostItem::Ptr childItem = hiPtr->shared();
+        auto childItem = hiPtr->shared();
         if(childItem) {
-            HostItem::Ptr parentItem = childItem->parent();
+            auto parentItem = childItem->parent();
             if( parentItem != rootItem ) {
                 return createIndex( parentItem->indexOf(childItem), 0, parentItem.get() );
             }
@@ -129,7 +129,7 @@ int HostModel::rowCount( const QModelIndex &parent ) const {
     if( parent.isValid() ) {
         HostItem* pPtr = static_cast<HostItem*>(parent.internalPointer());
         if( pPtr ) {
-            HostItem::Ptr parentItem = pPtr->shared();
+            auto parentItem = pPtr->shared();
             return parentItem->childCount();
         }
     }

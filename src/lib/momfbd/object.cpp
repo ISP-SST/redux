@@ -996,7 +996,7 @@ void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service
     LOG_DEBUG << "storePatches()";
 
     for (auto & part : wip.parts) {
-        PatchData::Ptr patch = static_pointer_cast<PatchData> (part);
+        auto patch = static_pointer_cast<PatchData> (part);
         LOG_DEBUG << "storePatches() index: (" << patch->index.x << "," << patch->index.y << ")  offset = "
                   << info->patches (patch->index.x , patch->index.y).offset;
         patch->step = MomfbdJob::JSTEP_COMPLETED;
