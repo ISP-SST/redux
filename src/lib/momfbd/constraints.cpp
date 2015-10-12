@@ -444,7 +444,7 @@ void Constraints::init( void ) {
     if( nParameters ) {
         
         //const vector<shared_ptr<Object>>& objects = job.getObjects();
-        for( uint modeIndex = 0; modeIndex < job.modeNumbers.size(); ++modeIndex ) {
+        for( unsigned int modeIndex = 0; modeIndex < job.modeNumbers.size(); ++modeIndex ) {
             uint16_t modeNumber = job.modeNumbers[modeIndex];
             int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts

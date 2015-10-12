@@ -426,7 +426,7 @@ void SubImage::setAlpha(uint16_t m, double a) {
 
 void SubImage::addAlphas(const double* alphas) {
     unique_lock<mutex> lock (mtx);
-    for(uint m=0; m<nModes; ++m) {
+    for(unsigned int m=0; m<nModes; ++m) {
         alpha[m] += alphas[m];
     }
 }
@@ -434,7 +434,7 @@ void SubImage::addAlphas(const double* alphas) {
 
 void SubImage::setAlphas(const double* alphas) {
     unique_lock<mutex> lock (mtx);
-    for(uint m=0; m<nModes; ++m) {
+    for(unsigned int m=0; m<nModes; ++m) {
         alpha[m] = alphas[m];
     }
 }
@@ -462,7 +462,7 @@ void SubImage::calcPhi( const double* a ) {
     resetPhi();
 
     double* phiPtr = phi.get();
-    for( uint i=0; i<nModes; ++i) {
+    for( unsigned int i=0; i<nModes; ++i) {
         double scaledAlpha = a[i]/object.wavelength;
         const double* modePtr = modes.modePointers[i];
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,

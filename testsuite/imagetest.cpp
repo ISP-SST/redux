@@ -46,8 +46,8 @@ void fourierTest( void ) {
 
         complex_t salt(rand()%100,rand()%100);
         // test *= operator for full-complex to full-complex AND half-complex to half-complex
-        for( uint y=0; y<nPoints; ++y) { 
-            for( uint x=0; x<halfSize+1 ; ++x) {
+        for( unsigned int y=0; y<nPoints; ++y) { 
+            for( unsigned int x=0; x<halfSize+1 ; ++x) {
                 complex_t val(y,x);
                 val += salt;
                 halfFT(y,x) = fullFT(y,x) = val;
@@ -56,8 +56,8 @@ void fourierTest( void ) {
         }
         fullFT *= fullFT;
         halfFT *= halfFT;
-        for( uint y=0; y<nPoints; ++y) { 
-            for( uint x=0; x<halfSize+1; ++x) {
+        for( unsigned int y=0; y<nPoints; ++y) { 
+            for( unsigned int x=0; x<halfSize+1; ++x) {
                 complex_t val(y,x);
                 val += salt;
                 val *= val;
@@ -68,8 +68,8 @@ void fourierTest( void ) {
         }
 
         // test *= operator for full-complex to half-complex
-        for( uint y=0; y<nPoints; ++y) { 
-            for( uint x=0; x<halfSize+1 ; ++x) {
+        for( unsigned int y=0; y<nPoints; ++y) { 
+            for( unsigned int x=0; x<halfSize+1 ; ++x) {
                 complex_t val(y,x);
                 val += salt;
                 halfFT(y,x) = fullFT(y,x) = val;
@@ -77,8 +77,8 @@ void fourierTest( void ) {
             }
         }
         halfFT *= fullFT;
-        for( uint y=0; y<nPoints; ++y) { 
-            for( uint x=0; x<halfSize+1; ++x) {
+        for( unsigned int y=0; y<nPoints; ++y) { 
+            for( unsigned int x=0; x<halfSize+1; ++x) {
                 complex_t val(y,x);
                 val += salt;
                 val *= val;
@@ -87,8 +87,8 @@ void fourierTest( void ) {
         }
 
         // test *= operator for half-complex to full-complex
-        for( uint y=0; y<nPoints; ++y) { 
-            for( uint x=0; x<halfSize+1 ; ++x) {
+        for( unsigned int y=0; y<nPoints; ++y) { 
+            for( unsigned int x=0; x<halfSize+1 ; ++x) {
                 complex_t val(y,x);
                 val += salt;
                 halfFT(y,x) = fullFT(y,x) = val;
@@ -96,8 +96,8 @@ void fourierTest( void ) {
             }
         }
         fullFT *= halfFT;
-        for( uint y=0; y<nPoints; ++y) { 
-            for( uint x=0; x<halfSize+1; ++x) {
+        for( unsigned int y=0; y<nPoints; ++y) { 
+            for( unsigned int x=0; x<halfSize+1; ++x) {
                 complex_t val(y,x);
                 val += salt;
                 val *= val;
@@ -120,16 +120,16 @@ void fourierTest( void ) {
             complex_t val(salt,0);                  // expected value of zero-frequency component
             BOOST_CHECK_SMALL( norm(fullFT(0,0)-val), tolerance );
             BOOST_CHECK_SMALL( norm(halfFT(0,0)-val), tolerance );
-            for( uint y=0; y<nPoints; ++y) { 
-                for( uint x=0; x<halfSize+1; ++x) {
+            for( unsigned int y=0; y<nPoints; ++y) { 
+                for( unsigned int x=0; x<halfSize+1; ++x) {
                     if( x || y ) BOOST_CHECK_SMALL( norm(halfFT(y,x)), tolerance );         // check all except (0,0)
                     if( x || y ) BOOST_CHECK_SMALL( norm(fullFT(y,x)), tolerance );         // check all except (0,0)
                     if( x ) BOOST_CHECK_SMALL( norm(fullFT(y,nPoints-x)), tolerance );
                 }
             }
             fullFT.reorder();                       // check that the zero-frequency value is reordered to the right location
-            for( uint y=0; y<nPoints; ++y) { 
-                for( uint x=0; x<nPoints; ++x) {
+            for( unsigned int y=0; y<nPoints; ++y) { 
+                for( unsigned int x=0; x<nPoints; ++x) {
                     if( (x == halfSize) && (y == halfSize) ) BOOST_CHECK_SMALL( norm(fullFT(y,x)-val), tolerance );
                     else BOOST_CHECK_SMALL( norm(fullFT(y,x)), tolerance );
                 }
@@ -156,8 +156,8 @@ void fourierTest( void ) {
             input.copy(result);     // convolveInPlace is destructive, use temporary
             halfFT.convolveInPlace(result);
             //BOOST_CHECK( result == expected );
-            for( uint y=0; y<nPoints; ++y) { 
-                for( uint x=0; x<nPoints; ++x) {
+            for( unsigned int y=0; y<nPoints; ++y) { 
+                for( unsigned int x=0; x<nPoints; ++x) {
                     BOOST_CHECK_SMALL( result(y,x)-expected(y,x), tolerance );
                 }
             }
@@ -170,8 +170,8 @@ void fourierTest( void ) {
             expected(halfSize+1,halfSize) = expected(halfSize,halfSize+1) = expected(halfSize-1,halfSize) = expected(halfSize,halfSize-1) = 2;
             expected(halfSize+1,halfSize+1) = expected(halfSize-1,halfSize+1) = expected(halfSize-1,halfSize-1) = expected(halfSize+1,halfSize-1) = 1;
             FourierTransform::autocorrelate(result);
-            for( uint y=0; y<nPoints; ++y) { 
-                for( uint x=0; x<nPoints; ++x) {
+            for( unsigned int y=0; y<nPoints; ++y) { 
+                for( unsigned int x=0; x<nPoints; ++x) {
                     BOOST_CHECK_SMALL( result(y,x)-expected(y,x), tolerance );
                 }
             }
@@ -193,15 +193,15 @@ void fourierTest( void ) {
             complex_t val(salt,0);          // geometry factor normalized out, only the mean-value remains
             BOOST_CHECK_EQUAL( fullFT(0,0), val );
             BOOST_CHECK_EQUAL( halfFT(0,0), val );
-            for( uint y=0; y<nPoints; ++y) { 
-                for( uint x=0; x<nPoints/2+1; ++x) {
+            for( unsigned int y=0; y<nPoints; ++y) { 
+                for( unsigned int x=0; x<nPoints/2+1; ++x) {
                     if( x || y ) BOOST_CHECK_EQUAL( fullFT(y,x), complex_t(0,0) );         // check all except (0,0)
                     if( x ) BOOST_CHECK_EQUAL( fullFT(y,nPoints-x), complex_t(0,0) );
                 }
             }
             fullFT.reorder();
-            for( uint y=0; y<nPoints; ++y) { 
-                for( uint x=0; x<nPoints; ++x) {
+            for( unsigned int y=0; y<nPoints; ++y) { 
+                for( unsigned int x=0; x<nPoints; ++x) {
                     if( (x == nPoints/2) && (y == nPoints/2) ) BOOST_CHECK_EQUAL( fullFT(y,x), val );
                     else  BOOST_CHECK_EQUAL( fullFT(y,x), complex_t(0,0) );
                 }

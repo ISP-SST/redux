@@ -48,10 +48,10 @@ void Grid::init (void) {
     angle = sharedArray<float> (id.size.y, id.size.x);
     float** distPtr = distance.get();
     float** anglePtr = angle.get();
-    for (uint y = 0; y < id.size.y; ++y) {
+    for (unsigned int y = 0; y < id.size.y; ++y) {
         double yDist = y - id.origin.y;
         double y2 = yDist*yDist;
-        for (uint x = 0; x < id.size.x; ++x) {
+        for (unsigned int x = 0; x < id.size.x; ++x) {
             double xDist = x - id.origin.x;
             if (yDist || xDist) {
                 double x2 = xDist*xDist;

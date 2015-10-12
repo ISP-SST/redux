@@ -116,12 +116,12 @@ namespace {
         BOOST_CHECK_EQUAL(min(ptr,n),ptr[0]);
         BOOST_CHECK_EQUAL(max(ptr,n),ptr[n-1]);
         T mn = 13;      // just something that is representable in all integer/float types
-        for(uint i=0; i<n; ++i) ptr[i] = mn + (i%2)*2 - 1;   // mn ± 1
+        for(unsigned int i=0; i<n; ++i) ptr[i] = mn + (i%2)*2 - 1;   // mn ± 1
         if( n%2 ) ptr[0] = mn;                              // if n is odd, set one value to mn
         BOOST_CHECK_CLOSE( mean(ptr,n), mn, 1E-20);
         if( n > 1 ) {       // compare rms/stddev against naĩve implementation
             double rms(0), stddev(0);
-            for(uint i=0; i<n; ++i) {
+            for(unsigned int i=0; i<n; ++i) {
                 rms += ptr[i]*ptr[i];
                 stddev += (ptr[i]-mn)*(ptr[i]-mn);
             }

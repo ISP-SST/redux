@@ -86,16 +86,16 @@ namespace redux {
         }
 
         template <typename T>
-        void connectedRegion(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, uint y, uint x, T threshold=T(0));
+        void connectedRegion(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int y, unsigned int x, T threshold=T(0));
         template <typename T>
-        void connectedRegion(T** data, size_t sizeY, size_t sizeX, uint y, uint x, T threshold=T(0)) {
+        void connectedRegion(T** data, size_t sizeY, size_t sizeX, unsigned int y, unsigned int x, T threshold=T(0)) {
             uint8_t** mask = redux::util::newArray<uint8_t>(sizeY,sizeX);
             connectedRegion(data, mask, sizeY, sizeX, y, x, threshold);
             std::transform(*data, *data+sizeY*sizeX, *mask, *data, redux::math::multiply<T,uint8_t>());
             redux::util::delArray(mask);
         }
         template <typename T>
-        void connectedRegion(T* data, size_t sizeY, size_t sizeX, uint y, uint x, T threshold=T(0)) {
+        void connectedRegion(T* data, size_t sizeY, size_t sizeX, unsigned int y, unsigned int x, T threshold=T(0)) {
             T** ptr = redux::util::makePointers(data, sizeY, sizeX);
             connectedRegion(ptr, sizeY, sizeX, y, x, threshold);
             redux::util::delPointers(ptr);

@@ -85,7 +85,7 @@ namespace {
     }
 
     template <typename T>
-    void maskConnected(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, uint yy, uint xx, uint y_start, uint x_start, T threshold) {
+    void maskConnected(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int yy, unsigned int xx, unsigned int y_start, unsigned int x_start, T threshold) {
         if (yy >= sizeY || xx >= sizeX) return;
         if ( !mask[yy][xx] && ((yy == y_start && xx == x_start) || data[yy][xx] > threshold)) {       // new point inserted, check neighbours
             mask[yy][xx] = 1;
@@ -120,8 +120,8 @@ double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double rad
     float** distPtr = grid.distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
     // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
     double val;
-    for (uint x = 0; x < mid; ++x) {
-        for (uint y = 0; y <= x; ++y) {     // We only generate the first octant, then copy.
+    for (unsigned int x = 0; x < mid; ++x) {
+        for (unsigned int y = 0; y <= x; ++y) {     // We only generate the first octant, then copy.
             val = 0;
             if (distPtr[y + 1][x + 1] < radius) {
                 val = 1;
@@ -144,8 +144,8 @@ double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double rad
             }
         }
     }
-    for (uint x = 0; x < mid; ++x) {
-        for (uint y = 0; y < mid; ++y) {     // copy 1st quadrant to 2,3,4
+    for (unsigned int x = 0; x < mid; ++x) {
+        for (unsigned int y = 0; y < mid; ++y) {     // copy 1st quadrant to 2,3,4
             val = pupil[mid + y][mid + x];
             if (val > 0) {
                 if (x) {
@@ -225,8 +225,8 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
     double** r2Ptr = r2.get();
     double normalization (0);
 
-    for (uint y = 0; y < nPoints; ++y) {
-        for (uint x = 0; x < nPoints; ++x) {
+    for (unsigned int y = 0; y < nPoints; ++y) {
+        for (unsigned int x = 0; x < nPoints; ++x) {
             //if(pupPtr[y][x]>0) {
             double tmp = distPtr[y][x] / r_c;                       // normalize radial distance
             //if(tmp>1) continue;
@@ -241,8 +241,8 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
 
     // generate polynomial part
     for (auto it = coeff.begin() + 1; it != coeff.end(); it++) {
-        for (uint y = 0; y < nPoints; ++y) {
-            for (uint x = 0; x < nPoints; ++x) {
+        for (unsigned int y = 0; y < nPoints; ++y) {
+            for (unsigned int x = 0; x < nPoints; ++x) {
                 //if(pupPtr[y][x]>0) {
                 rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m+2}
                 modePtr[y][x] += rPtr[y][x] * *it;
@@ -254,8 +254,8 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
     // Angular component
     if (m == 0) {
         double sf = sqrt (n + 1);
-        for (uint y = 0; y < nPoints; ++y) {
-            for (uint x = 0; x < nPoints; ++x) {
+        for (unsigned int y = 0; y < nPoints; ++y) {
+            for (unsigned int x = 0; x < nPoints; ++x) {
                 modePtr[y][x] *= sf; // * pupPtr[y][x];
                 if (pupPtr[y][x] > 0) {
                     normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
@@ -264,8 +264,8 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
         }
     } else if (modeNumber % 2) {
         double sf = sqrt ( (double) 2 * (n + 1));
-        for (uint y = 0; y < nPoints; ++y) {
-            for (uint x = 0; x < nPoints; ++x) {
+        for (unsigned int y = 0; y < nPoints; ++y) {
+            for (unsigned int x = 0; x < nPoints; ++x) {
                 modePtr[y][x] *= sf * sin (m * (aPtr[y][x] + angle)); //* pupPtr[y][x]
                 if (pupPtr[y][x] > 0) {
                     normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
@@ -274,8 +274,8 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
         }
     } else {
         double sf = sqrt ( (double) 2 * (n + 1));
-        for (uint y = 0; y < nPoints; ++y) {
-            for (uint x = 0; x < nPoints; ++x) {
+        for (unsigned int y = 0; y < nPoints; ++y) {
+            for (unsigned int x = 0; x < nPoints; ++x) {
                 modePtr[y][x] *= sf * cos (m * (aPtr[y][x] + angle)); //* pupPtr[y][x]
                 if (pupPtr[y][x] > 0) {
                     normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
@@ -286,8 +286,8 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
 
     // normalize
     normalization = 1.0 / (sqrt (normalization / pupil.area));
-    for (uint y = 0; y < nPoints; ++y) {
-        for (uint x = 0; x < nPoints; ++x) {
+    for (unsigned int y = 0; y < nPoints; ++y) {
+        for (unsigned int x = 0; x < nPoints; ++x) {
             //if(pupPtr[y][x]>0) {
             modePtr[y][x] *= normalization;
             //}
@@ -304,8 +304,8 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
   //  cout << "makeZernike_mvn:   mode = " << j << "  nph = " << nph << "  r_c = " << r_c << "  angle = " << angle << endl;
     int xo = nph / 2, yo = nph / 2;
     if (j == 1) {
-        for (uint x=0; x < nph; ++x) {
-            for (uint y=0; y < nph; ++y) {
+        for (unsigned int x=0; x < nph; ++x) {
+            for (unsigned int y=0; y < nph; ++y) {
                 mode[x][y] = 1.0;
             }
         }
@@ -315,8 +315,8 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         double *rc = RC (m, n);
         double **r = newArray<double> (nph, nph);
         double **rs = newArray<double> (nph, nph);
-        for (uint x=0; x < nph; ++x) {            // s=0
-            for (uint y=0; y < nph; ++y) {
+        for (unsigned int x=0; x < nph; ++x) {            // s=0
+            for (unsigned int y=0; y < nph; ++y) {
                 double rr = sqrt ( (double) sqr (x - xo) + (double) sqr (y - yo)) / r_c;
                 rs[x][y] = rr * rr;
                 r[x][y] = pow (rr, n);
@@ -325,8 +325,8 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         }
         rs[xo][yo] = 1.0;                         // avoid division by 0
         for (int s = 1; s <= (n - m) / 2; ++s) {
-            for (uint x = 0; x < nph; ++x) {
-                for (uint y = 0; y < nph; ++y) {
+            for (unsigned int x = 0; x < nph; ++x) {
+                for (unsigned int y = 0; y < nph; ++y) {
                     mode[x][y] += (r[x][y] /= rs[x][y]) * rc[s];
                 }
             }
@@ -352,8 +352,8 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
             }
         } else {                                   // m==0
             double sf = sqrt ( (double) (n + 1));
-            for (uint x = 0; x < nph; ++x) {
-                for (uint y = 0; y < nph; ++y) {
+            for (unsigned int x = 0; x < nph; ++x) {
+                for (unsigned int y = 0; y < nph; ++y) {
                     mode[x][y] *= sf;
                 }
             }
@@ -361,10 +361,10 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         delete[] rc;
     }
     double sum = 0.0, N = 0.0, dx = 0.5 / r_c, dy = 0.5 / r_c;
-    for (uint x = 0; x < nph; ++x) {
+    for (unsigned int x = 0; x < nph; ++x) {
         double xl = fabs ( ( (double) x - xo)) / r_c - dx, xh = fabs ( ( (double) x - xo)) / r_c + dx;
         double xhs = sqr (xh);
-        for (uint y = 0; y < nph; ++y) {
+        for (unsigned int y = 0; y < nph; ++y) {
             double yl = fabs ( ( (double) y - yo)) / r_c - dy, yh = fabs ( ( (double) y - yo)) / r_c + dy;
             double yhs = sqr (yh);
             double rsl = sqr (xl) + sqr (yl), rsh = xhs + yhs;
@@ -384,8 +384,8 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         }
     }
     sum /= N;
-    for (uint x = 0; x < nph; ++x) {
-        for (uint y = 0; y < nph; ++y) {
+    for (unsigned int x = 0; x < nph; ++x) {
+        for (unsigned int y = 0; y < nph; ++y) {
             mode[x][y] /= sqrt (sum);
         }
     }
@@ -456,7 +456,7 @@ template redux::util::Array<double> redux::image::fitPlane (const redux::util::A
 
 
 template <typename T>
-void redux::image::connectedRegion(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, uint y_start, uint x_start, T threshold) {
+void redux::image::connectedRegion(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int y_start, unsigned int x_start, T threshold) {
     memset(*mask, 0, sizeY * sizeX);
     maskConnected(data, mask, sizeY, sizeX, y_start, x_start, y_start, x_start, threshold);
 }
@@ -469,10 +469,10 @@ void redux::image::smooth(T** data, size_t sizeY, size_t sizeX, size_t nY, size_
     if (nY == 0 || nX == 0) return;
     T** tmp = newArray<T> (sizeY, sizeX);
     memset (*tmp, 0, sizeY * sizeX * sizeof (T));
-    for (uint y = 0; y < sizeY; ++y) {
+    for (unsigned int y = 0; y < sizeY; ++y) {
         int yl = std::max<int>(y-nY, 0);
         int yh = std::min(y+nY, sizeY);
-        for (uint x = 0; x < sizeX; ++x) {
+        for (unsigned int x = 0; x < sizeX; ++x) {
             int xl = std::max<int>(x-nX, 0);
             int xh = std::min(x+nX, sizeX);
             int cnt = 0;
@@ -509,38 +509,38 @@ void redux::image::ScharmerFilter (T** data, double** q2_inv, size_t sizeY, size
     
     std::transform (*pt, *pt + sizeY * sizeX, *pt, [noiseFactor](const double& a){ return noiseFactor/a;} );
     
-    for (uint y=0; y<sizeY; ++y) {
+    for (unsigned int y=0; y<sizeY; ++y) {
         rr[y][0] = pt[y][0];
-        for (uint x=1; x<sizeX; ++x) {
+        for (unsigned int x=1; x<sizeX; ++x) {
             rr[y][x] = pt[y][sizeX-x];
         }
     }
     
     double* tmp = newArray<double> (sizeY);
-    for(uint x=0; x<sizeX; ++x){                        // rr==filter
+    for(unsigned int x=0; x<sizeX; ++x){                        // rr==filter
         rr[0][x] = max((1.0-0.5*(rr[0][x]+pt[0][x])),0.0);
-        for(uint y=1; y<sizeY;++y) tmp[y]=rr[y][x];       // temporary storage
-        for(uint y=1; y<sizeY;++y) rr[y][x]=max((1.0-0.5*(tmp[sizeY-y]+pt[y][x])), 0.0);
+        for(unsigned int y=1; y<sizeY;++y) tmp[y]=rr[y][x];       // temporary storage
+        for(unsigned int y=1; y<sizeY;++y) rr[y][x]=max((1.0-0.5*(tmp[sizeY-y]+pt[y][x])), 0.0);
     }
     delArray (tmp);
     
-    for(uint y=0; y<sizeY; ++y) {
-        for(uint x=0; x<sizeX; ++x){
+    for(unsigned int y=0; y<sizeY; ++y) {
+        for(unsigned int x=0; x<sizeX; ++x){
             if(rr[y][x]<lo) rr[y][x] = 0.0;
             if(rr[y][x]>hi) rr[y][x] = 1.0;
         }
     }
     
-    uint yHalf = sizeY/2;
-    uint xHalf = sizeX/2;
+    unsigned int yHalf = sizeY/2;
+    unsigned int xHalf = sizeX/2;
     rr[yHalf][xHalf] = 1.0;                   // ; DC gain = 1
     
     connectedRegion(rr, sizeY, sizeX, yHalf, xHalf, 0.0);
     smooth(rr, sizeY, sizeX, 4, 4);
     
     frequency_cutoff *= frequency_cutoff;
-    for(uint y=0; y<sizeY; ++y) {
-        for(uint x=0; x<sizeX; ++x) {
+    for(unsigned int y=0; y<sizeY; ++y) {
+        for(unsigned int x=0; x<sizeX; ++x) {
             if( (sqr(y-yHalf)+sqr(x-xHalf)) > frequency_cutoff){
                 data[y][x] = 0.0;
             } else{

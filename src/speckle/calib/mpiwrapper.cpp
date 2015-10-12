@@ -274,9 +274,9 @@ void MpiWrapper::makeCube( void ) {
     memset( data.get(), 0, dataSize * sizeof( double ) );
     double* ptr = data.get();
 
-    for( uint i = 0; i < alpha.size(); ++i ) {
+    for( unsigned int i = 0; i < alpha.size(); ++i ) {
         double a_53 = pow( 1.0 / alpha[i], 5.0 / 3.0 );
-        for( uint j = 0; j < freq.size(); ++j ) {
+        for( unsigned int j = 0; j < freq.size(); ++j ) {
             complex_t delta = polar( freq[j], M_PI_4 );
             ptr[0] = pow( freq[j], 5.0 / 3.0 );
             ptr[1] = a_53;
@@ -296,18 +296,18 @@ void MpiWrapper::writeResults(std::ostream& strm) const {
     streamsize oldPrec = strm.precision(8);
     
     strm << "# (partially) corrected Zernikes: " << efficiencies.size() << "   efficiencies=[";
-    for(uint i=0; i<efficiencies.size(); ++i) { strm << (i?", ":" ") << freq[i]; }
+    for(unsigned int i=0; i<efficiencies.size(); ++i) { strm << (i?", ":" ") << freq[i]; }
     strm << "]\n# spatial frequency\n";
-    for(uint i=0; i<freq.size(); ++i) strm << freq[i] << endl;
+    for(unsigned int i=0; i<freq.size(); ++i) strm << freq[i] << endl;
     strm << "# seeing alpha\n";
-    for(uint i=0; i<alpha.size(); ++i) strm << alpha[i] << endl;
+    for(unsigned int i=0; i<alpha.size(); ++i) strm << alpha[i] << endl;
     strm << "# functions\n";
     double* ptr = data.get();
     double sr, sr_sigma;
 
-    for( uint i = 0; i < alpha.size(); ++i ) {
+    for( unsigned int i = 0; i < alpha.size(); ++i ) {
         strm << "letf           s_letf         stf            s_stf          sr             s_sr\n";
-        for( uint j = 0; j < freq.size(); ++j ) {
+        for( unsigned int j = 0; j < freq.size(); ++j ) {
             if(ptr[0] > 0 && ptr[2] && finite(ptr[1]) && finite(ptr[3]) ) {
                 sr = ptr[0]*ptr[0]/ptr[2];
                 sr_sigma = sr*sqrt(ptr[1] * ptr[1] / (ptr[0] * ptr[0]) + ptr[3] * ptr[3] / (ptr[2] * ptr[2]));

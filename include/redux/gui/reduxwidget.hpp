@@ -68,7 +68,7 @@ namespace redux {
             boost::asio::io_service ioservice;
             Host::HostInfo myInfo;
             
-            uint activeHost, activeJob;
+            unsigned int activeHost, activeJob;
 
             void createLayout( void );
             void createActions( void );

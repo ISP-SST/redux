@@ -213,7 +213,7 @@ void ReduxWidget::open() {
             dumpMsg( QString( "Opening LogFile : " ) + *it );
             /*LogFile* tmpLog = new LogFile ( buf );
             bool skip = false;
-            for ( uint i=0; i<myLogs.size(); ++i)
+            for ( unsigned int i=0; i<myLogs.size(); ++i)
             if ( !(*(myLogs[i]) != *tmpLog) )
                skip = true;
              cout << *tmpLog << endl;
@@ -251,7 +251,7 @@ void ReduxWidget::close() {
 //         dumpMsg( QString("Opening LogFile : ")+*it);
 //          LogFile* tmpLog = new LogFile ( buf );
 //          bool skip = false;
-//          for ( uint i=0; i<myLogs.size(); ++i)
+//          for ( unsigned int i=0; i<myLogs.size(); ++i)
 //             if ( !(*(myLogs[i]) != *tmpLog) )
 //                skip = true;
 //             if ( ! skip ) myLogs.push_back( tmpLog );

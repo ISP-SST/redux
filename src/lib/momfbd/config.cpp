@@ -180,7 +180,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         }
 
         if( diversity.size() == diversityModes.size() ) {
-            for(uint i=0; i<diversity.size(); ++i) {
+            for(unsigned int i=0; i<diversity.size(); ++i) {
                 if(diversityModes[i] == 4) {   // focus term, convert from physical length (including mm/cm) to coefficient
                     diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
                 }

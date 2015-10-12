@@ -419,7 +419,7 @@ void Channel::initCache (void) {
     Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
 
     bool needTiltCoeffs(false);
-    for (uint i = 0; i < diversityModes.size(); ++i) {
+    for (unsigned int i = 0; i < diversityModes.size(); ++i) {
         uint16_t modeNumber = diversityModes[i];
         Cache::ModeID id2 = id;
         if (diversityTypes[i] == ZERNIKE) {
@@ -554,8 +554,8 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
     patchWriteFail = std::async( launch::async, [this,&patches](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
         size_t nPatchesY = patches.dimSize(0);                                          // we will synchronize all the "patchWriteFail" futures at the end of MomfbdJob::preProcess
         size_t nPatchesX = patches.dimSize(1);
-        for(uint py=0; py<nPatchesY; ++py) {
-            for(uint px=0; px<nPatchesX; ++px) {
+        for(unsigned int py=0; py<nPatchesY; ++py) {
+            for(unsigned int px=0; px<nPatchesX; ++px) {
                 ChannelData& chData(patches(py,px)->objects[myObject.ID].channels[ID]);
                 copyImagesToPatch(chData);
                 chData.cacheStore(true);    // store to disk and clear array
@@ -669,7 +669,7 @@ void Channel::initPhiFixed (void) {
     phi_fixed.zero();
     ModeInfo id (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
     uint16_t modeNumber;
-    for (uint i = 0; i < diversityModes.size(); ++i) {
+    for (unsigned int i = 0; i < diversityModes.size(); ++i) {
         ModeInfo id2 = id;
         modeNumber = diversityModes[i];
         cout << "Channel::initPhiFixed()  i=" << i << endl;
@@ -931,8 +931,8 @@ void Channel::adjustCutouts(Array<PatchData::Ptr>& patches) {
     if( patches.nDimensions() == 2 ) {
         size_t nPatchesY = patches.dimSize(0);
         size_t nPatchesX = patches.dimSize(1);
-        for(uint py=0; py<nPatchesY; ++py) {
-            for(uint px=0; px<nPatchesX; ++px) {
+        for(unsigned int py=0; py<nPatchesY; ++py) {
+            for(unsigned int px=0; px<nPatchesX; ++px) {
                 PatchData& patch(*patches(py,px));
                 ChannelData& chData = patch.objects[myObject.ID].channels[ID];
                 adjustCutout(chData,patch.roi);
@@ -949,8 +949,8 @@ void Channel::storePatchData(boost::asio::io_service& service, Array<PatchData::
         size_t nPatchesY = patches.dimSize(0);
         size_t nPatchesX = patches.dimSize(1);
         cout << "storing (" << nPatchesY << "x" << nPatchesX << ") patches..." << endl;
-        for(uint py=0; py<nPatchesY; ++py) {
-            for(uint px=0; px<nPatchesX; ++px) {
+        for(unsigned int py=0; py<nPatchesY; ++py) {
+            for(unsigned int px=0; px<nPatchesX; ++px) {
                 PatchData& patch(*patches(py,px));
                 ChannelData& chData = patch.objects[myObject.ID].channels[ID];
                 service.post(std::bind(&ChannelData::cacheStore,std::ref(chData),true));

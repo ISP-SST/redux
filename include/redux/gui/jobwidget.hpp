@@ -101,7 +101,7 @@ namespace redux {
 
 //      TiXmlDocument doc;
 
-            uint activeHost, activeJob;
+            unsigned int activeHost, activeJob;
 
             void createLayout( void );
             void createActions( void );

@@ -17,7 +17,7 @@ StatusThread::StatusThread( Job::JobSet& j ) : isRunning( false ), isConnected( 
 void StatusThread::run() {
 
     isRunning = true;
-    //uint count = 0;
+    //unsigned int count = 0;
     //uint8_t cmd;
     while( isRunning ) {
         usleep( 2000 );

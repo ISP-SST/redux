@@ -359,8 +359,8 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
     uint64_t count(0);
     patches.resize(subImagePosY.size(),subImagePosX.size());
     Point16 ps(patchSize,patchSize);
-    for( uint y=0; y<subImagePosY.size(); ++y ) {
-        for( uint x=0; x<subImagePosX.size(); ++x ) {
+    for( unsigned int y=0; y<subImagePosY.size(); ++y ) {
+        for( unsigned int x=0; x<subImagePosX.size(); ++x ) {
             PatchData::Ptr patch( new PatchData(*this, y, x ) );
             patch->setPath(to_string(info.id));
             patch->step = JSTEP_QUEUED;

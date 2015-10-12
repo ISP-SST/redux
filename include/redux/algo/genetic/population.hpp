@@ -48,11 +48,11 @@ namespace redux {
 
                 Genetic<T>* myGenetic;
 
-                uint popSize;
-                uint genomeSize;
-                uint nInserted;
+                unsigned int popSize;
+                unsigned int genomeSize;
+                unsigned int nInserted;
 
-                //uint maxGenerations;
+                //unsigned int maxGenerations;
 
                 stat_struct* stats;
 
@@ -62,7 +62,7 @@ namespace redux {
                 float crossoverProbability, mutationProbability;
                 float *rndArray, *rndPtr;
                 int *rndIntArray, *rndIntPtr;
-                uint rndSize;
+                unsigned int rndSize;
                 
                 boost::uniform_real<double> uni_real;
                 boost::uniform_int<int> uni_int;
@@ -74,7 +74,7 @@ namespace redux {
 
                 bool compare ( Individual<T>*, Individual<T>* );
 
-                uint selectParent ( float );
+                unsigned int selectParent ( float );
                 void crossOver ( Individual<T>*, Individual<T>* );
                 void mutate ( Individual<T>* );
 
@@ -90,7 +90,7 @@ namespace redux {
                 ~Population();
 
                 void setPopSize ( const uint& value );
-                uint getPopSize() const {
+                unsigned int getPopSize() const {
                     return popSize;
                 }
 
@@ -102,15 +102,15 @@ namespace redux {
                 };
 
                 //void setMaxGenerations(const uint& value)   { maxGenerations = value; };
-                //uint getMaxGenerations() const { return maxGenerations; }
+                //unsigned int getMaxGenerations() const { return maxGenerations; }
 
                 void populate ( void );
                 void loadRanges ( void );
-                void setDynamicRange ( uint n, bool val );
+                void setDynamicRange ( unsigned int n, bool val );
                 void setDynamicRanges ( bool val );
                 void evacuate ( void );
                 void reset ( void );
-                void keep ( uint );
+                void keep ( unsigned int );
 
                 double evolve ( uint& steps ) {
                     return evolveTo ( DBL_MAX, steps );
@@ -210,7 +210,7 @@ namespace redux {
 //                 myGenetic->rand.rand ( rndIntArray, rndSize );
                 individuals = new Individual<T>* [ popSize << 1 ];
 
-                for ( uint i = 0; i < ( popSize << 1 ); ++i ) {
+                for ( unsigned int i = 0; i < ( popSize << 1 ); ++i ) {
                     individuals[i] = new Individual<T> ( this, myGenetic );
                     randomizeGenome ( individuals[i] );
                     individuals[i]->getFitness();
@@ -223,7 +223,7 @@ namespace redux {
                     return;
                 }
 
-                for ( uint i = 0; i < popSize << 1; ++i ) {
+                for ( unsigned int i = 0; i < popSize << 1; ++i ) {
                     delete individuals[i];
                 }
 
@@ -235,7 +235,7 @@ namespace redux {
             void Population<T>::reset ( void ) {
                 loadRanges();
 
-                for ( uint i = 0; i < popSize << 1; ++i ) {
+                for ( unsigned int i = 0; i < popSize << 1; ++i ) {
                     randomizeGenome ( individuals[i] );
                     individuals[i]->getFitness();
                 }
@@ -251,33 +251,33 @@ namespace redux {
 
                 ranges = new ParameterRange<T>[ genomeSize ];
 
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     ranges[i] = myGenetic->ranges[i];
                 }
             }
 
             template <class T>
-            void Population<T>::setDynamicRange ( uint n, bool val ) {
+            void Population<T>::setDynamicRange ( unsigned int n, bool val ) {
                 ranges[n].setDynamic ( val );
             }
 
             template <class T>
             void Population<T>::setDynamicRanges ( bool val ) {
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     ranges[i].setDynamic ( val );
                 }
             }
 
             template <class T>
-            void Population<T>::keep ( uint n ) {
-                uint m = std::min ( popSize, n );
+            void Population<T>::keep ( unsigned int n ) {
+                unsigned int m = std::min ( popSize, n );
 
                 if ( ( rndPtr - rndArray ) < popSize * genomeSize << 1 ) {
                     myGenetic->rand.rand ( rndArray, rndSize );
                     rndPtr = &rndArray[rndSize - 1];
                 }
 
-                for ( uint i = 0; i < popSize << 1; ++i ) {
+                for ( unsigned int i = 0; i < popSize << 1; ++i ) {
                     if ( i >= m ) {
                         randomizeGenome ( individuals[i] );
                     }
@@ -294,7 +294,7 @@ namespace redux {
                 if ( individuals ) {
                     Individual<T>** newIndividuals = new Individual<T>* [ ( popSize + n ) << 1 ];
 
-                    for ( uint i = 0; i < ( popSize + n ) << 1; ++i ) {
+                    for ( unsigned int i = 0; i < ( popSize + n ) << 1; ++i ) {
                         if ( i < popSize << 1 ) {
                             newIndividuals[i] = individuals[i];
                         }
@@ -305,7 +305,7 @@ namespace redux {
                     }
 
                     if ( n < 0 ) {
-                        for ( uint i = ( popSize + n ) << 1; i < popSize << 1; ++i ) {
+                        for ( unsigned int i = ( popSize + n ) << 1; i < popSize << 1; ++i ) {
                             delete individuals[i];
                         }
                     }
@@ -319,7 +319,7 @@ namespace redux {
 
             template <class T>
             void Population<T>::randomizeGenome ( Individual<T>* ind ) {
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     ind->genome[i] = ranges[i].getRandom ( *rndPtr-- );
                 }
 
@@ -329,7 +329,7 @@ namespace redux {
             template <class T>
             void Population<T>::calculateFitness ( int ind ) {
                 if ( ind < 0 ) {
-                    for ( uint i = 0; i < popSize; i++ ) {
+                    for ( unsigned int i = 0; i < popSize; i++ ) {
                         individuals[i]->getFitness();
                     }
 
@@ -342,7 +342,7 @@ namespace redux {
             }
 
             template <class T>
-            uint Population<T>::selectParent ( float dice ) {
+            unsigned int Population<T>::selectParent ( float dice ) {
                 double* low = myGenetic->breedProb;
                 double* high = & ( myGenetic->breedProb[popSize - 1] );
                 double* mid;
@@ -362,7 +362,7 @@ namespace redux {
                     }
                 }
 
-                return ( uint ) ( high - myGenetic->breedProb );
+                return ( unsigned int ) ( high - myGenetic->breedProb );
             }
 
             template <class T>
@@ -392,11 +392,11 @@ namespace redux {
 
             template <class T>
             bool Population<T>::compare ( Individual<T>* ind1, Individual<T>* ind2 ) {
-                //uint nBytes = (sizeof(T));
+                //unsigned int nBytes = (sizeof(T));
                 //T mask;
                 //u_int8_t *ptr,*ptr1,*ptr2;
                 //bool ret = true;
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     if ( ind1->genome[i] != ind2->genome[i] ) {
                         return false;
                     }
@@ -406,7 +406,7 @@ namespace redux {
                     ptr = (u_int8_t*)&mask;
                     ptr1 = (u_int8_t*)&(ind1->genome[i]);
                     ptr2 = (u_int8_t*)&(ind2->genome[i]);
-                    for (uint j=0; j<nBytes; ++j) {
+                    for (unsigned int j=0; j<nBytes; ++j) {
                     //(*ptr2) = (*ptr1)>>1;
                     if( *ptr & ( (*ptr1) ^ (*ptr2) ) ) {
                     return false;
@@ -420,9 +420,9 @@ namespace redux {
 
             template <class T>
             void Population<T>::crossOver ( Individual<T>* ind1, Individual<T>* ind2 ) {
-                uint nBits = genomeSize * ( sizeof ( T ) << 3 ); // N.B. left-shift bits by 3 is a faster way of multiplying by 8.
-                uint firstPoint = ( *rndIntPtr-- ) % nBits;
-                uint secondPoint = ( nBits - 1 );
+                unsigned int nBits = genomeSize * ( sizeof ( T ) << 3 ); // N.B. left-shift bits by 3 is a faster way of multiplying by 8.
+                unsigned int firstPoint = ( *rndIntPtr-- ) % nBits;
+                unsigned int secondPoint = ( nBits - 1 );
 
                 if ( myGenetic->crossOverType == Genetic<T>::X_1POINT ) {
                     // One point crossover is already defined, so nothing to do here...
@@ -484,12 +484,12 @@ namespace redux {
 
             template <class T>
             void Population<T>::mutate ( Individual<T>* ind ) {
-                //    uint genomeBits = sizeof(T)<<3;
+                //    unsigned int genomeBits = sizeof(T)<<3;
                 T mask;
-                uint rnd;
+                unsigned int rnd;
                 u_int8_t count = 0;
 
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     if ( *rndPtr-- < mutationProbability ) {
                         if ( count == 0 ) {
                             rnd = *rndIntPtr--;
@@ -498,7 +498,7 @@ namespace redux {
 
                         count--;
                         mask = ranges[i].getMask ( * ( ( ( u_int8_t* ) &rnd ) + count ) );
-                        //uint mask = (((u_int8_t)255) << 24) & rnd;
+                        //unsigned int mask = (((u_int8_t)255) << 24) & rnd;
                         //ranges[i].calculateMask();
                         //T mask2 = ranges[i].getMask();
                         //uint* ptr = (uint*)&(ind->genome[i]);
@@ -509,7 +509,7 @@ namespace redux {
                             u_int8_t* ptr = ( u_int8_t* ) & ( ind->genome[i] );
                             u_int8_t* maskPtr = ( u_int8_t* ) ( &mask );
 
-                            for ( uint j = 0; j < sizeof ( T ); ++j ) {
+                            for ( unsigned int j = 0; j < sizeof ( T ); ++j ) {
                                 if ( * ( maskPtr + j ) ) {
                                     * ( ptr + j ) ^= * ( maskPtr + j );
                                 }
@@ -582,7 +582,7 @@ namespace redux {
 
             template <class T>
             void Population<T>::refineCoords() {
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     if ( 20 * stats[i].std < ranges[i].getRange() ) {
                         if ( ranges[i].dynamic() ) {
                             ranges[i].stepMin ( ( stats[i].mean - 3 * stats[i].std - ranges[i].getMin() ) / 5 );
@@ -599,7 +599,7 @@ namespace redux {
                         /*T mymask = ranges[i].getMask();
                           char* ptr1 = ((char*)&mymask);
                           cout << i << " ";
-                          for (uint i=0; i<sizeof(T); ++i)
+                          for (unsigned int i=0; i<sizeof(T); ++i)
                           cout << colorString(bitString(ptr1[i]) + std::to_string(" "),MAGENTA);
                           cout << alignRight(mymask,20,-10) << endl;*/
                     }
@@ -610,12 +610,12 @@ namespace redux {
             template <class T>
             void Population<T>::getStats() {
 
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     // calculate mean
                     double sum = 0;
                     stats[i].min = stats[i].max = individuals[0]->genome[i];
 
-                    for ( uint j = 0; j < popSize; j++ ) {
+                    for ( unsigned int j = 0; j < popSize; j++ ) {
                         sum += individuals[j]->genome[i];
 
                         if ( individuals[j]->genome[i] > stats[i].max ) {
@@ -631,9 +631,9 @@ namespace redux {
                     sum = 0;
 
                     // NOTE: this method fails because of floating-point precision limits.
-                    //for (uint j=0; j<popSize; j++) sum += individuals[j]->genome[i]*individuals[j]->genome[i];
+                    //for (unsigned int j=0; j<popSize; j++) sum += individuals[j]->genome[i]*individuals[j]->genome[i];
                     //sum -= popSize*stats[i].mean*stats[i].mean;
-                    for ( uint j = 0; j < popSize; j++ ) {
+                    for ( unsigned int j = 0; j < popSize; j++ ) {
                         sum += ( individuals[j]->genome[i] - stats[i].mean ) * ( individuals[j]->genome[i] - stats[i].mean );
                     }
 
@@ -655,15 +655,15 @@ namespace redux {
                 }
 
                 bool done ( false );
-                uint nIter ( 0 );
-                uint limit = estimateRandomUsage();
-                uint remain;
+                unsigned int nIter ( 0 );
+                unsigned int limit = estimateRandomUsage();
+                unsigned int remain;
 
-                for ( uint ii = 0; ii < genomeSize; ++ii ) {
+                for ( unsigned int ii = 0; ii < genomeSize; ++ii ) {
                     ranges[ii].setPrecision ( 0 );
                 }
 
-                /*    for ( uint j=0; j<popSize<<1; ++j ) {
+                /*    for ( unsigned int j=0; j<popSize<<1; ++j ) {
                   individuals[j]->getFitness();
                   }*/
 
@@ -684,12 +684,12 @@ namespace redux {
                     }*/
 
                     // create "clones" of the parents in the second half of the array...
-                    for ( uint child = ( popSize << 1 ) - 1; child >= popSize; --child ) {
+                    for ( unsigned int child = ( popSize << 1 ) - 1; child >= popSize; --child ) {
                         *individuals[ child ] = *individuals[ selectParent ( *rndPtr-- ) ];
                     }
 
                     // Then do CrossOver to mix the genome of the parents,
-                    for ( uint child = ( popSize << 1 ) - 1; child >= popSize; child -= 2 ) {
+                    for ( unsigned int child = ( popSize << 1 ) - 1; child >= popSize; child -= 2 ) {
                         if ( *rndPtr-- < crossoverProbability ) {
                             while ( ! ( *individuals[ child ] != *individuals[ child - 1 ] ) ) { // make sure they are not identical.
                                 *individuals[ child ] = *individuals[ selectParent ( *rndPtr-- ) ];
@@ -700,16 +700,16 @@ namespace redux {
                     }
 
                     // ...and finally Random Mutation of the children
-                    for ( uint child = ( popSize << 1 ) - 1; child >= popSize; --child ) {
+                    for ( unsigned int child = ( popSize << 1 ) - 1; child >= popSize; --child ) {
                         mutate ( individuals[ child ] );
                     }
 
-                    uint count ( 0 );
+                    unsigned int count ( 0 );
 
                     // New individuals that are pure copies of the parents are randomized.
                     // ...then we calculate the fitness and the ones that are "better" than
                     // the worst old one are moved to the beginning of the array.
-                    for ( uint j = popSize; j < popSize << 1; ++j ) {
+                    for ( unsigned int j = popSize; j < popSize << 1; ++j ) {
                         // bit-swapping floats/doubles or signed integers can cause the variables to jump outside their defined intervals,
                         // so we need to check for that by calling checkGenome(). Randomize unmodified children.
                         if ( individuals[j]->reCalculate ) {
@@ -805,7 +805,7 @@ namespace redux {
 
                 tmp += "\n     Parameters:          Min         Max       Dynamic?   Precision          Mean         Standard deviation\n";
 
-                for ( uint i = 0; i < genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < genomeSize; ++i ) {
                     tmp += "    Parameter    " + std::to_string ( i );
                     tmp += std::to_string( ranges[i].getMin() ) + std::to_string(ranges[i].getMax());
 
@@ -824,11 +824,11 @@ namespace redux {
                 tmp += "     " +  individuals[0]->dump();
                 tmp += "     " +  individuals[1]->dump();
                 tmp += "     " +  individuals[10]->dump();
-                /*for( uint i=0; i<2; ++i ) { //popSize; ++i) {
+                /*for( unsigned int i=0; i<2; ++i ) { //popSize; ++i) {
                   tmp += string( 5, ' ' ) +  individuals[i]->dump();
                 }
 
-                for( uint i=popSize-1; i<popSize; ++i ) { //popSize; ++i) {
+                for( unsigned int i=popSize-1; i<popSize; ++i ) { //popSize; ++i) {
                   tmp += string( 5 ) + individuals[i]->dump();
                 }*/
                 return tmp;

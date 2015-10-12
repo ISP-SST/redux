@@ -439,7 +439,7 @@ void Object::fitAvgPlane(ObjectData& od) {
             vector<int64_t> last = cd.images.last();
             last[0] = first[0];                         // only select first image
             Array<float> view(cd.images, first, last);
-            for( uint i=0; i<nImages; ++i ) {
+            for( unsigned int i=0; i<nImages; ++i ) {
                 if( ! view.sameSize(fittedPlane) ) {
                     LOG_ERR << "Size mismatch when fitting average plane for object #" << ID;
                     fittedPlane.clear();
@@ -467,7 +467,7 @@ void Object::fitAvgPlane(ObjectData& od) {
             vector<int64_t> last = cd.images.last();
             last[0] = first[0];                         // only select first image
             Array<float> view(cd.images, first, last);
-            for( uint i=0; i<nImages; ++i ) {
+            for( unsigned int i=0; i<nImages; ++i ) {
                 view -= fittedPlane;                    // subract fitted plane from all images
                 view.shift(0, 1);                       // shift view to next image in stack
             }
@@ -768,8 +768,8 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
     
     LOG_WARN << "Writing to ANA still not properly implemented...";
 
-    for (uint y = 0; y < patches.dimSize(0); ++y) {
-        for (uint x = 0; x < patches.dimSize(1); ++x) {
+    for (unsigned int y = 0; y < patches.dimSize(0); ++y) {
+        for (unsigned int x = 0; x < patches.dimSize(1); ++x) {
             bfs::path fn = bfs::path (outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
             Ana::write(fn.string(), patches(y,x)->objects[ID].img);
         }

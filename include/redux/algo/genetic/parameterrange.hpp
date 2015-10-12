@@ -75,12 +75,12 @@ namespace redux {
                 unsigned char getPrecision() {
                     return diff + precision;
                 };
-                void increasePrecision ( uint val = 1 ) {
+                void increasePrecision ( unsigned int val = 1 ) {
                     if ( precision + val < ( ( sizeof ( T ) - 1 ) << 3 ) ) {
                         precision += val;
                     }
                 };
-                void decreasePrecision ( uint val = 1 ) {
+                void decreasePrecision ( unsigned int val = 1 ) {
                     if ( precision - val >= 0 ) {
                         precision -= val;
                     }
@@ -95,14 +95,14 @@ namespace redux {
                 };
                 T getDigits ( uint8_t minBits = 0 ) {
                     T tmp;
-                    uint maxN = ( sizeof ( T ) << 3 );
+                    unsigned int maxN = ( sizeof ( T ) << 3 );
 
                     if ( diff + precision > maxN ) {
                         precision = maxN - diff;
                     }
 
                     //cout << " maxN + diff + prec + m = " << maxN << "  " << (int)diff << "  " << (int)precision << "  " << (int)m << endl;
-                    uint n = std::max ( (uint8_t)( diff + precision ), minBits );
+                    unsigned int n = std::max ( (uint8_t)( diff + precision ), minBits );
                     uint8_t* ptr = ( uint8_t* ) &tmp;
                     memset ( ptr, 0, sizeof ( T ) );
 #if CPU_ARCHITECTURE == BIG_ENDIAN
@@ -168,7 +168,7 @@ namespace redux {
                     //calculateDiff();
                     //diff = 21;
                     //precision = 11;
-                    uint maxN = ( ( sizeof ( T ) - 1 ) << 3 );
+                    unsigned int maxN = ( ( sizeof ( T ) - 1 ) << 3 );
 
                     //if ( diff > maxN ) diff = maxN;
                     if ( diff + precision > maxN ) {
@@ -176,10 +176,10 @@ namespace redux {
                     }
 
                     //cout << " maxN + diff + prec = " << maxN << "  " << (int)diff << "  " << (int)precision << endl;
-                    uint n = ( uint ) ( ( diff + precision ) >> 1 );
-                    n += ( ( uint ) m ) % ( maxN - n + 8 );
+                    unsigned int n = ( unsigned int ) ( ( diff + precision ) >> 1 );
+                    n += ( ( unsigned int ) m ) % ( maxN - n + 8 );
                     //if (qqq >= maxN-2) cout << "bla    " << qqq << endl;
-                    //uint n = ((diff + precision) >> 1);// + m % ((diff + precision) >> 1); //(maxN >> 1);  // testing to semi-randomize the shift...
+                    //unsigned int n = ((diff + precision) >> 1);// + m % ((diff + precision) >> 1); //(maxN >> 1);  // testing to semi-randomize the shift...
                     uint8_t* ptr = ( uint8_t* ) &mask;
                     memset ( ptr, 0, sizeof ( T ) );
 #if CPU_ARCHITECTURE == BIG_ENDIAN
@@ -248,7 +248,7 @@ namespace redux {
                 }
 
                 void calculateDiff ( void ) {
-                    //uint i = 0;
+                    //unsigned int i = 0;
                     diff = 0;
 //                     uint8_t* minPtr = ( ( uint8_t* ) &minValue ) + ( sizeof ( T ) - 1 );
 //                     uint8_t* maxPtr = ( ( uint8_t* ) &maxValue ) + ( sizeof ( T ) - 1 );
@@ -261,7 +261,7 @@ namespace redux {
 //                     }
 // 
 //                     if ( minPtr > ( uint8_t* ) &minValue ) {
-//                         for ( uint j = 0; j < 8; ++j ) {
+//                         for ( unsigned int j = 0; j < 8; ++j ) {
 //                             if ( ( *minPtr ^ *maxPtr ) & ( 1 << ( 7 - j ) ) ) {
 //                                 break;
 //                             }

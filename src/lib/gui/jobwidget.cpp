@@ -466,7 +466,7 @@ void JobWidget::removeHost( void ) {
 
     QModelIndexList selection = peerTree->selectedIndexes();
     vector<uint> indices;
-    uint j;
+    unsigned int j;
     for( auto &item: selection ) {
         if( item.column() != 0 ) continue;
         j = item.row();
@@ -573,7 +573,7 @@ void JobWidget::removeJob( void ) {
 
     QModelIndexList selection = jobTree->selectedIndexes();
     vector<uint> indices;
-    uint j;
+    unsigned int j;
     for( auto &item: selection ) {
         if( item.column() != 0 ) continue;
         j = item.row();

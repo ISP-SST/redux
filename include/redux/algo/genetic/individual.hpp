@@ -110,7 +110,7 @@ namespace redux {
 
             template <class T>
             void Individual<T>::setGenome ( T* gen ) {
-                for ( uint i = 0; i < myPopulation->genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < myPopulation->genomeSize; ++i ) {
                     genome[i] = gen[i];
                     //if ( ! myPopulation->ranges[i].checkParam( &(genome[i]) ) )
                     //genome[i] = myPopulation->ranges[i].getRandom(*(myPopulation->rndPtr--));
@@ -120,7 +120,7 @@ namespace redux {
 
             template <class T>
             void Individual<T>::checkGenome ( void ) {
-                for ( uint i = 0; i < myPopulation->genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < myPopulation->genomeSize; ++i ) {
                     if ( ! myPopulation->ranges[i].checkParam ( & ( genome[i] ) ) ) {
                         genome[i] = myPopulation->ranges[i].getRandom ( * ( myPopulation->rndPtr-- ) );
                     }
@@ -132,7 +132,7 @@ namespace redux {
             template <class T>
             void Individual<T>::randomizeGenome() {
                // boost::variate_generator<base_generator_type&, boost::uniform_real<> > uni(generator, uni_dist);
-                for ( uint i = 0; i < myPopulation->genomeSize; ++i ) {
+                for ( unsigned int i = 0; i < myPopulation->genomeSize; ++i ) {
                //     genome[i] = myPopulation->ranges[i].getRandom ( myGenetic->rand() );
                 }
             }
@@ -174,7 +174,7 @@ namespace redux {
                 return ( fitness == rhs.fitness );
                 /*   if ( this->fitness != rhs.fitness ) return false;
                 return true;
-                for ( uint i=0; i<myPopulation->genomeSize; ++i )
+                for ( unsigned int i=0; i<myPopulation->genomeSize; ++i )
                   if ( genome[i] != rhs.genome[i] ) return false;
 
                 return true;*/
@@ -187,7 +187,7 @@ namespace redux {
                 }
 
                 //return false;
-                for ( uint i = 0; i < myPopulation->genomeSize; ++i )
+                for ( unsigned int i = 0; i < myPopulation->genomeSize; ++i )
                     if ( genome[i] != rhs.genome[i] ) {
                         return true;
                     }
@@ -218,7 +218,7 @@ namespace redux {
                 tmp += "            Genome: \n";
 
                 if ( myPopulation ) {
-                    for ( uint i = 0; i < myPopulation->genomeSize; ++i ) {
+                    for ( unsigned int i = 0; i < myPopulation->genomeSize; ++i ) {
                         tmp += std::to_string(genome[i]) + "    " + redux::util::bitString ( genome[i] ) + "\n";
                     }
                 }

@@ -4,7 +4,7 @@ using namespace redux::algo::genetic;
 using namespace redux::algo;
 using namespace redux::util;
 
-GeneticBase::GeneticBase ( uint nParameters, uint popSize ) : crossOverType ( X_RAND ),
+GeneticBase::GeneticBase ( unsigned int nParameters, unsigned int popSize ) : crossOverType ( X_RAND ),
     replaceMethod ( REPLACE_WORST ),
     maxGenerations ( 500 ),
     minGenerations ( 5 ),
@@ -33,12 +33,12 @@ void GeneticBase::calcProb ( void ) {
     breedPtr[0] = bPDF ( popSize, 1 );
 
     // cumulative probability.
-    for ( uint i = 1; i < popSize; ++i ) {
+    for ( unsigned int i = 1; i < popSize; ++i ) {
         breedPtr[i] = breedPtr[i - 1] + bPDF ( popSize, i + 1 );
     }
 
     // normalize probability to 1.
-    for ( uint i = 0; i < popSize; ++i ) {
+    for ( unsigned int i = 0; i < popSize; ++i ) {
         breedPtr[i] /= breedPtr[ popSize - 1 ];
     }
 }
@@ -70,7 +70,7 @@ void Genetic<T>::init ( void ) {
 
     populations = new Population<T>*[ nPopulations ];
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i] = new Population<T> ( this );
     }
 
@@ -83,7 +83,7 @@ void Genetic<T>::clear ( void ) {
         return;
     }
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         delete populations[i];
     }
 
@@ -93,7 +93,7 @@ void Genetic<T>::clear ( void ) {
 
 template <class T>
 void Genetic<T>::reset ( void ) {
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->reset();
     }
 
@@ -102,15 +102,15 @@ void Genetic<T>::reset ( void ) {
 
 
 template <class T>
-void Genetic<T>::keep ( uint n ) {
-    for ( uint i = 0; i < nPopulations; ++i ) {
+void Genetic<T>::keep ( unsigned int n ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->keep ( n );
     }
 }
 
 template <class T>
 void Genetic<T>::sort ( void ) {
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->sort();
     }
 }
@@ -125,19 +125,19 @@ void Genetic<T>::calcProb ( void ) {
     breedProb[0] = bPDF ( popSize, 1 );
 
     // cumulative probability.
-    for ( uint i = 1; i < popSize; ++i ) {
+    for ( unsigned int i = 1; i < popSize; ++i ) {
         breedProb[i] = breedProb[i - 1] + bPDF ( popSize, i + 1 );
     }
 
     // normalize probability to 1.
-    for ( uint i = 0; i < popSize; ++i ) {
+    for ( unsigned int i = 0; i < popSize; ++i ) {
         breedProb[i] /= breedProb[ popSize - 1 ];
     }
 }
 
 template <class T>
 void Genetic<T>::calcFitness ( void ) {
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->calculateFitness();
     }
 }
@@ -148,11 +148,11 @@ double Genetic<T>::evolve ( uint& steps ) {
         steps = maxGenerations;
     }
 
-    uint thisEffort = steps;
+    unsigned int thisEffort = steps;
     steps = 0;
     double fn = 0.0, tmp = 0.0;
 
-    for ( uint j = 0; j < nPopulations; ++j ) {
+    for ( unsigned int j = 0; j < nPopulations; ++j ) {
         tmp = populations[j]->evolve ( thisEffort );
 
         if ( tmp > fn ) {
@@ -172,11 +172,11 @@ double Genetic<T>::evolveTo ( double goal, uint& steps ) {
         steps = maxGenerations;
     }
 
-    uint thisEffort = steps;
+    unsigned int thisEffort = steps;
     steps = 0;
     double fn = 0.0, tmp = 0.0;
 
-    for ( uint j = 0; j < nPopulations; ++j ) {
+    for ( unsigned int j = 0; j < nPopulations; ++j ) {
         tmp = populations[j]->evolveTo ( goal, thisEffort );
 
         if ( tmp > fn ) {
@@ -196,7 +196,7 @@ T* Genetic<T>::getFittest ( void ) {
 }
 
 template <class T>
-T* Genetic<T>::getIndividual ( uint i ) {
+T* Genetic<T>::getIndividual ( unsigned int i ) {
     if ( i < popSize ) {
         return populations[0]->individuals[i]->genome;
     }
@@ -209,7 +209,7 @@ template <class T>
 void Genetic<T>::setCrossoverProbability ( float val ) {
     crossoverProbability = val;
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->setCrossoverProbability ( val );
     }
 }
@@ -218,7 +218,7 @@ template <class T>
 void Genetic<T>::setMutationProbability ( float val ) {
     mutationProbability = val;
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->setMutationProbability ( val );
     }
 }
@@ -240,7 +240,7 @@ void Genetic<T>::setGenomeSize ( const uint& n ) {
 
     ParameterRange<T>* newRanges = new ParameterRange<T>[n];
 
-    for ( uint i = 0; i < n; ++i ) {
+    for ( unsigned int i = 0; i < n; ++i ) {
         if ( i < genomeSize ) {
             newRanges[i] = ranges[i];
         }
@@ -253,49 +253,49 @@ void Genetic<T>::setGenomeSize ( const uint& n ) {
 }
 
 template <class T>
-void Genetic<T>::setParameterRange ( uint n, T low, T high, bool per ) {
+void Genetic<T>::setParameterRange ( unsigned int n, T low, T high, bool per ) {
     ranges[n].setRange ( low, high );
     ranges[n].setPeriodic ( per );
     //ranges[n].calculatePrecision();
     ranges[n].calculateMask();
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->loadRanges();
     }
 }
 
 template <class T>
-void Genetic<T>::setPeriodicParameter ( uint n, bool val ) {
+void Genetic<T>::setPeriodicParameter ( unsigned int n, bool val ) {
     ranges[n].setPeriodic ( val );
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->ranges[n].setPeriodic ( val );
     }
 }
 
 template <class T>
-void Genetic<T>::setDynamicRange ( uint n, bool val ) {
+void Genetic<T>::setDynamicRange ( unsigned int n, bool val ) {
     ranges[n].setDynamic ( val );
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->setDynamicRange ( n, val );
     }
 }
 
 template <class T>
 void Genetic<T>::setDynamicRanges ( bool val ) {
-    for ( uint i = 0; i < genomeSize; ++i ) {
+    for ( unsigned int i = 0; i < genomeSize; ++i ) {
         ranges[i].setDynamic ( val );
     }
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->setDynamicRanges ( val );
     }
 }
 
 template <class T>
 void Genetic<T>::insert ( T* genome ) {
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         populations[i]->insert ( genome );
     }
 }
@@ -316,7 +316,7 @@ std::string Genetic<T>::dump ( void ) const {
     } else tmp += "?????????????                 ";
     tmp +=  "\n" ;
 
-    for ( uint i = 0; i < nPopulations; ++i ) {
+    for ( unsigned int i = 0; i < nPopulations; ++i ) {
         tmp += populations[i]->dump();
     }
 

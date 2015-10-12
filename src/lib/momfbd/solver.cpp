@@ -330,8 +330,8 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
     default_random_engine re;
   /*  
 
-    //for(uint i=0; i<nFreeParameters; ++i) s->x->data[i] = 1E-6;
-    for(uint i=0; i<nParameters; ++i) {
+    //for(unsigned int i=0; i<nFreeParameters; ++i) s->x->data[i] = 1E-6;
+    for(unsigned int i=0; i<nParameters; ++i) {
         if((i+1)%51==3)alpha[i] = 1E-6;
         else alpha[i] = 1E-6;
     }
@@ -402,7 +402,7 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
                 LOG_TRACE << "iteration: " << iter << "  GSL reports no progress.";
                 failCount++;
                 if( iter == 1 ) {           // could not get started, perturb coefficients and try again...
-                    for(uint i=0; i<nFreeParameters; ++i) {
+                    for(unsigned int i=0; i<nFreeParameters; ++i) {
                         s->x->data[i] += dist(re);
                     }
                     status = GSL_EFAILED;   // prevent output

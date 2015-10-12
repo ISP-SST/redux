@@ -206,7 +206,7 @@ uint64_t ModeSet::unpack( const char* data, bool swap_endian ) {
     count += unpack(data+count,yTiltIndex,swap_endian);
     count += unpack(data+count,modeNumbers,swap_endian);
     modePointers.clear();
-    for(uint i=0; i<dimSize(0); ++i) {
+    for(unsigned int i=0; i<dimSize(0); ++i) {
         modePointers.push_back( ptr(i,0,0) );
     }
     return count;
@@ -239,7 +239,7 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
             modeNumbers.resize( dimSize(0) );
             std::iota(modeNumbers.begin(), modeNumbers.end(), 0);
             modePointers.clear();
-            for(uint i=0; i<dimSize(0); ++i) modePointers.push_back( ptr(i,0,0) );
+            for(unsigned int i=0; i<dimSize(0); ++i) modePointers.push_back( ptr(i,0,0) );
             xTiltIndex = 1;
             yTiltIndex = 0;     // FIXME  properly detect tilts, this is hardcoded for the mode-file I am testing stuff with !!!
             return true;
@@ -272,7 +272,7 @@ void ModeSet::init( const MomfbdJob& job, const Object& obj ) {
                 ret.info.pupilRadius = info.angle = 0;
                 std::iota(ret.modeNumbers.begin(), ret.modeNumbers.end(), 0);
                 ret.modePointers.clear();
-                for(uint i=0; i<ret.dimSize(0); ++i) ret.modePointers.push_back( ret.ptr(i,0,0) );
+                for(unsigned int i=0; i<ret.dimSize(0); ++i) ret.modePointers.push_back( ret.ptr(i,0,0) );
                 *this = ret;
                 return;
             }
@@ -410,7 +410,7 @@ void ModeSet::normalize( const redux::image::Pupil& pup ) {
     Array<double> view( reinterpret_cast<const redux::util::Array<double>&>(*this), 0, 0, 0, info.nPupilPixels-1, 0, info.nPupilPixels-1 );
     ArrayStats stats;
 
-    for( uint i=0; i<dimSize(0); ++i ) {
+    for( unsigned int i=0; i<dimSize(0); ++i ) {
         stats.getMinMaxMean( view * pup );
         view *= (pup.area/stats.norm);
         view.shift(0,1);

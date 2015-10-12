@@ -39,7 +39,7 @@ namespace redux {
 
         protected:
             
-            typedef double ( *BreedingPDF ) ( uint, uint );
+            typedef double ( *BreedingPDF ) ( uint, unsigned int );
 
             enum crossover_t { X_RAND = 0, X_1POINT, X_2POINT };
             enum replace_t { REPLACE_ALL = 0, REPLACE_RANDOM, REPLACE_WORST };
@@ -47,11 +47,11 @@ namespace redux {
             crossover_t crossOverType;
             replace_t replaceMethod;
 
-            uint maxGenerations, minGenerations, nGenerations;
-            uint popSize;
-            uint nParameters;
-            uint statFrequency;
-            uint totalEffort;
+            unsigned int maxGenerations, minGenerations, nGenerations;
+            unsigned int popSize;
+            unsigned int nParameters;
+            unsigned int statFrequency;
+            unsigned int totalEffort;
 
             float crossoverProbability, mutationProbability;
 
@@ -69,7 +69,7 @@ namespace redux {
             void calcProb ( void );
 
         public:
-            GeneticBase ( uint nParams, uint popSize );
+            GeneticBase ( unsigned int nParams, unsigned int popSize );
             
             void setPopSize ( const size_t& n );
 
@@ -81,7 +81,7 @@ namespace redux {
             void setBreedingPDF ( BreedingPDF f ) { bPDF = f; calcProb(); };
             
             void setStatFrequency ( const uint& value ) { statFrequency = value; };
-            uint getStatFrequency() const { return statFrequency; }
+            unsigned int getStatFrequency() const { return statFrequency; }
 
             void setCrossoverProbability ( float val ) { crossoverProbability = val; }
             void setMutationProbability ( float val ) { mutationProbability = val; }
@@ -122,16 +122,16 @@ namespace redux {
 
         public:
 
-            Genetic ( uint nVars = 2, uint nInd = 100 );
+            Genetic ( unsigned int nVars = 2, unsigned int nInd = 100 );
 
             void calcFitness ( void );
             double evolve ( uint& steps );
             double evolveTo ( double goal, uint& steps );
             T* getFittest ( void );
-            T* getIndividual ( uint );
-            void setParameterRange ( uint n, T low, T high, bool per = false );
-            void setPeriodicParameter ( uint n, bool val = true );
-            void setDynamicRange ( uint n, bool val );
+            T* getIndividual ( unsigned int );
+            void setParameterRange ( unsigned int n, T low, T high, bool per = false );
+            void setPeriodicParameter ( unsigned int n, bool val = true );
+            void setDynamicRange ( unsigned int n, bool val );
             void setDynamicRanges ( bool val );
 
             void clear ( void );
@@ -143,7 +143,7 @@ namespace redux {
                 totalEffort = 0;
             };
             void sort ( void );
-            void keep ( uint );
+            void keep ( unsigned int );
 
             /*! @fn void setFitnessFunction( FitnessFunction f, void* arg=NULL )
              *  @brief Specify the fitness function to be used.
@@ -166,27 +166,27 @@ namespace redux {
 
         };
 
-        /*! @fn double defaultMerit( uint n, T* data, void* arg )
+        /*! @fn double defaultMerit( unsigned int n, T* data, void* arg )
          *  @brief Default merit-function. A simple example, fitting each of the parameters to the value 0.5.
          */
         template <class T>
-        double defaultMerit ( uint n, T* data, void* arg ) {
+        double defaultMerit ( unsigned int n, T* data, void* arg ) {
             double chisq = 0;
 
-            for ( uint i = 0; i < n; ++i ) {
+            for ( unsigned int i = 0; i < n; ++i ) {
                 chisq += ( data[i] - 0.5 ) * ( data[i] - 0.5 );
             }
 
             return ( double ) 1.0 / chisq;
         }
 
-        /*! @fn defaultBreedingPDF(uint n, uint rank)
+        /*! @fn defaultBreedingPDF(unsigned int n, unsigned int rank)
          *  @brief Default breeding pdf.
          */
-        inline double defaultBreedingPDF ( uint n, uint rank ) {
+        inline double defaultBreedingPDF ( unsigned int n, unsigned int rank ) {
             double probability ( 0 );
 
-            for ( uint i = n; i >= rank; --i ) {
+            for ( unsigned int i = n; i >= rank; --i ) {
                 probability += ( n - i + 1 );
             }
 
@@ -194,9 +194,9 @@ namespace redux {
         }
 
         template <class T>
-        Genetic<T>::Genetic ( uint nParameters, uint popSize ) : GeneticBase ( nParameters,popSize ) {
+        Genetic<T>::Genetic ( unsigned int nParameters, unsigned int popSize ) : GeneticBase ( nParameters,popSize ) {
             //MTRandom::uint32 seed[ MTRandom::N ];
-            //for (uint i=0; i<MTRandom::N; ++i) seed[i] = 127*i;
+            //for (unsigned int i=0; i<MTRandom::N; ++i) seed[i] = 127*i;
             //rand.seed( (long)this );
             //rand.seed ( ::rand() );
             ranges.resize ( nParameters );
@@ -217,7 +217,7 @@ namespace redux {
 //                     return;
 //                 }
 //
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     delete populations[i];
 //                 }
 //
@@ -230,7 +230,7 @@ namespace redux {
          */
         template <class T>
         void Genetic<T>::reset ( void ) {
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->reset();
 //                 }
 
@@ -238,12 +238,12 @@ namespace redux {
         }
 
 
-        /*! @fn void Genetic<T>::keep( uint n )
+        /*! @fn void Genetic<T>::keep( unsigned int n )
          *  @brief Keep the best n individuals for next run, randomize the rest.
          */
         template <class T>
-        void Genetic<T>::keep ( uint n ) {
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+        void Genetic<T>::keep ( unsigned int n ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->keep ( n );
 //                 }
         }
@@ -253,7 +253,7 @@ namespace redux {
          */
         template <class T>
         void Genetic<T>::sort ( void ) {
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->sort();
 //                 }
         }
@@ -264,7 +264,7 @@ namespace redux {
          */
         template <class T>
         void Genetic<T>::calcFitness ( void ) {
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->calculateFitness();
 //                 }
         }
@@ -281,11 +281,11 @@ namespace redux {
                 steps = maxGenerations;
             }
 
-            //uint thisEffort = steps;
+            //unsigned int thisEffort = steps;
             steps = 0;
             double fn = 0.0;//, tmp = 0.0;
 
-//                 for ( uint j = 0; j < nPopulations; ++j ) {
+//                 for ( unsigned int j = 0; j < nPopulations; ++j ) {
 //                     tmp = populations[j]->evolve ( thisEffort );
 //
 //                     if ( tmp > fn ) {
@@ -312,11 +312,11 @@ namespace redux {
                 steps = maxGenerations;
             }
 
-            uint thisEffort = steps;
+            unsigned int thisEffort = steps;
             steps = 0;
             double fn = 0.0; //, tmp = 0.0;
 
-//                 for ( uint j = 0; j < nPopulations; ++j ) {
+//                 for ( unsigned int j = 0; j < nPopulations; ++j ) {
 //                     tmp = populations[j]->evolveTo ( goal, thisEffort );
 //
 //                     if ( tmp > fn ) {
@@ -344,7 +344,7 @@ namespace redux {
          *  @returns A pointer to the "genome" (i.e. the parameters) of the fittest individual.
          */
         template <class T>
-        T* Genetic<T>::getIndividual ( uint i ) {
+        T* Genetic<T>::getIndividual ( unsigned int i ) {
 //                 if ( i < popSize ) {
 //                     return populations[0]->individuals[i]->genome;
 //                 }
@@ -365,7 +365,7 @@ namespace redux {
 // //
 // //                 ParameterRange<T>* newRanges = new ParameterRange<T>[n];
 // //
-// //                 for ( uint i = 0; i < n; ++i ) {
+// //                 for ( unsigned int i = 0; i < n; ++i ) {
 // //                     if ( i < genomeSize ) {
 // //                         newRanges[i] = ranges[i];
 // //                     }
@@ -377,7 +377,7 @@ namespace redux {
 //                 init();
 //             }
 
-        /*! @fn void Genetic<T>::setParameterRange( uint n, T low, T high, bool per )
+        /*! @fn void Genetic<T>::setParameterRange( unsigned int n, T low, T high, bool per )
          *  @brief Set the limits for parameter number n (n >= 0)
          *  @param n Index of the parameter to modify (starting at 0 for the first parameter).
          *  @param low Smallest allowed value for this parameter.
@@ -386,32 +386,32 @@ namespace redux {
          *  inside the low limit?)
          */
         template <class T>
-        void Genetic<T>::setParameterRange ( uint n, T low, T high, bool per ) {
+        void Genetic<T>::setParameterRange ( unsigned int n, T low, T high, bool per ) {
             ranges[n].setRange ( low, high );
             ranges[n].setPeriodic ( per );
             //ranges[n].calculatePrecision();
             ranges[n].calculateMask();
             /*
-                            for ( uint i = 0; i < nPopulations; ++i ) {
+                            for ( unsigned int i = 0; i < nPopulations; ++i ) {
                                 populations[i]->loadRanges();
                             }*/
         }
 
-        /*! @fn void Genetic<T>::setPeriodicParameter( uint n, bool val )
+        /*! @fn void Genetic<T>::setPeriodicParameter( unsigned int n, bool val )
          *  @brief Specify if parameter n is periodic.
          *  @param n Index of the parameter to modify (starting at 0 for the first parameter).
          *  @param val true/false
          */
         template <class T>
-        void Genetic<T>::setPeriodicParameter ( uint n, bool val ) {
+        void Genetic<T>::setPeriodicParameter ( unsigned int n, bool val ) {
             ranges[n].setPeriodic ( val );
 
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->ranges[n].setPeriodic ( val );
 //                 }
         }
 
-        /*! @fn void Genetic<T>::setDynamicRange( uint n, bool val )
+        /*! @fn void Genetic<T>::setDynamicRange( unsigned int n, bool val )
          *  @brief Specify if parameter n is dynamic.
          *  @details Should the allowed range be modified according to the standard deviation of current values of the population ? \n
          *  The allowed ranges will be modified at a frequency specified by the statFrequency parameter.
@@ -419,10 +419,10 @@ namespace redux {
          *  @param val true/false
          */
         template <class T>
-        void Genetic<T>::setDynamicRange ( uint n, bool val ) {
+        void Genetic<T>::setDynamicRange ( unsigned int n, bool val ) {
             ranges[n].setDynamic ( val );
 
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->setDynamicRange ( n, val );
 //                 }
         }
@@ -433,11 +433,11 @@ namespace redux {
          */
         template <class T>
         void Genetic<T>::setDynamicRanges ( bool val ) {
-            for ( uint i = 0; i < nParameters; ++i ) {
+            for ( unsigned int i = 0; i < nParameters; ++i ) {
                 ranges[i].setDynamic ( val );
             }
 
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     populations[i]->setDynamicRanges ( val );
 //                 }
         }
@@ -462,7 +462,7 @@ namespace redux {
             } else tmp += "?????????????                 ";
             tmp +=  "\n" ;
 
-//                 for ( uint i = 0; i < nPopulations; ++i ) {
+//                 for ( unsigned int i = 0; i < nPopulations; ++i ) {
 //                     tmp += populations[i]->dump();
 //                 }
 

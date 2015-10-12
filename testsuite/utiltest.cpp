@@ -126,7 +126,7 @@ namespace {
                 BOOST_CHECK_EQUAL( array.dimSize(i), dims[i] );
             }
             T* rawPtr = array.get();
-            for( uint x = 0; x < nElements; ++x ) {
+            for( unsigned int x = 0; x < nElements; ++x ) {
                 rawPtr[x] = x;          // set values equal to real offsets: 0,1,2,3...
             }
 
@@ -139,7 +139,7 @@ namespace {
             BOOST_CHECK_EQUAL( array.pos(subLast).pos(), (--subarray.end()).pos() );
             
             // check that whole datablok is accessing the right element
-            for( uint i = 0; i < nElements; ++i ) {
+            for( unsigned int i = 0; i < nElements; ++i ) {
                 BOOST_CHECK_EQUAL( it.pos(), i );
                 BOOST_CHECK_EQUAL( cit.pos(), i );
                 BOOST_CHECK_EQUAL( *it, i );
@@ -151,12 +151,12 @@ namespace {
             cit = array.begin();
             
             // postfix ++
-            for( uint i = 0; i < nElements; ++i ) {
+            for( unsigned int i = 0; i < nElements; ++i ) {
                 BOOST_CHECK_EQUAL( *it++, i );
                 BOOST_CHECK_EQUAL( *cit++, i );
             }
 
-            for( uint i = 0; i<subarray.nElements(); ++i ) {
+            for( unsigned int i = 0; i<subarray.nElements(); ++i ) {
                 sit++;
             }
 
@@ -170,7 +170,7 @@ namespace {
                 BOOST_CHECK_EQUAL( *--it, i );
                 BOOST_CHECK_EQUAL( *--cit, i );
             }
-            for( uint i = 0; i<subarray.nElements(); ++i ) {
+            for( unsigned int i = 0; i<subarray.nElements(); ++i ) {
                 --sit;
             }
 
@@ -180,13 +180,13 @@ namespace {
             BOOST_CHECK( sit == subarray.begin() );
 
             // prefix ++
-            for( uint i = 0; i < nElements; ++i ) {
+            for( unsigned int i = 0; i < nElements; ++i ) {
                 BOOST_CHECK_EQUAL( *it, i );
                 BOOST_CHECK_EQUAL( *cit, i );
                 ++it;
                 ++cit;
             }
-            for( uint i = 0; i<subarray.nElements(); ++i ) {
+            for( unsigned int i = 0; i<subarray.nElements(); ++i ) {
                 ++sit;
             }
 
@@ -204,7 +204,7 @@ namespace {
                 BOOST_CHECK_EQUAL( *it, i );
                 BOOST_CHECK_EQUAL( *cit, i );
             }
-            for( uint i = 0; i<subarray.nElements(); ++i ) {
+            for( unsigned int i = 0; i<subarray.nElements(); ++i ) {
                 sit--;
             }
 
@@ -291,20 +291,20 @@ namespace {
 
             // shift subarray
             vector<int64_t> tmpV(nDims);
-            for( uint i = 0; i < nDims; ++i ) {
+            for( unsigned int i = 0; i < nDims; ++i ) {
                 tmpV[i] = subFirst[i];
             }
-            for( uint i = 0; i < nDims; ++i ) {
+            for( unsigned int i = 0; i < nDims; ++i ) {
                 Array<T> subarray2 = subarray;
                 vector<int64_t> tmp = tmpV;
                 BOOST_CHECK_EQUAL( subarray2.shift(i,-100000), -tmp[i]);                // can only shift to the edge
                 tmp[i] = 0;
                 BOOST_CHECK_EQUAL( subarray2.begin().pos(), array.pos(tmp).pos() );
             }
-            for( uint i = 0; i < nDims; ++i ) {
+            for( unsigned int i = 0; i < nDims; ++i ) {
                 tmpV[i] = subLast[i];
             }
-            for( uint i = 0; i < nDims; ++i ) {
+            for( unsigned int i = 0; i < nDims; ++i ) {
                 Array<T> subarray2 = subarray;
                 vector<int64_t> tmp = tmpV;
                 BOOST_CHECK_EQUAL( subarray2.shift(i,100000), dims[i]-tmp[i]-1);        // can only shift to the edge
@@ -577,7 +577,7 @@ void arrayTest( void ) {
 
     // test sub-array
     Array<int> subarray( array4x5, 0, 0, 0, 4 ); // 1x5 sub-array (slice)
-    for( uint i=0; i<4; ++i ) {
+    for( unsigned int i=0; i<4; ++i ) {
         BOOST_CHECK( subarray.get() == array4x5.get() );
         BOOST_CHECK( subarray.dense() );
         subarray.shift(0,1);

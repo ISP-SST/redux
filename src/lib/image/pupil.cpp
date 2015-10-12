@@ -44,8 +44,8 @@ namespace {
         float** distPtr = grid.distance.get();              // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
                                                             // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
         double val;
-        for (uint x = 0; x < mid; ++x) {
-            for (uint y = 0; y <= x; ++y) {                 // We only generate the first octant, then copy.
+        for (unsigned int x = 0; x < mid; ++x) {
+            for (unsigned int y = 0; y <= x; ++y) {                 // We only generate the first octant, then copy.
                 val = 0;
                 if (distPtr[y + 1][x + 1] < radius) {
                     val = 1;
@@ -68,8 +68,8 @@ namespace {
                 }
             }
         }
-        for (uint x = 0; x < mid; ++x) {
-            for (uint y = 0; y < mid; ++y) {     // copy 1st quadrant to 2,3,4
+        for (unsigned int x = 0; x < mid; ++x) {
+            for (unsigned int y = 0; y < mid; ++y) {     // copy 1st quadrant to 2,3,4
                 val = pupil[mid + y][mid + x];
                 if (val > 0) {
                     if (x) {
