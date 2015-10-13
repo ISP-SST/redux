@@ -229,34 +229,41 @@ void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, in
     groupOffset.y = rOffset;    // store the offset of this group (in the nullspace matrix).
     groupOffset.x = cOffset;
     
-    set<int32_t> tmpIndices;
-    map<int32_t, int32_t> indexMap;
-    for( auto ind : indices ) {
-        tmpIndices.insert( rOffset );
-        indexMap[ind] = rOffset;
-        std::swap( columnOrdering[rOffset++], ind );
-    }
-    indices = std::move( tmpIndices );
     nParameters = indices.size();
+    
+    vector<int32_t> newIndices(nParameters);
+    std::iota( newIndices.begin(), newIndices.end(), rOffset );         // newIndices is a dense range starting at rOffset
+    
+    map<int32_t, int32_t> indexMap;
+    std::transform( indices.begin(), indices.end(),
+                    newIndices.begin(),
+                    std::inserter( indexMap, indexMap.end() ),
+                    [columnOrdering](const int32_t& oldIndex, const int32_t& newIndex) {
+                        columnOrdering[newIndex] = oldIndex;            
+                        return make_pair(oldIndex, newIndex);
+                    } );
+
+    indices.clear();
+    indices.insert( newIndices.begin(), newIndices.end() );
     
     std::map<int32_t, int8_t> tmpEntries;
     int32_t indexOffset = 0;
-    int32_t firstIndex = *indices.begin();
     for( auto & constraint : constraints ) {
         constraint->replaceIndices( indexMap );
         for( auto & ind : constraint->entries ) {
-            tmpEntries.insert(make_pair(indexOffset-firstIndex+ind.first,ind.second));
+            tmpEntries.insert(make_pair(indexOffset-rOffset+ind.first, ind.second));
         }
         indexOffset += nParameters;     // next row
     }
     entries = std::move( tmpEntries );
     entriesHash = boost::hash_range(entries.begin(), entries.end());
     
+    rOffset += nParameters;
     cOffset += (nParameters - constraints.size());
     
     mapNullspace();
     
- }
+}
 
 
 void Constraints::Group::sortRows(void) {
@@ -290,7 +297,7 @@ void Constraints::Group::mapNullspace(void) {
         LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries");
         nullspace = tmpNS;
         storeNS = false;    // storing will overwrite the group we collided with.
-        nullspace->ns.resize(0);
+        nullspace->ns.clear();
     }
     
     if( nullspace->ns.nDimensions() < 1 ) {
@@ -346,14 +353,14 @@ void Constraints::blockifyGroups( void ) {
                 Point16 index(*it1++,it2);
                 ns_entries.insert(make_pair(index,1.0));
             }
-            std::vector <int32_t> output;
-            std::copy(unused1.begin(), unused1.end(), std::back_inserter(output));
-            redux::file::Ana::write("unused1",output);
-            output.clear();
-            std::copy(unused2.begin(), unused2.end(), std::back_inserter(output));
-            redux::file::Ana::write("unused2",output);
         }
     } else {
+        std::vector <int32_t> output;
+        std::copy(unused1.begin(), unused1.end(), std::back_inserter(output));
+        redux::file::Ana::write("unused1",output);
+        output.clear();
+        std::copy(unused2.begin(), unused2.end(), std::back_inserter(output));
+        redux::file::Ana::write("unused2",output);
         LOG_ERR << "Size mismatch in Constraints::blockifyGroups(). This should *never* happen, so go looking for the bug. :-P";
     }
     
@@ -438,30 +445,28 @@ void Constraints::init( void ) {
     nParameters = job.nImages() * nModes;
 
     parameterOrder.reset( new int32_t[nParameters] );
-    int32_t n = 0;
-    generate( parameterOrder.get(), parameterOrder.get()+nParameters, [&] { return n++; } );
-    
-    if( nParameters ) {
+    std::iota( parameterOrder.get(), parameterOrder.get()+nParameters, 0 );
+
+    auto &objects = job.getObjects();
+    if( nParameters && objects.size() ) {
         
-        //const vector<shared_ptr<Object>>& objects = job.getObjects();
         for( unsigned int modeIndex = 0; modeIndex < job.modeNumbers.size(); ++modeIndex ) {
             uint16_t modeNumber = job.modeNumbers[modeIndex];
             int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
                 shared_ptr<Constraint> c( new Constraint( imageCount * nModes + modeIndex, 1 ) );
-                for( auto& wf UNUSED: job.getObjects()[0]->getChannels()[0]->imageNumbers ) {  // only for first object and channel
+                for( size_t count=objects[0]->getChannels()[0]->imageNumbers.size(); count; --count ) {  // only for first object and channel
                     c->addEntry( imageCount * nModes + modeIndex, 1.0 );
                     imageCount++;
                 }
                 constraints.push_back( c );
 
-                map<int32_t, Constraint> wfCons;
                 int32_t kOffset = 0;
-                for( auto& obj : job.getObjects() ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
+                for( auto& obj : objects ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
                     for( auto& ch : obj->getChannels() ) {
                         if( kOffset ) { // skip reference channel
                             int32_t tOffset = 0;
-                            for( auto& wf UNUSED: ch->imageNumbers ) {
+                            for( size_t count=ch->imageNumbers.size(); count; --count ) {
                                 if( tOffset ) { // skip reference wavefront
                                     shared_ptr<Constraint> c( new Constraint( modeIndex, 1 ) ); // \alpha_{11m}
                                     c->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
@@ -478,7 +483,7 @@ void Constraints::init( void ) {
 
             } else {                // for non-tilts, the mode coefficients are the same for co-temporal images (same wavefront)
                 map<int32_t, Constraint> wfCons;
-                for( auto& obj : job.getObjects() ) {
+                for( auto& obj : objects ) {
                     for( auto& ch : obj->getChannels() ) {
                         for( auto& wf : ch->imageNumbers ) {
                             int32_t parameterOffset = imageCount * nModes;
