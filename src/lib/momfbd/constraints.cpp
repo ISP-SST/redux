@@ -74,7 +74,7 @@ void Constraints::NullSpace::mapNullspace(void) {
     int count = 0;
     for( auto& value: ns ) {
         if( abs(value) > NS_THRESHOLD ) {
-            ns_entries.insert(make_pair(Point16(count/nCols,count%nCols),value));
+            ns_entries.insert(make_pair(Point(count/nCols,count%nCols),value));
         }
         count++;
     }
@@ -350,7 +350,7 @@ void Constraints::blockifyGroups( void ) {
         if(unused1.size() > 0 ) {
             auto it1 = unused1.begin();
             for( auto & it2: unused2) {
-                Point16 index(*it1++,it2);
+                Point index(*it1++,it2);
                 ns_entries.insert(make_pair(index,1.0));
             }
         }
@@ -397,7 +397,7 @@ void Constraints::sortConstraints( bool blockwise ) {
 
 uint64_t Constraints::size( void ) const {
     uint64_t sz = sizeof(nParameters) + sizeof(nFreeParameters);
-    sz += sizeof(uint64_t) + ns_entries.size()*(Point16::size()+sizeof(double));
+    sz += sizeof(uint64_t) + ns_entries.size()*(Point::size()+sizeof(double));
     return sz;
 }
 
@@ -422,7 +422,7 @@ uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
     uint64_t nEntries;
     count += unpack( ptr+count, nEntries, swap_endian );
     while(nEntries--) {
-        pair<Point16,double> tmp;
+        pair<Point,double> tmp;
         count += tmp.first.unpack( ptr+count, swap_endian);
         count += unpack( ptr+count, tmp.second );
         ns_entries.insert(tmp);
