@@ -249,7 +249,7 @@ bool Channel::checkData (void) {
             if (!bfs::exists (fn)) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
                 if (!bfs::exists (fn)) {
-                    //LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
+                    LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
                     imageNumbers.erase(imageNumbers.begin() + i);
                     continue;
                 }
@@ -294,7 +294,7 @@ bool Channel::checkData (void) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % number));
                 if (!bfs::exists (fn)) {
                     logAndThrow("Dark-file " + (boost::format(darkTemplate) % number).str() + " not found!");
-                } else darkTemplate = fn.c_str();
+                } else darkTemplate = (bfs::path(imageDataDir) / bfs::path(darkTemplate)).c_str();      // found in imageDataDir, prepend it to darkTemplate
             }
         }
     }
@@ -473,27 +473,29 @@ void Channel::loadCalib(boost::asio::io_service& service) {     // load through 
     // TODO: cache files and just fetch shared_ptr
 
     if (!darkTemplate.empty()) {        // needs to be read synchronously because of adding/normalization
+        size_t nFrames(0);
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
             ClippedFile::load(dark,darkTemplate,alignClip,true);
+            nFrames = dark.meta->getNumberOfFrames();
         } else {
-            size_t nFrames = 1;
             Image<float> tmp;
             for (size_t di = 0; di < darkNumbers.size(); ++di) {
                 bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
                 if (!di) {
                     ClippedFile::load(dark,fn.string(),alignClip,true);
+                    nFrames = dark.meta->getNumberOfFrames();
                 } else {
                     ClippedFile::load(tmp,fn.string(),alignClip,true);
                     dark += tmp;
-                    nFrames++;
+                    nFrames += tmp.meta->getNumberOfFrames();
                 }
             }
             
             //   NOTE: no normalization here, modify metadata instead. TODO: += operator for meta to add frames??
 
         }
-
+        if (nFrames) dark *= 1.0/nFrames;
     }
 
 
