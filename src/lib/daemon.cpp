@@ -36,7 +36,7 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
-    hostTimeout(1000), timer( ioService ), worker( *this ) {
+    hostTimeout(100000), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
