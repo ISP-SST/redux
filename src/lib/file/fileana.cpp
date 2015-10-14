@@ -564,29 +564,29 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
     if( !hdr.get() ) {
         hdr.reset( new Ana() );
     }
-
-    size_t nElements = 1;
-    int nDims = 0;
-
-    for( auto &dim: data.dimensions() ) {
-        if( dim > 0 ) {     // TBD: should we always discard dimensions of size 1, or leave it to the user ??
-            hdr->m_Header.dim[nDims++] = dim;
-            nElements *= dim;
-        }
-    }
     
-    if(nDims == 0) {
+    auto tmpDims = data.dimensions(true);    // TBD: should we always discard dimensions of size 1, or leave it to the user ??
+    int nDims = tmpDims.size();
+
+    if( nDims == 0 ) {      // Don't write empty files, ignore silently.
         return;
     }
         
+    if( nDims > 16 ) {
+        throw invalid_argument( "Ana::write(): the ANA/f0 format does not support more dimensions than 16." );
+    }
+    
+    std::reverse( tmpDims.begin(), tmpDims.end() );     // ANA store fast dimension first
+    hdr->m_Header.ndim = 0;
+    size_t nElements = 1;
+    for( auto &dim: tmpDims ) {
+        hdr->m_Header.dim[hdr->m_Header.ndim++] = dim;
+        nElements *= dim;
+    }
+    
     ofstream file( filename, ifstream::binary );
     if( !file.good() ) {
         throw std::ios_base::failure( "Failed to open file: " + filename );
-    }
-
-    hdr->m_Header.ndim = nDims;
-    if( hdr->m_Header.ndim > 16 ) {
-        throw invalid_argument( "Ana::write(): the ANA/f0 format does not support more dimensions than 16." );
     }
 
     hdr->m_Header.datyp = getDatyp<T>();
