@@ -226,7 +226,7 @@ int main (int argc, char *argv[]) {
         bpt::ptree momfbd;
         std::stringstream filteredCfg(filterOldCfg(vm["config"].as<string>()));
         bpt::read_info (filteredCfg , momfbd);
-        bool check = (vm.count ("no-check") + vm.count ("print")) == 0;
+        bool check = vm.count ("no-check") == 0;
         vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
 
         if (vm.count ("print")) {       // dump configuration to console and exit
