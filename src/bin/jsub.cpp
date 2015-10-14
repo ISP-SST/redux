@@ -190,6 +190,7 @@ string filterOldCfg(string filename) {
     std::copy ( (std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>(), std::back_inserter (text));
     in.close();
 
+    replace(text, " ", "");     // spaces not allowed in cfg-values (e.g. DIVERSITY=0.00 mm)
     bool found = replace(text, "channel{", "channel {");
     found |= replace(text, "object{", "object {");
     found |= replace(text, "=", " ");
