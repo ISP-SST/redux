@@ -560,8 +560,10 @@ bool Object::checkData (void) {
 
     bfs::path tmpOF(outputFileName + ".ext");
     bfs::path tmpPath = tmpOF.parent_path();
-    if( !bfs::exists (tmpPath) ) {
-        if( !bfs::create_directories(tmpPath) ) {
+    
+    boost::system::error_code ec;
+    if( !tmpPath.empty() && !bfs::exists(tmpPath,ec) ) {
+        if( !bfs::create_directories(tmpPath,ec) ) {
             LOG_CRITICAL << boost::format ("failed to create directory for output: %s") % tmpPath;
             return false;
         } else LOG_TRACE << boost::format ("create output directory %s") % tmpPath;
@@ -571,8 +573,8 @@ bool Object::checkData (void) {
         slask += "_test_writability_";
         bfs::create_directory(slask);
         bfs::remove_all(slask);
-    } catch( ... ) {
-        LOG_CRITICAL << boost::format ("output directory %s not writable: %s") % tmpPath;
+    } catch( bfs::filesystem_error& e ) {
+        LOG_CRITICAL << boost::format ("output directory %s not writable: %s") % tmpPath % e.what();
         return false;
     }
     for (int i = 1; i & FT_MASK; i <<= 1) {
@@ -582,7 +584,7 @@ bool Object::checkData (void) {
                 LOG_CRITICAL << boost::format ("output file %s already exists! Use -f (or OVERWRITE) to replace file.") % tmpOF;
                 return false;
             } else {
-                LOG << "Output filename: " << tmpOF;
+                LOG_DETAIL << "Output filename: " << tmpOF;
             }
         }
     }
