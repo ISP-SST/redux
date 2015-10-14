@@ -138,8 +138,9 @@ void CacheItem::setLoaded(bool il) {
 void CacheItem::setPath(const string& path) {
     
     unique_lock<mutex> lock(itemMutex);
+    itemPath = bfs::path(path);
     Cache& c = Cache::get();
-    itemPath = bfs::path(c.path()) / bfs::path(path);
+    fullPath = bfs::path(c.path()) / itemPath;
     
 }
         
