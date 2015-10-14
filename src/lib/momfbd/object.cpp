@@ -558,7 +558,7 @@ bool Object::checkCfg (void) {
 
 bool Object::checkData (void) {
 
-    bfs::path tmpOF(outputFileName + ".ext");
+    bfs::path tmpOF("r_" + outputFileName + ".ext");
     bfs::path tmpPath = tmpOF.parent_path();
     
     boost::system::error_code ec;
@@ -800,7 +800,7 @@ void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
 
 void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData) {
 
-    bfs::path fn = bfs::path (outputFileName + "_thi.momfbd");      // TODO: fix storage properly
+    bfs::path fn = bfs::path ("r_" + outputFileName + ".momfbd");      // TODO: fix storage properly
 
     LOG << "Writing output to file: " << fn;
 
