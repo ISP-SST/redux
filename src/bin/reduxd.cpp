@@ -26,6 +26,7 @@ namespace {
         ( "port,p", bpo::value<uint16_t>()->default_value( 30000 ), "Port to listen on."
           " The environment variable REDUX_PORT will be used instead of the default if this option"
           " is not specified." )
+        ( "threads,t", po::value<uint16_t>()->default_value( 0 ), "max number of threads to use.")
         ;
 
         return options;
