@@ -262,14 +262,14 @@ double SubImage::metricChange(const complex_t* newOTF) const {
         dn = 2.0 * (dp.real() * p[ind].real() + dp.imag() * p[ind].imag()) + norm (dp);
         dl -= (q[ind] * dn - dq * (norm (p[ind]))) / (q[ind] * (q[ind]+dq));
     }
-    return dl / (4 * object.pupil.area);  // otfArea = 4*pupilArea
+    return dl / otfSize2;
 }
 
 
 double SubImage::gradientFiniteDifference( uint16_t modeIndex, double dalpha ) {
     complex_t* otfPtr = tmpC.get();
     double* phiPtr = tmpPhi.get();
-    double scale = 1.0/(dalpha * object.wavelength); //  TODO: fix normalization & tweak solver, should not be scaled by wavelength.
+    double scale = 1.0/(dalpha * object.wavelength);
     memcpy(phiPtr, phi.get(), pupilSize2*sizeof(double));
     addMode(phiPtr, modes.modePointers[modeIndex], dalpha);
     calcOTF(otfPtr, phiPtr);
@@ -282,7 +282,7 @@ double SubImage::gradientVogel(uint16_t modeIndex, double dalpha) const {
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
-    double scale = -2.0 / (object.wavelength*object.pupil.area); // TODO: fix normalization
+    double scale = -2.0 / (pupilSize2 * object.wavelength);
     for (auto & ind : object.pupil.pupilSupport) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }

@@ -60,6 +60,7 @@ namespace redux {
             uint16_t nThreads;
             uint32_t nParameters;
             uint32_t nFreeParameters;
+            uint32_t nTotalImages;
             
             uint16_t *modeNumbers;
             uint16_t *enabledModes;

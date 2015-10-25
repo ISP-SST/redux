@@ -507,13 +507,14 @@ void Object::calcMetric (void) {
     const double* qPtr = Q.get();
     
     unique_lock<mutex> lock (mtx);
-    size_t N = 4*pupilPixels*pupilPixels;
-    for (size_t ind=0; ind<N; ++ind) {
-    //for (auto & ind : otfIndices) {
+    //size_t N = 4*pupilPixels*pupilPixels;
+    //for (size_t ind=0; ind<N; ++ind) {
+    currentMetric = 0;
+    for (auto & ind : pupil.otfSupport) {
         currentMetric += (ftsPtr[ind] - norm (pPtr[ind]) / qPtr[ind]);
     }
 
-    currentMetric *= (weight / N);
+    currentMetric *= (weight / (4*pupil.area) );
 
 }
 

@@ -37,7 +37,8 @@ namespace {
 }
 
 
-Solver::Solver( const MomfbdJob& j ) : objects( j.getObjects() ), job(j), nFreeParameters(0), modeNumbers(nullptr), enabledModes(nullptr), alpha(nullptr), grad_alpha(nullptr) {
+Solver::Solver( const MomfbdJob& j ) : objects( j.getObjects() ), job(j), nFreeParameters(0),
+    nTotalImages(0), modeNumbers(nullptr), enabledModes(nullptr), alpha(nullptr), grad_alpha(nullptr) {
 
 }
 
@@ -57,6 +58,7 @@ void Solver::init( void ) {
     nModes = job.modeNumbers.size();
     nParameters = job.globalData->constraints.nParameters;
     nFreeParameters = job.globalData->constraints.nFreeParameters;
+    nTotalImages = job.nImages();
     
     window.resize( nPixels, nPixels );
     window = 1.0;
@@ -74,7 +76,7 @@ void Solver::init( void ) {
     grad_alpha = new double[nParameters];
     
     uint16_t* mPtr = modeNumbers;
-    for( size_t n=job.nImages(); n>0; n-- ) {
+    for( size_t n=nTotalImages; n>0; n-- ) {
         memcpy(mPtr,job.modeNumbers.data(),nModes*sizeof(uint16_t));
         mPtr += nModes;
     }
@@ -120,19 +122,16 @@ void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
 double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void* params ) {
 
     double* alphaPtr = alpha;
-    memset(alphaPtr,0,nParameters*sizeof(double));
+//    memset(alphaPtr,0,nParameters*sizeof(double));
     
     job.globalData->constraints.reverse(x->data, alphaPtr);
-    
-    size_t nModes = job.modeNumbers.size();
+   
     for( const auto& o: objects ) {
-        o->initPQ();
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
                 service.post ([&im, alphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcOTF();
-                    im->addToPQ();
                 });
                 alphaPtr += nModes;
             }
@@ -140,18 +139,20 @@ double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void
     }
     runThreadsAndWait( service, nThreads );
     
-    double sum( 0 );
-    for( const auto& o : objects ) {
-        if( o ) {
-            service.post( [&sum,o] {
-                o->calcMetric();
-                sum += o->metric();
-            } );
-        } else LOG_ERR << "my_f()  object is NULL";
+    for( const auto& o: objects ) {
+        service.post ([&o] {    // use a lambda to ensure these calls are sequential
+            o->initPQ();
+            o->addAllPQ();
+            o->calcMetric();
+        });
     }
     runThreadsAndWait( service, nThreads );
 
-    return sum;
+    double sum(0);
+    for( const auto& o : objects ) {
+        sum += o->metric();
+    }
+    return sum/nTotalImages;
     
 }
 
@@ -173,17 +174,23 @@ void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void*
     }
 
     for( const auto& o: objects ) {
-        o->initPQ();
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
                 service.post([this, &im, alphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcPFOTF();
-                    im->addToPQ();
                 });
                 alphaPtr += nModes;
             }
         }
+    }
+    runThreadsAndWait( service, nThreads );
+    for( const auto& o: objects ) {
+        service.post([&o] {    // use a lambda to ensure these calls are sequential
+                    o->initPQ();
+                    o->addAllPQ();
+                });
+        
     }
     runThreadsAndWait( service, nThreads );
     
@@ -194,7 +201,7 @@ void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void*
                     im->calcVogelWeight();
                     for ( uint16_t m=0; m<nModes; ++m ) {
                         if( enabledModes[m] ) {
-                            gAlphaPtr[m] = gradientMethod(*im, m, 1E-2 );
+                            gAlphaPtr[m] = gradientMethod(*im, m, 1E-4 )/nTotalImages;
                         }
                     }
                 });
@@ -225,17 +232,24 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
    }
 
     for( const auto& o: objects ) {
-        o->initPQ();
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
                 service.post([this, &im, alphaPtr] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcPFOTF();
-                    im->addToPQ();
                 });
                 alphaPtr += nModes;
             }
         }
+    }
+    runThreadsAndWait( service, nThreads );
+    for( const auto& o: objects ) {
+        service.post([&o] {    // use a lambda to ensure these calls are sequential
+                    o->initPQ();
+                    o->addAllPQ();
+                    o->calcMetric();
+                });
+        
     }
     runThreadsAndWait( service, nThreads );
     
@@ -247,23 +261,18 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
                     im->calcVogelWeight();
                     for ( uint16_t m=0; m<nModes; ++m ) {
                         if( enabledModes[m] ) {
-                            gAlphaPtr[m] = gradientMethod(*im, m, 1E-2 );
+                            gAlphaPtr[m] = gradientMethod(*im, m, 1E-4 )/nTotalImages;
                         }
                     }
                 });
                 gAlphaPtr += nModes;
             }
         }
-        service.post ([this, &o, &sum] {    // use a lambda to ensure these calls are sequential
-            //o->addAllPQ();
-            o->calcMetric();
-            sum += o->metric();
-        });
-        service.post(std::bind(&Object::calcMetric, o.get()));
+        sum += o->metric();
     }
     runThreadsAndWait( service, nThreads );
     
-    *f = sum;
+    *f = sum/nTotalImages;
 
     job.globalData->constraints.apply(grad_alpha,df->data);
 
