@@ -41,7 +41,7 @@ namespace redux {
             double my_f( boost::asio::io_service&, const gsl_vector*, void* );
             void my_df( boost::asio::io_service&, const gsl_vector*, void*, gsl_vector* );
             void my_fdf( boost::asio::io_service&, const gsl_vector*, void*, double*, gsl_vector* );
-            void run(PatchData::Ptr, boost::asio::io_service&, uint8_t nThreads);
+            void run(PatchData::Ptr, boost::asio::io_service&, uint16_t nThreads);
             
 
             double objectMetric(boost::asio::io_service&);
@@ -57,6 +57,7 @@ namespace redux {
             redux::util::Array<double> window, noiseWindow;
             
             uint16_t nModes;
+            uint16_t nThreads;
             uint32_t nParameters;
             uint32_t nFreeParameters;
             

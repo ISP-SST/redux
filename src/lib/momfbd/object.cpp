@@ -738,21 +738,21 @@ void Object::initCache (void) {
 }
 
 
-void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& patches ) {
+void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Array<PatchData::Ptr>& patches ) {
     
-    nObjectImages = nImages();
+    nImages();
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
     
     for (auto& ch : channels) {
         ch->loadCalib(service);
     }
-    runThreadsAndWait(service, myJob.info.maxThreads);
+    runThreadsAndWait(service, nThreads);
     
     objMaxMean = std::numeric_limits<double>::lowest();
     for (auto& ch : channels) {
         ch->loadData(service, patches);
-        runThreadsAndWait(service, myJob.info.maxThreads);
+        runThreadsAndWait(service, nThreads);
         objMaxMean = std::max(objMaxMean,ch->getMaxMean());
         if(startT.is_special()) startT = ch->startT;
         else startT = std::min(startT,ch->startT);

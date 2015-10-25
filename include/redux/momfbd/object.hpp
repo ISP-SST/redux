@@ -75,7 +75,7 @@ namespace redux {
             bool checkData(void);
 
             void initCache(void);
-            void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
+            void loadData(boost::asio::io_service&, uint16_t nThreads, redux::util::Array<PatchData::Ptr>&);
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);

@@ -52,11 +52,11 @@ namespace redux {
         
         bool check(void);
         
-        bool getWork(WorkInProgress&, uint8_t);
+        bool getWork(WorkInProgress&, uint16_t);
         void ungetWork(WorkInProgress&);
         void returnResults(WorkInProgress&);
         
-        bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
+        bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
 
     private:
 

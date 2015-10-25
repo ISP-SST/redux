@@ -50,11 +50,12 @@ Host::HostInfo::HostInfo( void ) : peerType(0) {
 }
 
 
-Host::HostStatus::HostStatus( void ) : currentJob( 0 ), nThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
+Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
     loadAvg( 0 ), progress( 0 ) {
         
     lastSeen = boost::posix_time::second_clock::local_time(); 
-
+    nThreads = maxThreads;
+    
 }
 
 Host::Host() : id(0), nConnections(0) {
@@ -98,13 +99,14 @@ void Host::touch(void) {
 }
 
 std::string Host::printHeader(void) {
-    string hdr = alignRight("ID",5) + alignCenter("HOST",15) + alignCenter("PID",7) + alignCenter("STATE",9);
+    string hdr = alignRight("ID",5) + alignCenter("HOST",25) + alignCenter("PID",7) + alignCenter("THREADS",9) + alignCenter("STATE",9);
     hdr += alignLeft("VERSION",9) + alignCenter("ARCH",8) + alignCenter("OS",25) + alignCenter("GFLOPS",8);
     return hdr;
 }
 
 std::string Host::print(void) {
-    string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,15) + alignCenter(to_string(info.pid),7);
+    string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
+    ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),9);
     ret += alignCenter(StateNames[status.state],9) + alignCenter(getVersionString(info.reduxVersion),9);
     ret += alignCenter(info.arch,8) + alignCenter(info.os,25) + alignCenter("-",8);
     return ret;
@@ -121,9 +123,8 @@ bool Host::operator>( const Host& rhs ) const {
 
 bool Host::operator<( const Host& rhs ) const {
 //    if( info.peerType == rhs.info.peerType ) {
-        if( iequals( info.name, rhs.info.name ) ) {
-            return (info.pid < rhs.info.pid);
-        } else return ( info.name.compare( rhs.info.name ) > 0 );
+        if( iequals( info.name, rhs.info.name ) ) return (info.pid < rhs.info.pid);
+        return ( info.name < rhs.info.name );
 //    } else return (info.peerType < rhs.info.peerType);
 }
 

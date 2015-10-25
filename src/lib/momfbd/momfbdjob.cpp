@@ -177,7 +177,7 @@ void MomfbdJob::checkParts( void ) {
 }
 
 
-bool MomfbdJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
+bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
 
     bool ret(false);
     uint8_t step = info.step.load();
@@ -254,13 +254,14 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
 }
 
 
-bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8_t maxThreads ) {
+bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint16_t maxThreads ) {
     
     uint8_t jobStep = info.step.load();
     uint8_t patchStep = 0;
+    uint16_t nThreads = std::min( maxThreads, info.maxThreads );
     if(wip.parts.size() && wip.parts[0]) patchStep = wip.parts[0]->step;
     if( jobStep == JSTEP_PREPROCESS ) {
-        preProcess(service);                           // preprocess on master: load, flatfield, split in patches
+        preProcess(service, nThreads);                           // preprocess on master: load, flatfield, split in patches
     }
     else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
         uint8_t nThreads = std::min( maxThreads, info.maxThreads);
@@ -282,7 +283,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
         }
     }
     else if( jobStep == JSTEP_POSTPROCESS ) {
-        postProcess(service);                          // postprocess on master, collect results, save...
+        postProcess(service, nThreads);                          // postprocess on master, collect results, save...
     }
     else {
         LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load();
@@ -293,11 +294,11 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
 }
 
 
-void MomfbdJob::preProcess( boost::asio::io_service& service ) {
+void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
     // TODO: start logging (to file)
 
-    LOG_TRACE << "MomfbdJob::preProcess()";
+    LOG_TRACE << "MomfbdJob::preProcess()   nThreads = " << nThreads;
     
     if ( !checkData() ) {
         LOG_ERR << "MomfbdJob::preProcess(): sanity check failed.";
@@ -371,7 +372,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service ) {
 
 
     for( auto& obj : objects ) {
-        obj->loadData(service, patches);
+        obj->loadData(service, nThreads, patches);
     }
     
     for( auto& obj : objects ) {
@@ -428,7 +429,7 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
 }
 
 
-void MomfbdJob::postProcess( boost::asio::io_service& service ) {
+void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
     LOG << "MomfbdJob::postProcess()";
     for( auto& patch: patches ) {

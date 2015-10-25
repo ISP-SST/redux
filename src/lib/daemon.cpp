@@ -36,7 +36,7 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
-    hostTimeout(100000), timer( ioService ), worker( *this ) {
+    hostTimeout(600), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
@@ -46,7 +46,12 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), p
         master = params["master"].as<string>();
         port = params["port"].as<uint16_t>();
     }
-
+    uint16_t nThreads = params["threads"].as<uint16_t>();
+    if( nThreads ) {
+        myInfo->status.nThreads = myInfo->status.maxThreads = nThreads;
+    }
+    
+    LOG << "Daemon:  using " << myInfo->status.nThreads << " threads.";
 
 }
 
@@ -88,7 +93,7 @@ void Daemon::maintenance( void ) {
 
     updateLoadAvg();
     cleanup();
-    worker.updateStatus();
+    //worker.updateStatus();    TODO: use a secondary connection for auxiliary communications
 
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
@@ -106,7 +111,7 @@ bool Daemon::doWork( void ) {
         timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
         // Add some threads for the async work.
-        for( std::size_t i = 0; i < 5; ++i ) {
+        for( std::size_t i = 0; i < 50; ++i ) {
             shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioService ) ) );
             threads.push_back( t );
         }

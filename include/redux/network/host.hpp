@@ -43,7 +43,7 @@ namespace redux {
 
             struct HostStatus {     // volatile info, refreshed every now and then.
                 uint64_t currentJob;
-                uint8_t nThreads, maxThreads;
+                uint16_t nThreads, maxThreads;
                 State state;
                 float loadAvg;
                 float progress;

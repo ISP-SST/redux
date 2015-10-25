@@ -55,11 +55,11 @@ namespace redux {
 
             size_t nImages(void) const;
             
-            bool getWork( WorkInProgress&, uint8_t );
+            bool getWork( WorkInProgress&, uint16_t );
             void ungetWork( WorkInProgress& );
             void returnResults( WorkInProgress& );
 
-            bool run( WorkInProgress&, boost::asio::io_service&, uint8_t );
+            bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
             
             bool check(void);
             bool checkCfg(void);
@@ -71,10 +71,10 @@ namespace redux {
         private:
 
             void checkParts( void );
-            void preProcess( boost::asio::io_service& );
+            void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
-            void postProcess( boost::asio::io_service& );
+            void postProcess( boost::asio::io_service&, uint16_t nThreads );
 
             std::vector<std::shared_ptr<Object>> objects;
 

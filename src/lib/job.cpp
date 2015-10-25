@@ -38,9 +38,9 @@ namespace {
 }
 
 
-void redux::runThreadsAndWait(boost::asio::io_service& service, uint8_t nThreads) {
+void redux::runThreadsAndWait(boost::asio::io_service& service, uint16_t nThreads) {
     boost::thread_group pool;
-    for(size_t t = 0; t < nThreads; ++t) {
+    for(uint16_t t = 0; t < nThreads; ++t) {
         pool.create_thread(boost::bind(&boost::asio::io_service::run, &service));
     }
     pool.join_all();
@@ -124,14 +124,14 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), timeout(1000), priority(10), verbosity(0), maxThreads(255), maxPartRetries(1),
+Job::Info::Info(void) : id(0), timeout(1000), priority(10), verbosity(0), maxPartRetries(1), maxThreads(255), 
          step(0), state(JSTATE_IDLE) {
 
 }
 
 
 uint64_t Job::Info::size(void) const {
-    uint64_t sz = 2*sizeof(uint32_t) + 6;
+    uint64_t sz = 2*sizeof(uint32_t) + sizeof(uint16_t) + 5;
     sz += typeString.length() + name.length() + user.length() + host.length() + logFile.length() + 5;
     sz += 3*sizeof(time_t);
     return sz;
@@ -210,7 +210,7 @@ void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
     info.timeout = tree.get<uint32_t>("TIMEOUT", globalDefaults.timeout);
     info.priority = tree.get<uint8_t>("PRIORITY", globalDefaults.priority);
     info.verbosity = tree.get<uint8_t>("VERBOSITY", globalDefaults.verbosity);
-    info.maxThreads = tree.get<uint8_t>("MAX_THREADS", globalDefaults.maxThreads);
+    info.maxThreads = tree.get<uint16_t>("MAX_THREADS", globalDefaults.maxThreads);
     info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", globalDefaults.maxPartRetries);
     info.logFile = tree.get<string>("LOGFILE", globalDefaults.logFile);
     

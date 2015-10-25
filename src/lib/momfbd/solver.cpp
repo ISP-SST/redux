@@ -138,7 +138,7 @@ double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void
             }
         }
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
     
     double sum( 0 );
     for( const auto& o : objects ) {
@@ -149,7 +149,7 @@ double Solver::my_f( boost::asio::io_service& service, const gsl_vector* x, void
             } );
         } else LOG_ERR << "my_f()  object is NULL";
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
 
     return sum;
     
@@ -185,7 +185,7 @@ void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void*
             }
         }
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
     
     for( const auto& o: objects ) {
         for( const auto& c: o->getChannels() ) {
@@ -202,7 +202,7 @@ void Solver::my_df( boost::asio::io_service& service, const gsl_vector* x, void*
             }
         }
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
     
     job.globalData->constraints.apply(grad_alpha,df->data);
 
@@ -214,7 +214,7 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
     double* gAlphaPtr = grad_alpha;
     
     job.globalData->constraints.reverse(x->data,alphaPtr);
-    memset(grad_alpha,0,job.globalData->constraints.nParameters*sizeof(double));
+    memset(grad_alpha,0,nParameters*sizeof(double));
     
    if ( checkAllSmaller( alphaPtr, nParameters, 1E-12 ) ) {
  //       cout << "Forcing graddiff" << endl;
@@ -237,7 +237,7 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
             }
         }
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
     
     double sum=0;
     for( const auto& o: objects ) {
@@ -261,7 +261,7 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
         });
         service.post(std::bind(&Object::calcMetric, o.get()));
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
     
     *f = sum;
 
@@ -270,12 +270,12 @@ void Solver::my_fdf( boost::asio::io_service& service, const gsl_vector* x, void
 }
 
 
-void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nThreads ) {
+void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint16_t inThreads ) {
 
     p->initPatch();
     data = p;
 
-    LOG << "run()  patch#" << data->id << "   index=" << data->index << " region=" << data->roi;
+    LOG << "run()  patch#" << data->id << "   index=" << data->index << " region=" << data->roi << "   nThreads=" << inThreads;
 
     std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, std::ref( service ), sp::_1, sp::_2 );
     std::function<gsl_df_t> wrapped_df = std::bind( &Solver::my_df, this, std::ref( service ), sp::_1, sp::_2, sp::_3 );
@@ -328,7 +328,9 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
     
     uniform_real_distribution<double> dist(-1E-8, 1E-8);
     default_random_engine re;
-  /*  
+    
+    nThreads = inThreads; //job.info.maxThreads;
+/*    nThreads = 1;
 
     //for(unsigned int i=0; i<nFreeParameters; ++i) s->x->data[i] = 1E-6;
     for(unsigned int i=0; i<nParameters; ++i) {
@@ -372,14 +374,14 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
 
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
-        modeCount = min<uint16_t>(modeCount,job.modeNumbers.size());
+        modeCount = min<uint16_t>(modeCount,nModes);
         std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
         
         transform(modeNumbers,modeNumbers+nParameters,enabledModes,
                   [&activeModes](const uint16_t& a){ return activeModes.count(a)?a:0; }
                  );
         
-        if( modeCount == job.modeNumbers.size() ) {                                     // final loop
+        if( modeCount == nModes ) {                                     // final loop
             modeCount = 0;                      // we use 0 to exit the eternal loop
             init_tol = job.FTOL;
             maxIterations = job.maxIterations;
@@ -443,8 +445,11 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint8_t nT
         GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
         totalIterations += iter;
         if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
-            LOG_DETAIL << boost::format("After %d iteration%s  metric=%g norm(grad)=%g using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
-                s->f % gradNorm % activeModes.size() % job.modeNumbers.size();
+            size_t nActiveModes = activeModes.size();
+            LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ") << "  metric=" << thisMetric
+             << " norm(grad)=" << (gradNorm/nActiveModes) << " using " << nActiveModes << "/" << nModes << " modes.";
+//            LOG_DETAIL << boost::format("After %d iteration%s  metric=%g norm(grad)=%g using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
+//                s->f % gradNorm % nActiveModes % nModes;
         }  
         //  
 
@@ -490,7 +495,7 @@ double Solver::objectMetric( boost::asio::io_service& service ) {
             } );
         } else LOG << "objectMetric()  object is NULL";
     }
-    runThreadsAndWait( service, job.info.maxThreads );
+    runThreadsAndWait( service, nThreads );
     
     double sum( 0 );
     for( const auto& o : objects ) {

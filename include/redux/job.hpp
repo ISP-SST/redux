@@ -24,7 +24,7 @@ namespace redux {
      *  @{
      */
     
-    void runThreadsAndWait(boost::asio::io_service& service, uint8_t nThreads );
+    void runThreadsAndWait(boost::asio::io_service& service, uint16_t nThreads );
 
     struct WorkInProgress;
     
@@ -76,7 +76,8 @@ namespace redux {
         
         struct Info {
             uint32_t id, timeout;
-            uint8_t priority, verbosity, maxThreads, maxPartRetries;
+            uint8_t priority, verbosity, maxPartRetries;
+            uint16_t maxThreads;
             std::atomic<uint8_t> step;
             std::atomic<uint8_t> state;
             std::string typeString, name, user, host;
@@ -117,13 +118,13 @@ namespace redux {
 
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
         
-        virtual bool getWork(WorkInProgress&, uint8_t) { return false; };
+        virtual bool getWork(WorkInProgress&, uint16_t) { return false; };
         virtual void ungetWork(WorkInProgress&) { };
         virtual void returnResults(WorkInProgress&) { };
 
         virtual void init(void) {};
         virtual void cleanup(void) {};
-        virtual bool run(WorkInProgress&, boost::asio::io_service&, uint8_t) = 0;
+        virtual bool run(WorkInProgress&, boost::asio::io_service&, uint16_t) = 0;
         
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);

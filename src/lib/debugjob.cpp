@@ -202,7 +202,7 @@ bool DebugJob::check(void) {
     return ret;
 }
 
-bool DebugJob::getWork( WorkInProgress& wip, uint8_t nThreads ) {
+bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")";
@@ -260,7 +260,7 @@ void DebugJob::returnResults( WorkInProgress& wip ) {
 }
 
 
-bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint8_t maxThreads ) {
+bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint16_t maxThreads ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::run("<<(int)maxThreads<<") ";
