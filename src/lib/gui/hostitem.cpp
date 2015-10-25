@@ -40,8 +40,8 @@ void HostItem::reset(Host::Ptr h) {
     itemData << boost::str(boost::format("%3.1f%%") % host->status.loadAvg).c_str();     //to_string( host->status.loadAvg ).c_str();
     time_duration elapsed = (second_clock::local_time() - host->info.startedAt);
     itemData << to_simple_string(elapsed).c_str();//to_iso_extended_string( host->info.startedAt ).c_str(); //tsToString( tsSubtract( ts, ( *rootObject )[i]->startTime ) ).c_str();
-    elapsed = (second_clock::local_time() - host->status.lastSeen);
-    itemData << to_simple_string(elapsed).c_str();//to_iso_extended_string( host->lastSeen ).c_str(); //tsToString( tsSubtract( ts, ( *rootObject )[i]->lastSeen ) ).c_str();
+    //elapsed = (second_clock::local_time() - host->status.lastSeen);
+    itemData << to_iso_extended_string( host->status.lastSeen ).c_str(); //tsToString( tsSubtract( ts, ( *rootObject )[i]->lastSeen ) ).c_str();
 
     itemData << Host::TypeNames[host->info.peerType].c_str();
 

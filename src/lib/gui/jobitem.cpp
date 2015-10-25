@@ -38,7 +38,7 @@ void JobItem::reset(Job::JobPtr j) {
         itemData << job->info.typeString.c_str();        // job-type
         itemData << std::to_string( job->info.priority ).c_str(); // priority
         itemData << job->info.user.c_str();              // username
-        tmp = Job::stateString( job->info.state ) + " - " + job->stepString( job->info.step );
+        tmp = Job::stateString( job->info.state ); // + " - " + job->stepString( job->info.step );
         itemData << tmp.c_str();     // current state
 /*
     itemData.clear();
