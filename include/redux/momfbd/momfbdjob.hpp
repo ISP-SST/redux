@@ -71,7 +71,7 @@ namespace redux {
 
         private:
 
-            void checkParts( void );
+            uint8_t checkParts( void );
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );

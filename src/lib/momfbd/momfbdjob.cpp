@@ -155,7 +155,7 @@ size_t MomfbdJob::nImages(void) const {
 }
 
 
-void MomfbdJob::checkParts( void ) {
+uint8_t MomfbdJob::checkParts( void ) {
 
     uint8_t mask = 0;
     for( auto & patch : patches ) {
@@ -173,7 +173,9 @@ void MomfbdJob::checkParts( void ) {
     if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
         info.step.store( mask );
     }
-
+    
+    return mask;
+    
 }
 
 
