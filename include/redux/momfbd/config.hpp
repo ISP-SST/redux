@@ -208,6 +208,7 @@ namespace redux {
             std::string observationTime;
             std::string observationDate;
             std::string tmpDataDir;
+            std::string outputDir;                  //!< Where the output goes (defaults to current directory of jsub)
             std::vector<std::string> outputFiles;
             /*****************************/
 

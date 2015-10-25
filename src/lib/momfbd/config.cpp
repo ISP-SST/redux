@@ -12,8 +12,10 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 namespace bpo = boost::program_options;
 namespace bpt = boost::property_tree;
+namespace bfs = boost::filesystem;
 
 using namespace redux::momfbd;
 using namespace redux::util;
@@ -25,6 +27,7 @@ using boost::algorithm::iequals;
 namespace {
     const string thisChannel = "config";
 
+    boost::system::error_code ec;
     /*const*/ GlobalCfg globalDefaults;
     const string basisTags[] = {"","Zernike","Karhunen-Loeve"};
     const string fpmTags[] = {"","median","invdistweight","horint"};
@@ -579,7 +582,7 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_gamma(1E-4),
     outputFileType(FT_NONE), outputDataType(DT_F32T), sequenceNumber(0),
-    observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
+    observationTime(""), observationDate("N/A"), tmpDataDir("./data"), outputDir("") {
 
 
 }
@@ -700,6 +703,8 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     observationDate = tree.get<string>( "DATE_OBS", defaults.observationDate );
     //tmpDataDir = cleanPath( tree.get<string>( "PROG_DATA_DIR", defaults.tmpDataDir ) );
     tmpDataDir = tree.get<string>( "PROG_DATA_DIR", defaults.tmpDataDir );
+    outputDir = tree.get<string>( "OUTPUT_DIR", defaults.outputDir );
+    if( outputDir.empty() ) outputDir = bfs::current_path().string();
     tmpString = tree.get<string>( "OUTPUT_FILES", "" );
     outputFiles = defaults.outputFiles;
     if( tmpString != "" ) {
@@ -795,6 +800,7 @@ void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
     if(observationTime != defaults.observationTime) tree.put("TIME_OBS", observationTime);
     if(observationDate != defaults.observationDate) tree.put("DATE_OBS", observationDate);
     if(tmpDataDir != defaults.tmpDataDir) tree.put("PROG_DATA_DIR", tmpDataDir);
+    if(outputDir != defaults.outputDir) tree.put("OUTPUT_DIR", outputDir);
     if(outputFiles != defaults.outputFiles) tree.put("OUTPUT_FILES", outputFiles);
 
     ObjectCfg::getProperties(tree, defaults);
@@ -813,6 +819,7 @@ uint64_t GlobalCfg::size(void) const {
     sz += observationTime.length() + 1;
     sz += observationDate.length() + 1;
     sz += tmpDataDir.length() + 1;
+    sz += outputDir.length() + 1;
     for( const auto& filename : outputFiles ) {
         sz += filename.length() + 1;
     }
@@ -848,6 +855,7 @@ uint64_t GlobalCfg::pack(char* ptr) const {
     count += pack(ptr+count, observationTime);
     count += pack(ptr+count, observationDate);
     count += pack(ptr+count, tmpDataDir);
+    count += pack(ptr+count, outputDir);
     count += pack( ptr+count, (uint16_t)outputFiles.size() );
     for( auto & filename : outputFiles ) {
         count += pack( ptr+count, filename );
@@ -886,6 +894,7 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, observationTime, swap_endian);
     count += unpack(ptr+count, observationDate, swap_endian);
     count += unpack(ptr+count, tmpDataDir, swap_endian);
+    count += unpack(ptr+count, outputDir, swap_endian);
     uint16_t tmp;
     count += unpack( ptr+count, tmp, swap_endian );
     outputFiles.resize( tmp );
