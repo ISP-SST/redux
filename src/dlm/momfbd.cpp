@@ -36,13 +36,13 @@ using namespace std;
 //http://idlastro.gsfc.nasa.gov/idl_html_help/Structure_Variables.html
 
 // Local implementation to avoid including boost dependencies in the DLM
-bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase, const std::locale& loc ) {
+bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase ) {
 
     auto it = std::search (
                   haystack.begin(), haystack.end(),
                   needle.begin(),   needle.end(),
-    [ignoreCase,&loc] ( char ch1, char ch2 ) {
-        if ( ignoreCase ) return std::toupper ( ch1,loc ) == std::toupper ( ch2,loc );
+    [ignoreCase] ( char ch1, char ch2 ) {
+        if ( ignoreCase ) return std::toupper ( ch1 ) == std::toupper ( ch2 );
         return ch1 == ch2;
     }
               );
@@ -1095,6 +1095,41 @@ void img_clip ( Array<float>& img ) {
 }
 
 
+template <typename T>
+void copyRaw( vector<int16_t>& out, T* data, size_t count) {
+    out.clear();
+    for( size_t i=0; i<count; ++i) {
+        out.push_back(static_cast<int16_t>(data[i]));
+    }
+}
+
+
+vector<int16_t> getAsVector( const IDL_VPTR& v ) {
+    IDL_ENSURE_SIMPLE( v );
+    vector<int16_t> ret;
+    if ( v->flags & IDL_V_ARR ) {   // array
+        switch(v->type) {
+            case IDL_TYP_BYTE: copyRaw( ret, reinterpret_cast<uint8_t*>(v->value.arr->data), v->value.arr->n_elts ); break;
+            case IDL_TYP_INT: copyRaw( ret, reinterpret_cast<int16_t*>(v->value.arr->data), v->value.arr->n_elts ); break;
+            case IDL_TYP_LONG: copyRaw( ret, reinterpret_cast<int32_t*>(v->value.arr->data), v->value.arr->n_elts ); break;
+            case IDL_TYP_FLOAT: copyRaw( ret, reinterpret_cast<float*>(v->value.arr->data), v->value.arr->n_elts ); break;
+            case IDL_TYP_DOUBLE: copyRaw( ret, reinterpret_cast<double*>(v->value.arr->data), v->value.arr->n_elts ); break;
+            default: cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << endl;
+        }
+    } else {    // scalar
+        switch(v->type) {
+            case IDL_TYP_BYTE: copyRaw( ret, &(v->value.c), 1 ); break;
+            case IDL_TYP_INT: copyRaw( ret, &(v->value.i), 1 ); break;
+            case IDL_TYP_LONG: copyRaw( ret, &(v->value.l), 1 ); break;
+            case IDL_TYP_FLOAT: copyRaw( ret, &(v->value.f), 1 ); break;
+            case IDL_TYP_DOUBLE: copyRaw( ret, &(v->value.d), 1 ); break;
+            default: cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << endl;
+        }
+    }
+    return ret;
+}
+
+
 IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
 
     if ( argc < 5 ) {
@@ -1102,7 +1137,11 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         momfbd_help();
         return IDL_Gettmp();
     }
-
+    
+    vector<int16_t> patchesFirstX = getAsVector(argv[1]);
+    vector<int16_t> patchesLastX = getAsVector(argv[2]);
+    vector<int16_t> patchesFirstY = getAsVector(argv[3]);
+    vector<int16_t> patchesLastY = getAsVector(argv[4]);
 
     IDL_VPTR img_in = argv[0];
     int patchSizeX  = img_in->value.s.arr->dim[0];
@@ -1110,6 +1149,17 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     int nPatchesX = img_in->value.s.arr->dim[2];
     int nPatchesY = img_in->value.s.arr->dim[3];
 
+    if( nPatchesX != (int)patchesFirstX.size() || nPatchesX != (int)patchesLastX.size() ||
+        nPatchesY != (int)patchesFirstY.size() || nPatchesY != (int)patchesLastY.size() ) {
+        cout << "MOMFBD_MOZAIC: Array-size does not match the offset vectors." << endl;
+        cout << "Array: nPatchesX = " << nPatchesX << " nPatchesY = " << nPatchesY << endl;
+        cout << printArray(patchesFirstX,"firstPixelX") << endl;
+        cout << printArray(patchesLastX,"lastPixelX") << endl;
+        cout << printArray(patchesFirstY,"firstPixelY") << endl;
+        cout << printArray(patchesLastY,"lastPixelY") << endl;
+        return IDL_Gettmp();
+    }
+    
     KW_RESULT kw;
     kw.margin = std::max ( patchSizeX, patchSizeY ) / 8; // number of pixels to cut from the edges of each path,
     // default is 12.5% (to conform with the old version)
@@ -1122,11 +1172,15 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     IDL_KW_FREE;
 
     if ( verbosity > 0 ) {
-        cout << "Mozaic:  nPatches = (" << nPatchesX << "," << nPatchesY << ")" << endl;
-        cout << "        patchSize = (" << patchSizeX << "," << patchSizeY << ")" << endl;
+        cout << "Mozaic:  nPatches = (" << nPatchesY << "," << nPatchesX << ")" << endl;
+        cout << "        patchSize = (" << patchSizeY << "," << patchSizeX << ")" << endl;
         cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         cout << "           margin = " << margin << endl;
         cout << "        transpose = " << ( notranspose?"NO":"YES" ) << endl;
+        cout << "      " << printArray(patchesFirstX,"firstPixelX") << endl;
+        cout << "       " << printArray(patchesLastX,"lastPixelX") << endl;
+        cout << "      " << printArray(patchesFirstY,"firstPixelY") << endl;
+        cout << "       " << printArray(patchesLastY,"lastPixelY") << endl;
     }
 
 
@@ -1135,17 +1189,6 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         return IDL_Gettmp();
     }
 
-    int16_t* patchesFirstX = ( int16_t* ) ( argv[1]->value.s.arr->data );
-    int16_t* patchesLastX = ( int16_t* ) ( argv[2]->value.s.arr->data );
-    int16_t* patchesFirstY = ( int16_t* ) ( argv[3]->value.s.arr->data );
-    int16_t* patchesLastY = ( int16_t* ) ( argv[4]->value.s.arr->data );
-
-    if ( verbosity > 1 ) {
-        cout << "      " << printArray ( patchesFirstX,nPatchesX,"firstPixelX" ) << endl;
-        cout << "       " << printArray ( patchesLastX,nPatchesX,"lastPixelX" ) << endl;
-        cout << "      " << printArray ( patchesFirstY,nPatchesY,"firstPixelY" ) << endl;
-        cout << "       " << printArray ( patchesLastY,nPatchesY,"lastPixelY" ) << endl;
-    }
 
     Array<struct Overlaps> overlaps ( nPatchesY, nPatchesX ); // How many pixels of overlap between the patches, in order N,E,S,W
     // calculate the overlaps.
@@ -1166,6 +1209,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
 
     int imgFirstX = patchesFirstX[0];
     int imgLastX = patchesLastX[0];
+
     for ( int x = 0; x < nPatchesX; ++x ) {
         if ( patchesFirstX[x] < imgFirstX ) imgFirstX = patchesFirstX[x];
         if ( patchesLastX[x] > imgLastX ) imgLastX = patchesLastX[x];
@@ -1176,6 +1220,7 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     }
     imgLastX -= imgFirstX;
     imgFirstX = 0;
+
     int imgFirstY = patchesFirstY[0];
     int imgLastY = patchesLastY[0];
     for ( int y = 0; y < nPatchesY; ++y ) {
@@ -1188,9 +1233,10 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     }
     imgLastY -= imgFirstY;
     imgFirstY = 0;
-    //
+
     int imgSizeX = imgLastX - imgFirstX + 1;
     int imgSizeY = imgLastY - imgFirstY + 1;
+
 
     Array<float> pic( imgSizeY, imgSizeX );
     memset( pic.ptr( 0 ), 0, imgSizeX * imgSizeY * sizeof( float ) );
