@@ -174,10 +174,10 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
 
 bool ObjectData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
+    loaded |= CacheItem::cacheLoad(removeAfterLoad);
     for( auto& cd: channels ) {
         loaded |= cd.cacheLoad(removeAfterLoad);
     }
-    loaded |= CacheItem::cacheLoad(removeAfterLoad);
     return loaded;      // true if any part was loaded, TODO better control of partial fails.
 }
 

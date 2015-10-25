@@ -227,7 +227,7 @@ uint64_t Pupil::unpack( const char* data, bool swap_endian ) {
 
 bool Pupil::load( const string& filename, uint16_t pixels ) {
     
-    if ( bfs::exists( bfs::path( filename ) ) ) {
+    if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
         if( nDimensions() != 2 || dimSize(0) != pixels || dimSize(1) != pixels ) {    // mismatch
             LOG_WARN << "File: " << filename << " does not match this " << pixels << "x" << pixels << " Pupil."
@@ -289,14 +289,14 @@ void Pupil::generateSupport(double threshold){
     
     FourierTransform::autocorrelate(OTF);                               // auto-correlate the pupil to generate the support of the OTF.
 
-    LOG_DEBUG << "Generated pupilSupport with " << pupilSupport.size() << " elements. (full size = " << nElements() << ", area = " << area << " )";
+    //LOG_DEBUG << "Generated pupilSupport with " << pupilSupport.size() << " elements. (full size = " << nElements() << ", area = " << area << " )";
     double* tmpPtr = OTF.get();
     for (size_t index = 0; index < OTF.nElements(); ++index) {           // map indices where the OTF-mask (auto-correlated pupil-mask) is non-zero.
         if (fabs(tmpPtr[index]) > threshold) {
             otfSupport.push_back(index);
         }
     }
-    LOG_DEBUG << "Generated otfSupport with " << otfSupport.size() << " elements. (full size = " << OTF.nElements() << ", area ~ " << (4.0*area) << " )";
+    //LOG_DEBUG << "Generated otfSupport with " << otfSupport.size() << " elements. (full size = " << OTF.nElements() << ", area ~ " << (4.0*area) << " )";
 }
 
 

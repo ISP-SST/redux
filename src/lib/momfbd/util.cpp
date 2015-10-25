@@ -87,7 +87,7 @@ int64_t redux::momfbd::util::extractTime( const char* header ) {
 
 void redux::momfbd::util::loadPupil( const std::string& filename, redux::util::Array<double>& pupil, uint32_t pupilSize ) {
     
-    if( bfs::exists( filename ) ) {
+    if( bfs::is_regular_file(filename) ) {
 
         readFile( filename, pupil );
        

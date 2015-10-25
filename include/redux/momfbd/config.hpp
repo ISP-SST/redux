@@ -83,7 +83,7 @@ namespace redux {
             /*****************************/
 
             /************ Input **********/
-            std::string imageDataDir;              //!< Where the data is located
+            std::string imageDataDir;               //!< Where the data is located
             std::string imageTemplate;
             std::string darkTemplate;
             std::string gainFile;

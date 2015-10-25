@@ -226,7 +226,7 @@ ModeSet& ModeSet::operator=( const ModeSet& rhs ) {
 
 bool ModeSet::load( const string& filename, uint16_t pixels ) {
     
-    if ( bfs::exists( bfs::path( filename ) ) ) {
+    if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
         if( nDimensions() != 3 || dimSize(1) != pixels || dimSize(2) != pixels ) {    // mismatch
             LOG_WARN << "File: " << filename << " does not match this " << pixels << "x" << pixels << " ModeSet."
@@ -254,8 +254,8 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
 void ModeSet::init( const MomfbdJob& job, const Object& obj ) {
     
     // From file
-    bfs::path fn = bfs::path(obj.modeFile);
-    if ( bfs::exists(fn) ) {
+    bfs::path fn(obj.modeFile);
+    if ( bfs::is_regular_file(fn) ) {
         ModeInfo info( obj.modeFile, obj.pupilPixels );
         ModeSet& ret = job.globalData->get(info);
         unique_lock<mutex> lock(ret.mtx);

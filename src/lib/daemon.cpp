@@ -189,8 +189,10 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
             case CMD_STAT: conn->strand.post( boost::bind( &Daemon::updateHostStatus, this, conn ) ); break;
             case CMD_JSTAT: conn->strand.post( boost::bind( &Daemon::sendJobStats, this, conn ) ); break;
             case CMD_PSTAT: conn->strand.post( boost::bind( &Daemon::sendPeerList, this, conn ) ); break;
-            case CMD_DISCONNECT: conn->socket().close(); break;
-            default: LOG_DETAIL << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd );
+            case CMD_DISCONNECT: removeConnection(conn); break;
+            default: LOG_DEBUG << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd );
+                removeConnection(conn);
+                return;
         }
 
     }

@@ -153,7 +153,7 @@ string redux::util::cleanPath(string in, string base) {
     if(in[0] == '~') in = expandTilde(in);
 
     bf::path fn, result, ain(in);
-    if(exists(ain) && !bf::is_directory(ain)) {
+    if(bf::is_regular_file(ain)) {
         fn = ain.filename();
         ain = ain.parent_path();
     }

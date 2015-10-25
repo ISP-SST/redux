@@ -266,9 +266,9 @@ bool Channel::checkData (void) {
     if ( incomplete ) {   // check if files are present
         for (size_t i (0); i < imageNumbers.size();) {
             bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
-            if (!bfs::exists (fn)) {
+            if (!bfs::is_regular_file (fn)) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
-                if (!bfs::exists (fn)) {
+                if (!bfs::is_regular_file(fn)) {
                     LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
                     imageNumbers.erase(imageNumbers.begin() + i);
                     continue;
@@ -282,15 +282,15 @@ bool Channel::checkData (void) {
         }
     }
     if (imageNumbers.empty()) {         // single file
-        bfs::path fn = bfs::path (imageDataDir) / bfs::path (imageTemplate);
-        if (! bfs::exists (fn)) {
+        bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
+        if (!bfs::is_regular_file(fn)) {
             LOG_ERR << boost::format ("Image-file %s not found!") % fn;
             return false;
         }
     } else {                            // template + numbers
         for (auto & number : imageNumbers) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)));
-            if (!bfs::exists (fn)) {
+            if (!bfs::is_regular_file(fn)) {
                 LOG_ERR << boost::format ("Image-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
                 return false;
             }
@@ -299,86 +299,87 @@ bool Channel::checkData (void) {
 
 
     // Dark(s)
-    size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
-    if (nWild == 0 || darkNumbers.empty()) {          // single file, DARK_NUM will be ignored if no wildcard in the template
-        if (! bfs::exists (bfs::path (darkTemplate))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (darkTemplate);
-            if (! bfs::exists (fn)) {
-                logAndThrow("Dark-file " + darkTemplate + " not found!");
-            } else darkTemplate = fn.c_str();
-        }
-    } else {                            // template
-        for (auto & number : darkNumbers) {
-            bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % number));
-            if (!bfs::exists (fn)) {
-                fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % number));
-                if (!bfs::exists (fn)) {
-                    logAndThrow("Dark-file " + (boost::format(darkTemplate) % number).str() + " not found!");
-                } else darkTemplate = (bfs::path(imageDataDir) / bfs::path(darkTemplate)).c_str();      // found in imageDataDir, prepend it to darkTemplate
+    if (!darkTemplate.empty()) {
+        size_t nWild = std::count(darkTemplate.begin(), darkTemplate.end(), '%');
+        if (nWild == 0 || darkNumbers.empty()) {          // single file, DARK_NUM will be ignored if no wildcard in the template
+            if (!bfs::is_regular_file(darkTemplate)) {
+                bfs::path fn = bfs::path (imageDataDir) / bfs::path (darkTemplate);
+                if (!bfs::is_regular_file(fn)) {
+                    logAndThrow("Dark-file " + darkTemplate + " not found!");
+                } else darkTemplate = fn.c_str();
+            }
+        } else {                            // template
+            for (auto & number : darkNumbers) {
+                bfs::path fn = bfs::path(boost::str(boost::format(darkTemplate) % number));
+                if (!bfs::is_regular_file(fn)) {
+                    fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % number));
+                    if (!bfs::is_regular_file(fn)) {
+                        logAndThrow("Dark-file " + (boost::format(darkTemplate) % number).str() + " not found!");
+                    } else darkTemplate = (bfs::path(imageDataDir) / bfs::path(darkTemplate)).c_str();      // found in imageDataDir, prepend it to darkTemplate
+                }
             }
         }
     }
 
-
     // Gain
     if (!gainFile.empty()) {
-        if (! bfs::exists (bfs::path (gainFile))) {
+        if (!bfs::is_regular_file(gainFile)) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (gainFile);
-            if (! bfs::exists (fn)) {
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Gain-file " + gainFile + " not found!");
             } else gainFile = fn.c_str();
         }
     }
 
     if (!responseFile.empty()) {
-        if (! bfs::exists (bfs::path (responseFile))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (responseFile);
-            if (! bfs::exists (fn)) {
+        if (!bfs::is_regular_file(responseFile)) {
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(responseFile);
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Response-file " + responseFile + " not found!");
             } else responseFile = fn.c_str();
         }
     }
 
     if (!backgainFile.empty()) {
-        if (! bfs::exists (bfs::path (backgainFile))) {
+        if (!bfs::is_regular_file(backgainFile)) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (backgainFile);
-            if (! bfs::exists (fn)) {
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Backgain-file " + backgainFile + " not found!");
             } else backgainFile = fn.c_str();
         }
     }
 
     if (!psfFile.empty()) {
-        if (! bfs::exists (bfs::path (psfFile))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (psfFile);
-            if (! bfs::exists (fn)) {
+        if (!bfs::is_regular_file(psfFile)) {
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(psfFile);
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("PSF-file " + psfFile + " not found!");
             } else psfFile = fn.c_str();
         }
     }
 
     if (!mmFile.empty()) {
-        if (! bfs::exists (bfs::path (mmFile))) {
+        if (!bfs::is_regular_file(mmFile)) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (mmFile);
-            if (! bfs::exists (fn)) {
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Modulation-matrix file " + mmFile + " not found!");
             } else mmFile = fn.c_str();
         }
     }
 
     if (!xOffsetFile.empty()) {
-        if (! bfs::exists (bfs::path (xOffsetFile))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (xOffsetFile);
-            if (! bfs::exists (fn)) {
+        if (!bfs::is_regular_file(xOffsetFile)) {
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(xOffsetFile);
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Offset-file " + xOffsetFile + " not found!");
             } else xOffsetFile = fn.c_str();
         }
     }
 
     if (!yOffsetFile.empty()) {
-        if (! bfs::exists (bfs::path (yOffsetFile))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (yOffsetFile);
-            if (! bfs::exists (fn)) {
+        if (!bfs::is_regular_file(yOffsetFile)) {
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(yOffsetFile);
+            if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Offset-file " + yOffsetFile + " not found!");
             } else yOffsetFile = fn.c_str();
         }
@@ -680,9 +681,8 @@ void Channel::initPatch (ChannelData& cd) {
         subImages[i]->wrap( cd.images, i, i, cd.offset.y, cd.offset.y+patchSize-1, cd.offset.x, cd.offset.x+patchSize-1 );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), cd.images.dimSize(1)*cd.images.dimSize(2), ST_VALUES|ST_RMS );
         subImages[i]->init();
-        //subImages[i]->dump("o"+to_string(myObject.ID)+"_c"+to_string(ID)+"_im"+to_string(i));
     }
-//cout << "Ch::initP   modes @ " << hexString(myObject.modes.get()) << "   uc=" << myObject.modes.use_count() << endl;
+
 }
 
 

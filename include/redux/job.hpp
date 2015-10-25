@@ -57,6 +57,12 @@ namespace redux {
                                JSTATE_CANCELLED = 64,
                                JSTATE_ERR       = 128           // Error flag. Should not be used, dynamic error handling is better...
                              };
+        enum Step : uint8_t { JSTEP_SUBMIT = 1,
+                              // Intermediate steps can be defined per job. The ones listed here are needed by the Deamon class.
+                              JSTEP_COMPLETED = 64,
+                              JSTEP_ERR = 128
+                            };
+
         typedef std::shared_ptr<Job> JobPtr;
         struct JobCompare {
             bool operator()( const JobPtr &a, const JobPtr &b ) const { return ( *a < *b ); }

@@ -69,10 +69,6 @@ namespace redux {
             template <typename T>
             void getAlphas(T* alphas) const {
                 std::copy(currentAlpha.begin(),currentAlpha.end(),alphas);
-//                 size_t cnt (0);
-//                 for (auto& it: alpha) {
-//                     alphas[cnt++] = static_cast<T>(it.second);
-//                 }
             }
             
             void resetPhi(void);

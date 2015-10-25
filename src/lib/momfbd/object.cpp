@@ -451,12 +451,12 @@ void Object::fitAvgPlane(ObjectData& od) {
         fittedPlane.zero();
         
         for( auto& cd : od.channels ) {
-            size_t nImages = cd.images.dimSize(0);
+            size_t nImg = cd.images.dimSize(0);
             vector<int64_t> first = cd.images.first();
             vector<int64_t> last = cd.images.last();
             last[0] = first[0];                         // only select first image
             Array<float> view(cd.images, first, last);
-            for( unsigned int i=0; i<nImages; ++i ) {
+            for( unsigned int i=0; i<nImg; ++i ) {
                 if( ! view.sameSize(fittedPlane) ) {
                     LOG_ERR << "Size mismatch when fitting average plane for object #" << ID;
                     fittedPlane.clear();
@@ -479,12 +479,12 @@ void Object::fitAvgPlane(ObjectData& od) {
         LOG_DETAIL << "Subtracting average plane before processing.";
         
         for( auto& cd : od.channels ) {
-            size_t nImages = cd.images.dimSize(0);
+            size_t nImg = cd.images.dimSize(0);
             vector<int64_t> first = cd.images.first();
             vector<int64_t> last = cd.images.last();
             last[0] = first[0];                         // only select first image
             Array<float> view(cd.images, first, last);
-            for( unsigned int i=0; i<nImages; ++i ) {
+            for( unsigned int i=0; i<nImg; ++i ) {
                 view -= fittedPlane;                    // subract fitted plane from all images
                 view.shift(0, 1);                       // shift view to next image in stack
             }
@@ -575,7 +575,17 @@ bool Object::checkCfg (void) {
 
 bool Object::checkData (void) {
 
-    bfs::path tmpOF("r_" + outputFileName + ".ext");
+    bfs::path outDir( myJob.outputDir );
+    bfs::path tmpOF(outputFileName+".ext");
+    
+    if( bfs::path(outputFileName).is_relative() ) {
+        tmpOF = (bfs::path("r_")+=tmpOF);
+        tmpOF = outDir / tmpOF;
+    }  else {
+        bfs::path fn("r_");
+        fn += tmpOF.filename();
+        tmpOF = tmpOF.parent_path() / fn;
+    }
     bfs::path tmpPath = tmpOF.parent_path();
     
     boost::system::error_code ec;
@@ -596,7 +606,7 @@ bool Object::checkData (void) {
     }
     for (int i = 1; i & FT_MASK; i <<= 1) {
         if (i & myJob.outputFileType) {  // this filetype is specified.
-            tmpOF.replace_extension (FileTypeExtensions.at ( (FileType) i));
+            tmpOF.replace_extension(FileTypeExtensions.at ( (FileType) i));
             if( bfs::exists(tmpOF) && !(myJob.runFlags & RF_FORCE_WRITE) ) {
                 LOG_CRITICAL << boost::format ("output file %s already exists! Use -f (or OVERWRITE) to replace file.") % tmpOF;
                 return false;
@@ -611,9 +621,9 @@ bool Object::checkData (void) {
     }
     
     if (!pupilFile.empty()) {
-        if (! bfs::exists (bfs::path (pupilFile))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (pupilFile);
-            if (! bfs::exists (fn)) {
+        if (!bfs::is_regular_file(pupilFile)) {
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(pupilFile);
+            if (! bfs::is_regular_file(fn)) {
                 //logAndThrow("Pupil-file " + pupilFile + " not found!");
                 LOG_CRITICAL << boost::format ("Pupil-file %s not found!") % pupilFile;
                 return false;
@@ -622,9 +632,9 @@ bool Object::checkData (void) {
     }
 
     if (!modeFile.empty()) {
-        if (! bfs::exists (bfs::path (modeFile))) {
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (modeFile);
-            if (! bfs::exists (fn)) {
+        if (!bfs::is_regular_file(modeFile)) {
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(modeFile);
+            if (!bfs::is_regular_file(fn)) {
                 //logAndThrow("Mode-file " + modeFile + " not found!");
                 LOG_CRITICAL << boost::format ("Mode-file %s not found!") % modeFile;
                 return false;
@@ -639,16 +649,12 @@ bool Object::checkData (void) {
 
 void Object::initCache (void) {
     
-    for (auto& ch : channels) {
-        ch->initCache();
-    }
-    
     Pupil::calculatePupilSize (frequencyCutoff, pupilRadiusInPixels, pupilPixels, wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel);
     
     myJob.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
     myJob.pupilPixels = pupilPixels;
 
-    if ( bfs::exists( bfs::path( pupilFile ) ) ) {
+    if ( bfs::is_regular_file(pupilFile) ) {
         PupilInfo info( pupilFile, pupilPixels );
         Pupil& ret = myJob.globalData->get(info);
         unique_lock<mutex> lock(ret.mtx);
@@ -687,7 +693,7 @@ void Object::initCache (void) {
         }
     }
 
-    if ( bfs::exists( bfs::path( modeFile ) ) ) {
+    if ( bfs::is_regular_file(modeFile) ) {
         ModeInfo info( modeFile, pupilPixels );
         ModeSet& ret = myJob.globalData->get(info);
         unique_lock<mutex> lock(ret.mtx);
@@ -708,7 +714,7 @@ void Object::initCache (void) {
     
     if( modes.empty() ) {
         ModeInfo info(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-        if (myJob.modeBasis == ZERNIKE) {     // force use of Zernike modes for all tilts
+        if (myJob.modeBasis == ZERNIKE) {
             info.firstMode = info.lastMode = 0;
         }
         ModeSet& ret = myJob.globalData->get(info);
@@ -752,6 +758,10 @@ void Object::initCache (void) {
     defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
     alphaToDefocus = 1.0/defocusToAlpha;
 
+    for (auto& ch : channels) {
+        ch->initCache();
+    }
+    
 }
 
 
@@ -789,13 +799,19 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
     for (unsigned int y = 0; y < patches.dimSize(0); ++y) {
         for (unsigned int x = 0; x < patches.dimSize(1); ++x) {
-            bfs::path fn = bfs::path (outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
+            bfs::path fn = bfs::path(outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
+            if( fn.is_relative() ) {
+                fn = bfs::path(myJob.outputDir) / fn;
+            }
             Ana::write(fn.string(), patches(y,x)->objects[ID].img);
         }
     }
 
     if( saveMask & SF_SAVE_ALPHA ) {
-        bfs::path fn = bfs::path (outputFileName + ".alpha.f0");
+        bfs::path fn = bfs::path(outputFileName + ".alpha.f0");
+        if( fn.is_relative() ) {
+            fn = bfs::path(myJob.outputDir) / fn;
+        }
         LOG << "Saving alpha-coefficients to: " << fn;
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size());
         for( auto& patch: patches ) {
@@ -809,7 +825,10 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
 
 void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
-    bfs::path fn = bfs::path (outputFileName + ".fits");
+    bfs::path fn = bfs::path(outputFileName + ".fits");
+    if( fn.is_relative() ) {
+        fn = bfs::path(myJob.outputDir) / fn;
+    }
     LOG << "NOT writing output to file: " << fn;
     LOG_ERR << "Writing to FITS still not implemented...";
 }
@@ -817,8 +836,16 @@ void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
 
 void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData) {
 
-    bfs::path fn = bfs::path ("r_" + outputFileName + ".momfbd");      // TODO: fix storage properly
+    bfs::path fn = bfs::path(outputFileName + ".momfbd");      // TODO: fix storage properly
 
+    if( fn.is_relative() ) {
+        fn = (bfs::path("r_")+=fn);
+        fn = bfs::path(myJob.outputDir) / fn;
+    } else {
+        bfs::path fn2("r_");
+        fn2 += fn.filename();
+        fn = fn.parent_path() / fn2;
+    }
     LOG << "Writing output to file: " << fn;
 
     std::shared_ptr<FileMomfbd> info (new FileMomfbd());

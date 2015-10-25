@@ -179,7 +179,7 @@ void SubImage::newCutout(void) {
     
     copy(img);                                                                                  // copy current cut-out to (double) working copy.
 
-    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
+    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES );     // TODO test if this is necessary or if the stats for the larger area is sufficient
 
     double avg = stats.mean;
     transform(img.get(), img.get()+img.nElements(), window.get(), img.get(),

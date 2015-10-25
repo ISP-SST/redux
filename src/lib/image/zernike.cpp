@@ -69,9 +69,8 @@ double Zernike::covariance( int32_t i, int32_t j ) {
     double& cov = Cache::get<PairID,double>( PairID(i,j), std::numeric_limits<double>::infinity() );
     unique_lock<mutex> lock(get().mtx);
     if( ! isfinite(cov) ) { // not calulated yet
-        //cout << "Calulating ZernikeCov for (" << i << "," << j << ")" << endl;;
         cov = calcZernikeCovariance(i, j);
-    } //else cout << "." << flush;
+    }
     return cov;
 
 }
@@ -83,7 +82,6 @@ const vector<double>& Zernike::radialPolynomial(int32_t m, int32_t n) {
     Zernike& z = get();
     unique_lock<mutex> lock(z.mtx);
     if( poly.empty() ) { // not calulated yet
-        cout << "Calulating ZernikePolyfor (" << m << "," << n << ")" << endl;;
         int32_t nmm = (n - m) / 2;
         int32_t npm = (n + m) / 2;
         size_t nmax = max(npm, n);

@@ -245,6 +245,7 @@ Job::~Job(void) {
 #ifdef DBG_JOB_
     LOG_DEBUG << "Destructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1);
 #endif
+    cleanup();
 }
 
 
