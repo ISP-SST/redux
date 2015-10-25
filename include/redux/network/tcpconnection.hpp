@@ -4,6 +4,7 @@
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <boost/asio.hpp>
@@ -25,24 +26,23 @@ namespace redux {
                 if( !error ) {
                     if( sent != transferred ) {
                         std::ostringstream ss;
-                        ss << "TcpConnection::async_write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
-                        throw std::ios_base::failure( ss.str() );
+                        std::cerr << "TcpConnection::async_write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
+                        //throw std::ios_base::failure( ss.str() );
                     }
                 }
-                else {
-                    if( ( error == error::eof ) || ( error == error::connection_reset ) ) {
-                        // TODO handle reconnects...
-                    }
-                    else {
-                        throw std::ios_base::failure( "TcpConnection::async_write: error: " + error.message() );
-                    }
-                }
+//                 else {
+//                     if( ( error == error::eof ) || ( error == error::connection_reset ) ) {
+//                         // TODO handle reconnects...
+//                     }
+//                     else {
+//                         throw std::ios_base::failure( "TcpConnection::async_write: error: " + error.message() );
+//                     }
+//                 }
             }
 
             
             template <typename T>
             void strandWrite( const std::shared_ptr<T>& data, size_t sz ) {
-
                 if( mySocket.is_open() ) {
                     boost::asio::async_write( mySocket, boost::asio::buffer( data.get(), sz ),
                                               strand.wrap(

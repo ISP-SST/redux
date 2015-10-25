@@ -42,35 +42,37 @@ TcpConnection::~TcpConnection( void ) {
 }
 
 
-shared_ptr<char> TcpConnection::receiveBlock( uint64_t& blockSize ) {
+shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
 
     using redux::util::unpack;
     shared_ptr<char> buf;
-    
-    try {
-        char sz[sizeof( uint64_t )];
-        uint64_t count = boost::asio::read( socket(), boost::asio::buffer( sz, sizeof( uint64_t ) ) );
+    uint64_t blockSize(0);
+    received = 0;
 
-        if( count != sizeof( uint64_t ) ) {
-            throw ios_base::failure( "blockSize: Only received " + to_string( count ) + "/" + to_string( sizeof( uint64_t ) ) + " bytes." );
-        }
-        
-        unpack( sz, blockSize, swapEndian );
-
-        if(blockSize > 0) {
-            buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
-            count = boost::asio::read( socket(), boost::asio::buffer( buf.get(), blockSize ) );
-
-            if( count != blockSize ) {
-                throw ios_base::failure( "Only received " + to_string( count ) + "/" + to_string( blockSize ) + " bytes." );
-            }
-        }
+    char sz[sizeof(uint64_t)];
+    boost::system::error_code ec;
+    uint64_t count = boost::asio::read( socket(), boost::asio::buffer(sz, sizeof(uint64_t)), ec );
+    if( ec ) {
+        //LOG_ERR << "TcpConnection::receiveBlock(" << hexString(this) << ")  failed to receive blockSize.  error: " + ec.message();
+        //cerr << "TcpConnection::receiveBlock(" << hexString(this) << ")  Failed to receive blockSize.  error: " + ec.message() << endl;
+        return buf;
     }
-    catch( const exception& e ) {
-        cerr << "Failed to receive datablock: " << e.what() << endl;
-        //LOG_ERR << "Failed to receive datablock: " << e.what();
-        blockSize = 0;
-        buf.reset();
+
+    unpack( sz, blockSize, swapEndian );
+    if( blockSize == 0 ) return buf;
+
+    buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
+
+    int64_t remain = blockSize;
+    while( remain > 0 ) {
+        try {
+            count = boost::asio::read( socket(), boost::asio::buffer(buf.get()+received,remain), boost::asio::transfer_at_least(1) );
+            received += count;
+            remain -= count;
+        }
+        catch( const exception& ) {
+            // ignore and continue.  TODO: make it safer
+        }
     }
     return buf;
 

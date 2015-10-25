@@ -48,7 +48,8 @@ namespace redux {
         std::shared_ptr<Job> job, previousJob;
         std::vector<Part::Ptr> parts;
         boost::posix_time::ptime workStarted;
-        network::TcpConnection::Ptr connection;            // Basically only used to separate remote/local jobs.
+        bool isRemote;
+        bool hasResults;
         uint16_t nParts,nCompleted;
     };
 

@@ -182,40 +182,37 @@ uint8_t MomfbdJob::checkParts( void ) {
 bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
 
     bool ret(false);
+    static int nActive(0);          // count number of running+preprocesssed jobs (local worker only)
     uint8_t step = info.step.load();
     wip.parts.clear();
+    if( step == JSTEP_COMPLETED ) {
+        return false;
+    }
 
      // run pre-/postprocessing if local
-    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip.connection ) {
-        ret = true;
+    if( !wip.isRemote ) {
+        if(step == JSTEP_POSTPROCESS) {
+            nActive--;
+            return true;
+        }
+        if( (step == JSTEP_PREPROCESS) && (nActive < 2) ) {
+            nActive++;
+            return true;
+        }
     }
     
     if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
         info.step = step = JSTEP_RUNNING;
     }
 
-    if ( !ret && (step == JSTEP_RUNNING) ) {                      // running
+    if ( step == JSTEP_RUNNING ) {                      // running
         unique_lock<mutex> lock( jobMutex );
-//         size_t nParts = wip.peer->status.nThreads;
-//         if( info.nThreads ) nParts = std::min( wip.peer->status.nThreads, info.nThreads );
-       /* if(!wip.connection) {   // local worker, check if there are results to write
+        if( wip.isRemote || nActive > 1 ) {     // FIXME: last job will not be processed locally (nActive < 2).
             for( auto & patch : patches ) {
-                if( patch->step & JSTEP_POSTPROCESS ) {
-                    LOG_DEBUG << "getWork(): PP-patch   step = " << bitString(patch->step);
-                    wip.parts.push_back( patch );
-                }
-            }
-            if( wip.parts.size() ) {
-                LOG_DEBUG << "getWork(): nPP = " << wip.parts.size();
-                ret = true;
-            }
-        }*/
-        if(!ret && wip.connection) {
-            for( auto & patch : patches ) {
-                if( patch->step == JSTEP_QUEUED ) {
+                if( patch && (patch->step == JSTEP_QUEUED) ) {
                     patch->step = JSTEP_RUNNING;
                     wip.parts.push_back( patch );
-                    if(wip.previousJob.get() != this) {     // First time for this slave -> include global data
+                    if( wip.isRemote && (wip.previousJob.get() != this) ) {     // First time for this slave -> include global data
                         wip.parts.push_back( globalData );
                     }
                     ret = true;
@@ -240,7 +237,7 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
     for( auto& part : wip.parts ) {
         part->step = JSTEP_QUEUED;
     }
-    wip.parts.clear();
+    
 }
 
 
@@ -250,6 +247,7 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
     for( auto& part : wip.parts ) {
         auto patch = static_pointer_cast<PatchData>( part );
         patch->step = JSTEP_POSTPROCESS;
+        patch->setPath(to_string(info.id));
         patches(patch->index.y,patch->index.x) = patch;
     }
     checkParts();
@@ -274,12 +272,12 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     uint8_t jobStep = info.step.load();
     uint8_t patchStep = 0;
     uint16_t nThreads = std::min( maxThreads, info.maxThreads );
+    
     if(wip.parts.size() && wip.parts[0]) patchStep = wip.parts[0]->step;
+    
     if( jobStep == JSTEP_PREPROCESS ) {
         preProcess(service, nThreads);                           // preprocess on master: load, flatfield, split in patches
-    }
-    else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
-        uint8_t nThreads = std::min( maxThreads, info.maxThreads);
+    } else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
         if( patchStep == JSTEP_POSTPROCESS ) {      // patch-wise post-processing, do we need any for momfbd?  the filtering etc. is done on the slaves.
         } else {                                    // main processing
             if(!globalData) {
@@ -292,6 +290,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
             for( auto& part : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 // Run main processing
                 solver->run(static_pointer_cast<PatchData>(part), service, nThreads);
+                wip.hasResults = true;
                 // Get results
                 //it = proc->result;
             }

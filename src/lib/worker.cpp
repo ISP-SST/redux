@@ -51,6 +51,15 @@ void Worker::connect( void ) {
         return;
     }
     
+    try {
+        auto test UNUSED = connection->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
+        return;
+    } catch ( ... ) { }
+
+    if( connection->socket().is_open() ) {
+        connection->socket().close();
+    }
+
     LOG_DEBUG << "Attempting to connect to master at " << daemon.master << ":" << daemon.port;
 
     connection->connect( daemon.params["master"].as<string>(), to_string( daemon.params["port"].as<uint16_t>() ) );

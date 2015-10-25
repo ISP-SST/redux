@@ -211,7 +211,7 @@ bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
     uint8_t step = info.step.load();
     wip.parts.clear();
      // run pre-/postprocessing if local
-    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip.connection ) {
+    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip.isRemote ) {
         return true;
     }
     
@@ -222,7 +222,7 @@ bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
     if( step == JSTEP_RUNNING ) {
         unique_lock<mutex> lock( jobMutex );
         size_t nParts = std::min( nThreads, info.maxThreads) * 2;
-        if(wip.connection) {
+        if(wip.isRemote) {
             for( auto & part : jobParts ) {
                 if( part.second->step == JSTEP_QUEUED ) {
                     part.second->step = JSTEP_RUNNING;

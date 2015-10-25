@@ -31,17 +31,22 @@ void TcpServer::onAccept( TcpConnection::Ptr conn,
     accept();    // always start another accept
     if( !error ) {
         if( onConnected ) {
-            LOG_DETAIL << "Accepted connection from \"" << conn->socket().remote_endpoint().address().to_string() << "\"";
             Command cmd;
-            *conn >> cmd;
-
-            if( cmd != CMD_CONNECT ) return;    // The connection is terminated when going out of scope.
-            
-            if( false ) {                       // TODO authentication. (key exchange ?)
-                *conn << CMD_AUTH;
-                // if auth fails => return, else continue and do the callback
+            try {
+                
+                *conn >> cmd;
+                if( cmd != CMD_CONNECT ) return;    // The connection is terminated when going out of scope.
+                
+                if( false ) {                       // TODO authentication. (key exchange ?)
+                    *conn << CMD_AUTH;
+                    // if auth fails => return, else continue and do the callback
+                }
             }
-
+            catch( const exception& e ) {
+                LOG_TRACE << "onAccept() Failed to process new connection. Reason: " << e.what();   // only report to trace level since connect/disconnect should be quiet.
+                return;
+            } 
+            LOG_DETAIL << "Accepted connection from \"" << conn->socket().remote_endpoint().address().to_string() << "\"";
             onConnected(conn);
         }
     } else {
