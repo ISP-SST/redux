@@ -372,38 +372,43 @@ void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const d
 */
 
 void SubImage::adjustOffset(void) {
-    bool adjusted(false);
-    int32_t mIndex = object.modes.xTiltIndex;
+
+    PointI oldOffset = offsetShift;
+    PointD oldVal(0,0),newVal(0,0);
+    int32_t mIndex = object.modes.yTiltIndex;  // NOTE: should be x, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
-        int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
+        oldVal.x = currentAlpha[mIndex]*object.alphaToPixels;
+        int adjust = -lround(currentAlpha[mIndex]*object.alphaToPixels);
         if( adjust ) {
             adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
-                offsetShift.x += adjust;        // Noll-index = 2 corresponds to x-tilt.
-                double oldval = currentAlpha[mIndex];
-                currentAlpha[mIndex] -= adjust*object.pixelsToAlpha;
-                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
-                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
-                adjusted = true;
+                offsetShift.x += adjust;
+                currentAlpha[mIndex] += adjust*object.pixelsToAlpha;
+                newVal.x = currentAlpha[mIndex]*object.alphaToPixels;
             }
         }
     }
-    mIndex = object.modes.yTiltIndex;
+    
+    mIndex = object.modes.xTiltIndex;  // NOTE: should be y, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
-        int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
+        oldVal.y = currentAlpha[mIndex]*object.alphaToPixels;
+        int adjust = -lround(currentAlpha[mIndex]*object.alphaToPixels);
         if( adjust ) {
             adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
-                offsetShift.y += adjust;        // Noll-index = 3 corresponds to y-tilt.
-                double oldval = currentAlpha[mIndex];
-                currentAlpha[mIndex] -= adjust*object.pixelsToAlpha;
-                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
-                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
-                adjusted = true;
+                offsetShift.y += adjust;
+                currentAlpha[mIndex] += adjust*object.pixelsToAlpha;
+                newVal.y = currentAlpha[mIndex]*object.alphaToPixels;
             }
         }
     }
-    if(adjusted) newCutout();
+    
+    if(oldOffset != offsetShift) {
+        LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+                  << ":  cutout was shifted, from " << oldOffset << " to " << offsetShift
+                  << " oldVal=" << oldVal << "  newVal=" << newVal;
+        newCutout();
+    }
     
 }
 
@@ -450,6 +455,19 @@ void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
         cnt++;
     }
 
+}
+
+
+void SubImage::getAlphas(float* alphas) const {
+    std::copy( currentAlpha.begin(), currentAlpha.end(), alphas );
+    int32_t mIndex = object.modes.yTiltIndex;  // NOTE: should be x, this is just because subimage is transposed!!
+    if( mIndex >= 0 ) {
+        alphas[mIndex] -= offsetShift.x*object.pixelsToAlpha;
+    }
+    mIndex = object.modes.xTiltIndex;  // NOTE: should be y, this is just because subimage is transposed!!
+    if( mIndex >= 0 ) {
+        alphas[mIndex] -= offsetShift.y*object.pixelsToAlpha;
+    }
 }
 
 
@@ -517,7 +535,7 @@ void SubImage::calcOTF(void) {
     
     const double* pupilPtr = object.pupil.get();
     double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-
+    
     for (auto & ind : object.pupil.pupilInOTF) {
 #ifdef USE_LUT
         otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
@@ -525,7 +543,7 @@ void SubImage::calcOTF(void) {
         otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
 #endif
     }
-    
+
     tmpOTF.ft(otfPtr);
     tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);

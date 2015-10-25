@@ -66,8 +66,8 @@ namespace redux {
             void setAlphas(const double* a);
             void setAlphas(const std::vector<uint16_t>& modes, const double* a);
 
-            template <typename T>
-            void getAlphas(T* alphas) const {
+            void getAlphas(float* alphas) const;    // copy with offset correction (results)
+            void getAlphas(double* alphas) const {  // copy without offset correction
                 std::copy(currentAlpha.begin(),currentAlpha.end(),alphas);
             }
             

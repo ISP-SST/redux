@@ -462,7 +462,6 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint16_t i
         }  
         //  
 
-/*      FIXME the shifting does not work as expected, will look at it soon.
         for( const auto& o: job.objects ) {
             for( const auto& c: o->channels ) {
                 for( const auto& im: c->getSubImages() ) {
@@ -470,8 +469,7 @@ void Solver::run( PatchData::Ptr p, boost::asio::io_service& service, uint16_t i
                 }
             }
         }
-        runThreadsAndWait( service, job.info.maxThreads );
-*/       
+        runThreadsAndWait( service, nThreads );
         getAlpha();
         job.globalData->constraints.apply( alpha, beta_init->data );
 
