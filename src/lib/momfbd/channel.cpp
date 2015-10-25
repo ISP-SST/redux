@@ -494,28 +494,30 @@ void Channel::loadCalib(boost::asio::io_service& service) {     // load through 
     // TODO: cache files and just fetch shared_ptr
 
     if (!darkTemplate.empty()) {        // needs to be read synchronously because of adding/normalization
+        Image<float> tmp;
         size_t nFrames(0);
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
-            ClippedFile::load(dark,darkTemplate,alignClip,true);
-            nFrames = dark.meta->getNumberOfFrames();
+            ClippedFile::load(tmp,darkTemplate,alignClip,true);
+            nFrames = tmp.meta->getNumberOfFrames();
         } else {
-            Image<float> tmp;
+            Image<float> tmp2;
             for (size_t di = 0; di < darkNumbers.size(); ++di) {
                 bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
                 if (!di) {
-                    ClippedFile::load(dark,fn.string(),alignClip,true);
-                    nFrames = dark.meta->getNumberOfFrames();
-                } else {
                     ClippedFile::load(tmp,fn.string(),alignClip,true);
-                    dark += tmp;
-                    nFrames += tmp.meta->getNumberOfFrames();
+                    nFrames = tmp.meta->getNumberOfFrames();
+                } else {
+                    ClippedFile::load(tmp2,fn.string(),alignClip,true);
+                    tmp += tmp2;
+                    nFrames += tmp2.meta->getNumberOfFrames();
                 }
             }
             
             //   NOTE: no normalization here, modify metadata instead. TODO: += operator for meta to add frames??
 
         }
+        dark = tmp.copy();
         if (nFrames) dark *= 1.0/nFrames;
     }
 
