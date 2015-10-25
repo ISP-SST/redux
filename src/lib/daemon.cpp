@@ -181,6 +181,7 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
         connections[conn]->touch();
 
         switch( cmd ) {
+            case CMD_DIE: conn->strand.post( boost::bind( &Daemon::die, this, conn ) ); break;
             case CMD_ADD_JOB: conn->strand.post( boost::bind( &Daemon::addJobs, this, conn ) ); break;
             case CMD_DEL_JOB: conn->strand.post( boost::bind( &Daemon::removeJobs, this, conn ) ); break;
             case CMD_GET_WORK: conn->strand.post( boost::bind( &Daemon::sendWork, this, conn ) ); break;
@@ -342,6 +343,13 @@ void Daemon::cleanup( void ) {
 
 }
 
+
+void Daemon::die( TcpConnection::Ptr& conn ) {
+    LOG_DEBUG << "Received exit command.";
+    unique_lock<mutex> lock( peerMutex );
+    connections.clear();
+    conn->socket().close();
+    stop();
 }
 
 

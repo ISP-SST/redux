@@ -41,7 +41,9 @@ namespace {
         ( "port,p", bpo::value<string>()->default_value( "30000" ),
           "Port to use when connecting to a master."
           " The environment variable REDUX_PORT can be used to override the default value." )
+        ( "priority", bpo::value<int>()->default_value( 10 ), "Job priority" )
         ( "force,f", "Overwrite output file if exists" )
+        ( "kill,k", "Send exit command to Server." )
         ( "swap,s", "swap mode: write compressed data to swap file instead of keeping it in memory (useful for large problems)" )
         ( "config,c", bpo::value<string>()->default_value( "momfbd.cfg" ), "Configuration file to process." )
         ( "simx", bpo::value<string>(), "x coordinate[s] of subimages to restore" )
@@ -79,7 +81,8 @@ namespace {
     }
 }
 
-void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
+
+void killServer(TcpConnection::Ptr conn) {
     
     Host::HostInfo me, master;
     uint8_t cmd = CMD_CONNECT;
@@ -99,10 +102,40 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
         return;
     }
    
+    cmd = CMD_DIE;
+    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+   
+}
+
+
+void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
+    
+    Host::HostInfo me, master;
+    uint8_t cmd = CMD_CONNECT;
+
+    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+    boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
+
+    if( cmd == CMD_AUTH ) {
+        // implement
+    }
+    if( cmd == CMD_CFG ) {  // handshake requested
+        *conn << me;
+        *conn >> master;
+        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
+    }
+    if( cmd != CMD_OK ) {
+        LOG_ERR << "Handshake with server failed.";
+        return;
+    }
+   
     // all ok, upload jobs.
     size_t bufferSize = 0;
     for( auto &job: jobs ) {
-        bufferSize += job->size();
+        if( job ) {
+            job->info.priority = prio;
+            bufferSize += job->size();
+        }
     }
     
     auto buf = sharedArray<char>( bufferSize+sizeof(size_t)+1 );
@@ -112,7 +145,9 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs) {
 
     bufferSize += sizeof(size_t)+1;
     for( auto &job: jobs ) {
-        packedBytes += job->pack(ptr+packedBytes);
+        if( job ) {
+            packedBytes += job->pack(ptr+packedBytes);
+        }
     }
     if( packedBytes != bufferSize ) {
         LOG_ERR << "Packing of jobs failed:  bufferSize = " << bufferSize << "  packedBytes = " << packedBytes;
@@ -204,8 +239,7 @@ string filterOldCfg(string filename) {
 
 
 int main (int argc, char *argv[]) {
-
-
+    
     bpo::variables_map vm;
     bpo::options_description programOptions = getOptions();
 
@@ -244,21 +278,26 @@ int main (int argc, char *argv[]) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            std::vector<std::shared_ptr<std::thread> > threads;
-            for ( int i=0; i<5; ++i) {
-                shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioservice ) ) );
+            if(vm.count ("kill")) {
+                killServer(conn);
+            } else {
+                std::vector<std::shared_ptr<std::thread> > threads;
+                for ( int i=0; i<5; ++i) {
+                    shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioservice ) ) );
+                    threads.push_back( t );
+                }
+                int priority = vm["priority"].as<int>();
+                shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs, priority) ) );
                 threads.push_back( t );
-            }
-            shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs) ) );
-            threads.push_back( t );
-            //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
-            //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
-            //uploadJobs(conn, jobs);
-            //ioservice.run();
-            //t.join();
-            //tt.join();
-            for( auto & t : threads ) {
-                t->join();
+                //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
+                //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
+                //uploadJobs(conn, jobs);
+                //ioservice.run();
+                //t.join();
+                //tt.join();
+                for( auto & it : threads ) {
+                    it->join();
+                }
             }
         }
 
