@@ -390,10 +390,16 @@ void Object::addToFT( const redux::image::FourierTransform& ft ) {
 
 void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft ) {
     unique_lock<mutex> lock( mtx );
+    const complex_t* ftPtr = ft.get();
     const complex_t* oftPtr = oldft.get();
-    transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
-              [&oftPtr](const double& a, const complex_t& b) { return a+norm(b)-norm(*oftPtr++); }
-             );
+    double* ftSumPtr = ftSum.get();
+    size_t nElements = patchSize*patchSize;
+    for(size_t ind=0; ind<nElements; ++ind ) {
+        ftSumPtr[ind] += (norm(ftPtr[ind])-norm(oftPtr[ind]));
+    }
+//     transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
+//               [&oftPtr](const double& a, const complex_t& b) { return a+norm(b)-norm(*oftPtr++); }
+//              );
 }
 
 
