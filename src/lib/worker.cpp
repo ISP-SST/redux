@@ -133,20 +133,16 @@ bool Worker::fetchWork( void ) {
 
     try {
 
-        if( !connection->socket().is_open() ) {
-            connect();
-        }
+        connect();
 
         if( !connection->socket().is_open() ) {
             return false;
         }
 
-        LOG_DEBUG << "Requesting remote work.";
         *connection << CMD_GET_WORK;
 
         size_t blockSize;
         shared_ptr<char> buf = connection->receiveBlock( blockSize );               // reply
-        LOG_TRACE << "Received " << blockSize << " bytes.";
 
         if( !blockSize ) return false;
 
@@ -156,15 +152,16 @@ bool Worker::fetchWork( void ) {
         if( count != blockSize ) {
             throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
         }
-        wip.connection = connection;
+        wip.isRemote = true;
 
+        LOG_TRACE << "Received work: " << wip.print();
         return true;
     }
     catch( const exception& e ) {
-        LOG_ERR << "fetchWork: Exception caught while fetching job: " << e.what() << endl;
+        LOG_ERR << "fetchWork: Exception caught while fetching job: " << e.what();
     }
     catch( ... ) {
-        LOG_ERR << "fetchWork: Unrecognized exception caught while fetching job." << endl;
+        LOG_ERR << "fetchWork: Unrecognized exception caught while fetching job.";
     }
 
     return false;
@@ -174,19 +171,29 @@ bool Worker::fetchWork( void ) {
 
 bool Worker::getWork( void ) {
 
-    if( wip.connection ) {            // remote work: return parts.
+    if( wip.isRemote ) {            // remote work: return parts.
         returnWork();
-    } else if ( wip.parts.size() ) {
+        int count(0);
+        while( wip.hasResults && count++ < 5 ) {
+            LOG_DEBUG << "Failed to return data, trying again in 5 seconds.";
+            runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(5));
+            runTimer.wait();
+            returnWork();
+        }
+    } else if ( wip.hasResults ) {
         daemon.returnResults( wip );
     }
 
+    if( wip.hasResults ) {
+        LOG_WARN << "Failed to return data, this part will be discarded.";
+    }
+    
+    wip.isRemote = wip.hasResults = false;
+    
     if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
             LOG_DEBUG << "Initializing new job: " + wip.print();
             wip.job->init();
-            if( wip.previousJob ) {
-                wip.previousJob->cleanup();
-            }
             wip.previousJob = wip.job;
         } else LOG_DEBUG << "Starting new part of the same job: " + wip.print();
         for( auto& part: wip.parts ) {
@@ -201,7 +208,6 @@ bool Worker::getWork( void ) {
 
     wip.job.reset();
     wip.previousJob.reset();
-    wip.connection.reset();
     wip.parts.clear();
     
     return false;
@@ -212,40 +218,44 @@ bool Worker::getWork( void ) {
 
 void Worker::returnWork( void ) {
 
-    if( wip.parts.size() ) {
-
+    if( wip.hasResults ) {
+        
         try {
-
-            if( !wip.connection->socket().is_open() ) {
-                return;     // TODO handle reconnects
-            }
-
-            LOG_DETAIL << "Returning result: " + wip.print();
-            uint64_t blockSize = wip.workSize();
-            size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
             
-            shared_ptr<char> data = sharedArray<char>( totalSize );
-            char* ptr = data.get();
-            
-            uint64_t count = pack( ptr, CMD_PUT_PARTS );
-            count += pack( ptr+count, blockSize );
-           if(blockSize) {
-                count += wip.packWork(ptr+count);
+            connect();
 
+            if( connection->socket().is_open() ) {
+
+                LOG_DEBUG << "Returning result: " + wip.print();
+                uint64_t blockSize = wip.workSize();
+                size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
+                
+                shared_ptr<char> data = sharedArray<char>( totalSize );
+                char* ptr = data.get();
+                
+                uint64_t count = pack( ptr, CMD_PUT_PARTS );
+                count += pack( ptr+count, blockSize );
+                if(blockSize) {
+                    count += wip.packWork(ptr+count);
+
+                }
+
+                connection->writeAndCheck( data, totalSize );
+
+                Command cmd = CMD_ERR;
+                *(connection) >> cmd;
+                
+                if( cmd == CMD_OK ) {
+                    wip.hasResults = false;
+                } 
+                
             }
-
-            connection->writeAndCheck( data, totalSize );
-
-            Command cmd = CMD_ERR;
-
-            *(connection) >> cmd;
-
         }
         catch( const exception& e ) {
-            LOG_ERR << "getJob: Exception caught while returning work: " << e.what() << endl;
+            LOG_ERR << "getJob: Exception caught while returning work: " << e.what();
         }
         catch( ... ) {
-            LOG_ERR << "getJob: Unrecognized exception caught while returning work." << endl;
+            LOG_ERR << "getJob: Unrecognized exception caught while returning work.";
         }
 
     }
