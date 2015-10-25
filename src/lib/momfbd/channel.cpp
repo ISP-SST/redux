@@ -686,27 +686,62 @@ void Channel::initPatch (ChannelData& cd) {
 }
 
 
-void Channel::initPhiFixed (void) {
-    phi_fixed.resize (myObject.pupilPixels, myObject.pupilPixels);
+void Channel::initPhiFixed(void) {
+    
+    phi_fixed.resize( myObject.pupilPixels, myObject.pupilPixels );
     phi_fixed.zero();
-    ModeInfo id (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-    uint16_t modeNumber;
+    double* phiPtr = phi_fixed.get();
+    size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
+    
+    ModeInfo mi (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+    //cout << "Channel::initPhiFixed() " << __LINE__ << "   defocusToAlpha=" << myObject.defocusToAlpha << endl;
     for (unsigned int i = 0; i < diversityModes.size(); ++i) {
-        ModeInfo id2 = id;
-        modeNumber = diversityModes[i];
-        cout << "Channel::initPhiFixed()  i=" << i << endl;
+        uint16_t modeNumber = diversityModes[i];
+        ModeInfo mi2 = mi;
+        //cout << "Channel::initPhiFixed()  i=" << i << "  mode=" << modeNumber << "  div=" << diversity[i] << endl;
         if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {
-            id2.firstMode = id2.lastMode = 0;
+            mi2.firstMode = mi2.lastMode = 0;
         }
-        id2.modeNumber = modeNumber;
-        //const auto mode = myJob.globalData->fetch (id2);
-        //redux::file::Ana::write ("mode_" + to_string (modeNumber) + "_" + to_string (i) + ".f0", *mode);
-        //phi_fixed.add (*mode, diversity[i]);
-        //redux::file::Ana::write ("phi-mode_" + to_string (modeNumber) + "_" + to_string (i) + ".f0", phi_fixed);
+        mi2.modeNumber = modeNumber;
+        ModeSet& ms = myJob.globalData->get(mi2);
+        
+        auto it = std::find(ms.modeNumbers.begin(), ms.modeNumbers.end(), modeNumber);
+        if( it != ms.modeNumbers.end() ) {
+            double div = diversity[i];
+            const double* modePtr = ms.modePointers[static_cast<size_t>(it-ms.modeNumbers.begin())];
+            transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
+                [div](const double& p, const double& m) {
+                    return p + div*m;
+                });
+        }
+
     }
     computePhi();   // no tilts for now, just initialize once
 }
-
+/*    ModeInfo info(myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+    for (unsigned int i=0; i < diversityModes.size(); ++i) {
+        uint16_t modeNumber = diversityModes[i];
+        ModeInfo info2 = info;
+        if (diversityTypes[i] == ZERNIKE) {
+            info2.firstMode = info2.lastMode = 0;
+        }
+        ModeSet& ret = myJob.globalData->get(info2);
+        unique_lock<mutex> lock(ret.mtx);
+        if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
+            if(diversityTypes[i] == ZERNIKE) {
+                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+            } else {
+                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+            }
+            if( ret.nDimensions() != 3 || ret.dimSize(1) != myObject.pupilPixels || ret.dimSize(2) != myObject.pupilPixels ) {    // mismatch
+                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
+            } else {
+                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
+                ret.normalize( myObject.pupil );
+            }
+        }  
+    }
+*/
 
 void Channel::computePhi (void) {
     //cout << "Channel::computePhi()" << endl;

@@ -71,8 +71,8 @@ namespace redux {
             /********  Diversity  ********/
             // TODO: reorganize
             std::vector<double> diversity;
-            std::vector<uint32_t> diversityModes;  //!< mode numbers
-            std::vector<uint32_t> diversityTypes;   //!< mode types (Zernike/KL)
+            std::vector<uint16_t> diversityModes;    //!< mode numbers
+            std::vector<uint16_t> diversityTypes;    //!< mode types (Zernike/KL)
             /*****************************/
             
             /******* Data settings *******/

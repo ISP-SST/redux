@@ -55,9 +55,9 @@ namespace {
     }
 
 
-    void parseSegment( vector<uint32_t>& divs, vector<uint32_t>& types, string elem ) {
+    void parseSegment( vector<uint16_t>& divs, vector<uint16_t>& types, string elem ) {
         size_t n = std::count( elem.begin(), elem.end(), '-' );
-        uint32_t tp = 0;
+        uint16_t tp = 0;
         if( elem.find_first_of( "Zz" ) != string::npos ) tp |= ZERNIKE;
         if( elem.find_first_of( "Kk" ) != string::npos ) tp |= KARHUNEN_LOEVE;
         if( tp == 3 ) {
@@ -66,14 +66,14 @@ namespace {
         
         elem.erase( boost::remove_if( elem, boost::is_any_of( "ZzKk" ) ), elem.end() );
         if( n == 0 ) {
-            divs.push_back( boost::lexical_cast<uint32_t>( elem ) );
+            divs.push_back( boost::lexical_cast<uint16_t>( elem ) );
             types.push_back( tp );
             return;
         }
         else if( n == 1 ) {
             n = elem.find_first_of( '-' );
-            uint32_t first = boost::lexical_cast<uint32_t>( elem.substr( 0, n ) );
-            uint32_t last = boost::lexical_cast<uint32_t>( elem.substr( n + 1 ) );
+            uint16_t first = boost::lexical_cast<uint16_t>( elem.substr( 0, n ) );
+            uint16_t last = boost::lexical_cast<uint16_t>( elem.substr( n + 1 ) );
             while( first <= last ) {
                 divs.push_back( first++ );
                 types.push_back( tp );
@@ -310,8 +310,8 @@ uint64_t ChannelCfg::size(void) const {
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
-    sz += diversityModes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += diversityTypes.size() * sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += diversityModes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += diversityTypes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
     sz += alignClip.size()*sizeof(int16_t) + sizeof(uint64_t);
     sz += imageDataDir.length() + 1;
     sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
