@@ -66,7 +66,7 @@ namespace redux {
         network::Host::Ptr myInfo;
         std::map<network::TcpConnection::Ptr, network::Host::Ptr> connections;
         std::map<size_t, network::Host::Ptr> peers;
-        std::map<network::Host::Ptr, WorkInProgress> peerWIP;
+        std::map<network::Host::Ptr, WorkInProgress, network::Host::Compare> peerWIP;
         
         boost::asio::io_service ioService;
         boost::asio::deadline_timer timer;

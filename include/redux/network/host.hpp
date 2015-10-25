@@ -17,7 +17,7 @@ namespace redux {
 
             typedef std::shared_ptr<Host> Ptr;
             struct Compare {
-                bool operator()( const Ptr &a, const Ptr &b ) const { return ( *a < *b ); }
+                bool operator()( const Ptr &a, const Ptr &b ) const { return ( (*a) < (*b) ); }
             };
             typedef std::set<Ptr, Compare> Set;
              
