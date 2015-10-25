@@ -432,9 +432,30 @@ void Channel::initCache (void) {
 
     LOG_DEBUG << "Generated otfIndices with " << otfIndices.size() << " elements. (full size = " << tmpImg.nElements() << ")";
     */
-  
-    
-    
+
+    ModeInfo mi(myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+    for (unsigned int i=0; i < diversityModes.size(); ++i) {
+        uint16_t modeNumber = diversityModes[i];
+        ModeInfo mi2 = mi;
+        if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {
+            mi2.firstMode = mi2.lastMode = 0;
+        }
+        ModeSet& ret = myJob.globalData->get(mi2);
+        unique_lock<mutex> lock(ret.mtx);
+        if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
+            if(diversityTypes[i] == ZERNIKE) {
+                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes );
+            } else {
+                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff );
+            }
+            if( ret.nDimensions() != 3 || ret.dimSize(1) != myObject.pupilPixels || ret.dimSize(2) != myObject.pupilPixels ) {    // mismatch
+                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
+            } else {
+                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")";
+                ret.normalize( myObject.pupil );
+            }
+        }  
+    }
     
 /*
     Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
@@ -669,7 +690,6 @@ void Channel::initPatch (ChannelData& cd) {
         return;
     }
 
-
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         Array<float> view( cd.images, 0, 0, 0, cd.images.dimSize(1)-1, 0, cd.images.dimSize(2)-1 );
         for( uint16_t i=0; i<nImages; ++i ) {
@@ -677,6 +697,7 @@ void Channel::initPatch (ChannelData& cd) {
             view.shift(0,1);
         }
     }
+    
     uint16_t patchSize = myObject.patchSize;
     for (uint16_t i=0; i < nImages; ++i) {
         subImages[i]->setPatchInfo( i, cd.offset, cd.shift, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
@@ -685,6 +706,43 @@ void Channel::initPatch (ChannelData& cd) {
         subImages[i]->init();
     }
 
+    phi_fixed.copy( phi_channel );
+   
+//    cout << "Channel::initPatch() " << __LINE__ << "   res=" << cd.residualOffset << endl;
+//    cout << "Channel::initPatch() " << __LINE__ << "   pixelsToAlpha=" << myObject.pixelsToAlpha << endl;
+    
+    int32_t mIndex = myObject.modes.xTiltIndex;
+    if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
+        /*int adjust = lround(currentAlpha[mIndex]*myObject.alphaToPixels);
+        if( adjust ) {
+            adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
+            if(adjust) {
+                offsetShift.x += adjust;        // Noll-index = 2 corresponds to x-tilt.
+                double oldval = currentAlpha[mIndex];
+                currentAlpha[mIndex] -= adjust*myObject.pixelsToAlpha;
+                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
+                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
+                adjusted = true;
+            }
+        }*/
+    }
+    /*mIndex = myObject.modes.yTiltIndex;
+    if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
+        int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
+        if( adjust ) {
+            adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
+            if(adjust) {
+                offsetShift.y += adjust;        // Noll-index = 3 corresponds to y-tilt.
+                double oldval = currentAlpha[mIndex];
+                currentAlpha[mIndex] -= adjust*object.pixelsToAlpha;
+                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
+                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
+                adjusted = true;
+            }
+        }
+    }*/
+
+    
 }
 
 
