@@ -349,7 +349,7 @@ uint64_t GlobalData::pack( char* ptr ) const {
         count += mode.first.pack(ptr+count);
         count += mode.second.pack(ptr+count);
     }
-    count += pack(ptr,(uint16_t)pupils.size());
+    count += pack(ptr+count,(uint16_t)pupils.size());
     for(auto& pupil: pupils) {
         count += pupil.first.pack(ptr+count);
         count += pupil.second.pack(ptr+count);
@@ -367,19 +367,17 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
         ModeInfo id("");
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
-            ModeSet dummy;
-            ModeSet& ms = redux::util::Cache::get<ModeInfo,ModeSet>(id, dummy);
+            ModeSet& ms = redux::util::Cache::get<ModeInfo,ModeSet>(id);
             count += ms.unpack(ptr+count,swap_endian);
             modes.emplace(id, ms);
         }
     }
-    count += unpack(ptr,tmp,swap_endian);
+    count += unpack(ptr+count,tmp,swap_endian);
     if(tmp) {
         PupilInfo id("");
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
-            Pupil dummy;
-            Pupil& pup = redux::util::Cache::get<PupilInfo,Pupil>(id, dummy);
+            Pupil& pup = redux::util::Cache::get<PupilInfo,Pupil>(id);
             count += pup.unpack(ptr+count,swap_endian);
             pupils.emplace(id, pup);
         }
