@@ -47,13 +47,13 @@ bool redux::util::isHex(const string &s) {
 }
 
 
-bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase, const std::locale& loc ) {
+bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase ) {
 
     auto it = std::search (
                   haystack.begin(), haystack.end(),
                   needle.begin(),   needle.end(),
-    [ignoreCase,&loc] ( char ch1, char ch2 ) {
-        if ( ignoreCase ) return std::toupper ( ch1,loc ) == std::toupper ( ch2,loc );
+    [ignoreCase] ( char ch1, char ch2 ) {
+        if ( ignoreCase ) return std::toupper ( ch1 ) == std::toupper ( ch2 );
         return ch1 == ch2;
     }
               );
@@ -63,10 +63,10 @@ bool redux::util::contains ( const std::string & haystack, const std::string & n
 }
 
 
-bool redux::util::nocaseLess(const std::string& lhs, const std::string& rhs, const std::locale& loc) {
+bool redux::util::nocaseLess(const std::string& lhs, const std::string& rhs) {
 
           return std::lexicographical_compare( lhs.begin (), lhs.end (), rhs.begin (), rhs.end (),
-                                               [&loc] ( char ch1, char ch2 ) { return std::toupper( ch1, loc ) < std::toupper( ch2,loc ); }
+                                               [] ( char ch1, char ch2 ) { return std::toupper( ch1 ) < std::toupper( ch2 ); }
                                              );
 
 }

@@ -49,9 +49,15 @@ void redux::runThreadsAndWait(boost::asio::io_service& service, uint16_t nThread
 
 
 size_t Job::registerJob(const string& name, JobCreator f) {
+    std::locale::global(std::locale("C"));
+    std::cout.imbue(std::locale("C"));
+    std::cerr.imbue(std::locale("C"));
+    std::cin.imbue(std::locale("C"));
+    boost::filesystem::path::imbue(std::locale("C"));
+
     static size_t nJobTypes(0);
     std::unique_lock<mutex> lock(globalJobMutex);
-    auto ret = getMap().insert({ boost::to_upper_copy(name), {nJobTypes + 1, f}});
+    auto ret = getMap().insert({ boost::to_upper_copy(name, std::locale("C")), {nJobTypes + 1, f}});
     if(ret.second) {
         return ret.first->second.first;
     }
@@ -64,7 +70,7 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, boo
     std::unique_lock<mutex> lock(globalJobMutex);
     for(auto & property : tree) {
         string name = property.first;
-        auto it2 = getMap().find(boost::to_upper_copy(name));       // check if the current tag matches a registered (Job-derived) class.
+        auto it2 = getMap().find(boost::to_upper_copy(name, std::locale("C")));       // check if the current tag matches a registered (Job-derived) class.
         if(it2 != getMap().end()) {
             Job* tmpJob = it2->second.second();
             tmpJob->parsePropertyTree(vm, property.second);
@@ -84,7 +90,7 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, boo
 Job::JobPtr Job::newJob(const string& name) {
     JobPtr tmp;
     std::unique_lock<mutex> lock(globalJobMutex);
-    auto it = getMap().find(boost::to_upper_copy(name));
+    auto it = getMap().find(boost::to_upper_copy(name, std::locale("C")));
     if(it != getMap().end()) {
         tmp.reset(it->second.second());
     } else {

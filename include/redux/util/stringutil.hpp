@@ -35,8 +35,8 @@ namespace redux {
         bool onlyHex( const std::string &s );
         bool isInteger( const std::string &s );
         bool isHex( const std::string &s );
-        bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false, const std::locale& loc = std::locale());
-        bool nocaseLess(const std::string& lhs, const std::string& rhs, const std::locale& loc = std::locale());
+        bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false);
+        bool nocaseLess(const std::string& lhs, const std::string& rhs);
         
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )

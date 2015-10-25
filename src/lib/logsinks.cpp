@@ -109,7 +109,7 @@ void LogSink::parseFilter( string f ) {
     vector<string> parts;
     boost::split(parts, f, boost::is_any_of(":") );
     for( auto & part : parts ) {
-        severity_level tmp = parseSeverity( boost::to_upper_copy( part ) );
+        severity_level tmp = parseSeverity( boost::to_upper_copy( part, std::locale("C") ) );
         if( tmp ) {
             minSeverity = tmp;
         }

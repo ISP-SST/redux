@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/filesystem.hpp>
 
 using namespace redux;
 using namespace std;
@@ -56,6 +57,12 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
 
 
 Logger::Logger( bpo::variables_map& vm ) {
+    
+    std::locale::global(std::locale("C"));
+    std::cout.imbue(std::locale("C"));
+    std::cerr.imbue(std::locale("C"));
+    std::cin.imbue(std::locale("C"));
+    boost::filesystem::path::imbue(std::locale("C"));
 
     boost::log::add_common_attributes();
 
