@@ -74,11 +74,10 @@ void Constraints::NullSpace::mapNullspace(void) {
     int count = 0;
     for( auto& value: ns ) {
         if( abs(value) > NS_THRESHOLD ) {
-            ns_entries.insert(make_pair(Point(count/nCols,count%nCols),value));
+            ns_entries.insert(make_pair(PointI(count/nCols,count%nCols),value));
         }
         count++;
     }
-
 }
 #undef NS_THRESHOLD
 
@@ -86,30 +85,34 @@ void Constraints::NullSpace::mapNullspace(void) {
 #define NS_ANALYTIC 0
 void Constraints::NullSpace::calculateNullspace(bool store) {
     
-    if(NS_ANALYTIC) {
-        LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group.";
-        ns.resize(nParameters,nParameters-nConstraints);
-        if (nParameters == nConstraints+1) {    // 1D nullspace
-            ns = 1.0/sqrt(nParameters);
-        } else {
-            // TODO implement
-        }
-        
+    if (nParameters == nConstraints) {
+        ns.clear();
     } else {
-        LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group.";
-        Array<double> C,R;
-        C.resize(nConstraints, nParameters);
-        ns.resize(nParameters, nParameters);    // use ns rather than a temporary "Q" array
-        R.resize(nParameters, nConstraints);
-        C.zero();
-        for( auto & entry: c_entries ) {
-            C( entry.first/nParameters, entry.first%nParameters ) = entry.second;
+        if(NS_ANALYTIC) {
+            LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group.";
+            ns.resize(nParameters,nParameters-nConstraints);
+            if (nParameters == nConstraints+1) {    // 1D nullspace
+                ns = 1.0/sqrt(nParameters);
+            } else {
+                // TODO implement
+            }
+            
+        } else {
+            LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group.";
+            Array<double> C,R;
+            C.resize(nConstraints, nParameters);
+            ns.resize(nParameters, nParameters);    // use ns rather than a temporary "Q" array
+            R.resize(nParameters, nConstraints);
+            C.zero();
+            for( auto & entry: c_entries ) {
+                C( entry.first/nParameters, entry.first%nParameters ) = entry.second;
+            }
+            // we need C^T to find the nullspace of C
+            transpose(C.get(), nConstraints, nParameters);
+            qr_decomp(C.get(), nParameters, nConstraints, ns.get(), R.get());
+            ns.setLimits(0,nParameters-1,nConstraints,nParameters-1);
+            ns.trim();
         }
-        // we need C^T to find the nullspace of C
-        transpose(C.get(), nConstraints, nParameters);
-        qr_decomp(C.get(), nParameters, nConstraints, ns.get(), R.get());
-        ns.setLimits(0,nParameters-1,nConstraints,nParameters-1);
-        ns.trim();
     }
     isLoaded = true;
     if(store) cacheStore();
@@ -230,6 +233,7 @@ void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, in
     groupOffset.x = cOffset;
     
     nParameters = indices.size();
+    int32_t nConstraints = constraints.size();
     
     vector<int32_t> newIndices(nParameters);
     std::iota( newIndices.begin(), newIndices.end(), rOffset );         // newIndices is a dense range starting at rOffset
@@ -259,8 +263,8 @@ void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, in
     entriesHash = boost::hash_range(entries.begin(), entries.end());
     
     rOffset += nParameters;
-    cOffset += (nParameters - constraints.size());
-    
+    cOffset += (nParameters - nConstraints);
+
     mapNullspace();
     
 }
@@ -289,31 +293,37 @@ bool Constraints::Group::dense( void ) const {
 
 void Constraints::Group::mapNullspace(void) {
     
-    shared_ptr<NullSpace> tmpNS( new NullSpace(entries,nParameters,constraints.size()) );
-    nullspace = redux::util::Cache::get( entriesHash, tmpNS );
-    bool storeNS = true;
-    if( !nullspace->verify(entries,nParameters,constraints.size()) ) {
-        LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance.";
-        LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries");
-        nullspace = tmpNS;
-        storeNS = false;    // storing will overwrite the group we collided with.
-        nullspace->ns.clear();
-    }
-    
-    if( nullspace->ns.nDimensions() < 1 ) {
-        nullspace->calculateNullspace(storeNS);
-    }
-        
-    if( nullspace->ns_entries.empty() ) {
-        nullspace->mapNullspace();
-    }
-    
+    int32_t nConstraints = constraints.size();
     ns_entries.clear();
-    for( auto& entry: nullspace->ns_entries ) {
-        ns_entries.insert(make_pair(entry.first + groupOffset,entry.second));
+    if( nParameters > nConstraints ) {
+        
+        shared_ptr<NullSpace> tmpNS( new NullSpace(entries,nParameters,nConstraints) );
+        nullspace = redux::util::Cache::get( entriesHash, tmpNS );
+        bool storeNS = true;
+        
+        if( !nullspace->verify(entries,nParameters,nConstraints) ) {
+            LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance.";
+            LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries");
+            nullspace = tmpNS;
+            storeNS = false;    // storing will overwrite the group we collided with.
+            nullspace->ns.clear();
+        }
+        
+        if( nullspace->ns.nDimensions() < 1 ) {
+            nullspace->calculateNullspace(storeNS);
+        }
+            
+        if( nullspace->ns_entries.empty() ) {
+            nullspace->mapNullspace();
+        }
+
+        for( auto& entry: nullspace->ns_entries ) {
+            ns_entries.insert(make_pair(entry.first + groupOffset,entry.second));
+        }
+        
+    } else if (nParameters == nConstraints) {
+        for(int32_t i=0; i<nParameters; ++i) ns_entries.insert(make_pair(PointI(groupOffset.y+i,-1),0.0));
     }
-
-
  
 }
 
@@ -339,9 +349,12 @@ void Constraints::blockifyGroups( void ) {
         for( auto& entry: g.ns_entries ) {
             auto index = entry.first;
             index.y = colMap[index.y];     // map parameter-index back to original order, so ns_entries can be applied directly to alpha.
-            ns_entries.insert(make_pair(index,entry.second));
             unused1.erase(index.y);
             unused2.erase(index.x);
+            if( index.x < 0 ) {     // if this group has nParams = nConstriants just map it to 0 to prevent out-of-bounds, value is 0 anyway.
+                index.x = 0;
+            }
+            ns_entries.insert(make_pair(index,entry.second));
         }
     }
 
@@ -350,7 +363,7 @@ void Constraints::blockifyGroups( void ) {
         if(unused1.size() > 0 ) {
             auto it1 = unused1.begin();
             for( auto & it2: unused2) {
-                Point index(*it1++,it2);
+                PointI index(*it1++,it2);
                 ns_entries.insert(make_pair(index,1.0));
             }
         }
@@ -397,7 +410,7 @@ void Constraints::sortConstraints( bool blockwise ) {
 
 uint64_t Constraints::size( void ) const {
     uint64_t sz = sizeof(nParameters) + sizeof(nFreeParameters);
-    sz += sizeof(uint64_t) + ns_entries.size()*(Point::size()+sizeof(double));
+    sz += sizeof(uint64_t) + ns_entries.size()*(PointI::size()+sizeof(double));
     return sz;
 }
 
@@ -422,7 +435,7 @@ uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
     uint64_t nEntries;
     count += unpack( ptr+count, nEntries, swap_endian );
     while(nEntries--) {
-        pair<Point,double> tmp;
+        pair<PointI,double> tmp;
         count += tmp.first.unpack( ptr+count, swap_endian);
         count += unpack( ptr+count, tmp.second );
         ns_entries.insert(tmp);
