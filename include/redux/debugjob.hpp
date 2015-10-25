@@ -40,6 +40,8 @@ namespace redux {
         DebugJob(void);
         DebugJob( const DebugJob& ) = delete;
         ~DebugJob(void);
+        
+        static Job* create(void) { std::cout << jobType << std::endl; return new DebugJob(); }
 
         void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
         bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
@@ -75,7 +77,7 @@ namespace redux {
     /*! @} */
     
     namespace debugjob {
-        const size_t dummy = redux::DebugJob::jobType;       // this will trigger the registration of DebugJob in Job::jobMap
+        const DebugJob DebugJobDummy UNUSED;       // this will trigger the registration of DebugJob in Job::jobMap
     }
 
 }

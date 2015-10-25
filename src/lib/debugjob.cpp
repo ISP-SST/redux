@@ -20,9 +20,6 @@ using namespace std;
 namespace {
 
     const string thisChannel = "debugjob";
-    static Job* createDebugJob( void ) {
-        return new DebugJob();
-    }
 
     int64_t mandelbrot( const complex<double>& p, int maxIterations = 100 ) {
 
@@ -43,7 +40,7 @@ namespace {
 
 
 }
-size_t DebugJob::jobType = Job::registerJob( "DebugJob", createDebugJob );
+size_t DebugJob::jobType = Job::registerJob( "DebugJob", DebugJob::create );
 
 
 uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {

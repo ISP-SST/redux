@@ -42,6 +42,8 @@ namespace redux {
             MomfbdJob( void );
             ~MomfbdJob( void );
 
+            static Job* create(void) { return new MomfbdJob(); }
+
             uint64_t unpackParts(const char* ptr, WorkInProgress&, bool);
             
             void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
@@ -90,7 +92,7 @@ namespace redux {
 
         };
 
-        const size_t dummy UNUSED = MomfbdJob::jobType;       // this will trigger the registration of MomfbdJob in Job::jobMap
+        const MomfbdJob MomfbdJobDummy UNUSED;       // this will trigger the registration of MomfbdJob in Job::jobMap
 
         /*! @} */
 

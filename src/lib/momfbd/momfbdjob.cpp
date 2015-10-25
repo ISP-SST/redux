@@ -22,11 +22,9 @@ using namespace std;
 namespace {
 
     const string thisChannel = "momfbdjob";
-    static Job* createMomfbdJob( void ) {
-        return new MomfbdJob();
-    }
+
 }
-size_t MomfbdJob::jobType = Job::registerJob( "momfbd", createMomfbdJob );
+size_t MomfbdJob::jobType = Job::registerJob( "momfbd", MomfbdJob::create );
 
 
 MomfbdJob::MomfbdJob( void ) {
