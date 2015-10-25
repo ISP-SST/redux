@@ -254,6 +254,19 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
 }
 
 
+void MomfbdJob::cleanup(void) {
+    
+    for( auto &o: objects ) {
+        o->cleanup();
+    }
+    objects.clear();
+    patches.clear();
+    globalData.reset();
+    solver.reset();
+
+}
+
+
 bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint16_t maxThreads ) {
     
     uint8_t jobStep = info.step.load();

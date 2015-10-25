@@ -124,7 +124,7 @@ Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), myObject (o),
 }
 
 Channel::~Channel() {
-
+    cleanup();
 }
 
 void Channel::parsePropertyTree (bpt::ptree& tree) {
@@ -141,6 +141,26 @@ bpt::ptree Channel::getPropertyTree (bpt::ptree& tree) {
     ChannelCfg::getProperties (node, myObject);         // generate using our parent-object as default-values.
     tree.push_back (bpt::ptree::value_type ("channel", node));
     return node;
+
+}
+
+
+void Channel::cleanup(void) {
+    
+    LOG_TRACE << "Channel::cleanup()";
+    imageStats.clear();
+    images.clear();
+    dark.clear();
+    gain.clear();
+    ccdResponse.clear();
+    ccdScattering.clear();
+    psf.clear();
+    modulationMatrix.clear();
+    xOffset.clear();
+    yOffset.clear();
+    subImages.clear();
+    phi_fixed.clear();
+    phi_channel.clear();
 
 }
 

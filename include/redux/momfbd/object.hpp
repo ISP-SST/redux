@@ -41,6 +41,7 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             
+            void cleanup(void);
             uint32_t nImages(void) const;
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };

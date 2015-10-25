@@ -59,6 +59,7 @@ namespace redux {
             void ungetWork( WorkInProgress& );
             void returnResults( WorkInProgress& );
 
+            void cleanup(void);
             bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
             
             bool check(void);

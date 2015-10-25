@@ -78,7 +78,7 @@ Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg (j), myJob (j), currentMe
 
 
 Object::~Object() {
-
+    cleanup();
 }
 
 
@@ -169,6 +169,23 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
     }
     count += unpack (ptr + count, nObjectImages, swap_endian);
     return count;
+}
+
+
+void Object::cleanup(void) {
+    
+    LOG_TRACE << "Object::cleanup()";
+    for( auto &c: channels ) {
+        c->cleanup();
+    }
+    channels.clear();
+    ftSum.clear();
+    Q.clear();
+    P.clear();
+    fittedPlane.clear();
+    pupil.clear();
+    modes.clear();
+    
 }
 
 
