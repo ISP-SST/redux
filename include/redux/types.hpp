@@ -25,7 +25,7 @@ namespace redux {
         * A general 2D point
         */
         template<typename T> struct PointType {
-            PointType ( T yy=0, T xx=0 ) : x(xx), y(yy) {}
+            explicit PointType ( T yy=0, T xx=0 ) : x(xx), y(yy) {}
             PointType ( PointType<T>&& rhs ) : x(std::move(rhs.x)), y(std::move(rhs.y)) {}
             PointType ( const PointType<T>& rhs ) : x(rhs.x), y(rhs.y) {}
             template <typename U> PointType ( const PointType<U>& rhs ) : x(rhs.x), y(rhs.y) {}
@@ -40,20 +40,30 @@ namespace redux {
                 count += redux::util::unpack(ptr+count,y,swap_endian);
                 return count;
             }
-            template <typename U> PointType<T> max(const PointType<U>& rhs) { PointType<T> tmp(*this); tmp.x=std::max<T>(tmp.x,rhs.x); tmp.y=std::max<T>(tmp.y,rhs.y); return tmp; }
-            template <typename U> PointType<T> min(const PointType<U>& rhs) { PointType<T> tmp(*this); tmp.x=std::min<T>(tmp.x,rhs.x); tmp.y=std::min<T>(tmp.y,rhs.y); return tmp; }
-            operator std::string() const { return "("+std::to_string(y)+","+std::to_string(x)+")"; }
+            template <typename U> PointType<T> max(const PointType<U>& rhs) {
+                PointType<T> tmp(*this);
+                tmp.x=std::max<T>(tmp.x,rhs.x);
+                tmp.y=std::max<T>(tmp.y,rhs.y);
+                return std::move(tmp); }
+            template <typename U> PointType<T> min(const PointType<U>& rhs) {
+                PointType<T> tmp(*this);
+                tmp.x=std::min<T>(tmp.x,rhs.x);
+                tmp.y=std::min<T>(tmp.y,rhs.y);
+                return std::move(tmp); }
+            operator std::string() const { std::ostringstream out; out << "(" << y << "," << x << ")"; return out.str(); }
             template <typename U> PointType<T>& operator+=(const PointType<U>& rhs) { x += rhs.x; y += rhs.y; return *this; }
             template <typename U> PointType<T>& operator-=(const PointType<U>& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
             template <typename U> PointType<T> operator+(const PointType<U>& rhs) const { PointType<T> res(*this); return std::move(res+=rhs); }
             template <typename U> PointType<T> operator-(const PointType<U>& rhs) const { PointType<T> res(*this); return std::move(res-=rhs); }
             PointType<T>& operator=(const PointType<T>& rhs) { x = rhs.x; y = rhs.y; return *this; }
-            template <typename U> PointType<T>& operator=(const PointType<U>& rhs) { x = rhs.x; y = rhs.x; return *this; }
-            PointType<T>& operator=(T rhs) { x = rhs; y = rhs; return *this; }
-            PointType<T>& operator+=(T rhs) { x += rhs; y += rhs; return *this; }
-            PointType<T>& operator-=(T rhs) { x -= rhs; y -= rhs; return *this; }
-            PointType<T> operator+(T rhs) const { PointType<T> tmp(*this); tmp += rhs; return tmp; }
-            PointType<T> operator-(T rhs) const { PointType<T> tmp(*this); tmp -= rhs; return tmp; }
+            template <typename U> PointType<T>& operator=(const PointType<U>& rhs) { x = rhs.x; y = rhs.y; return *this; }
+            PointType<T>& operator=(const T& rhs) { x = rhs; y = rhs; return *this; }
+            PointType<T>& operator+=(const T& rhs) { x += rhs; y += rhs; return *this; }
+            PointType<T>& operator-=(const T& rhs) { x -= rhs; y -= rhs; return *this; }
+            PointType<T>& operator*=(const T& rhs) { x *= rhs; y *= rhs; return *this; }
+            PointType<T> operator+(const T& rhs) const { PointType<T> tmp(*this); tmp += rhs; return std::move(tmp); }
+            PointType<T> operator-(const T& rhs) const { PointType<T> tmp(*this); tmp -= rhs; return std::move(tmp); }
+            PointType<T> operator*(const T& rhs) const { PointType<T> tmp(*this); tmp *= rhs; return std::move(tmp); }
             template <typename U> bool operator==(const PointType<U>& rhs) const { return (x == rhs.x && y == rhs.y); }
             bool operator==(T rhs) const { return (x == rhs && y == rhs); }
             template <typename U> bool operator!=(const PointType<U>& rhs) const { return !(*this == rhs); }
