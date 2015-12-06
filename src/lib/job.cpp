@@ -130,7 +130,7 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), timeout(1000), priority(10), verbosity(0), maxPartRetries(1), maxThreads(255), 
+Job::Info::Info(void) : id(0), timeout(1800), priority(10), verbosity(0), maxPartRetries(1), maxThreads(255), 
          step(0), state(JSTATE_IDLE) {
 
 }
@@ -219,6 +219,7 @@ void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
     info.maxThreads = tree.get<uint16_t>("MAX_THREADS", globalDefaults.maxThreads);
     info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", globalDefaults.maxPartRetries);
     info.logFile = tree.get<string>("LOGFILE", globalDefaults.logFile);
+    info.name = tree.get<string>("NAME", globalDefaults.name);
     
 }
 
@@ -231,6 +232,7 @@ bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
     if(info.maxThreads != globalDefaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);
     if(info.maxPartRetries != globalDefaults.maxPartRetries) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
     if(info.logFile != globalDefaults.logFile) tree.put("LOGFILE", info.logFile);
+    if(info.name != globalDefaults.name) tree.put("NAME", info.name);
     if(root) {
         root->push_back(bpt::ptree::value_type("job", tree));
     }
@@ -238,7 +240,7 @@ bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
 }
 
 
-Job::Job(void) {
+Job::Job(void) : cachePath("") {
     info.user = getUname();
     info.host = boost::asio::ip::host_name();
 #ifdef DBG_JOB_
@@ -252,6 +254,11 @@ Job::~Job(void) {
     LOG_DEBUG << "Destructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1);
 #endif
     cleanup();
+    
+    if( !cachePath.empty() ) {
+        boost::system::error_code ec;
+        bfs::remove_all( bfs::path(Cache::get().path()) / bfs::path(cachePath), ec );
+    }
 }
 
 

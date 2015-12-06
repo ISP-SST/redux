@@ -94,6 +94,7 @@ namespace redux {
             redux::util::Array<float> fittedPlane;
             redux::image::Pupil pupil;
             ModeSet modes;                                                  //!< modes used in this object
+            PointF shiftToAlpha;                                            //!< Conversion factors for the tilt-modes. Derived from modes, pupilSize, imgSize & wavelength
             double currentMetric;
             double reg_gamma;
             double frequencyCutoff, pupilRadiusInPixels;

@@ -138,6 +138,7 @@ namespace redux {
     protected:
         
         std::mutex jobMutex;
+        std::string cachePath;
 
     };
 
