@@ -172,7 +172,7 @@ std::string WorkInProgress::print( void ) {
     
     string ret = "\"" + ( job ? job->info.name : string( "undefined" ) ) + "\"";
     if( parts.size() ) {
-        ret += " (" + to_string( nCompleted ) + "/" + to_string( nParts ) + " part(s):";
+        ret += " (job: #" + (job ? to_string(job->info.id) : "0" ) + " part(s):";
         for( auto & part : parts ) {
             if( part ) {
                 ret += " " + to_string( part->id );

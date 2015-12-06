@@ -93,12 +93,13 @@ void printPeerList( TcpConnection::Ptr conn ) {
 
     const char* ptr = buf.get();
     uint64_t count(0);
+    int hostCount(0);
     try {
         Host peer;
-        cout << peer.printHeader() << endl;
+        cout << "    " << peer.printHeader() << endl;
         while( count < blockSize ) {
             count += peer.unpack(ptr+count,conn->getSwapEndian());
-            cout << peer.print() << endl;
+            cout << alignRight(to_string(++hostCount),4) << peer.print() << endl;
         }
     } catch ( const exception& e) {
         LOG_ERR << "printPeerList: Exception caught while parsing block: " << e.what();

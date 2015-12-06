@@ -154,8 +154,8 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
         return;
     }
 
-    conn->writeAndCheck( buf, bufferSize );
-    boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),bufferSize));
+    conn->asyncWrite( buf, bufferSize );
+    //boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),bufferSize));
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 
     bool swap_endian = (me.littleEndian != master.littleEndian);
@@ -169,7 +169,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
             size_t thisSize = count*sizeof(uint64_t);
             received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, thisSize ) );
             if( received == thisSize ) {
-                if( count ) LOG << "Upload of " << count << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),count,"IDs");
+                if( count ) LOG_DETAIL << "Upload of " << count << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),count,"IDs");
             } else {
                 LOG_ERR << "Failed to read job IDs.  received=" << received << " thisSize=" << thisSize;
             }
@@ -264,6 +264,14 @@ int main (int argc, char *argv[]) {
         bool check = vm.count ("no-check") == 0;
         vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
 
+        if( vm.count ("name") ) {
+            for( auto & job : jobs ) {
+                if( job ) {
+                    job->info.name = vm["name"].as<string>();
+                }
+            }
+        }
+
         if (vm.count ("print")) {       // dump configuration to console and exit
             bpt::ptree dump;
             for( auto & job : jobs ) {
@@ -272,7 +280,7 @@ int main (int argc, char *argv[]) {
             bpt::write_info( cout<<endl, dump );
             return EXIT_SUCCESS;
         }
-
+        
         boost::asio::io_service ioservice;
         auto conn = TcpConnection::newPtr(ioservice);
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
