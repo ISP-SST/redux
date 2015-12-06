@@ -1,4 +1,5 @@
 #include "rdx.hpp"
+#include "imgtools.hpp"
 
 #include "redux/image/fouriertransform.hpp"
 #include "redux/util/arraystats.hpp"
@@ -872,6 +873,8 @@ extern "C" {
             { { (IDL_VPTR (*) ()) cdescatter}, (char*) "CDESCATTER", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) cbezier3}, (char*) "CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }
+            { { (IDL_VPTR (*) ()) redux::img_align}, (char*) "IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) redux::img_project}, (char*) "IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }
         };
 
         static IDL_SYSFUN_DEF2 procedure_addr[] = {

@@ -30,6 +30,7 @@ file(GLOB REDUX_NETWORK_CPP "network/*.cpp")
 file(GLOB REDUX_NETWORK_HPP "${REDUX_HDR_BASE}/network/*.hpp")
 
 file(GLOB REDUX_UTIL_CPP "util/*.cpp")
+file(GLOB REDUX_UTIL_OPENCV_CPP "util/opencv/*.cpp")
 file(GLOB REDUX_UTIL_HPP "${REDUX_HDR_BASE}/util/*.hpp")
 
 if (Fits_FOUND)
@@ -61,7 +62,8 @@ REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_MATH_CPP} ${REDUX_MATH_HPP}
                     ${REDUX_MOMFBD_CPP} ${REDUX_MOMFBD_HPP}
                     ${REDUX_NETWORK_CPP} ${REDUX_NETWORK_HPP}
-                    ${REDUX_UTIL_CPP} ${REDUX_UTIL_HPP}
+                    ${REDUX_SST_CPP} ${REDUX_SST_HPP}
+                    ${REDUX_UTIL_CPP} ${REDUX_UTIL_OPENCV_CPP} ${REDUX_UTIL_HPP}
 )
 
 if(REDUX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)

@@ -9,3 +9,5 @@ FUNCTION        CCONVOLVE       2       2          KEYWORDS
 FUNCTION        CDESCATTER      3       3          KEYWORDS
 FUNCTION        CBEZIER2        3       3          KEYWORDS
 FUNCTION        CBEZIER3        3       3          KEYWORDS
+FUNCTION        IMG_ALIGN       2       2          KEYWORDS
+FUNCTION        IMG_PROJECT     2       2          KEYWORDS
