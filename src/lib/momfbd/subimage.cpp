@@ -308,7 +308,7 @@ void SubImage::calcVogelWeight(void) {
     
     tmpOTF.zero();
     FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
-    tmpOTF.ift(hjPtr);
+    tmpOTF.getIFT(hjPtr);
     tmpOTF.zero();
     for( const size_t& ind: object.pupil.otfSupport ) {
         complex_t pq = pPtr[ind] * qPtr[ind];
@@ -317,7 +317,7 @@ void SubImage::calcVogelWeight(void) {
         tmpOtfPtr[ind] = (pq*ftPtr[ind] - ps*otfPtr[ind]) / qs;
     }
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
-    tmpOTF.ift(glPtr);
+    tmpOTF.getIFT(glPtr);
     
     double normalization = 1.0/(otfSize2*otfSize2);
     transform( glPtr, glPtr+otfSize2, hjPtr, glPtr,
@@ -515,9 +515,9 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
 #endif
     }
     
-    tmpOTF.ft(otfPtr);
-    tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);
+    tmpOTF.autocorrelate();
+    tmpOTF.getFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
 
@@ -548,9 +548,9 @@ void SubImage::calcOTF(void) {
 #endif
     }
 
-    tmpOTF.ft(otfPtr);
-    tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);
+    tmpOTF.autocorrelate();
+    tmpOTF.getFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
 
@@ -585,9 +585,9 @@ void SubImage::calcPFOTF(void) {
         otfPtr[ind.second] = normalization*pfPtr[ind.first];
     }
 
-    tmpOTF.ft(otfPtr);
-    tmpOTF.autocorrelate(1.0/otfSize2);
     tmpOTF.ift(otfPtr);
+    tmpOTF.autocorrelate();
+    tmpOTF.getFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
     //object.addToPQ(imgFT,OTF,tmpC);

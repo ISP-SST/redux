@@ -130,11 +130,13 @@ namespace redux {
             template <typename T>
             const FourierTransform& operator*=( const T& val ) { Array<complex_t>::operator*=(val); return *this; }
             
-
-            void ft( double* );         //!< NOTE use of these requires FT and input to be properly sized already !!
-            void ft( complex_t* );
-            void ift( double* );        //!> NOTE fftw:c2r is destructive, so only use these direct functions in one-shot contexts.
-            void ift( complex_t* );
+            void conjugate(void);
+            void ft( double* in );         //!< NOTE use of these requires FT and input to be properly sized already !!
+            void ft( complex_t* in );
+            void ift( complex_t* in );
+            void getIFT( double* out );        //!> NOTE fftw:c2r is destructive, so only use these direct functions in one-shot contexts.
+            void getIFT( complex_t* out );
+            void getFT( complex_t* out );
             
             
             void init(void);

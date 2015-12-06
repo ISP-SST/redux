@@ -233,31 +233,49 @@ template FourierTransform::FourierTransform (const double*, size_t, size_t, int,
 template FourierTransform::FourierTransform (const complex_t*, size_t, size_t, int, uint8_t);
 template FourierTransform::FourierTransform (const int32_t*, size_t, size_t, int, uint8_t);
 
+void FourierTransform::conjugate(void) {
+    transform( get(), get()+nElements(), get(), [](const complex_t&a){ return std::conj(a); } );
+}
 
-void FourierTransform::ft( double* data ) {
 
-    fftw_execute_dft_r2c( plan->forward_plan, data, reinterpret_cast<fftw_complex*>(get()) );
+void FourierTransform::ft( double* in ) {
+
+    fftw_execute_dft_r2c( plan->forward_plan, in, reinterpret_cast<fftw_complex*>(get()) );
 
 }
 
 
-void FourierTransform::ft( complex_t* data ) {
+void FourierTransform::ft( complex_t* in ) {
 
-    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(data), reinterpret_cast<fftw_complex*>(get()) );
+    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
 
 }
 
 
-void FourierTransform::ift( double* out ) {
+void FourierTransform::ift( complex_t* in ) {
+
+    fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
+
+}
+
+
+void FourierTransform::getIFT( double* out ) {
 
     fftw_execute_dft_c2r( plan->backward_plan, reinterpret_cast<fftw_complex*>(get()), out);
 
 }
 
 
-void FourierTransform::ift( complex_t* out ) {
+void FourierTransform::getIFT( complex_t* out ) {
 
     fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(get()), reinterpret_cast<fftw_complex*>(out) );
+
+}
+
+
+void FourierTransform::getFT( complex_t* out ) {
+
+    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(get()), reinterpret_cast<fftw_complex*>(out) );
 
 }
 
@@ -635,6 +653,13 @@ void FourierTransform::reorder(T* in, size_t ySize, size_t xSize) {
     delete[] buf;
 
 }
+template void FourierTransform::reorder( uint8_t*, size_t, size_t);
+template void FourierTransform::reorder( int16_t*, size_t, size_t);
+template void FourierTransform::reorder( int32_t*, size_t, size_t);
+template void FourierTransform::reorder( float*, size_t, size_t);
+template void FourierTransform::reorder( double*, size_t, size_t);
+template void FourierTransform::reorder( std::complex<float>*, size_t, size_t);
+template void FourierTransform::reorder( complex_t*, size_t, size_t);
 
 
 void FourierTransform::reorder (void) {
