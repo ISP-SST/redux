@@ -160,20 +160,20 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
 }
 
 
-ModeSet::ModeSet() : info(""), xTiltIndex(-1), yTiltIndex(-1) {
+ModeSet::ModeSet() : info(""), tiltMode(-1,-1) {
     
 }
 
 
 ModeSet::ModeSet(ModeSet&& rhs) : redux::util::Array<double>(std::move(reinterpret_cast<redux::util::Array<double>&>(rhs))),
-    info(std::move(rhs.info)), xTiltIndex(std::move(rhs.xTiltIndex)), yTiltIndex(std::move(rhs.yTiltIndex)),
+    info(std::move(rhs.info)), tiltMode(std::move(rhs.tiltMode)),
     modeNumbers(std::move(rhs.modeNumbers)), modePointers(std::move(rhs.modePointers)) {
 
 }
 
 
 ModeSet::ModeSet(const ModeSet& rhs) : redux::util::Array<double>(reinterpret_cast<const redux::util::Array<double>&>(rhs)),
-    info(rhs.info), xTiltIndex(rhs.xTiltIndex), yTiltIndex(rhs.yTiltIndex),
+    info(rhs.info), tiltMode(rhs.tiltMode),
     modeNumbers(rhs.modeNumbers), modePointers(rhs.modePointers) {
     
 }
@@ -181,18 +181,19 @@ ModeSet::ModeSet(const ModeSet& rhs) : redux::util::Array<double>(reinterpret_ca
 
 uint64_t ModeSet::size( void ) const {
     uint64_t sz = Array<double>::size();
-    sz += info.size() + 2*sizeof(int32_t);
+    sz += info.size() + tiltMode.size() + shiftToAlpha.size();
     sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
     return sz;
 }
 
 
 uint64_t ModeSet::pack( char* data ) const {
+    cout << "Packing modes at " << hexString(this) << endl;
     using redux::util::pack;
     uint64_t count = Array<double>::pack(data);
     count += info.pack(data+count);
-    count += pack(data+count,xTiltIndex);
-    count += pack(data+count,yTiltIndex);
+    count += tiltMode.pack(data+count);
+    count += shiftToAlpha.pack(data+count);
     count += pack(data+count,modeNumbers);
     return count;
 }
@@ -202,8 +203,8 @@ uint64_t ModeSet::unpack( const char* data, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = Array<double>::unpack(data,swap_endian);
     count += info.unpack(data+count,swap_endian);
-    count += unpack(data+count,xTiltIndex,swap_endian);
-    count += unpack(data+count,yTiltIndex,swap_endian);
+    count += tiltMode.unpack(data+count,swap_endian);
+    count += shiftToAlpha.unpack(data+count,swap_endian);
     count += unpack(data+count,modeNumbers,swap_endian);
     modePointers.clear();
     for(unsigned int i=0; i<dimSize(0); ++i) {
@@ -217,8 +218,8 @@ ModeSet& ModeSet::operator=( const ModeSet& rhs ) {
     redux::util::Array<double>::operator=( reinterpret_cast<const redux::util::Array<double>&>(rhs) );
     modeNumbers = rhs.modeNumbers;
     modePointers = rhs.modePointers;
-    xTiltIndex = rhs.xTiltIndex;
-    yTiltIndex = rhs.yTiltIndex;
+    tiltMode = rhs.tiltMode;
+    shiftToAlpha = rhs.shiftToAlpha;
     info = rhs.info;
     return *this;
 }
@@ -240,8 +241,8 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
             std::iota(modeNumbers.begin(), modeNumbers.end(), 0);
             modePointers.clear();
             for(unsigned int i=0; i<dimSize(0); ++i) modePointers.push_back( ptr(i,0,0) );
-            xTiltIndex = 1;
-            yTiltIndex = 0;     // FIXME  properly detect tilts, this is hardcoded for the mode-file I am testing stuff with !!!
+            tiltMode.x = 1;
+            tiltMode.y = 0;     // FIXME  properly detect tilts, this is hardcoded for the mode-file I am testing stuff with !!!
             return true;
         }
     }
@@ -326,8 +327,6 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
     info.nPupilPixels = pixels;
     info.pupilRadius = radius;
     info.angle = angle;
-    
-    LOG_TRACE << "Generating Zernike ModeSet.";
 
     ModeInfo base_info(0, 0, 0, pixels, radius, angle, 0);
  
@@ -339,6 +338,8 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
         ModeInfo info = base_info;
         if ( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
             info.firstMode = info.lastMode = 0;
+            if ( it == 2 ) tiltMode.x = modeNumbers.size();
+            else tiltMode.y = modeNumbers.size();
         }
         info.modeNumber = it;
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
@@ -347,15 +348,10 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
         }
 
         view.assign( reinterpret_cast<const redux::util::Array<double>&>(*mode) );
-        modePointers.push_back(view.ptr());
+        modePointers.push_back(view.ptr(0,0,0));
         view.shift(0,1);
         modeNumbers.push_back(it);
     }
-    
-    vector<uint16_t>::const_iterator it = std::find(modeNumbers.begin(), modeNumbers.end(), 2);
-    if( it != modeNumbers.end() ) xTiltIndex = (it-modeNumbers.begin());
-    it = std::find(modeNumbers.begin(), modeNumbers.end(), 3);
-    if( it != modeNumbers.end() ) yTiltIndex = (it-modeNumbers.begin());
 
 }
 
@@ -368,8 +364,6 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
     info.pupilRadius = radius;
     info.angle = angle;
     
-    LOG_TRACE << "Generating Karhunen-Loeve ModeSet.";
-
     ModeInfo base_info(firstZernike, lastZernike, 0, pixels, radius, angle, cutoff);
  
     resize( modes.size(), pixels, pixels );
@@ -380,6 +374,8 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         ModeInfo info = base_info;
         if ( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
             info.firstMode = info.lastMode = 0;
+            if ( it == 2 ) tiltMode.x = modeNumbers.size();
+            else tiltMode.y = modeNumbers.size();
         }
         info.modeNumber = it;
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
@@ -392,32 +388,39 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         }
 
         view.assign( reinterpret_cast<const redux::util::Array<double>&>(*mode) );
-        modePointers.push_back(view.ptr());
+        modePointers.push_back(view.ptr(0,0,0));
         view.shift(0,1);
         modeNumbers.push_back(it);
     }
-    
-    vector<uint16_t>::const_iterator it = std::find(modeNumbers.begin(), modeNumbers.end(), 2);
-    if( it != modeNumbers.end() ) xTiltIndex = (it-modeNumbers.begin());
-    it = std::find(modeNumbers.begin(), modeNumbers.end(), 3);
-    if( it != modeNumbers.end() ) yTiltIndex = (it-modeNumbers.begin());
    
 }
 
 
 void ModeSet::normalize( const redux::image::Pupil& pup ) {
 
-    Array<double> view( reinterpret_cast<const redux::util::Array<double>&>(*this), 0, 0, 0, info.nPupilPixels-1, 0, info.nPupilPixels-1 );
-    ArrayStats stats;
-
-    for( unsigned int i=0; i<dimSize(0); ++i ) {
-        stats.getMinMaxMean( view * pup );
-        view *= (pup.area/stats.norm);
-        view.shift(0,1);
+    const double* pupPtr = pup.get();
+    size_t nPixels = info.nPupilPixels*info.nPupilPixels;
+    for ( uint16_t i=0; i<modePointers.size(); ++i ) {
+        double* ptr = modePointers[i];
+        if(!ptr) continue;
+        double norm(0);
+        double mx(ptr[0]);
+        double mn(ptr[0]);
+        for( size_t ind=0; ind<nPixels; ++ind) {
+            double tmp = ptr[ind];
+            if( pupPtr[ind] > 0 ) norm += tmp*tmp*pupPtr[ind];
+            mx = std::max(mx,tmp);
+            mn = std::min(mn,tmp);
+        }
+        if( i == tiltMode.x ) {
+            shiftToAlpha.x = 2 * M_PI / (mx-mn);
+        } else if (i == tiltMode.y) {
+            shiftToAlpha.y = 2 * M_PI / (mx-mn);
+        }
+        norm = sqrt(pup.area/norm);
+        transform( ptr, ptr+nPixels, ptr, [norm](const double& m) { return norm*m; });
     }
-   
-   
-    
+
 }
 
 

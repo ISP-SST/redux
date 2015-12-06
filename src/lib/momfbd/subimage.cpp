@@ -375,30 +375,34 @@ void SubImage::adjustOffset(void) {
 
     PointI oldOffset = offsetShift;
     PointD oldVal(0,0),newVal(0,0);
-    int32_t mIndex = object.modes.yTiltIndex;  // NOTE: should be x, this is just because subimage is transposed!!
+    int32_t mIndex = object.modes.tiltMode.x;  // NOTE: should be x, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
-        oldVal.x = currentAlpha[mIndex]*object.alphaToPixels;
-        int adjust = -lround(currentAlpha[mIndex]*object.alphaToPixels);
+        double shiftToAlpha = object.shiftToAlpha.x;
+        double alphaToShift = 1.0/shiftToAlpha;
+        oldVal.x = currentAlpha[mIndex]*alphaToShift;
+        int adjust = -lround(currentAlpha[mIndex]*alphaToShift);
         if( adjust ) {
             adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.x += adjust;
-                currentAlpha[mIndex] += adjust*object.pixelsToAlpha;
-                newVal.x = currentAlpha[mIndex]*object.alphaToPixels;
+                currentAlpha[mIndex] += adjust*shiftToAlpha;
+                newVal.x = currentAlpha[mIndex]*alphaToShift;
             }
         }
     }
-    
-    mIndex = object.modes.xTiltIndex;  // NOTE: should be y, this is just because subimage is transposed!!
+
+    mIndex = object.modes.tiltMode.y;  // NOTE: should be y, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
-        oldVal.y = currentAlpha[mIndex]*object.alphaToPixels;
-        int adjust = -lround(currentAlpha[mIndex]*object.alphaToPixels);
+        double shiftToAlpha = object.shiftToAlpha.y;
+        double alphaToShift = 1.0/shiftToAlpha;
+        oldVal.y = currentAlpha[mIndex]*alphaToShift;
+        int adjust = -lround(currentAlpha[mIndex]*alphaToShift);
         if( adjust ) {
             adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.y += adjust;
-                currentAlpha[mIndex] += adjust*object.pixelsToAlpha;
-                newVal.y = currentAlpha[mIndex]*object.alphaToPixels;
+                currentAlpha[mIndex] += adjust*shiftToAlpha;
+                newVal.y = currentAlpha[mIndex]*alphaToShift;
             }
         }
     }
@@ -460,13 +464,13 @@ void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
 
 void SubImage::getAlphas(float* alphas) const {
     std::copy( currentAlpha.begin(), currentAlpha.end(), alphas );
-    int32_t mIndex = object.modes.yTiltIndex;  // NOTE: should be x, this is just because subimage is transposed!!
+    int32_t mIndex = object.modes.tiltMode.x;  // NOTE: should be x, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
-        alphas[mIndex] -= offsetShift.x*object.pixelsToAlpha;
+        alphas[mIndex] -= offsetShift.x*object.shiftToAlpha.x;
     }
-    mIndex = object.modes.xTiltIndex;  // NOTE: should be y, this is just because subimage is transposed!!
+    mIndex = object.modes.tiltMode.y;  // NOTE: should be y, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
-        alphas[mIndex] -= offsetShift.y*object.pixelsToAlpha;
+        alphas[mIndex] -= offsetShift.y*object.shiftToAlpha.y;
     }
 }
 

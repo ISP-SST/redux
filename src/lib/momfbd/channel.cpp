@@ -711,7 +711,7 @@ void Channel::initPatch (ChannelData& cd) {
 //    cout << "Channel::initPatch() " << __LINE__ << "   res=" << cd.residualOffset << endl;
 //    cout << "Channel::initPatch() " << __LINE__ << "   pixelsToAlpha=" << myObject.pixelsToAlpha << endl;
     
-    int32_t mIndex = myObject.modes.xTiltIndex;
+    int32_t mIndex = myObject.modes.tiltMode.x;
     if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
         /*int adjust = lround(currentAlpha[mIndex]*myObject.alphaToPixels);
         if( adjust ) {
@@ -726,7 +726,7 @@ void Channel::initPatch (ChannelData& cd) {
             }
         }*/
     }
-    /*mIndex = myObject.modes.yTiltIndex;
+    /*mIndex = myObject.modes.tiltMode.y;
     if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
         int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
         if( adjust ) {

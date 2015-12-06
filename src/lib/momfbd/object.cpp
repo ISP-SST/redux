@@ -750,18 +750,23 @@ void Object::initCache (void) {
     
     
     pixelsToAlpha =  alphaToPixels = 0;
-    if( modes.yTiltIndex >= 0 ) {
-        double delta = modes(modes.yTiltIndex,pupilPixels/2+1,pupilPixels/2) - modes(modes.yTiltIndex,pupilPixels/2,pupilPixels/2);
+    double pixelsToAlpha2(0);
+    double alphaToPixels2(0);
+    if( modes.tiltMode.y >= 0 ) {
+        double delta = modes(modes.tiltMode.y,pupilPixels/2+1,pupilPixels/2) - modes(modes.tiltMode.y,pupilPixels/2,pupilPixels/2);
+        pixelsToAlpha2 = (2 * M_PI / (delta*(pupilPixels-1))) * pupilPixels/patchSize;
+        alphaToPixels2 = 1.0 / pixelsToAlpha2;
         pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
-    } else if ( modes.xTiltIndex >= 0 ) {
-        double delta = modes(modes.xTiltIndex,pupilPixels/2,pupilPixels/2+1) - modes(modes.xTiltIndex,pupilPixels/2,pupilPixels/2);
+    } else if ( modes.tiltMode.x >= 0 ) {
+        double delta = modes(modes.tiltMode.x,pupilPixels/2,pupilPixels/2+1) - modes(modes.tiltMode.x,pupilPixels/2,pupilPixels/2);
         pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
     }
     
     if( fabs(pixelsToAlpha) > 0 ) {
         alphaToPixels = 1.0/pixelsToAlpha;
     }
-
+    shiftToAlpha = modes.shiftToAlpha;
+    shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize);           // rescale for convolution in larger images and at 
     defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
     alphaToDefocus = 1.0/defocusToAlpha;
 
@@ -950,51 +955,54 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
-            info->patches(x,y).region[0] = patchesData(y,x)->roi.first.x+1;         // store as 1-based indices
-            info->patches(x,y).region[1] = patchesData(y,x)->roi.last.x+1;
-            info->patches(x,y).region[2] = patchesData(y,x)->roi.first.y+1;
-            info->patches(x,y).region[3] = patchesData(y,x)->roi.last.y+1;
-            info->patches(x,y).nChannels = nChannels;
-            info->patches(x,y).nim = sharedArray<int32_t> (nChannels);
-            info->patches(x,y).dx = sharedArray<int32_t> (nChannels);
-            info->patches(x,y).dy = sharedArray<int32_t> (nChannels);
-            for (int i = 0; i < nChannels; ++i) {
-                info->patches(x,y).nim.get()[i] = channels[i]->nImages();
-                info->patches(x,y).dx.get()[i] = patchesData(y,x)->objects[ID].channels[i].shift.x;
-                info->patches(x,y).dy.get()[i] = patchesData(y,x)->objects[ID].channels[i].shift.y;
-            }
-            blockSize += imgSize;
-            if ( writeMask&MOMFBD_PSF ) {
-                if(patchesData(y,x)->objects[ID].psf.nDimensions()>1) {
-                    info->patches(x,y).npsf = patchesData(y,x)->objects[ID].psf.dimSize(0);
-                    blockSize += info->patches(x,y).npsf*imgSize;
+            PatchData::Ptr thisPatch = patchesData(y,x);
+            if( thisPatch ) {
+                info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
+                info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
+                info->patches(x,y).region[2] = thisPatch->roi.first.y+1;
+                info->patches(x,y).region[3] = thisPatch->roi.last.y+1;
+                info->patches(x,y).nChannels = nChannels;
+                info->patches(x,y).nim = sharedArray<int32_t> (nChannels);
+                info->patches(x,y).dx = sharedArray<int32_t> (nChannels);
+                info->patches(x,y).dy = sharedArray<int32_t> (nChannels);
+                for (int i = 0; i < nChannels; ++i) {
+                    info->patches(x,y).nim.get()[i] = channels[i]->nImages();
+                    info->patches(x,y).dx.get()[i] = thisPatch->objects[ID].channels[i].shift.x;
+                    info->patches(x,y).dy.get()[i] = thisPatch->objects[ID].channels[i].shift.y;
                 }
-            }
-            if ( writeMask&MOMFBD_OBJ ) {
-                if(patchesData(y,x)->objects[ID].cobj.nDimensions()>1) {
-                    info->patches(x,y).nobj = patchesData(y,x)->objects[ID].cobj.dimSize(0);
-                    blockSize += info->patches(x,y).nobj*imgSize;
+                blockSize += imgSize;
+                if ( writeMask&MOMFBD_PSF ) {
+                    if(thisPatch->objects[ID].psf.nDimensions()>1) {
+                        info->patches(x,y).npsf = thisPatch->objects[ID].psf.dimSize(0);
+                        blockSize += info->patches(x,y).npsf*imgSize;
+                    }
                 }
-            }
-            if ( writeMask&MOMFBD_RES ) {
-                if(patchesData(y,x)->objects[ID].res.nDimensions()>1) {
-                    info->patches(x,y).nres = patchesData(y,x)->objects[ID].res.dimSize(0);
-                    blockSize += info->patches(x,y).nres*imgSize;
+                if ( writeMask&MOMFBD_OBJ ) {
+                    if(thisPatch->objects[ID].cobj.nDimensions()>1) {
+                        info->patches(x,y).nobj = thisPatch->objects[ID].cobj.dimSize(0);
+                        blockSize += info->patches(x,y).nobj*imgSize;
+                    }
                 }
-            }
-            if ( writeMask&MOMFBD_ALPHA ) {
-                if(patchesData(y,x)->objects[ID].alpha.nDimensions()==2) {
-                    info->patches(x,y).nalpha = patchesData(y,x)->objects[ID].alpha.dimSize(0);
-                    info->patches(x,y).nm = patchesData(y,x)->objects[ID].alpha.dimSize(1);
-                    blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float);
+                if ( writeMask&MOMFBD_RES ) {
+                    if(thisPatch->objects[ID].res.nDimensions()>1) {
+                        info->patches(x,y).nres = thisPatch->objects[ID].res.dimSize(0);
+                        blockSize += info->patches(x,y).nres*imgSize;
+                    }
                 }
-            }
-            if ( writeMask&MOMFBD_DIV ) {
-                if(patchesData(y,x)->objects[ID].div.nDimensions()>1) {
-                    info->patches(x,y).ndiv = patchesData(y,x)->objects[ID].div.dimSize(0);
-                    info->patches(x,y).nphx = info->nPH;
-                    info->patches(x,y).nphy = info->nPH;
-                    blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float);
+                if ( writeMask&MOMFBD_ALPHA ) {
+                    if(thisPatch->objects[ID].alpha.nDimensions()==2) {
+                        info->patches(x,y).nalpha = thisPatch->objects[ID].alpha.dimSize(0);
+                        info->patches(x,y).nm = thisPatch->objects[ID].alpha.dimSize(1);
+                        blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float);
+                    }
+                }
+                if ( writeMask&MOMFBD_DIV ) {
+                    if(thisPatch->objects[ID].div.nDimensions()>1) {
+                        info->patches(x,y).ndiv = thisPatch->objects[ID].div.dimSize(0);
+                        info->patches(x,y).nphx = info->nPH;
+                        info->patches(x,y).nphy = info->nPH;
+                        blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float);
+                    }
                 }
             }
         }   // y-loop
@@ -1007,26 +1015,54 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     int64_t offset = modeSize;
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
-            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].img.get(), imgSize);
-            info->patches(x,y).imgPos = offset;
-            offset += imgSize;
-            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].psf.get(), info->patches(x,y).npsf*imgSize);
-            info->patches(x,y).psfPos = offset;
-            offset += info->patches(x,y).npsf*imgSize;
-            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].cobj.get(), info->patches(x,y).nobj*imgSize);
-            info->patches(x,y).objPos = offset;
-            offset += info->patches(x,y).nobj*imgSize;
-            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].res.get(), info->patches(x,y).nres*imgSize);
-            info->patches(x,y).resPos = offset;
-            offset += info->patches(x,y).nres*imgSize;
-            size_t alphaSize = info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float);
-            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].alpha.get(), alphaSize);
-            info->patches(x,y).alphaPos = offset;
-            offset += alphaSize;
-            size_t divSize = info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float);
-            memcpy(tmpPtr+offset, patchesData(y,x)->objects[ID].div.get(), divSize);
-            info->patches(x,y).diversityPos = offset;
-            offset += divSize;
+            PatchData::Ptr thisPatch = patchesData(y,x);
+            if( thisPatch && ID < thisPatch->objects.size() ) {
+                auto &objData = thisPatch->objects[ID];
+                if( objData.img.nElements() ) {
+                    memcpy(tmpPtr+offset, objData.img.get(), imgSize);
+                } else {
+                    memset(tmpPtr+offset, 0, imgSize);
+                }
+                info->patches(x,y).imgPos = offset;
+                offset += imgSize;
+                if( objData.psf.nElements() ) {
+                    memcpy(tmpPtr+offset, objData.psf.get(), info->patches(x,y).npsf*imgSize);
+                } else {
+                    memset(tmpPtr+offset, 0, info->patches(x,y).npsf*imgSize);
+                }
+                info->patches(x,y).psfPos = offset;
+                offset += info->patches(x,y).npsf*imgSize;
+                if( objData.cobj.nElements() ) {
+                    memcpy(tmpPtr+offset, objData.cobj.get(), info->patches(x,y).nobj*imgSize);
+                } else {
+                    memset(tmpPtr+offset, 0, info->patches(x,y).nobj*imgSize);
+                }
+                info->patches(x,y).objPos = offset;
+                offset += info->patches(x,y).nobj*imgSize;
+                if( objData.res.nElements() ) {
+                    memcpy(tmpPtr+offset, objData.res.get(), info->patches(x,y).nres*imgSize);
+                } else {
+                    memset(tmpPtr+offset, 0, info->patches(x,y).nres*imgSize);
+                }
+                info->patches(x,y).resPos = offset;
+                offset += info->patches(x,y).nres*imgSize;
+                size_t alphaSize = info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float);
+                if( objData.alpha.nElements() ) {
+                    memcpy(tmpPtr+offset, objData.alpha.get(), alphaSize);
+                } else {
+                    memset(tmpPtr+offset, 0, alphaSize);
+                }
+                info->patches(x,y).alphaPos = offset;
+                offset += alphaSize;
+                size_t divSize = info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float);
+                if( objData.div.nElements() ) {
+                    memcpy(tmpPtr+offset, objData.div.get(), divSize);
+                } else {
+                    memset(tmpPtr+offset, 0, divSize);
+                }
+                info->patches(x,y).diversityPos = offset;
+                offset += divSize;
+            } else cout << "NullPatch or index out-of-bounds: " << ID << endl;
         }
     }
 

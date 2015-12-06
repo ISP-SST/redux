@@ -76,7 +76,9 @@ namespace redux {
             
             ModeInfo info;
             
-            int32_t xTiltIndex, yTiltIndex;
+            PointI tiltMode;                    //!< Contains the indices for the tilt modes. (-1 if no tilts are present)
+            PointF shiftToAlpha;                //!< Converts a shift of 1 pixel into corresponding mode-coefficient (NB. if image-size != pupil-size it has to be re-scaled accordingly)
+            
             std::vector<uint16_t> modeNumbers;
             std::vector<double*> modePointers;
             std::mutex mtx;
