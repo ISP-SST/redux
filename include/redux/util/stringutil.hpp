@@ -65,6 +65,12 @@ namespace redux {
 
         std::string getUname( __uid_t id = 0 );
         std::string cleanPath( std::string path, std::string base = "" );
+        
+        
+        template <typename T=uint32_t>
+        std::vector<T> stringToUInts(const std::string& str);
+        template <typename T>
+        std::string uIntsToString(const std::vector<T>& ints);
 
         /*! @brief Converts integer types to a hexadecimal std::string
          */

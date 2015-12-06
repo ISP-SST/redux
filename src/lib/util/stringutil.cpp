@@ -1,5 +1,7 @@
 #include "redux/util/stringutil.hpp"
 
+#include "redux/translators.hpp"
+
 #include <cstdlib>
 #include <pwd.h>
 #include <unistd.h>
@@ -8,8 +10,11 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/regex.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 namespace bf = boost::filesystem;
+namespace bpt = boost::property_tree;
+
 
 using namespace redux::util;
 using namespace std;
@@ -47,7 +52,7 @@ bool redux::util::isHex(const string &s) {
 }
 
 
-bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase ) {
+bool redux::util::contains ( const string & haystack, const string & needle, bool ignoreCase ) {
 
     auto it = std::search (
                   haystack.begin(), haystack.end(),
@@ -63,7 +68,7 @@ bool redux::util::contains ( const std::string & haystack, const std::string & n
 }
 
 
-bool redux::util::nocaseLess(const std::string& lhs, const std::string& rhs) {
+bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
 
           return std::lexicographical_compare( lhs.begin (), lhs.end (), rhs.begin (), rhs.end (),
                                                [] ( char ch1, char ch2 ) { return std::toupper( ch1 ) < std::toupper( ch2 ); }
@@ -180,3 +185,30 @@ string redux::util::cleanPath(string in, string base) {
 
 }
 
+
+template <typename T>
+vector<T> redux::util::stringToUInts(const string& str) {
+    
+    bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
+    tmpTree.put( "tmp", str );
+    return tmpTree.get<vector<T>>( "tmp", vector<T>() );
+
+}
+template vector<uint8_t> redux::util::stringToUInts(const string&);
+template vector<uint16_t> redux::util::stringToUInts(const string&);
+template vector<uint32_t> redux::util::stringToUInts(const string&);
+template vector<uint64_t> redux::util::stringToUInts(const string&);
+
+
+template <typename T>
+std::string redux::util::uIntsToString(const std::vector<T>& ints) {
+    
+    bpt::ptree tmpTree;
+    tmpTree.put("tmp", ints);
+    return tmpTree.get<string>( "tmp", "" );
+    
+}
+template string redux::util::uIntsToString(const vector<uint8_t>& );
+template string redux::util::uIntsToString(const vector<uint16_t>& );
+template string redux::util::uIntsToString(const vector<uint32_t>& );
+template string redux::util::uIntsToString(const vector<uint64_t>& );
