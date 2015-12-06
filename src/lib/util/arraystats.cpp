@@ -17,6 +17,7 @@ void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
     min = std::numeric_limits<double>::max();
     max = std::numeric_limits<double>::lowest();
     sum = 0;
+    sqr_sum = 0;
     norm = 0;
     const T* ptr = data + n;
     size_t count(0);
@@ -30,6 +31,7 @@ void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
         if ( tmp == tmp ) { // will exclude NaN
             sum += tmp;
             norm += abs(tmp);
+            sqr_sum += tmp*tmp;
             count++;
         }
     }
@@ -183,7 +185,7 @@ template void redux::util::ArrayStats::getStats( uint32_t, const Array<int32_t>&
             uint8_t noiseType;              // flag indicating noise statistics (not used atm.)
 */
 size_t redux::util::ArrayStats::size( void ) {
-    return sizeof(int) + 11*sizeof(double);
+    return sizeof(int) + 12*sizeof(double);
 }
 
 
@@ -196,6 +198,7 @@ uint64_t redux::util::ArrayStats::pack( char* ptr ) const {
     count += pack(ptr+count, max);
     count += pack(ptr+count, median);
     count += pack(ptr+count, sum);
+    count += pack(ptr+count, sqr_sum);
     count += pack(ptr+count, norm);
     count += pack(ptr+count, mean);
     count += pack(ptr+count, rms);
@@ -214,6 +217,7 @@ uint64_t redux::util::ArrayStats::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count, max, swap_endian);
     count += unpack(ptr+count, median, swap_endian);
     count += unpack(ptr+count, sum, swap_endian);
+    count += unpack(ptr+count, sqr_sum, swap_endian);
     count += unpack(ptr+count, norm, swap_endian);
     count += unpack(ptr+count, mean, swap_endian);
     count += unpack(ptr+count, rms, swap_endian);
