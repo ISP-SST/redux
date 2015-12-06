@@ -24,7 +24,7 @@ endif()
 set( EXT_LIB_PREFIX boost_ )
 
 set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR}" )
-set( EXT_COMPONENTS date_time filesystem locale program_options serialization log
+set( EXT_COMPONENTS date_time filesystem program_options serialization log
                          system thread regex timer unit_test_framework )
 
 set( EXT_HEADER_FILE boost/version.hpp )
