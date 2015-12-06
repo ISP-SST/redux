@@ -19,14 +19,13 @@ namespace redux {
 
        class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
 
-            template <typename T>
-            void writeCallback( const std::shared_ptr<T>& /*dummy*/, size_t sent, const boost::system::error_code& error, size_t transferred ) {
+            static void writeCallback( size_t sent, const boost::system::error_code& error, size_t transferred ) {
                 using namespace boost::asio;
 
                 if( !error ) {
                     if( sent != transferred ) {
                         std::ostringstream ss;
-                        std::cerr << "TcpConnection::async_write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
+                        std::cerr << "TcpConnection::write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
                         //throw std::ios_base::failure( ss.str() );
                     }
                 }
@@ -41,24 +40,31 @@ namespace redux {
             }
 
             
+        public:
+
             template <typename T>
-            void strandWrite( const std::shared_ptr<T>& data, size_t sz ) {
+            void asyncWrite( const std::shared_ptr<T>& data, size_t sz ) {
                 if( mySocket.is_open() ) {
                     boost::asio::async_write( mySocket, boost::asio::buffer( data.get(), sz ),
-                                              strand.wrap(
-                                              boost::bind( &TcpConnection::writeCallback<T>, this, data, sz,
+                                          //    strand.wrap(
+                                              boost::bind( &TcpConnection::writeCallback, sz,
                                                            boost::asio::placeholders::error,
                                                            boost::asio::placeholders::bytes_transferred )
-                                                   )
+                                          //         )
                                             );
 
                 }
             }
 
-        public:
+            template <typename T>
+            void syncWrite( const T* data, size_t sz ) {
+                if( mySocket.is_open() ) {
+                    boost::asio::write( mySocket, boost::asio::buffer( data, sz ) );
+                }
+            }
 
             typedef std::shared_ptr<TcpConnection> Ptr;
-            typedef std::function<void( Ptr )> callback;
+            typedef std::function<void(Ptr)> callback;
 
             ~TcpConnection( void );
 
@@ -70,23 +76,29 @@ namespace redux {
             std::shared_ptr<char> receiveBlock( uint64_t& blockSize );
             
             template <class T>
-            void writeAndCheck( const std::shared_ptr<T>& data, size_t sz ) {
-                  strand.post( boost::bind( &TcpConnection::strandWrite<T>, this, data, sz ) );
-            }
-            
-            template <class T>
-            void writeAndCheck( const std::vector<T>& data ) {
+            void asyncWrite( const std::vector<T>& data ) {
                 size_t sz = data.size();
                 if (!sz) return;
                 auto tmp = redux::util::sharedArray<T>( sz );
                 memcpy(tmp.get(),data.data(),sz*sizeof(T));
-                strand.post( boost::bind( &TcpConnection::strandWrite<T>, this, tmp, sz*sizeof(T) ) );
+                asyncWrite(tmp, sz*sizeof(T));
             }
 
             template <class T>
-            void writeAndCheck( const T& data ) {
-               auto tmp = std::make_shared<T>(data);
-                strand.post( boost::bind( &TcpConnection::strandWrite<T>, this, tmp, sizeof(T) ) );
+            void asyncWrite( const T& data ) {
+                asyncWrite(std::make_shared<T>(data), sizeof(T) );
+            }
+
+            template <class T>
+            void syncWrite( const std::vector<T>& in ) {
+                size_t sz = in.size();
+                if (!sz) return;
+                syncWrite( in.data(), sz*sizeof(T) );
+            }
+
+            template <class T>
+            void syncWrite( const T& data ) {
+                syncWrite( &data, sizeof(T) );
             }
 
             tcp::socket& socket() { return mySocket; }

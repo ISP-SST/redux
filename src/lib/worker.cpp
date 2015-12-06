@@ -119,7 +119,7 @@ void Worker::updateStatus( void ) {
         count += pack( ptr+count, blockSize );
         count += daemon.myInfo->status.pack( ptr+count );
 
-        connection->writeAndCheck( buf, totSize );
+        connection->asyncWrite( buf, totSize );
     }
     else {
         if( daemon.port > 1024 ) {
@@ -240,7 +240,7 @@ void Worker::returnWork( void ) {
 
                 }
 
-                connection->writeAndCheck( data, totalSize );
+                connection->asyncWrite( data, totalSize );
 
                 Command cmd = CMD_ERR;
                 *(connection) >> cmd;

@@ -4,6 +4,8 @@
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <thread>
+
 namespace ba = boost::asio;
 
 using namespace redux::util;
@@ -27,7 +29,7 @@ namespace {
 
 
 TcpConnection::TcpConnection( boost::asio::io_service& io_service )
-    : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand( myService ) {
+    : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand(io_service) {
 #ifdef DBG_NET_
     LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
 #endif
@@ -103,8 +105,8 @@ void TcpConnection::idle( void ) {
     }
 
     if( mySocket.is_open() ) {
-        mySocket.async_read_some( ba::null_buffers(), strand.wrap(boost::bind( &TcpConnection::onActivity, this, shared_from_this(),
-                                                                   ba::placeholders::error ) ) );
+        mySocket.async_read_some( ba::null_buffers(),
+                                  boost::bind( &TcpConnection::onActivity, this, shared_from_this(), ba::placeholders::error) );
 
     }
     
@@ -115,7 +117,9 @@ void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& er
     if( !error ) {
         if( activityCallback ) {
             //LOG_DEBUG << "Activity on connection \"" << connptr->socket().remote_endpoint().address().to_string() << "\"";
-            activityCallback( connptr );
+            if( mySocket.is_open() ) {
+                std::thread(activityCallback,connptr).detach();
+            }
         }
     } else {
         if( ( error == ba::error::eof ) || ( error == ba::error::connection_reset ) ) {
@@ -128,15 +132,15 @@ void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& er
 }
 
 
-TcpConnection& TcpConnection::operator<<( const Command& out ) {
-    writeAndCheck(out);
+TcpConnection& TcpConnection::operator<<( const Command& in ) {
+    syncWrite(&in, sizeof(Command));
     return *this;
 }
 
 
-TcpConnection& TcpConnection::operator>>( Command& in ) {
-    if( ba::read( mySocket, ba::buffer( &in, sizeof( Command ) ) ) < sizeof( Command ) ) {
-        in = CMD_ERR;
+TcpConnection& TcpConnection::operator>>( Command& out ) {
+    if( ba::read( mySocket, ba::buffer( &out, sizeof( Command ) ) ) < sizeof( Command ) ) {
+        out = CMD_ERR;
         throw std::ios_base::failure( "Failed to receive command." );
     }
     return *this;

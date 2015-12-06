@@ -36,7 +36,7 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
-    hostTimeout(600), timer( ioService ), worker( *this ) {
+    hostTimeout(1800), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
@@ -181,15 +181,15 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
         connections[conn]->touch();
 
         switch( cmd ) {
-            case CMD_DIE: conn->strand.post( boost::bind( &Daemon::die, this, conn ) ); break;
-            case CMD_ADD_JOB: conn->strand.post( boost::bind( &Daemon::addJobs, this, conn ) ); break;
-            case CMD_DEL_JOB: conn->strand.post( boost::bind( &Daemon::removeJobs, this, conn ) ); break;
-            case CMD_GET_WORK: conn->strand.post( boost::bind( &Daemon::sendWork, this, conn ) ); break;
-            case CMD_GET_JOBLIST: conn->strand.post( boost::bind( &Daemon::sendJobList, this, conn ) ); break;
-            case CMD_PUT_PARTS: conn->strand.post( boost::bind( &Daemon::putParts, this, conn ) ); break;
-            case CMD_STAT: conn->strand.post( boost::bind( &Daemon::updateHostStatus, this, conn ) ); break;
-            case CMD_JSTAT: conn->strand.post( boost::bind( &Daemon::sendJobStats, this, conn ) ); break;
-            case CMD_PSTAT: conn->strand.post( boost::bind( &Daemon::sendPeerList, this, conn ) ); break;
+            case CMD_DIE: die(conn); break;
+            case CMD_ADD_JOB: addJobs(conn); break;
+            case CMD_DEL_JOB: removeJobs(conn); break;
+            case CMD_GET_WORK: sendWork(conn); break;
+            case CMD_GET_JOBLIST: sendJobList(conn); break;
+            case CMD_PUT_PARTS: putParts(conn); break;
+            case CMD_STAT: updateHostStatus(conn); break;
+            case CMD_JSTAT: sendJobStats(conn); break;
+            case CMD_PSTAT: sendPeerList(conn); break;
             case CMD_DISCONNECT: removeConnection(conn); break;
             default: LOG_DEBUG << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd );
                 removeConnection(conn);
@@ -199,9 +199,11 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
     }
     catch( const exception& e ) {
         LOG_ERR << "activity(): Exception when parsing incoming command: " << e.what();
+        removeConnection(conn);
+        return;
     }
 
-    conn->strand.post( boost::bind( &TcpConnection::idle, conn ) );
+    conn->idle();
 
 }
 
@@ -257,7 +259,7 @@ void Daemon::removeConnection( TcpConnection::Ptr& conn ) {
         connections.erase(it);
     }
     conn->socket().close();
-
+    conn->setCallback(nullptr);
 }
 
 
@@ -379,7 +381,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job #" + to_string(nJobs) );
                     unique_lock<mutex> lock( jobMutex );
                     job->info.id = ++jobCounter;
-                    job->info.name = "job_" + to_string( job->info.id );
+                    if( job->info.name.empty() ) job->info.name = "job_" + to_string( job->info.id );
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
                     ids.push_back( jobCounter );
                     ids[0]++;
@@ -398,7 +400,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
     if( count == blockSize ) {
         if( ids[0] ) LOG << "Received " << ids[0] << " jobs." << printArray(ids.data()+1,ids[0],"  IDs");
         *conn << CMD_OK;           // all ok, return IDs
-        conn->writeAndCheck( ids );
+        conn->syncWrite(ids);
     } else {
         LOG_ERR << "addJobs: Parsing of datablock failed, count = " << count << "   blockSize = " << blockSize << "  bytes.";
         *conn << CMD_ERR;
@@ -412,9 +414,9 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
         char* ptr = tmp.get();
         ptr += redux::util::pack( ptr, messagesSize );
         redux::util::pack( ptr, messages );
-        conn->writeAndCheck( tmp, messagesSize+sizeof(uint64_t) );
+        conn->syncWrite(tmp.get(), messagesSize+sizeof(uint64_t));
     } else {
-        conn->writeAndCheck( messagesSize );
+        conn->syncWrite(messagesSize);
     }
 
 
@@ -603,9 +605,9 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     
     if( count ) {
         pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)
-        conn->writeAndCheck( data, count+sizeof(uint64_t) );
+        conn->syncWrite( data.get(), count+sizeof(uint64_t) );
     } else {
-        conn->writeAndCheck( count );
+        conn->syncWrite(count);
     }
     
 }
@@ -660,7 +662,7 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
         LOG_ERR << "sendJobList(): Mismatch when packing joblist:  count = " << count << "   blockSize = " << blockSize << "  bytes.";
         return;
     }
-    conn->writeAndCheck( buf, blockSize );
+    conn->syncWrite( buf.get(), blockSize );
 
 }
 
@@ -701,7 +703,7 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
         return;
     }
 
-    conn->writeAndCheck( buf, totalSize );
+    conn->syncWrite( buf.get(), totalSize );
 
 }
 
@@ -727,7 +729,7 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
         return;
     }
 
-    conn->writeAndCheck( buf, totalSize );
+    conn->syncWrite( buf.get(), totalSize );
 
 }
 
