@@ -81,6 +81,7 @@ namespace redux {
             
             std::vector<uint16_t> modeNumbers;
             std::vector<double*> modePointers;
+            std::vector<double> atm_rms;
             std::mutex mtx;
 
             

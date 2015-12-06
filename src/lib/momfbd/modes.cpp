@@ -351,6 +351,7 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
         modePointers.push_back(view.ptr(0,0,0));
         view.shift(0,1);
         modeNumbers.push_back(it);
+        atm_rms.push_back(mode->atm_rms);
     }
 
 }
@@ -391,6 +392,7 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         modePointers.push_back(view.ptr(0,0,0));
         view.shift(0,1);
         modeNumbers.push_back(it);
+        atm_rms.push_back(mode->atm_rms);
     }
    
 }
