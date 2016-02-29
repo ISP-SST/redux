@@ -1,7 +1,6 @@
 #ifndef REDUX_MATH_LINALG_HPP
 #define REDUX_MATH_LINALG_HPP
 
-//#include <opencv/cv.h>
 #include "redux/util/array.hpp"
 
 #include <gsl/gsl_permutation.h>

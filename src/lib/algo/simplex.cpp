@@ -1,5 +1,6 @@
 #include "redux/algo/simplex.hpp"
 
+#ifdef NOT_USED_ANYWHERE_NOW
 
 using namespace redux::algo;
 using namespace Eigen;
@@ -113,3 +114,5 @@ int Simplex::minRatioRule( int q ) {
     }
     return p;
 }
+
+#endif

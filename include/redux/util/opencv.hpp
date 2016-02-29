@@ -1,6 +1,8 @@
 #ifndef REDUX_UTIL_OPENCV_HPP
 #define REDUX_UTIL_OPENCV_HPP
 
+#ifdef REDUX_WITH_OPENCV
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -72,5 +74,6 @@ double findTransformECC( InputArray templateImage, InputArray inputImage,
 
 } // cv
 
+#endif          // if WITH_OPENCV
 
 #endif      // REDUX_UTIL_OPENCV_HPP

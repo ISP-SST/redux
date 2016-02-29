@@ -8,16 +8,17 @@
 #include <iostream>
 #include <set>
 
-#include "opencv2/core/core.hpp"
-#include "opencv2/features2d/features2d.hpp"
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/calib3d/calib3d.hpp"
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/video/video.hpp>
 
-
-
+#ifdef REDUX_WITH_OPENCV
+#    include <opencv2/core/core.hpp>
+#    include <opencv2/features2d/features2d.hpp>
+#    include <opencv2/calib3d/calib3d.hpp>
+#    include <opencv2/imgproc/imgproc.hpp>
 using namespace cv;
+#endif
+
+
+
 using namespace std;
 
 using namespace redux::util;
@@ -63,6 +64,7 @@ namespace {
     };
 
 
+#ifdef REDUX_WITH_OPENCV
     Mat arrayToMat (const IDL_VPTR& in, int verbose = 0) {
 
         try {
@@ -275,7 +277,7 @@ namespace {
         return std::move (matches);
 
     }
-
+#endif
 
 }
 
@@ -283,6 +285,10 @@ namespace {
 
 IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
+#ifndef REDUX_WITH_OPENCV
+    cerr << "img_align: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
+    return IDL_GettmpInt(0);
+#else
     IDL_VPTR ret;
     IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_NOP, &ret);
     Mat retMat = arrayToMat (ret);
@@ -533,12 +539,18 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     }
 
     return ret;
-
+    
+#endif
+    
 }
 
 
 IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
 
+#ifndef REDUX_WITH_OPENCV
+    cerr << "img_project: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
+    return IDL_GettmpInt(0);
+#else
     if (argc != 2) {
         cerr << "img_project needs 2 arguments. A 3x3 or 2x3 transformation matrix, and an image." << endl;
         return IDL_GettmpInt (0);
@@ -584,6 +596,7 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
     }
 
     return out;
-
+    
+#endif
 
 }

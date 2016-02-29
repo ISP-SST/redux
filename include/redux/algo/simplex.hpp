@@ -1,6 +1,8 @@
 #ifndef REDUX_ALGO_SIMPLEX_HPP
 #define REDUX_ALGO_SIMPLEX_HPP
 
+#ifdef NOT_USED_ANYWHERE_NOW
+
 //#include <Eigen/Dense>
 #include <eigen3/Eigen/Dense>
 
@@ -51,5 +53,6 @@ namespace redux {
     
 }
 
+#endif
 
 #endif  // REDUX_ALGO_SIMPLEX_HPP

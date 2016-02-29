@@ -30,7 +30,6 @@ file(GLOB REDUX_NETWORK_CPP "network/*.cpp")
 file(GLOB REDUX_NETWORK_HPP "${REDUX_HDR_BASE}/network/*.hpp")
 
 file(GLOB REDUX_UTIL_CPP "util/*.cpp")
-file(GLOB REDUX_UTIL_OPENCV_CPP "util/opencv/*.cpp")
 file(GLOB REDUX_UTIL_HPP "${REDUX_HDR_BASE}/util/*.hpp")
 
 if (Fits_FOUND)
@@ -48,6 +47,20 @@ if (NetCDF_FOUND)
         add_definitions(-DREDUX_WITH_NCDF)
     endif()
 endif()
+
+if (OpenCV_FOUND)
+    option(REDUX_WITH_OPENCV "Build with OpenCV support" ON)
+    if (REDUX_WITH_OPENCV)
+        message(STATUS "Building with OpenCV support")
+        add_definitions(-DREDUX_WITH_OPENCV)
+        file(GLOB REDUX_UTIL_OPENCV_CPP "util/opencv/*.cpp")
+    endif()
+endif()
+
+if( NOT REDUX_WITH_OPENCV )
+    message(WARNING "Building without OpenCV support, some functionality might not be compiled.")
+endif()
+
 
 ##### revison info ######
 set(REDUX_REVISION_SRC_FILE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
