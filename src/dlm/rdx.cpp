@@ -8,6 +8,8 @@
 #include <iostream>
 #include <typeinfo>
 
+#include <boost/algorithm/string.hpp>
+
 using namespace redux::image;
 using namespace redux::util;
 using namespace redux;
@@ -973,6 +975,97 @@ IDL_VPTR uints_to_string(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_VPTR arglist;
+    IDL_STRING split_chars;
+} MT_KW;
+
+
+// NOTE:  The keywords MUST be listed in alphabetical order !!
+static IDL_KW_PAR mt_kw_pars[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "ARG_LIST",   IDL_TYP_UNDEF,  1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MT_KW,arglist) },
+    { (char*) "SPLIT_CHARS", IDL_TYP_STRING, 1, 0, 0, (char*)IDL_KW_OFFSETOF2(MT_KW,split_chars) },
+    { NULL }
+};
+
+IDL_VPTR make_template(int argc, IDL_VPTR* argv, char* argk) {
+    
+    string ret;
+    if (argc < 1) {
+        return IDL_StrToSTRING( (char*)ret.c_str() );
+    }
+    
+    IDL_VPTR strlist = argv[0];
+    IDL_ENSURE_STRING( strlist )
+    IDL_ENSURE_SIMPLE( strlist );
+    
+    if ( !(strlist->flags & IDL_V_ARR) ) {
+        return strlist;
+    }
+    
+    IDL_ARRAY* strarr = strlist->value.arr;
+    IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(strlist->value.arr->data);
+
+    if ( strarr->n_elts == 1) {
+        return IDL_StrToSTRING( strptr->s );
+    }
+    
+    MT_KW kw;
+    kw.split_chars = IDL_STATIC_STRING(".");
+    
+    (void) IDL_KWProcessByOffset (argc, argv, argk, mt_kw_pars, (IDL_VPTR*)0, 255, &kw);
+    
+    string split_chars = kw.split_chars.s;
+    string tmp = strptr->s;    // first item
+    
+    std::vector<std::string> segments;
+    boost::split(segments, tmp, boost::is_any_of(split_chars));
+    
+    size_t n_segments = segments.size();
+    vector< set<string> > seg_list(n_segments);
+
+    for( int i=0; i<strarr->n_elts; ++i ) {
+        tmp = strptr[i].s;
+        boost::split(segments, tmp, boost::is_any_of(split_chars));
+        if( segments.size() != n_segments ) {
+            cout << "Item did not match template: " << tmp << endl;
+            continue;
+        }
+        for( size_t j=0; j<n_segments; ++j ) {
+            seg_list[j].insert(segments[j]);
+        }
+    }
+    
+    int arg_cnt(0);
+    for( size_t j=0; j<n_segments; ++j ) {
+        if(seg_list[j].size() > 1 ) {
+            ret += "%"+to_string(++arg_cnt);
+        } else {
+            ret += *(seg_list[j].begin());
+        }
+        if( j < n_segments-1 ) ret += split_chars[0];
+    }
+    
+    if( kw.arglist && arg_cnt ) {
+        IDL_VPTR arglist;
+        IDL_MEMINT dims[] = { arg_cnt };    // x/y, im#, nMatches 
+        IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &arglist );
+        strptr = reinterpret_cast<IDL_STRING*>(arglist->value.arr->data);
+        for( size_t j=0; j<n_segments; ++j ) {
+            if(seg_list[j].size() > 1 ) {
+                tmp = boost::join( seg_list[j], " " );
+                IDL_StrStore(strptr++,const_cast<char*>(tmp.c_str()));
+            }
+        }
+        IDL_VarCopy( arglist, kw.arglist );
+    }
+    
+    return IDL_StrToSTRING( (char*)ret.c_str() );
+
+}
+
 
 void fft_reorder(int argc, IDL_VPTR* argv) {
 
@@ -1022,6 +1115,7 @@ extern "C" {
             { { (IDL_VPTR (*) ()) cbezier3}, (char*) "CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) string_to_uints}, (char*) "STRING_TO_UINTS", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) uints_to_string}, (char*) "UINTS_TO_STRING", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) make_template}, (char*) "MAKE_TEMPLATE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::img_align}, (char*) "IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::img_project}, (char*) "IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }
         };
