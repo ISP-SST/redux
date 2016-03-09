@@ -7,8 +7,9 @@
 
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
-#include "redux/file/fileio.hpp"
 #include "redux/math/functions.hpp"
+#include "redux/image/cachedfile.hpp"
+#include "redux/image/fouriertransform.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/logger.hpp"
 #include "redux/translators.hpp"
@@ -23,7 +24,6 @@
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
-#include "redux/image/fouriertransform.hpp"
 
 namespace bfs = boost::filesystem;
 using namespace redux::file;
@@ -38,84 +38,6 @@ namespace {
 
     const string thisChannel = "channel";
     
-    struct ClippedFile {
-        string filename;
-        const vector<int16_t> clip;
-        bool symmetricClip;
-
-        ClippedFile(const string& fn, const vector<int16_t>& cl, bool sym=false) :
-            filename(fn), clip(cl), symmetricClip(sym) { }
-
-        bool operator<(const ClippedFile& rhs) const {
-            if(filename == rhs.filename) {
-                if(symmetricClip == rhs.symmetricClip) {
-                    return (clip < rhs.clip);
-                }
-                return (symmetricClip < rhs.symmetricClip);
-            }
-            return (filename < rhs.filename);
-        }
-
-        template <typename T>
-        void loadImage(Image<T>& img, bool normalize=false) const {
-
-            redux::file::readFile(filename, img);
-            
-            if( clip.size() == 4 ) {
-                bool flipX = false, flipY = false;
-                vector<int16_t> alignClip = clip;
-                if (alignClip[0] > alignClip[1]) {     // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first. TBD: how should this be ?
-                    std::swap (alignClip[0], alignClip[1]);
-                    flipX = true;
-                }
-                if (alignClip[2] > alignClip[3]) {
-                    std::swap (alignClip[2], alignClip[3]);
-                    flipY = true;
-                }
-                for (auto & index : alignClip)
-                    --index;       // NOTE: momfbd cfg files uses 1-based indexes, internally we start with 0.
-                size_t sy = alignClip[3] - alignClip[2] + 1;
-                size_t sx = alignClip[1] - alignClip[0] + 1;
-                if(symmetricClip) {
-                    const std::vector<size_t>& dims = img.dimensions();
-                    int skewY = (dims[0] - sy) / 2  - alignClip[2];
-                    int skewX = (dims[1] - sx) / 2  - alignClip[0];
-                    alignClip[0] += skewX;
-                    alignClip[1] += skewX;
-                    alignClip[2] += skewY;
-                    alignClip[3] += skewY;
-                }
-                img.setLimits (alignClip[2], alignClip[3], alignClip[0], alignClip[1]);
-                img.trim();
-
-                if (flipX || flipY) {
-                    shared_ptr<T*> arrayPtr = img.reshape(sy, sx);
-                    T** imgPtr = arrayPtr.get();
-                    if (flipX) reverseX(imgPtr, sy, sx);
-                    if (flipY) reverseY(imgPtr, sy, sx);
-                }
-            }
-
-        }
-
-        template <typename T>
-        static void load(Image<T>& img, const string& fn, const vector<int16_t>& cl, bool norm=false, bool sym=false) {
-            ClippedFile cf(fn,cl,sym);
-            Image<T>& cimg = redux::util::Cache::get<ClippedFile, Image<T> >(cf);
-            {
-                unique_lock<mutex> lock(cimg.imgMutex);
-                if(cimg.nElements() == 0) cf.loadImage(cimg,norm);
-            }
-            img = cimg;
-        }
-
-        template <typename T>
-        static void unload(const string& fn, const vector<int16_t>& cl, bool sym=false) {
-            ClippedFile cf(fn,cl,sym);
-            redux::util::Cache::erase<ClippedFile, Image<T>>(cf);
-        }
-    };
-
 }
 
 
@@ -280,6 +202,8 @@ bool Channel::checkData (void) {
             return false;
         }
     }
+    
+
     if (imageNumbers.empty()) {         // single file
         bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
         if (!bfs::is_regular_file(fn)) {
@@ -295,7 +219,7 @@ bool Channel::checkData (void) {
             }
         }
     }
-
+    
     myJob.info.progress[1] += std::max(imageNumbers.size(),1UL)*3;  // load, process, split & store (TODO more accurate progress reporting)
 
     // Dark(s)
@@ -519,17 +443,17 @@ void Channel::loadCalib(boost::asio::io_service& service) {     // load through 
         size_t nFrames(0);
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
-            ClippedFile::load(tmp,darkTemplate,alignClip,true);
+            CachedFile::load( tmp, darkTemplate);
             nFrames = tmp.meta->getNumberOfFrames();
         } else {
             Image<float> tmp2;
             for (size_t di = 0; di < darkNumbers.size(); ++di) {
                 bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
                 if (!di) {
-                    ClippedFile::load(tmp,fn.string(),alignClip,true);
+                    CachedFile::load( tmp, fn.string());
                     nFrames = tmp.meta->getNumberOfFrames();
                 } else {
-                    ClippedFile::load(tmp2,fn.string(),alignClip,true);
+                    CachedFile::load( tmp2, fn.string() );
                     tmp += tmp2;
                     nFrames += tmp2.meta->getNumberOfFrames();
                 }
@@ -539,37 +463,59 @@ void Channel::loadCalib(boost::asio::io_service& service) {     // load through 
 
         }
         dark = tmp.copy();
+        if( alignClip.size() ) clipImage( dark, alignClip );
         if (nFrames) dark *= 1.0/nFrames;
     }
 
 
     if (!gainFile.empty()) {
-        service.post(std::bind(ClippedFile::load<float>, std::ref(gain), gainFile, alignClip, false/*norm*/, false/*symclip*/));
+        service.post([this](){
+            CachedFile::load<float>( gain, gainFile );
+            if( alignClip.size() ) clipImage( gain, alignClip );
+        });
     }
 
 
     if (!responseFile.empty()) {
-        service.post(std::bind(ClippedFile::load<float>, std::ref(ccdResponse), responseFile, alignClip, false/*norm*/, false/*symclip*/));
+        service.post([this](){
+            CachedFile::load<float>( ccdResponse, responseFile );
+            if( alignClip.size() ) clipImage( ccdResponse, alignClip, true );
+        });
     }
 
     if (!backgainFile.empty()) {
-        service.post(std::bind(ClippedFile::load<float>, std::ref(ccdScattering), backgainFile, alignClip, false/*norm*/, false/*symclip*/));
+        service.post([this](){
+            CachedFile::load<float>( ccdScattering, backgainFile );
+            if( alignClip.size() ) clipImage( ccdScattering, alignClip );
+        });
     }
 
     if (!psfFile.empty()) {
-        service.post(std::bind(ClippedFile::load<float>, std::ref(psf), psfFile, alignClip, false/*norm*/, true/*symclip*/));
+        service.post([this](){
+            CachedFile::load<float>( psf, psfFile );
+            if( alignClip.size() ) clipImage( psf, alignClip );
+        });
     }
 
     if (!mmFile.empty()) {
-        service.post(std::bind(ClippedFile::load<float>, std::ref(modulationMatrix), mmFile, alignClip, false/*norm*/, false/*symclip*/));
+        service.post([this](){
+            CachedFile::load<float>( modulationMatrix, mmFile );
+            if( alignClip.size() ) clipImage( modulationMatrix, alignClip );
+        });
     }
 
     if (!xOffsetFile.empty()) {
-        service.post(std::bind(ClippedFile::load<int16_t>, std::ref(xOffset), xOffsetFile, alignClip, false/*norm*/, false/*symclip*/));
+        service.post([this](){
+            CachedFile::load<int16_t>( xOffset, xOffsetFile );
+            if( alignClip.size() ) clipImage( xOffset, alignClip );
+        });
     }
 
     if (!yOffsetFile.empty()) {
-        service.post(std::bind(ClippedFile::load<int16_t>, std::ref(yOffset), yOffsetFile, alignClip, false/*norm*/, false/*symclip*/));
+        service.post([this](){
+            CachedFile::load<int16_t>( yOffset, yOffsetFile );
+            if( alignClip.size() ) clipImage( yOffset, alignClip );
+        });
     }
     
 }
@@ -623,21 +569,21 @@ void Channel::unloadCalib(void) {               // unload what was accessed thro
     if (!darkTemplate.empty()) {
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
-            ClippedFile::unload<float>(darkTemplate,alignClip);
+            CachedFile::unload<float>(darkTemplate);
         } else {
             for (size_t di = 0; di < darkNumbers.size(); ++di) {
                 bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
-                ClippedFile::unload<float>(fn.string(),alignClip);
+                CachedFile::unload<float>(fn.string());
             }
         }
     }
-    if( !gainFile.empty() ) ClippedFile::unload<float>(gainFile, alignClip);
-    if( !responseFile.empty() ) ClippedFile::unload<float>(responseFile, alignClip);
-    if( !backgainFile.empty() ) ClippedFile::unload<float>(backgainFile, alignClip);
-    if( !psfFile.empty() ) ClippedFile::unload<float>(psfFile, alignClip, true);
-    if( !mmFile.empty() ) ClippedFile::unload<float>(mmFile, alignClip);
-    if( !xOffsetFile.empty() ) ClippedFile::unload<int16_t>(xOffsetFile, alignClip);
-    if( !yOffsetFile.empty() ) ClippedFile::unload<int16_t>(yOffsetFile, alignClip);
+    if( !gainFile.empty() ) CachedFile::unload<float>(gainFile);
+    if( !responseFile.empty() ) CachedFile::unload<float>(responseFile);
+    if( !backgainFile.empty() ) CachedFile::unload<float>(backgainFile);
+    if( !psfFile.empty() ) CachedFile::unload<float>(psfFile);
+    if( !mmFile.empty() ) CachedFile::unload<float>(mmFile);
+    if( !xOffsetFile.empty() ) CachedFile::unload<int16_t>(xOffsetFile);
+    if( !yOffsetFile.empty() ) CachedFile::unload<int16_t>(yOffsetFile);
     
     dark.clear();
     gain.clear();
@@ -882,13 +828,14 @@ void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEn
 void Channel::loadImage(size_t i) {
     
     bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[i]));
-    ClippedFile cf(fn.string(),alignClip,false);
+    CachedFile cf( fn.string() );
     
     Image<float> tmpImg;
     Image<float> view(images,i,i,0,imgSize.y-1,0,imgSize.x-1);
     
-    LOG_DEBUG << boost::format ("Loading image %s  (%d:%d:%d  %s)") % fn % myObject.ID % ID % i % printArray(alignClip,"clip");
-    cf.loadImage(tmpImg,false);
+    LOG_DEBUG << boost::format ("Loading image "+imageTemplate+"  (%d:%d:%d  %s)") % imageNumbers[i] % myObject.ID % ID % i % printArray(alignClip,"clip");
+    cf.loadImage( tmpImg );
+    clipImage( tmpImg, alignClip );
     myJob.info.progress[0]++;
     if(tmpImg.meta) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
@@ -1083,22 +1030,20 @@ void Channel::storePatchData(boost::asio::io_service& service, Array<PatchData::
 Point16 Channel::getImageSize(void) {
 
     if( imgSize == 0 ) {
-        if( alignClip.size() == 4 ) {
+        if( alignClip.size() == 4 ) {   // we have align-clip, but no mapping => reference channel.
             imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
-            return imgSize;
-        }
-        size_t nImages = imageNumbers.size();
-        bfs::path fn;
-        if(nImages) {
-            fn = bfs::path(imageDataDir) / bfs::path(boost::str (boost::format (imageTemplate) % imageNumbers[0]));
-        } else {
-            nImages = 1;
-            fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
-        }
-        Image<float> tmp;
-        ClippedFile::load(tmp,fn.string(),alignClip);       // Image will be cached, so this is not a "wasted" load.
-        if( tmp.nDimensions() == 2 ) {
-            imgSize = Point16(tmp.dimSize(0),tmp.dimSize(1));
+        } else {                        //  No align-map or align-clip, get full image size.
+            bfs::path fn;
+            if( nImages() ) {
+                fn = bfs::path(imageDataDir) / bfs::path(boost::str(boost::format (imageTemplate) % imageNumbers[0]));
+            } else {
+                fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
+            }
+            Image<float> tmp;
+            CachedFile::load( tmp, fn.string() );       // Image will be cached, so this is not a "wasted" load.
+            if( tmp.nDimensions() == 2 ) {
+                imgSize = Point16( tmp.dimSize(0), tmp.dimSize(1) );
+            } else LOG_ERR << "Image " << fn << " is not 2-dimensional.";
         }
     }
     return imgSize;

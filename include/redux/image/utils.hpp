@@ -3,6 +3,7 @@
 
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
+#include "redux/util/arrayutil.hpp"
 #include "redux/types.hpp"
 
 #include <functional>
@@ -171,6 +172,54 @@ namespace redux {
             return chisq / static_cast<double>( count );
         }
 
+        template <typename T>
+        void clipImage( redux::util::Array<T>& img, const std::vector<int16_t> clip, bool symmetricClip=false )  {
+            
+            std::vector<int16_t> thisClip = clip;
+            if( thisClip.size() == 2 ) {        // apply same values to both dimensions.
+                thisClip.insert( thisClip.end(), clip.begin(), clip.end() );
+            }
+            
+            if( thisClip.size() == 4 ) {
+                bool flipX = false, flipY = false;
+                // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first.
+                if ( thisClip[0] > thisClip[1] ) {
+                    std::swap( thisClip[0], thisClip[1] );
+                    flipX = true;
+                }
+                if ( thisClip[2] > thisClip[3] ) {
+                    std::swap( thisClip[2], thisClip[3] );
+                    flipY = true;
+                }
+                for( auto & index : thisClip )
+                    --index;       // NOTE: momfbd cfg files uses 1-based indexes, internally we start with 0.
+                size_t sy = thisClip[3] - thisClip[2] + 1;
+                size_t sx = thisClip[1] - thisClip[0] + 1;
+                if( symmetricClip ) {
+                    const std::vector<size_t>& dims = img.dimensions();
+                    int skewY = (dims[0] - sy) / 2  - thisClip[2];
+                    int skewX = (dims[1] - sx) / 2  - thisClip[0];
+                    thisClip[0] += skewX;
+                    thisClip[1] += skewX;
+                    thisClip[2] += skewY;
+                    thisClip[3] += skewY;
+                }
+                img.setLimits( thisClip[2], thisClip[3], thisClip[0], thisClip[1] );
+                img.trim();
+
+                if( flipX || flipY ) {
+                    std::shared_ptr<T*> arrayPtr = img.reshape(sy, sx);
+                    T** imgPtr = arrayPtr.get();
+                    if (flipX) redux::util::reverseX(imgPtr, sy, sx);
+                    if (flipY) redux::util::reverseY(imgPtr, sy, sx);
+                }
+            }
+        }
+        
+        template <typename T>
+        void clipImage( redux::image::Image<T>& arr, const std::vector<int16_t> clip, bool symmetricClip=false )  {
+            clipImage( reinterpret_cast<redux::util::Array<T>&>(arr), clip, symmetricClip );
+        }
 
         template <typename T, typename Predicate>
         void fillPixels( redux::util::Array<T>& array, T fillValue, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
