@@ -585,7 +585,7 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
                  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
     telescopeD(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
-    badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_gamma(1E-4),
+    badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_gamma(1E-4), graddiff_step(1E-2),
     outputFileType(FT_NONE), outputDataType(DT_F32T), sequenceNumber(0),
     observationTime(""), observationDate("N/A"), tmpDataDir("./data"), outputDir("") {
 
@@ -691,6 +691,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     FTOL = tree.get<float>("FTOL", defaults.FTOL);
     EPS = tree.get<float>("EPS", defaults.EPS);
     reg_gamma = tree.get<float>("REG_GAMMA", defaults.reg_gamma);
+    graddiff_step = tree.get<float>("GRADDIFF_STEP", defaults.graddiff_step);
 
     vector<FileType> filetypes = tree.get<vector<FileType>>("FILE_TYPE", vector<FileType>(1, (runFlags & RF_CALIBRATE) ? FT_ANA : FT_FITS));
     for(const FileType& it : filetypes) outputFileType |= it;
@@ -798,6 +799,7 @@ void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
     if(FTOL != defaults.FTOL) tree.put("FTOL", FTOL);
     if(EPS != defaults.EPS) tree.put("EPS", EPS);
     if(reg_gamma != defaults.reg_gamma) tree.put("REG_GAMMA", reg_gamma);
+    if(graddiff_step != defaults.graddiff_step) tree.put("GRADDIFF_STEP", graddiff_step);
  
     if(outputFileType != ((runFlags & RF_CALIBRATE) ? FT_ANA : FT_FITS)) tree.put("FILE_TYPE", ftTags[outputFileType%8]);
     if(outputDataType != defaults.outputDataType) tree.put("DATA_TYPE", dtTags[outputDataType%5]);
@@ -818,7 +820,7 @@ uint64_t GlobalCfg::size(void) const {
     sz += 6*sizeof(uint8_t);                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType
     sz += 9*sizeof(uint16_t);                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
     sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
-    sz += 5*sizeof(float);                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma
+    sz += 6*sizeof(float);                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma, graddiff_step
     sz += sizeof(double);                    // telescopeD
     sz += sizeof(uint32_t);                  // sequenceNumber
     sz += observationTime.length() + 1;
@@ -854,6 +856,7 @@ uint64_t GlobalCfg::pack(char* ptr) const {
     count += pack(ptr+count, FTOL);
     count += pack(ptr+count, EPS);
     count += pack(ptr+count, reg_gamma);
+    count += pack(ptr+count, graddiff_step);
     count += pack(ptr+count, outputFileType);
     count += pack(ptr+count, outputDataType);
     count += pack(ptr+count, sequenceNumber);
@@ -893,6 +896,7 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, FTOL, swap_endian);
     count += unpack(ptr+count, EPS, swap_endian);
     count += unpack(ptr+count, reg_gamma, swap_endian);
+    count += unpack(ptr+count, graddiff_step, swap_endian);
     count += unpack(ptr+count, outputFileType);
     count += unpack(ptr+count, outputDataType);
     count += unpack(ptr+count, sequenceNumber, swap_endian);
