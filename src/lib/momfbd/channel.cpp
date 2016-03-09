@@ -296,6 +296,7 @@ bool Channel::checkData (void) {
         }
     }
 
+    myJob.info.progress[1] += std::max(imageNumbers.size(),1UL)*3;  // load, process, split & store (TODO more accurate progress reporting)
 
     // Dark(s)
     if (!darkTemplate.empty()) {
@@ -607,6 +608,7 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
             }
         }
         images.clear();                                                                 // release resources after storing the patch-data.
+        myJob.info.progress[0] += nImages;
         return false;   // TODO return true if any error
     });
 
@@ -887,10 +889,12 @@ void Channel::loadImage(size_t i) {
     
     LOG_DEBUG << boost::format ("Loading image %s  (%d:%d:%d  %s)") % fn % myObject.ID % ID % i % printArray(alignClip,"clip");
     cf.loadImage(tmpImg,false);
+    myJob.info.progress[0]++;
     if(tmpImg.meta) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
     }
     preprocessImage(i, tmpImg);
+    myJob.info.progress[0]++;
     imageStats[i]->getStats(borderClip, tmpImg);     // get stats for corrected data
     view.assign(reinterpret_cast<redux::util::Array<float>&>(tmpImg));
  

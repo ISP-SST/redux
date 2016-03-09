@@ -46,6 +46,7 @@ namespace redux {
 
             static Job* create(void) { return new MomfbdJob(); }
 
+            void setProgressString(void);
             uint64_t unpackParts(const char* ptr, WorkInProgress&, bool);
             
             void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
@@ -57,13 +58,15 @@ namespace redux {
 
             size_t nImages(void) const;
             
-            bool getWork( WorkInProgress&, uint16_t );
+            bool getWork( WorkInProgress&, uint16_t, bool );
             void ungetWork( WorkInProgress& );
+            void failWork( WorkInProgress& );
             void returnResults( WorkInProgress& );
 
             void cleanup(void);
             bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
             
+            bool active(void);
             bool check(void);
             bool checkCfg(void);
             bool checkData(void);

@@ -197,12 +197,12 @@ bool DebugJob::check(void) {
         case JSTEP_RUNNING: ;
         case JSTEP_POSTPROCESS: ;
         case JSTEP_COMPLETED: ret = true; break;
-        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << " (" << stepString(info.step) << ")";
+        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step;
     }
     return ret;
 }
 
-bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
+bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")";

@@ -132,15 +132,17 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), timeout(1800), priority(10), verbosity(0), maxPartRetries(1), maxThreads(255), 
-         step(0), state(JSTATE_IDLE) {
+Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(1), maxThreads(255), 
+         step(JSTEP_NONE), state(JSTATE_NONE) {
 
+    
 }
 
 
 uint64_t Job::Info::size(void) const {
-    uint64_t sz = 2*sizeof(uint32_t) + sizeof(uint16_t) + 5;
-    sz += typeString.length() + name.length() + user.length() + host.length() + logFile.length() + 5;
+    uint64_t sz = 4*sizeof(uint32_t) + sizeof(uint16_t) + 5;
+    sz += typeString.length() + name.length() + user.length() + host.length() + 4;
+    sz += progressString.length() + logFile.length() + 2;
     sz += 3*sizeof(time_t);
     return sz;
 }
@@ -157,9 +159,12 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, maxPartRetries);
     count += pack(ptr+count, step.load());
     count += pack(ptr+count, state.load());
+    count += pack(ptr+count, progress[0].load());
+    count += pack(ptr+count, progress[1].load());
     count += pack(ptr+count, name);
     count += pack(ptr+count, user);
     count += pack(ptr+count, host);
+    count += pack(ptr+count, progressString);
     count += pack(ptr+count, logFile);
     count += pack(ptr+count, redux::util::to_time_t(submitTime));
     count += pack(ptr+count, redux::util::to_time_t(startedTime));
@@ -182,9 +187,15 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     step.store(tmp);
     count += unpack(ptr+count, tmp);
     state.store(tmp);
+    uint32_t tmp32;
+    count += unpack(ptr+count, tmp32);
+    progress[0].store(tmp);
+    count += unpack(ptr+count, tmp32);
+    progress[1].store(tmp);
     count += unpack(ptr+count, name);
     count += unpack(ptr+count, user);
     count += unpack(ptr+count, host);
+    count += unpack(ptr+count, progressString);
     count += unpack(ptr+count, logFile);
     time_t timestamp;
     count += unpack(ptr+count, timestamp, swap_endian);
@@ -198,7 +209,7 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
 
 
 std::string Job::Info::printHeader(void) {
-    string hdr = alignRight("ID", 5) + alignCenter("type", 10) + alignCenter("submitted", 20);
+    string hdr = alignRight("#", 4) + alignRight("ID", 5) + alignCenter("type", 10) + alignCenter("submitted", 20); // + alignCenter("started", 20);
     hdr += alignCenter("name", 15) + alignLeft("user", 15) + alignCenter("priority", 8) + alignCenter("state", 8);
     return hdr;
 }
@@ -206,9 +217,11 @@ std::string Job::Info::printHeader(void) {
 
 std::string Job::Info::print(void) {
     string info = alignRight(std::to_string(id), 5) + alignCenter(typeString, 10);
-    info += alignCenter(to_iso_extended_string(submitTime), 20);
+    string startedString = "";
+    if ( !startedTime.is_not_a_date_time() ) startedString = to_iso_extended_string(startedTime);
+    info += alignCenter(to_iso_extended_string(submitTime), 20); // + alignCenter(startedString, 20);
     info += alignCenter(name, 15) + alignLeft(user + "@" + host, 15) + alignCenter(std::to_string(priority), 8)
-    + alignCenter(stateTag(state), 3); // + alignLeft(stepString(step), 15);
+    + alignCenter(stateTag(state), 3) + alignLeft(progressString, 15);
     return info;
 }
 

@@ -52,7 +52,7 @@ namespace redux {
         
         bool check(void);
         
-        bool getWork(WorkInProgress&, uint16_t);
+        bool getWork(WorkInProgress&, uint16_t, bool);
         void ungetWork(WorkInProgress&);
         void returnResults(WorkInProgress&);
         

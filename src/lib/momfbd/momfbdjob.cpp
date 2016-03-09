@@ -46,6 +46,22 @@ MomfbdJob::~MomfbdJob( void ) {
                   };
 */        
 
+void MomfbdJob::setProgressString( void ) {
+    
+    float progress = 100.0*info.progress[0];
+    if(info.progress[1] > 0) progress /= info.progress[1];
+
+    switch(info.step.load()) {
+        case JSTEP_PREPROCESS: info.progressString = boost::str(boost::format(" (P:%.1f%%)") % progress); break;
+        case JSTEP_QUEUED: info.progressString = " (Q)"; break;
+        case JSTEP_RUNNING: info.progressString = boost::str(boost::format(" (%.1f%%)") % progress); break;
+        case JSTEP_POSTPROCESS: info.progressString = boost::str(boost::format(" (W:%.1f%%)") % progress); break;
+        default: info.progressString = "";
+    }
+
+
+}
+
 
 uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {
     using redux::util::unpack;
@@ -169,10 +185,10 @@ uint8_t MomfbdJob::checkParts( void ) {
 
     uint8_t mask = 0;
     for( auto & patch : patches ) {
-        /*if( (patch.second->step & JSTEP_ERR) && (patch.second->nRetries<info.maxPartRetries)) {
-            patch.second->nRetries++;
-            patch.second->step &= ~JSTEP_ERR;
-        }*/
+        if( (patch->step & JSTEP_ERR) && (patch->nRetries < info.maxPartRetries)) {
+            patch->nRetries++;
+            patch->step = JSTEP_QUEUED;
+        }
         mask |= patch->step;
     }
 
@@ -189,10 +205,9 @@ uint8_t MomfbdJob::checkParts( void ) {
 }
 
 
-bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
+bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStartNew ) {
 
     bool ret(false);
-    static int nActive(0);          // count number of running+preprocesssed jobs (local worker only)
     uint8_t step = info.step.load();
     wip.parts.clear();
     if( step == JSTEP_COMPLETED ) {
@@ -202,27 +217,31 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
      // run pre-/postprocessing if local
     if( !wip.isRemote ) {
         if(step == JSTEP_POSTPROCESS) {
-            nActive--;
             return true;
         }
-        if( (step == JSTEP_PREPROCESS) && (nActive < 2) ) {
-            nActive++;
+        if( allowStartNew && (step == JSTEP_CHECKED) ) {
+            info.step = JSTEP_PREPROCESS;
+            info.progress[0] = 0;
             return true;
         }
-    }
-    
-    if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
-        info.step = step = JSTEP_RUNNING;
-    }
+    } else {
 
-    if ( step == JSTEP_RUNNING ) {                      // running
-        unique_lock<mutex> lock( jobMutex );
-        if( wip.isRemote || nActive > 1 ) {     // FIXME: last job will not be processed locally (nActive < 2).
+        if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
+            unique_lock<mutex> lock( jobMutex );
+            info.step = step = JSTEP_RUNNING;
+            info.progress[0] = 0;
+            info.progress[1] = patches.nElements();
+        }
+
+        if ( step == JSTEP_RUNNING ) {                      // running
+            unique_lock<mutex> lock( jobMutex );
+            checkParts();
             for( auto & patch : patches ) {
                 if( patch && (patch->step == JSTEP_QUEUED) ) {
+                    //LOG_DETAIL << "Starting patch: #" << patch->id << "   step=" << (int)patch->step << "  ptr = " << hexString(patch.get());
                     patch->step = JSTEP_RUNNING;
                     wip.parts.push_back( patch );
-                    if( wip.isRemote && (wip.previousJob.get() != this) ) {     // First time for this slave -> include global data
+                    if( wip.previousJob.get() != this ) {     // First time for this slave -> include global data
                         wip.parts.push_back( globalData );
                     }
                     ret = true;
@@ -231,7 +250,6 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads ) {
             }
         }
     }
-    
     //  LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
     if( ret ) {
         unique_lock<mutex> lock( jobMutex );
@@ -251,16 +269,40 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 }
 
 
-void MomfbdJob::returnResults( WorkInProgress& wip ) {
+void MomfbdJob::failWork( WorkInProgress& wip ) {
     unique_lock<mutex> lock( jobMutex );
+    for( auto& part : wip.parts ) {
+        part->step = JSTEP_ERR;
+    }
+    
+}
+
+
+void MomfbdJob::returnResults( WorkInProgress& wip ) {
+    
+    unique_lock<mutex> lock( jobMutex );
+    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+
     checkParts();
+    boost::posix_time::time_duration elapsed = (now - wip.workStarted);
+
     for( auto& part : wip.parts ) {
         auto patch = static_pointer_cast<PatchData>( part );
         patch->step = JSTEP_POSTPROCESS;
         patch->setPath(to_string(info.id));
         patches(patch->index.y,patch->index.x) = patch;
+        info.progress[0]++;
     }
+
+    info.maxProcessingTime = max<uint32_t>( info.maxProcessingTime, elapsed.total_seconds() );
+    if( info.maxProcessingTime ) {
+        uint32_t newTimeout = info.maxProcessingTime * (20 - info.progress[0]*18.0/info.progress[1]);    // TBD: start with large margin, then shrink to ~2*maxProcessingTime ?
+        LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds.";
+        info.timeout = newTimeout;    // TBD: fixed timeout or 10 * maxProcTime ?
+    }
+    
     checkParts();
+    
 }
 
 
@@ -420,6 +462,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     LOG_DETAIL << "MomfbdJob::preProcess()  Done.  nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << "   nImages = " << nTotalImages;
 
     info.step.store( JSTEP_QUEUED );
+    info.state.store( JSTATE_IDLE );
 
 }
 
@@ -473,6 +516,17 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads
 }
 
 
+bool MomfbdJob::active(void) {
+    switch (info.step) {
+        case JSTEP_PREPROCESS: ;
+        case JSTEP_QUEUED: ;
+        case JSTEP_RUNNING: ;
+        case JSTEP_POSTPROCESS: return true;
+        default: return false;
+    }
+}
+
+
 bool MomfbdJob::check(void) {
     bool ret(false);
     unique_lock<mutex> lock(jobMutex);
@@ -509,6 +563,8 @@ bool MomfbdJob::checkCfg(void) {
 
 
 bool MomfbdJob::checkData(void) {
+    
+    info.progress[1] = 0;
 
     for( auto& obj: objects ) {
         if( !obj->checkData() ) return false;

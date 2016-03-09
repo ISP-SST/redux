@@ -79,18 +79,19 @@ namespace redux {
         static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, bool check=false );
         static JobPtr newJob( const std::string& );
         
-        virtual std::string stepString(uint8_t) { return "-"; };
+        virtual void setProgressString(void) { info.progressString = ""; };
         static std::string stateString(uint8_t);
         static std::string stateTag(uint8_t);
         
         struct Info {
-            uint32_t id, timeout;
+            uint32_t id, timeout, maxProcessingTime;
             uint8_t priority, verbosity, maxPartRetries;
             uint16_t maxThreads;
             std::atomic<uint8_t> step;
             std::atomic<uint8_t> state;
+            std::atomic<uint32_t> progress[2];
             std::string typeString, name, user, host;
-            std::string logFile;
+            std::string progressString, logFile;
             boost::posix_time::ptime submitTime;
             boost::posix_time::ptime startedTime;
             boost::posix_time::ptime completedTime;
@@ -125,10 +126,12 @@ namespace redux {
         virtual uint64_t pack(char*) const;
         virtual uint64_t unpack(const char*, bool);
 
+        virtual bool active(void) { return false; };
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
         
-        virtual bool getWork(WorkInProgress&, uint16_t) { return false; };
+        virtual bool getWork(WorkInProgress&, uint16_t, bool) { return false; };
         virtual void ungetWork(WorkInProgress&) { };
+        virtual void failWork(WorkInProgress&) { };
         virtual void returnResults(WorkInProgress&) { };
 
         virtual void init(void) {};
