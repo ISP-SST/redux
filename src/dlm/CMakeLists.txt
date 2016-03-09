@@ -20,6 +20,10 @@ if (DEFINED IDL_FOUND)
     set(IDL_DLM_DIR "${IDL_DLM_DIR}" CACHE PATH "")
     message(STATUS "IDL DLM will be installed into: \"${IDL_DLM_DIR}\"")
     
+    if (REDUX_WITH_OPENCV)
+        add_definitions(-DREDUX_WITH_OPENCV)
+    endif()
+
     set(CMAKE_DEBUG_POSTFIX "")   # no debug-suffix for dlm libraries
     
     REDUX_SETDIRS()     # this will populate REDUX_CURRENT_LIBRARIES with the necessary dependencies
