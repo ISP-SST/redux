@@ -1,6 +1,7 @@
 #include "redux/application.hpp"
 
 #include "redux/logger.hpp"
+#include "redux/revision.hpp"
 #include "redux/version.hpp"
 
 #include <vector>
@@ -33,7 +34,7 @@ void Application::getOptions( po::options_description& options, const string& na
     po::options_description config( "Configuration" );
     config.add_options()
     ( "settings", "Configuration file to load settings from." )
-    ( "name", po::value<string>()->default_value( name ),
+    ( "aname", po::value<string>()->default_value( name ),
       "Name used to identify this application instance." )
     ( "unique,u", "Prevent any other application-based process with this flag from"
       " using the same name." )
@@ -89,8 +90,13 @@ void Application::checkGeneralOptions( po::options_description& desc, po::variab
         exit( 0 );
     }
     if( vm.count( "version" ) ) {
-        cout << "Version: " << getVersionString() << endl;
-        cout << getLongVersionString() << endl;
+        if( vm.count( "verbose" ) ) {
+            cout << "Version:  " << getLongVersionString() << endl;
+            cout << "Commited: " << reduxCommitTime << endl;
+            cout << "Compiled: " << reduxBuildTime << endl;
+        } else {
+            cout << getVersionString() << endl;
+        }
         exit( 0 );
     }
     if( vm.count( "copyright" ) ) {
@@ -121,7 +127,7 @@ Application::Application( po::variables_map& vm, RunMode rm ) : runMode(rm), ret
             //throw KillException();
         }
     }
-    applicationName = vm["name"].as<string>();
+    applicationName = vm["aname"].as<string>();
 
 }
 

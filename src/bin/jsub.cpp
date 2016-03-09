@@ -45,7 +45,8 @@ namespace {
         ( "force,f", "Overwrite output file if exists" )
         ( "kill,k", "Send exit command to Server." )
         ( "swap,s", "swap mode: write compressed data to swap file instead of keeping it in memory (useful for large problems)" )
-        ( "config,c", bpo::value<string>()->default_value( "momfbd.cfg" ), "Configuration file to process." )
+        ( "config,c", bpo::value< vector<string> >()->multitoken(), "Configuration file(s) to process." )
+        ( "name", po::value<string>(), "Name to use for the supplied configurations." )
         ( "simx", bpo::value<string>(), "x coordinate[s] of subimages to restore" )
         ( "simy", bpo::value<string>(), "y coordinate[s] of subimages to restore" )
         ( "imgn,n", bpo::value<string>(), "Image numbers" )
@@ -154,8 +155,10 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
         return;
     }
 
-    conn->asyncWrite( buf, bufferSize );
+    //conn->asyncWrite( buf, bufferSize );
+    conn->syncWrite( buf.get(), bufferSize );
     //boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),bufferSize));
+
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 
     bool swap_endian = (me.littleEndian != master.littleEndian);
@@ -211,7 +214,7 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 }
 
 
-string filterOldCfg(string filename) {
+string filterOldCfg(string filename, string jobname, string logfile ) {
     
     std::ifstream in(filename, std::ios::in | std::ios::binary);
     if (!in) {
@@ -231,7 +234,10 @@ string filterOldCfg(string filename) {
     found |= replace(text, "=", " ");
     
     if (found) { // old cfg file, wrap inside momfbd { ... }
-        text = "momfbd { \n" + text + "\n}";
+        text = "momfbd { \n" + text;
+        text += "NAME " + jobname + "\n";
+        text += "LOGFILE " + logfile + "\n";
+        text += "\n}";
     }
 
     return text;
@@ -257,20 +263,34 @@ int main (int argc, char *argv[]) {
 
 
     try {
+        
         Logger logger( vm );
         bpt::ptree momfbd;
-        std::stringstream filteredCfg(filterOldCfg(vm["config"].as<string>()));
+        
+        if( !vm.count ("config") ) {
+            cerr << "No configuration file supplied." << endl;
+            return 0;
+        }
+        
+        vector<string> files = vm["config"].as<vector<string>>();
+
+        string globalName = "";
+        if( vm.count ("name") ) {
+            globalName = vm["name"].as<string>();
+        }
+
+        stringstream filteredCfg;
+        for( auto it: files ) {
+            string bn = boost::filesystem::basename(it);
+            string jobName = (globalName=="") ? bn : globalName;
+            string logFile = bn + ".log";
+            string tmpS = filterOldCfg(it, jobName, logFile) + "\n";
+            filteredCfg.write(tmpS.c_str(),tmpS.size());
+        }
+
         bpt::read_info (filteredCfg , momfbd);
         bool check = vm.count ("no-check") == 0;
         vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
-
-        if( vm.count ("name") ) {
-            for( auto & job : jobs ) {
-                if( job ) {
-                    job->info.name = vm["name"].as<string>();
-                }
-            }
-        }
 
         if (vm.count ("print")) {       // dump configuration to console and exit
             bpt::ptree dump;
@@ -306,6 +326,7 @@ int main (int argc, char *argv[]) {
                 for( auto & it : threads ) {
                     it->join();
                 }
+
             }
         }
 

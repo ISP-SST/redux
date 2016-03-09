@@ -82,7 +82,7 @@ Logger::Logger( bpo::variables_map& vm ) {
                 if( hasDefault ) {
                     continue;
                 }
-                filename = vm["name"].as<string>() + ".log";
+                filename = vm["aname"].as<string>() + ".log";
                 hasDefault = true;
             }
             addFileLog( filename );

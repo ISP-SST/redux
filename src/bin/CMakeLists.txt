@@ -3,9 +3,9 @@ USE_REDUX(redux)
 
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
-REDUX_ADD_EXECUTABLE( jsub jsub.cpp )
-REDUX_ADD_EXECUTABLE( jstat jstat.cpp )
-REDUX_ADD_EXECUTABLE( jdel jdel.cpp )
+REDUX_ADD_EXECUTABLE( rsub jsub.cpp )
+REDUX_ADD_EXECUTABLE( rstat jstat.cpp )
+REDUX_ADD_EXECUTABLE( rdel jdel.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 

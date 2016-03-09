@@ -85,7 +85,6 @@ int main( int argc, char *argv[] ) {
     vm.notify();
 
 //     if( !vm.count( "jobs" ) && !vm.count( "all" ) ) {
-//         cout << allOptions << endl;
 //         return EXIT_SUCCESS;
 //     }
 // 
@@ -96,7 +95,6 @@ int main( int argc, char *argv[] ) {
         }
         
         if( jobString.empty() ) {
-            cout << "EMPTY\n" << allOptions << endl;
             return EXIT_SUCCESS;
         }
         

@@ -15,7 +15,7 @@ using namespace std;
 namespace {
 
     const string thisChannel = "reduxd";
-
+    
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
 
