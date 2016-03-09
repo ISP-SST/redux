@@ -20,11 +20,13 @@ namespace redux {
         struct ModeInfo {
             
             uint16_t firstMode, lastMode, modeNumber, nPupilPixels;
+            std::vector<uint16_t> modeNumbers;
             double pupilRadius, angle, cutoff;
             std::string filename;
             ModeInfo ( std::string, uint16_t nPixels=0 );
             ModeInfo ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
             ModeInfo ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
+            ModeInfo ( uint16_t firstMode, uint16_t lastMode, std::vector<uint16_t> modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -70,7 +72,7 @@ namespace redux {
             void init( const MomfbdJob& job, const Object& ch );
             void generate( uint16_t pixels, double radius, double angle, const std::vector<uint16_t>& modes );  // Zernike
             void generate( uint16_t pixels, double radius, double angle, uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modes, double cutoff ); // Karhunen-Loeve
-            void normalize(const redux::image::Pupil&);         //!< Normalize modes so that sum(|mode*pupil|) = pupilArea
+            void getNorms(const redux::image::Pupil&);         //!< Normalize modes so that sum(|mode*pupil|) = pupilArea
             
             void setPupilSize( uint16_t nPixels, double radiusInPixels, double rotation );
             
@@ -81,7 +83,8 @@ namespace redux {
             
             std::vector<uint16_t> modeNumbers;
             std::vector<double*> modePointers;
-            std::vector<double> atm_rms;
+            std::vector<float> atm_rms;
+            std::vector<float> norms;          //!< (square of) L_{2,2} norms for the modes over the pupil
             std::mutex mtx;
 
             

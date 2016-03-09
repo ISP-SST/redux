@@ -54,9 +54,17 @@ ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, u
           
 }
 
+
+ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, std::vector<uint16_t> modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
+    : firstMode(firstMode), lastMode(lastMode), nPupilPixels(nPoints), modeNumbers(modeNumbers),
+      pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename("") {
+          
+}
+
       
 uint64_t ModeInfo::size( void ) const {
     static uint64_t sz = 4*sizeof(uint16_t) + 3*sizeof(double) + 1;
+    sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += filename.length();
     return sz;
 }
@@ -67,6 +75,7 @@ uint64_t ModeInfo::pack( char* ptr ) const {
     uint64_t count = pack(ptr,firstMode);
     count += pack(ptr+count,lastMode);
     count += pack(ptr+count,modeNumber);
+    count += pack(ptr+count,modeNumbers);
     count += pack(ptr+count,nPupilPixels);
     count += pack(ptr+count,pupilRadius);
     count += pack(ptr+count,angle);
@@ -81,6 +90,7 @@ uint64_t ModeInfo::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = unpack(ptr,firstMode,swap_endian);
     count += unpack(ptr+count,lastMode,swap_endian);
     count += unpack(ptr+count,modeNumber,swap_endian);
+    count += unpack(ptr+count,modeNumbers,swap_endian);
     count += unpack(ptr+count,nPupilPixels,swap_endian);
     count += unpack(ptr+count,pupilRadius,swap_endian);
     count += unpack(ptr+count,angle,swap_endian);
@@ -97,6 +107,8 @@ bool ModeInfo::operator<(const ModeInfo& rhs) const {
         return firstMode < rhs.firstMode;
     if(lastMode != rhs.lastMode)
         return lastMode < rhs.lastMode;
+    if(modeNumbers != rhs.modeNumbers)
+        return modeNumbers < rhs.modeNumbers;
     if(modeNumber != rhs.modeNumber)
         return modeNumber < rhs.modeNumber;
     if(nPupilPixels != rhs.nPupilPixels)
@@ -183,18 +195,21 @@ uint64_t ModeSet::size( void ) const {
     uint64_t sz = Array<double>::size();
     sz += info.size() + tiltMode.size() + shiftToAlpha.size();
     sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
+    sz += atm_rms.size()*sizeof(float) + sizeof(uint64_t);
+    sz += norms.size()*sizeof(float) + sizeof(uint64_t);
     return sz;
 }
 
 
 uint64_t ModeSet::pack( char* data ) const {
-    cout << "Packing modes at " << hexString(this) << endl;
     using redux::util::pack;
     uint64_t count = Array<double>::pack(data);
     count += info.pack(data+count);
     count += tiltMode.pack(data+count);
     count += shiftToAlpha.pack(data+count);
     count += pack(data+count,modeNumbers);
+    count += pack(data+count,atm_rms);
+    count += pack(data+count,norms);
     return count;
 }
 
@@ -206,6 +221,8 @@ uint64_t ModeSet::unpack( const char* data, bool swap_endian ) {
     count += tiltMode.unpack(data+count,swap_endian);
     count += shiftToAlpha.unpack(data+count,swap_endian);
     count += unpack(data+count,modeNumbers,swap_endian);
+    count += unpack(data+count,atm_rms,swap_endian);
+    count += unpack(data+count,norms,swap_endian);
     modePointers.clear();
     for(unsigned int i=0; i<dimSize(0); ++i) {
         modePointers.push_back( ptr(i,0,0) );
@@ -217,6 +234,8 @@ uint64_t ModeSet::unpack( const char* data, bool swap_endian ) {
 ModeSet& ModeSet::operator=( const ModeSet& rhs ) {
     redux::util::Array<double>::operator=( reinterpret_cast<const redux::util::Array<double>&>(rhs) );
     modeNumbers = rhs.modeNumbers;
+    atm_rms = rhs.atm_rms;
+    norms = rhs.norms;
     modePointers = rhs.modePointers;
     tiltMode = rhs.tiltMode;
     shiftToAlpha = rhs.shiftToAlpha;
@@ -322,6 +341,10 @@ void ModeSet::init( const MomfbdJob& job, const Object& obj ) {
 
 void ModeSet::generate( uint16_t pixels, double radius, double angle, const vector<uint16_t>& modes ) {
     
+    resize();   // clear
+    modeNumbers.clear();
+    modePointers.clear();
+
     if ( modes.empty() ) return;
     
     info.nPupilPixels = pixels;
@@ -335,14 +358,14 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
     Array<double> view( reinterpret_cast<const redux::util::Array<double>&>(*this), 0, 0, 0, pixels-1, 0, pixels-1 );
     
     for( auto& it : modes ) {
-        ModeInfo info = base_info;
+        ModeInfo minfo = base_info;
         if ( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
-            info.firstMode = info.lastMode = 0;
+            minfo.firstMode = minfo.lastMode = 0;
             if ( it == 2 ) tiltMode.x = modeNumbers.size();
             else tiltMode.y = modeNumbers.size();
         }
-        info.modeNumber = it;
-        auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
+        minfo.modeNumber = it;
+        auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( minfo );
         if( !mode ) {
             mode.reset( new PupilMode( it, pixels, radius, angle ) );    // Zernike
         }
@@ -358,6 +381,10 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
 
 
 void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t firstZernike, uint16_t lastZernike, const vector<uint16_t>& modes, double cutoff ) {
+    
+    resize();       // clear
+    modeNumbers.clear();
+    modePointers.clear();
     
     if ( modes.empty() ) return;
     
@@ -398,10 +425,13 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
 }
 
 
-void ModeSet::normalize( const redux::image::Pupil& pup ) {
+// Find the normalizations such that the integral of each mode over the pupil equals the pupil-area.
+void ModeSet::getNorms( const redux::image::Pupil& pup ) {
 
     const double* pupPtr = pup.get();
     size_t nPixels = info.nPupilPixels*info.nPupilPixels;
+
+    norms.resize(modePointers.size());
     for ( uint16_t i=0; i<modePointers.size(); ++i ) {
         double* ptr = modePointers[i];
         if(!ptr) continue;
@@ -414,13 +444,14 @@ void ModeSet::normalize( const redux::image::Pupil& pup ) {
             mx = std::max(mx,tmp);
             mn = std::min(mn,tmp);
         }
-        if( i == tiltMode.x ) {
-            shiftToAlpha.x = 2 * M_PI / (mx-mn);
-        } else if (i == tiltMode.y) {
-            shiftToAlpha.y = 2 * M_PI / (mx-mn);
-        }
+        norms[i] = sqrt(norm/pup.area);
         norm = sqrt(pup.area/norm);
-        transform( ptr, ptr+nPixels, ptr, [norm](const double& m) { return norm*m; });
+        if( i == tiltMode.x ) {
+            shiftToAlpha.x = 2 * M_PI / (mx-mn); // / norm;     // A shift of 1 pixel corresponds to an introduced phase-shift across the pupil of 1 period.
+        } else if (i == tiltMode.y) {
+            shiftToAlpha.y = 2 * M_PI / (mx-mn); // / norm;
+        }
+
     }
 
 }

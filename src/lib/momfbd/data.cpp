@@ -235,6 +235,7 @@ void PatchData::collectResults(void) {
 
 
 uint64_t PatchData::size( void ) const {
+    if( !isLoaded && cachedSize ) return cachedSize;
     uint64_t sz = Part::size();
     sz += index.size() + roi.size();
     for( auto& obj: objects ) {

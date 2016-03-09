@@ -185,6 +185,7 @@ namespace redux {
             int options;
             std::mutex itemMutex;
             bool isLoaded;
+            uint64_t cachedSize;
             
         };
         

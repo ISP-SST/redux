@@ -707,7 +707,7 @@ void Object::initCache (void) {
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( modeFile, pupilPixels ) ) {
                 LOG_DEBUG << "Loaded Mode-file " << modeFile;
-                ret.normalize( pupil );
+                ret.getNorms( pupil );
                 modes = ret;
               } else LOG_ERR << "Failed to load Mode-file " << modeFile;
         } else {
@@ -736,7 +736,7 @@ void Object::initCache (void) {
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
             } else {
                 LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
-                ret.normalize( pupil );
+                ret.getNorms( pupil );
                 modes = ret; 
             }
         } else {

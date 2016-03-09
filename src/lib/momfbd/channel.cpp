@@ -452,7 +452,7 @@ void Channel::initCache (void) {
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
             } else {
                 LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")";
-                ret.normalize( myObject.pupil );
+                ret.getNorms( myObject.pupil );
             }
         }  
     }
