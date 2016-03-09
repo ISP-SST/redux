@@ -8,7 +8,8 @@
 using namespace redux::util;
 using namespace std;
 
-string Cache::cachePath = "/scratch/tomas/redux/";
+//string Cache::cachePath = "/scratch/tomas/redux/";
+string Cache::cachePath = "/swap/redux/";
 
 
 Cache& Cache::get(void) {
@@ -106,17 +107,17 @@ bool CacheItem::cacheStore(bool clearAfterStore){
     if(isLoaded) {
         unique_lock<mutex> lock(itemMutex);
         bfs::create_directories(fullPath.parent_path());
-        size_t sz = csize();
-        unique_ptr<char[]> buf( new char[sz] );
+        cachedSize = csize();
+        unique_ptr<char[]> buf( new char[cachedSize] );
         size_t psz = cpack(buf.get());
-        if( psz <= sz ) {
+        if( psz <= cachedSize ) {
             ofstream out(fullPath.c_str(), ofstream::binary);
             if( out.good() ) {
-                out.write( buf.get(), sz );
+                out.write( buf.get(), cachedSize );
                 //cout << hexString(this) << "  CacheItem::cacheStore() " << fullPath << "   OK  clear=" << clearAfterStore << endl;
                 ret = true;
             } else cout << hexString(this) << "  CacheItem::cacheStore() out.good() == false !!!" << endl;
-        } else cout << hexString(this) << "  CacheItem::cacheStore() " << psz << " > " << sz << " !!!" << endl;
+        } else cout << hexString(this) << "  CacheItem::cacheStore() " << psz << " > " << cachedSize << " !!!" << endl;
     } //else cout << hexString(this) << "  CacheItem::cacheStore()  " << fullPath << "   not Loaded !!!" << endl;
     
     if(clearAfterStore) {

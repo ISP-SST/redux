@@ -122,6 +122,19 @@ namespace redux {
                 }
             }
 
+            template <typename T> void apply(const T* in, T* out, double scale) const {
+                memset(out,0,nFreeParameters*sizeof(T));
+                for( auto& entry: ns_entries ) {
+                    out[entry.first.x] += entry.second * scale * in[entry.first.y];
+                }
+            }
+            template <typename T> void reverse(const T* in, T* out, double scale) const {
+                memset(out,0,nParameters*sizeof(T));
+                for( auto& entry: ns_entries ) {
+                    out[entry.first.y] += entry.second * scale * in[entry.first.x];
+                }
+            }
+
             std::string name (const std::string& base) const;
 
             int32_t nConstraints (void) const { return constraints.size(); };
