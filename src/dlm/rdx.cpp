@@ -973,6 +973,43 @@ IDL_VPTR uints_to_string(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
+
+void fft_reorder(int argc, IDL_VPTR* argv) {
+
+    if( argc < 1 ) {
+        cout << "fft_reorder: needs a single 2D array as input." << endl;
+        return;
+    }
+    
+    IDL_VPTR array = argv[0];
+    IDL_ENSURE_SIMPLE(array);
+    IDL_ENSURE_ARRAY(array);
+    
+    if ( array->value.arr->n_dim != 2 ) {
+        cout << "fft_reorder: needs a single 2D array as input." << endl;
+        return;
+    }
+
+    size_t nX = array->value.arr->dim[0];
+    size_t nY = array->value.arr->dim[1];
+    UCHAR* data = array->value.arr->data;
+    try {
+        switch(array->type) {
+            case IDL_TYP_INT: FourierTransform::reorder( reinterpret_cast<int16_t*>(data), nY, nX ); break;
+            case IDL_TYP_LONG: FourierTransform::reorder( reinterpret_cast<int32_t*>(data), nY, nX ); break;
+            case IDL_TYP_FLOAT: FourierTransform::reorder( reinterpret_cast<float*>(data), nY, nX ); break;
+            case IDL_TYP_DOUBLE: FourierTransform::reorder( reinterpret_cast<double*>(data), nY, nX ); break;
+            case IDL_TYP_COMPLEX: FourierTransform::reorder( reinterpret_cast<std::complex<float>*>(data), nY, nX ); break;
+            case IDL_TYP_DCOMPLEX: FourierTransform::reorder( reinterpret_cast<std::complex<double>*>(data), nY, nX ); break;
+            default: FourierTransform::reorder( data, nY, nX);
+        }
+    } catch ( const exception& e ) {   // catch-all to avoid killing the idl session.
+        cout << "fft_reorder: Error during call to FourierTransform::reorder() : " << e.what() << endl;
+    }
+
+}
+
+
 extern "C" {
 
     int IDL_Load (void) {
@@ -991,6 +1028,7 @@ extern "C" {
 
         static IDL_SYSFUN_DEF2 procedure_addr[] = {
             { { (IDL_SYSRTN_GENERIC) redux::printStruct}, (char*) "STRUCT_INFO", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_SYSRTN_GENERIC) fft_reorder}, (char*) "FFT_REORDER", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
 
         return IDL_SysRtnAdd (function_addr, TRUE, IDL_CARRAY_ELTS (function_addr)) &&

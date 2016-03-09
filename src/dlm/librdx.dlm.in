@@ -11,5 +11,6 @@ FUNCTION        CBEZIER2        3       3          KEYWORDS
 FUNCTION        CBEZIER3        3       3          KEYWORDS
 FUNCTION        STRING_TO_UINTS 1       1          KEYWORDS
 FUNCTION        UINTS_TO_STRING 1       1          KEYWORDS
+PROCEDURE       FFT_REORDER     1       1          KEYWORDS
 FUNCTION        IMG_ALIGN       2       2          KEYWORDS
 FUNCTION        IMG_PROJECT     2       2          KEYWORDS
