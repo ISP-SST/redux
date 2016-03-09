@@ -120,7 +120,7 @@ namespace redux {
             external_type result;
             if(!str.empty()) {
                 std::vector<std::string> tokens;
-                boost::split(tokens, str, boost::is_any_of(","));
+                boost::split(tokens, str, boost::is_any_of(", "));
                 if(std::numeric_limits<T>::is_integer && !std::numeric_limits<T>::is_signed) {    // only expand '-' & ':' for unsigned integers
                     for(auto & token : tokens) {
                         parseSegment(result, token);
