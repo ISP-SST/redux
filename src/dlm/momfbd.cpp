@@ -474,7 +474,6 @@ namespace {
         // Version string
         strPtr[0].slen = info->versionString.length();
         strPtr[0].s = new char[strPtr->slen + 1];
-        //cout << "alloc  vs = " << hexString(strPtr[0].s) << endl;
         strPtr[0].s[strPtr[0].slen] = '\0';
         info->versionString.copy ( strPtr[0].s, strPtr[0].slen );
         strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
@@ -482,7 +481,6 @@ namespace {
         // Time string
         strPtr[1].slen = info->timeString.length();
         strPtr[1].s = new char[strPtr[1].slen + 1];
-        //cout << "alloc  ts = " << hexString(strPtr[1].s) << endl;
         strPtr[1].s[strPtr[1].slen] = '\0';
         info->timeString.copy ( strPtr[1].s, strPtr[1].slen );
         strPtr[1].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
@@ -490,7 +488,6 @@ namespace {
         // Date string
         strPtr[2].slen = info->dateString.length();
         strPtr[2].s = new char[strPtr[2].slen + 1];
-        //cout << "alloc  ds = " << hexString(strPtr[2].s) << endl;
         strPtr[2].s[strPtr[2].slen] = '\0';
         info->dateString.copy ( strPtr[2].s, strPtr[2].slen );
         strPtr[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
@@ -695,7 +692,6 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_MEMINT dims[] = {1};
     IDL_VPTR v;
 
-    //  cout << "after params:   mask = " << bitString(loadMask) << endl;
     if ( checkData ) {
         vector<IDL_STRUCT_TAG_DEF> allTags;
         createTags ( allTags, info->dataMask, info.get() );

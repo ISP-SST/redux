@@ -32,6 +32,7 @@ namespace {
         IDL_INT help;
         IDL_INT by_distance;
         float eps;
+        IDL_INT margin;
         IDL_INT max_dist;
         float max_scale;
         IDL_INT max_points;
@@ -51,9 +52,10 @@ namespace {
         { (char*) "EPS",        IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (eps) },
         { (char*) "H_INIT",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (h_init) },
         { (char*) "HELP",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
+        { (char*) "MARGIN",     IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (margin) },
         { (char*) "MAX_DIST",   IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_dist) },
-        { (char*) "MAX_SCALE",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_scale) },
         { (char*) "MAX_POINTS", IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_points) },
+        { (char*) "MAX_SCALE",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_scale) },
         { (char*) "NITER",      IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (niter) },
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
@@ -112,7 +114,6 @@ namespace {
             img.convertTo (img2, CV_32FC1);
             double minValue, maxValue;
             cv::minMaxLoc (img2, &minValue, &maxValue);
-            //cout << "Stretching histogram:  min = " << minValue << "  max = " << maxValue << endl;
             img2 = (img2 - minValue) / (maxValue - minValue);
             return std::move (img2);
         } catch (cv::Exception& e) {
@@ -302,6 +303,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     kw.by_distance = 0;
     kw.eps = 1E-3;
     kw.help = 0;
+    kw.margin = 30;
     kw.max_dist = 80;
     kw.max_scale = 1.1;
     kw.max_points = -1;
@@ -359,10 +361,27 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         
         detector.detect (imgByte1, keypoints1);
         detector.detect (imgByte2, keypoints2);
-        
-        keypoints1.erase( std::remove_if(keypoints1.begin(), keypoints1.end(), [](const KeyPoint& kp) { return !std::isfinite( norm(kp.pt) ); }),
+        Point2f last(imgFloat1.cols-kw.margin, imgFloat1.rows-kw.margin);
+        keypoints1.erase( std::remove_if(keypoints1.begin(), keypoints1.end(),
+                                         [&kw,&last](const KeyPoint& kp) {
+                                             if ( std::isfinite( norm(kp.pt) ) ) {
+                                                 if( (kp.pt.x > kw.margin) && (kp.pt.y > kw.margin) &&
+                                                     (kp.pt.x < last.x) && (kp.pt.y < last.y)
+                                                 ) return false;
+                                             }
+                                             return true;
+                                        }),
                           keypoints1.end());
-        keypoints2.erase( std::remove_if(keypoints2.begin(), keypoints2.end(), [](const KeyPoint& kp) { return !std::isfinite( norm(kp.pt) ); }),
+        
+        keypoints2.erase( std::remove_if(keypoints2.begin(), keypoints2.end(),
+                                         [&kw,&last](const KeyPoint& kp) {
+                                             if ( std::isfinite( norm(kp.pt) ) ) {
+                                                 if( (kp.pt.x > kw.margin) && (kp.pt.y > kw.margin) &&
+                                                     (kp.pt.x < last.x) && (kp.pt.y < last.y)
+                                                 ) return false;
+                                             }
+                                             return true;
+                                        }),
                           keypoints2.end());
 
         if ( kw.verbose > 1 || keypoints1.size() < 3 || keypoints2.size() < 3 ) {
@@ -398,26 +417,26 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             return (norm(a.pt - mid) < norm(b.pt - mid));
         });
 
-        if( kw.show > 1 ) {
-            drawKeypoints(imgByte1, largestKP1, result, Scalar(0,0,255) );
-            imshow( "Good Matches & Object detection", result );
-            waitKey(0); 
-            drawKeypoints(imgByte2, largestKP2, result, Scalar(0,0,255) );
-            imshow( "Good Matches & Object detection", result );
-            waitKey(0); 
-        }
+//         if( kw.show > 1 ) {
+//             drawKeypoints(imgByte1, largestKP1, result, Scalar(0,0,255) );
+//             imshow( "Good Matches & Object detection", result );
+//             waitKey(0); 
+//             drawKeypoints(imgByte2, largestKP2, result, Scalar(0,0,255) );
+//             imshow( "Good Matches & Object detection", result );
+//             waitKey(0); 
+//         }
       
         largestKP1.resize(kw.nrefpoints);
         largestKP2.resize(kw.nrefpoints);
         
-        if( kw.show ) {
-            drawKeypoints(imgByte1, largestKP1, result, Scalar(0,0,255) );
-            imshow( "Good Matches & Object detection", result );
-            waitKey(0); 
-            drawKeypoints(imgByte2, largestKP2, result, Scalar(0,0,255) );
-            imshow( "Good Matches & Object detection", result );
-            waitKey(0); 
-        }
+//         if( kw.show ) {
+//             drawKeypoints(imgByte1, largestKP1, result, Scalar(0,0,255) );
+//             imshow( "Good Matches & Object detection", result );
+//             waitKey(0); 
+//             drawKeypoints(imgByte2, largestKP2, result, Scalar(0,0,255) );
+//             imshow( "Good Matches & Object detection", result );
+//             waitKey(0); 
+//         }
       
         std::vector<Mat> initializations;
         if( kw.h_init ) {
@@ -474,35 +493,41 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         if (kw.max_points < 0) kw.max_points = keypoints1.size() * 0.85;   // by default, do refinement by dropping the weakest 15%
 
         if (kw.max_points > 3) {     // at least 4 points needed for findHomography
-            vector< DMatch > refineMatches;
+            //vector< DMatch > refineMatches;
             if ( size_t(kw.max_points) < keypoints1.size() ) {
                 if (kw.by_distance) {         // sort according to distance from image centre
                     Point2f mid (imgFloat1.cols / 2, imgFloat1.rows / 2);
                     std::sort (keypoints1.begin(), keypoints1.end(),
                     [mid] (const KeyPoint & a, const KeyPoint & b) {
-                        return (norm(a.pt - mid) < norm(b.pt - mid));
+                        return (norm(a.pt - mid) > norm(b.pt - mid));
                     });
-                }
-
+                } 
                 keypoints1.resize (kw.max_points);
-                keypoints2.resize (kw.max_points);
-                refineMatches = matchNearest (keypoints1, keypoints2, H, kw.max_dist);
-            } else refineMatches = matches;
+                matches = matchNearest (keypoints1, keypoints2, H, kw.max_dist);
+            } //else refineMatches = matches;
 
             vector<Point2f> obj, scene;
 
-            for (auto & m : refineMatches) {
+//             if( kw.show > 1 ) {
+//                 drawKeypoints(imgByte1, keypoints1, result, Scalar(0,0,255) );
+//                 imshow( "Good Matches & Object detection", result );
+//                 waitKey(0); 
+//             }
+        
+            if (kw.verbose > 1) {
+                cout << "Using " << matches.size() << " pairs to refine the fit." << endl;
+            }
+            for (auto & m : matches) {
                 obj.push_back (keypoints1[ m.queryIdx ].pt);
                 scene.push_back (keypoints2[ m.trainIdx ].pt);
             }
 
             double max1, max2;
             double metric1 = metric (H, obj, scene, &max1);
-            H = findHomography (obj, scene, CV_LMEDS);       //  CV_RANSAC  CV_LMEDS  0
+            H = findHomography (obj, scene, CV_LMEDS, 0.5);       //  CV_RANSAC  CV_LMEDS  0
             double metric2 = metric (H, obj, scene, &max2);
 
             if (kw.verbose > 1) {
-                cout << "Using " << refineMatches.size() << " pairs to refine the fit." << endl;
                 cout << "   -> error (avg,max): (" << metric1 << "," << max1 << ") -> (" << metric2 << "," << max2 << ")" << endl;
             }
         }
