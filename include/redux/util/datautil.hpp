@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <math.h>
@@ -158,6 +159,18 @@ namespace redux {
             return totalSize;
         }
         
+        template <class T, class Comp, class Alloc>
+        inline uint64_t pack(char* ptr, const std::set<T,Comp,Alloc>& in) {
+            uint64_t count = in.size();
+            *reinterpret_cast<uint64_t*>(ptr) = count;
+            uint64_t totalSize = sizeof(uint64_t);
+            for (auto &element: in) {
+                *reinterpret_cast<T*>(ptr+totalSize) = element;
+                totalSize += sizeof(T);
+            }
+            return totalSize;
+        }
+        
         template <typename T>
         inline uint64_t pack(char* ptr, const T* in, size_t count) {
             uint64_t sz = count*sizeof(T);
@@ -225,6 +238,22 @@ namespace redux {
                     swapEndian(tmpU);
                 }
                 out.insert(std::make_pair(tmpT,tmpU));
+            }
+            return totalSize;
+        }
+        
+        template <class T, class Comp, class Alloc>
+        inline uint64_t unpack(const char* ptr, std::set<T,Comp,Alloc>& out, bool swap_endian=false) {
+            uint64_t count = *reinterpret_cast<const uint64_t*>(ptr);
+            uint64_t totalSize = sizeof(uint64_t);
+            if(swap_endian) swapEndian(count);
+            for( uint64_t cnt=0; cnt<count; ++cnt) {
+                T tmpT = *reinterpret_cast<const T*>(ptr+totalSize);
+                totalSize += sizeof(T);
+                if(swap_endian) {
+                    swapEndian(tmpT);
+                }
+                out.insert(tmpT);
             }
             return totalSize;
         }
