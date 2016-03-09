@@ -33,17 +33,22 @@ namespace redux {
         void maintenance( void );
         bool doWork(void);
         
+        void workerInit( void );
+        void connect(void);
+        void updateStatus(void);
+        network::TcpConnection::Ptr getMaster(void);
+        void unlockMaster(void);
+        
         void connected(network::TcpConnection::Ptr);
         void activity( network::TcpConnection::Ptr );
         void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
-        void removeConnection(network::TcpConnection::Ptr&);
+        void removeConnection(network::TcpConnection::Ptr);
         void cleanup(void);
         void die( network::TcpConnection::Ptr& );
         void addJobs( network::TcpConnection::Ptr& );
         void removeJobs( network::TcpConnection::Ptr& );
         //Job::JobPtr selectJob(bool);
         bool getWork( WorkInProgress&, uint8_t nThreads = 1);
-        void returnResults( WorkInProgress& );
         void sendWork( network::TcpConnection::Ptr& );
         void putParts( network::TcpConnection::Ptr& );
         void sendJobList( network::TcpConnection::Ptr& );
@@ -66,8 +71,12 @@ namespace redux {
         std::mutex peerMutex;
         network::Host::Ptr myInfo;
         std::map<network::TcpConnection::Ptr, network::Host::Ptr> connections;
-        std::map<size_t, network::Host::Ptr> peers;
         std::map<network::Host::Ptr, WorkInProgress, network::Host::Compare> peerWIP;
+        
+        struct {
+            network::TcpConnection::Ptr conn;
+            network::Host::Ptr host;
+        } myMaster;
         
         boost::asio::io_service ioService;
         boost::asio::deadline_timer timer;

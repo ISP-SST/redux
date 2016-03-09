@@ -33,138 +33,66 @@ Worker::~Worker( void ) {
 
 void Worker::init( void ) {
 
-    peer.reset( new Host() );
-    connection = TcpConnection::newPtr( daemon.ioService );
-    if( daemon.port < 1024 ) {
-        LOG_DEBUG << "Running local worker only.";
-    } else {
-        connect();
-    }
     runTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 1 ) );
     runTimer.async_wait(strand.wrap(boost::bind(&Worker::run, this)));
 
 }
 
-void Worker::connect( void ) {
-    
-    if( daemon.port < 1024 ) {
-        return;
-    }
-    
-    try {
-        auto test UNUSED = connection->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
-        return;
-    } catch ( ... ) { }
-
-    if( connection->socket().is_open() ) {
-        connection->socket().close();
-    }
-
-    LOG_DEBUG << "Attempting to connect to master at " << daemon.master << ":" << daemon.port;
-
-    connection->connect( daemon.params["master"].as<string>(), to_string( daemon.params["port"].as<uint16_t>() ) );
-    if( connection->socket().is_open() ) {
-
-        Command cmd;
-
-        daemon.myInfo->info.peerType |= Host::TP_WORKER;
-        *connection << CMD_CONNECT;
-        *connection >> cmd;
-        if( cmd == CMD_AUTH ) {
-            // implement
-        }
-        if( cmd == CMD_CFG ) {  // handshake requested
-            *connection << daemon.myInfo->info;
-            *connection >> peer->info;
-            *connection >> cmd;       // ok or err
-        }
-        if( cmd != CMD_OK ) {
-            LOG_ERR << "Handshake with master failed  (server replied: " << cmd << ")";
-            connection->socket().close();
-            daemon.myInfo->info.peerType &= ~Host::TP_WORKER;
-        } else LOG_DEBUG << "Connected.";
-
-    }
-
-}
 
 void Worker::stop( void ) {
-    if( connection->socket().is_open() ) {
-        *connection << CMD_DISCONNECT;
-        connection->socket().close();
-    }
+
     ioService.stop();
-    daemon.myInfo->info.peerType &= ~Host::TP_WORKER;
 
 }
 
-
-void Worker::updateStatus( void ) {
-
-    if( !connection->socket().is_open() ) {
-        connect();
-    }
-
-    if( connection->socket().is_open() ) {
-#ifdef DEBUG_
-        LOG_TRACE << "Sending statusupdate to server";
-#endif
-        size_t blockSize = daemon.myInfo->status.size();
-        size_t totSize = blockSize + sizeof( size_t ) + 1;
-        auto buf = sharedArray<char>(totSize);
-        char* ptr = buf.get();
-        memset( ptr, 0, totSize );
-
-        uint64_t count = pack( ptr, CMD_STAT );
-        count += pack( ptr+count, blockSize );
-        count += daemon.myInfo->status.pack( ptr+count );
-
-        connection->asyncWrite( buf, totSize );
-    }
-    else {
-        if( daemon.port > 1024 ) {
-            LOG_WARN << "No connection to master:  " << daemon.master << ":" << daemon.port;
-        }
-    }
-
-}
 
 bool Worker::fetchWork( void ) {
 
+    bool ret = false;
+    network::TcpConnection::Ptr conn;
+    
     try {
 
-        connect();
+        if( (conn = daemon.getMaster()) ) {
 
-        if( !connection->socket().is_open() ) {
-            return false;
+            *conn << CMD_GET_WORK;
+
+            size_t blockSize;
+            shared_ptr<char> buf = conn->receiveBlock( blockSize );               // reply
+
+            if( blockSize ) {
+
+                const char* ptr = buf.get();
+                uint64_t count = wip.unpackWork( ptr, conn->getSwapEndian() );
+
+                if( count != blockSize ) {
+                    throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
+                }
+                wip.isRemote = true;
+
+                LOG_TRACE << "Received work: " << wip.print();
+                
+                ret = true;
+                
+            }
+
         }
-
-        *connection << CMD_GET_WORK;
-
-        size_t blockSize;
-        shared_ptr<char> buf = connection->receiveBlock( blockSize );               // reply
-
-        if( !blockSize ) return false;
-
-        const char* ptr = buf.get();
-        uint64_t count = wip.unpackWork( ptr, connection->getSwapEndian() );
-
-        if( count != blockSize ) {
-            throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
-        }
-        wip.isRemote = true;
-
-        LOG_TRACE << "Received work: " << wip.print();
-        return true;
+        
     }
     catch( const exception& e ) {
         LOG_ERR << "fetchWork: Exception caught while fetching job: " << e.what();
+        if( conn ) conn->socket().close();
+        ret = false;
     }
     catch( ... ) {
         LOG_ERR << "fetchWork: Unrecognized exception caught while fetching job.";
+        if( conn ) conn->socket().close();
+        ret = false;
     }
-
-    return false;
+    
+    if(conn) daemon.unlockMaster();
+    
+    return ret;
 }
 
 
@@ -180,8 +108,10 @@ bool Worker::getWork( void ) {
             runTimer.wait();
             returnWork();
         }
+        daemon.myInfo->active();
     } else if ( wip.hasResults ) {
-        daemon.returnResults( wip );
+        wip.returnResults();
+        daemon.myInfo->active();
     }
 
     if( wip.hasResults ) {
@@ -199,6 +129,7 @@ bool Worker::getWork( void ) {
         for( auto& part: wip.parts ) {
             part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
         }
+        daemon.myInfo->active();
         return true;
     }
     
@@ -210,6 +141,7 @@ bool Worker::getWork( void ) {
     wip.previousJob.reset();
     wip.parts.clear();
     
+    daemon.myInfo->status.state = Host::ST_IDLE;
     return false;
 
 }
@@ -222,9 +154,9 @@ void Worker::returnWork( void ) {
         
         try {
             
-            connect();
+            network::TcpConnection::Ptr conn = daemon.getMaster();
 
-            if( connection->socket().is_open() ) {
+            if( conn && conn->socket().is_open() ) {
 
                 LOG_DEBUG << "Returning result: " + wip.print();
                 uint64_t blockSize = wip.workSize();
@@ -240,16 +172,19 @@ void Worker::returnWork( void ) {
 
                 }
 
-                connection->asyncWrite( data, totalSize );
+                conn->asyncWrite( data, totalSize );
 
                 Command cmd = CMD_ERR;
-                *(connection) >> cmd;
+                *(conn) >> cmd;
                 
                 if( cmd == CMD_OK ) {
                     wip.hasResults = false;
                 } 
                 
             }
+            
+            if( conn ) daemon.unlockMaster();
+            
         }
         catch( const exception& e ) {
             LOG_ERR << "getJob: Exception caught while returning work: " << e.what();

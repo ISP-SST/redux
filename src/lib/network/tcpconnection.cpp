@@ -29,7 +29,7 @@ namespace {
 
 
 TcpConnection::TcpConnection( boost::asio::io_service& io_service )
-    : activityCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand(io_service) {
+    : activityCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand(io_service) {
 #ifdef DBG_NET_
     LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
 #endif
@@ -125,7 +125,11 @@ void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& er
         if( ( error == ba::error::eof ) || ( error == ba::error::connection_reset ) ) {
             mySocket.close();
         } else {
-            throw std::ios_base::failure( "TcpConnection::onActivity: error: " + error.message() );
+            if( errorCallback ) {
+                std::thread(errorCallback,connptr).detach();
+            } else {
+                throw std::ios_base::failure( "TcpConnection::onActivity: error: " + error.message() );
+            }
         }
     }
 

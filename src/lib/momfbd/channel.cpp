@@ -597,7 +597,7 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
     }
     runThreadsAndWait(service, myJob.info.maxThreads);
     
-    patchWriteFail = std::async( launch::async, [this,&patches](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
+    patchWriteFail = std::async( launch::async, [this,&patches,nImages](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
         size_t nPatchesY = patches.dimSize(0);                                          // we will synchronize all the "patchWriteFail" futures at the end of MomfbdJob::preProcess
         size_t nPatchesX = patches.dimSize(1);
         for(unsigned int py=0; py<nPatchesY; ++py) {

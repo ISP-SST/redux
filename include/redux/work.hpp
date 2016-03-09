@@ -29,13 +29,14 @@ namespace redux {
         uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
         uint64_t id;
+        boost::posix_time::ptime partStarted;
         uint8_t step, nRetries, partType;
     };
 
 
     struct WorkInProgress {
         typedef std::shared_ptr<WorkInProgress> Ptr;
-        WorkInProgress(network::TcpConnection::Ptr c=0);
+        WorkInProgress(void);
         WorkInProgress(const WorkInProgress&);
         ~WorkInProgress();
         uint64_t size(void) const;
@@ -44,6 +45,7 @@ namespace redux {
         uint64_t workSize(void);
         uint64_t packWork(char*) const;
         uint64_t unpackWork(const char*, bool swap_endian=false);
+        void returnResults(void);
         std::string print(void);
         std::shared_ptr<Job> job, previousJob;
         std::vector<Part::Ptr> parts;

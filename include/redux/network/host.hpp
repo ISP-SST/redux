@@ -48,6 +48,7 @@ namespace redux {
                 float loadAvg;
                 float progress;
                 boost::posix_time::ptime lastSeen;
+                boost::posix_time::ptime lastActive;
                 HostStatus( void );
                 size_t size(void) const;
                 uint64_t pack( char* ) const;
@@ -62,6 +63,7 @@ namespace redux {
             uint64_t unpack( const char*, bool );
             
             void touch(void);
+            void active(void);
             
             static std::string printHeader(void);
             std::string print(void);
@@ -74,7 +76,7 @@ namespace redux {
             bool operator!=( const Host& rhs ) const { return !(*this == rhs); };
 
             uint64_t id;
-            int nConnections;
+            std::atomic<int> nConnections;
             
         };
 

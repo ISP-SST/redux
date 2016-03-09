@@ -36,7 +36,7 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
-    hostTimeout(1800), timer( ioService ), worker( *this ) {
+    hostTimeout(60), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
@@ -82,7 +82,13 @@ void Daemon::reset( void ) {
 
 void Daemon::stop( void ) {
     runMode = EXIT;
+    if( myMaster.conn->socket().is_open() ) {
+        *myMaster.conn << CMD_DISCONNECT;
+        myMaster.conn->socket().close();
+        myInfo->info.peerType &= ~Host::TP_WORKER;
+    }
     ioService.stop();
+    worker.stop();
 }
 
 
@@ -93,8 +99,14 @@ void Daemon::maintenance( void ) {
 
     updateLoadAvg();
     cleanup();
-    //worker.updateStatus();    TODO: use a secondary connection for auxiliary communications
-
+    static int cnt(0);
+    if( (++cnt % 6) == 0 ) {
+        updateStatus();   // TODO: use a secondary connection for auxiliary communications
+        cnt = 0;
+    }
+    //cout << "blahytt: " << cnt << endl;
+    //ioService.post([](){ cout << "vlahytt: " << cnt << endl;} );
+    //cout << "clahytt: " << cnt << endl;
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
 }
@@ -116,6 +128,7 @@ bool Daemon::doWork( void ) {
             threads.push_back( t );
         }
         LOG_TRACE << "Initializing worker.";
+        workerInit();
         worker.init();
         LOG_TRACE << "Running the asio service.";
         ioService.run();
@@ -138,6 +151,122 @@ bool Daemon::doWork( void ) {
 }
 
 
+void Daemon::workerInit( void ) {
+    
+    if( port < 1024 ) {
+        LOG_DEBUG << "Running local worker only.";
+    } else {
+        LOG_DEBUG << "Running slave.";
+        myMaster.host.reset( new Host() );
+        myMaster.conn = TcpConnection::newPtr( ioService );
+        connect();
+    }
+    
+}
+
+
+void Daemon::connect(void) {
+    
+    if( port < 1024 ) {
+        return;
+    }
+    
+    try {
+        auto test UNUSED = myMaster.conn->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
+        return;
+    } catch ( ... ) { }
+
+    if( myMaster.conn->socket().is_open() ) {
+        myMaster.conn->socket().close();
+    }
+
+    LOG_TRACE << "Attempting to connect to master at " << master << ":" << port;
+
+    myMaster.conn->connect( params["master"].as<string>(), to_string( params["port"].as<uint16_t>() ) );
+    if( myMaster.conn->socket().is_open() ) {
+
+        Command cmd;
+
+        myInfo->info.peerType |= Host::TP_WORKER;
+        *myMaster.conn << CMD_CONNECT;
+        *myMaster.conn >> cmd;
+        if( cmd == CMD_AUTH ) {
+            // implement
+        }
+        if( cmd == CMD_CFG ) {  // handshake requested
+            *myMaster.conn << myInfo->info;
+            *myMaster.conn >> myMaster.host->info;
+            *myMaster.conn >> cmd;       // ok or err
+        }
+        if( cmd != CMD_OK ) {
+            LOG_ERR << "Handshake with master failed  (server replied: " << cmd << ")";
+            myMaster.conn->socket().close();
+            myInfo->info.peerType &= ~Host::TP_WORKER;
+        } else LOG_TRACE << "Connected.";
+
+    }
+
+}
+
+
+void Daemon::updateStatus( void ) {
+
+    network::TcpConnection::Ptr conn = getMaster();
+    //myInfo->touch();
+    
+    if( conn && conn->socket().is_open() ) {
+#ifdef DEBUG_
+        LOG_TRACE << "Sending statusupdate to server";
+#endif
+        size_t blockSize = myInfo->status.size();
+        size_t totSize = blockSize + sizeof( size_t ) + 1;
+        auto buf = sharedArray<char>(totSize);
+        char* ptr = buf.get();
+        memset( ptr, 0, totSize );
+
+        uint64_t count = pack( ptr, CMD_STAT );
+        count += pack( ptr+count, blockSize );
+        count += myInfo->status.pack( ptr+count );
+
+        conn->asyncWrite( buf, totSize );
+    }
+    
+    if( conn ) unlockMaster();
+    
+}
+
+
+network::TcpConnection::Ptr Daemon::getMaster(void) {
+    
+    if ( myMaster.conn ) {
+        try {
+            myMaster.conn->lock();
+            connect();          // will return without doing anything if the remote endpoint exists.
+            if( myMaster.conn->socket().is_open() ) return myMaster.conn;
+        }
+        catch( exception& e ) {
+            LOG_DEBUG << "getMaster: Exception caught while getting connection to master: " << e.what();
+        }
+        catch( ... ) {
+            LOG_DEBUG << "getMaster: Uncaught exception while getting connection to master.";
+        }
+        myMaster.conn->unlock();        
+    }
+
+    return nullptr;
+    
+}
+
+
+void Daemon::unlockMaster(void) {
+
+    if ( myMaster.conn ) {
+        myMaster.conn->unlock();
+    }
+
+}
+
+        
 void Daemon::connected( TcpConnection::Ptr conn ) {
 
     try {
@@ -146,10 +275,11 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
         *conn >> remote_info;
         *conn << myInfo->info;
 
-        LOG_DEBUG << "connected()  Handshake successful.";
+        //LOG_DEBUG << "connected()  Handshake successful.";
         addConnection( remote_info, conn );
 
         conn->setCallback( bind( &Daemon::activity, this, std::placeholders::_1 ) );
+        conn->setErrorCallback( bind( &Daemon::removeConnection, this, std::placeholders::_1 ) );
         *conn << CMD_OK;           // all ok
         conn->idle();
         return;
@@ -236,9 +366,11 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
         
         if( id ) {
             host.reset( newHost );
-            LOG_DEBUG << "New connection from new host: " << host->print() << "   ID=" << host->id;
+            if( host->info.peerType & (Host::TP_WORKER|Host::TP_MASTER) ) {  // filter out the "ui" connections which will connect/disconnect silently
+                LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id;
+            }
             //peers.insert( make_pair( id, host ) );
-        } else LOG_DEBUG << "New connection from existing host: " << host->print() << endl;
+        } else LOG_DEBUG << "New connection from existing host: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id;
         conn->setSwapEndian(remote_info.littleEndian != myInfo->info.littleEndian);
     }
     
@@ -248,18 +380,20 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
 }
 
 
-void Daemon::removeConnection( TcpConnection::Ptr& conn ) {
+void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
     unique_lock<mutex> lock( peerMutex );
     auto it = connections.find(conn);
     if( it != connections.end()) {
-        if( it->first ) {
-            LOG_DEBUG << "removing connection:  " << it->second->print();
+        if( it->second && (it->second->info.peerType & (Host::TP_WORKER|Host::TP_MASTER))) {  // filter out the "ui" connections which will connect/disconnect silently
+            it->second->nConnections--;
+            LOG_DEBUG << "Host #" << it->second->id << "  (" << it->second->info.name << ":" << it->second->info.pid << ") disconnected.";
         }
         connections.erase(it);
     }
-    conn->socket().close();
+    conn->setErrorCallback(nullptr);
     conn->setCallback(nullptr);
+    conn->socket().close();
 }
 
 
@@ -291,42 +425,46 @@ void Daemon::cleanup( void ) {
                     wip->second.previousJob.reset();
                     peerWIP.erase(wip);
                 }*-/
-                cout << "Removing peer: " << it.second.print();
                 peers.erase( it++ );
             } else ++it;
         }
      */   
+
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         for( auto it=peerWIP.begin(); it != peerWIP.end(); ) {
             Job::JobPtr job = it->second.job;
-            bool timedOut(false);
+            Host::Ptr host = it->first;
             boost::posix_time::time_duration elapsed = (now - it->second.workStarted);
-            if( job && elapsed > boost::posix_time::seconds( job->info.timeout ) ) {
-                LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ", returning unfinished work to queue: " << it->second.print();
-                timedOut = true;
-            }
-            
-            if( it->first && it->second.job ) {
-                elapsed = (now - it->first->status.lastSeen);
-                if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
-                    LOG_DETAIL << "Peer has not been active in " << to_simple_string(elapsed) << ", returning unfinished work to queue: " << it->second.print();
-                    timedOut = true;
-                }
-            }
-
-            if( timedOut ) {
-                if( job ) {
-                    job->ungetWork( it->second );
-                    for( auto& part: it->second.parts ) {
+            if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
+                LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << it->second.print();
+                LOG_WARN << "Returning unfinished work to queue: " << it->second.print();
+                job->failWork( it->second );
+                for( auto& part: it->second.parts ) {
+                    if( part ) {
                         part->cacheLoad();
                         part->cacheStore(true);
+                        //LOG_TRACE << "Returned part: #" << part->id << "   step=" << (int)part->step;
                     }
-                    it->second.parts.clear();
-                    it->second.previousJob.reset();
                 }
+                it->second.parts.clear();
+                it->second.previousJob.reset();
                 peerWIP.erase(it++);
                 continue;
             }
+            
+            if( host && host->nConnections > 0 ) {
+                elapsed = (now - host->status.lastSeen);
+                if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
+                    LOG_DETAIL << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << "   nConn = " << host->nConnections;
+                    for( auto it2 = begin(connections); it2 != end(connections); ++it2 ) {
+                        if( (*it2->second) == (*host) ) {
+                            it2->first->socket().close();
+                            break;
+                        }
+                    }
+                }
+            }
+
             ++it;
         }
     }
@@ -359,6 +497,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
 
     size_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
+
     if( !blockSize ) {
         *conn << CMD_ERR;
         return;
@@ -371,6 +510,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
     vector<string> messages;
     bool swap_endian = conn->getSwapEndian();
     try {
+        vector<shared_ptr<Job>> newjobs;
         while( count < blockSize ) {
             string tmpS = string( ptr+count );
             Job::JobPtr job = Job::newJob( tmpS );
@@ -378,19 +518,25 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                 nJobs++;
                 try {
                     count += job->unpack( ptr+count, swap_endian );
-                    if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job #" + to_string(nJobs) );
-                    unique_lock<mutex> lock( jobMutex );
+                    if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
                     job->info.id = ++jobCounter;
                     if( job->info.name.empty() ) job->info.name = "job_" + to_string( job->info.id );
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
                     ids.push_back( jobCounter );
                     ids[0]++;
-                    jobs.push_back( job );
+                    newjobs.push_back( job );
                 } catch( const job_check_failed& e ) {
                     messages.push_back( e.what() );
                 }
             } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
         }
+        unique_lock<mutex> lock( jobMutex );
+        jobs.insert( jobs.end(), newjobs.begin(), newjobs.end() );
+        std::sort( jobs.begin(), jobs.end(), [](const Job::JobPtr& a, const Job::JobPtr& b) {
+            if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
+            if(a->info.step != b->info.step) return (a->info.step > b->info.step);
+            return (a->info.id < b->info.id);
+        } );
     } catch( const exception& e ) {
         LOG_ERR << "addJobs: Exception caught while parsing block: " << e.what();
     } catch( ... ) {
@@ -446,14 +592,14 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             vector<size_t> deleted_ids; 
             for( auto & jobId : jobList ) {
-                std::remove_if( jobs.begin(), jobs.end(), [jobId, &deleted_ids](const Job::JobPtr& j) {
-                    if( !j ) return true;
-                    if( j->info.id == jobId ) {
-                        deleted_ids.push_back(jobId);
-                        return true;
-                    }
-                    return false;
-                });
+                jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [jobId, &deleted_ids](const Job::JobPtr& j) {
+                        if( !j ) return true;
+                        if( j->info.id == jobId ) {
+                            deleted_ids.push_back(jobId);
+                            return true;
+                        }
+                        return false;
+                    }), jobs.end() );
             }
             if( !deleted_ids.empty() ) LOG << "Removed " << printArray(deleted_ids,"jobs");
             return;
@@ -468,14 +614,14 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobMutex );
             vector<string> deletedList;
             for( auto & jobId : jobList ) {
-                std::remove_if( jobs.begin(), jobs.end(), [jobId, &deletedList](const Job::JobPtr& j) {
+                jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [jobId, &deletedList](const Job::JobPtr& j) {
                     if( !j ) return true;
                     if( j->info.name == jobId ) {
                         deletedList.push_back(jobId);
                         return true;
                     }
                     return false;
-                });
+                }), jobs.end() );
             }
             if( !deletedList.empty() ) LOG << "Removed " << printArray(deletedList,"jobs");
             return;
@@ -498,70 +644,58 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
 bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
 
-    unique_lock<mutex> lock( jobMutex );
     wip.previousJob = wip.job;
     wip.job.reset();
+
+    unique_lock<mutex> lock( jobMutex );
     
     if( wip.isRemote ) {              // remote worker
-        // TODO: sort by priority
         for( Job::JobPtr& job : jobs ) {
-            if( job && job->check() && job->getWork( wip, nThreads ) ) {
+            if( job && (job->info.step & Job::StepUserMask) &&
+                job->check() && job->getWork( wip, nThreads, false ) ) {
                 wip.job = job;
+                wip.workStarted = boost::posix_time::second_clock::local_time();
+                for( auto& part: wip.parts ) {
+                    part->partStarted = boost::posix_time::second_clock::local_time();
+                }
                 break;
             }
         }
     } else {                            // local worker
+        uint16_t nActive(0);
         for( Job::JobPtr& job : jobs ) {
-            //uint8_t step = job->info.step.load();
-            // TODO only pre-process 1-2 jobs at a time
-            if( job && job->check() && job->getWork( wip, nThreads ) ) {
+            if( job && job->active() ) nActive++; // count all user defined steps 
+        }
+        static int maxActiveJobs(3);            // FIXME: configurable
+        bool mayStartNewJob = (nActive < maxActiveJobs);
+        for( Job::JobPtr& job : jobs ) {
+            if( job && job->check() && job->getWork( wip, nThreads, mayStartNewJob ) ) {
                 wip.job = job;
-                break;
-            }
-        }
-    }
-    /*if( wip.isRemote ) {                // remote worker
-
-    }
-    else {                          // local worker
-        for( auto & it : jobs ) {
-            uint8_t step = it->info.step.load();
-            if( (nQueuedJobs < 2) && (step < Job::JSTEP_QUEUED) ) {
-                it->getWork( wip, nThreads );
-                ret = true;
-            } else if( step & ( Job::JSTEP_QUEUED | Job::JSTEP_RUNNING | Job::JSTEP_POSTPROCESS ) ) {
-                if( it->getWork( wip, nThreads ) || ( step != Job::JSTEP_RUNNING ) ) {
-                    ret = true;
+                wip.workStarted = boost::posix_time::second_clock::local_time();
+                for( auto& part: wip.parts ) {
+                    part->partStarted = boost::posix_time::second_clock::local_time();
                 }
-            }
-            if ( ret ) {
-                job = it;
                 break;
             }
         }
-    }*/
+    }
+    lock.unlock();
     
     if( wip.job ) {
+
         wip.job->info.state.store( Job::JSTATE_ACTIVE );
         for( auto& part: wip.parts ) {
             part->cacheLoad(false);
         }
-        wip.workStarted = boost::posix_time::second_clock::local_time();
+
+        if( wip.job->info.startedTime.is_not_a_date_time() ) {
+            wip.job->info.startedTime = boost::posix_time::second_clock::local_time();
+        }
+        
+        
     }
     
     return bool(wip.job);
-}
-
-
-void Daemon::returnResults( WorkInProgress& wip ) {
-    
-    wip.job->returnResults( wip );
-    for( auto& part : wip.parts ) {
-        part->cacheStore(true);       // store and free some resources. (if implemented for this Part-derivative)
-    }
-    wip.parts.clear();
-    wip.hasResults = false;
-
 }
 
 
@@ -575,12 +709,14 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         
         auto it = peerWIP.find(connections[conn]);
         if( it == peerWIP.end() ) {
-            auto rit = peerWIP.emplace( connections[conn], WorkInProgress( conn ) );
+            auto rit = peerWIP.emplace( connections[conn], WorkInProgress() );
             if( !rit.second ) {
                 LOG_ERR << "Failed to insert new connection into peerWIP";
             }
             it = rit.first;
         }
+        lock.unlock();      // this should be safe as long as the "it" entry in peerWip is not erased while the below is executing.
+        
         WorkInProgress& wip = it->second;
         auto host = it->first;
 
@@ -589,6 +725,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         if( getWork( wip, host->status.nThreads ) ) {
             blockSize += wip.workSize();
             LOG_DEBUG << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip.print();
+            host->status.state = Host::ST_ACTIVE;
         }
 
         data = sharedArray<char>(blockSize+sizeof(uint64_t));
@@ -619,26 +756,35 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     Command reply = CMD_ERR;            // return err unless everything seems fine.
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    unique_lock<mutex> lock( peerMutex );
-    auto it = peerWIP.find(connections[conn]);
-    if( it == peerWIP.end() ) {
-        LOG_ERR << "Received results from unexpected host. (probably timed out)";
-        *conn << reply;
-        return;
+    if( blockSize == 0 ) {
+        LOG_ERR << "Received empty result.";
     } else {
-        WorkInProgress& wip = it->second;
-        if( blockSize ) {
-            try {
-                wip.unpackWork( buf.get(), conn->getSwapEndian() );
-                LOG_DEBUG << "Received results from " << it->first->info.name << ":" << it->first->info.pid << "   " << wip.print();
-                returnResults( wip );
-                reply = CMD_OK;         // all ok
-            } catch ( exception& e ) {
-                LOG_ERR << "putParts:  exception when unpacking results: " << e.what();
-            }
+        unique_lock<mutex> lock( peerMutex );
+        auto it = peerWIP.find(connections[conn]);
+        if( it == peerWIP.end() ) {
+            LOG_ERR << "Received results from unexpected host. (probably timed out)";
+        } else {
+
+            shared_ptr<WorkInProgress> wip( new WorkInProgress() );
+            std::swap( it->second, *wip );
+
+            it->second.job = wip->job;
+            bool endian = conn->getSwapEndian();
+            it->first->status.state = Host::ST_IDLE;
+            string msg = "Received results from " + it->first->info.name + ":" + to_string(it->first->info.pid);
+            std::thread([buf,wip,endian,msg](){
+                try {
+                    wip->unpackWork( buf.get(), endian );
+                    LOG_DEBUG << msg << "   " + wip->print();
+                    wip->returnResults();
+                } catch ( exception& e ) {
+                    LOG_ERR << "putParts:  exception when unpacking results: " << e.what();
+                }
+            }).detach();
+            reply = CMD_OK;         // all ok
+            //lock.release();
         }
     }
-    
     *conn << reply;
 
 }
@@ -674,7 +820,9 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
 
     if( blockSize ) {
         try {
+            unique_lock<mutex> lock( peerMutex );
             connections[conn]->status.unpack( buf.get(), conn->getSwapEndian() );
+            connections[conn]->touch();     // Note: lastSeen is copied over, so do a new "touch()" afterwards.
         }
         catch( const exception& e ) {
             LOG_ERR << "updateStatus: Exception caught while parsing block: " << e.what();
@@ -689,7 +837,10 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
     size_t blockSize = 0;
     unique_lock<mutex>( jobMutex );
     for( auto & job : jobs ) {
-        if(job) blockSize += job->info.size();
+        if(job) {
+            job->setProgressString();
+            blockSize += job->info.size();
+        }
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
@@ -713,16 +864,16 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
     size_t blockSize = myInfo->size();
     unique_lock<mutex> lock( peerMutex );
 
-    for( auto & peer : peerWIP ) {
-        if(peer.first) blockSize += peer.first->size();
+    for( auto & peer : connections ) {
+        if(peer.second && peer.second->info.peerType&Host::TP_WORKER) blockSize += peer.second->size();
     }
     size_t totalSize = blockSize + sizeof( size_t );
     auto buf = sharedArray<char>( totalSize );
     char* ptr =  buf.get();
     uint64_t count = pack(ptr, blockSize );
     count += myInfo->pack( ptr+count );
-    for( auto & peer : peerWIP ) {
-        if(peer.first) count += peer.first->pack( ptr+count );
+    for( auto & peer : connections ) {
+        if(peer.second && peer.second->info.peerType&Host::TP_WORKER) count += peer.second->pack( ptr+count );
     }
     if( count != totalSize ) {
         LOG_ERR << "Packing of peers infos failed:  count = " << count << "   totalSize = " << totalSize << "  bytes.";
@@ -746,6 +897,6 @@ void Daemon::updateLoadAvg( void ) {
         return;
     }
 
-    myInfo->status.loadAvg = loadAvg[0] / myInfo->info.nCores * 100.0;
+    myInfo->status.loadAvg = loadAvg[0]; // / myInfo->info.nCores * 100.0;
     //LOG_TRACE << "updateLoadAvg()  = " << myInfo->status.loadAvg;
 }

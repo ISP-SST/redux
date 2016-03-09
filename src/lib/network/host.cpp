@@ -14,6 +14,7 @@
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/date_time/posix_time/conversion.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 using boost::algorithm::iequals;
 
 using namespace redux::network;
@@ -54,6 +55,7 @@ Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread:
     loadAvg( 0 ), progress( 0 ) {
         
     lastSeen = boost::posix_time::second_clock::local_time(); 
+    lastActive = boost::posix_time::second_clock::local_time();
     nThreads = maxThreads;
     
 }
@@ -95,20 +97,35 @@ uint64_t Host::unpack( const char* ptr, bool swap_endian ) {
 
 
 void Host::touch(void) {
+
     status.lastSeen = boost::posix_time::second_clock::local_time();
+    
 }
+
+
+void Host::active(void) {
+
+    status.lastActive = boost::posix_time::second_clock::local_time();
+    status.state = ST_ACTIVE;
+    
+}
+
 
 std::string Host::printHeader(void) {
     string hdr = alignRight("ID",5) + alignCenter("HOST",25) + alignCenter("PID",7) + alignCenter("THREADS",9) + alignCenter("STATE",9);
-    hdr += alignLeft("VERSION",9) + alignCenter("ARCH",8) + alignCenter("OS",25) + alignCenter("GFLOPS",8);
+    hdr += alignLeft("VERSION",9) + alignCenter("loadavg",9) + alignCenter("Last Activity",17) + alignCenter("Uptime",15);
     return hdr;
 }
 
 std::string Host::print(void) {
+    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+    boost::posix_time::time_duration elapsed = (now - status.lastSeen); //status.lastActive);
+    boost::posix_time::time_duration uptime = (now - info.startedAt);
     string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
     ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),9);
     ret += alignCenter(StateNames[status.state],9) + alignCenter(getVersionString(info.reduxVersion),9);
-    ret += alignCenter(info.arch,8) + alignCenter(info.os,25) + alignCenter("-",8);
+    ret += alignCenter(boost::str(boost::format("%.2f") % status.loadAvg),9);
+    ret += alignCenter(to_simple_string(elapsed),17) + alignCenter(to_simple_string(uptime),15);
     return ret;
 }
 
@@ -202,7 +219,7 @@ bool Host::HostInfo::operator==(const HostInfo& rhs) const {
 
 size_t Host::HostStatus::size(void) const {
     size_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads);
-    sz += sizeof(state) + sizeof(loadAvg) + sizeof(progress) + sizeof(time_t);
+    sz += sizeof(state) + sizeof(loadAvg) + sizeof(progress) + 2*sizeof(time_t);
     return sz;
 }
 
@@ -218,6 +235,7 @@ uint64_t Host::HostStatus::pack( char* ptr ) const {
     count += pack(ptr+count,loadAvg);
     count += pack(ptr+count,progress);
     count += pack(ptr+count,redux::util::to_time_t( lastSeen ));
+    count += pack(ptr+count,redux::util::to_time_t( lastActive ));
     
     return count;
     
@@ -228,8 +246,8 @@ uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
-    uint64_t count = unpack(ptr,nThreads);
-    count += unpack(ptr+count,maxThreads);
+    uint64_t count = unpack(ptr,nThreads, swap_endian);
+    count += unpack(ptr+count,maxThreads, swap_endian);
     count += unpack(ptr+count,state, swap_endian);
     count += unpack(ptr+count,currentJob, swap_endian);
     count += unpack(ptr+count,loadAvg, swap_endian);
@@ -237,6 +255,8 @@ uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
     time_t timestamp;
     count += unpack(ptr+count,timestamp,swap_endian);
     lastSeen = boost::posix_time::from_time_t( timestamp );
+    count += unpack(ptr+count,timestamp,swap_endian);
+    lastActive = boost::posix_time::from_time_t( timestamp );
     
     return count;
     

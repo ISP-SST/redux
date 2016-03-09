@@ -71,14 +71,14 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-WorkInProgress::WorkInProgress( network::TcpConnection::Ptr c ) : isRemote( false ), hasResults(false), nParts(0), nCompleted(0) {
+WorkInProgress::WorkInProgress(void) : isRemote( false ), hasResults(false), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif
 }
 
-WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), parts(rhs.parts), isRemote(rhs.isRemote),
-    hasResults(false), nParts(rhs.nParts), nCompleted(rhs.nCompleted) {
+WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), previousJob(rhs.previousJob), parts(rhs.parts), workStarted(rhs.workStarted),
+    isRemote(rhs.isRemote), hasResults(false), nParts(rhs.nParts), nCompleted(rhs.nCompleted) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif
@@ -93,6 +93,7 @@ WorkInProgress::~WorkInProgress() {
 
 uint64_t WorkInProgress::size(void) const {
     static uint64_t sz = 2*sizeof(uint16_t); // nParts + nCompleted
+    sz += sizeof(time_t);   // workStarted is converted and transferred as time_t
     return sz;
 }
 
@@ -101,6 +102,7 @@ uint64_t WorkInProgress::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = pack( ptr, nParts );
     count += pack( ptr+count, nCompleted );
+    count += pack(ptr+count,redux::util::to_time_t( workStarted ));
     return count;
 }
 
@@ -109,6 +111,9 @@ uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = unpack( ptr, nParts, swap_endian );
     count += unpack( ptr+count, nCompleted, swap_endian );
+    time_t timestamp;
+    count += unpack(ptr+count,timestamp,swap_endian);
+    workStarted = boost::posix_time::from_time_t( timestamp );
     return count;
 }
 
@@ -165,6 +170,18 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
     } else throw invalid_argument( "Can't unpack parts without a job instance..." );
     
     return count;
+}
+
+
+void WorkInProgress::returnResults(void) {
+    if( job ) {
+        job->returnResults( *this );
+        for( auto& part : parts ) {
+            part->cacheStore(true);
+        }
+        parts.clear();
+        hasResults = false;
+    }
 }
 
 

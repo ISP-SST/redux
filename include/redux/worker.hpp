@@ -28,7 +28,6 @@ namespace redux {
         void connect( void );
         void stop( void );
 
-        void updateStatus(void);
 
     private:
 
@@ -49,8 +48,7 @@ namespace redux {
         WorkInProgress wip;
 
         Daemon& daemon;
-        network::Host::Ptr peer;
-        network::TcpConnection::Ptr connection;
+
         
     };
 
