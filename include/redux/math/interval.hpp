@@ -72,16 +72,12 @@ namespace redux {
             //std::function<int(int)> 
             //Interval& trim( bool (*skip)(T), T step = minStep ) {
             virtual Interval& trim( std::function<bool(T)>& skip, T step = minStep ) {
-                //std::cout << "trim    m_Min = "<< m_Min << "   m_Max = " << m_Max << "   step = " << step << std::endl;
                 while( m_Start < m_End && skip(m_Start) ) {
-                    //std::cout << ".";
                     m_Start += step;
                 }
                 while( m_Start < m_End && skip(m_End) ) {
-                    //std::cout << "|";
                     m_End -= step;
                 }
-                //std::cout << std::endl << "trim2   m_Min = "<< m_Min << "   m_Max = " << m_Max << "   step = " << step << std::endl;
                 return *this;
             }
 

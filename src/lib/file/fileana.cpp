@@ -381,7 +381,7 @@ int redux::file::Ana::compressData( shared_ptr<uint8_t>& out, const char* data, 
 }
 
 
-void redux::file::Ana::read( const std::string& filename, char* data, std::shared_ptr<redux::file::Ana> hdr ) {
+void redux::file::Ana::read( const std::string& filename, char* data, std::shared_ptr<redux::file::Ana>& hdr ) {
 
     ifstream file( filename, ifstream::binary );
     if( !file.good() ) {
@@ -390,8 +390,8 @@ void redux::file::Ana::read( const std::string& filename, char* data, std::share
 
     if( !hdr.get() ) {
         hdr.reset( new Ana() );
-        hdr->read( file );
     }
+    hdr->read( file );
 
     file.seekg( hdr->hdrSize );
     if( !file.good() ) {

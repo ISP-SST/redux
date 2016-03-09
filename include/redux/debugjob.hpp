@@ -41,7 +41,7 @@ namespace redux {
         DebugJob( const DebugJob& ) = delete;
         ~DebugJob(void);
         
-        static Job* create(void) { std::cout << jobType << std::endl; return new DebugJob(); }
+        static Job* create(void) { return new DebugJob(); }
 
         void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
         bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );

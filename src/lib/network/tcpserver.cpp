@@ -46,7 +46,7 @@ void TcpServer::onAccept( TcpConnection::Ptr conn,
                 LOG_TRACE << "onAccept() Failed to process new connection. Reason: " << e.what();   // only report to trace level since connect/disconnect should be quiet.
                 return;
             } 
-            LOG_DETAIL << "Accepted connection from \"" << conn->socket().remote_endpoint().address().to_string() << "\"";
+            //LOG_DETAIL << "Accepted connection from \"" << conn->socket().remote_endpoint().address().to_string() << "\"";
             onConnected(conn);
         }
     } else {

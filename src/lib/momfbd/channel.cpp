@@ -147,7 +147,6 @@ bpt::ptree Channel::getPropertyTree (bpt::ptree& tree) {
 
 void Channel::cleanup(void) {
     
-    LOG_TRACE << "Channel::cleanup()";
     imageStats.clear();
     images.clear();
     dark.clear();

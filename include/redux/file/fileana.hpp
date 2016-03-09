@@ -85,7 +85,7 @@ namespace redux {
              *  @brief Load an ANA file into a data block
              */
             //@{
-            static void read( const std::string& filename, char* data, std::shared_ptr<redux::file::Ana> hdr );
+            static void read( const std::string& filename, char* data, std::shared_ptr<redux::file::Ana>& hdr );
             template <typename T>
             static void read( const std::string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana>& hdr );
             template <typename T>

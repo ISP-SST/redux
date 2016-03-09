@@ -69,7 +69,6 @@ void JobTreeView::contextMenuEvent( QContextMenuEvent* event ) {
         submenu.addAction( addJobActs[i] );
     }
 
-    //cout << "BLA " << currentIndex().row() << " - " << currentIndex().column() << " - " << (int)currentIndex().isValid() << endl;
     submenu.setTitle( "Add Job" );
     //menu.addAction ( addAct );
     menu.addMenu( &submenu );

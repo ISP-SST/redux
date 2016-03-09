@@ -105,6 +105,7 @@ Job::JobPtr Job::newJob(const string& name) {
 string Job::stateString(uint8_t state) {
 
     switch(state) {
+        case JSTATE_NONE: return "";
         case JSTATE_IDLE: return "idle";
         case JSTATE_ACTIVE: return "active";
         case JSTATE_PAUSED: return "paused";
@@ -119,6 +120,7 @@ string Job::stateString(uint8_t state) {
 string Job::stateTag(uint8_t state) {
 
     switch(state) {
+        case JSTATE_NONE: return "";
         case JSTATE_IDLE: return "I";
         case JSTATE_ACTIVE: return "A";
         case JSTATE_PAUSED: return "P";

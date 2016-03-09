@@ -43,7 +43,7 @@ namespace redux {
             void contextMenuEvent( QContextMenuEvent* event );
 
         private slots:
-            void addJob( int i ) { }; //cout << "P=" << i << endl;  };
+            void addJob( int i ) { };
             void cloning( void ) { emit cloneJob(); };
             void removing( void ) { emit removeJob(); };
             void submit( void ) { emit submitJob(); };

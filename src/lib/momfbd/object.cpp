@@ -174,7 +174,6 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 
 void Object::cleanup(void) {
     
-    LOG_TRACE << "Object::cleanup()";
     for( auto &c: channels ) {
         c->cleanup();
     }
@@ -750,12 +749,12 @@ void Object::initCache (void) {
     
     
     pixelsToAlpha =  alphaToPixels = 0;
-    double pixelsToAlpha2(0);
-    double alphaToPixels2(0);
+    //double pixelsToAlpha2(0);
+    //double alphaToPixels2(0);
     if( modes.tiltMode.y >= 0 ) {
         double delta = modes(modes.tiltMode.y,pupilPixels/2+1,pupilPixels/2) - modes(modes.tiltMode.y,pupilPixels/2,pupilPixels/2);
-        pixelsToAlpha2 = (2 * M_PI / (delta*(pupilPixels-1))) * pupilPixels/patchSize;
-        alphaToPixels2 = 1.0 / pixelsToAlpha2;
+        //pixelsToAlpha2 = (2 * M_PI / (delta*(pupilPixels-1))) * pupilPixels/patchSize;
+        //alphaToPixels2 = 1.0 / pixelsToAlpha2;
         pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta);
     } else if ( modes.tiltMode.x >= 0 ) {
         double delta = modes(modes.tiltMode.x,pupilPixels/2,pupilPixels/2+1) - modes(modes.tiltMode.x,pupilPixels/2,pupilPixels/2);

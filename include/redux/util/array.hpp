@@ -129,7 +129,6 @@ namespace redux {
                 }
                 void fastIncrement( void ) { 
                     if(pos_ >= end_) {
-                        std::cout << "pos=" << pos_ << "  end=" << end_ << std::endl;
                         throw std::out_of_range("Array::iterator:  Iterating past end().");
                     }
                     ++pos_;
@@ -1062,8 +1061,6 @@ namespace redux {
                 auto it = const_iterator( *this, getOffset( dimLast ), begin_, getOffset( dimLast ) );
                 end_ = it.pos()+1;  // 1 step after last element;
                 dense_ = (int64_t(begin_+nElements_) == end_);
-                //std::cout << "Arr::SetLimits:  begin=" << begin_ << "  end=" << end_ << "  nEl=" << nElements_
-                //<< " lastOff=" << getOffset( dimLast ) << " dense=" << dense_ << std::endl;
             }
             
             template <typename U>

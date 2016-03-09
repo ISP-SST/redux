@@ -24,19 +24,9 @@ namespace redux {
 
                 if( !error ) {
                     if( sent != transferred ) {
-                        std::ostringstream ss;
                         std::cerr << "TcpConnection::write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
-                        //throw std::ios_base::failure( ss.str() );
                     }
                 }
-//                 else {
-//                     if( ( error == error::eof ) || ( error == error::connection_reset ) ) {
-//                         // TODO handle reconnects...
-//                     }
-//                     else {
-//                         throw std::ios_base::failure( "TcpConnection::async_write: error: " + error.message() );
-//                     }
-//                 }
             }
 
             
@@ -106,10 +96,15 @@ namespace redux {
 
             void connect( std::string host, std::string service );
             void setCallback( callback cb = nullptr ) { activityCallback = cb; };
+            void setErrorCallback( callback cb = nullptr ) { errorCallback = cb; };
             void idle( void );
             void onActivity( Ptr conn, const boost::system::error_code& error );
             void setSwapEndian(bool se) { swapEndian = se; };
             bool getSwapEndian(void) { return swapEndian; };
+            
+            void lock(void) { mtx.lock(); };
+            void unlock(void) { mtx.unlock(); };
+            bool try_lock(void) { return mtx.try_lock(); };
 
             TcpConnection& operator<<( const Command& );
             TcpConnection& operator>>( Command& );
@@ -119,9 +114,11 @@ namespace redux {
             TcpConnection( const TcpConnection& ) = delete;
 
             callback activityCallback;
+            callback errorCallback;
             tcp::socket mySocket;
             boost::asio::io_service& myService;
             bool swapEndian;
+            std::mutex mtx;
 
        public:
             boost::asio::strand strand;

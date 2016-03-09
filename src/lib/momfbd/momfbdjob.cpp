@@ -36,6 +36,16 @@ MomfbdJob::~MomfbdJob( void ) {
     
 }
 
+/*        enum Step : uint8_t { //  JSTEP_SUBMIT = 1,   Defined in job.hpp
+                    JSTEP_PREPROCESS = 2,
+                    JSTEP_QUEUED = 4,
+                    JSTEP_RUNNING = 8,
+                    JSTEP_POSTPROCESS = 16
+                    //JSTEP_COMPLETED = 64,           Defined in job.hpp
+                    //JSTEP_ERR = 128                 Defined in job.hpp
+                  };
+*/        
+
 
 uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {
     using redux::util::unpack;
@@ -469,13 +479,14 @@ bool MomfbdJob::check(void) {
     int val = info.step;
     switch (val) {
         case 0:                 ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;
-        case JSTEP_SUBMIT:      ret = checkData(); if(ret) info.step = JSTEP_PREPROCESS; break;
-        case JSTEP_PREPROCESS: ;                  // no checks at these steps, just fall through and return true
+        case JSTEP_SUBMIT:      ret = checkData();  if(ret) info.step = JSTEP_CHECKED; break;
+        case JSTEP_CHECKED: ;                  // no checks at these steps, just fall through and return true
+        case JSTEP_PREPROCESS: ;
         case JSTEP_QUEUED: ;
         case JSTEP_RUNNING: ;
         case JSTEP_POSTPROCESS: ;
         case JSTEP_COMPLETED: ret = true; break;
-        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << " (" << stepString(info.step) << ")";
+        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step;
     }
     return ret;
 }

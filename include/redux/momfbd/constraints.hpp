@@ -133,7 +133,7 @@ namespace redux {
             void read (void);
             void write (void);
 
-            void dump (std::string tag);
+            void dump (std::string tag="constraints");
 
             std::vector<std::shared_ptr<Constraint>> constraints;
             std::vector<Group> groups;

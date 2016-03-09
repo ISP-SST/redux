@@ -105,7 +105,6 @@ static __inline T sqr (T x) {
 
 
 double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double radius) {
-    //cout << "makePupil_thi:   nph = " << nPoints << "  r_c = " << radius << endl;
 
     double area = 0.0, origin = 0.5;
     memset (*pupil, 0, nPoints * nPoints * sizeof (double));
@@ -170,7 +169,7 @@ double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double rad
 
 
 double redux::image::makePupil_mvn (double** pupil, int nph, double r_c) {
-    //cout << "makePupil_mvn:   nph = " << nph << "  r_c = " << r_c << endl;
+
     double area = 0.0;
     memset (*pupil, 0, nph * nph * sizeof (double));
     int xo = nph / 2, yo = nph / 2;
@@ -285,7 +284,7 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
     }
 
     // normalize
-    normalization = 1.0 / (sqrt (normalization / pupil.area));
+    normalization = sqrt(pupil.area/normalization);
     for (unsigned int y = 0; y < nPoints; ++y) {
         for (unsigned int x = 0; x < nPoints; ++x) {
             //if(pupPtr[y][x]>0) {
@@ -301,7 +300,6 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
 
 void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r_c, double angle) {
 
-  //  cout << "makeZernike_mvn:   mode = " << j << "  nph = " << nph << "  r_c = " << r_c << "  angle = " << angle << endl;
     int xo = nph / 2, yo = nph / 2;
     if (j == 1) {
         for (unsigned int x=0; x < nph; ++x) {
@@ -581,7 +579,7 @@ double redux::image::inv_dist_wght (float **a, size_t sizeY, size_t sizeX, size_
 template <typename T>
 double redux::image::inverseDistanceWeight (T** array, size_t sizeY, size_t sizeX, size_t posY, size_t posX) {
 
-    static const double* inverseDistanceSquared = getDistanceMap();     // will only be initialized once.
+    static const double* const inverseDistanceSquared = getDistanceMap();     // will only be initialized once.
 
     // TODO: verify this function, results look weird
     int64_t beginX = std::max (0L, static_cast<int64_t> (posX - maxDistance));
@@ -769,7 +767,6 @@ void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Arr
         }
         metric /= data.nElements();
         delta /= metric;
-        //cout << "descatter:  iter = " << i << ", ChiSq = " << metric <<  ", delta = " << delta << endl;
     } while ( (delta > minImprovement) && (metric > epsilon) && (++i < maxIterations));
 
     img_center.copy (data);

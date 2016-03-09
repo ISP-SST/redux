@@ -23,6 +23,7 @@ namespace redux {
     const double planck = 4.135667516e-15;                                    //!< Plancks constant @e h (\f$eV \cdot s\f$)
     const double planckbar = 6.58211928e-16;                                  //!< Plancks constant @e \f$\hbar = h/(2 \pi)\f$ (\f$eV \cdot s\f$)
     const double BohrMagneton = 57.883817555 * planck* CC;                    //!< Bohr magneton (Gauss/Ångström)
+    const double GoldenRatio = (1.0+std::sqrt(5.0))/2.0;                      //!< Golden ratio @e \f$\phi = (1+\sqrt(5))/2\f$
     //  5.7883817555(79)×10−5    eV/Tesla
     //    => = 5.7883817555×10−9     eV/Gauss
     //    => = 5.7883817555×10−9 * planck*CC*1e10    /(Gauss*Ångström)

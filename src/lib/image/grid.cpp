@@ -87,7 +87,6 @@ double Zernike::covariance( int32_t i, int32_t j ) {
     double& cov = Cache::get<PairID,double>( PairID(i,j), std::numeric_limits<double>::infinity() );
     unique_lock<mutex> lock(get().mtx);
     if( ! isfinite(cov) ) { // not calulated yet
-        cout << "Calulating ZernikeCov for (" << i << "," << j << ")" << endl;;
         cov = calcZernikeCovariance(i, j);
     }
     return cov;

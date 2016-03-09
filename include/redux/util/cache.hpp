@@ -99,7 +99,6 @@ namespace redux {
                 Cache& c = get();
                 auto& m = c.getMap<KeyT,T>();
                 auto ret = m.emplace(key,std::shared_ptr<T>(new T(args...)));
-                std::cout << "blaha: " << hexString(ret.first->second.get()) << std::endl; 
                 return ret.first->second;
                 
             }*/
@@ -123,12 +122,10 @@ namespace redux {
             template<class KeyT, class T>
             void mapMaintenance(void) {
                 auto m = getMap<KeyT,T>();
-                std::cout << "mapMaintenance:  &m = " << redux::util::hexString(&m.second) << "   m.sz = " << m.second.size() << std::endl;
             }
             template<class T, class U>
             void setMaintenance(void) {
                 auto s = getSet<T,U>();
-                std::cout << "setMaintenance:  &m = " << redux::util::hexString(&s.second) << "   s.sz = " << s.second.size() << std::endl;
             }
             template<class KeyT, class T>
             std::map<KeyT,T>& initMap(void) {       // called only once when a new KeyT/T pair is used.
@@ -186,7 +183,6 @@ namespace redux {
             std::mutex itemMutex;
             bool isLoaded;
             uint64_t cachedSize;
-            
         };
         
         
