@@ -76,6 +76,7 @@ namespace redux {
             /*****************************/
             
             /******* Data settings *******/
+            std::vector<float> alignMap;            //!< Coefficients for the projective transformation (from reference channel) into this channel (default: none)
             std::vector<int16_t> alignClip;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
             uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
             uint8_t incomplete;                     //!< Some files might not exist, just skip those.

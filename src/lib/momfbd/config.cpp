@@ -200,6 +200,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         
     }
 
+    alignMap = tree.get<vector<float>>( "ALIGN_MAP", defaults.alignMap );
     alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", defaults.alignClip );
     borderClip = tree.get<uint16_t>("BORDER_CLIP", defaults.borderClip);
     incomplete = tree.get<bool>( "INCOMPLETE", defaults.incomplete );
@@ -272,6 +273,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(noiseFudge != defaults.noiseFudge) tree.put("NF", noiseFudge);
     if(weight != defaults.weight) tree.put("WEIGHT", weight);
     
+    if(alignMap != defaults.alignMap) tree.put("ALIGN_MAP", alignMap);
     if(alignClip != defaults.alignClip) tree.put("ALIGN_CLIP", alignClip);
     if(borderClip != defaults.borderClip) tree.put("BORDER_CLIP", borderClip);
     if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", (bool)incomplete);
@@ -312,6 +314,7 @@ uint64_t ChannelCfg::size(void) const {
     sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
     sz += diversityModes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
     sz += diversityTypes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += alignMap.size()*sizeof(float) + sizeof(uint64_t);
     sz += alignClip.size()*sizeof(int16_t) + sizeof(uint64_t);
     sz += imageDataDir.length() + 1;
     sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
@@ -333,6 +336,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, diversity);
     count += pack(ptr+count, diversityModes);
     count += pack(ptr+count, diversityTypes);
+    count += pack(ptr+count, alignMap);
     count += pack(ptr+count, alignClip);
     count += pack(ptr+count, borderClip);
     count += pack(ptr+count, incomplete);
@@ -367,6 +371,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, diversity, swap_endian);
     count += unpack(ptr+count, diversityModes, swap_endian);
     count += unpack(ptr+count, diversityTypes, swap_endian);
+    count += unpack(ptr+count, alignMap, swap_endian);
     count += unpack(ptr+count, alignClip, swap_endian);
     count += unpack(ptr+count, borderClip, swap_endian);
     count += unpack(ptr+count, incomplete);
@@ -402,7 +407,7 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
            (subImagePosX == rhs.subImagePosX) &&
            (subImagePosY == rhs.subImagePosY) &&
            (imageDataDir == rhs.imageDataDir) &&
-           (imageDataDir == rhs.imageDataDir) &&
+           (darkTemplate == rhs.darkTemplate) &&
            (imageTemplate == rhs.imageTemplate) &&
            (imageNumbers == rhs.imageNumbers) &&
            (wfIndex == rhs.wfIndex) &&
