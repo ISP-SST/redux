@@ -1,5 +1,6 @@
 #include "redux/file/fileana.hpp"
 
+#include "redux/util/arraystats.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/types.hpp"
 
@@ -274,6 +275,72 @@ bpx::time_duration redux::file::Ana::getExposureTime(void) {
     
     return (getEndTime()-getStartTime());
 
+}
+
+
+size_t redux::file::Ana::dataSize(void) { 
+
+    return nElements()*typeSizes[ m_Header.datyp ];
+    
+}
+
+
+size_t redux::file::Ana::dimSize(size_t i) {
+    
+    if( i > m_Header.ndim ) return 0;
+    
+    return m_Header.dim[i];
+    
+}
+
+
+uint8_t redux::file::Ana::elementSize(void) { 
+    
+    return typeSizes[ m_Header.datyp ];
+    
+}
+
+
+size_t redux::file::Ana::nElements(void) {
+    
+    uint8_t nDims = m_Header.ndim;
+    if( nDims == 0 ) return 0;
+    
+    size_t ret = 1;
+    for( uint8_t i=0; i < nDims; ++i ) {
+        ret *= m_Header.dim[i];
+    }
+    
+    return ret;
+    
+}
+
+
+// IDL type-ID = ANA type-ID + 1
+int redux::file::Ana::getIDLType(void) {
+    
+    return m_Header.datyp + 1;
+    
+}
+
+
+double redux::file::Ana::getMinMaxMean( const char* data, double* Min, double* Max ){
+    
+    ArrayStats stats;
+    size_t nEl = nElements();
+    switch( m_Header.datyp ) {
+        case( ANA_BYTE ):   stats.getMinMaxMean( data, nEl ); break;
+        case( ANA_WORD ):   stats.getMinMaxMean( reinterpret_cast<const int16_t*>(data), nEl ); break;
+        case( ANA_LONG ):   stats.getMinMaxMean( reinterpret_cast<const int32_t*>(data), nEl ); break;
+        case( ANA_FLOAT ):  stats.getMinMaxMean( reinterpret_cast<const float*>(data), nEl ); break;
+        case( ANA_DOUBLE ): stats.getMinMaxMean( reinterpret_cast<const double*>(data), nEl ); break;
+        default: ;
+    }
+    if( Min ) *Min = stats.min;
+    if( Max ) *Max = stats.max;
+    
+    return stats.mean;
+    
 }
 
 

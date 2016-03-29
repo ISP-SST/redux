@@ -52,6 +52,15 @@ namespace redux {
             bpx::ptime getEndTime(void);
             bpx::ptime getAverageTime(void);
             bpx::time_duration getExposureTime(void);
+            
+            size_t dataSize(void);
+            size_t dimSize(size_t);
+            uint8_t elementSize(void);
+            uint8_t nDims(void) { return m_Header.ndim; }
+            size_t nElements(void);
+            int getIDLType(void);
+            
+            double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr );
 
             struct raw_header {                    // first block for ana files
                 uint32_t synch_pattern;

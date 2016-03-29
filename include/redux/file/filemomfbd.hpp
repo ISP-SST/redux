@@ -67,6 +67,8 @@ namespace redux {
                 return "";
             }
 
+            double getMinMaxMean( const char* data, double* min=nullptr, double* max=nullptr ) { return 0; };
+            
             float version, pix2cf, cf2pix;
             std::string dateString, timeString, versionString;
             std::vector<std::string> fileNames;

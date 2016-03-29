@@ -41,6 +41,15 @@ namespace redux {
             virtual bpx::ptime getAverageTime(void) { return bpx::ptime(); };
             virtual bpx::time_duration getExposureTime(void) { return bpx::time_duration(); };
             
+            virtual size_t dataSize(void) { return 0; };
+            virtual size_t dimSize(size_t) { return 0; };
+            virtual uint8_t elementSize(void) { return 0; };
+            virtual uint8_t nDims(void) { return 0; }
+            virtual size_t nElements(void) { return 0; };
+            virtual int getIDLType(void) { return 0; };
+            
+            virtual double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr ) = 0;
+            
             std::string& at(const std::string& key) { return list[key]; };
             //const std::string& at (const std::string& key) const { return list[key]; };
             void clearList(void) { list.clear(); }
