@@ -3,18 +3,30 @@ DESCRIPTION REDUX tools
 VERSION ${LIBREDUX_VERSION_MAJOR}.${LIBREDUX_VERSION_MINOR}.${LIBREDUX_VERSION_PATCH}
 SOURCE Redux Pipeline - ${LIBREDUX_COMMIT_INFO}
 BUILD_DATE ${LIBREDUX_COMMIT_TIME}
-PROCEDURE       STRUCT_INFO     0       1          KEYWORDS
-FUNCTION        STRUCT_INFO     0       1          KEYWORDS
-FUNCTION        CCONVOLVE       2       2          KEYWORDS
-FUNCTION        CDESCATTER      3       3          KEYWORDS
-FUNCTION        CBEZIER2        3       3          KEYWORDS
-FUNCTION        CBEZIER3        3       3          KEYWORDS
-FUNCTION        CPUPIL          2       2          KEYWORDS
-FUNCTION        KARHUNEN_LOEVE  3       3          KEYWORDS
-PROCEDURE       CLEAR_MODECACHE 0       0          KEYWORDS
-FUNCTION        STRING_TO_UINTS 1       1          KEYWORDS
-FUNCTION        UINTS_TO_STRING 1       1          KEYWORDS
-PROCEDURE       FFT_REORDER     1       1          KEYWORDS
-FUNCTION        IMG_ALIGN       2       2          KEYWORDS
-FUNCTION        IMG_PROJECT     2       2          KEYWORDS
-FUNCTION        MAKE_TEMPLATE   1       1          KEYWORDS
+PROCEDURE       RDX_CLEAR_CACHE   0       0
+PROCEDURE       RDX_CLEAR_MODES   0       0
+FUNCTION        RDX_CONVOLVE      2       2          KEYWORDS
+FUNCTION        RDX_DESCATTER     3       3          KEYWORDS
+FUNCTION        RDX_FILLPIX       1       1          KEYWORDS
+FUNCTION        RDX_FIND_SHIFT    2       2          KEYWORDS
+FUNCTION        RDX_INTS2STR      1       1          KEYWORDS
+FUNCTION        RDX_LOADFILES     1       1          KEYWORDS
+FUNCTION        RDX_MAKE_MASK     0       1          KEYWORDS
+FUNCTION        RDX_MAKE_MODES    3       3          KEYWORDS
+FUNCTION        RDX_MAKE_PUPIL    2       2
+FUNCTION        RDX_MAKE_TEMPLATE 1       1          KEYWORDS
+PROCEDURE       RDX_MEMALIGN      1       1
+PROCEDURE       RDX_REORDER       1       1
+FUNCTION        RDX_STR2INTS      1       1          KEYWORDS
+PROCEDURE       RDX_STRUCTINFO    0       1          KEYWORDS
+FUNCTION        RDX_SUMFILES      1       1          KEYWORDS
+FUNCTION        RDX_SUMIMAGES     1       1          KEYWORDS
+FUNCTION        CBEZIER2          3       3          KEYWORDS
+FUNCTION        CBEZIER3          3       3          KEYWORDS
+FUNCTION        IMG_ALIGN         2       2          KEYWORDS
+FUNCTION        IMG_PROJECT       2       2          KEYWORDS
+FUNCTION        IMG_REMAP         3       3          KEYWORDS
+FUNCTION        INPAINT           2       2          KEYWORDS
+PROCEDURE       RDX               0       1
+PROCEDURE       TIC               0       0
+PROCEDURE       TOC               0       0          KEYWORDS

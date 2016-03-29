@@ -42,7 +42,7 @@ if (DEFINED IDL_FOUND)
     SET(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
     configure_file("libgridmatch.dlm.in" "${GRIDMATCH_DLM_FILE_LOCATION}")
         
-    add_library(rdx SHARED rdx.cpp imgtools.cpp)
+    add_library(rdx SHARED cvutil.cpp fft.cpp idlutil.cpp imgtools.cpp modes.cpp rdx.cpp string.cpp)
     SET(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${REDUX_CURRENT_LIBRARIES})

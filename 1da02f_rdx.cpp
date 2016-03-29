@@ -32,10 +32,12 @@ namespace {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_INT help;
         IDL_INT indent;
+        IDL_INT lpoffset;
         IDL_INT normalize;
         IDL_INT niter;
         IDL_INT nthreads;
         IDL_INT padding;
+        IDL_INT qwret;
         IDL_INT verbose;
     } KW_RESULT;
 
@@ -44,10 +46,12 @@ namespace {
         IDL_KW_FAST_SCAN,
         { (char*) "HELP",      IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
         { (char*) "INDENT",    IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (indent) },
+        { (char*) "LPOFFSET",  IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (lpoffset) },
         { (char*) "NORMALIZE", IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (normalize) },
         { (char*) "NITER",     IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (niter) },
         { (char*) "NTHREADS",  IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (nthreads) },
         { (char*) "PADDING",   IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (padding) },
+        { (char*) "QWRET",     IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (qwret) },
         { (char*) "VERBOSE",   IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (verbose) },
         { NULL }
     };
