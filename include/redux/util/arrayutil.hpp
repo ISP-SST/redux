@@ -154,6 +154,32 @@ namespace redux {
             delete[] tmp;
         }
 
+        template <typename T>
+        void copyInto( const T* in, size_t inY, size_t inX, T* out, size_t outY, size_t outX, size_t posY, size_t posX ) {
+            T* outPtr = out + posY*outX + posX;
+            size_t nBytes = inX * sizeof( T );
+            for( size_t y = 0; y < inY; ++y ) {
+                memcpy( outPtr+y*outX, in+y*inX, nBytes );
+            }
+        }
+
+        template <typename T, typename U>
+        void copyInto( const T* in, size_t inY, size_t inX, U* out, size_t outY, size_t outX, size_t posY, size_t posX ) {
+            U* outPtr = out + posY*outX + posX;
+            for( size_t y = 0; y < inY; ++y ) {
+                std::copy( in+y*inX, in+(y+1)*inX, outPtr+y*outX );
+            }
+        }
+
+        template <typename T>
+        void copyPart( const T* in, size_t inY, size_t inX, T* out, size_t outY, size_t outX, size_t posY, size_t posX ) {
+            const T* inPtr = in + posY*inX + posX;
+            size_t nBytes = outX * sizeof( T );
+            for( size_t y = 0; y < outY; ++y ) {
+                memcpy( out+y*outX, inPtr+y*inX, nBytes );
+            }
+        }
+
 
         /*! @} */
 
