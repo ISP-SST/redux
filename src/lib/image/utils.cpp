@@ -27,16 +27,21 @@ using namespace std;
 
 namespace {
 
-    const int maxDistance = 32;
+    const int maxDistance = 64;
     const int maxDistance2 = maxDistance*maxDistance;
     const double deltasqr = 4;
     const double beta = 2;
     
-    double distMap[maxDistance2+1];
+    double distMap[2*maxDistance2+1];
+    
+    bool calculateCache( void ) {
+
+        return true;
+    }
 
     const double* getDistanceMap (void) {
-        memset(distMap,0,(maxDistance2+1)*sizeof(double));
-        for(int i=1; i<=maxDistance2; ++i) distMap[i] = pow (i + deltasqr, -beta);
+        memset(distMap,0,(2*maxDistance2+1)*sizeof(double));
+        for(int i=0; i<=2*maxDistance2; ++i) distMap[i] = pow (i + deltasqr, -beta);
         return distMap;
     }
 
@@ -592,15 +597,15 @@ double redux::image::inverseDistanceWeight (T** array, size_t sizeY, size_t size
         int y2 = (y-posY)*(y-posY);
         for (int x = beginX; x < endX; ++x) {
             int x2 = (x-posX)*(x-posX);
-            if( x2+y2 > maxDistance2 ) break;
-            if (array[y][x] > 0) {
+            //if( x2+y2 > maxDistance2 ) break;
+            if( array[y][x] ) {
                 double tmp = inverseDistanceSquared[y2+x2];
                 weightedSum += tmp * array[y][x];
                 normalization += tmp;
             }
         }
     }
-    if( normalization > 0 ) {
+    if( normalization ) {
         return weightedSum / normalization;
     }
     return 0.0;
