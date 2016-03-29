@@ -5,6 +5,8 @@
 #include "redux/util/array.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <mutex>
+
 #include <fftw3.h>
 
 namespace redux {
@@ -21,14 +23,20 @@ namespace redux {
                       };
 
         class FourierTransform : public redux::util::Array<complex_t> {
+            
+            struct PlansContainer {
+                PlansContainer() { fftw_init_threads(); };
+                ~PlansContainer(){ fftw_cleanup_threads(); };
+                std::mutex mtx;
+            };
 
         public:
-            
             struct Plan {
                 typedef std::shared_ptr<const Plan> Ptr;
                 enum TYPE { R2C=1, C2C };
                 struct Index {
                     Index(const std::vector<size_t>& dims, TYPE t, uint8_t nt);
+                    Index( size_t sizeY, size_t sizeX, TYPE t, uint8_t nt);
                     bool operator<( const Index& rhs ) const;
                     TYPE tp;
                     uint8_t nThreads;
@@ -37,11 +45,17 @@ namespace redux {
                 fftw_plan forward_plan, backward_plan;
                 Plan( const Index& );
                 ~Plan();
+                static Plan::Ptr get(const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads=1);
+                static Plan::Ptr get(size_t sizeY, size_t sizeX, Plan::TYPE tp, uint8_t nThreads=1);
+                static void clear(void);
+                static PlansContainer pc;
                 void init( void );
+                void forward( double* in, fftw_complex* out ) const ;
+                void backward( fftw_complex* in, double* out ) const;
+
                 bool operator<( const Plan& rhs ) const { return (id < rhs.id); };
             };
 
-            static Plan::Ptr getPlan(const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads=1);
             
             FourierTransform();
             FourierTransform(size_t ySize, size_t xSize, int flags=0, uint8_t nThreads=1);
@@ -81,6 +95,8 @@ namespace redux {
             
             template <typename T>
             void convolveInPlace( redux::util::Array<T>& in, int flags=0  ) const;
+            //template <typename T>
+            //void convolveInPlace( T* in, size_t ySize, size_t xSize, int flags=0 ) const;
 
             template <typename T>
             redux::util::Array<T> convolve( const redux::util::Array<T>& in ) const {
@@ -107,7 +123,7 @@ namespace redux {
             static void normalize( FourierTransform& );
             void normalize(void) { normalize(*this); };
             void setThreads(uint8_t nT) { nThreads = nT; };
-            double nInputElements(void) const { return inputSize; };
+            size_t nInputElements(void) const { return inputSize; };
 
             void reorder(void);
             template <typename T>
@@ -131,17 +147,20 @@ namespace redux {
             const FourierTransform& operator*=( const T& val ) { Array<complex_t>::operator*=(val); return *this; }
             
             void conjugate(void);
+            void ft( double* in, complex_t* out );         //!< NOTE use of these requires FT and input to be properly sized already !!
             void ft( double* in );         //!< NOTE use of these requires FT and input to be properly sized already !!
             void ft( complex_t* in );
             void ift( complex_t* in );
+            void ift( complex_t* in, double* out );
             void getIFT( double* out );        //!> NOTE fftw:c2r is destructive, so only use these direct functions in one-shot contexts.
             void getIFT( complex_t* out );
             void getFT( complex_t* out );
             
+            Plan::Ptr getPlan(void) { return plan; };
             
             void init(void);
-            void init(const double*, size_t, size_t);
-            void init(const complex_t*, size_t, size_t);
+            //template <typename T> void init( const std::complex<T>* in, size_t ySize, size_t xSize );
+            template <typename T> void init(const T*, size_t, size_t);
 
         private:
             Plan::Ptr plan;
@@ -150,10 +169,34 @@ namespace redux {
             bool halfComplex;
             bool normalized;
             uint8_t nThreads;
-            double inputSize;
+            size_t inputSize;
             
         };
        
+        template <>
+        inline void FourierTransform::init( const std::complex<double>* in, size_t ySize, size_t xSize ) {
+            if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
+                redux::util::Array<complex_t>::resize(ySize,xSize);
+            }
+
+            plan = Plan::get({ySize, xSize}, Plan::C2C, nThreads);
+            complex_t* dataPtr = const_cast<complex_t*>(in);    // fftw takes non-const, even if input is not modified.
+            fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (ptr()));
+        }
+        
+        template <>
+        inline void FourierTransform::init( const std::complex<float>* in, size_t ySize, size_t xSize ) {
+            if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
+                redux::util::Array<complex_t>::resize(ySize,xSize);
+            }
+
+            plan = Plan::get({ySize, xSize}, Plan::C2C, nThreads);
+            size_t nElements = ySize*xSize;
+            complex_t* tmpData = new complex_t[ySize*xSize];
+            std::copy(in, in+nElements, tmpData);
+            fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (tmpData), reinterpret_cast<fftw_complex*> (ptr()));
+            delete[] tmpData;
+        }
   //      template <>
   //      redux::util::Array<double> FourierTransform::convolve( const redux::util::Array<double>& ) const;
 

@@ -1,5 +1,7 @@
 #include "redux/image/fouriertransform.hpp"
 
+#include <redux/util/cache.hpp>
+
 #include <algorithm>
 #include <map>
 #include <mutex>
@@ -10,11 +12,20 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+FourierTransform::PlansContainer FourierTransform::Plan::pc;
 
 FourierTransform::Plan::Index::Index (const std::vector<size_t>& dims, TYPE t, uint8_t nt) : tp (t), nThreads (nt), sizes (dims) {
     sizes.erase( remove_if( sizes.begin(), sizes.end(), [](size_t i){ return i <= 1;}), sizes.end());
     if ( sizes.empty() ) {
         throw std::logic_error ("FT::Plan constructed with no non-trivial dimensions:  " + printArray (dims, "in"));
+    }
+}
+
+FourierTransform::Plan::Index::Index (size_t sizeY, size_t sizeX, TYPE t, uint8_t nt) : tp (t), nThreads (nt), sizes({sizeY,sizeX}) {
+    sizes.erase( remove_if( sizes.begin(), sizes.end(), [](size_t i){ return i <= 1;}), sizes.end() );
+    if ( sizes.empty() ) {
+        throw std::logic_error ("FT::Plan constructed with no non-trivial dimensions:  ["
+        + to_string(sizeY) + ", " + to_string(sizeX) + "]");
     }
 }
 
@@ -51,14 +62,14 @@ void FourierTransform::Plan::init (void) {
         if (id.sizes.size() == 2) {
             auto in = sharedArray<double> (id.sizes[0], id.sizes[1]);
             auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1] / 2 + 1);
-            forward_plan = fftw_plan_dft_r2c_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_MEASURE);
-            backward_plan = fftw_plan_dft_c2r_2d (id.sizes[0], id.sizes[1], *out.get(), *in.get(), FFTW_MEASURE);
+            forward_plan = fftw_plan_dft_r2c_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_ESTIMATE);   // FFTW_MEASURE|FFTW_UNALIGNED
+            backward_plan = fftw_plan_dft_c2r_2d (id.sizes[0], id.sizes[1], *out.get(), *in.get(), FFTW_ESTIMATE);
         } else
             if (id.sizes.size() == 1) {
                 auto in = sharedArray<double> (id.sizes[0]);
                 auto out = sharedArray<fftw_complex> (id.sizes[0] / 2 + 1);
-                forward_plan = fftw_plan_dft_r2c_1d (id.sizes[0], in.get(), out.get(), FFTW_MEASURE);
-                backward_plan = fftw_plan_dft_c2r_1d (id.sizes[0] / 2 + 1, out.get(), in.get(), FFTW_MEASURE);
+                forward_plan = fftw_plan_dft_r2c_1d (id.sizes[0], in.get(), out.get(), FFTW_ESTIMATE);
+                backward_plan = fftw_plan_dft_c2r_1d (id.sizes[0] / 2 + 1, out.get(), in.get(), FFTW_ESTIMATE);
             } else {
                 throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
             }
@@ -67,14 +78,14 @@ void FourierTransform::Plan::init (void) {
             if (id.sizes.size() == 2) {
                 auto in = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
                 auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
-                forward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_FORWARD, FFTW_MEASURE);
-                backward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_BACKWARD, FFTW_MEASURE);
+                forward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_FORWARD, FFTW_ESTIMATE);
+                backward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_BACKWARD, FFTW_ESTIMATE);
             } else {
                 if (id.sizes.size() == 1) {
                     auto in = sharedArray<fftw_complex> (id.sizes[0]);
                     auto out = sharedArray<fftw_complex> (id.sizes[0]);
-                    forward_plan = fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_FORWARD, FFTW_MEASURE);
-                    backward_plan =  fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_BACKWARD, FFTW_MEASURE);
+                    forward_plan = fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_FORWARD, FFTW_ESTIMATE);
+                    backward_plan =  fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_BACKWARD, FFTW_ESTIMATE);
                 } else {
                     throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
                 }
@@ -86,9 +97,25 @@ void FourierTransform::Plan::init (void) {
 }
 
 
+void FourierTransform::Plan::forward( double* in, fftw_complex* out ) const {
+    
+    if( id.tp != R2C ) throw std::logic_error ("FT::Plan::forward(double*, fftw_complex*) is only avainlable for Real-To-Complex Plans.");
+    fftw_execute_dft_r2c( forward_plan, in, out );
+    
+}
+
+
+void FourierTransform::Plan::backward( fftw_complex* in, double* out ) const {
+    
+    if( id.tp != R2C ) throw std::logic_error ("FT::Plan::backward(fftw_complex*, double*) is only avainlable for Real-To-Complex Plans.");
+    fftw_execute_dft_c2r( backward_plan, in, out );
+    
+}
+
+
 namespace {
     
-    struct PlansContainer {  // using a static instance below ensures that fftw_init_threads is called only once, and cleanup is done when program exits.
+    /*struct PlansContainer {  // using a static instance below ensures that fftw_init_threads is called only once, and cleanup is done when program exits.
         PlansContainer() { fftw_init_threads(); };
         ~PlansContainer(){
             for( auto& plan : plans) {
@@ -99,14 +126,14 @@ namespace {
             fftw_cleanup_threads();
         };
         std::map<FourierTransform::Plan::Index, FourierTransform::Plan::Ptr> plans;
-    };
+    };*/
     
 }
 
 
-FourierTransform::Plan::Ptr FourierTransform::getPlan (const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads) {
+FourierTransform::Plan::Ptr FourierTransform::Plan::get(const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads) {
 
-    static PlansContainer pc;
+/*    static PlansContainer pc;
     
     static mutex mtx;
     unique_lock<mutex> lock (mtx);
@@ -116,7 +143,42 @@ FourierTransform::Plan::Ptr FourierTransform::getPlan (const std::vector<size_t>
         plan.first->second.reset( new Plan( plan.first->first ) );
     }
 
-    return plan.first->second;
+    return plan.first->second;*/
+
+    Plan::Index id(dims, tp, nThreads);
+    Plan::Ptr& plan = Cache::get< Plan::Index, Plan::Ptr >( id, nullptr );
+
+    unique_lock<mutex> lock(pc.mtx);
+
+    if( !plan ) {  // insertion successful, i.e. new plan -> initialize it
+        plan.reset( new Plan(id ) );
+    }
+
+    return plan;
+
+
+}
+
+
+FourierTransform::Plan::Ptr FourierTransform::Plan::get( size_t sizeY, size_t sizeX, Plan::TYPE tp, uint8_t nThreads ) {
+
+    Plan::Index id(sizeY, sizeX, tp, nThreads);
+    Plan::Ptr& plan = Cache::get< Plan::Index, Plan::Ptr >( id, nullptr );
+
+    unique_lock<mutex> lock(pc.mtx);
+
+    if( !plan ) {  // insertion successful, i.e. new plan -> initialize it
+        plan.reset( new Plan(id ) );
+    }
+
+    return plan;
+
+}
+
+void FourierTransform::Plan::clear( void ) {
+
+    Cache::clear<Plan::Index, Plan::Ptr >();
+
 }
 
 
@@ -238,6 +300,13 @@ void FourierTransform::conjugate(void) {
 }
 
 
+void FourierTransform::ft( double* in, complex_t* out ) {
+
+    fftw_execute_dft_r2c( plan->forward_plan, in, reinterpret_cast<fftw_complex*>(out) );
+
+}
+
+
 void FourierTransform::ft( double* in ) {
 
     fftw_execute_dft_r2c( plan->forward_plan, in, reinterpret_cast<fftw_complex*>(get()) );
@@ -255,6 +324,13 @@ void FourierTransform::ft( complex_t* in ) {
 void FourierTransform::ift( complex_t* in ) {
 
     fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
+
+}
+
+
+void FourierTransform::ift( complex_t* in, double* out ) {
+
+    fftw_execute_dft_c2r( plan->backward_plan, reinterpret_cast<fftw_complex*>(in), out );
 
 }
 
@@ -283,40 +359,71 @@ void FourierTransform::getFT( complex_t* out ) {
 void FourierTransform::init (void) {
 
     if( halfComplex ) { 
-        plan = getPlan(dimensions(), Plan::R2C, nThreads);
+        plan = Plan::get(dimensions(), Plan::R2C, nThreads);
     } else {
-        plan = getPlan(dimensions(), Plan::C2C, nThreads);
+        plan = Plan::get(dimensions(), Plan::C2C, nThreads);
     }
 
 }
+/*
+template <typename T>
+void FourierTransform::init( const std::complex<T>* in, size_t ySize, size_t xSize ) {
+    if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
+        Array<complex_t>::resize(ySize,xSize);
+    }
+
+    plan = Plan::get({ySize, xSize}, Plan::C2C, nThreads);
+    complex_t* dataPtr = const_cast<complex_t*>(in);    // fftw takes non-const, even if input is not modified.
+    fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (ptr()));
+}
+//template void FourierTransform::init( const std::complex<float>*, size_t, size_t );
+template void FourierTransform::init( const std::complex<double>*, size_t, size_t );*/
 
 
-void FourierTransform::init (const double* in, size_t ySize, size_t xSize) {
+template <typename T>
+void FourierTransform::init (const T* in, size_t ySize, size_t xSize) {
 
     // for r2c transforms, the last dimension has size = n/2+1
     if( (ySize != dimSize(0)) || (xSize != 2*(dimSize(1)-1))) {
         Array<complex_t>::resize (ySize,xSize/2+1);
     }
 
-    plan = getPlan({ySize, xSize}, Plan::R2C, nThreads);
-    
+    plan = Plan::get({ySize, xSize}, Plan::R2C, nThreads);
+    size_t nElements = ySize*xSize;
     double* tmpData = new double[ySize*xSize];
-    memcpy (tmpData, in, ySize*xSize*sizeof (double));  // copy data because r2c-transforms modifies input
+    std::copy(in, in+nElements, tmpData);  // copy data because r2c-transforms modifies input
     fftw_execute_dft_r2c (plan->forward_plan, tmpData, reinterpret_cast<fftw_complex*> (ptr()));
     delete[] tmpData;
-
+    
 }
 
+//template void FourierTransform::init( const std::complex<float>*, size_t, size_t );
+namespace redux {
+    namespace image {
+        /*template <>
+        void FourierTransform::init<complex<float>> ( const complex<float>* in, size_t ySize, size_t xSize ) {
+            if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
+                Array<complex_t>::resize(ySize,xSize);
+            }
 
-void FourierTransform::init (const complex_t* in, size_t ySize, size_t xSize) {
-    if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
-        Array<complex_t>::resize(ySize,xSize);
+            plan = getPlan({ySize, xSize}, Plan::C2C, nThreads);
+            size_t nElements = ySize*xSize;
+            complex_t* tmpData = new complex_t[ySize*xSize];
+            std::copy(in, in+nElements, tmpData);
+            fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (tmpData), reinterpret_cast<fftw_complex*> (ptr()));
+            delete[] tmpData;
+        }*/
+        
     }
-
-    plan = getPlan({ySize, xSize}, Plan::C2C, nThreads);
-    complex_t* dataPtr = const_cast<complex_t*>(in);    // fftw takes non-const, even if input is not modified.
-    fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (ptr()));
 }
+template void FourierTransform::init( const uint8_t*, size_t, size_t );
+template void FourierTransform::init( const int16_t*, size_t, size_t );
+template void FourierTransform::init( const int32_t*, size_t, size_t );
+template void FourierTransform::init( const float*, size_t, size_t );
+template void FourierTransform::init( const double*, size_t, size_t );
+//template void FourierTransform::init( const complex<float>*, size_t, size_t );
+//template void FourierTransform::init( const complex<double>*, size_t, size_t );
+
 
 
 template <typename T>
@@ -550,7 +657,6 @@ double FourierTransform::noise (int mask, double limit) const {
 }
 
 
-
 template <typename T>
 void FourierTransform::convolveInPlace (Array<T>& inout, int flags) const {
 
@@ -579,6 +685,38 @@ template void FourierTransform::convolveInPlace (Array<float>& inout, int flags)
 template void FourierTransform::convolveInPlace (Array<double>& inout, int flags) const;
 template void FourierTransform::convolveInPlace (Array<complex_t>& inout, int flags) const;
 
+/*
+template <typename T>
+void FourierTransform::convolveInPlace (T* inout, size_t ySize, size_t xSize, int flags) const {
+
+    if( xSize*ySize != nInputElements ) {
+        cout << "FourierTransform::convolveInPlace(): input dimensions does not match this FourierTransform." << endl;
+        return;
+    }
+
+    double* tmp = new double[ nInputElements ];
+    std::copy( inout, inout+nInputElements, tmp );
+    
+    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
+
+    fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
+
+    
+    
+    if (! normalized) {
+    }
+
+    FourierTransform inFT (inout, flags, nThreads);
+    inFT *= *this;
+    inFT.inv (inout, FT_REORDER);
+    
+    delete[] tmp;
+    
+}
+template void FourierTransform::convolveInPlace(float*, size_t, size_t, int) const;
+template void FourierTransform::convolveInPlace(double*, size_t, size_t, int) const;
+template void FourierTransform::convolveInPlace(complex_t*, size_t, size_t, int) const;
+*/
 
 void FourierTransform::normalize (FourierTransform& in) {
     if (in.normalized) return;
@@ -692,10 +830,10 @@ void FourierTransform::resize( size_t ySize, size_t xSize, int flags, uint8_t nT
 
     if (flags & FT_FULLCOMPLEX) {
         halfComplex = false;
-        plan = getPlan( {ySize, xSize}, Plan::C2C, nThreads);
+        plan = Plan::get( {ySize, xSize}, Plan::C2C, nThreads);
     } else {
         halfComplex = true;
-        plan = getPlan( {ySize, xSize}, Plan::R2C, nThreads);
+        plan = Plan::get( {ySize, xSize}, Plan::R2C, nThreads);
     }
 
     if (flags & FT_NORMALIZE) {
@@ -719,11 +857,19 @@ const FourierTransform& FourierTransform::operator*= (const FourierTransform& rh
     if (halfComplex == rhs.halfComplex) {
         //Array<complex_t>::operator*= (rhs);
         //std::transform (first, first+5, second, results, std::multiplies<int>());
-        std::transform (ptr(), ptr()+nElements(), rhs.ptr(), ptr(), std::multiplies<complex_t>());
+        //std::transform (ptr(), ptr()+nElements(), rhs.ptr(), ptr(), std::multiplies<complex_t>());
+        complex_t* thisPtr = ptr();
+        const complex_t* rhsPtr = rhs.ptr();
+        size_t N = nElements();
+        for ( size_t i=0; i<N; ++i ) {
+            thisPtr[i] *= rhsPtr[i];
+        }
     } else if (halfComplex) {
+
         Array<complex_t> half (reinterpret_cast<const Array<complex_t>&> (rhs), dimensions());
         Array<complex_t>::operator*= (half);
     } else {
+
         Array<complex_t> half (reinterpret_cast<Array<complex_t>&> (*this), rhs.dimensions());
 
         int d0 = dimSize (0);
