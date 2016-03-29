@@ -12,6 +12,12 @@ using namespace std;
 string Cache::cachePath = "/swap/redux/";
 
 
+void Cache::cleanup(void) {
+    for( auto& func: get().cleanup_funcs ) {
+        func();
+    }
+}
+
 Cache& Cache::get(void) {
     static Cache cache;
     return cache;

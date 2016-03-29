@@ -41,6 +41,7 @@ namespace redux {
                 bool operator() (const std::shared_ptr<T>& lhs, const std::shared_ptr<T>& rhs) const { return (*lhs)<(*rhs); }
             };
         public:
+            static void cleanup(void);
             static Cache& get(void);
             std::string path(void);
             void setPath(const std::string&);
@@ -131,22 +132,27 @@ namespace redux {
             std::map<KeyT,T>& initMap(void) {       // called only once when a new KeyT/T pair is used.
                 static std::map<KeyT,T> m;
                 std::function<void(void)> func = std::bind(&Cache::mapMaintenance<KeyT,T>,this);
+                std::function<void(void)> cfunc = std::bind(&Cache::clear<KeyT,T>);
                 std::unique_lock<std::mutex> lock(cacheMutex);
                 funcs.push_back(func);
+                cleanup_funcs.push_back(cfunc);
                 return m;
             }
             template<class T, class U>
             std::set<T,U>& initSet(void) {       // called only once when a new KeyT/T pair is used.
                 static std::set<T,U> s;
                 std::function<void(void)> func = std::bind(&Cache::setMaintenance<T,U>,this);
+                std::function<void(void)> cfunc = std::bind(&Cache::clear<T>);
                 std::unique_lock<std::mutex> lock(cacheMutex);
                 funcs.push_back(func);
+                cleanup_funcs.push_back(cfunc);
                 return s;
             }
 
             std::mutex cacheMutex;
             static std::string cachePath;
             std::vector<std::function<void(void)>> funcs;
+            std::vector<std::function<void(void)>> cleanup_funcs;
             int pollTime;
         };
         
