@@ -39,10 +39,12 @@ void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
     if(count) mean /= count;
     
 }
-template void redux::util::ArrayStats::getMinMaxMean( const float*, size_t );
-template void redux::util::ArrayStats::getMinMaxMean( const double*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const char*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const uint8_t*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const int16_t*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const int32_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const float*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const double*, size_t );
 
            
 template <typename T>
