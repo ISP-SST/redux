@@ -78,6 +78,46 @@ bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
 }
 
 
+vector<set<string>> redux::util::make_template( const vector<string>& list, string& out, string split_chars ) {
+    
+    vector<string> segments;
+    vector< set<string> > seg_list;
+
+    if( split_chars.empty() ) return seg_list;
+    
+    size_t n_segments(0);
+    for( auto& str: list ) {
+        boost::split(segments, str, boost::is_any_of(split_chars));
+        if( !n_segments && (segments.size() >= 1) ) {    // TBD: how to treat size=1 (no split), return tpl="" or tpl="%1"
+            n_segments = segments.size();
+            seg_list.resize( n_segments );
+        }
+        if( segments.size() == n_segments ) {
+            for( size_t j=0; j<n_segments; ++j ) {
+                seg_list[j].insert(segments[j]);
+            }
+        } else if(n_segments) {
+            //cout << "Multiple segment sizes!!  nS=" << n_segments << "  ss=" << segments.size() << endl;
+        }
+    }
+    
+    int arg_cnt(0);
+    out = "";
+    for( size_t j=0; j<n_segments; ++j ) {
+        size_t nArgs = seg_list[j].size();
+        if( nArgs > 1 ) {
+            out += "%"+to_string(++arg_cnt);     // add a placeholder for this segment
+        } else if( nArgs == 1 ) {
+            out += *(seg_list[j].begin());       // a unique item, add it to template
+        }
+        if( j < n_segments-1 ) out += split_chars[0];       // separator    TBD: should this be a parameter
+    }
+
+    return std::move(seg_list);
+    
+}
+
+
 string redux::util::alignCenter(const string& s, size_t n, unsigned char c) {
 
     if(s.length() > n) {

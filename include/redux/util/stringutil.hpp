@@ -2,6 +2,7 @@
 #define REDUX_UTIL_STRINGUTIL_HPP
 
 #include <map>
+#include <set>
 #include <vector>
 #include <sstream>
 #include <iostream>
@@ -38,6 +39,7 @@ namespace redux {
         bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false);
         bool nocaseLess(const std::string& lhs, const std::string& rhs);
         
+        std::vector<std::set<std::string>> make_template( const std::vector<std::string>& list, std::string& out, std::string split_chars="." );
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )
          *  @brief Append char 'c' to both sides of s, and form a block of width n
