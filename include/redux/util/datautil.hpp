@@ -340,6 +340,21 @@ namespace redux {
             }
 
         }
+        
+        template <class T>
+        T medianOf3( T* ptr ) {
+
+            if( *ptr > *(ptr+1) ) {
+                if( *ptr < *(ptr+2) ) return *ptr;
+                else if( *(ptr+1) < *(ptr+2) ) return *(ptr+2);
+                else return *(ptr+1);
+            } else {
+                if( *ptr < *(ptr+2) ) return *(ptr+1);
+                else if( *(ptr+1) < *(ptr+2) ) return *(ptr+2);
+                else return *(ptr);
+            }
+
+        }
         //@}
 
         //@{
