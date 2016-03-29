@@ -57,7 +57,7 @@ po::options_description& Application::parseCmdLine( int argc, const char* const 
         all.add( *programOptions );
     }
 
-    Application::executableName = fs::path( argv[0] ).filename().string();
+    Application::executableName = fs::path( string(argv[0]) ).filename().string();
     getOptions( all, Application::executableName );
     
     po::command_line_parser parser( argc, argv );
