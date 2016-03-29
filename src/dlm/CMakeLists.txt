@@ -47,6 +47,10 @@ if (DEFINED IDL_FOUND)
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${REDUX_CURRENT_LIBRARIES})
     
+    if(REDUX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)
+        add_dependencies(rdx GIT_CHECK_LIBREDUX)
+    endif()
+    
     install(TARGETS ana momfbd gridmatch rdx DESTINATION ${IDL_DLM_DIR} )
     install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} ${RDX_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
    

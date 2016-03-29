@@ -33,6 +33,8 @@ set( EXT_MAJOR_REGEXP "define[ \t]+BOOST_VERSION[ \t]+" )
 set( EXT_MINOR_REGEXP "Disabled-NotAvailable" )
 set( EXT_PATCH_REGEXP "Disabled-NotAvailable" )
 
+set( EXT_HELPTEXT "Try your systems equivalent of \"apt-get install libboost-all-dev\"" )
+
 # Attempt to locate libs/headers automagically
 include("${CMAKE_CURRENT_LIST_DIR}/FindExternal.cmake")
 

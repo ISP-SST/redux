@@ -195,6 +195,15 @@ macro( EXTRACT_FILE_VERSION FILE_NAME )
 endmacro()
 
 
+macro( notFound )
+    if( EXT_HELPTEXT )
+        message( ${EXT_HELPTEXT} )
+    endif()
+    clearVars()
+    clearLocalVars()
+    return()
+endmacro()
+
 ##### End of helper functions #####
 
 
@@ -310,10 +319,8 @@ if( EXT_VERSION_FILE )
     unset( ${EXT_NAME}_VERSION_FILE CACHE )
 
     if( ${EXT_NAME}_VERSION AND EXT_REQUIRED_VERSION AND ${EXT_NAME}_VERSION VERSION_LESS EXT_REQUIRED_VERSION )
-        message(WARNING "FindExternal:\"${EXT_NAME}\"  Version mismatch.  Found: ${${EXT_NAME}_VERSION} < ${EXT_REQUIRED_VERSION}")
-        clearVars()
-        clearLocalVars()
-        return()
+        message("FindExternal:\"${EXT_NAME}\"  Version mismatch.  Found: ${${EXT_NAME}_VERSION} < ${EXT_REQUIRED_VERSION}")
+        notFound()
     endif()
     
 endif()
@@ -455,9 +462,10 @@ if( EXT_COMPONENTS )
         set( ${EXT_NAME}_REQUIRED_COMPONENTS_FOUND FALSE  )
     endif()
 
-    if( EXT_DEBUG AND NOT ${EXT_NAME}_REQUIRED_COMPONENTS_FOUND )
-        message( STATUS "The following required ${EXT_NAME} components"
+    if( NOT ${EXT_NAME}_REQUIRED_COMPONENTS_FOUND )
+        message( "The following required ${EXT_NAME} components"
                              " were not found: \"${${EXT_NAME}_COMPONENTS}\"" )
+        notFound()
     endif()
 else()
     unset( ${EXT_NAME}_LIBRARIES CACHE )

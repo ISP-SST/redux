@@ -18,6 +18,8 @@ set( EXT_MINOR_REGEXP "define CV_VERSION_MAJOR" )
 set( EXT_PATCH_REGEXP "define CV_VERSION_MINOR" )
 
 
+set( EXT_HELPTEXT "Try your systems equivalent of \"apt-get install libopencv-*-dev\"" )
+
 # Attempt to locate libs/headers automagically
 include("${CMAKE_CURRENT_LIST_DIR}/FindExternal.cmake")
 
