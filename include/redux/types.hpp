@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <complex>
 
+#include <fftw3.h>
+
 namespace redux {
 
 
@@ -148,9 +150,14 @@ namespace redux {
         
         typedef std::complex<double> complex_t;
         
+        inline const complex_t& operator*=( complex_t& lhs, const fftw_complex& rhs ) { return lhs *= reinterpret_cast<const complex_t&>(rhs); }
+        inline const fftw_complex& operator*=( fftw_complex& lhs, const complex_t& rhs ) { reinterpret_cast<complex_t&>(lhs) *= rhs; return lhs; }
+        
+        
         /* @} */
 
 }
+
 
 
 #endif // REDUX_TYPES_HPP
