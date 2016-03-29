@@ -270,7 +270,7 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
         double sf = sqrt ( (double) 2 * (n + 1));
         for (unsigned int y = 0; y < nPoints; ++y) {
             for (unsigned int x = 0; x < nPoints; ++x) {
-                modePtr[y][x] *= sf * sin (m * (aPtr[y][x] + angle)); //* pupPtr[y][x]
+                modePtr[y][x] *= sf * sin (m * (aPtr[y][x] - angle)); //* pupPtr[y][x]
                 if (pupPtr[y][x] > 0) {
                     normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
                 }
@@ -280,7 +280,7 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
         double sf = sqrt ( (double) 2 * (n + 1));
         for (unsigned int y = 0; y < nPoints; ++y) {
             for (unsigned int x = 0; x < nPoints; ++x) {
-                modePtr[y][x] *= sf * cos (m * (aPtr[y][x] + angle)); //* pupPtr[y][x]
+                modePtr[y][x] *= sf * cos (m * (aPtr[y][x] - angle)); //* pupPtr[y][x]
                 if (pupPtr[y][x] > 0) {
                     normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
                 }
