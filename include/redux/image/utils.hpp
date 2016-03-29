@@ -6,9 +6,11 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/types.hpp"
 
+#include <atomic>
 #include <functional>
 #include <iostream>
 #include <map>
+#include <thread>
 
 namespace redux {
 
@@ -229,14 +231,14 @@ namespace redux {
         }
 
 
-        template <typename T, typename Predicate>
-        void fillPixels( T** array, size_t sy, size_t sx, std::function<double( size_t, size_t )> filler, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+        template <typename T, typename Predicate, typename MaskType=uint8_t>
+        void fillPixels( T** array, size_t sy, size_t sx, std::function<double( size_t, size_t )> filler, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ), MaskType** mask=nullptr  ) {
             std::map<size_t, T> tmp;
             T* ptr = *array;
             size_t offset = 0;
             for( size_t y = 0; y < sy; ++y ) {
                 for( size_t x = 0; x < sx; ++x ) {
-                    if( predicate( array[y][x] ) ) tmp.insert( std::pair<size_t, T>( offset, filler( y, x ) ) );
+                    if( (!mask || !mask[y][x]) && predicate( array[y][x] ) ) tmp.insert( std::pair<size_t, T>( offset, filler( y, x ) ) );
                     ++offset;
                 }
             }
@@ -253,6 +255,64 @@ namespace redux {
             for( auto it = array.begin(); it != array.end(); ++it ) {
                 if( predicate( *it ) ) *it = filler( it );
             }
+        }
+
+        template <typename T, typename U=uint8_t>
+        void fillPixels( T** image, size_t sy, size_t sx, U** mask=nullptr ) {
+            
+            size_t offset(0);
+            const size_t nPixels = sy*sx;
+
+            std::map<size_t, T> values;
+            size_t o;
+            while( (o = offset++) < nPixels ) {
+                if( !mask || mask[0][o%nPixels] ) {
+                    size_t y = o/sy;
+                    size_t x = o%sy;
+                    values.insert( std::pair<size_t, T>( o, inverseDistanceWeight( image, sy, sx, y, x ) ) );
+                    //values.insert( std::pair<size_t, T>( o, horizontalInterpolation( image, sy, sx, y, x ) ) );
+                }
+            }
+            for( auto &it: values ) {
+                image[0][it.first] = it.second;
+            }
+
+        }
+
+        
+        template <typename T, typename U=uint8_t>
+        void fillPixels( T*** image, size_t nImages, size_t sy, size_t sx, U** mask=nullptr, unsigned int nThreads=std::thread::hardware_concurrency() ) {
+            
+            std::atomic<size_t> offset(0);
+            const size_t nPixels = sy*sx;
+            
+            auto nextbad = [&](void) {
+                size_t o;
+                while( (o = offset.fetch_add(1)) < nPixels ) {
+                    if( !mask || mask[0][o%nPixels]) return o;
+                }
+                return nPixels;
+            };
+
+            std::vector<std::thread> threads;
+            for( unsigned int t=0; t<nThreads; ++t ) {
+                threads.push_back( std::thread(
+                    [&](){
+                        size_t myOffset;
+                        std::map<size_t, T> values;
+                        while( (myOffset=nextbad()) < nPixels ) {
+                            size_t y = myOffset/sy;
+                            size_t x = myOffset%sy;
+                            values.insert( std::pair<size_t, T>( myOffset, inverseDistanceWeight( image, sy, sx, y, x ) ) );
+                        }
+
+                        for( auto &it: values ) {
+                            image[0][it.first] = it.second;
+                        }
+                    }));
+            }
+            for( auto& th : threads ) th.join();
+
         }
 
         template <typename T>
