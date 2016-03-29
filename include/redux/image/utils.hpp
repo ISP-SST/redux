@@ -4,6 +4,7 @@
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/util/opencv.hpp"
 #include "redux/types.hpp"
 
 #include <atomic>
@@ -323,17 +324,19 @@ namespace redux {
         template <typename T>
         void normalizeIfMultiFrames( redux::image::Image<T>& img );
         
-        /*! Fit and subtract the backscatter patter for semi-transparent CCDs 
-         *  @param data Image to be cleaned
-         *  @param ccdGain Image containing the backscatter pattern
-         *  @param psf PSF for the system
-         *  @param maxIterations Exit condition
-         *  @param minImprovement Exit if the improvement in one step is less than this factor (1 means no improvement)
-         *  @param epsilon Exit if the metric reaches this value.
-         */
         template <typename T, typename U>
-        void descatter(redux::util::Array<T>& data, const redux::util::Array<U>& ccdgain, const redux::util::Array<U>& psf,
-                       int maxIterations=50, double minImprovement=1, double epsilon=1E-10 );
+        void make_mask( T* input, U* mask, size_t ySize, size_t xSize, double thres=0, int smooth=5, bool filterLarger=false, bool invert=false ) {
+#ifdef REDUX_WITH_OPENCV
+            cv::Mat inMat( ySize, xSize, cv::cvType<T>(), input );
+            cv::Mat maskMat( ySize, xSize, cv::cvType<U>(), mask );
+            cv::make_mask( inMat, maskMat, thres, smooth, filterLarger, invert );
+#else
+            std::cerr << "make_mask is not yet implemented for non-OpenCV builds." << std::endl;
+#endif            
+        }
+        
+        template <typename T, typename U>
+        void inpaint( T* img, U* mask, T* out, size_t ySize, size_t xSize, double radius, int flags=0 );
 
     }   // image
 

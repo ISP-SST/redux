@@ -19,6 +19,9 @@
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
+#ifdef REDUX_WITH_OPENCV
+#       include <opencv2/photo/photo.hpp>
+#endif
 using namespace redux::image;
 using namespace redux::momfbd;
 using namespace redux::util;
@@ -714,72 +717,17 @@ template void redux::image::normalizeIfMultiFrames (redux::image::Image<float>&)
 
 
 template <typename T, typename U>
-void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Array<U>& psf_in, int maxIterations, double minImprovement, double epsilon) {
-
-    vector<size_t> dims = data.dimensions (true);
-
-    if (dims.size() != 2 || dims != ccdgain.dimensions() || dims != psf_in.dimensions()) {
-        cout << "descatter(): dimensions of gain/psf does not match image." << endl;
-        return;
-    }
-
-    for (auto & dim : dims) dim *= 2;
-
-    Array<double> img (dims);                   // Twice the size of input
-    Array<double> img_center (img, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with img.
-    img.zero();                                 // whole array = 0
-    img_center.assign(data);                    // central subimage = img_in
-
-    Array<double> psf (dims);                  // Twice the size of input
-    Array<double> psf_center (psf, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with psf.
-    psf.zero();                                 // whole array = 0
-    psf_center.assign(psf_in);                  // central subimage = psf_in
-    double sum = total (psf_in);
-    if (sum) {                                  // normalize
-        psf_center *= 1.0 / sum;
-    }
-
-    Array<double> gain;
-    ccdgain.copy(gain);
-
-    redux::image::FourierTransform otf (psf, FT_REORDER | FT_NORMALIZE);
-
-    Array<double>::const_iterator itg = gain.begin();
-    for (auto & value : img_center) {
-        double g = *itg++;
-        value /= (1.0 + g * g);
-    }
-
-    Array<double> tmp (dims);                  // Twice the size of input
-    Array<double> tmp_center (tmp, dims[0] / 4, 3 * dims[0] / 4 - 1, dims[1] / 4, 3 * dims[1] / 4 - 1); // centered subimage of half (i.e. original) size. N.B: shares data with tmp.
-
-    double metric = std::numeric_limits< double >::max();
-    double delta;
-    int i = 0;
-    do {
-        img.copy (tmp);
-        tmp_center *= gain;
-        otf.convolveInPlace (tmp);
-        tmp_center *= gain;
-        delta = metric;
-        metric = 0.0;
-        typename Array<T>::const_iterator in_it = data.begin();
-        Array<double>::const_iterator tmp_it = tmp_center.begin();
-        for (auto & value : img_center) {
-            double new_value = (*in_it++ - *tmp_it++);
-            metric += (value - new_value) * (value - new_value);
-            value = new_value;
-        }
-        metric /= data.nElements();
-        delta /= metric;
-    } while ( (delta > minImprovement) && (metric > epsilon) && (++i < maxIterations));
-
-    img_center.copy (data);
-
+void redux::image::inpaint( T* img, U* mask, T* out, size_t ySize, size_t xSize, double radius, int flags ) {
+#ifdef REDUX_WITH_OPENCV
+    cv::Mat imgMat( ySize, xSize, cv::cvType<T>(), img );
+    cv::Mat maskMat( ySize, xSize, cv::cvType<U>(), mask );
+    cv::Mat outMat( ySize, xSize, cv::cvType<T>(), out );
+    cv::inpaint( imgMat, maskMat, outMat, radius, flags );
+#else
+    std::cerr << "make_mask is not yet implemented for non-OpenCV builds." << std::endl;
+#endif            
 }
-template void redux::image::descatter (Array<float>&, const Array<float>&, const Array<float>&, int, double, double);
-template void redux::image::descatter (Array<double>&, const Array<float>&, const Array<float>&, int, double, double);
-template void redux::image::descatter (Array<float>&, const Array<double>&, const Array<double>&, int, double, double);
-
+template void redux::image::inpaint( float*, uint8_t*, float*, size_t, size_t, double, int );
+template void redux::image::inpaint( double*, uint8_t*, double*, size_t, size_t, double, int );
 
 

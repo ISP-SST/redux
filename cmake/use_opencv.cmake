@@ -6,7 +6,7 @@ set( EXT_NAME "OpenCV" )
 #set( EXT_DEBUG 1 )
 
 set( EXT_LIB_PREFIX opencv_ )
-set( EXT_COMPONENTS calib3d contrib core features2d flann imgproc legacy ml objdetect )
+set( EXT_COMPONENTS calib3d contrib core features2d flann imgproc legacy ml objdetect photo )
 
 set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR}" )
 set( EXT_LIB_DEBUG_SUFFIX "d" )

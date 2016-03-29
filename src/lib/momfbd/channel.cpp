@@ -10,6 +10,7 @@
 #include "redux/math/functions.hpp"
 #include "redux/image/cachedfile.hpp"
 #include "redux/image/fouriertransform.hpp"
+#include "redux/image/descatter.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/logger.hpp"
 #include "redux/translators.hpp"
