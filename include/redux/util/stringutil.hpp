@@ -66,6 +66,7 @@ namespace redux {
         std::string getUname( __uid_t id = 0 );
         std::string cleanPath( std::string path, std::string base = "" );
         
+        void printProgress(const std::string& text, float progress);
         
         template <typename T=uint32_t>
         std::vector<T> stringToUInts(const std::string& str);

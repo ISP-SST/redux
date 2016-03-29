@@ -3,6 +3,7 @@
 #include "redux/translators.hpp"
 
 #include <cstdlib>
+#include <mutex>
 #include <pwd.h>
 #include <unistd.h>
 
@@ -183,6 +184,16 @@ string redux::util::cleanPath(string in, string base) {
 
     return (result / fn).string();
 
+}
+
+
+void redux::util::printProgress( const string& text, float progress ) {
+    static mutex mtx;
+    unique_lock<mutex> lock(mtx);
+    if( progress >= 0 ) {
+        printf( "\r%s (%.1f%%)", text.c_str(), progress );
+    } else printf( "\r%s", text.c_str() );
+    fflush(stdout);
 }
 
 
