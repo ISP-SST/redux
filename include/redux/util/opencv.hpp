@@ -7,6 +7,16 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 namespace cv {
+    
+    template <typename T> inline int cvType(void) { return CV_8UC1; }
+    template<> inline int cvType<int16_t>(void) { return CV_16SC1; }
+    template<> inline int cvType<int32_t>(void) { return CV_32SC1; }
+    template<> inline int cvType<float>(void) { return CV_32FC1; }
+    template<> inline int cvType<double>(void) { return CV_64FC1; }
+
+    
+    void make_mask( InputArray image, InputOutputArray mask, double thres=0, int smooth=5, bool filterLarger=false, bool invert=false );
+    
 
 enum
 {
