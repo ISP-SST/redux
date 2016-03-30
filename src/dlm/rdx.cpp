@@ -434,11 +434,11 @@ static IDL_KW_PAR kw_timer_pars[] = {
 
 string timer_info( int lvl ) {
     
-    string ret = "TIC/TOC";
+    string ret = "RDX_TIC/RDX_TOC";
     if( lvl > 0 ) {
         
         ret += ((lvl > 1)?"\n":"            ");          // newline if lvl>1
-        ret += "   Syntax:   tic & wait,3 & toc\n";
+        ret += "   Syntax:   rdx_tic & wait,3 & rdx_toc\n";
     
         if( lvl > 1 ) {
             ret +=  "   Accepted Keywords (for TOC):\n"
@@ -497,16 +497,16 @@ extern "C" {
         IDL_ExitRegister( IdlContainer::exit );
         
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)IdlContainer::info, (char*)"RDX", 0, 1, 0, 0 }, 0);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_start, (char*)"TIC", 0, 0, 0, 0 }, 0 );
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_elapsed, (char*)"TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_start, (char*)"RDX_TIC", 0, 0, 0, 0 }, 0 );
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_elapsed, (char*)"RDX_TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
         
         static IDL_SYSFUN_DEF2 function_addr[] = {
-            { { (IDL_VPTR (*) ()) cbezier2}, (char*) "CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) cbezier3}, (char*) "CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) redux::inpaint}, (char*) "INPAINT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) redux::img_align}, (char*) "IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) redux::img_project}, (char*) "IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) redux::img_remap}, (char*) "IMG_REMAP", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) cbezier3}, (char*) "RDX_CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) redux::inpaint}, (char*) "RDX_INPAINT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) redux::img_align}, (char*) "RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) redux::img_project}, (char*) "RDX_IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
+            { { (IDL_VPTR (*) ()) redux::img_remap}, (char*) "RDX_IMG_REMAP", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
 
         

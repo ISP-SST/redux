@@ -122,7 +122,7 @@ namespace redux {
     template <typename T, typename U>
     void subtractFromIDL(const UCHAR* in1, const T* in2, U* out, size_t nElements, UCHAR IDLtype);
 
-    double getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min=nullptr, double* Max=nullptr );
+    double getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min=nullptr, double* Max=nullptr, bool* hasInf=nullptr );
     
     void structinfo( int argc, IDL_VPTR argv[], char* argk );
     

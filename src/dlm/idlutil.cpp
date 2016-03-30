@@ -463,7 +463,7 @@ template void redux::subtractFromIDL<double,float>(const UCHAR*, const double*, 
 template void redux::subtractFromIDL<double,double>(const UCHAR*, const double*, double*, size_t, UCHAR);
 
 
-double redux::getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min, double* Max ) {
+double redux::getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min, double* Max, bool* hasInf ) {
 
     ArrayStats stats;
     switch( IDLtype ) {
@@ -476,6 +476,7 @@ double redux::getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype
     }
     if( Min ) *Min = stats.min;
     if( Max ) *Max = stats.max;
+    if( hasInf ) *hasInf = stats.hasInfinity;
     
     return stats.mean;
     

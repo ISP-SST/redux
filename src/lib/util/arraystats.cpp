@@ -19,6 +19,7 @@ void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
     sum = 0;
     sqr_sum = 0;
     norm = 0;
+    hasInfinity = false;
     const T* ptr = data + n;
     size_t count(0);
     while( ptr-- > data ) {
@@ -28,12 +29,12 @@ void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
         } else if( tmp < min ) {
             min = tmp;
         }
-        if ( tmp == tmp ) { // will exclude NaN
+        if ( isfinite( tmp ) ) { // will exclude NaN
             sum += tmp;
             norm += abs(tmp);
             sqr_sum += tmp*tmp;
             count++;
-        }
+        } else hasInfinity = true;
     }
     mean = sum;
     if(count) mean /= count;
@@ -66,7 +67,8 @@ void redux::util::ArrayStats::getRmsStddev(const T* data, size_t n) {
             rms = sqrt(rms);
         }
     } else if (n == 1) {
-        rms = (*data == *data)?*data:0; // will exclude NaN
+        double tmp = static_cast<double>( *data );
+        rms = isfinite(tmp)?tmp:0;
         stddev = 0;
     }
 }

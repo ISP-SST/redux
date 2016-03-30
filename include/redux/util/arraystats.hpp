@@ -14,7 +14,7 @@ namespace redux {
             typedef std::shared_ptr<ArrayStats> Ptr;
 
             ArrayStats() : clip(-1), cutoff(-1), min(0), max(0), median(0), sum(0), sqr_sum(0), norm(0),
-                           mean(0), rms(0), stddev(0), noise(0), noiseRMS(0) {}
+                           mean(0), rms(0), stddev(0), noise(0), noiseRMS(0), hasInfinity(false) {}
             template <typename T> void getMinMaxMean(const T* data, size_t count);
             template <typename T> void getMinMaxMean(const redux::util::Array<T>& data) {
                 if (data.dense()) getMinMaxMean(data.ptr(),data.nElements());
@@ -50,6 +50,7 @@ namespace redux {
             double min, max, median;
             double sum, sqr_sum, norm, mean, rms, stddev;
             double noise, noiseRMS;
+            bool hasInfinity;
 
         };
 

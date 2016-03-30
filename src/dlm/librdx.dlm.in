@@ -3,6 +3,7 @@ DESCRIPTION REDUX tools
 VERSION ${LIBREDUX_VERSION_MAJOR}.${LIBREDUX_VERSION_MINOR}.${LIBREDUX_VERSION_PATCH}
 SOURCE Redux Pipeline - ${LIBREDUX_COMMIT_INFO}
 BUILD_DATE ${LIBREDUX_COMMIT_TIME}
+PROCEDURE       RDX               0       1
 PROCEDURE       RDX_CLEAR_CACHE   0       0
 PROCEDURE       RDX_CLEAR_MODES   0       0
 FUNCTION        RDX_CONVOLVE      2       2          KEYWORDS
@@ -21,12 +22,11 @@ FUNCTION        RDX_STR2INTS      1       1          KEYWORDS
 PROCEDURE       RDX_STRUCTINFO    0       1          KEYWORDS
 FUNCTION        RDX_SUMFILES      1       1          KEYWORDS
 FUNCTION        RDX_SUMIMAGES     1       1          KEYWORDS
-FUNCTION        CBEZIER2          3       3          KEYWORDS
-FUNCTION        CBEZIER3          3       3          KEYWORDS
-FUNCTION        IMG_ALIGN         2       2          KEYWORDS
-FUNCTION        IMG_PROJECT       2       2          KEYWORDS
-FUNCTION        IMG_REMAP         3       3          KEYWORDS
-FUNCTION        INPAINT           2       2          KEYWORDS
-PROCEDURE       RDX               0       1
-PROCEDURE       TIC               0       0
-PROCEDURE       TOC               0       0          KEYWORDS
+PROCEDURE       RDX_TIC           0       0
+PROCEDURE       RDX_TOC           0       0          KEYWORDS
+FUNCTION        RDX_CBEZIER2      3       3          KEYWORDS
+FUNCTION        RDX_CBEZIER3      3       3          KEYWORDS
+FUNCTION        RDX_IMG_ALIGN     2       2          KEYWORDS
+FUNCTION        RDX_IMG_PROJECT   2       2          KEYWORDS
+FUNCTION        RDX_IMG_REMAP     3       3          KEYWORDS
+FUNCTION        RDX_INPAINT       2       2          KEYWORDS

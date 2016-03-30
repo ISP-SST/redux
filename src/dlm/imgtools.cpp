@@ -41,6 +41,7 @@ namespace bfs = boost::filesystem;
 
 namespace {
 
+    static char nl[] = "\n";
     static IDL_MEMINT dims3x3[] = { 3, 3 };
 
     typedef struct {
@@ -1385,7 +1386,9 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                     [&](){
                         size_t myImgIndex;
                         while( (myImgIndex=imgIndex.fetch_add(1)) < nImages ) {
-                            checkedPtr[myImgIndex] = getMinMaxMean( dataPtr+myImgIndex*frameSize, nPixels, dataType );
+                            bool hasInf;
+                            checkedPtr[myImgIndex] = getMinMaxMean( dataPtr+myImgIndex*frameSize, nPixels, dataType, 0, 0, &hasInf );
+                            if( hasInf ) checkedPtr[myImgIndex] = std::numeric_limits<double>::infinity();
                         }
                     }));
             }
@@ -1525,6 +1528,12 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                     while( (myImgIndex=imgIndex.fetch_add(1)) < nImages ) {
                         if( !checkedPtr || checkedPtr[myImgIndex] > 0 ) {
                             sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myDataPtr) );
+                        } else {
+                            if ( kw.lun ) {
+                                string tmp = "Image #" + to_string(myImgIndex);
+                                IDL_PoutRaw( kw.lun, (char*)tmp.c_str(), tmp.length() );
+                                IDL_PoutRaw( kw.lun, nl, 1 );
+                            }
                         }
                     }
                     std::unique_lock<mutex> lock(mtx);
@@ -1864,7 +1873,12 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         auto sumFunc = [&]( size_t imgIndex, double* mySumPtr, double* myTmpPtr, UCHAR* myLoadPtr ) {
 
                 if( checkedPtr  ) {
-                    checkedPtr[imgIndex] = getMinMaxMean( myLoadPtr, nPixels, dataType );
+                    bool hasInf;
+                    checkedPtr[imgIndex] = getMinMaxMean( myLoadPtr, nPixels, dataType, 0, 0, &hasInf );
+                    if( hasInf ) {
+                        checkedPtr[imgIndex] = std::numeric_limits<double>::infinity();
+                        return;
+                    }
                 }
                 
                 if( kw.pinh_align ) {
@@ -1988,14 +2002,19 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             double tmean = kw.limit*checkedPtr[ nImages/2 ];
             memcpy( checkedPtr, checkedPtr+nImages, nImages*sizeof(double) );
             for( size_t i=0; i<nImages; ++i ) {
-                size_t offset = std::min( std::max(nImages+i-1, nImages), 2*nImages-3 );       // restrict to array
-                checkedPtr[i] = (abs(checkedPtr[i]-medianOf3(checkedPtr+offset)) <= tmean);
-                if ( checkedPtr[i] == 0 ) {
-                    if ( kw.lun ) {
-                        static char nl[] = "\n";
-                        IDL_PoutRaw( kw.lun, (char*)existingFiles[i].c_str(), existingFiles[i].length() );
-                        IDL_PoutRaw( kw.lun, nl, 1 );
+                if( isfinite(checkedPtr[i]) ) {
+                    size_t offset = std::min( std::max(nImages+i-1, nImages), 2*nImages-3 );       // restrict to array
+                    checkedPtr[i] = (abs(checkedPtr[i]-medianOf3(checkedPtr+offset)) <= tmean);
+                    if ( checkedPtr[i] == 0 ) {
+                        if ( kw.lun ) {
+                            IDL_PoutRaw( kw.lun, (char*)existingFiles[i].c_str(), existingFiles[i].length() );
+                            IDL_PoutRaw( kw.lun, nl, 1 );
+                        }
+                        ++nDiscarded;
                     }
+                } else {
+                    IDL_PoutRaw( kw.lun, (char*)existingFiles[i].c_str(), existingFiles[i].length() );
+                    IDL_PoutRaw( kw.lun, nl, 1 );
                     ++nDiscarded;
                 }
             }
@@ -2052,7 +2071,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         if( kw.verbose > 1 ) {
             printProgress( statusString, 100.0 );
             if( nDiscarded ) {
-                cout << "  Check failed for " << nDiscarded << " files." << endl;
+                cout << "  Check failed for " << nDiscarded << " file" << ((nDiscarded>1)?"s.":".") << endl;
             } else {
                 cout << "  All ok." << endl;
             }
