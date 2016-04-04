@@ -1829,10 +1829,11 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         unique_ptr<double[]> tmp( new double [ 2*nPixels*kw.nthreads ] );
         
         shared_ptr<float*> shiftsData;
+        float** shifts = nullptr;
         if( kw.pinh_align ) {
             shiftsData = sharedArray<float>( nImages, 2 );
+            shifts = shiftsData.get();
         }
-        float** shifts = shiftsData.get();
         
         double* sumPtr = sums.get();
         double* tmpPtr = tmp.get();
@@ -2039,8 +2040,10 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                         if( kw.time ) times[myImgIndex] = boost::posix_time::time_duration(0,0,0);
                                         sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
                                         --nSummed;
-                                        shifts[imgIndex][0] = 0;
-                                        shifts[imgIndex][1] = 0;
+                                        if( shifts ) {
+                                            shifts[myImgIndex][0] = 0;
+                                            shifts[myImgIndex][1] = 0;
+                                        }
                                     } catch( const exception& e ) {
                                         cout << "rdx_sumfiles: Failed to load file: " << existingFiles[myImgIndex] << "  Reason: " << e.what() << endl;
                                     }
