@@ -3,7 +3,7 @@
 #
 
 set( EXT_NAME "IDL" )
-set( USE_VERSION "1.0" )
+set( EXT_REQUIRED_VERSION "7.1" )
 #set( EXT_COMPONENTS idl )
 
 set( EXT_HINT "/usr/local/itt/idl/external/include/"
@@ -13,10 +13,10 @@ set( EXT_HINT "/usr/local/itt/idl/external/include/"
 )
 
 set( EXT_HEADER_FILE "idl_export.h" )
-#set( EXT_VERSION_FILE "idl/idlv.h" )
-#set( EXT_MAJOR_REGEXP "MAJOR_VERSION" )
-#set( EXT_MINOR_REGEXP "MINOR_VERSION" )
-#set( EXT_PATCH_REGEXP "SUBMINOR_VERSION" )
+set( EXT_VERSION_FILE "idl_export.h" )
+set( EXT_MAJOR_REGEXP "VERSION_MAJOR" )
+set( EXT_MINOR_REGEXP "VERSION_MINOR" )
+set( EXT_PATCH_REGEXP "VERSION_SUB" )
 
 
 # Attempt to locate libs/headers automagically

@@ -14,7 +14,7 @@ set( EXT_MAJOR_REGEXP "OMPI_MAJOR_VERSION" )
 set( EXT_MINOR_REGEXP "OMPI_MINOR_VERSION" )
 set( EXT_PATCH_REGEXP "OMPI_RELEASE_VERSION" )
 
-set( EXT_HELPTEXT "Try your systems equivalent of \"apt-get install libopenmpi-dev\"" )
+set( ${EXT_NAME}_HELPTEXT "Try your systems equivalent of \"apt-get install libopenmpi-dev\"" )
 
 # Attempt to locate libs/headers automagically
 include("${CMAKE_CURRENT_LIST_DIR}/FindExternal.cmake")

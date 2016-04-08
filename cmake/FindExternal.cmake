@@ -196,8 +196,8 @@ endmacro()
 
 
 macro( notFound )
-    if( EXT_HELPTEXT )
-        message( ${EXT_HELPTEXT} )
+    if( ${EXT_NAME}_HELPTEXT )
+        message( ${${EXT_NAME}_HELPTEXT} )
     endif()
     clearVars()
     clearLocalVars()
@@ -208,13 +208,13 @@ endmacro()
 
 
 # return immediately if we already located this package.
-if( ${EXT_NAME}_FOUND AND IS_DIRECTORY "${${EXT_NAME}_INCLUDE_DIR}" )
-    #if(EXT_DEBUG)
-    #    message(STATUS "FindExternal:\"${EXT_NAME}\"  already located, skipping.")
-    #endif()
-    clearLocalVars()
-    return()
-endif()
+# if( ${EXT_NAME}_FOUND AND IS_DIRECTORY "${${EXT_NAME}_INCLUDE_DIR}" )
+#     #if(EXT_DEBUG)
+#     #    message(STATUS "FindExternal:\"${EXT_NAME}\"  already located, skipping.")
+#     #endif()
+#     clearLocalVars()
+#     return()
+# endif()
 
  # Clear variables
 clearVars()
@@ -274,6 +274,10 @@ if ( NOT EXISTS ${${EXT_NAME}_INCLUDE_DIR} )
         PATHS ${EXT_PATHS} "${EXT_HINT}"
         PATH_SUFFIXES ${DEFAULT_INCLUDE_SUFFIXES}
     )
+    if( EXISTS ${${EXT_NAME}_INCLUDE_DIR} )
+        get_filename_component(${EXT_NAME}_INCLUDE_DIR ${${EXT_NAME}_INCLUDE_DIR} REALPATH)
+        string( REGEX REPLACE "/include(.*)" "" ${EXT_NAME}_DIR "${${EXT_NAME}_INCLUDE_DIR}" )
+    endif()
 endif()
 
 if(EXT_DEBUG)
@@ -407,17 +411,19 @@ if( EXT_COMPONENTS )
         unset( ${EXT_NAME}_${__COMP}_LIBRARY CACHE )
 
         if( ${EXT_NAME}_${__COMP}_LIBRARY_DEBUG )
-            set( ${EXT_NAME}_${__COMP}_LIBRARY ${${EXT_NAME}_${__COMP}_LIBRARY_DEBUG} )
             get_filename_component( LIBPATH "${${EXT_NAME}_${__COMP}_LIBRARY_DEBUG}" PATH )
-            #list( APPEND ${EXT_NAME}_LIB_DIRS ${LIBPATH} )
-            append_libs_unique( ${EXT_NAME}_LIB_DIRS "${LIBPATH}" )
+            get_filename_component(${EXT_NAME}_${__COMP}_LIBRARY_DEBUG ${${EXT_NAME}_${__COMP}_LIBRARY_DEBUG} NAME_WE)
+            string(REGEX REPLACE "^lib" "" ${EXT_NAME}_${__COMP}_LIBRARY_DEBUG ${${EXT_NAME}_${__COMP}_LIBRARY_DEBUG})
+            set( ${EXT_NAME}_${__COMP}_LIBRARY ${${EXT_NAME}_${__COMP}_LIBRARY_DEBUG} )
+            append_paths_unique( ${EXT_NAME}_LIB_DIRS "${LIBPATH}/" )
         endif()
 
         if( ${EXT_NAME}_${__COMP}_LIBRARY_RELEASE )
-            set( ${EXT_NAME}_${__COMP}_LIBRARY ${${EXT_NAME}_${__COMP}_LIBRARY_RELEASE} )
             get_filename_component( LIBPATH "${${EXT_NAME}_${__COMP}_LIBRARY_RELEASE}" PATH )
-            #list( APPEND ${EXT_NAME}_LIB_DIRS ${LIBPATH} )
-            append_libs_unique( ${EXT_NAME}_LIB_DIRS "${LIBPATH}" )
+            get_filename_component(${EXT_NAME}_${__COMP}_LIBRARY_RELEASE ${${EXT_NAME}_${__COMP}_LIBRARY_RELEASE} NAME_WE)
+            string(REGEX REPLACE "^lib" "" ${EXT_NAME}_${__COMP}_LIBRARY_RELEASE ${${EXT_NAME}_${__COMP}_LIBRARY_RELEASE})
+            set( ${EXT_NAME}_${__COMP}_LIBRARY ${${EXT_NAME}_${__COMP}_LIBRARY_RELEASE} )
+            append_paths_unique( ${EXT_NAME}_LIB_DIRS "${LIBPATH}/" )
         endif()
 
         # if both are found...
