@@ -554,6 +554,32 @@ namespace redux {
         //@}
 
 
+        /*! @brief Segment a range from first to last (inklusive) into segments of a given length
+        *   @param first First value in range.
+        *   @param last Last value in range.
+        *   @param segmentLength Size of the segments
+        *   @param minimumOverlap Smallest accepted overlap
+        *   @returns A vector containing the locations of the segments.
+        */
+        template <typename T>
+        std::vector<T> segment( T first, T last, int segmentLength, int minimumOverlap=0 ) {
+            int nSegments=2;
+            if( first == last ) return std::move(std::vector<T>());
+            if( first > last ) std::swap( first, last );
+            double separation = (last-first)/static_cast<double>(nSegments-1);
+            double overlap = segmentLength-separation;
+            while(overlap < minimumOverlap) {
+                ++nSegments;
+                separation = (last-first)/static_cast<double>(nSegments-1);
+                overlap = segmentLength-separation;
+            }
+            std::vector<T> ret;
+            for(int i = 0; i < nSegments; ++i) {
+                ret.push_back(static_cast<T>(i*separation+first) );
+            }
+            return std::move(ret);
+        }
+
         
         
         /*! @} */

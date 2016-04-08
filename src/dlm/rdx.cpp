@@ -437,7 +437,7 @@ string timer_info( int lvl ) {
     string ret = "RDX_TIC/RDX_TOC";
     if( lvl > 0 ) {
         
-        ret += ((lvl > 1)?"\n":"            ");          // newline if lvl>1
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
         ret += "   Syntax:   rdx_tic & wait,3 & rdx_toc\n";
     
         if( lvl > 1 ) {
@@ -490,6 +490,84 @@ void timer_elapsed( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_INT help;
+    IDL_INT momfbd;
+} KW_SEGMENT;
+
+// NOTE:  The keywords MUST be listed in alphabetical order !!
+static IDL_KW_PAR kw_segment_pars[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "HELP",     IDL_TYP_INT,   1,   IDL_KW_ZERO,   0,   (char*)IDL_KW_OFFSETOF2(KW_SEGMENT,help) },
+    { (char*) "MOMFBD",   IDL_TYP_INT,   1,   IDL_KW_ZERO,   0,   (char*)IDL_KW_OFFSETOF2(KW_SEGMENT,momfbd) },
+    { NULL }
+};
+
+string segment_info( int lvl ) {
+    
+    string ret = "RDX_SEGMENT";
+    if( lvl > 0 ) {
+        
+        ret += ((lvl > 1)?"\n":"        ");          // newline if lvl>1
+        ret += "   Syntax:   pos = rdx_segment( first, last, size, min-overlap) \n";
+        
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      MOMFBD              Interpret arguments as pixels and do segmentation identical to the MOMFBD code.\n";
+        }
+    
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+
+IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
+    
+    if( argc < 3 ) {
+        cout << segment_info(2) << endl;
+        return IDL_GettmpInt(-1);
+    }
+    
+    IDL_LONG first = IDL_LongScalar( argv[0] );
+    IDL_LONG last = IDL_LongScalar( argv[1] );
+    IDL_LONG sz = IDL_LongScalar( argv[2] );
+
+    IDL_LONG minOverLap(0);
+    if( argc > 3 && (argk[3] == 0) ) {
+        minOverLap = IDL_LongScalar( argv[3] );
+    }
+    
+    KW_SEGMENT kw;
+    (void) IDL_KWProcessByOffset(argc, argv, argk, kw_segment_pars, (IDL_VPTR*)0, 255, &kw);
+    
+    if( kw.help ) {
+        cout << segment_info(2) << endl;
+        return IDL_GettmpInt(-1);
+    }
+    
+    if( kw.momfbd ) {
+        first += sz/2;
+        last -= sz/2;
+        minOverLap = 16 + sz/4; 
+    }
+    
+    std::vector<IDL_LONG> resV = segment<IDL_LONG>( first, last, sz, minOverLap );
+    if ( resV.empty() ) {
+        return IDL_GettmpInt(-1);
+    }
+    
+    IDL_MEMINT dims[] = { resV.size() };
+    unique_ptr<IDL_LONG> res( new IDL_LONG[ dims[0] ] );
+    memcpy( res.get(),resV.data(),dims[0]*sizeof(IDL_LONG) );
+   
+    return IDL_ImportArray( 1, dims, IDL_TYP_LONG, (UCHAR*)res.release(), redux::util::castAndDelete<IDL_LONG>, 0 );
+    
+}
+
+
 extern "C" {
 
     int IDL_Load (void) {
@@ -499,6 +577,7 @@ extern "C" {
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)IdlContainer::info, (char*)"RDX", 0, 1, 0, 0 }, 0);
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_start, (char*)"RDX_TIC", 0, 0, 0, 0 }, 0 );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_elapsed, (char*)"RDX_TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_segment, (char*)"RDX_SEGMENT", 0, 4, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, segment_info );
         
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
