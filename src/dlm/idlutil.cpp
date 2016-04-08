@@ -122,6 +122,64 @@ namespace redux {
     template<> UCHAR idlType<int32_t>(void) { return IDL_TYP_LONG; }
     template<> UCHAR idlType<float>(void) { return IDL_TYP_FLOAT; }
     template<> UCHAR idlType<double>(void) { return IDL_TYP_DOUBLE; }
+ 
+    string printValue( IDL_VPTR v, UCHAR* data, size_t maxLength=30 ) {
+        
+        if( v->type == IDL_TYP_PTR ) {
+            IDL_HVID tmpHVID = *((IDL_HVID*)(data));
+            IDL_HEAP_VPTR heapPtr = IDL_HeapVarHashFind(tmpHVID);
+            if( heapPtr ) {
+                v = &(heapPtr->var);
+                if( heapPtr->var.flags & IDL_V_ARR ) {
+                    data = reinterpret_cast<UCHAR*>(v->value.arr->data);
+                } else data = reinterpret_cast<UCHAR*>(&(v->value));
+            }
+        }
+        
+        if( v->flags & IDL_V_ARR ) {
+            string ret;
+            size_t nElements = std::min<size_t>( 5, v->value.arr->n_elts );
+            IDL_ALLTYPES* tmpAll = reinterpret_cast<IDL_ALLTYPES*>(data);
+            UCHAR* arrayData = tmpAll->arr->data;
+            switch( v->type ) {
+                case( IDL_TYP_BYTE ):   ret = printArray( arrayData, nElements, "" ); break;
+                case( IDL_TYP_INT ):    ret = printArray( reinterpret_cast<IDL_INT*>(arrayData), nElements, "" ); break;
+                case( IDL_TYP_LONG ):   ret = printArray( reinterpret_cast<IDL_LONG*>(arrayData), nElements, "" ); break;
+                case( IDL_TYP_FLOAT ):  ret = printArray( reinterpret_cast<float*>(arrayData), nElements, "" ); break;
+                case( IDL_TYP_DOUBLE ): ret = printArray( reinterpret_cast<double*>(arrayData), nElements, "" ); break;
+                case( IDL_TYP_STRING ): {
+                    ret = "\"";
+                    IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(arrayData);
+                    for( size_t i=0; i<nElements; ++i ) {
+                        if( strptr[i].slen && strptr[i].s ) {
+                            if( i ) ret += ", ";
+                            ret += strptr[i].s;
+                        }
+                    }
+                    ret += "\"";
+                    break;
+                }
+                default: ret =  "";
+            }
+            return ret.substr( 0, maxLength );
+        } else {
+            IDL_ALLTYPES* tmpAll = reinterpret_cast<IDL_ALLTYPES*>(data);
+            switch( v->type ) {
+                case( IDL_TYP_BYTE ):   return to_string( (int)tmpAll->c );
+                case( IDL_TYP_INT ):    return to_string( tmpAll->i );
+                case( IDL_TYP_LONG ):   return to_string( tmpAll->l );
+                case( IDL_TYP_FLOAT ):  return to_string( tmpAll->f );
+                case( IDL_TYP_DOUBLE ): return to_string( tmpAll->d );
+                case( IDL_TYP_STRING ): {
+                    if( tmpAll->str.slen && tmpAll->str.s ) {
+                        return "\"" + string( tmpAll->str.s ) + "\"";
+                    } else return "\"\"";
+                }
+                default: return "";
+            }
+        }
+    }
+    
 }
 
 
@@ -484,14 +542,18 @@ double redux::getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype
 
 
 // print the layout of an IDL structure and return the total data-size
-size_t printStruct (IDL_VPTR data, int current, int indent) {
+size_t printStruct (IDL_VPTR data, int current, int indent, IDL_INT max_length) {
 
     size_t sz = 0;
-
+    if( data->type == IDL_TYP_OBJREF ) {    // if it is an object-reference, fetch the heap-pointer and call again.
+        IDL_HEAP_VPTR heapPtr = IDL_HeapVarHashFind(data->value.hvid);
+        return printStruct( &(heapPtr->var), current, indent, max_length );
+    }
+    
     if (data->type == IDL_TYP_STRUCT) {
         if (current < 0) {
-            cout << "           TAG           TYPE                     OFFSET         SIZE           " << endl;
-            sz += printStruct (data, indent, indent);
+            cout << "           TAG           TYPE                     OFFSET         SIZE           VALUE" << endl;
+            sz += printStruct (data, indent, indent, max_length );
             cout << string (45, ' ') << "Total Size:         " << to_string (sz) << endl;
             return sz;
         }
@@ -505,33 +567,51 @@ size_t printStruct (IDL_VPTR data, int current, int indent) {
             char *name = IDL_StructTagNameByIndex (structDef, t, 0, 0);
             IDL_VPTR v;
             IDL_MEMINT offset = IDL_StructTagInfoByIndex (structDef, t, 0, &v);
-            string type = IDL_TypeNameFunc(v->type);
+            UCHAR dataType = v->type;
+            string typeName = string(" ")+IDL_TypeNameFunc(dataType);
+            size_t dataSize = IDL_TypeSizeFunc(dataType);
+            UCHAR* dataPtr = (data->value.s.arr->data + offset);
+            
+            if( v->flags & IDL_V_ARR ) {
+                v->value.arr->data = dataPtr;
+            }
+
+            
+            if( dataType == IDL_TYP_PTR ) {
+                IDL_HVID tmpHVID = *((IDL_HVID*)(dataPtr));
+                IDL_HEAP_VPTR heapPtr = IDL_HeapVarHashFind(tmpHVID);
+                if( !heapPtr ) continue;
+                v = &(heapPtr->var);
+                dataType = heapPtr->var.type;
+                dataPtr = reinterpret_cast<UCHAR*>(&(heapPtr->var.value));
+                typeName = string("*")+IDL_TypeNameFunc(dataType);
+            }
+            
             count = 1;
-
-            if (v->flags & IDL_V_ARR) {
-                type.append ("(");
+            if( v->flags & IDL_V_ARR ) {
+                typeName.append ("(");
                 for (int d = 0; d < v->value.arr->n_dim; ++d) {
-                    if (d) type.append (",");
-
+                    if (d) typeName.append (",");
                     count *= v->value.arr->dim[d];
-                    type.append (to_string ( (int) v->value.arr->dim[d]));
+                    typeName.append (to_string ( (int) v->value.arr->dim[d]));
                 }
-                type.append (")");
+                typeName.append (")");
+                dataPtr = reinterpret_cast<UCHAR*>(&(v->value));
             }
 
             cout.setf (std::ios::left);
 
-            if (v->type == IDL_TYP_STRUCT) {
-                cout << std::setw (25) << (string (current, ' ') + name);
-                cout << std::setw (25) << type;
-                cout << std::setw (15) << to_string ( (size_t) offset) << endl;
-                sz += count * printStruct(v, current + indent, indent);
+            cout << std::setw (25) << (string (current, ' ') + name);
+            cout << std::setw (25) << typeName;
+            cout << std::setw (15) << to_string ( (size_t) offset);
+            if( dataType == IDL_TYP_STRUCT ) {
+                cout << endl;
+                sz += count * printStruct(v, current + indent, indent, max_length);
             } else {
-                sz += count * IDL_TypeSizeFunc(v->type);
-                cout << std::setw (25) << (string (current, ' ') + name);
-                cout << std::setw (25) << type;
-                cout << std::setw (15) << to_string ( (size_t) offset);
-                cout << std::setw (15) << to_string (count * IDL_TypeSizeFunc(v->type)) << endl;   // << endl;
+                cout << std::setw (15) << to_string (count * dataSize);
+                cout << std::setw (30) << printValue( v, dataPtr, max_length );
+                cout << endl;
+                sz += count * dataSize;
             }
 
         }
@@ -546,12 +626,14 @@ typedef struct {
     IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
     IDL_INT help;
     IDL_INT indent;
+    IDL_INT max_length;
 } KW_RESULT;
 
 static IDL_KW_PAR kw_pars[] = {
     IDL_KW_FAST_SCAN,
     { (char*) "HELP",      IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
     { (char*) "INDENT",    IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (indent) },
+    { (char*) "MAX_LENGTH",IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_length) },
     { NULL }
 };
 
@@ -588,6 +670,7 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
     KW_RESULT kw;
     kw.help = 0;
     kw.indent = 2;
+    kw.max_length = 90;
     (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     if (kw.help) {
@@ -597,7 +680,7 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
 
     int indent = std::min (std::max ( (int) kw.indent, 0), 30);
 
-    printStruct( data, -1, indent);
+    printStruct( data, -1, indent, kw.max_length );
     
 }
 
