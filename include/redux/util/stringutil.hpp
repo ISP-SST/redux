@@ -291,7 +291,8 @@ namespace redux {
         std::string printArray( T** data, size_t firstY, size_t lastY, size_t firstX, size_t lastX, const std::string& name = "matrix", const std::vector<std::string>& delimiters = {",",","}, int d = 3 ) {
             std::ostringstream oss;
             oss.precision( d );
-            oss << name << "=[";
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool rowSeparator( false );
             for( size_t i = firstY; i <= lastY; ++i ) {
                 bool elementSeparator( false );
@@ -334,7 +335,8 @@ namespace redux {
         std::string printArray( T** data, size_t m, size_t n, const std::string& name = "matrix", const std::vector<std::string>& delimiters = {",",","}, int d = 3 ) {
             std::ostringstream oss;
             oss.precision( d );
-            oss << name << "=[";
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool rowSeparator( false );
             for( size_t i = 0; i < m; ++i ) {
                 bool elementSeparator( false );
@@ -375,7 +377,8 @@ namespace redux {
 
             std::ostringstream oss;
             oss.precision( d );
-            oss << name << "=[";
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool separator( false );
             for( size_t i = 0; i < n; ++i ) {
                 if( separator ) {
@@ -407,7 +410,9 @@ namespace redux {
         inline std::string printArray( const std::map<T,U>& data, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
-            oss << std::setprecision( d ) << name << "=[";
+            oss << std::setprecision( d );
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool separator( false );
             for( auto & element : data ) {
                 if( separator ) {
@@ -435,7 +440,9 @@ namespace redux {
         inline std::string printArray( const T& data, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
-            oss << std::setprecision( d ) << name << "=[";
+            oss << std::setprecision( d );
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool separator( false );
             for( auto & element : data ) {
                 if( separator ) {
