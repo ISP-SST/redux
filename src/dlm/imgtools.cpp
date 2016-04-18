@@ -1410,6 +1410,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         atomic<size_t> nSummed(0);
         mutex mtx;
         
+#ifdef REDUX_WITH_OPENCV
         Mat refImg;
         promise<cv::Rect> subImgROI;
         shared_future<cv::Rect> fut = subImgROI.get_future();
@@ -1423,6 +1424,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         int flags = INTER_CUBIC;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
         int borderMode = BORDER_CONSTANT;
         const Scalar borderValue = Scalar();
+#endif
         
         auto sumFunc = [&]( size_t imgIndex, double* mySumPtr, double* myTmpPtr, UCHAR* myDataPtr) {
             try {
@@ -1442,6 +1444,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                         fillPixels( tmp2D.get(), (size_t)ySize, (size_t)xSize, mask2D.get() );
                     }
                     
+#ifdef REDUX_WITH_OPENCV
                     Mat cvImg( ySize, xSize, CV_64FC1, myTmpPtr );
                     cv::Rect roi;
                     if( !imgIndex ) {
@@ -1481,6 +1484,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                         Mat( cvImg, roi ).convertTo( refImg, CV_32F );
 
                         subImgROI.set_value( roi );
+                      
                          
                     } else {
 
@@ -1499,8 +1503,8 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                         warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
 
                         memcpy( myTmpPtr, slaskPtr, nPixels*sizeof(double) );
-                        
                     }
+#endif                        
                     
                     
                     for( size_t n=0; n<nPixels; ++n ) mySumPtr[n] += myTmpPtr[n];
@@ -1542,6 +1546,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         }
         for (auto& th : threads) th.join();
         
+#ifdef REDUX_WITH_OPENCV
         if( kw.pinh_align > 1 ) {
             Mat cvImg( ySize, xSize, CV_64FC1, summedData );
             Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
@@ -1555,7 +1560,8 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
             warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
             memcpy( summedData, tmpPtr, nPixels*sizeof(double) );
         }
-        
+#endif
+
         if( kw.verbose > 1 ) {
             printProgress( statusString, 100.0 );
             if( nSummed == nImages ) {
@@ -2167,8 +2173,9 @@ static IDL_KW_PAR inp_kw_pars[] = {
     { NULL }
 };
 
-#include <opencv2/photo/photo.hpp>
-
+#ifdef REDUX_WITH_OPENCV
+#    include <opencv2/photo/photo.hpp>
+#endif
 IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
     
 #ifndef REDUX_WITH_OPENCV
