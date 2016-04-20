@@ -58,7 +58,7 @@ namespace redux {
             
             std::string& operator[](const std::string& key) { return list[key]; };
             
-            std::map<std::string,std::string, cmp> list;
+            std::map<std::string, std::string, cmp> list;
             
         };
 

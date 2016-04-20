@@ -46,7 +46,7 @@ namespace redux {
             
             double metricChange(const complex_t* newOTF) const;
             double gradientFiniteDifference(uint16_t, double);
-            double gradientVogel(uint16_t mode, double dalpha) const;
+            double gradientVogel(uint16_t mode, double) const;
             void calcVogelWeight(void);
             
             //void addScaledMode( double* modePtr, double a );

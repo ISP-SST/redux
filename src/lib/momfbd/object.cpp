@@ -243,7 +243,7 @@ void Object::getResults(ObjectData& od) {
     avgObjFT.safeDivide(tmpD);
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
-        LOG_TRACE << boost::format("Applying Scharmer filter with frequency-cutoff = %f and noise-variance = %f") % (0.9*frequencyCutoff) % avgNoiseVariance;
+        LOG_TRACE << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance;
         ScharmerFilter(aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     
@@ -765,7 +765,7 @@ void Object::initCache (void) {
         alphaToPixels = 1.0/pixelsToAlpha;
     }
     shiftToAlpha = modes.shiftToAlpha;
-    shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize);           // rescale for convolution in larger images and at 
+    shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize);
     defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
     alphaToDefocus = 1.0/defocusToAlpha;
 
@@ -782,10 +782,10 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
     
-    for (auto& ch : channels) {
-        ch->loadCalib(service);
+    for( auto& ch : channels ) {
+        ch->loadCalib( service );
     }
-    runThreadsAndWait(service, nThreads);
+    runThreadsAndWait( service, nThreads );
     
     objMaxMean = std::numeric_limits<double>::lowest();
     for (auto& ch : channels) {

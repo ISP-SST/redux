@@ -422,9 +422,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         }
     }
     uint64_t count(0);
-    patches.resize(subImagePosY.size(),subImagePosX.size());
-    Point16 ps(patchSize,patchSize);
-    cachePath = to_string(info.id);
+    patches.resize( subImagePosY.size(), subImagePosX.size() );
+    Point16 ps( patchSize, patchSize );
+    cachePath = to_string( info.id );
     for( unsigned int y=0; y<subImagePosY.size(); ++y ) {
         for( unsigned int x=0; x<subImagePosX.size(); ++x ) {
             PatchData::Ptr patch( new PatchData(*this, y, x ) );
@@ -439,7 +439,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
 
 
     for( auto& obj : objects ) {
-        obj->loadData(service, nThreads, patches);
+        obj->loadData( service, nThreads, patches );
     }
     
     for( auto& obj : objects ) {
@@ -457,7 +457,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         }
         nTotalImages += obj->nImages();
     }
-    if(writeFailed) LOG_ERR<< "MomfbdJob::preProcess()  Hmmmmm, that's odd, I haven't implemented any error-reporting yet.";
+    if( writeFailed ) LOG_ERR<< "MomfbdJob::preProcess()  Hmmmmm, that's odd, I haven't implemented any error-reporting yet.";
 
     LOG_DETAIL << "MomfbdJob::preProcess()  Done.  nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << "   nImages = " << nTotalImages;
 

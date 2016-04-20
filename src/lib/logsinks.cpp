@@ -13,7 +13,6 @@
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/support/date_time.hpp>
-#include <boost/log/utility/empty_deleter.hpp>
 
 namespace blog = boost::log;
 namespace expr = boost::log::expressions;
@@ -215,7 +214,7 @@ void StreamSink::init( void ) {
     boost::shared_ptr< bsinks::text_ostream_backend > backend =
         boost::make_shared< bsinks::text_ostream_backend >();
 
-    backend->add_stream( boost::shared_ptr< std::ostream >( &strm, blog::empty_deleter() ) );
+    backend->add_stream( boost::shared_ptr< std::ostream >( &strm, [](std::ostream*){} ) );
 
     // Wrap it into the frontend and register in the core
     sink.reset( new sink_type( backend ) );

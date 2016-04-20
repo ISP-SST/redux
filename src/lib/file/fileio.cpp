@@ -20,8 +20,8 @@ namespace {
 
 
     template <typename T>
-    map<string, std::shared_ptr<T>>& getFileCache( void ) {
-        static map<string, std::shared_ptr<T>> cache;
+    map<string, shared_ptr<T>>& getFileCache( void ) {
+        static map<string, shared_ptr<T>> cache;
         return cache;
     }
 
