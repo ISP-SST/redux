@@ -418,17 +418,14 @@ void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<c
 }
 
 
-void Object::addToPQ(const redux::image::FourierTransform& ft, const Array<complex_t>& otf) {
+void Object::addToPQ(const complex_t* ft, const complex_t* otf) {
 
     unique_lock<mutex> lock (mtx);
     double *qPtr = Q.get();
     complex_t *pPtr = P.get();
-    const complex_t *ftPtr = ft.get();
-    const complex_t *otfPtr = otf.get();
-
     for( auto& ind: pupil.otfSupport ) {
-        qPtr[ind] += norm(otfPtr[ind]);
-        pPtr[ind] += conj(ftPtr[ind]) * otfPtr[ind];
+        qPtr[ind] += norm(otf[ind]);
+        pPtr[ind] += conj(ft[ind]) * otf[ind];
     }
     
 }

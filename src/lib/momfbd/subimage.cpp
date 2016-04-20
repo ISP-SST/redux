@@ -230,7 +230,7 @@ void SubImage::addPQ (const complex_t* otf, complex_t* P, double* Q) const {
 
 
 void SubImage::addToPQ(void) const {
-    object.addToPQ( imgFT, OTF );
+    object.addToPQ( imgFT.get(), OTF.get() );
 }
 
 
@@ -278,7 +278,7 @@ double SubImage::gradientFiniteDifference( uint16_t modeIndex, double dalpha ) {
 }
 
 
-double SubImage::gradientVogel(uint16_t modeIndex, double dalpha) const {
+double SubImage::gradientVogel(uint16_t modeIndex, double ) const {
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
@@ -475,8 +475,20 @@ void SubImage::getAlphas(float* alphas) const {
 }
 
 
-void SubImage::calcPhi( const double* a ) {
+void SubImage::addPhi( const double* p, double scale ) {
+    
+    double* phiPtr = phi.get();
+    transform( phiPtr, phiPtr+pupilSize2, p, phiPtr,
+            [scale](const double& a, const double& b) {
+                return a + scale*b;
+            });
+    
+    newPhi = true;
+    
+}
 
+
+void SubImage::calcPhi( const double* a ) {
 #ifdef DEBUG_
     LOG_TRACE << "SubImage::calcPhi(" << hexString(this) << ")   nModes=" << nModes << "  pupilSize2=" << pupilSize2;
 #endif
@@ -497,6 +509,29 @@ void SubImage::calcPhi( const double* a ) {
     memcpy( currentAlpha.data(), a, nModes*sizeof(double) );
     
     newPhi = true;
+}
+
+
+void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale) {
+
+    const double* phiPtr = phi.get();
+    const double* pupilPtr = object.pupil.get();
+    
+    double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+
+    for (auto & ind : object.pupil.pupilInOTF) {
+#ifdef USE_LUT
+        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
+#else
+        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
+#endif
+    }
+    
+    tmpOTF.ift(otfPtr);
+    tmpOTF.autocorrelate();
+    tmpOTF.getFT(otfPtr);
+    FourierTransform::reorder(otfPtr, otfSize, otfSize);
+
 }
 
 

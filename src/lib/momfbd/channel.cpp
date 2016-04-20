@@ -791,7 +791,7 @@ void Channel::addAllFT (redux::util::Array<double>& ftsum) {
 
 void Channel::addAllPQ(void) const {
     for (const auto& subimage : subImages) {
-        myObject.addToPQ( subimage->imgFT, subimage->OTF );
+        myObject.addToPQ( subimage->imgFT.get(), subimage->OTF.get() );
     }
 }
 

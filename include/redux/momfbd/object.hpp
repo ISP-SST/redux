@@ -60,7 +60,7 @@ namespace redux {
             void addRegGamma(double);
             void addToFT(const redux::image::FourierTransform&);
             void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft );
-            void addToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&);
+            void addToPQ(const complex_t* ft, const complex_t* otf);
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
             void fitAvgPlane(ObjectData&);

@@ -72,8 +72,10 @@ namespace redux {
             }
             
             void resetPhi(void);
+            void addPhi(const double* p, double scale=1.0);
             void calcPhi(const double* a);
 
+            void calcOTF(complex_t* otf, const double* phiOffset, double scale);
             void calcOTF(complex_t* otf, const double* phi);
             void calcOTF(void);
             void calcPFOTF(void);
