@@ -35,20 +35,19 @@ using namespace redux;
 using namespace std;
 
 #define lg Logger::mlg
-namespace {
-
-    const string thisChannel = "channel";
-    
-}
 
 
 Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), myObject (o), myJob (j) {
 
+    setLogChannel(myJob.getLogChannel());
+    
 }
+
 
 Channel::~Channel() {
     cleanup();
 }
+
 
 void Channel::parsePropertyTree (bpt::ptree& tree) {
 

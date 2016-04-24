@@ -14,9 +14,9 @@ using namespace redux;
 using namespace std;
 
 #define lg Logger::mlg
-namespace {
-    const std::string thisChannel = "worker";
+#define logChannel "worker"
 
+namespace {
     typedef boost::asio::time_traits<boost::posix_time::ptime> time_traits_t;
 }
 

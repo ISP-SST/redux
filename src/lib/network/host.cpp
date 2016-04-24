@@ -26,9 +26,7 @@ const std::string Host::StateNames[] = { "offline", "idle", "active", "error" };
 const std::string Host::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
 
 #define lg Logger::lg
-namespace {
-    const std::string thisChannel = "net";
-}
+#define logChannel "net"
 
 Host::HostInfo::HostInfo( void ) : peerType(0) {
 

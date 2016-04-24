@@ -30,7 +30,7 @@ namespace redux {
         std::vector<std::string> channels;
         severity_level minSeverity;
         bool truncate;
-        LogSink( const severity_level& sev = sev_normal );
+        LogSink( int sev = sev_normal, bool overwrite=false );
         virtual ~LogSink( void ) = default;
         void parseFilter( std::string );
     };
@@ -44,7 +44,7 @@ namespace redux {
         boost::shared_ptr< sink_type > sink;
     public:
         std::string fileName;
-        FileSink( const std::string&, const severity_level& sev = sev_normal );
+        FileSink( const std::string&, int sev = sev_normal, bool overwrite=false );
         ~FileSink( void );
         void parse( const std::string& s );
     };
@@ -58,7 +58,7 @@ namespace redux {
         boost::shared_ptr< sink_type > sink;
         std::ostream& strm;
     public:
-        StreamSink( std::ostream&, int = sev_normal );
+        StreamSink( std::ostream&, int sev = sev_normal );
         ~StreamSink( void );
     };
 

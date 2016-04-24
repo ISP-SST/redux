@@ -15,7 +15,7 @@ using namespace std;
 #define lg Logger::lg
 namespace {
 
-    const string thisChannel = "redux-gui";
+    const string logChannel = "redux-gui";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {

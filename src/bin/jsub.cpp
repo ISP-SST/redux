@@ -28,7 +28,7 @@ using namespace std;
 #define lg Logger::lg
 namespace {
 
-    const string thisChannel = "jsub";
+    const string logChannel = "jsub";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
@@ -274,16 +274,27 @@ int main (int argc, char *argv[]) {
         
         vector<string> files = vm["config"].as<vector<string>>();
 
-        string globalName = "";
+        string globalName;
         if( vm.count ("name") ) {
             globalName = vm["name"].as<string>();
+        }
+
+        string globalLog;
+        if( vm.count ("log-file") ) {
+            vector<string> logFiles = vm["log-file"].as<vector<string>>();
+            if( logFiles.size() ) {
+                globalLog = logFiles[0];
+            }
+            if( logFiles.size() > 1 ) {
+                cerr << "Only 1 log-file supported at the moment. Using: " << globalLog << endl;
+            }
         }
 
         stringstream filteredCfg;
         for( auto it: files ) {
             string bn = boost::filesystem::basename(it);
-            string jobName = (globalName=="") ? bn : globalName;
-            string logFile = bn + ".log";
+            string jobName = globalName.empty() ? bn : globalName;
+            string logFile = globalLog.empty() ? bn + ".log" : globalLog;
             string tmpS = filterOldCfg(it, jobName, logFile) + "\n";
             filteredCfg.write(tmpS.c_str(),tmpS.size());
         }

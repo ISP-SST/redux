@@ -19,7 +19,7 @@ using namespace boost::posix_time;
 #define lg Logger::lg
 namespace {
 
-    const string thisChannel = "jstat";
+    const string logChannel = "jstat";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {

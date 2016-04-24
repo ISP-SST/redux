@@ -16,9 +16,8 @@ using namespace std;
 string Application::executableName;
 
 #define lg Logger::mlg
-namespace {
-    const string thisChannel = "app";
-}
+#define logChannel "app"
+
 
 void Application::getOptions( po::options_description& options, const string& name ) {
 

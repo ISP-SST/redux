@@ -1,6 +1,7 @@
 #ifndef REDUX_JOB_HPP
 #define REDUX_JOB_HPP
 
+#include "redux/logger.hpp"
 #include "redux/work.hpp"
 
 #include <atomic>
@@ -92,10 +93,12 @@ namespace redux {
             std::atomic<uint32_t> progress[2];
             std::string typeString, name, user, host;
             std::string progressString, logFile;
+            std::string outputDir;                  //!< Where the output goes (defaults to current directory of rsub)
             boost::posix_time::ptime submitTime;
             boost::posix_time::ptime startedTime;
             boost::posix_time::ptime completedTime;
             Info();
+            Info(const Info&);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -138,6 +141,11 @@ namespace redux {
         virtual void cleanup(void) {};
         virtual bool run(WorkInProgress&, boost::asio::io_service&, uint16_t) = 0;
         
+        virtual void setLogChannel(std::string channel) { jobLogChannel = channel; };
+        std::string getLogChannel(void) { return jobLogChannel; }
+        void startLog(bool overwrite=false);
+        void stopLog(void);
+        
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);
     
@@ -145,6 +153,8 @@ namespace redux {
         
         std::mutex jobMutex;
         std::string cachePath;
+        std::string jobLogChannel;
+        std::shared_ptr<LogSink> jlog;
 
     };
 

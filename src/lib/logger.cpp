@@ -14,9 +14,7 @@ Logger::logger_t Logger::lg;
 Logger::logger_mt Logger::mlg;
 
 #define lg Logger::lg
-namespace {
-    const string thisChannel = "log";
-}
+#define logChannel "log"
 
 pair<string, string> Logger::customParser( const string& s ) { // custom parser to handle multiple -q/-v flags (e.g. -vvvv)
 

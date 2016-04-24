@@ -19,11 +19,8 @@ using namespace redux;
 using namespace std;
 
 #define lg Logger::mlg
-namespace {
+#define logChannel jobLogChannel
 
-    const string thisChannel = "momfbdjob";
-
-}
 size_t MomfbdJob::jobType = Job::registerJob( "momfbd", MomfbdJob::create );
 
 
@@ -357,6 +354,18 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     }
     return false;
     
+}
+
+
+void MomfbdJob::setLogChannel(std::string channel) {
+    Job::setLogChannel(channel);
+    GlobalCfg::setLogChannel(channel);
+    for( auto& obj : objects ) {
+        obj->setLogChannel(channel);
+        for (auto& ch : obj->channels) {
+            ch->setLogChannel(channel);
+        }
+    }
 }
 
 

@@ -17,7 +17,7 @@ using namespace std;
 
 namespace {
 
-    const string thisChannel = "work";
+    const string logChannel = "work";
     
 #ifdef DBG_PART_
     static atomic<int> partCounter(0);

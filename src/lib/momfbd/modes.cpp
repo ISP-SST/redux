@@ -27,11 +27,7 @@ namespace bfs = boost::filesystem;
 
 
 #define lg Logger::mlg
-namespace {
-
-    const string thisChannel = "mode";
-    
-}
+#define logChannel "mode"
 
 
 ModeInfo::ModeInfo( string filename, uint16_t nPixels )

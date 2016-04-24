@@ -32,7 +32,7 @@ namespace bpt = boost::property_tree;
 #define lg Logger::lg
 namespace {
 
-    const string thisChannel = "jdel";
+    const string logChannel = "jdel";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {

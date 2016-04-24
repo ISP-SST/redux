@@ -18,13 +18,12 @@ using namespace redux;
 using namespace std;
 
 #define lg Logger::mlg
+#define logChannel "subimage"
 
 //#define USE_LUT
 #define ALPHA_CUTOFF 1E-12
 
 namespace {
-    
-    const std::string thisChannel = "subimage";
 
 #ifdef USE_LUT
 #define QUADRANT_SAMPLES    1000000       // angular sampling points (per quadrant) for the sine/cosine lookup table

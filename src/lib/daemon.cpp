@@ -25,8 +25,9 @@ using namespace std;
 
 
 #define lg Logger::mlg
+#define logChannel "deamon"
+
 namespace {
-    const string thisChannel = "deamon";
 
     mutex jobMutex;
 
@@ -518,11 +519,17 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                 nJobs++;
                 try {
                     count += job->unpack( ptr+count, swap_endian );
-                    if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
                     job->info.id = ++jobCounter;
                     if( job->info.name.empty() ) job->info.name = "job_" + to_string( job->info.id );
+                    if( job->info.logFile.empty() ) {
+                        job->setLogChannel(logChannel);
+                    } else {
+                        job->startLog();
+                        job->setLogChannel( job->getLogChannel() );
+                    }
+                    if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
-                    ids.push_back( jobCounter );
+                    ids.push_back( job->info.id );
                     ids[0]++;
                     newjobs.push_back( job );
                 } catch( const job_check_failed& e ) {
@@ -724,7 +731,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         wip.isRemote = true;
         if( getWork( wip, host->status.nThreads ) ) {
             blockSize += wip.workSize();
-            LOG_DEBUG << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip.print();
+            LOGC_DETAIL(wip.job->getLogChannel()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip.print();
             host->status.state = Host::ST_ACTIVE;
         }
 
@@ -775,7 +782,7 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
             std::thread([buf,wip,endian,msg](){
                 try {
                     wip->unpackWork( buf.get(), endian );
-                    LOG_DEBUG << msg << "   " + wip->print();
+                    LOGC_DETAIL(wip->job->getLogChannel()) << msg << "   " + wip->print();
                     wip->returnResults();
                 } catch ( exception& e ) {
                     LOG_ERR << "putParts:  exception when unpacking results: " << e.what();

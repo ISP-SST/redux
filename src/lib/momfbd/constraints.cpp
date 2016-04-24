@@ -21,11 +21,7 @@ using namespace redux;
 using namespace std;
 
 #define lg Logger::mlg
-namespace {
-
-    const string thisChannel = "constraints";
-
-}
+#define logChannel "constraints"
 
 
 void Constraints::Constraint::replaceIndices( const map<int32_t, int32_t>& indexMap ) {

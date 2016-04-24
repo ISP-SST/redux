@@ -19,7 +19,7 @@ using namespace std;
 #define lg Logger::mlg
 namespace {
 
-    const string thisChannel = "debugjob";
+    const string logChannel = "debugjob";
 
     int64_t mandelbrot( const complex<double>& p, int maxIterations = 100 ) {
 

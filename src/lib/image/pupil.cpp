@@ -24,10 +24,9 @@ namespace bfs = boost::filesystem;
 
 
 #define lg Logger::mlg
+#define logChannel "pupil"
 
 namespace {
-        
-    const string thisChannel = "pupil";
         
     double makePupil(double** pupil, uint16_t nPoints, double radius) {
 

@@ -24,8 +24,8 @@ using boost::algorithm::iequals;
 
 #define lg redux::Logger::mlg
 
+
 namespace {
-    const string thisChannel = "config";
 
     boost::system::error_code ec;
     /*const*/ GlobalCfg globalDefaults;
@@ -61,7 +61,7 @@ namespace {
         if( elem.find_first_of( "Zz" ) != string::npos ) tp |= ZERNIKE;
         if( elem.find_first_of( "Kk" ) != string::npos ) tp |= KARHUNEN_LOEVE;
         if( tp == 3 ) {
-            LOG_ERR << "Different mode-types in specified mode range \"" << elem << "\"";
+            LOGC_ERR("channel") << "Different mode-types in specified mode range \"" << elem << "\"";
         } else if( tp == 0 ) tp = ZERNIKE;
         
         elem.erase( boost::remove_if( elem, boost::is_any_of( "ZzKk" ) ), elem.end() );
@@ -126,8 +126,8 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), 
-                           borderClip(10), incomplete(0), mmRow(0), mmWidth(0), imageNumberOffset(0) {
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), borderClip(10), incomplete(0),
+        mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel("config") {
 
 }
 
@@ -587,7 +587,7 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_gamma(1E-4), graddiff_step(1E-2),
     outputFileType(FT_NONE), outputDataType(DT_F32T), sequenceNumber(0),
-    observationTime(""), observationDate("N/A"), tmpDataDir("./data"), outputDir("") {
+    observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
 
 
 }
@@ -709,8 +709,6 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     observationDate = tree.get<string>( "DATE_OBS", defaults.observationDate );
     //tmpDataDir = cleanPath( tree.get<string>( "PROG_DATA_DIR", defaults.tmpDataDir ) );
     tmpDataDir = tree.get<string>( "PROG_DATA_DIR", defaults.tmpDataDir );
-    outputDir = tree.get<string>( "OUTPUT_DIR", defaults.outputDir );
-    if( outputDir.empty() ) outputDir = bfs::current_path().string();
     tmpString = tree.get<string>( "OUTPUT_FILES", "" );
     outputFiles = defaults.outputFiles;
     if( tmpString != "" ) {
@@ -807,7 +805,6 @@ void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
     if(observationTime != defaults.observationTime) tree.put("TIME_OBS", observationTime);
     if(observationDate != defaults.observationDate) tree.put("DATE_OBS", observationDate);
     if(tmpDataDir != defaults.tmpDataDir) tree.put("PROG_DATA_DIR", tmpDataDir);
-    if(outputDir != defaults.outputDir) tree.put("OUTPUT_DIR", outputDir);
     if(outputFiles != defaults.outputFiles) tree.put("OUTPUT_FILES", outputFiles);
 
     ObjectCfg::getProperties(tree, defaults);
@@ -826,7 +823,6 @@ uint64_t GlobalCfg::size(void) const {
     sz += observationTime.length() + 1;
     sz += observationDate.length() + 1;
     sz += tmpDataDir.length() + 1;
-    sz += outputDir.length() + 1;
     for( const auto& filename : outputFiles ) {
         sz += filename.length() + 1;
     }
@@ -863,7 +859,6 @@ uint64_t GlobalCfg::pack(char* ptr) const {
     count += pack(ptr+count, observationTime);
     count += pack(ptr+count, observationDate);
     count += pack(ptr+count, tmpDataDir);
-    count += pack(ptr+count, outputDir);
     count += pack( ptr+count, (uint16_t)outputFiles.size() );
     for( auto & filename : outputFiles ) {
         count += pack( ptr+count, filename );
@@ -903,7 +898,6 @@ uint64_t GlobalCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, observationTime, swap_endian);
     count += unpack(ptr+count, observationDate, swap_endian);
     count += unpack(ptr+count, tmpDataDir, swap_endian);
-    count += unpack(ptr+count, outputDir, swap_endian);
     uint16_t tmp;
     count += unpack( ptr+count, tmp, swap_endian );
     outputFiles.resize( tmp );

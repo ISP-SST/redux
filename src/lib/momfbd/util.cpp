@@ -16,10 +16,7 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 #define lg Logger::mlg
-namespace {
-    const string thisChannel = "util";
-}
-
+#define logChannel "util"
 
 int64_t redux::momfbd::util::extractTime( const char* header ) {
     

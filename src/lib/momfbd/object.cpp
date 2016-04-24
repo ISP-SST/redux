@@ -36,11 +36,10 @@ using namespace std;
 using boost::algorithm::iequals;
 
 #define lg Logger::mlg
-namespace {
 
-    const string thisChannel = "object";
+namespace {
     
-    bool checkImageScale (double& F, double& A, double& P) {
+    bool checkImageScale (double& F, double& A, double& P, const string& logChannel) {
 
         double rad2asec = 180.0 * 3600.0 / redux::PI;
         size_t count = F > 0 ? 1 : 0;
@@ -69,10 +68,10 @@ namespace {
     
 }
 
-
 Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg (j), myJob (j), currentMetric(0), reg_gamma(0),
     frequencyCutoff(0),pupilRadiusInPixels(0), ID (id), objMaxMean(0), imgSize(0), nObjectImages(0) {
 
+    setLogChannel(myJob.getLogChannel());
 
 }
 
@@ -534,7 +533,7 @@ bool Object::checkCfg (void) {
         if (!ch->checkCfg()) return false;
     }
 
-    if (!checkImageScale (telescopeF, arcSecsPerPixel, pixelSize)) {
+    if (!checkImageScale (telescopeF, arcSecsPerPixel, pixelSize, logChannel)) {
         return false;
     }
 
@@ -578,7 +577,7 @@ bool Object::checkCfg (void) {
 
 bool Object::checkData (void) {
 
-    bfs::path outDir( myJob.outputDir );
+    bfs::path outDir( myJob.info.outputDir );
     bfs::path tmpOF(outputFileName+".ext");
     
     if( bfs::path(outputFileName).is_relative() ) {
@@ -809,7 +808,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
         for (unsigned int x = 0; x < patches.dimSize(1); ++x) {
             bfs::path fn = bfs::path(outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
             if( fn.is_relative() ) {
-                fn = bfs::path(myJob.outputDir) / fn;
+                fn = bfs::path(myJob.info.outputDir) / fn;
             }
             Ana::write(fn.string(), patches(y,x)->objects[ID].img);
         }
@@ -818,7 +817,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
     if( saveMask & SF_SAVE_ALPHA ) {
         bfs::path fn = bfs::path(outputFileName + ".alpha.f0");
         if( fn.is_relative() ) {
-            fn = bfs::path(myJob.outputDir) / fn;
+            fn = bfs::path(myJob.info.outputDir) / fn;
         }
         LOG << "Saving alpha-coefficients to: " << fn;
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size());
@@ -835,7 +834,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
     bfs::path fn = bfs::path(outputFileName + ".fits");
     if( fn.is_relative() ) {
-        fn = bfs::path(myJob.outputDir) / fn;
+        fn = bfs::path(myJob.info.outputDir) / fn;
     }
     LOG << "NOT writing output to file: " << fn;
     LOG_ERR << "Writing to FITS still not implemented...";
@@ -848,7 +847,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
     if( fn.is_relative() ) {
         fn = (bfs::path("r_")+=fn);
-        fn = bfs::path(myJob.outputDir) / fn;
+        fn = bfs::path(myJob.info.outputDir) / fn;
     } else {
         bfs::path fn2("r_");
         fn2 += fn.filename();

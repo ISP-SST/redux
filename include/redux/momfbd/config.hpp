@@ -51,6 +51,8 @@ namespace redux {
 
             virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() );
             virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
+            
+            void setLogChannel(std::string channel) { logChannel = channel; };
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;
@@ -101,8 +103,8 @@ namespace redux {
             std::vector<uint32_t> darkNumbers;      //!< Use these numbers together with the template to generate file-list
             std::vector<float> stokesWeights;
             /*****************************/
-           
             
+            std::string logChannel;
             
         };
         
@@ -210,7 +212,6 @@ namespace redux {
             std::string observationTime;
             std::string observationDate;
             std::string tmpDataDir;
-            std::string outputDir;                  //!< Where the output goes (defaults to current directory of jsub)
             std::vector<std::string> outputFiles;
             /*****************************/
 

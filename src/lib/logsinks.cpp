@@ -22,9 +22,9 @@ using namespace redux;
 using namespace std;
 
 #define lg Logger::mlg
-namespace {
+#define logChannel "log"
 
-    const string thisChannel = "log";
+namespace {
 
     const map<string, severity_level> sevMap = {
         {"trace", sev_trace},
@@ -96,7 +96,7 @@ namespace {
 }
 
 
-LogSink::LogSink( const severity_level& sev ) : minSeverity( sev ), truncate( false ) {
+LogSink::LogSink( int sev, bool overwrite ) : minSeverity( static_cast<severity_level>(sev) ), truncate( overwrite ) {
 
 }
 
@@ -106,7 +106,7 @@ void LogSink::parseFilter( string f ) {
     channels.clear();
 
     vector<string> parts;
-    boost::split(parts, f, boost::is_any_of(":") );
+    boost::split(parts, f, boost::is_any_of("|") );
     for( auto & part : parts ) {
         severity_level tmp = parseSeverity( boost::to_upper_copy( part, std::locale("C") ) );
         if( tmp ) {
@@ -120,7 +120,7 @@ void LogSink::parseFilter( string f ) {
 }
 
 
-FileSink::FileSink( const string& s, const severity_level& sev ) : LogSink( sev ) {
+FileSink::FileSink( const string& s, int sev, bool overwrite ) : LogSink( sev, overwrite ) {
     parse( s );
     init();
     LOG_DEBUG << "Started logging to file \"" << fileName << "\".";
@@ -140,7 +140,7 @@ FileSink::~FileSink( void ) {
 
 void FileSink::parse( const string& s ) {
 
-    size_t pos = s.rfind( ":" );
+    size_t pos = s.rfind( "|" );
     if( pos == string::npos ) {
         fileName = s;
     }
@@ -190,7 +190,7 @@ void FileSink::init( void ) {
 }
 
 
-StreamSink::StreamSink( std::ostream& s, int sev ) : strm( s ) {
+StreamSink::StreamSink( std::ostream& s, int sev ) : LogSink( sev ), strm( s ) {
     minSeverity = static_cast<severity_level>( sev );
     init();
     LOG_DEBUG << "Started logging to stream.";

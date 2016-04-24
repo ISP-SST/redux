@@ -66,6 +66,8 @@ namespace redux {
             void cleanup(void);
             bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
             
+            void setLogChannel(std::string channel);
+            
             bool active(void);
             bool check(void);
             bool checkCfg(void);

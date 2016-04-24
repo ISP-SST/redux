@@ -24,11 +24,11 @@ using namespace std;
 namespace sp=std::placeholders;
 
 #define lg Logger::mlg
+#define logChannel "solver"
+
 //#define DEBUG_
 
 namespace {
-
-    const std::string thisChannel = "solver";
 
     grad_t gradientMethods[] = { nullptr,
         std::bind(&SubImage::gradientFiniteDifference, sp::_1, sp::_2, sp::_3),
@@ -479,14 +479,14 @@ void Solver::run( PatchData::Ptr p ) {
         }  
         //  
 
-        for( const auto& o: job.objects ) {
+        /*for( const auto& o: job.objects ) {
             for( const auto& c: o->channels ) {
                 for( const auto& im: c->getSubImages() ) {
                     service.post( [&im](){ im->adjustOffset(); } );
                 }
             }
         }
-        runThreadsAndWait( service, nThreads );
+        runThreadsAndWait( service, nThreads );*/
         getAlpha();
         job.globalData->constraints.apply( alpha, beta_init->data );
 #ifdef DEBUG_

@@ -18,8 +18,9 @@ using namespace std;
 #endif
 
 #define lg Logger::mlg
+#define logChannel "net"
+
 namespace {
-    const std::string thisChannel = "net";
 
 #ifdef DBG_NET_
     static atomic<int> connCounter(0);

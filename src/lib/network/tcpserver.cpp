@@ -8,9 +8,7 @@ using namespace redux::util;
 using namespace std;
 
 #define lg Logger::lg
-namespace {
-    const std::string thisChannel = "net";
-}
+#define logChannel "net"
 
 TcpServer::TcpServer( boost::asio::io_service& io_service, uint16_t port )
     : acceptor( io_service, tcp::endpoint( tcp::v4(), port ) ), onConnected(nullptr) {

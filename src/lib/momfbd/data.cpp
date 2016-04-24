@@ -13,13 +13,6 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::mlg
-namespace {
-
-const std::string thisChannel = "data";
-
-}
-
 
 ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
 

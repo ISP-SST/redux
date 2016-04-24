@@ -21,6 +21,8 @@ using namespace std;
 #endif
 
 #define lg Logger::lg
+#define logChannel jobLogChannel
+
 namespace {
 
     const string thisChannel = "job";
@@ -76,10 +78,10 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, boo
             tmpJob->parsePropertyTree(vm, property.second);
             if(!check || tmpJob->check()) {
                 tmp.push_back(shared_ptr<Job>(tmpJob));
-            } else LOG_WARN << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
+            } else LOGC_WARN("job") << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
         } else {
 #ifdef DEBUG_
-            LOG_WARN << "No job-class with tag \"" << name << "\" registered.";
+            LOGC_WARN("job") << "No job-class with tag \"" << name << "\" registered.";
 #endif
         }
     }
@@ -139,10 +141,34 @@ Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10
 }
 
 
+Job::Info::Info(const Info& rhs) {
+
+    id = rhs.id;
+    timeout = rhs.timeout;
+    maxProcessingTime = rhs.maxProcessingTime;
+    priority = rhs.priority;
+    verbosity = rhs.verbosity;
+    maxPartRetries = rhs.maxPartRetries;
+    maxThreads = rhs.maxThreads;
+    step = rhs.step.load();
+    state = rhs.state.load();
+    typeString = rhs.typeString;
+    name = rhs.name;
+    user = rhs.user;
+    host = rhs.host;
+    logFile = rhs.logFile;
+    outputDir = rhs.outputDir;
+    submitTime = rhs.submitTime;
+    startedTime = rhs.startedTime;
+    completedTime = rhs.completedTime;
+
+}
+
+
 uint64_t Job::Info::size(void) const {
     uint64_t sz = 4*sizeof(uint32_t) + sizeof(uint16_t) + 5;
     sz += typeString.length() + name.length() + user.length() + host.length() + 4;
-    sz += progressString.length() + logFile.length() + 2;
+    sz += progressString.length() + logFile.length() + outputDir.length() + 3;
     sz += 3*sizeof(time_t);
     return sz;
 }
@@ -166,6 +192,7 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, host);
     count += pack(ptr+count, progressString);
     count += pack(ptr+count, logFile);
+    count += pack(ptr+count, outputDir);
     count += pack(ptr+count, redux::util::to_time_t(submitTime));
     count += pack(ptr+count, redux::util::to_time_t(startedTime));
     count += pack(ptr+count, redux::util::to_time_t(completedTime));
@@ -197,6 +224,7 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, host);
     count += unpack(ptr+count, progressString);
     count += unpack(ptr+count, logFile);
+    count += unpack(ptr+count, outputDir);
     time_t timestamp;
     count += unpack(ptr+count, timestamp, swap_endian);
     submitTime = boost::posix_time::from_time_t(timestamp);
@@ -226,16 +254,43 @@ std::string Job::Info::print(void) {
 }
 
 
-void Job::parsePropertyTree(bpo::variables_map&, bpt::ptree& tree) {
+void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree) {
     
-    info.timeout = tree.get<uint32_t>("TIMEOUT", globalDefaults.timeout);
-    info.priority = tree.get<uint8_t>("PRIORITY", globalDefaults.priority);
-    info.verbosity = tree.get<uint8_t>("VERBOSITY", globalDefaults.verbosity);
-    info.maxThreads = tree.get<uint16_t>("MAX_THREADS", globalDefaults.maxThreads);
-    info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", globalDefaults.maxPartRetries);
-    info.logFile = tree.get<string>("LOGFILE", globalDefaults.logFile);
-    info.name = tree.get<string>("NAME", globalDefaults.name);
+    Info defaults = globalDefaults;
+
+    if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, use it.
+        defaults.verbosity = vm["verbosity"].as<int>();
+    } else defaults.verbosity = Logger::getDefaultSeverity();
+    cout << "Job:  verbosity = " << (int)defaults.verbosity << endl;
+        
+    if( vm.count( "name" ) > 0 ) {
+        defaults.name = vm["name"].as<string>();
+    }
+    if( vm.count( "log-file" ) ) {
+        vector<string> logfiles = vm["log-file"].as<vector<string>>();
+        for( auto & filename : logfiles ) { // get first non-empty logfile
+            if( filename.empty() )  continue;
+            defaults.logFile = filename;
+            break;
+        }
+    } else if( !defaults.name.empty() ) {
+        defaults.logFile = defaults.name + ".log";
+    }
     
+    info.timeout = tree.get<uint32_t>("TIMEOUT", defaults.timeout);
+    info.priority = tree.get<uint8_t>("PRIORITY", defaults.priority);
+    info.verbosity = tree.get<uint8_t>("VERBOSITY", defaults.verbosity);
+    info.maxThreads = tree.get<uint16_t>("MAX_THREADS", defaults.maxThreads);
+    info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", defaults.maxPartRetries);
+    info.logFile = tree.get<string>("LOGFILE", defaults.logFile);
+    info.outputDir = tree.get<string>( "OUTPUT_DIR", defaults.outputDir );
+    if( info.outputDir.empty() ) info.outputDir = bfs::current_path().string();
+    info.name = tree.get<string>("NAME", defaults.name);
+    
+    if( !info.logFile.empty() ) {
+        startLog(true);
+    }
+
 }
 
 
@@ -247,6 +302,7 @@ bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
     if(info.maxThreads != globalDefaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);
     if(info.maxPartRetries != globalDefaults.maxPartRetries) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
     if(info.logFile != globalDefaults.logFile) tree.put("LOGFILE", info.logFile);
+    if(info.outputDir != globalDefaults.outputDir) tree.put("OUTPUT_DIR", info.outputDir);
     if(info.name != globalDefaults.name) tree.put("NAME", info.name);
     if(root) {
         root->push_back(bpt::ptree::value_type("job", tree));
@@ -289,6 +345,39 @@ uint64_t Job::pack(char* ptr) const {
 
 uint64_t Job::unpack(const char* ptr, bool swap_endian) {
     return info.unpack(ptr, swap_endian);
+}
+
+
+void Job::startLog( bool overwrite ) {
+    
+    bfs::path logFilePath = bfs::path( info.logFile );
+    try {
+        string tmpChan = "job "+to_string( info.id );
+        if( logFilePath.is_relative() ) {
+            bfs::path outDir( info.outputDir );
+            boost::system::error_code ec;
+            if( !outDir.empty() && !bfs::exists(outDir,ec) ) {
+                if( !bfs::create_directories(outDir,ec) ) {
+                    cerr << "failed to create directory for output: " << outDir << endl;
+                    return;
+                }
+            }
+            logFilePath = bfs::path(info.outputDir) / logFilePath;
+        }
+        setLogChannel(tmpChan);
+        FileSink* tmpLog = new FileSink( tmpChan+"|"+logFilePath.string(), info.verbosity, overwrite );
+        LOG << "Writing Log to file: " << logFilePath << "  verb = " << (int)info.verbosity << "  or = " << (int)overwrite;
+        jlog.reset( tmpLog );
+        info.logFile = bfs::canonical(tmpLog->fileName).string();
+    } catch( bfs::filesystem_error& e ) {
+        cerr << "failed to create logfile: " << logFilePath << endl;
+    }
+
+}
+
+
+void Job::stopLog(void) {
+    jlog.reset();
 }
 
 
