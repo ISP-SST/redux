@@ -787,14 +787,14 @@ IDL_VPTR rdx_fillpix( int argc, IDL_VPTR* argv, char* argk ) {
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
    
     int nDims = images->value.arr->n_dim;
-    size_t nImages = 1;
+    /*size_t nImages = 1;
     if( nDims == 3 ) {
         nImages = images->value.arr->dim[2];
-    }
+    }*/
     IDL_MEMINT xSize = images->value.arr->dim[1];
     IDL_MEMINT ySize = images->value.arr->dim[0];
     size_t nPixels = xSize*ySize;
-    size_t frameSize = nPixels*images->value.arr->elt_len;
+    //size_t frameSize = nPixels*images->value.arr->elt_len;
 
     if( kw.mask ) {
         IDL_ENSURE_SIMPLE(kw.mask);
@@ -2150,8 +2150,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
-typedef struct {
-    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+/*typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; // Must be first entry in structure
     IDL_INT help;
     float range;
     IDL_INT telea;
@@ -2172,17 +2172,20 @@ static IDL_KW_PAR inp_kw_pars[] = {
    // { (char*) "SPLIT_CHARS", IDL_TYP_STRING, 1, 0, 0, (char*)IDL_KW_OFFSETOF2(SI_KW,split_chars) },
     { NULL }
 };
+*/
 
-#ifdef REDUX_WITH_OPENCV
-#    include <opencv2/photo/photo.hpp>
-#endif
+//#include <opencv2/photo/photo.hpp>
+
 IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
     
 #ifndef REDUX_WITH_OPENCV
     cerr << "inpaint: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
+    cerr << "inpaint: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
+    return IDL_GettmpInt(0);
 
+#ifdef sdfhshsfgjdjdgj  
     if( argc < 2 ) {
         cout << "inpaint: Needs 2 inputs, image and mask." << endl;
         return IDL_GettmpInt(0);
@@ -2300,6 +2303,7 @@ IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
 
     return ret;
     
+#endif
 #endif
 
 }

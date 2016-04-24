@@ -266,32 +266,38 @@ double SubImage::metricChange(const complex_t* newOTF) const {
 }
 
 
-double SubImage::gradientFiniteDifference( uint16_t modeIndex, double dalpha ) {
+double SubImage::gradientFiniteDifference( uint16_t modeIndex, double step ) {
+    
     complex_t* otfPtr = tmpC.get();
     double* phiPtr = tmpPhi.get();
-    double scale = 1.0/(dalpha * object.wavelength);
+    step /= modes.norms[modeIndex];
     memcpy(phiPtr, phi.get(), pupilSize2*sizeof(double));
-    addMode(phiPtr, modes.modePointers[modeIndex], dalpha);
+    addMode(phiPtr, modes.modePointers[modeIndex], step );
     calcOTF(otfPtr, phiPtr);
-    return scale*metricChange(otfPtr);
+    return metricChange(otfPtr)/step;
     
 }
 
 
 double SubImage::gradientVogel(uint16_t modeIndex, double ) const {
+
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
-    double scale = -2.0 / (pupilSize2 * object.wavelength);
+    double scale = -2.0 * object.pupil.area / pupilSize2;
+    //double scale = -2.0 * object.wavelength;
+    //double scale = -2.0/modes.norms[modeIndex]; // / (pupilSize2);
     for (auto & ind : object.pupil.pupilSupport) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }
+
     return ret;
+    
 }
 
 
 void SubImage::calcVogelWeight(void) {
-    
+
 #ifdef DEBUG_
     LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size();
 #endif
@@ -494,10 +500,10 @@ void SubImage::calcPhi( const double* a ) {
 #endif
 
     resetPhi();
-
+    double scale = 1.0; // /(object.wavelength*pupilSize2); //*object.pupil.area);
     double* phiPtr = phi.get();
     for( unsigned int i=0; i<nModes; ++i) {
-        double scaledAlpha = a[i]/object.wavelength;
+        double scaledAlpha = a[i]*scale;
         const double* modePtr = modes.modePointers[i];
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [scaledAlpha](const double& p, const double& m) {
@@ -540,7 +546,8 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
     memset (otfPtr, 0, otfSize2*sizeof (complex_t));
 
     const double* pupilPtr = object.pupil.get();
-    double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
 
     for (auto & ind : object.pupil.pupilInOTF) {
 #ifdef USE_LUT
@@ -573,7 +580,8 @@ void SubImage::calcOTF(void) {
     memset(otfPtr, 0, otfSize2*sizeof (complex_t));
     
     const double* pupilPtr = object.pupil.get();
-    double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
     
     for (auto & ind : object.pupil.pupilInOTF) {
 #ifdef USE_LUT
@@ -609,7 +617,8 @@ void SubImage::calcPFOTF(void) {
     memset (otfPtr, 0, otfSize2*sizeof (complex_t));
     
     const double* pupilPtr = object.pupil.get();
-    double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
+    //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
 
     for( const auto& ind: object.pupil.pupilInOTF ) {
 #ifdef USE_LUT

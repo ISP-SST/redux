@@ -336,12 +336,12 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
                  globalData.reset( new GlobalData(*this) );
             }
             if( !solver ) {
-                solver.reset( new Solver(*this) );            // Initialize, allocations, etc.
+                solver.reset( new Solver(*this, service, nThreads) );            // Initialize, allocations, etc.
                 solver->init();
             }
             for( auto& part : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 // Run main processing
-                solver->run(static_pointer_cast<PatchData>(part), service, nThreads);
+                solver->run(static_pointer_cast<PatchData>(part));
                 wip.hasResults = true;
                 // Get results
                 //it = proc->result;

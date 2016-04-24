@@ -467,12 +467,12 @@ void Constraints::init( void ) {
             uint16_t modeNumber = job.modeNumbers[modeIndex];
             int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
-                shared_ptr<Constraint> c( new Constraint( imageCount * nModes + modeIndex, 1 ) );
+                shared_ptr<Constraint> thisConstraint( new Constraint( imageCount * nModes + modeIndex, 1 ) );
                 for( size_t count=objects[0]->getChannels()[0]->imageNumbers.size(); count; --count ) {  // only for first object and channel
-                    c->addEntry( imageCount * nModes + modeIndex, 1.0 );
+                    thisConstraint->addEntry( imageCount * nModes + modeIndex, 1.0 );
                     imageCount++;
                 }
-                constraints.push_back( c );
+                constraints.push_back( thisConstraint );
 
                 int32_t kOffset = 0;
                 for( auto& obj : objects ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
@@ -481,11 +481,11 @@ void Constraints::init( void ) {
                             int32_t tOffset = 0;
                             for( size_t count=ch->imageNumbers.size(); count; --count ) {
                                 if( tOffset ) { // skip reference wavefront
-                                    shared_ptr<Constraint> c( new Constraint( modeIndex, 1 ) ); // \alpha_{11m}
-                                    c->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
-                                    c->addEntry( kOffset + tOffset + modeIndex, 1 );            // \alpha_{tkm}
-                                    c->addEntry( kOffset + modeIndex, -1 );                     // \alpha_{1km}
-                                    constraints.push_back( c );
+                                    thisConstraint.reset( new Constraint( modeIndex, 1 ) );                  // \alpha_{11m}
+                                    thisConstraint->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
+                                    thisConstraint->addEntry( kOffset + tOffset + modeIndex, 1 );            // \alpha_{tkm}
+                                    thisConstraint->addEntry( kOffset + modeIndex, -1 );                     // \alpha_{1km}
+                                    constraints.push_back( thisConstraint );
                                 }
                                 tOffset += nModes;
                             }
@@ -502,9 +502,9 @@ void Constraints::init( void ) {
                             int32_t parameterOffset = imageCount * nModes;
                             auto ret = wfCons.insert( make_pair( wf, Constraint( parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
-                                shared_ptr<Constraint> c( new Constraint( ret.first->second ) );
-                                c->addEntry( parameterOffset + modeIndex, -1 );
-                                constraints.push_back( c );
+                                shared_ptr<Constraint> thisConstraint( new Constraint( ret.first->second ) );
+                                thisConstraint->addEntry( parameterOffset + modeIndex, -1 );
+                                constraints.push_back( thisConstraint );
                             }
                             imageCount++;
                         }

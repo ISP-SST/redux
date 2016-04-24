@@ -20,7 +20,7 @@
 #include <boost/lexical_cast.hpp>
 
 #ifdef REDUX_WITH_OPENCV
-#       include <opencv2/photo/photo.hpp>
+//#       include <opencv2/photo/photo.hpp>
 #endif
 using namespace redux::image;
 using namespace redux::momfbd;
@@ -722,7 +722,8 @@ void redux::image::inpaint( T* img, U* mask, T* out, size_t ySize, size_t xSize,
     cv::Mat imgMat( ySize, xSize, cv::cvType<T>(), img );
     cv::Mat maskMat( ySize, xSize, cv::cvType<U>(), mask );
     cv::Mat outMat( ySize, xSize, cv::cvType<T>(), out );
-    cv::inpaint( imgMat, maskMat, outMat, radius, flags );
+    std::cerr << "make_mask is not yet implemented for OpenCV builds." << std::endl;
+    //cv::inpaint( imgMat, maskMat, outMat, radius, flags );
 #else
     std::cerr << "make_mask is not yet implemented for non-OpenCV builds." << std::endl;
 #endif            

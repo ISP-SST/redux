@@ -516,7 +516,7 @@ void Object::calcMetric (void) {
         currentMetric += (ftsPtr[ind] - norm (pPtr[ind]) / qPtr[ind]);
     }
 
-    currentMetric *= (weight / (4*pupil.area) );
+    currentMetric /= (patchSize*patchSize);
 
 }
 
@@ -716,7 +716,7 @@ void Object::initCache (void) {
     }
     
     if( modes.empty() ) {
-        ModeInfo info(myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
+        ModeInfo info(myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
         if (myJob.modeBasis == ZERNIKE) {
             info.firstMode = info.lastMode = 0;
         }
