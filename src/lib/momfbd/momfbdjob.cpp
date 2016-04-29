@@ -286,7 +286,7 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
     for( auto& part : wip.parts ) {
         auto patch = static_pointer_cast<PatchData>( part );
         patch->step = JSTEP_POSTPROCESS;
-        patch->setPath(to_string(info.id));
+        patch->setPath(cachePath);
         patches(patch->index.y,patch->index.x) = patch;
         info.progress[0]++;
     }
@@ -433,7 +433,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     uint64_t count(0);
     patches.resize( subImagePosY.size(), subImagePosX.size() );
     Point16 ps( patchSize, patchSize );
-    cachePath = to_string( info.id );
+    cachePath = to_string(Cache::pid()) +"_"+ to_string( info.id );
     for( unsigned int y=0; y<subImagePosY.size(); ++y ) {
         for( unsigned int x=0; x<subImagePosX.size(); ++x ) {
             PatchData::Ptr patch( new PatchData(*this, y, x ) );
@@ -574,7 +574,6 @@ bool MomfbdJob::checkCfg(void) {
 bool MomfbdJob::checkData(void) {
     
     info.progress[1] = 0;
-
     for( auto& obj: objects ) {
         if( !obj->checkData() ) return false;
     }

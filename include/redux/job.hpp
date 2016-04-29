@@ -141,6 +141,8 @@ namespace redux {
         virtual void cleanup(void) {};
         virtual bool run(WorkInProgress&, boost::asio::io_service&, uint16_t) = 0;
         
+        std::string cfg(void);
+        
         virtual void setLogChannel(std::string channel) { jobLogChannel = channel; };
         std::string getLogChannel(void) { return jobLogChannel; }
         void startLog(bool overwrite=false);

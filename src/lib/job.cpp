@@ -10,6 +10,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/date_time/posix_time/time_formatters.hpp>
+#include <boost/property_tree/info_parser.hpp>
 
 using namespace redux::util;
 using namespace redux;
@@ -261,7 +262,6 @@ void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree) {
     if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, use it.
         defaults.verbosity = vm["verbosity"].as<int>();
     } else defaults.verbosity = Logger::getDefaultSeverity();
-    cout << "Job:  verbosity = " << (int)defaults.verbosity << endl;
         
     if( vm.count( "name" ) > 0 ) {
         defaults.name = vm["name"].as<string>();
@@ -348,6 +348,17 @@ uint64_t Job::unpack(const char* ptr, bool swap_endian) {
 }
 
 
+string Job::cfg(void) {
+
+    bpt::ptree pt;
+    this->getPropertyTree( &pt );
+    stringstream ss;
+    bpt::write_info( ss, pt );
+    return ss.str();
+    
+}
+
+
 void Job::startLog( bool overwrite ) {
     
     bfs::path logFilePath = bfs::path( info.logFile );
@@ -366,8 +377,8 @@ void Job::startLog( bool overwrite ) {
         }
         setLogChannel(tmpChan);
         FileSink* tmpLog = new FileSink( tmpChan+"|"+logFilePath.string(), info.verbosity, overwrite );
-        LOG << "Writing Log to file: " << logFilePath << "  verb = " << (int)info.verbosity << "  or = " << (int)overwrite;
         jlog.reset( tmpLog );
+        LOG_DETAIL << "Job configuration:\n" << cfg();
         info.logFile = bfs::canonical(tmpLog->fileName).string();
     } catch( bfs::filesystem_error& e ) {
         cerr << "failed to create logfile: " << logFilePath << endl;
