@@ -41,7 +41,6 @@ namespace redux {
             
             /**** Local processing (slaves) ****/
             void initPatch(void);
-            void collectResults(void);
             /***********************************/
             
             /********* Input *********/
@@ -75,7 +74,6 @@ namespace redux {
             
             void setPath(const std::string& path);
             void initPatch(void);
-            void collectResults(void);
             virtual uint64_t size(void) const;
             virtual uint64_t pack(char*) const;
             virtual uint64_t unpack(const char*, bool);
@@ -114,7 +112,6 @@ namespace redux {
 
             void setPath(const std::string& path);
             void initPatch(void);
-            void collectResults(void);
             virtual uint64_t size(void) const;
             virtual uint64_t pack(char*) const;
             virtual uint64_t unpack(const char*, bool);

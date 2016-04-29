@@ -49,7 +49,6 @@ namespace redux {
             void getAlpha(void);
             
             void dump( std::string tag );
-            PatchData::Ptr data;
             
             const MomfbdJob& job;
             const std::vector<std::shared_ptr<Object>>& objects;

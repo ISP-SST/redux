@@ -104,9 +104,10 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointI& shift
     
     if( nM != nModes ) {
         nModes = nM;
-        currentAlpha.resize(nM);
+        alphaOffsets.resize(nM);
     }
-
+    memset( alphaOffsets.data(), 0, nM*sizeof(double) );
+    
 }
 
 
@@ -116,15 +117,14 @@ void SubImage::init (void) {
     
     copy(img);                    // copy current cut-out to (double) working copy.
     
-    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
+    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES );
 
-    double avg = stats.mean;
+    transform(img.get(), img.get()+img.nElements(), window.get(), img.get(),
+              [&](const double& a, const double& b) { return (a-stats.mean)*b+stats.mean; }
+             );
+    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
     string str = "Initializing image " + to_string(object.ID) + ":" + to_string(channel.ID) + ":" + to_string(index)
     + "   mean=" + to_string (stats.mean) + " stddev=" + to_string (stats.stddev);
-    
-    transform(img.get(), img.get()+img.nElements(), window.get(), img.get(),
-              [avg](const double& a, const double& b) { return (a-avg)*b+avg; }
-             );
     
     transpose(img.get(),imgSize,imgSize);                                                       // to match MvN
     
@@ -132,21 +132,23 @@ void SubImage::init (void) {
     if (imgSize == noiseSize) {
         img.copy(tmpImg);
         transform(tmpImg.get(), tmpImg.get()+tmpImg.nElements(), noiseWindow.get(), tmpImg.get(),
-                [avg](const double& a, const double& b) { return (a-avg)*b; }
+                [&](const double& a, const double& b) { return (a-stats.mean)*b; }
                 );
-        stats.getNoise(tmpImg);
+        imgFT.reset(tmpImg.get(), imgSize, imgSize, FT_FULLCOMPLEX);
+        stats.noise = imgFT.noise(-1,-1);
     } else {
         size_t offset = (imgSize-noiseSize) / 2;
         Array<double> tmp(img, offset, offset+noiseSize-1, offset ,offset+noiseSize-1);
         tmp.trim();
         transform(tmp.get(), tmp.get()+tmp.nElements(), noiseWindow.get(), tmp.get(),
-                [avg](const double& a, const double& b) { return (a-avg)*b; }
+                [&](const double& a, const double& b) { return (a-stats.mean)*b; }
                 );
-        stats.getNoise(tmp);
+        imgFT.reset(tmp.get(), imgSize, imgSize, FT_FULLCOMPLEX);
+        stats.noise = imgFT.noise(-1,-1);
     }
-    
+
     if (imgSize == otfSize) {                                                                   // imgSize = 2*pupilSize
-        imgFT.reset(img.get(), imgSize, imgSize, FT_FULLCOMPLEX );                              // full-complex for now, perhaps half-complex later for performance
+        imgFT.reset(img.get(), imgSize, imgSize, FT_FULLCOMPLEX); //|FT_NORMALIZE );                 // full-complex for now, perhaps half-complex later for performance
     } else {                                                                                    // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
         int offset = (otfSize - imgSize) / 2;
         Array<double> tmp (otfSize, otfSize);
@@ -156,10 +158,9 @@ void SubImage::init (void) {
         for (int i = 0; i < imgSize; ++i) {
             memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));
         }
-        imgFT.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX );                             // full-complex for now, perhaps half-complex later for performance
+        imgFT.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX); //|FT_NORMALIZE );               // full-complex for now, perhaps half-complex later for performance
     }
-   
- 
+
     FourierTransform::reorder(imgFT);                                                          // keep FT in centered form
     stats.noise *= channel.noiseFudge;
     double rg = stats.noise/stats.stddev;
@@ -313,7 +314,8 @@ void SubImage::calcVogelWeight(void) {
     
     tmpOTF.zero();
     FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
-    tmpOTF.getIFT(hjPtr);
+
+    tmpOTF.getIFT(hjPtr);       // normalize by otfSize2 below
     tmpOTF.zero();
     for( const size_t& ind: object.pupil.otfSupport ) {
         complex_t pq = pPtr[ind] * qPtr[ind];
@@ -321,6 +323,7 @@ void SubImage::calcVogelWeight(void) {
         double qs = qPtr[ind] * qPtr[ind];
         tmpOtfPtr[ind] = (pq*ftPtr[ind] - ps*otfPtr[ind]) / qs;
     }
+
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
     tmpOTF.getIFT(glPtr);
     
@@ -376,38 +379,40 @@ void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const d
 }
 */
 
-void SubImage::adjustOffset(void) {
+void SubImage::adjustOffset(double* alpha) {
 
     PointI oldOffset = offsetShift;
     PointD oldVal(0,0),newVal(0,0);
-    int32_t mIndex = object.modes.tiltMode.x;  // NOTE: should be x, this is just because subimage is transposed!!
+    int32_t mIndex = object.modes.tiltMode.y;  // NOTE: should be x, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.x;
         double alphaToShift = 1.0/shiftToAlpha;
-        oldVal.x = currentAlpha[mIndex]*alphaToShift;
-        int adjust = -lround(currentAlpha[mIndex]*alphaToShift);
+        newVal.x = oldVal.x = alpha[mIndex]*alphaToShift;
+        int adjust = -lround( oldVal.x );
         if( adjust ) {
             adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
-            if(adjust) {
+            if( adjust ) {
                 offsetShift.x += adjust;
-                currentAlpha[mIndex] += adjust*shiftToAlpha;
-                newVal.x = currentAlpha[mIndex]*alphaToShift;
+                alpha[mIndex] += adjust*shiftToAlpha;
+                alphaOffsets[mIndex] = offsetShift.x*shiftToAlpha;
+                newVal.x = alpha[mIndex]*alphaToShift;
             }
         }
     }
 
-    mIndex = object.modes.tiltMode.y;  // NOTE: should be y, this is just because subimage is transposed!!
+    mIndex = object.modes.tiltMode.x;  // NOTE: should be y, this is just because subimage is transposed!!
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.y;
         double alphaToShift = 1.0/shiftToAlpha;
-        oldVal.y = currentAlpha[mIndex]*alphaToShift;
-        int adjust = -lround(currentAlpha[mIndex]*alphaToShift);
+        newVal.y = oldVal.y = alpha[mIndex]*alphaToShift;
+        int adjust = -lround( oldVal.y );
         if( adjust ) {
             adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.y += adjust;
-                currentAlpha[mIndex] += adjust*shiftToAlpha;
-                newVal.y = currentAlpha[mIndex]*alphaToShift;
+                alpha[mIndex] += adjust*shiftToAlpha;
+                alphaOffsets[mIndex] = offsetShift.y*shiftToAlpha;
+                newVal.y = alpha[mIndex]*alphaToShift;
             }
         }
     }
@@ -422,61 +427,17 @@ void SubImage::adjustOffset(void) {
 }
 
 
-void SubImage::addAlpha(uint16_t m, double a) {
+void SubImage::addAlphaOffsets(double* alphas, float* alphaOut) const {
     
-    unique_lock<mutex> lock (mtx);
-    alpha[m] += a;
-    
-}
-
-
-void SubImage::setAlpha(uint16_t m, double a) {
-    
-    unique_lock<mutex> lock (mtx);
-    alpha[m] = a;
-    
-}
-
-
-void SubImage::addAlphas(const double* alphas) {
-    unique_lock<mutex> lock (mtx);
-    for(unsigned int m=0; m<nModes; ++m) {
-        alpha[m] += alphas[m];
-    }
-}
-
-
-void SubImage::setAlphas(const double* alphas) {
-    unique_lock<mutex> lock (mtx);
-    for(unsigned int m=0; m<nModes; ++m) {
-        alpha[m] = alphas[m];
-    }
-}
-
-
-void SubImage::setAlphas(const std::vector<uint16_t>& modes, const double* a) {
-
-    int cnt=0;
-    for (auto & m : modes) {
-        //if( m > 2 ) {
-            alpha[m] = a[cnt];
-        //}
-        cnt++;
-    }
-
-}
-
-
-void SubImage::getAlphas(float* alphas) const {
-    std::copy( currentAlpha.begin(), currentAlpha.end(), alphas );
-    int32_t mIndex = object.modes.tiltMode.x;  // NOTE: should be x, this is just because subimage is transposed!!
+    int32_t mIndex = object.modes.tiltMode.x;
     if( mIndex >= 0 ) {
-        alphas[mIndex] -= offsetShift.x*object.shiftToAlpha.x;
+        alphaOut[mIndex] = (alphas[mIndex]+alphaOffsets[mIndex]); ///object.shiftToAlpha.x;
     }
-    mIndex = object.modes.tiltMode.y;  // NOTE: should be y, this is just because subimage is transposed!!
+    mIndex = object.modes.tiltMode.y;
     if( mIndex >= 0 ) {
-        alphas[mIndex] -= offsetShift.y*object.shiftToAlpha.y;
+        alphaOut[mIndex] = (alphas[mIndex]+alphaOffsets[mIndex]); ///object.shiftToAlpha.y;
     }
+    
 }
 
 
@@ -494,6 +455,7 @@ void SubImage::addPhi( const double* p, double scale ) {
 
 
 void SubImage::calcPhi( const double* a ) {
+
 #ifdef DEBUG_
     LOG_TRACE << "SubImage::calcPhi(" << hexString(this) << ")   nModes=" << nModes << "  pupilSize2=" << pupilSize2;
 #endif
@@ -510,8 +472,6 @@ void SubImage::calcPhi( const double* a ) {
             });
 
     }
-    
-    memcpy( currentAlpha.data(), a, nModes*sizeof(double) );
     
     newPhi = true;
 }

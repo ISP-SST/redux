@@ -55,7 +55,7 @@ namespace redux {
             //void addModes(size_t nModes, uint16_t* modes, const double* a) { addModes(phi.get(), nModes, modes, a); }
             //void addModes(double* phiPtr, size_t nModes, uint16_t* modes, const double* a) const;
             
-            void adjustOffset(void);
+            void adjustOffset(double* alpha);
 
             void addPhases(const double* a) { addPhases(phi.get(), a); };
             void addPhases(double* phiPtr, const double* a) const;
@@ -66,9 +66,9 @@ namespace redux {
             void setAlphas(const double* a);
             void setAlphas(const std::vector<uint16_t>& modes, const double* a);
 
-            void getAlphas(float* alphas) const;    // copy with offset correction (results)
+            void addAlphaOffsets(double* alphas, float* alphaOut) const;    // copy with offset correction (results)
             void getAlphas(double* alphas) const {  // copy without offset correction
-                std::copy(currentAlpha.begin(),currentAlpha.end(),alphas);
+                std::copy(alphaOffsets.begin(),alphaOffsets.end(),alphas);
             }
             
             void resetPhi(void);
@@ -138,9 +138,7 @@ namespace redux {
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;
             
-            std::map<uint16_t, double> alpha;
-            double** alphaRef;
-            std::vector<double> currentAlpha;
+            std::vector<double> alphaOffsets;
             bool newPhi;
             bool newOTF;
             std::mutex mtx;

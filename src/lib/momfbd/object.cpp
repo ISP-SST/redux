@@ -219,7 +219,7 @@ void Object::initPatch( ObjectData& od ) {
 }
 
 
-void Object::getResults(ObjectData& od) {
+void Object::getResults(ObjectData& od, double* alpha) {
     
     unique_lock<mutex> lock (mtx);
     
@@ -328,16 +328,18 @@ void Object::getResults(ObjectData& od) {
     }
     
     // Mode coefficients
-    if( saveMask & SF_SAVE_ALPHA) {
+    if( saveMask & SF_SAVE_ALPHA ) {
         if( nObjectImages  ) {
             size_t nModes = myJob.modeNumbers.size();
             od.alpha.resize(nObjectImages, myJob.modeNumbers.size());
             od.alpha.zero();
-            float* alphaPtr = od.alpha.get();
+            double* alphaPtr = alpha;
+            float* alphaOutPtr = od.alpha.get();
             for( auto& ch: channels ) {
                 for ( auto& si: ch->subImages ) {
-                    si->getAlphas(alphaPtr);
+                    si->addAlphaOffsets(alphaPtr, alphaOutPtr);
                     alphaPtr += nModes;
+                    alphaOutPtr += nModes;
                 }
             }
         } else {

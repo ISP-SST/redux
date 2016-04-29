@@ -71,7 +71,7 @@ void Solver::init( void ) {
     md -= ( md % 2 );
     noiseWindow.resize(md,md);
     noiseWindow = 1.0;
-    redux::image::apodizeInPlace( noiseWindow, md / 8);     // FIXME: old code spacifies md/16, but applies it after "window", so it is actually the product...
+    redux::image::apodizeInPlace( noiseWindow, md / 16);     // FIXME: old code specifies md/16, but applies it after "window", so it is actually the product...
     
     enabledModes = new uint16_t[nParameters];
     modeNumbers = new uint16_t[nParameters];
@@ -304,10 +304,9 @@ void Solver::my_fdf( const gsl_vector* x, void* params, double* f, gsl_vector* d
 }
 
 
-void Solver::run( PatchData::Ptr p ) {
+void Solver::run( PatchData::Ptr data ) {
     
-    p->initPatch();
-    data = p;
+    data->initPatch();
 
     LOG << "run()  patch#" << data->id << "   index=" << data->index << " region=" << data->roi << "   nThreads=" << nThreads;
 
@@ -377,8 +376,13 @@ void Solver::run( PatchData::Ptr p ) {
 
     init_step /= max_mode_norm;
 
-    double previousMetric(0), thisMetric(0), gradNorm(0);
+    double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
+
+    double previousMetric(0);
+    double thisMetric(0);
+    double gradNorm(0);
     uint16_t nModeIncrement = job.nModeIncrement;
+    double* alphaPtr;
 
     size_t failCount(0);
     size_t totalIterations(0);
@@ -451,7 +455,10 @@ void Solver::run( PatchData::Ptr p ) {
             }
             gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric);
             if (iter>1) {
+                double relativeMetric = thisMetric/initialMetric; 
                 double relativeChange = 2.0 * fabs(thisMetric-previousMetric) / (fabs(thisMetric)+fabs(previousMetric)+job.EPS);
+//             LOG_DETAIL << "Iter: " << (totalIterations+iter) << "   thisMetric = " << thisMetric
+//                         << "   relativeChange = " << relativeChange << "   relativeMetric = " << relativeMetric << "   cnt = " << successCount;
                 if(relativeChange < job.FTOL) {      // count consecutive "marginal decreases" in metric
                     if( successCount++ >= job.targetIterations ) { // exit after targetIterations consecutive improvements.
                      successCount = 0;
@@ -479,15 +486,17 @@ void Solver::run( PatchData::Ptr p ) {
         }  
         //  
 
-        /*for( const auto& o: job.objects ) {
+        alphaPtr = alpha;
+        for( const auto& o: job.objects ) {
             for( const auto& c: o->channels ) {
                 for( const auto& im: c->getSubImages() ) {
-                    service.post( [&im](){ im->adjustOffset(); } );
+                    service.post( [&im,alphaPtr](){ im->adjustOffset(alphaPtr); } );
+                    alphaPtr += nModes;
                 }
             }
         }
-        runThreadsAndWait( service, nThreads );*/
-        getAlpha();
+        runThreadsAndWait( service, nThreads );
+
         job.globalData->constraints.apply( alpha, beta_init->data );
 #ifdef DEBUG_
             LOG_DETAIL << printArray(alpha, nParameters, "\nalpha")
@@ -499,12 +508,19 @@ void Solver::run( PatchData::Ptr p ) {
     }
     
     LOG << "Elapsed: " << boost::timer::format(timer.elapsed());
-  
-    job.globalData->constraints.reverse(s->x->data,alpha);
+    job.globalData->constraints.reverse( s->x->data, alpha );
+    
+    alphaPtr = alpha;
+    for( auto& obj: data->objects ) {
+        obj.myObject->getResults(obj,alphaPtr);
+        alphaPtr += obj.myObject->nObjectImages*nModes;
+        obj.setLoaded( obj.size()>6*sizeof(uint64_t) );
+        for( auto& ch: obj.channels ) {
+            ch.images.clear();         // don't need input data anymore.
+        }
+    }
 
     gsl_multimin_fdfminimizer_free( s );
-    p->collectResults();
-
     gsl_vector_free(beta_init);
     
     if( status == GSL_FAILURE ) {

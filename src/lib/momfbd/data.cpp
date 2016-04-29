@@ -5,8 +5,6 @@
 
 #include "redux/image/utils.hpp"
 
-#include "redux/file/fileana.hpp"
-
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
@@ -33,11 +31,6 @@ void ChannelData::setPath(const std::string& path) {
 
 void ChannelData::initPatch(void) {
     myChannel->initPatch(*this);
-}
-
-
-void ChannelData::collectResults(void) {
-    images.clear();         // don't need input data anymore.
 }
 
 
@@ -103,16 +96,6 @@ void ObjectData::initPatch(void) {
     }
     myObject->initPQ();
     myObject->addAllPQ();
-}
-
-
-void ObjectData::collectResults(void) {
-    myObject->getResults(*this);
-    if(size()>6*sizeof(uint64_t)) isLoaded = true;
-    else isLoaded = false;
-    for( auto& ch: channels ) {
-        ch.collectResults();
-    }
 }
 
 
@@ -216,13 +199,6 @@ void PatchData::setPath(const std::string& path) {
 void PatchData::initPatch(void) {
     for( auto& obj: objects ) {
         obj.initPatch();
-    }
-}
-
-
-void PatchData::collectResults(void) {
-    for( auto& obj: objects ) {
-        obj.collectResults();
     }
 }
 

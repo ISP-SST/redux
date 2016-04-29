@@ -256,8 +256,8 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
             std::iota(modeNumbers.begin(), modeNumbers.end(), 0);
             modePointers.clear();
             for(unsigned int i=0; i<dimSize(0); ++i) modePointers.push_back( ptr(i,0,0) );
-            tiltMode.x = 1;
-            tiltMode.y = 0;     // FIXME  properly detect tilts, this is hardcoded for the mode-file I am testing stuff with !!!
+            tiltMode.x = 0;
+            tiltMode.y = 1;     // FIXME  properly detect tilts, this is hardcoded for the mode-file I am testing stuff with !!!
             return true;
         }
     }
