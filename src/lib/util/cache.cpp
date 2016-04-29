@@ -8,9 +8,6 @@
 using namespace redux::util;
 using namespace std;
 
-//string Cache::cachePath = "/scratch/tomas/redux/";
-string Cache::cachePath = "/swap/redux/";
-
 
 void Cache::cleanup(void) {
     for( auto& func: get().cleanup_funcs ) {
@@ -25,14 +22,19 @@ Cache& Cache::get(void) {
 
 
 string Cache::path(void) {
-    unique_lock<mutex> lock(cacheMutex);
-    return cachePath;
+    unique_lock<mutex> lock(mtx);
+    return path_;
 }
 
 
 void Cache::setPath(const string& path) {
-    unique_lock<mutex> lock(cacheMutex);
-    cachePath = path;
+    unique_lock<mutex> lock(mtx);
+    path_ = path;
+}
+
+
+pid_t Cache::pid(void) {
+    return get().pid_;
 }
 
 

@@ -45,6 +45,7 @@ namespace redux {
             static Cache& get(void);
             std::string path(void);
             void setPath(const std::string&);
+            static pid_t pid(void);
             template<class T>
             static int erase(const T& entry) {
                 auto s = get().getSet<T>();
@@ -119,7 +120,7 @@ namespace redux {
             }
 
         private:
-            Cache(){};
+            Cache() : path_("/swap/redux/"), pid_(getpid()) {};
             template<class KeyT, class T>
             void mapMaintenance(void) {
                 auto m = getMap<KeyT,T>();
@@ -133,7 +134,7 @@ namespace redux {
                 static std::map<KeyT,T> m;
                 std::function<void(void)> func = std::bind(&Cache::mapMaintenance<KeyT,T>,this);
                 std::function<void(void)> cfunc = std::bind(&Cache::clear<KeyT,T>);
-                std::unique_lock<std::mutex> lock(cacheMutex);
+                std::unique_lock<std::mutex> lock(mtx);
                 funcs.push_back(func);
                 cleanup_funcs.push_back(cfunc);
                 return m;
@@ -143,14 +144,15 @@ namespace redux {
                 static std::set<T,U> s;
                 std::function<void(void)> func = std::bind(&Cache::setMaintenance<T,U>,this);
                 std::function<void(void)> cfunc = std::bind(&Cache::clear<T>);
-                std::unique_lock<std::mutex> lock(cacheMutex);
+                std::unique_lock<std::mutex> lock(mtx);
                 funcs.push_back(func);
                 cleanup_funcs.push_back(cfunc);
                 return s;
             }
 
-            std::mutex cacheMutex;
-            static std::string cachePath;
+            std::mutex mtx;
+            std::string path_;
+            pid_t pid_;
             std::vector<std::function<void(void)>> funcs;
             std::vector<std::function<void(void)>> cleanup_funcs;
             int pollTime;
