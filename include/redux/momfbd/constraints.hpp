@@ -142,6 +142,8 @@ namespace redux {
             void init (void);
             redux::util::Array<int16_t> getMatrix (bool blocked=false) const;
             redux::util::Array<double> getNullMatrix (void) const;
+            redux::util::Array<int16_t> getReducedMatrix (bool blocked=false) const;
+            redux::util::Array<double> getReducedNullMatrix (void) const;
             redux::util::Array<int16_t> getSubMatrix (int32_t groupID) const;
             void read (void);
             void write (void);
