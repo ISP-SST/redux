@@ -794,6 +794,10 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
         else endT = std::max(endT,ch->endT);
     }
 
+    for (auto& ch : channels) {
+        ch->storePatches(service, patches);
+    }
+    runThreadsAndWait(service, nThreads);
     
 }
 

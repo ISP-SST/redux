@@ -542,7 +542,15 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
         service.post(std::bind(&Channel::loadImage, this, i));       // will *not* be loaded through the cache, so only saved in "images"
     }
     runThreadsAndWait(service, myJob.info.maxThreads);
+}
+
+
+void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
+
+    size_t nImages = images.dimSize(0);
     
+    //images *= myObject.objMaxMean;
+
     patchWriteFail = std::async( launch::async, [this,&patches,nImages](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
         size_t nPatchesY = patches.dimSize(0);                                          // we will synchronize all the "patchWriteFail" futures at the end of MomfbdJob::preProcess
         size_t nPatchesX = patches.dimSize(1);
@@ -558,8 +566,6 @@ void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& 
         return false;   // TODO return true if any error
     });
 
-    
-    runThreadsAndWait(service, myJob.info.maxThreads);
 
 }
 
