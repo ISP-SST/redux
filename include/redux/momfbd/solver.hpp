@@ -44,7 +44,12 @@ namespace redux {
             void my_fdf( const gsl_vector*, void*, double*, gsl_vector* );
             
             void run(PatchData::Ptr);
+            void applyAlpha(void);
+            void applyBeta( const gsl_vector* beta );
+            void applyBeta( const gsl_vector* beta, double scale );
             double metric(void);
+            void gradient(void);
+            void gradient(gsl_vector* out);
             void clear(void);
             void getAlpha(void);
             

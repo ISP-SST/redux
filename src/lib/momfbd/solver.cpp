@@ -530,6 +530,41 @@ void Solver::run( PatchData::Ptr data ) {
 }
 
 
+void Solver::applyAlpha( void ) {
+
+    double* alphaPtr = alpha;
+    for( const auto& o: objects ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
+                service.post ([&im, alphaPtr] {    // use a lambda to ensure these calls are sequential
+                    im->calcPhi( alphaPtr );
+                    im->calcPFOTF();
+                });
+                alphaPtr += nModes;
+            }
+        }
+    }
+    runThreadsAndWait( service, nThreads );
+    
+}
+
+
+void Solver::applyBeta( const gsl_vector* beta ) {
+
+    job.globalData->constraints.reverse( beta->data, alpha );
+    applyAlpha();
+
+}
+
+
+void Solver::applyBeta( const gsl_vector* beta, double scale ) {
+
+    job.globalData->constraints.reverse( beta->data, alpha, scale );
+    applyAlpha();
+
+}
+
+
 
 
 double Solver::metric(void) {
@@ -548,6 +583,49 @@ double Solver::metric(void) {
         sum += o->metric();
     }
     return sum;
+}
+
+
+
+void Solver::gradient(void) {
+
+    double* gAlphaPtr = grad_alpha;
+    memset(gAlphaPtr,0,nParameters*sizeof(double));
+
+    for( const auto& o: objects ) {
+        service.post([&o] {    // use a lambda to ensure these calls are sequential
+                    o->initPQ();
+                    o->addAllPQ();
+                });
+        
+    }
+    runThreadsAndWait( service, nThreads );
+    
+    for( const auto& o: objects ) {
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
+                service.post ([this, &im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
+                    /*if ( job.gradientMethod == GM_VOGEL )*/ im->calcVogelWeight();
+                    for ( uint16_t m=0; m<nModes; ++m ) {
+                        if( enabledModes[m] ) {
+                            gAlphaPtr[m] = gradientMethod(*im, m, job.graddiff_step );
+                        }
+                    }
+                });
+                gAlphaPtr += nModes;
+            }
+        }
+    }
+    runThreadsAndWait( service, nThreads );
+    
+}
+ 
+ 
+void Solver::gradient( gsl_vector* grad ) {
+    
+    gradient();
+    job.globalData->constraints.apply( grad_alpha, grad->data );
+    
 }
 
 
