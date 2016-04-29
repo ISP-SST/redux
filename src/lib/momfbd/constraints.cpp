@@ -477,13 +477,19 @@ void Constraints::init( void ) {
                         if( kOffset ) { // skip reference channel
                             int32_t tOffset = 0;
                             for( size_t count=ch->imageNumbers.size(); count; --count ) {
-                                if( tOffset ) { // skip reference wavefront
-                                    thisConstraint.reset( new Constraint( modeIndex, 1 ) );                  // \alpha_{11m}
-                                    thisConstraint->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
-                                    thisConstraint->addEntry( kOffset + tOffset + modeIndex, 1 );            // \alpha_{tkm}
-                                    thisConstraint->addEntry( kOffset + modeIndex, -1 );                     // \alpha_{1km}
+//                                 if( tOffset ) { // skip reference wavefront      TODO: select type with cfg option.
+//                                                                                  TBD:  proper dealing with fixed differences.
+//                                     thisConstraint.reset( new Constraint( modeIndex, 1 ) );                  // \alpha_{11m}
+//                                     thisConstraint->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
+//                                     thisConstraint->addEntry( kOffset + tOffset + modeIndex, 1 );            // \alpha_{tkm}
+//                                     thisConstraint->addEntry( kOffset + modeIndex, -1 );                     // \alpha_{1km}
+//                                     constraints.push_back( thisConstraint );
+//                                 }
+                                //if( tOffset ) { // skip reference wavefront
+                                    thisConstraint.reset( new Constraint( tOffset + modeIndex, 1 ) ); // \alpha_{tkm}
+                                    thisConstraint->addEntry( kOffset + tOffset + modeIndex, -1 );          // \alpha_{t(k-1)m}
                                     constraints.push_back( thisConstraint );
-                                }
+                                //}
                                 tOffset += nModes;
                             }
                         }
