@@ -16,6 +16,7 @@
 #include <typeinfo>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/chrono.hpp>
 #include <boost/numeric/ublas/io.hpp> 
 #include <boost/timer/timer.hpp>
 
@@ -24,6 +25,8 @@ using namespace redux::image;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
+using namespace boost::timer;
+using namespace boost::chrono;
 
 
 namespace {
@@ -409,8 +412,6 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
-using namespace boost::timer;
-using namespace boost::chrono;
 cpu_timer& getTimer(void) {
     static cpu_timer timer;
     return timer;

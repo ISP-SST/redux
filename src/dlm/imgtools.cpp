@@ -912,9 +912,6 @@ string load_files_info( int lvl ) {
 
 IDL_VPTR load_files( int argc, IDL_VPTR* argv, char* argk ) {
     
-    using namespace boost::timer;
-    using namespace boost::chrono;
-    
     if( argc < 1 ) {
         return IDL_GettmpInt(0);
     }
