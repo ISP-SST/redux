@@ -61,7 +61,7 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
     uint8_t cmd = CMD_JSTAT;
     boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
 
-    size_t blockSize;
+    uint64_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if ( !blockSize ) return;
@@ -92,9 +92,10 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
             if ( nj < nJobs ) addComma = true;
             nJobs = min(nj,nJobs);
         }
-        cout << alignRight("#", 4) << alignRight("ID", 5) << alignCenter("type", 10) << alignCenter("submitted", 20); // + alignCenter("started", 20);
+        cout << alignRight("#", 4) << alignRight("ID", 5) << alignCenter("type", 10) << alignCenter("started", 20); // + alignCenter("started", 20);
         cout << alignCenter("name", maxLength[0]+4) + alignCenter("user", maxLength[1]+5) + alignCenter("priority", 8) + alignCenter("state", 8);
         cout << endl;
+        ptime now = boost::posix_time::second_clock::local_time();
         for( int i=0; i<nJobs; ++i ) {
             if( i == nJobs-1 ) {
                 i = infos.size()-1;
@@ -102,9 +103,10 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
             }
                 
             string info = alignRight(std::to_string(infos[i]->id), 5) + alignCenter(infos[i]->typeString, 10);
-            string startedString = "";
-            if ( !infos[i]->startedTime.is_not_a_date_time() ) startedString = to_iso_extended_string(infos[i]->startedTime);
-            info += alignCenter(to_iso_extended_string(infos[i]->submitTime), 20); // + alignCenter(startedString, 20);
+            string startedString;
+            if ( infos[i]->startedTime < now ) startedString = to_iso_extended_string(infos[i]->startedTime);
+            else startedString = to_iso_extended_string(infos[i]->submitTime);
+            info += alignCenter(startedString, 20);
             info += alignCenter(infos[i]->name, maxLength[0]+4) + alignLeft(infos[i]->user + "@" + infos[i]->host, maxLength[1]+5);
             info += alignCenter(std::to_string(infos[i]->priority), 8);
             info += alignCenter(Job::stateTag(infos[i]->state), 3) + alignLeft(infos[i]->progressString, 15);
@@ -124,7 +126,7 @@ void printPeerList( TcpConnection::Ptr conn, int ns ) {
     uint8_t cmd = CMD_PSTAT;
     boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
 
-    size_t blockSize;
+    uint64_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if ( !blockSize ) return;

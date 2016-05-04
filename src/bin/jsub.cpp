@@ -131,33 +131,31 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
     }
    
     // all ok, upload jobs.
-    size_t bufferSize = 0;
+    uint64_t jobsSize(0);
     for( auto &job: jobs ) {
         if( job ) {
             job->info.priority = prio;
-            bufferSize += job->size();
+            jobsSize += job->size();
         }
     }
     
-    auto buf = sharedArray<char>( bufferSize+sizeof(size_t)+1 );
-    char* ptr = buf.get();
-    uint64_t packedBytes = pack(ptr,CMD_ADD_JOB);
-    packedBytes += pack(ptr+packedBytes,bufferSize);
-
-    bufferSize += sizeof(size_t)+1;
+    shared_ptr<char> buf( new char[jobsSize+sizeof(uint64_t)+1], []( char* p ){ delete[] p; } );
+    char* ptr = buf.get()+sizeof(uint64_t)+1;
+    uint64_t packedBytes(0);
     for( auto &job: jobs ) {
         if( job ) {
             packedBytes += job->pack(ptr+packedBytes);
         }
     }
-    if( packedBytes != bufferSize ) {
-        LOG_ERR << "Packing of jobs failed:  bufferSize = " << bufferSize << "  packedBytes = " << packedBytes;
-        return;
-    }
-
-    //conn->asyncWrite( buf, bufferSize );
-    conn->syncWrite( buf.get(), bufferSize );
-    //boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),bufferSize));
+    
+    uint64_t totalSize = packedBytes+sizeof(uint64_t)+1;                    // cmd & blockSize will be sent before block
+    ptr = buf.get();
+    pack( ptr, CMD_ADD_JOB);
+    pack( ptr+1, packedBytes );
+    
+    //conn->asyncWrite( buf, packedBytes );
+    conn->syncWrite( buf.get(), totalSize );
+    //boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),packedBytes));
 
     boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 

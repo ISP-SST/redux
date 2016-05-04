@@ -563,6 +563,7 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
         }
         images.clear();                                                                 // release resources after storing the patch-data.
         myJob.info.progress[0] += nImages;
+        myJob.setProgressString();
         return false;   // TODO return true if any error
     });
 
@@ -843,6 +844,7 @@ void Channel::loadImage(size_t i) {
     }
     preprocessImage( i, tmpImg );
     myJob.info.progress[0]++;
+    myJob.setProgressString();
     imageStats[i]->getStats(borderClip, tmpImg);     // get stats for corrected data
     view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );
 }

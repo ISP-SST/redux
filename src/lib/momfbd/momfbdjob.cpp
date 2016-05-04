@@ -47,13 +47,14 @@ void MomfbdJob::setProgressString( void ) {
     
     float progress = 100.0*info.progress[0];
     if(info.progress[1] > 0) progress /= info.progress[1];
-
-    switch(info.step.load()) {
-        case JSTEP_PREPROCESS: info.progressString = boost::str(boost::format(" (P:%.1f%%)") % progress); break;
-        case JSTEP_QUEUED: info.progressString = " (Q)"; break;
-        case JSTEP_RUNNING: info.progressString = boost::str(boost::format(" (%.1f%%)") % progress); break;
-        case JSTEP_POSTPROCESS: info.progressString = boost::str(boost::format(" (W:%.1f%%)") % progress); break;
-        default: info.progressString = "";
+    uint8_t step = info.step.load();
+    switch(step) {
+        case JSTEP_PREPROCESS: sprintf( info.progressString, " (P:%.1f%%)", progress); break;
+        case JSTEP_QUEUED: sprintf( info.progressString, " (Q)"); break;
+        case JSTEP_RUNNING: sprintf( info.progressString, " (%.1f%%)", progress); break;
+        case JSTEP_POSTPROCESS: sprintf( info.progressString, " (W:%.1f%%)", progress); break;
+        case JSTEP_COMPLETED: sprintf( info.progressString, " (completed)"); break;
+        default: strcpy(info.progressString, "");
     }
 
 
@@ -219,19 +220,21 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStart
         if( allowStartNew && (step == JSTEP_CHECKED) ) {
             info.step = JSTEP_PREPROCESS;
             info.progress[0] = 0;
+            info.startedTime = boost::posix_time::second_clock::local_time();
             return true;
         }
     } else {
 
         if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
-            unique_lock<mutex> lock( jobMutex );
             info.step = step = JSTEP_RUNNING;
             info.progress[0] = 0;
             info.progress[1] = patches.nElements();
+            auto lock = getLock();
+            setProgressString();
         }
 
         if ( step == JSTEP_RUNNING ) {                      // running
-            unique_lock<mutex> lock( jobMutex );
+            auto lock = getLock();
             checkParts();
             for( auto & patch : patches ) {
                 if( patch && (patch->step == JSTEP_QUEUED) ) {
@@ -249,7 +252,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStart
     }
     //  LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
     if( ret ) {
-        unique_lock<mutex> lock( jobMutex );
+        auto lock = getLock();
         checkParts();
     }
     wip.nParts = wip.parts.size();
@@ -258,7 +261,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStart
 
 
 void MomfbdJob::ungetWork( WorkInProgress& wip ) {
-    unique_lock<mutex> lock( jobMutex );
+    auto lock = getLock();
     for( auto& part : wip.parts ) {
         part->step = JSTEP_QUEUED;
     }
@@ -267,7 +270,7 @@ void MomfbdJob::ungetWork( WorkInProgress& wip ) {
 
 
 void MomfbdJob::failWork( WorkInProgress& wip ) {
-    unique_lock<mutex> lock( jobMutex );
+    auto lock = getLock();
     for( auto& part : wip.parts ) {
         part->step = JSTEP_ERR;
     }
@@ -277,7 +280,7 @@ void MomfbdJob::failWork( WorkInProgress& wip ) {
 
 void MomfbdJob::returnResults( WorkInProgress& wip ) {
     
-    unique_lock<mutex> lock( jobMutex );
+    auto lock = getLock();
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
 
     checkParts();
@@ -299,7 +302,7 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
     }
     
     checkParts();
-    
+    setProgressString();
 }
 
 
@@ -472,7 +475,10 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
 
     info.step.store( JSTEP_QUEUED );
     info.state.store( JSTATE_IDLE );
-
+    
+    auto lock = getLock();
+    setProgressString();
+    
 }
 
 void MomfbdJob::initCache(void) {
@@ -508,12 +514,23 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
 
 void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
-    LOG << "MomfbdJob::postProcess()";
+    LOG_DEBUG << "MomfbdJob::postProcess()";
+    info.progress[0] = 0;
+    info.progress[1] = objects.size();
+    {
+        auto lock = getLock();
+        setProgressString();
+    }
     for( auto& patch: patches ) {
         patch->cacheLoad(true);        // load and erase cache-file.
     }
     for( auto& obj : objects ) {
-        service.post( std::bind( &Object::writeResults, obj.get(), patches ) );
+        service.post( [&](){
+            obj->writeResults( patches );
+            info.progress[0]++;
+            auto lock = getLock();
+            setProgressString();
+        } );
     }
     runThreadsAndWait(service, 1); //objects.size());  TODO: fix multithreaded write
     
@@ -521,7 +538,9 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads
     
     info.step.store( JSTEP_COMPLETED );
     info.state.store( 0 );
-
+    auto lock = getLock();
+    setProgressString();
+    
 }
 
 
@@ -538,7 +557,7 @@ bool MomfbdJob::active(void) {
 
 bool MomfbdJob::check(void) {
     bool ret(false);
-    unique_lock<mutex> lock(jobMutex);
+    auto lock = getLock();
     int val = info.step;
     switch (val) {
         case 0:                 ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;

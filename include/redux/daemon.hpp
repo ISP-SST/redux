@@ -62,7 +62,7 @@ namespace redux {
         
         const po::variables_map& params;
         
-        std::mutex jobMutex;
+        std::mutex jobsMutex;
         size_t jobCounter;
         std::vector<Job::JobPtr> jobs;
         uint16_t nQueuedJobs;

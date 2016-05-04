@@ -162,7 +162,7 @@ void Worker::returnWork( void ) {
                 uint64_t blockSize = wip.workSize();
                 size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
                 
-                shared_ptr<char> data = sharedArray<char>( totalSize );
+                shared_ptr<char> data( new char[totalSize], []( char* p ){ delete[] p; } );
                 char* ptr = data.get();
                 
                 uint64_t count = pack( ptr, CMD_PUT_PARTS );

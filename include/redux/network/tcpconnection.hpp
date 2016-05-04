@@ -33,7 +33,7 @@ namespace redux {
         public:
 
             template <typename T>
-            void asyncWrite( const std::shared_ptr<T>& data, size_t sz ) {
+            void asyncWrite( const std::shared_ptr<T> data, size_t sz ) {
                 if( mySocket.is_open() ) {
                     boost::asio::async_write( mySocket, boost::asio::buffer( data.get(), sz ),
                                           //    strand.wrap(
@@ -69,7 +69,7 @@ namespace redux {
             void asyncWrite( const std::vector<T>& data ) {
                 size_t sz = data.size();
                 if (!sz) return;
-                auto tmp = redux::util::sharedArray<T>( sz );
+                std::shared_ptr<T> tmp( new T[sz], [](T* p){ delete[] p;} );
                 memcpy(tmp.get(),data.data(),sz*sizeof(T));
                 asyncWrite(tmp, sz*sizeof(T));
             }

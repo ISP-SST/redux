@@ -29,8 +29,6 @@ using namespace std;
 
 namespace {
 
-    mutex jobMutex;
-
     typedef boost::asio::time_traits<boost::posix_time::ptime> time_traits_t;
 
 }
@@ -221,7 +219,7 @@ void Daemon::updateStatus( void ) {
 #endif
         size_t blockSize = myInfo->status.size();
         size_t totSize = blockSize + sizeof( size_t ) + 1;
-        auto buf = sharedArray<char>(totSize);
+        shared_ptr<char> buf( new char[totSize], []( char* p ){ delete[] p; } );
         char* ptr = buf.get();
         memset( ptr, 0, totSize );
 
@@ -471,7 +469,7 @@ void Daemon::cleanup( void ) {
     }
     
     {
-        unique_lock<mutex> lock( jobMutex );
+        unique_lock<mutex> lock( jobsMutex );
         for( auto& job : jobs ) {
             if( job && (job->info.step == Job::JSTEP_COMPLETED) ) {
                 LOG_DEBUG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue.";
@@ -537,7 +535,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                 }
             } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
         }
-        unique_lock<mutex> lock( jobMutex );
+        unique_lock<mutex> lock( jobsMutex );
         jobs.insert( jobs.end(), newjobs.begin(), newjobs.end() );
         std::sort( jobs.begin(), jobs.end(), [](const Job::JobPtr& a, const Job::JobPtr& b) {
             if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
@@ -563,11 +561,12 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
     uint64_t messagesSize(0);
     if( messages.size() ) {
         messagesSize = redux::util::size( messages );
-        shared_ptr<char> tmp = sharedArray<char>(messagesSize+sizeof(uint64_t));
+        size_t totSize = messagesSize+sizeof(uint64_t);
+        shared_ptr<char> tmp( new char[totSize], []( char* p ){ delete[] p; } );
         char* ptr = tmp.get();
         ptr += redux::util::pack( ptr, messagesSize );
         redux::util::pack( ptr, messages );
-        conn->syncWrite(tmp.get(), messagesSize+sizeof(uint64_t));
+        conn->syncWrite(tmp.get(), totSize);
     } else {
         conn->syncWrite(messagesSize);
     }
@@ -586,7 +585,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
         string jobString = string( buf.get() );
         if( iequals( jobString, "all" ) ) {
-            unique_lock<mutex> lock( jobMutex );
+            unique_lock<mutex> lock( jobsMutex );
             if( jobs.size() ) LOG << "Clearing joblist.";
             jobs.clear();
             return;
@@ -596,7 +595,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
             tmpTree.put( "jobs", jobString );
             vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
-            unique_lock<mutex> lock( jobMutex );
+            unique_lock<mutex> lock( jobsMutex );
             vector<size_t> deleted_ids; 
             for( auto & jobId : jobList ) {
                 jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [jobId, &deleted_ids](const Job::JobPtr& j) {
@@ -618,7 +617,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
         try {   // remove by name
             vector<string> jobList;
             boost::split( jobList, jobString, boost::is_any_of( "," ) );
-            unique_lock<mutex> lock( jobMutex );
+            unique_lock<mutex> lock( jobsMutex );
             vector<string> deletedList;
             for( auto & jobId : jobList ) {
                 jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [jobId, &deletedList](const Job::JobPtr& j) {
@@ -654,7 +653,7 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
     wip.previousJob = wip.job;
     wip.job.reset();
 
-    unique_lock<mutex> lock( jobMutex );
+    unique_lock<mutex> lock( jobsMutex );
     
     if( wip.isRemote ) {              // remote worker
         for( Job::JobPtr& job : jobs ) {
@@ -694,11 +693,6 @@ bool Daemon::getWork( WorkInProgress& wip, uint8_t nThreads ) {
         for( auto& part: wip.parts ) {
             part->cacheLoad(false);
         }
-
-        if( wip.job->info.startedTime.is_not_a_date_time() ) {
-            wip.job->info.startedTime = boost::posix_time::second_clock::local_time();
-        }
-        
         
     }
     
@@ -735,7 +729,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             host->status.state = Host::ST_ACTIVE;
         }
 
-        data = sharedArray<char>(blockSize+sizeof(uint64_t));
+        data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
         char* ptr = data.get()+sizeof(uint64_t);
         if(wip.job) {
 
@@ -799,23 +793,26 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
 
 void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
 
-    uint64_t blockSize = 0;
-    unique_lock<mutex>( jobMutex );
+    uint64_t blockSize(0);
+    unique_lock<mutex>( jobsMutex );
     for( auto & job : jobs ) {
         blockSize += job->size();
     }
-    auto buf = sharedArray<char>( blockSize + sizeof( uint64_t ) );         // blockSize will be sent before block
-    char* ptr = buf.get();
-    uint64_t count = pack( ptr, blockSize );                                // store blockSize
-    blockSize += sizeof( uint64_t );                                        // ...and add sizeof(blockSize) to make verification & write correct below.
+    uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
+    shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
+    char* ptr = buf.get()+sizeof( uint64_t );
+    uint64_t packedSize(0);
     for( auto & job : jobs ) {
-        count += job->pack( ptr+count );
+        packedSize += job->pack( ptr+packedSize );
     }
-    if( count != blockSize ) {
-        LOG_ERR << "sendJobList(): Mismatch when packing joblist:  count = " << count << "   blockSize = " << blockSize << "  bytes.";
-        return;
+    if( packedSize > blockSize ) {
+        string msg = "sendJobList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
+        throw length_error(msg);
+        //LOG_DEBUG << msg;
     }
-    conn->syncWrite( buf.get(), blockSize );
+    totalSize = packedSize + sizeof( uint64_t );
+    pack( buf.get(), packedSize );                                                // store real blockSize
+    conn->syncWrite( buf.get(), totalSize );
 
 }
 
@@ -841,26 +838,32 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
 
 void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 
-    size_t blockSize = 0;
-    unique_lock<mutex>( jobMutex );
+    uint64_t blockSize(0);
+    unique_lock<mutex>( jobsMutex );
     for( auto & job : jobs ) {
         if(job) {
-            job->setProgressString();
+            //job->setProgressString();
             blockSize += job->info.size();
         }
     }
-    size_t totalSize = blockSize + sizeof( size_t );
-    auto buf = sharedArray<char>( totalSize );
-    char* ptr = buf.get();
-    uint64_t count = pack( ptr, blockSize );
+    uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
+    shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
+    char* ptr = buf.get()+sizeof( uint64_t );
+    uint64_t packedSize(0);                                                      // store real blockSize
     for( auto & job : jobs ) {
-        if(job) count += job->info.pack( ptr+count );
+        if(job) {
+            auto lock = job->getLock();
+            packedSize += job->info.pack( ptr+packedSize );
+        }
     }
-    if( count != totalSize ) {
-        LOG_ERR << "sendJobStats(): Packing of job infos failed:  count = " << count << "  totalSize = " << totalSize << " bytes.";
-        return;
+    if( packedSize > blockSize ) {
+        string msg = "sendJobStats(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
+        throw length_error(msg);
+        //LOG_DEBUG << msg;
     }
-
+    totalSize = packedSize + sizeof( uint64_t );
+    //cout << "sendJobStats:  packedSize = " + to_string(packedSize) << endl;
+    pack( buf.get(), packedSize );                                                // store real blockSize
     conn->syncWrite( buf.get(), totalSize );
 
 }
@@ -868,25 +871,26 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 
 void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
 
-    size_t blockSize = myInfo->size();
+    uint64_t blockSize = myInfo->size();
     unique_lock<mutex> lock( peerMutex );
 
     for( auto & peer : connections ) {
         if(peer.second && peer.second->info.peerType&Host::TP_WORKER) blockSize += peer.second->size();
     }
-    size_t totalSize = blockSize + sizeof( size_t );
-    auto buf = sharedArray<char>( totalSize );
-    char* ptr =  buf.get();
-    uint64_t count = pack(ptr, blockSize );
-    count += myInfo->pack( ptr+count );
+    uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
+    shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
+    char* ptr =  buf.get()+sizeof( uint64_t );
+    uint64_t packedSize = myInfo->pack( ptr );
     for( auto & peer : connections ) {
-        if(peer.second && peer.second->info.peerType&Host::TP_WORKER) count += peer.second->pack( ptr+count );
+        if(peer.second && peer.second->info.peerType&Host::TP_WORKER) packedSize += peer.second->pack( ptr+packedSize );
     }
-    if( count != totalSize ) {
-        LOG_ERR << "Packing of peers infos failed:  count = " << count << "   totalSize = " << totalSize << "  bytes.";
-        return;
+    if( packedSize > blockSize ) {
+        string msg = "sendPeerList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
+        throw length_error(msg);
+        //LOG_DEBUG << msg;
     }
-
+    totalSize = packedSize + sizeof( uint64_t );
+    pack( buf.get(), packedSize );                                                // store real blockSize
     conn->syncWrite( buf.get(), totalSize );
 
 }

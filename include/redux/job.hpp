@@ -80,7 +80,7 @@ namespace redux {
         static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, bool check=false );
         static JobPtr newJob( const std::string& );
         
-        virtual void setProgressString(void) { info.progressString = ""; };
+        virtual void setProgressString(void) { strcpy(info.progressString,""); };
         static std::string stateString(uint8_t);
         static std::string stateTag(uint8_t);
         
@@ -92,8 +92,9 @@ namespace redux {
             std::atomic<uint8_t> state;
             std::atomic<uint32_t> progress[2];
             std::string typeString, name, user, host;
-            std::string progressString, logFile;
+            std::string logFile;
             std::string outputDir;                  //!< Where the output goes (defaults to current directory of rsub)
+            char progressString[20];
             boost::posix_time::ptime submitTime;
             boost::posix_time::ptime startedTime;
             boost::posix_time::ptime completedTime;
@@ -147,6 +148,8 @@ namespace redux {
         std::string getLogChannel(void) { return jobLogChannel; }
         void startLog(bool overwrite=false);
         void stopLog(void);
+        
+        std::unique_lock<std::mutex> getLock(void) { return std::move( std::unique_lock<std::mutex>(jobMutex) ); }
         
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);

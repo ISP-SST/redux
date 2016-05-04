@@ -67,8 +67,8 @@ Host::Host(const HostInfo& hi, uint64_t i) : info(hi), id(i), nConnections(0) {
 }
 
 
-size_t Host::size(void) const {
-    size_t sz = sizeof(uint64_t) + info.size() + status.size();
+uint64_t Host::size(void) const {
+    uint64_t sz = sizeof(uint64_t) + info.size() + status.size();
     return sz;
 }
 
@@ -161,8 +161,8 @@ Host& Host::operator=( const Host& rhs ) {
 }
 */
 
-size_t Host::HostInfo::size(void) const {
-    size_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(peerType) + sizeof(nCores);
+uint64_t Host::HostInfo::size(void) const {
+    uint64_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(peerType) + sizeof(nCores);
     sz += sizeof(time_t);   // startedAt is converted and transferred as time_t
     sz += name.length() + os.length() + arch.length() + 3;
     return sz;
@@ -215,8 +215,8 @@ bool Host::HostInfo::operator==(const HostInfo& rhs) const {
 }
 
 
-size_t Host::HostStatus::size(void) const {
-    size_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads);
+uint64_t Host::HostStatus::size(void) const {
+    uint64_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads);
     sz += sizeof(state) + sizeof(loadAvg) + sizeof(progress) + 2*sizeof(time_t);
     return sz;
 }
@@ -263,8 +263,8 @@ uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
 
 TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostInfo& out) {
     
-    size_t sz = out.size() + sizeof(size_t) + 1;
-    auto buf = sharedArray<char>(sz);
+    uint64_t sz = out.size() + sizeof(uint64_t) + 1;
+    shared_ptr<char> buf( new char[sz], []( char* p ){ delete[] p; } );
     char* ptr = buf.get();
     memset(ptr,0,sz);
     
@@ -285,8 +285,8 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostI
 
 TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& in) {
     
-    size_t sz = sizeof(size_t)+1;
-    auto buf = sharedArray<char>(sz);
+    uint64_t sz = sizeof(uint64_t)+1;
+    shared_ptr<char> buf( new char[sz], []( char* p ){ delete[] p; } );
 
     size_t readBytes = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( readBytes != sz ) {
@@ -299,7 +299,7 @@ TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& i
     
     uint64_t count = unpack(ptr+1,sz,swap_endian);
     
-    buf = sharedArray<char>(sz);
+    buf.reset( new char[sz], []( char* p ){ delete[] p; } );
 
     count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( count != sz ) {

@@ -1189,7 +1189,7 @@ namespace redux {
 
             void create( void ) {
                 if( dataSize ) {
-                    datablock = sharedArray<T>(dataSize);
+                    datablock.reset( new T[dataSize], [](T*& p){ delete[] p; p = nullptr; } );
                 }
                 else {
                     datablock.reset();

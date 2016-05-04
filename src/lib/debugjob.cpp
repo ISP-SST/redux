@@ -187,7 +187,7 @@ void DebugJob::checkParts( void ) {
 
 bool DebugJob::check(void) {
     bool ret(false);
-    unique_lock<mutex> lock(jobMutex);
+    auto lock = getLock();
     int val = info.step;
     switch (val) {
         case 0:                 ret = true; if(ret) info.step = JSTEP_SUBMIT; break;
@@ -220,7 +220,7 @@ bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool ) {
     }
     
     if( step == JSTEP_RUNNING ) {
-        unique_lock<mutex> lock( jobMutex );
+        auto lock = getLock();
         size_t nParts = std::min( nThreads, info.maxThreads) * 2;
         if(wip.isRemote) {
             for( auto & part : jobParts ) {
@@ -239,7 +239,7 @@ bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool ) {
 
 
 void DebugJob::ungetWork( WorkInProgress& wip ) {
-    unique_lock<mutex> lock( jobMutex );
+    auto lock = getLock();
     for( auto & part : wip.parts ) {
         part->step = JSTEP_QUEUED;
     }
@@ -248,7 +248,7 @@ void DebugJob::ungetWork( WorkInProgress& wip ) {
 
 
 void DebugJob::returnResults( WorkInProgress& wip ) {
-    unique_lock<mutex> lock( jobMutex );
+    auto lock = getLock();
     checkParts();
     for( auto & part : wip.parts ) {
         auto dpart = static_pointer_cast<DebugPart>( part );

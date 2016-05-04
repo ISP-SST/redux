@@ -24,13 +24,17 @@ namespace redux {
          *  @param p Pointer (of any order)
          */
         //@{
-        template <class T> void delArray( T*& p ) { delete[] p; }
+        template <class T> void delArray( T*& p ) { delete[] p; p = nullptr; }
         template <class T>
         void delArray( T**& p ) {
             delArray( *p );              // Call delArray() for the next pointer-level.
             delete[] p;                  // Delete current pointer-level.
+            p = nullptr;
         }
-        template <typename T, typename U> void castAndDelete( U* p ) { delete[] reinterpret_cast<T*>(p); }
+        template <typename T, typename U> void castAndDelete( U* p ) {
+            delete[] reinterpret_cast<T*>(p);
+            p = nullptr;
+        }
         //@}
 
         /*! @name delPointers
@@ -39,11 +43,12 @@ namespace redux {
          *  @param p Array of pointers (of any order)
          */
         //@{
-        template <class T>  void delPointers( T* p ) { }
+        template <class T>  void delPointers( T*& p ) { p = nullptr; }
         template <class T>
         void delPointers( T**& p ) {
             delPointers( *p );           // Call delPointers() for the next pointer-level.
             delete[] p;                  // Delete current pointer-level.
+            p = nullptr;
         }
         //@}
 
@@ -117,7 +122,7 @@ namespace redux {
         template <class T, typename ...S>
         std::shared_ptr<typename detail::Dummy<T,S...>::dataType> sharedArray( S ...sizes ) {
             typedef typename detail::Dummy<T,S...>::dataType dataType;
-            return std::shared_ptr<dataType>( newArray<T>( sizes... ), []( dataType* p ) { delArray( p ); } );
+            return std::shared_ptr<dataType>( newArray<T>( sizes... ), []( dataType*& p ) { delArray( p ); } );
         }
 
         
@@ -129,7 +134,7 @@ namespace redux {
         template <class T, typename ...S>
         std::shared_ptr<typename detail::Dummy<T,S...>::dataType> reshapeArray( T* array, S ...sizes ) {
             typedef typename detail::Dummy<T,S...>::dataType dataType;
-            return std::shared_ptr<dataType>( makePointers<T>( array, sizes... ), []( dataType* p ) { delPointers( p ); } );
+            return std::shared_ptr<dataType>( makePointers<T>( array, sizes... ), []( dataType*& p ) { delPointers( p ); } );
         }
         
         

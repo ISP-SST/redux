@@ -35,7 +35,7 @@ namespace redux {
                 boost::posix_time::ptime startedAt;
                 std::string name, os, arch;
                 HostInfo( void );
-                size_t size(void) const;
+                uint64_t size(void) const;
                 uint64_t pack( char* ) const;
                 uint64_t unpack( const char*, bool );
                 bool operator==(const HostInfo&) const;
@@ -50,7 +50,7 @@ namespace redux {
                 boost::posix_time::ptime lastSeen;
                 boost::posix_time::ptime lastActive;
                 HostStatus( void );
-                size_t size(void) const;
+                uint64_t size(void) const;
                 uint64_t pack( char* ) const;
                 uint64_t unpack( const char*, bool );
             } status;
@@ -58,7 +58,7 @@ namespace redux {
             Host(void);
             Host(const HostInfo&, uint64_t i=0);
 
-            size_t size(void) const;
+            uint64_t size(void) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
             
