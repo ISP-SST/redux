@@ -26,9 +26,6 @@ using namespace redux;
 
 using namespace std;
 
-namespace bpo = boost::program_options;
-namespace bpt = boost::property_tree;
-
 #define lg Logger::lg
 namespace {
 
@@ -41,7 +38,7 @@ namespace {
         options.add_options()
         ( "master,m", bpo::value<string>()->default_value( "localhost" ), "Hostname/IP of the master" )
         ( "port,p", bpo::value<string>()->default_value( "30000" ), "Port to use, either when connecting to the master." )
-        ( "jobs,j", po::value< vector<string> >()->composing(), "Job(s) to delete, as job-ID(s) or job-name(s)."
+        ( "jobs,j", bpo::value< vector<string> >()->composing(), "Job(s) to delete, as job-ID(s) or job-name(s)."
         "All additional arguments on the command-line will be interpreted as jobs to delete."
         "Comma (or space) separated list of IDs/names is accepted. IDs may also be specified as ranges (e.g 4-17)." )
         ;
@@ -55,9 +52,9 @@ namespace {
 
         static map<string, string> vmap;
         if( vmap.empty() ) {
-            vmap["REDUX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
-            vmap["REDUX_PORT"] = "port";            // This means the environment variable REDUX_PORT will override the
-            // default value of 30000 specified above.
+            vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
+            vmap["RDX_PORT"] = "port";            // This means the environment variable RDX_PORT will override the
+                                                  // default value of 30000 specified above.
         }
         map<string, string>::const_iterator ci = vmap.find( envName );
         if( ci == vmap.end() ) {

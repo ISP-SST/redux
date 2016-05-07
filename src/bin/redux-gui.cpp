@@ -24,7 +24,7 @@ namespace {
         options.add_options()
         ( "master,m", po::value<string>()->default_value( "" ), "name or ip of master." )
         ( "port,p", bpo::value<uint16_t>()->default_value( 30000 ), "Port to listen on."
-          " The environment variable REDUX_PORT will be used instead of the default if this option"
+          " The environment variable RDX_PORT will be used instead of the default if this option"
           " is not specified." )
         ;
 
@@ -36,8 +36,8 @@ namespace {
 
         static map<string, string> vmap;
         if( vmap.empty() ) {
-            vmap["REDUX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
-            vmap["REDUX_PORT"] = "port";            // This means the environment variable REDUX_PORT will override the
+            vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
+            vmap["RDX_PORT"] = "port";            // This means the environment variable RDX_PORT will override the
             // default value of 30000 specified above.
         }
         map<string, string>::const_iterator ci = vmap.find( envName );

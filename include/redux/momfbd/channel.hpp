@@ -61,8 +61,6 @@ namespace redux {
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
             void computePhi(void);
-            //void addMode(redux::util::Array<double>&, uint16_t, double) const;
-            //void getPhi(redux::util::Array<double>&, const WaveFront&) const;
             //void addAllFT(redux::image::FourierTransform&);
             void addAllFT(redux::util::Array<double>&);
             void addAllPQ(void) const;

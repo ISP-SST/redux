@@ -35,7 +35,7 @@ void ChannelData::initPatch(void) {
 
 
 uint64_t ChannelData::size( void ) const {
-    uint64_t sz = shift.size() + offset.size() + residualOffset.size();
+    uint64_t sz = channelOffset.size() + offset.size() + residualOffset.size();
     sz += images.size();
     return sz;
 }
@@ -43,7 +43,7 @@ uint64_t ChannelData::size( void ) const {
 
 uint64_t ChannelData::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = shift.pack(ptr);
+    uint64_t count = channelOffset.pack(ptr);
     count += offset.pack(ptr+count);
     count += residualOffset.pack(ptr+count);
     count += images.pack(ptr+count);
@@ -53,7 +53,7 @@ uint64_t ChannelData::pack( char* ptr ) const {
 
 uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = shift.unpack(ptr, swap_endian);
+    uint64_t count = channelOffset.unpack(ptr, swap_endian);
     count += offset.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
     count += images.unpack(ptr+count, swap_endian);
@@ -206,7 +206,7 @@ void PatchData::initPatch(void) {
 uint64_t PatchData::size( void ) const {
     if( !isLoaded && cachedSize ) return cachedSize;
     uint64_t sz = Part::size();
-    sz += index.size() + roi.size();
+    sz += index.size() + position.size() + roi.size();
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         sz += obj.ObjectData::size();
@@ -219,6 +219,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = Part::pack(ptr);
     count += index.pack(ptr+count);
+    count += position.pack(ptr+count);
     count += roi.pack(ptr+count);
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
@@ -232,6 +233,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = Part::unpack(ptr, swap_endian);
     count += index.unpack(ptr+count, swap_endian);
+    count += position.unpack(ptr+count, swap_endian);
     count += roi.unpack(ptr+count, swap_endian);
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)

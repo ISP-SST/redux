@@ -46,7 +46,7 @@ namespace redux {
             /********* Input *********/
             redux::util::Array<float> images;                   //!< Image stack for this channel.
             RegionI cutout;                                     //!< Coordinates of the cutout region.
-            PointI shift;                                       //!< The displacement of this channel. Initially just from the x/y-offset files, but during the fitting the cutout might get shifted.
+            PointI channelOffset;                               //!< The displacement of this channel relative to the reference channel.
             PointI offset;                                      //!< Local offset, i.e. where in the "block" we cut out the subimage for processing.
             PointF residualOffset;                              //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
             /*************************/
@@ -105,6 +105,7 @@ namespace redux {
             const MomfbdJob& myJob;
             std::vector<redux::util::Compressed<ObjectData,5>> objects;
             Point16 index;                      //! Patch-index in mozaic
+            Point16 position;                   //! Patch position (centre coordinates in the reference channel)
             Region16 roi;                       //! Region/position of this patch in the full image
             PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
             PatchData( const PatchData& ) = delete;

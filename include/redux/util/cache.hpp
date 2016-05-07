@@ -120,7 +120,7 @@ namespace redux {
             }
 
         private:
-            Cache() : path_("/swap/redux/"), pid_(getpid()) {};
+            Cache() : path_(""), pid_(getpid()) {};
             template<class KeyT, class T>
             void mapMaintenance(void) {
                 auto m = getMap<KeyT,T>();

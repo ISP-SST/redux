@@ -318,44 +318,6 @@ bool Channel::checkData (void) {
 // TBD: this should be a parameter somewhere...
 void Channel::initCache (void) {
 
-    //LOG_DETAIL << "wavelength = " << myObject.wavelength << "   patchSize = " << patchSize << "  telescopeD = " << myJob.telescopeD << "  arcSecsPerPixel = " << arcSecsPerPixel;
-//     Pupil::calculatePupilSize (frequencyCutoff, pupilRadiusInPixels, pupilPixels, myObject.wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel);
-//     
-//     myJob.patchSize = myObject.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
-//     myJob.pupilPixels = myObject.pupilPixels = pupilPixels;
-    //size_t otfPixels = 2 * pupilPixels;
-    //LOG_DETAIL << "frequencyCutoff = " << frequencyCutoff << "  pupilSize = " << pupilPixels << "  pupilRadiusInPixels = " << pupilRadiusInPixels;
-    //pupil = myJob.globalData->fetch (pupilPixels, pupilRadiusInPixels);
-    // Create a temporary OTF and store the indices where the OTF/pupil are non-zero. This will be used in loops to skip irrelevant evaluations.
-    /*Array<double> tmpImg (2 * pupilPixels, 2 * pupilPixels);
-    tmpImg.zero();
-    Array<double> tmpSubImg (tmpImg, 0, pupilPixels - 1, 0, pupilPixels - 1);
-    pupil.first.copy(tmpSubImg);
-    size_t cnt(0);
-    for (auto & it: tmpSubImg) {      // map indices where the pupil-mask is non-zero.
-        if( it > INDEX_THRESHOLD ) {
-            pupilIndices.insert (cnt);
-            size_t otfOffset = (cnt / pupilPixels) * otfPixels + (cnt % pupilPixels) + (pupilPixels / 2) + (pupilPixels / 2) * otfPixels;
-            pupilInOTF.insert(make_pair (cnt, otfOffset));
-            it = 1;
-        }
-        cnt++;
-    }
-    FourierTransform::autocorrelate (tmpImg);
-
-    LOG_DEBUG << "Generated pupilIndices with " << pupilIndices.size() << " elements. (full size = " << pupil.first.nElements() << ", area = " << pupil.second << " )";
-    double* tmpPtr = tmpImg.get();
-
-    for (size_t index = 0; index < tmpImg.nElements(); ++index) {           // map indices where the OTF-mask (auto-correlated pupil-mask) is non-zero.
-        if (fabs(tmpPtr[index]) > INDEX_THRESHOLD) {
-            otfIndices.insert (index);
-            //tmpPtr[index] = 1;
-        } else tmpPtr[index] = 0;
-    }
-    //Ana::write ("otfsupport.f0", tmpImg);
-
-    LOG_DEBUG << "Generated otfIndices with " << otfIndices.size() << " elements. (full size = " << tmpImg.nElements() << ")";
-    */
 
     ModeInfo mi(myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
     for (unsigned int i=0; i < diversityModes.size(); ++i) {
@@ -380,54 +342,6 @@ void Channel::initCache (void) {
             }
         }  
     }
-    
-/*
-    Cache::ModeID id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-
-    bool needTiltCoeffs(false);
-    for (unsigned int i = 0; i < diversityModes.size(); ++i) {
-        uint16_t modeNumber = diversityModes[i];
-        Cache::ModeID id2 = id;
-        if (diversityTypes[i] == ZERNIKE) {
-            id2.firstMode = id2.lastMode = 0;
-        }
-        id2.modeNumber = modeNumber;
-        myJob.globalData->fetch (id2);
-    }
-
-    bfs::path fn = bfs::path("mvn_modes.f0");
-    Array<double> debugModes;
-    if ( bfs::exists (fn)) {
-        redux::file::readFile(fn.string(), debugModes);
-    }
-    
-    
-    if ( !modeFile.empty() ) {
-        modes.setPupilSize( pupilPixels, 0.0, 0.0 );
-        modes.loadFile( modeFile );
-    }
-    
-    if( modes.nPupilPixels != pupilPixels ) {
-        modes.setPupilSize( pupilPixels, pupilRadiusInPixels, rotationAngle );
-        modes.generate( myJob );
-        // TODO generate
-    }
-    
-    modeNumbers.clear();
-    cnt = 0;
-
-    if( needTiltCoeffs ) {
-        id.firstMode = id.lastMode = 0;
-        id.modeNumber = 3;
-        const auto mode = myJob.globalData->fetch (id);
-        double ddx = (*mode)(pupilPixels/2,pupilPixels/2+1) - (*mode)(pupilPixels/2,pupilPixels/2);
-        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*ddx);
-        alphaToPixels = 1.0/pixelsToAlpha;
-        
-    }
-    */
-    //defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
-    //alphaToDefocus = 1.0/pixelsToAlpha;
     
 }
 
@@ -655,7 +569,7 @@ void Channel::initPatch (ChannelData& cd) {
     
     uint16_t patchSize = myObject.patchSize;
     for (uint16_t i=0; i < nImages; ++i) {
-        subImages[i]->setPatchInfo( i, cd.offset, cd.shift, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
+        subImages[i]->setPatchInfo( i, cd.offset, cd.channelOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->wrap( cd.images, i, i, cd.offset.y, cd.offset.y+patchSize-1, cd.offset.x, cd.offset.x+patchSize-1 );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), cd.images.dimSize(1)*cd.images.dimSize(2), ST_VALUES|ST_RMS );
         subImages[i]->init();
@@ -728,30 +642,7 @@ void Channel::initPhiFixed(void) {
     }
     computePhi();   // no tilts for now, just initialize once
 }
-/*    ModeInfo info(myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-    for (unsigned int i=0; i < diversityModes.size(); ++i) {
-        uint16_t modeNumber = diversityModes[i];
-        ModeInfo info2 = info;
-        if (diversityTypes[i] == ZERNIKE) {
-            info2.firstMode = info2.lastMode = 0;
-        }
-        ModeSet& ret = myJob.globalData->get(info2);
-        unique_lock<mutex> lock(ret.mtx);
-        if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
-            if(diversityTypes[i] == ZERNIKE) {
-                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
-            } else {
-                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
-            }
-            if( ret.nDimensions() != 3 || ret.dimSize(1) != myObject.pupilPixels || ret.dimSize(2) != myObject.pupilPixels ) {    // mismatch
-                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
-            } else {
-                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
-                ret.normalize( myObject.pupil );
-            }
-        }  
-    }
-*/
+
 
 void Channel::computePhi (void) {
     phi_fixed.copy(phi_channel);
@@ -762,32 +653,6 @@ void Channel::computePhi (void) {
     // TODO: add tilt corrections
 }
 
-/*
-void Channel::addMode (redux::util::Array<double>& phi, uint16_t modenumber, double weight) const {
-    const auto mode = modes.at (modenumber);
-    // cout << "Channel::addMode()  mode = " << modenumber << "  weight = " << weight << endl;
-    //redux::file::Ana::write ("mode_" + to_string (modenumber) + ".f0", *mode);
-    //redux::file::Ana::write ("pupil.f0", pupil.first);
-    if (mode) {
-        phi.add (*mode, weight);
-    }
-}
-
-
-void Channel::getPhi (redux::util::Array<double>& phi, const WaveFront& wf) const {
-    phi_channel.copy(phi);
-    //return;
-    //cout << "Channel::getPhi()" << endl;
-    for (auto & it : wf.modes) {
-        //cout << "Channel::getPhi()  it.first = " << it.first << endl;
-        const auto mode = modes.at (it.first);
-        if (mode) {  //&& it.second.second ) { // TODO: possibility to enable/disable modes
-            //cout << "Channel::getPhi()  mode = " << hexString(mode.get()) << endl;
-            phi.add (*mode, *it.second.value);
-        }
-    }
-}
-*/
 
 void Channel::addAllFT (redux::util::Array<double>& ftsum) {
     for (auto& subimage : subImages) {
@@ -983,13 +848,13 @@ void Channel::adjustCutout( ChannelData& chData, const Region16& origCutout ) co
         chData.residualOffset.y = stats.mean/100.0;
     }
 
-    chData.shift = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
-    chData.shift -= imgBoundary.outside( chData.cutout+chData.shift );                          // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
-    chData.cutout += chData.shift;
-    chData.residualOffset -= chData.shift;
+    chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
+    chData.channelOffset -= imgBoundary.outside( chData.cutout+chData.channelOffset );                          // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
+    chData.cutout += chData.channelOffset;
+    chData.residualOffset -= chData.channelOffset;
     chData.offset = myObject.maxLocalShift;
     if( chData.cutout != desiredCutout ) {
-        chData.offset -= (chData.cutout.first - desiredCutout.first - chData.shift);
+        chData.offset -= (chData.cutout.first - desiredCutout.first - chData.channelOffset);
     }
     
 }
@@ -1017,7 +882,6 @@ void Channel::storePatchData(boost::asio::io_service& service, Array<PatchData::
     if( patches.nDimensions() == 2 ) {
         size_t nPatchesY = patches.dimSize(0);
         size_t nPatchesX = patches.dimSize(1);
-        cout << "storing (" << nPatchesY << "x" << nPatchesX << ") patches..." << endl;
         for(unsigned int py=0; py<nPatchesY; ++py) {
             for(unsigned int px=0; px<nPatchesX; ++px) {
                 PatchData& patch(*patches(py,px));

@@ -15,8 +15,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/program_options.hpp>
-namespace bpo = boost::program_options;
-namespace bpt = boost::property_tree;
 
 using namespace redux::util;
 using namespace redux::network;
@@ -37,27 +35,23 @@ namespace {
         options.add_options()
         ( "master,m", bpo::value<string>()->default_value( "localhost" ),
           "Hostname/IP of a master to connect to."
-          " The environment variable REDUX_MASTER can be used to override the default value." )
+          " The environment variable RDX_MASTER can be used to override the default value." )
         ( "port,p", bpo::value<string>()->default_value( "30000" ),
           "Port to use when connecting to a master."
-          " The environment variable REDUX_PORT can be used to override the default value." )
+          " The environment variable RDX_PORT can be used to override the default value." )
         ( "priority", bpo::value<int>()->default_value( 10 ), "Job priority" )
         ( "force,f", "Overwrite output file if exists" )
         ( "kill,k", "Send exit command to Server." )
-        ( "swap,s", "swap mode: write compressed data to swap file instead of keeping it in memory (useful for large problems)" )
+        ( "swap,s", "swap mode: write auxiliary data to files instead of keeping it in memory (compatibility flag, always enabled)" )
         ( "config,c", bpo::value< vector<string> >()->multitoken(), "Configuration file(s) to process." )
-        ( "name", po::value<string>(), "Name to use for the supplied configurations." )
+        ( "name", bpo::value<string>(), "Name to use for the supplied configurations." )
         ( "simx", bpo::value<string>(), "x coordinate[s] of subimages to restore" )
         ( "simy", bpo::value<string>(), "y coordinate[s] of subimages to restore" )
         ( "imgn,n", bpo::value<string>(), "Image numbers" )
-        ( "sequence", bpo::value<string>(), "sequence number to insert in filename template." )
+//        ( "sequence", bpo::value<string>(), "sequence number to insert in filename template." )
         ( "print,P", "(debug) print the parsed configuration to console and exit without uploading." )
         ( "no-check", "Don't verify the configuration." )
-        ( "output-file,o", "Comma separated list of output file base names."
-          "File names are applied to the objects in the order they are found in the config file."
-          "If insufficient names are provided, a default name will be created for the remaining objects."
-          "Excess names will generate a warning but are ignored otherwise. The names are base names only,"
-          "an appropriate suffix will be attached (.fits/.f0)." )
+        ( "output-dir,O", bpo::value<string>(), "Output directory. If left blank, the current directory is used.")
         ;
 
         return options;
@@ -68,9 +62,9 @@ namespace {
 
         static map<string, string> vmap;
         if( vmap.empty() ) {
-            vmap["REDUX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
-            vmap["REDUX_MASTER"] = "master";        // If it exists, it will override the default value (localhost) above
-            vmap["REDUX_PORT"] = "port";            // If it exists, it will override the default value (30000) above
+            vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
+            vmap["RDX_MASTER"] = "master";        // If it exists, it will override the default value (localhost) above
+            vmap["RDX_PORT"] = "port";            // If it exists, it will override the default value (30000) above
         }
         map<string, string>::const_iterator ci = vmap.find( envName );
         if( ci == vmap.end() ) {
@@ -212,7 +206,7 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 }
 
 
-string filterOldCfg(string filename, string jobname, string logfile ) {
+string filterOldCfg(string filename, string jobname, string logfile, string outputDir ) {
     
     std::ifstream in(filename, std::ios::in | std::ios::binary);
     if (!in) {
@@ -235,6 +229,7 @@ string filterOldCfg(string filename, string jobname, string logfile ) {
         text = "momfbd { \n" + text;
         text += "NAME " + jobname + "\n";
         text += "LOGFILE " + logfile + "\n";
+        text += "OUTPUT_DIR " + outputDir + "\n";
         text += "\n}";
     }
 
@@ -277,6 +272,11 @@ int main (int argc, char *argv[]) {
             globalName = vm["name"].as<string>();
         }
 
+        string globalOutputDir;
+        if( vm.count ("output-dir") ) {
+            globalOutputDir = vm["output-dir"].as<string>();
+        }
+        
         string globalLog;
         if( vm.count ("log-file") ) {
             vector<string> logFiles = vm["log-file"].as<vector<string>>();
@@ -292,8 +292,9 @@ int main (int argc, char *argv[]) {
         for( auto it: files ) {
             string bn = boost::filesystem::basename(it);
             string jobName = globalName.empty() ? bn : globalName;
+            string oututDir = globalOutputDir.empty() ? boost::filesystem::current_path().string() : globalOutputDir;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
-            string tmpS = filterOldCfg(it, jobName, logFile) + "\n";
+            string tmpS = filterOldCfg(it, jobName, logFile, oututDir) + "\n";
             filteredCfg.write(tmpS.c_str(),tmpS.size());
         }
 

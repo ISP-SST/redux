@@ -9,8 +9,8 @@
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 
-namespace pt = boost::property_tree;
-namespace po = boost::program_options;
+namespace bpt = boost::property_tree;
+namespace bpo = boost::program_options;
 
 namespace redux {
 
@@ -33,21 +33,21 @@ namespace redux {
             }
         };
 
-        Application( po::variables_map& vm, RunMode=EXIT );
+        Application( bpo::variables_map& vm, RunMode=EXIT );
         virtual ~Application( void );
 
-        static void getOptions( po::options_description& options, const std::string& );
-        static po::options_description& getOptionsDescription( const std::string& name = "application" );
+        static void getOptions( bpo::options_description& options, const std::string& );
+        static bpo::options_description& getOptionsDescription( const std::string& name = "application" );
 
-        typedef void ( parserFunction )( po::options_description&, po::variables_map& );
+        typedef void ( parserFunction )( bpo::options_description&, bpo::variables_map& );
 
         static std::pair<std::string, std::string> appCmdParser( const std::string& s );
-        static po::options_description& parseCmdLine( int argc, const char* const argv[], po::variables_map& vm,
-                                                      po::options_description* programOptions = nullptr,
-                                                      po::positional_options_description * positionalOptions = nullptr,
+        static bpo::options_description& parseCmdLine( int argc, const char* const argv[], bpo::variables_map& vm,
+                                                      bpo::options_description* programOptions = nullptr,
+                                                      bpo::positional_options_description * positionalOptions = nullptr,
                                                       parserFunction customParser = nullptr );
 
-        static void checkGeneralOptions( po::options_description& desc, po::variables_map& vm );
+        static void checkGeneralOptions( bpo::options_description& desc, bpo::variables_map& vm );
 
         int run( void );                    //!< application entry-point, basically just a loop that calls \c doWork()
         
@@ -70,7 +70,7 @@ namespace redux {
         std::string applicationName;
         std::string settingsFile;
 
-        pt::ptree propTree;
+        bpt::ptree propTree;
         redux::Logger logger;
         
         

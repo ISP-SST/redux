@@ -7,7 +7,6 @@
 
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/program_options.hpp>
-namespace bpo = boost::program_options;
 
 using namespace redux::util;
 using namespace redux::network;
@@ -42,9 +41,9 @@ namespace {
 
         static map<string, string> vmap;
         if( vmap.empty() ) {
-            vmap["REDUX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
-            vmap["REDUX_PORT"] = "port";            // This means the environment variable REDUX_PORT will override the
-            // default value of 30000 specified above.
+            vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
+            vmap["RDX_PORT"] = "port";            // This means the environment variable RDX_PORT will override the
+                                                  // default value of 30000 specified above.
         }
         map<string, string>::const_iterator ci = vmap.find( envName );
         if( ci == vmap.end() ) {

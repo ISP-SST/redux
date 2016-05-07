@@ -57,9 +57,6 @@ namespace redux {
         void sendPeerList( network::TcpConnection::Ptr& );
         void updateLoadAvg( void );
         
-        std::string master;
-        uint16_t port;
-        
         const po::variables_map& params;
         
         std::mutex jobsMutex;

@@ -135,8 +135,6 @@ namespace redux {
                 }
             }
 
-            std::string name (const std::string& base) const;
-
             int32_t nConstraints (void) const { return constraints.size(); };
 
             void init (void);

@@ -34,23 +34,42 @@ namespace {
 }
 
 
-Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), master(""), port(0), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
+Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
     hostTimeout(60), timer( ioService ), worker( *this ) {
 
     myInfo.reset( new Host() );
 
-    if( params["master"].as<string>() == "" ) {
-        server.reset( new TcpServer( ioService, params["port"].as<uint16_t>() ) );
-    } else {    // we are connecting to a remote host
-        master = params["master"].as<string>();
-        port = params["port"].as<uint16_t>();
-    }
     uint16_t nThreads = params["threads"].as<uint16_t>();
     if( nThreads ) {
         myInfo->status.nThreads = myInfo->status.maxThreads = nThreads;
     }
+
+    if( params.count("cache-dir") ) {
+        auto & c = Cache::get();
+        c.setPath( params["cache-dir"].as<string>() );
+    }
+    
+    uint16_t port = params["port"].as<uint16_t>();
+    string master = params["master"].as<string>();
+    if( port < 1024 ) {
+        LOG_CRITICAL << "Daemon:  using a port < 1024 requires root permissions, which this program should *not* have.";
+        stop();
+        return;
+    }
+        
+    if( master.empty() ) {
+        try {
+            server.reset( new TcpServer( ioService, port ) );
+        } catch ( const exception& e ) {
+            LOG_CRITICAL << "Daemon:  failed to start server: " << e.what();
+            server.reset();
+            stop();
+            return;
+        }
+    }
     
     LOG << "Daemon:  using " << myInfo->status.nThreads << " threads.";
+    
 
 }
 
@@ -81,7 +100,7 @@ void Daemon::reset( void ) {
 
 void Daemon::stop( void ) {
     runMode = EXIT;
-    if( myMaster.conn->socket().is_open() ) {
+    if( myMaster.conn && myMaster.conn->socket().is_open() ) {
         *myMaster.conn << CMD_DISCONNECT;
         myMaster.conn->socket().close();
         myInfo->info.peerType &= ~Host::TP_WORKER;
@@ -103,9 +122,6 @@ void Daemon::maintenance( void ) {
         updateStatus();   // TODO: use a secondary connection for auxiliary communications
         cnt = 0;
     }
-    //cout << "blahytt: " << cnt << endl;
-    //ioService.post([](){ cout << "vlahytt: " << cnt << endl;} );
-    //cout << "clahytt: " << cnt << endl;
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
 }
@@ -152,7 +168,9 @@ bool Daemon::doWork( void ) {
 
 void Daemon::workerInit( void ) {
     
-    if( port < 1024 ) {
+    string master = params["master"].as<string>();
+    
+    if( master.empty() ) {
         LOG_DEBUG << "Running local worker only.";
     } else {
         LOG_DEBUG << "Running slave.";
@@ -165,8 +183,11 @@ void Daemon::workerInit( void ) {
 
 
 void Daemon::connect(void) {
+
+    uint16_t port = params["port"].as<uint16_t>();
+    string master = params["master"].as<string>();
     
-    if( port < 1024 ) {
+    if( master.empty() ) {
         return;
     }
     
@@ -181,7 +202,7 @@ void Daemon::connect(void) {
 
     LOG_TRACE << "Attempting to connect to master at " << master << ":" << port;
 
-    myMaster.conn->connect( params["master"].as<string>(), to_string( params["port"].as<uint16_t>() ) );
+    myMaster.conn->connect( master, to_string(port) );
     if( myMaster.conn->socket().is_open() ) {
 
         Command cmd;
@@ -327,7 +348,7 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
 
     }
     catch( const exception& e ) {
-        LOG_ERR << "activity(): Exception when parsing incoming command: " << e.what();
+        LOG_DEBUG << "activity(): Exception when parsing incoming command: " << e.what();
         removeConnection(conn);
         return;
     }
@@ -862,7 +883,6 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
         //LOG_DEBUG << msg;
     }
     totalSize = packedSize + sizeof( uint64_t );
-    //cout << "sendJobStats:  packedSize = " + to_string(packedSize) << endl;
     pack( buf.get(), packedSize );                                                // store real blockSize
     conn->syncWrite( buf.get(), totalSize );
 

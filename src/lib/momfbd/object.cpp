@@ -582,13 +582,8 @@ bool Object::checkData (void) {
     bfs::path outDir( myJob.info.outputDir );
     bfs::path tmpOF(outputFileName+".ext");
     
-    if( bfs::path(outputFileName).is_relative() ) {
-        tmpOF = (bfs::path("r_")+=tmpOF);
+    if( tmpOF.is_relative() ) {
         tmpOF = outDir / tmpOF;
-    }  else {
-        bfs::path fn("r_");
-        fn += tmpOF.filename();
-        tmpOF = tmpOF.parent_path() / fn;
     }
     bfs::path tmpPath = tmpOF.parent_path();
     
@@ -852,12 +847,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     bfs::path fn = bfs::path(outputFileName + ".momfbd");      // TODO: fix storage properly
 
     if( fn.is_relative() ) {
-        fn = (bfs::path("r_")+=fn);
         fn = bfs::path(myJob.info.outputDir) / fn;
-    } else {
-        bfs::path fn2("r_");
-        fn2 += fn.filename();
-        fn = fn.parent_path() / fn2;
     }
     LOG << "Writing output to file: " << fn;
 
@@ -968,8 +958,8 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
                 info->patches(x,y).dy = sharedArray<int32_t> (nChannels);
                 for (int i = 0; i < nChannels; ++i) {
                     info->patches(x,y).nim.get()[i] = channels[i]->nImages();
-                    info->patches(x,y).dx.get()[i] = thisPatch->objects[ID].channels[i].shift.x;
-                    info->patches(x,y).dy.get()[i] = thisPatch->objects[ID].channels[i].shift.y;
+                    info->patches(x,y).dx.get()[i] = thisPatch->objects[ID].channels[i].channelOffset.x;
+                    info->patches(x,y).dy.get()[i] = thisPatch->objects[ID].channels[i].channelOffset.y;
                 }
                 blockSize += imgSize;
                 if ( writeMask&MOMFBD_PSF ) {
@@ -1063,7 +1053,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
                 }
                 info->patches(x,y).diversityPos = offset;
                 offset += divSize;
-            } else cout << "NullPatch or index out-of-bounds: " << ID << endl;
+            } else LOG_ERR << "NullPatch or index out-of-bounds:  id=" << ID;
         }
     }
 

@@ -78,32 +78,34 @@ void CacheItem::cacheTouch(void) {
 bool CacheItem::cacheLoad(bool removeAfterLoad) {
 
     bool ret(false);
-    if(fullPath.empty()) return ret;
-    if(!isLoaded) {
-        unique_lock<mutex> lock(itemMutex);
-        if ( bfs::exists(fullPath) ) {
-            ifstream in(fullPath.c_str(), ofstream::binary|ios_base::ate);
-            if( in.good() ) {
-                size_t sz = in.tellg();
-                unique_ptr<char[]> buf( new char[sz] );
-                in.seekg(0, ios_base::beg);
-                in.clear();
-                in.read(buf.get(), sz);
-                size_t psz = cunpack(buf.get(),false);
-                if( psz >= sz ) {
-                    isLoaded = true;
-                    //cout << hexString(this) << "  CacheItem::cacheLoad() " << fullPath << "   OK  remove=" << removeAfterLoad << endl;
-                    ret = true;
-                } else cout << hexString(this) << "  CacheItem::cacheLoad() " << psz << " < " << sz << " !!!" << endl;
-            } else cout << hexString(this) << "  CacheItem::cacheLoad() in.good() == false !!!" << endl;
-        } //else cout << hexString(this) << "  CacheItem::cacheLoad() " << fullPath << " doesn't exist !!!" << endl;
-    } //else cout << hexString(this) << "  CacheItem::cacheLoad()  " << fullPath << "   already Loaded !!!" << endl;
-    
-    if(isLoaded && removeAfterLoad) {
-        unique_lock<mutex> lock(itemMutex);
-        bfs::remove(fullPath);
+    try {
+        if(fullPath.empty()) return ret;
+        if(!isLoaded) {
+            unique_lock<mutex> lock(itemMutex);
+            if ( bfs::exists(fullPath) ) {
+                ifstream in(fullPath.c_str(), ofstream::binary|ios_base::ate);
+                if( in.good() ) {
+                    size_t sz = in.tellg();
+                    unique_ptr<char[]> buf( new char[sz] );
+                    in.seekg(0, ios_base::beg);
+                    in.clear();
+                    in.read(buf.get(), sz);
+                    size_t psz = cunpack(buf.get(),false);
+                    if( psz >= sz ) {
+                        isLoaded = true;
+                        ret = true;
+                    }
+                }
+            }
+        }
+        
+        if(isLoaded && removeAfterLoad) {
+            unique_lock<mutex> lock(itemMutex);
+            bfs::remove(fullPath);
+        }
+    } catch( exception& e ) {
+        cout << "CacheItem::cacheLoad() failed: " << e.what() << endl;;
     }
-    
     return ret;
 }
 
@@ -111,26 +113,32 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
 bool CacheItem::cacheStore(bool clearAfterStore){
 
     bool ret(false);
-    if(fullPath.empty()) return ret;
-    if(isLoaded) {
-        unique_lock<mutex> lock(itemMutex);
-        bfs::create_directories(fullPath.parent_path());
-        cachedSize = csize();
-        unique_ptr<char[]> buf( new char[cachedSize] );
-        size_t psz = cpack(buf.get());
-        if( psz <= cachedSize ) {
-            ofstream out(fullPath.c_str(), ofstream::binary);
-            if( out.good() ) {
-                out.write( buf.get(), cachedSize );
-                //cout << hexString(this) << "  CacheItem::cacheStore() " << fullPath << "   OK  clear=" << clearAfterStore << endl;
-                ret = true;
-            } else cout << hexString(this) << "  CacheItem::cacheStore() out.good() == false !!!" << endl;
-        } else cout << hexString(this) << "  CacheItem::cacheStore() " << psz << " > " << cachedSize << " !!!" << endl;
-    } //else cout << hexString(this) << "  CacheItem::cacheStore()  " << fullPath << "   not Loaded !!!" << endl;
-    
-    if(clearAfterStore) {
-        cclear();
-        isLoaded = false;
+    try {
+        if(fullPath.empty()) return ret;
+        if(isLoaded) {
+            unique_lock<mutex> lock(itemMutex);
+            bfs::path parent = fullPath.parent_path();
+            if( !parent.empty() ) {
+                bfs::create_directories( fullPath.parent_path() );
+            }
+            cachedSize = csize();
+            unique_ptr<char[]> buf( new char[cachedSize] );
+            size_t psz = cpack(buf.get());
+            if( psz <= cachedSize ) {
+                ofstream out(fullPath.c_str(), ofstream::binary);
+                if( out.good() ) {
+                    out.write( buf.get(), cachedSize );
+                    ret = true;
+                }
+            }
+        }
+        
+        if(clearAfterStore) {
+            cclear();
+            isLoaded = false;
+        }
+    } catch( exception& e ) {
+        cout << "CacheItem::cacheStore() failed: " << e.what() << endl;;
     }
     return ret;
 }

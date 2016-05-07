@@ -441,14 +441,6 @@ uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-std::string Constraints::name( const string& base ) const {
-    string ret = base;
-
-    cout << "constraint file: \"" << ret << "\"" << endl;
-    return ret;
-}
-
-
 void Constraints::init( void ) {
     
     int32_t nModes = job.modeNumbers.size();
@@ -622,7 +614,7 @@ Array<int16_t> Constraints::getReducedMatrix( bool blocked ) const {
             row += group.constraints.size();
             col += group.indices.size();
         }
-        //cout << "Group:  nR = " << row << "  nC = " << col << "  nG = " << hashes.size() << endl;
+
         c.resize( row, col );
         c.zero();
         col = row = 0;
@@ -633,7 +625,6 @@ Array<int16_t> Constraints::getReducedMatrix( bool blocked ) const {
             }
             auto ret = hashes.insert( group.entriesHash );
             if( ret.second == false ) continue;
-            //cout << "Group:  nPar = " << group.nParameters << "  hash = " << group.entriesHash << endl;
             int32_t nConstr = group.constraints.size();
             int32_t nPar = group.indices.size();
             int32_t firstIndex = *group.indices.begin();
@@ -644,7 +635,6 @@ Array<int16_t> Constraints::getReducedMatrix( bool blocked ) const {
             Array<int16_t> cc( c, rowBegin, row-1, colBegin, col-1 );  // sub-array of c
             for( int i = 0; i < nConstr; ++i ) {
                 for( auto& entry : group.constraints[i]->entries ) {
-                    //cout << "C(" << i << "," << (entry.first-firstIndex) << ") = " << (int)entry.second << endl;
                     if( entry.first - firstIndex >= nPar ) {
                         // TODO: Skip silently for now, but should throw or warn.
                         continue;
@@ -677,7 +667,6 @@ Array<double> Constraints::getReducedNullMatrix( void ) const {
             col += group.nullspace->nParameters - group.nullspace->nConstraints;
         }
     }
-    //cout << "NS: Group:  nR = " << row << "  nC = " << col << "  nG = " << hashes.size() << endl;
     Array<double> ns( row, col );
     ns.zero();
     col = row = 0;
@@ -686,7 +675,6 @@ Array<double> Constraints::getReducedNullMatrix( void ) const {
         if( group.nullspace ) {
             auto ret = hashes.insert( group.nullspace->entriesHash );
             if( ret.second == false ) continue;
-            //cout << "NS: Group:  nPar = " << group.nParameters << "  hash = " << group.nullspace->entriesHash << "   data=" << hexString(group.nullspace.get()) << endl;
             int32_t nConstr = group.nullspace->nConstraints;
             int32_t nPar = group.nullspace->nParameters;
             int32_t firstIndex = *group.indices.begin();
@@ -694,24 +682,10 @@ Array<double> Constraints::getReducedNullMatrix( void ) const {
             int32_t colBegin = col;
             row += nPar;
             col += nPar-nConstr;
-            //cout << "NS: Group:  r=(" << rowBegin << "," << row-1 << ")  c=(" << colBegin << "," << col-1 << ")    entrySize = "
-            //<< group.nullspace->ns_entries.size() << "  " << printArray(group.nullspace->ns.dimensions(),"  nsSize") << endl;
             Array<double> sns( ns, rowBegin, row-1, colBegin, col-1 );  // sub-array of c
             sns.copyFrom<double>( group.nullspace->ns.get() );
-            //for( auto& entry : group.nullspace->ns_entries ) {
-            //    cout << "NS(" << entry.first.x << "," << entry.first.y << ") = " << entry.second << endl;
-                //sns( entry.first.y, entry.first.x ) = entry.second;
-                //if( entry.first - firstIndex >= nPar ) {
-                    // TODO: Skip silently for now, but should throw or warn.
-                //    continue;
-                //}
-                //sns( i, entry.first - firstIndex ) = entry.second;
-            //}
-
         }
     }
-    //cout << "NS: done " << endl;
-
     
     return ns;
 

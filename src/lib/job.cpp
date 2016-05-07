@@ -293,10 +293,6 @@ void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree) {
     info.outputDir = tree.get<string>( "OUTPUT_DIR", defaults.outputDir );
     if( info.outputDir.empty() ) info.outputDir = bfs::current_path().string();
     info.name = tree.get<string>("NAME", defaults.name);
-    
-    if( !info.logFile.empty() ) {
-        startLog(true);
-    }
 
 }
 

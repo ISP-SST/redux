@@ -18,8 +18,6 @@ ProjectivePoints::ProjectivePoints( size_t nPoints )
         (*this)( 2, i ) = 1;
     }
     
-    cout << (*this) << endl;
-    
 }
 
 
@@ -172,7 +170,6 @@ ProjectivePoints ProjectiveMap::operator*(const ProjectivePoints& rhs) const {
     size_t nPoints = rhs.size2();
     ProjectivePoints ret( nPoints );
     ret.assign(prod(*this,rhs));
-    cout << "Gurka: " << __LINE__ << "   ret = " << ret << endl;
     for (size_t i=0; i<nPoints; ++ i) {
         double& w = ret( 2, i );
         if( w && (w != 1.0) ) {
@@ -181,7 +178,6 @@ ProjectivePoints ProjectiveMap::operator*(const ProjectivePoints& rhs) const {
             w = 1;
         }
     }
-    cout << "Gurka: " << __LINE__ << "   ret = " << ret << endl;
     return std::move(ret);
 }
 

@@ -19,9 +19,9 @@ string Application::executableName;
 #define logChannel "app"
 
 
-void Application::getOptions( po::options_description& options, const string& name ) {
+void Application::getOptions( bpo::options_description& options, const string& name ) {
 
-    po::options_description general( "General Options" );
+    bpo::options_description general( "General Options" );
     general.add_options()
     ( "version,V", "Print version information and quit." )
     ( "copyright", "Print copyright information and quit." )
@@ -30,11 +30,11 @@ void Application::getOptions( po::options_description& options, const string& na
     ( "sample", "Produce a sample config script on standard output, that uses" " various application features." )
     ;
 
-    po::options_description config( "Configuration" );
+    bpo::options_description config( "Configuration" );
     config.add_options()
     ( "settings", "Configuration file to load settings from." )
-    ( "aname", po::value<string>()->default_value( name ),
-      "Name used to identify this application instance." )
+    ( "appname", bpo::value<string>()->default_value( name ),
+      "Name used to identify this application." )
     ( "unique,u", "Prevent any other application-based process with this flag from"
       " using the same name." )
     ;
@@ -47,11 +47,11 @@ pair<string, string> Application::appCmdParser( const string& s ) {
     return Logger::customParser( s );
 }
 
-po::options_description& Application::parseCmdLine( int argc, const char* const argv[],  po::variables_map& vm,
-                                                    po::options_description* programOptions,
-                                                    po::positional_options_description *positionalOptions,
+bpo::options_description& Application::parseCmdLine( int argc, const char* const argv[],  bpo::variables_map& vm,
+                                                    bpo::options_description* programOptions,
+                                                    bpo::positional_options_description *positionalOptions,
                                                     parserFunction custom_parser ) {
-    static po::options_description all;
+    static bpo::options_description all;
     if( programOptions ) {
         all.add( *programOptions );
     }
@@ -59,14 +59,14 @@ po::options_description& Application::parseCmdLine( int argc, const char* const 
     Application::executableName = fs::path( string(argv[0]) ).filename().string();
     getOptions( all, Application::executableName );
     
-    po::command_line_parser parser( argc, argv );
+    bpo::command_line_parser parser( argc, argv );
     parser.options( all );
     parser.extra_parser( appCmdParser );
 
     if( positionalOptions ){
         parser.allow_unregistered().positional(*positionalOptions);
     }
-    po::store( parser.run(), vm );
+    bpo::store( parser.run(), vm );
 
     if( custom_parser ) {
         custom_parser( all, vm );
@@ -82,7 +82,7 @@ po::options_description& Application::parseCmdLine( int argc, const char* const 
 }
 
 
-void Application::checkGeneralOptions( po::options_description& desc, po::variables_map& vm ) {
+void Application::checkGeneralOptions( bpo::options_description& desc, bpo::variables_map& vm ) {
 
     if( vm.count( "help" ) ) {
         cout << desc << endl;
@@ -114,19 +114,19 @@ void Application::checkGeneralOptions( po::options_description& desc, po::variab
 }
 
 
-Application::Application( po::variables_map& vm, RunMode rm ) : runMode(rm), returnValue(0), logger(vm) {
+Application::Application( bpo::variables_map& vm, RunMode rm ) : runMode(rm), returnValue(0), logger(vm) {
 
     if( vm.count("settings") ) {
         settingsFile = vm["settings"].as<string>();
         if( fs::is_regular(settingsFile) ) {
             LOG_DETAIL << "Loading file \"" <<  settingsFile << "\"";
-            pt::read_info( settingsFile, propTree );
+            bpt::read_info( settingsFile, propTree );
         } else {
             LOG_ERR << "Failed to load file \"" << settingsFile << "\", starting with default settings.";
             //throw KillException();
         }
     }
-    applicationName = vm["aname"].as<string>();
+    applicationName = vm["appname"].as<string>();
 
 }
 
