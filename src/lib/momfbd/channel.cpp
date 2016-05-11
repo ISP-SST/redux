@@ -421,14 +421,28 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
     if( !xOffsetFile.empty() ) {
         service.post([this](){
             CachedFile::load<int16_t>( xOffset, xOffsetFile );
-            if( alignClip.size() ) clipImage( xOffset, alignClip );
+            if( alignClip.size() == 4 ) {
+                if( abs(alignClip[1]-alignClip[0])+1 != xOffset.dimSize(1) ||
+                    abs(alignClip[3]-alignClip[2])+1 != xOffset.dimSize(0) ) {
+                    LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip.";
+                    xOffset.clear();
+                }
+                //clipImage( xOffset, alignClip );
+            }
         });
     }
 
     if( !yOffsetFile.empty() ) {
         service.post([this](){
             CachedFile::load<int16_t>( yOffset, yOffsetFile );
-            if( alignClip.size() ) clipImage( yOffset, alignClip );
+            if( alignClip.size() == 4 ) {
+                if( abs(alignClip[1]-alignClip[0])+1 != yOffset.dimSize(1) ||
+                    abs(alignClip[3]-alignClip[2])+1 != yOffset.dimSize(0) ) {
+                    LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip.";
+                    yOffset.clear();
+                }
+                //clipImage( yOffset, alignClip );
+            }
         });
     }
     
