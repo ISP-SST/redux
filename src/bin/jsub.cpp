@@ -272,9 +272,12 @@ int main (int argc, char *argv[]) {
             globalName = vm["name"].as<string>();
         }
 
-        string globalOutputDir;
+        boost::filesystem::path outputDir = boost::filesystem::current_path();
         if( vm.count ("output-dir") ) {
-            globalOutputDir = vm["output-dir"].as<string>();
+            boost::filesystem::path tmpPath = vm["output-dir"].as<string>();
+            if( tmpPath.is_relative() && !outputDir.empty() ) {
+                outputDir = outputDir / tmpPath;
+            }
         }
         
         string globalLog;
@@ -292,9 +295,8 @@ int main (int argc, char *argv[]) {
         for( auto it: files ) {
             string bn = boost::filesystem::basename(it);
             string jobName = globalName.empty() ? bn : globalName;
-            string oututDir = globalOutputDir.empty() ? boost::filesystem::current_path().string() : globalOutputDir;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
-            string tmpS = filterOldCfg(it, jobName, logFile, oututDir) + "\n";
+            string tmpS = filterOldCfg(it, jobName, logFile, outputDir.string()) + "\n";
             filteredCfg.write(tmpS.c_str(),tmpS.size());
         }
 

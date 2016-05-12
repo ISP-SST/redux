@@ -582,7 +582,7 @@ bool Object::checkData (void) {
     bfs::path outDir( myJob.info.outputDir );
     bfs::path tmpOF(outputFileName+".ext");
     
-    if( tmpOF.is_relative() ) {
+    if( tmpOF.is_relative() && !outDir.empty() ) {
         tmpOF = outDir / tmpOF;
     }
     bfs::path tmpPath = tmpOF.parent_path();
