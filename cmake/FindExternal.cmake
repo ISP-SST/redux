@@ -52,6 +52,7 @@ macro( appendPaths )
     endif()
 endmacro()
 
+string(TOUPPER ${EXT_NAME} EXT_UPPERNAME)
 
 macro( storeVars )
     if(EXT_DEBUG)
@@ -235,11 +236,13 @@ if( EXT_INCLUDE_SUFFIXES )
     set( DEFAULT_INCLUDE_SUFFIXES "${DEFAULT_INCLUDE_SUFFIXES};${EXT_INCLUDE_SUFFIXES}" )
 endif()
 
-# Check if ${EXT_NAME}_DIR or SAPERA_DIR are defined in the environment
+# Check if ${EXT_UPPERNAME}_DIR is defined in the environment
 # skip if ${EXT_NAME}_DIR already is a valid directory
 if( NOT IS_DIRECTORY "${${EXT_NAME}_DIR}" )
-    if( DEFINED ENV{${EXT_NAME}_DIR} )
-        set( ${EXT_NAME}_DIR "$ENV{${EXT_NAME}_DIR}" )
+    if( IS_DIRECTORY "${${EXT_UPPERNAME}_DIR}" )
+        set( ${EXT_NAME}_DIR "${${EXT_UPPERNAME}_DIR}" )
+    elseif( DEFINED ENV{${EXT_UPPERNAME}_DIR} )
+        set( ${EXT_NAME}_DIR "$ENV{${EXT_UPPERNAME}_DIR}" )
     endif()
 endif()
 
@@ -262,6 +265,9 @@ if(EXT_DEBUG)
     message(STATUS "FindExternal:\"${EXT_NAME}\"  CMAKE_SYSTEM_PREFIX_PATH   \"${CMAKE_SYSTEM_PREFIX_PATH}\"")
     message(STATUS "FindExternal:\"${EXT_NAME}\"  CMAKE_SYSTEM_LIBRARY_PATH   \"${CMAKE_SYSTEM_LIBRARY_PATH}\"")
     message(STATUS "FindExternal:\"${EXT_NAME}\"  CMAKE_LIBRARY_PATH   \"${CMAKE_LIBRARY_PATH}\"")
+    message(STATUS "FindExternal:\"${EXT_NAME}\"  CMAKE_INCLUDE_PATH   \"${CMAKE_INCLUDE_PATH}\"")
+    message(STATUS "FindExternal:\"${EXT_NAME}\"  CMAKE_LIBRARY_PATH   \"$ENV{CMAKE_LIBRARY_PATH}\"")
+    message(STATUS "FindExternal:\"${EXT_NAME}\"  CMAKE_INCLUDE_PATH   \"$ENV{CMAKE_INCLUDE_PATH}\"")
 endif()
 
 
@@ -270,8 +276,8 @@ endif()
 if ( NOT EXISTS ${${EXT_NAME}_INCLUDE_DIR} )
     find_path(
         ${EXT_NAME}_INCLUDE_DIR "${EXT_HEADER_FILE}"
-        HINTS "${${EXT_NAME}_DIR}" ${EXT_HINT} ${EXT_PATHS}
-        PATHS ${EXT_PATHS} "${EXT_HINT}"
+        HINTS "${${EXT_NAME}_DIR}" ${EXT_HINT} ${EXT_PATHS} ENV CMAKE_INCLUDE_PATH
+        PATHS ${EXT_PATHS} "${EXT_HINT}" ENV CMAKE_INCLUDE_PATH
         PATH_SUFFIXES ${DEFAULT_INCLUDE_SUFFIXES}
     )
     if( EXISTS ${${EXT_NAME}_INCLUDE_DIR} )
@@ -298,8 +304,8 @@ if( EXT_VERSION_FILE )
 
     find_file( ${EXT_NAME}_VERSION_FILE
         NAMES ${EXT_VERSION_FILE}
-        HINTS "${${EXT_NAME}_DIR}" "${EXT_HINT}" ${EXT_PATHS}
-        PATHS "${${EXT_NAME}_DIR}" "${EXT_HINT}" "${${EXT_NAME}_INCLUDE_DIR}" "${${EXT_NAME}_INCLUDE_DIR}/.."
+        HINTS "${${EXT_NAME}_DIR}" "${EXT_HINT}" ${EXT_PATHS} ENV CMAKE_INCLUDE_PATH
+        PATHS "${${EXT_NAME}_DIR}" "${EXT_HINT}" "${${EXT_NAME}_INCLUDE_DIR}" "${${EXT_NAME}_INCLUDE_DIR}/.." ENV CMAKE_INCLUDE_PATH
         PATH_SUFFIXES ${DEFAULT_INCLUDE_SUFFIXES}
     )
     if(EXT_DEBUG)
@@ -384,9 +390,9 @@ if( EXT_COMPONENTS )
         find_library(
             ${EXT_NAME}_${__COMP}_LIBRARY_RELEASE
             NAMES ${__LIBNAMES}
-            HINTS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." "${EXT_HINT}" ${EXT_PATHS}
+            HINTS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." "${EXT_HINT}" ${EXT_PATHS} ENV CMAKE_LIBRARY_PATH
             PATH_SUFFIXES ${DEFAULT_LIBPATH_SUFFIXES}
-            PATHS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." ${EXT_PATHS} "${EXT_HINT}"
+            PATHS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." ${EXT_PATHS} "${EXT_HINT}" ENV CMAKE_LIBRARY_PATH
         )
         if(EXT_DEBUG)
             message("FindExternal:\"${EXT_NAME}\"  ${EXT_NAME}_${__COMP}_LIBRARY_RELEASE : \"${${EXT_NAME}_${__COMP}_LIBRARY_RELEASE}\"")
@@ -398,9 +404,9 @@ if( EXT_COMPONENTS )
             find_library(
                 ${EXT_NAME}_${__COMP}_LIBRARY_DEBUG
                 NAMES ${__LIBNAMES}
-                HINTS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." "${EXT_HINT}" ${EXT_PATHS}
+                HINTS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." "${EXT_HINT}" ${EXT_PATHS} ENV CMAKE_LIBRARY_PATH
                 PATH_SUFFIXES ${DEFAULT_LIBPATH_SUFFIXES}
-                PATHS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." ${EXT_PATHS} "${EXT_HINT}"
+                PATHS "${${EXT_NAME}_DIR}" "${${EXT_NAME}_DIR}/.." ${EXT_PATHS} "${EXT_HINT}" ENV CMAKE_LIBRARY_PATH
             )
             if(EXT_DEBUG)
                 message("FindExternal:\"${EXT_NAME}\"  ${EXT_NAME}_${__COMP}_LIBRARY_DEBUG : \"${${EXT_NAME}_${__COMP}_LIBRARY_DEBUG}\"")
@@ -492,9 +498,8 @@ else()
     find_package_handle_standard_args( ${EXT_NAME} REQUIRED_VARS ${EXT_NAME}_INCLUDE_DIR )
 endif()
 
-string(TOUPPER ${EXT_NAME} tmpN)
-if ( ${tmpN}_FOUND )
-    set(${EXT_NAME}_FOUND 1)
+if ( ${EXT_UPPERNAME}_FOUND )
+    set(${EXT_UPPERNAME}_FOUND 1)
     if(EXT_DEBUG)
         message(STATUS "FindExternal:\"${EXT_NAME}\" Found.")
     endif()
