@@ -569,6 +569,28 @@ IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+string hasopencv_info( int lvl ) {
+    
+    string ret = "RDX_HASOPENCV";
+    if( lvl > 0 ) {
+        ret += "   Syntax:   has_cv = rdx_hasopencv()\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+IDL_VPTR rdx_hasopencv( int argc, IDL_VPTR* argv, char* argk ) {
+    
+#ifdef REDUX_WITH_OPENCV
+    return IDL_GettmpInt(1);
+#else
+    return IDL_GettmpInt(0);
+#endif
+    
+}
+
+
 extern "C" {
 
     int IDL_Load (void) {
@@ -579,6 +601,7 @@ extern "C" {
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_start, (char*)"RDX_TIC", 0, 0, 0, 0 }, 0 );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_elapsed, (char*)"RDX_TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_segment, (char*)"RDX_SEGMENT", 0, 4, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, segment_info );
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_hasopencv, (char*)"RDX_HASOPENCV", 0, 0, 0, 0 }, 1, hasopencv_info );
         
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },

@@ -25,6 +25,7 @@ FUNCTION        RDX_SUMFILES      1       1          KEYWORDS
 FUNCTION        RDX_SUMIMAGES     1       1          KEYWORDS
 PROCEDURE       RDX_TIC           0       0
 PROCEDURE       RDX_TOC           0       0          KEYWORDS
+FUNCTION        RDX_HASOPENCV     0       0
 FUNCTION        RDX_CBEZIER2      3       3          KEYWORDS
 FUNCTION        RDX_CBEZIER3      3       3          KEYWORDS
 FUNCTION        RDX_IMG_ALIGN     2       2          KEYWORDS
