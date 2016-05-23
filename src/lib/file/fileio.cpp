@@ -1,6 +1,7 @@
 #include "redux/file/fileio.hpp"
 
 #include "redux/file/fileana.hpp"
+#include "redux/file/filefits.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <iostream>
@@ -52,7 +53,7 @@ Format redux::file::readFmt( const string& filename ) {
             switch( magic ) {
                 case Ana::MAGIC_ANA: ;
                 case Ana::MAGIC_ANAR: return FMT_ANA;
-                //case Fits::MAGIC_FITS: return FMT_FITS;
+                case Fits::MAGIC_FITS: return FMT_FITS;
                 //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
                 default: cout << "readFmt needs to be implemented for this file-type: \"" << filename << "\""  << endl; return FMT_NONE; 
             }
@@ -132,7 +133,10 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
             meta.reset( new Ana(fn) );
             break;
         }
-        //case Fits::MAGIC_FITS: return FMT_FITS;
+        case FMT_FITS: {
+            meta.reset( new Fits(fn) );
+            break;
+        }
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::getMeta(arr) needs to be implemented for this file-type: " << fmt << "   \"" << fn << "\""  << endl;
     }
@@ -156,7 +160,16 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
             } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Ana type." << endl;
             break;
         }
-        //case Fits::MAGIC_FITS: return FMT_FITS;
+        case FMT_FITS: {
+            if( !meta ) {
+                meta.reset( new Fits() );
+            }
+            shared_ptr<Fits> hdr = static_pointer_cast<Fits>(meta);
+            if( hdr ) {
+                Fits::read( filename, data, hdr );
+            } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Fits type." << endl;
+            break;
+        }
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::readFile(string,char*,meta) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\"" << endl;
     }
@@ -173,7 +186,11 @@ void redux::file::readFile( const string& filename, redux::util::Array<T>& data 
             Ana::read(filename,data,hdr);
             break;
         }
-        //case Fits::MAGIC_FITS: return FMT_FITS;
+        case FMT_FITS: {
+            shared_ptr<Fits> hdr(new Fits());
+            Fits::read(filename,data,hdr);
+            break;
+        }
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::read(arr) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }
