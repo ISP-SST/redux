@@ -8,6 +8,7 @@ PROCEDURE       RDX_CLEAR_CACHE   0       0
 PROCEDURE       RDX_CLEAR_MODES   0       0
 FUNCTION        RDX_CONVOLVE      2       2          KEYWORDS
 FUNCTION        RDX_DESCATTER     3       3          KEYWORDS
+FUNCTION        RDX_FILETYPE      0       1
 FUNCTION        RDX_FILLPIX       1       1          KEYWORDS
 FUNCTION        RDX_FIND_SHIFT    2       2          KEYWORDS
 FUNCTION        RDX_INTS2STR      1       1          KEYWORDS

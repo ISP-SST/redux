@@ -3,6 +3,7 @@
 #include "idlutil.hpp"
 #include "imgtools.hpp"
 
+#include "redux/file/fileio.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/momfbd/modes.hpp"
 #include "redux/util/arraystats.hpp"
@@ -20,6 +21,7 @@
 #include <boost/numeric/ublas/io.hpp> 
 #include <boost/timer/timer.hpp>
 
+using namespace redux::file;
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
@@ -560,7 +562,7 @@ IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
         return IDL_GettmpInt(-1);
     }
     
-    IDL_MEMINT dims[] = { resV.size() };
+    IDL_MEMINT dims[] = { (IDL_MEMINT)resV.size() };
     unique_ptr<IDL_LONG> res( new IDL_LONG[ dims[0] ] );
     memcpy( res.get(),resV.data(),dims[0]*sizeof(IDL_LONG) );
    
@@ -573,7 +575,7 @@ string hasopencv_info( int lvl ) {
     
     string ret = "RDX_HASOPENCV";
     if( lvl > 0 ) {
-        ret += "   Syntax:   has_cv = rdx_hasopencv()\n";
+        ret += "         Syntax:   has_cv = rdx_hasopencv()\n";
     } else ret += "\n";
 
     return ret;
@@ -591,6 +593,88 @@ IDL_VPTR rdx_hasopencv( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+string filetype_info( int lvl ) {
+    
+    string ret = "RDX_FILETYPE";
+    if( lvl > 0 ) {
+        ret += "          Syntax:   fmt = rdx_filetype()\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
+    
+    if( argc < 1 ) {
+        cout << filetype_info(2) << endl;
+        return IDL_StrToSTRING( (char*)"fla" );
+    }
+    
+    IDL_VPTR filenames = argv[0];
+    IDL_ENSURE_SIMPLE( filenames );
+    
+    if( filenames->type != IDL_TYP_STRING ) {
+        return IDL_StrToSTRING( (char*)"fly" );
+    }
+
+    if ( !(filenames->flags & IDL_V_ARR) ) {
+        bfs::path fn( string(filenames->value.str.s) );
+        Format fmt = FMT_NONE;
+        try {
+            if( bfs::is_regular_file(fn) ) {
+                fmt = redux::file::readFmt( fn.string() );
+            } else {
+                fmt = redux::file::guessFmt( fn.string() );
+            }
+        } catch( const exception& e) {
+            cout << "Failed to determine type: " << e.what() << endl;
+            cout << "filename: " << fn << endl;
+        }
+        switch(fmt) {
+            case FMT_ANA: return IDL_StrToSTRING( (char*)"ANA" );
+            case FMT_FITS: return IDL_StrToSTRING( (char*)"FITS" );
+            case FMT_NCDF: return IDL_StrToSTRING( (char*)"NCDF" );
+            default: return IDL_StrToSTRING( (char*)"" );
+        }
+    } else {
+        IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(filenames->value.arr->data);
+        vector<string> fileTypes;
+        for( int i=0; i<filenames->value.arr->n_elts; ++i ) {
+            bfs::path fn( string(strptr[i].s) );
+            Format fmt = FMT_NONE;
+            try {
+                if( bfs::is_regular_file(fn) ) {
+                    fmt = redux::file::readFmt( fn.string() );
+                } else {
+                    fmt = redux::file::guessFmt( fn.string() );
+                }
+            } catch( const exception& e) {
+                cout << "Failed to determine type: " << e.what() << endl;
+                cout << "filename: " << fn << endl;
+            }
+            switch(fmt) {
+                case FMT_ANA: fileTypes.push_back("ANA"); break;
+                case FMT_FITS: fileTypes.push_back("FITS"); break;
+                case FMT_NCDF: fileTypes.push_back("NCDF"); break;
+                default: fileTypes.push_back("");
+            }
+        }
+        if( fileTypes.empty() ) return IDL_StrToSTRING( (char*)"" );
+        IDL_MEMINT dims[] = { (IDL_MEMINT)fileTypes.size() };
+        IDL_VPTR ret;
+        IDL_STRING* retptr = (IDL_STRING*)IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_NOP, &ret );
+        for( auto & ft: fileTypes ) {
+            IDL_StrStore( retptr, (char*)ft.c_str() );
+            retptr++;
+        }
+        return ret;
+    }
+
+    
+}
+
+
 extern "C" {
 
     int IDL_Load (void) {
@@ -602,6 +686,7 @@ extern "C" {
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_elapsed, (char*)"RDX_TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_segment, (char*)"RDX_SEGMENT", 0, 4, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, segment_info );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_hasopencv, (char*)"RDX_HASOPENCV", 0, 0, 0, 0 }, 1, hasopencv_info );
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_filetype, (char*)"RDX_FILETYPE", 0, 1, 0, 0 }, 1, filetype_info );
         
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
