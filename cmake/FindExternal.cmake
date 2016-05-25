@@ -45,7 +45,7 @@
 
 macro( appendPaths )
     # Append to current lists if found
-    if( ${EXT_NAME}_FOUND )
+    if( DEFINED ${EXT_NAME}_FOUND )
         append_libs_unique( REDUX_CURRENT_LIBRARIES "${${EXT_NAME}_LIBRARIES}" )
         append_paths_unique( REDUX_CURRENT_INCLUDES ${${EXT_NAME}_INCLUDE_DIR} )
         append_paths_unique( REDUX_CURRENT_LIBDIRS ${${EXT_NAME}_LIB_DIRS} )
