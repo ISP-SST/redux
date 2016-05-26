@@ -126,8 +126,14 @@ string ints2str_info( int lvl ) {
 
 IDL_VPTR ints2str( int argc, IDL_VPTR* argv, char* argk ) {
     
+    STR_TO_INT_KW kw;
+    kw.sort = 0;
+    kw.verbose = 0;
+    kw.unique = 0;
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, str_to_int_kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    
     string ret;
-    if (argc < 1) {
+    if (nPlainArgs < 1) {
         return IDL_StrToSTRING( (char*)"" );
     }
     
@@ -135,11 +141,6 @@ IDL_VPTR ints2str( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_ENSURE_SIMPLE(uints);
     IDL_ENSURE_ARRAY(uints);
     
-    STR_TO_INT_KW kw;
-    kw.sort = 0;
-    kw.verbose = 0;
-    kw.unique = 0;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, str_to_int_kw_pars, (IDL_VPTR*) 0, 255, &kw);
     if( kw.help ) {
         cout << ints2str_info(2) << endl;
         return IDL_StrToSTRING( (char*)"" );
@@ -219,8 +220,11 @@ string maketemplate_info( int lvl ) {
 
 IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
     
+    MT_KW kw;
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, mt_kw_pars, (IDL_VPTR*)0, 255, &kw);
+    
     string ret;
-    if (argc < 1) {
+    if (nPlainArgs < 1) {
         return IDL_StrToSTRING( (char*)"" );
     }
     
@@ -239,8 +243,6 @@ IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
         return IDL_StrToSTRING( strptr->s );
     }
     
-    MT_KW kw;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, mt_kw_pars, (IDL_VPTR*)0, 255, &kw);
     if ( kw.help ) {
         cout << maketemplate_info(2) << endl;
         return IDL_StrToSTRING( (char*)"" );

@@ -240,15 +240,6 @@ double *bezier3 (int n, T *xin, U *yin, int np, double *xp) {
 
 IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
     
-    if (argc < 3) {
-        cout << "cbezier2: needs 3 arguments. " << endl;
-        return IDL_GettmpInt (-1);
-    }
-    
-    IDL_VPTR x = argv[0];
-    IDL_VPTR y = argv[1];
-    IDL_VPTR xp_in = argv[2];
-
     KW_RESULT kw;
     kw.help = 0;
     kw.verbose = 0;
@@ -256,7 +247,16 @@ IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
     kw.padding = 0;
     kw.niter = 1;
     kw.nthreads = 1;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    if (nPlainArgs < 3) {
+        cout << "cbezier2: needs 3 arguments. " << endl;
+        return IDL_GettmpInt (-1);
+    }
+    
+    IDL_VPTR x = argv[0];
+    IDL_VPTR y = argv[1];
+    IDL_VPTR xp_in = argv[2];
 
     if (kw.help) {
         cout << "cbezier2: no help available yet..." << endl;
@@ -328,15 +328,6 @@ IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
 
 IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
     
-    if (argc < 3) {
-        cout << "cbezier2: needs 3 arguments. " << endl;
-        return IDL_GettmpInt (-1);
-    }
-    
-    IDL_VPTR x = argv[0];
-    IDL_VPTR y = argv[1];
-    IDL_VPTR xp_in = argv[2];
-
     KW_RESULT kw;
     kw.help = 0;
     kw.verbose = 0;
@@ -344,7 +335,16 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
     kw.padding = 0;
     kw.niter = 1;
     kw.nthreads = 1;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    if (nPlainArgs < 3) {
+        cout << "cbezier2: needs 3 arguments. " << endl;
+        return IDL_GettmpInt (-1);
+    }
+    
+    IDL_VPTR x = argv[0];
+    IDL_VPTR y = argv[1];
+    IDL_VPTR xp_in = argv[2];
 
     if (kw.help) {
         cout << "cbezier2: no help available yet..." << endl;
@@ -529,7 +529,10 @@ string segment_info( int lvl ) {
 
 IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
     
-    if( argc < 3 ) {
+    KW_SEGMENT kw;
+    int nPlainArgs = IDL_KWProcessByOffset(argc, argv, argk, kw_segment_pars, (IDL_VPTR*)0, 255, &kw);
+    
+    if( nPlainArgs < 3 ) {
         cout << segment_info(2) << endl;
         return IDL_GettmpInt(-1);
     }
@@ -539,12 +542,9 @@ IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_LONG sz = IDL_LongScalar( argv[2] );
 
     IDL_LONG minOverLap(0);
-    if( argc > 3 && (argk[3] == 0) ) {
+    if( nPlainArgs > 3 ) {
         minOverLap = IDL_LongScalar( argv[3] );
     }
-    
-    KW_SEGMENT kw;
-    (void) IDL_KWProcessByOffset(argc, argv, argk, kw_segment_pars, (IDL_VPTR*)0, 255, &kw);
     
     if( kw.help ) {
         cout << segment_info(2) << endl;
@@ -623,7 +623,12 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
         Format fmt = FMT_NONE;
         try {
             if( bfs::is_regular_file(fn) ) {
-                fmt = redux::file::readFmt( fn.string() );
+                try {
+                    fmt = redux::file::readFmt( fn.string() );
+                } catch( const std::ios_base::failure&) {
+                    // silently ignore read errors.
+                    fmt = redux::file::guessFmt( fn.string() );
+                }
             } else {
                 fmt = redux::file::guessFmt( fn.string() );
             }

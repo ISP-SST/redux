@@ -623,18 +623,18 @@ namespace {
 //
 IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if ( argc < 1 ) {
+    KW_RESULT kw;
+    kw.verbose = 0;
+    kw.help = 0;
+    int nPlainArgs = IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
+
+    if ( nPlainArgs < 1 ) {
         cout << "MOMFBD_READ: takes 1 argument." << endl;
         momfbd_help();
         return IDL_GettmpInt ( 0 ); // return a dummy
     }
 
     IDL_VPTR fileName = argv[0];
-
-    KW_RESULT kw;
-    kw.verbose = 0;
-    kw.help = 0;
-    ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
 
     if ( kw.help ) {
         momfbd_help();
@@ -769,7 +769,12 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
 void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if ( argc < 2 ) {
+    KW_RESULT kw;
+    kw.help = 0;
+    kw.verbose = 0;
+    int nPlainArgs = IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
+
+    if ( nPlainArgs < 2 ) {
         cout << "MOMFBD_WRITE: needs (at least) 2 arguments." << endl;
         momfbd_help();
         return;
@@ -777,11 +782,6 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
     IDL_VPTR momfbdStruct  = argv[0];
     IDL_VPTR fileName  = argv[1];
-
-    KW_RESULT kw;
-    kw.help = 0;
-    kw.verbose = 0;
-    ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
 
     if ( kw.help ) {
         momfbd_help();

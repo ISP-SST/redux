@@ -74,7 +74,11 @@ string convolve_info( int lvl ) {
 
 IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
 
-    if (argc < 2) {
+    KW_CONV_RESULT kw;
+    kw.nthreads = thread::hardware_concurrency();
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_conv_pars, (IDL_VPTR*) 0, 255, &kw);
+    
+    if (nPlainArgs < 2) {
         cout << "rdx_convolve: needs 2 arguments (image and psf).\n" << convolve_info(2) << endl;
         return IDL_GettmpInt (-1);
     }
@@ -88,10 +92,6 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
     IDL_ENSURE_SIMPLE(psfVar);
     IDL_ENSURE_ARRAY(psfVar);
 
-    KW_CONV_RESULT kw;
-    kw.nthreads = thread::hardware_concurrency();
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_conv_pars, (IDL_VPTR*) 0, 255, &kw);
-    
     if (kw.help) {
         cout << convolve_info(2) << endl;
         return IDL_GettmpInt (-1);
@@ -277,7 +277,17 @@ string rdx_descatter_info( int lvl ) {
 
 IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if (argc < 3) {
+    KW_DESCATTER_RESULT kw;
+    kw.epsilon = 1E-8;
+    kw.help = 0;
+    kw.verbose = 0;
+    kw.normalize = 0;
+    kw.padding = 256;
+    kw.niter = 50;
+    kw.nthreads = 1; //thread::hardware_concurrency();
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_descatter_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    if (nPlainArgs < 3) {
         cout << "rdx_descatter: needs at least 3 arguments (image(s), backgain and psf). " << rdx_descatter_info(2) << endl;
         return IDL_GettmpInt (-1);
     }
@@ -294,16 +304,6 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
 
     IDL_ENSURE_SIMPLE(psfVar);
     IDL_ENSURE_ARRAY(psfVar);
-
-    KW_DESCATTER_RESULT kw;
-    kw.epsilon = 1E-8;
-    kw.help = 0;
-    kw.verbose = 0;
-    kw.normalize = 0;
-    kw.padding = 256;
-    kw.niter = 50;
-    kw.nthreads = 1; //thread::hardware_concurrency();
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_descatter_pars, (IDL_VPTR*) 0, 255, &kw);
 
     if (kw.help) {
         cout << rdx_descatter_info(2) << endl;

@@ -112,7 +112,18 @@ string make_modes_info( int lvl ) {
 
 IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     
-    if (argc < 3) {
+    MODE_KW kw;
+    kw.help = 0;
+    kw.verbose = 0;
+    kw.normalize = 0;
+    kw.firstZernike = 2;
+    kw.lastZernike = 2000;
+    kw.angle = 0;
+    kw.pupil = kw.variance = nullptr;
+    kw.cutoff = 1E-3;
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, mode_kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    
+    if (nPlainArgs < 3) {
         cout << "rdx_make_modes: needs 3 arguments: mode-number(s), nPixels & pupil-radius (in pixels). " << endl;
         return IDL_GettmpInt (-1);
     }
@@ -144,17 +155,6 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     double radius = IDL_DoubleScalar(argv[2]);
     IDL_VPTR tmp;
  
-    MODE_KW kw;
-    kw.help = 0;
-    kw.verbose = 0;
-    kw.normalize = 0;
-    kw.firstZernike = 2;
-    kw.lastZernike = 2000;
-    kw.angle = 0;
-    kw.pupil = kw.variance = nullptr;
-    kw.cutoff = 1E-3;
-
-    (void) IDL_KWProcessByOffset (argc, argv, argk, mode_kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     kw.angle *= dtor;       // convert degrees to radians.
     

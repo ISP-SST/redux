@@ -70,8 +70,11 @@ Format redux::file::guessFmt( const string& filename ) {
     size_t pos = filename.find_last_of('.');
     if( pos != string::npos && pos < filename.length() ) {
         string ext = filename.substr(pos+1);
-        if( ext == "f0" || ext == "fz" ) {
+        std::transform(ext.begin(), ext.end(),ext.begin(), ::toupper);
+        if( ext == "F0" || ext == "FZ" ) {
             return FMT_ANA;
+        } else if( ext == "FITS" ) {
+            return FMT_FITS;
         }
     }
     return FMT_NONE;

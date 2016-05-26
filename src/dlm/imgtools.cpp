@@ -250,15 +250,6 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     cerr << "img_align: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
-    IDL_VPTR ret;
-    IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_NOP, &ret);
-    Mat retMat = arrayToMat (ret);
-
-    if (argc < 2) {
-        cerr << "img_align takes 2 images as input." << endl;
-        return ret;
-    }
-
     KW_RESULT kw;
     kw.by_distance = 0;
     kw.eps = 1E-3;
@@ -272,7 +263,16 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     kw.show = 0;
     kw.verbose = 0;
     kw.threshold = 0;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    IDL_VPTR ret;
+    IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_NOP, &ret);
+    Mat retMat = arrayToMat (ret);
+
+    if (nPlainArgs < 2) {
+        cerr << "img_align takes 2 images as input." << endl;
+        return ret;
+    }
 
     IDL_VPTR img1_in = argv[0];
     IDL_VPTR img2_in = argv[1];
@@ -536,17 +536,18 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
     cerr << "img_project: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
-    if (argc != 2) {
-        cerr << "img_project needs 2 arguments. A 3x3 or 2x3 transformation matrix, and an image." << endl;
-        return IDL_GettmpInt (0);
-    }
 
     KW_RESULT kw;
     kw.help = 0;
     kw.nrefpoints = 4;
     kw.verbose = 0;
     kw.threshold = 0.05;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    if (nPlainArgs != 2) {
+        cerr << "img_project needs 2 arguments. A 3x3 or 2x3 transformation matrix, and an image." << endl;
+        return IDL_GettmpInt (0);
+    }
 
     IDL_VPTR H_in = argv[0];
     IDL_VPTR img_in = argv[1];
@@ -597,17 +598,17 @@ IDL_VPTR redux::img_remap (int argc, IDL_VPTR* argv, char* argk) {
     cerr << "img_remap: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
-    if (argc != 3) {
-        cerr << "img_remap needs 3 arguments. An image and 2 coordinate maps." << endl;
-        return IDL_GettmpInt (0);
-    }
-
     KW_RESULT kw;
     kw.help = 0;
     kw.nrefpoints = 4;
     kw.verbose = 0;
     kw.threshold = 0.05;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    if (nPlainArgs != 3) {
+        cerr << "img_remap needs 3 arguments. An image and 2 coordinate maps." << endl;
+        return IDL_GettmpInt (0);
+    }
 
     IDL_VPTR img_in = argv[0];
     IDL_ENSURE_SIMPLE( img_in );
@@ -912,7 +913,11 @@ string load_files_info( int lvl ) {
 
 IDL_VPTR load_files( int argc, IDL_VPTR* argv, char* argk ) {
     
-    if( argc < 1 ) {
+    LOAD_FILES_KW kw;
+    kw.nthreads = std::thread::hardware_concurrency();
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, load_files_kw_pars, (IDL_VPTR*)0, 255, &kw);
+        
+    if( nPlainArgs < 1 ) {
         return IDL_GettmpInt(0);
     }
     
@@ -944,10 +949,6 @@ IDL_VPTR load_files( int argc, IDL_VPTR* argv, char* argk ) {
             return IDL_GettmpInt(0);
         }
 
-        LOAD_FILES_KW kw;
-        kw.nthreads = std::thread::hardware_concurrency();
-        (void) IDL_KWProcessByOffset (argc, argv, argk, load_files_kw_pars, (IDL_VPTR*)0, 255, &kw);
-        
         kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
 
         if( kw.help ) {
@@ -1080,14 +1081,14 @@ IDL_VPTR rdx_make_mask( int argc, IDL_VPTR* argv, char* argk ) {
     return IDL_GettmpInt(0);
 #else
 
-    if( argc < 1 ) {
+    MAKE_MASK_KW kw;
+    kw.threshold = 0;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, make_mask_kw_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if( nPlainArgs < 1 ) {
         return IDL_GettmpInt(0);
     }
     
-    MAKE_MASK_KW kw;
-    kw.threshold = 0;
-    (void) IDL_KWProcessByOffset( argc, argv, argk, make_mask_kw_pars, (IDL_VPTR*)0, 255, &kw );
-
     if( kw.help ) {
         cout << make_mask_info(2) << endl;
         return IDL_GettmpInt(0);
@@ -2182,17 +2183,18 @@ IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
     cerr << "inpaint: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 
-#ifdef sdfhshsfgjdjdgj  
-    if( argc < 2 ) {
+#ifdef sdfhshsfgjdjdgj
+    
+    INP_KW kw;
+    kw.range = 1;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, inp_kw_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if( nPlainArgs < 2 ) {
         cout << "inpaint: Needs 2 inputs, image and mask." << endl;
         return IDL_GettmpInt(0);
     }
     
     int type = cv::INPAINT_NS;
-    INP_KW kw;
-    kw.range = 1;
-    (void) IDL_KWProcessByOffset( argc, argv, argk, inp_kw_pars, (IDL_VPTR*)0, 255, &kw );
-
     if( kw.help ) {
         cout << "inpaint: No help available." << endl;
         return IDL_GettmpInt(0);

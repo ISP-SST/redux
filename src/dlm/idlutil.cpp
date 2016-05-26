@@ -660,18 +660,18 @@ string structinfo_help( int lvl ) {
 
 void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
 
-    if( argc < 1 ) {
+    KW_RESULT kw;
+    kw.help = 0;
+    kw.indent = 2;
+    kw.max_length = 90;
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+
+    if( nPlainArgs < 1 ) {
         cout << structinfo_help(2) << endl;
         return;
     }
 
     IDL_VPTR data = argv[0];
-
-    KW_RESULT kw;
-    kw.help = 0;
-    kw.indent = 2;
-    kw.max_length = 90;
-    (void) IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     if (kw.help) {
         cout << structinfo_help(2) << endl;

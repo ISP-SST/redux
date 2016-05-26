@@ -98,7 +98,12 @@ IDL_VPTR redux::fzhead( int argc, IDL_VPTR* argv ) {
 
 IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if( argc < 1 ) {
+    KW_RESULT kw;
+    kw.help = 0;
+    kw.verbose = 0;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
+
+    if( nPlainArgs < 1 ) {
         cout << "F0: needs 1 argument." << endl;
         ana_help();
         return IDL_GettmpInt(0);    // return a dummy
@@ -106,11 +111,6 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
     
     IDL_VPTR name_raw = argv[0];
     
-    KW_RESULT kw;
-    kw.help = 0;
-    kw.verbose = 0;
-    ( void ) IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
-
     if( kw.help ) {
         ana_help();
         return IDL_GettmpInt(0);    // return a dummy
@@ -174,7 +174,12 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
 
 void redux::fzread( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if( argc < 2 ) {
+    KW_RESULT kw;
+    kw.verbose = 0;
+    kw.help = 0;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
+
+    if( nPlainArgs < 2 ) {
         cout << "FZREAD: needs (at least) 2 arguments." << endl;
         ana_help();
         return;
@@ -182,11 +187,6 @@ void redux::fzread( int argc, IDL_VPTR* argv, char* argk ) {
 
     IDL_VPTR imageVar  = argv[0];
     IDL_VPTR fileName  = argv[1];
-
-    KW_RESULT kw;
-    kw.verbose = 0;
-    kw.help = 0;
-    ( void ) IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
 
     if( kw.help ) {
         ana_help();
@@ -267,7 +267,13 @@ void redux::fzread( int argc, IDL_VPTR* argv, char* argk ) {
 
 void redux::fzwrite( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if( argc < 2 ) {
+    KW_RESULT kw;
+    kw.help = 0;
+    kw.verbose = 0;
+    kw.compress = 0;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
+
+    if( nPlainArgs < 2 ) {
         cout << "FZWRITE: needs (at least) 2 arguments." << endl;
         ana_help();
         return;
@@ -276,12 +282,6 @@ void redux::fzwrite( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_VPTR imageVar  = argv[0];
     IDL_VPTR fileName  = argv[1];
 
-    KW_RESULT kw;
-    kw.help = 0;
-    kw.verbose = 0;
-    kw.compress = 0;
-    ( void ) IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
-    
     if( kw.help ) {
         ana_help();
         return;
@@ -294,7 +294,7 @@ void redux::fzwrite( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_ENSURE_STRING( fileName );
 
     char* headerText = nullptr;
-    if(argc > 2) {
+    if(nPlainArgs > 2) {
         IDL_VPTR hdrVar    = argv[2];
         IDL_ENSURE_SIMPLE( hdrVar );
         IDL_ENSURE_STRING( hdrVar );
@@ -351,7 +351,13 @@ void redux::fzwrite( int argc, IDL_VPTR* argv, char* argk ) {
 
 void redux::fcwrite( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if( argc < 2 ) {
+    KW_RESULT kw;
+    kw.help = 0;
+    kw.verbose = 0;
+    kw.compress = 5;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
+
+    if( nPlainArgs < 2 ) {
         cout << "FCWRITE: needs (at least) 2 arguments." << endl;
         ana_help();
         return;
@@ -359,12 +365,6 @@ void redux::fcwrite( int argc, IDL_VPTR* argv, char* argk ) {
     
     IDL_VPTR imageVar  = argv[0];
     IDL_VPTR fileName  = argv[1];
-
-    KW_RESULT kw;
-    kw.help = 0;
-    kw.verbose = 0;
-    kw.compress = 5;
-    ( void ) IDL_KWProcessByOffset( argc, argv, argk, kw_pars, ( IDL_VPTR* )0, 255, &kw );
 
     if( kw.help ) {
         ana_help();
@@ -378,7 +378,7 @@ void redux::fcwrite( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_ENSURE_STRING( fileName );
 
     char* headerText = nullptr;
-    if(argc > 2) {
+    if(nPlainArgs > 2) {
         IDL_VPTR hdrVar    = argv[2];
         IDL_ENSURE_SIMPLE( hdrVar );
         IDL_ENSURE_STRING( hdrVar );
