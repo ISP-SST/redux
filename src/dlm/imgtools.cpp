@@ -436,6 +436,12 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             } catch (cv::Exception& e) { }
         }
 
+        if( results.empty() ) {
+            cout << "Failed to match detected pinholes, try to increase nref (current: "
+                 << kw.nrefpoints << ")  or adjust threshold (current: "
+                 << kw.threshold << ")." << endl;
+            return ret;
+        }
         H = results.rbegin()->second;
 
         vector< DMatch > matches = matchNearest (keypoints1, keypoints2, H, kw.max_dist);
