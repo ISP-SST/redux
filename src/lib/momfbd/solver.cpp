@@ -519,6 +519,8 @@ void Solver::run( PatchData::Ptr data ) {
             ch.images.clear();         // don't need input data anymore.
         }
     }
+    
+    data->finalMetric = thisMetric;
 
     gsl_multimin_fdfminimizer_free( s );
     gsl_vector_free(beta_init);

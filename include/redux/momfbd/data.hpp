@@ -107,6 +107,7 @@ namespace redux {
             Point16 index;                      //! Patch-index in mozaic
             Point16 position;                   //! Patch position (centre coordinates in the reference channel)
             Region16 roi;                       //! Region/position of this patch in the full image
+            float finalMetric;
             PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
             PatchData( const PatchData& ) = delete;
             ~PatchData();

@@ -207,6 +207,7 @@ uint64_t PatchData::size( void ) const {
     if( !isLoaded && cachedSize ) return cachedSize;
     uint64_t sz = Part::size();
     sz += index.size() + position.size() + roi.size();
+    sz += sizeof(float);
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         sz += obj.ObjectData::size();
@@ -221,6 +222,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += index.pack(ptr+count);
     count += position.pack(ptr+count);
     count += roi.pack(ptr+count);
+    count += pack( ptr+count, finalMetric );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         count += obj.ObjectData::pack(ptr+count);
@@ -235,6 +237,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += index.unpack(ptr+count, swap_endian);
     count += position.unpack(ptr+count, swap_endian);
     count += roi.unpack(ptr+count, swap_endian);
+    count += unpack( ptr+count, finalMetric, swap_endian );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         count += obj.ObjectData::unpack( ptr+count, swap_endian );

@@ -3,6 +3,7 @@
 #include "redux/momfbd/util.hpp"
 
 #include "redux/logger.hpp"
+#include "redux/file/fileana.hpp"
 #include "redux/util/bitoperations.hpp"
 #include "redux/util/stringutil.hpp"
 
@@ -14,6 +15,7 @@ using boost::algorithm::iequals;
 
 using namespace redux::momfbd;
 using namespace redux::momfbd::util;
+using namespace redux::file;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
@@ -315,7 +317,7 @@ void MomfbdJob::cleanup(void) {
     patches.clear();
     globalData.reset();
     solver.reset();
-
+    
 }
 
 
@@ -326,7 +328,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     uint16_t nThreads = std::min( maxThreads, info.maxThreads );
     
     if(wip.parts.size() && wip.parts[0]) patchStep = wip.parts[0]->step;
-    
+
     if( jobStep == JSTEP_PREPROCESS ) {
         preProcess(service, nThreads);                           // preprocess on master: load, flatfield, split in patches
     } else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
@@ -384,7 +386,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         info.state.store( JSTATE_IDLE );
         return;
     }
-    
+
     Point16 imageSizes;
     for( auto& obj : objects ) {
         Point16 tmp = obj->getImageSize();
@@ -433,6 +435,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
             pos = adjustedPos;
         }
     }
+   
     uint64_t count(0);
     patches.resize( subImagePosY.size(), subImagePosX.size() );
     Point16 ps( patchSize, patchSize );
@@ -449,7 +452,6 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
             patches(y,x) = std::move(patch);
         }
     }
-
 
     for( auto& obj : objects ) {
         obj->loadData( service, nThreads, patches );
@@ -522,6 +524,17 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads
         auto lock = getLock();
         setProgressString();
     }
+    
+    if( saveMask&SF_SAVE_METRIC ) {
+        bfs::path fn = bfs::path(info.outputDir) / bfs::path("metrics_"+to_string(info.id)+".f0");
+        Array<float> metrics( patches.dimensions() );
+        for( auto& patch: patches ) {
+            metrics( patch->index.y, patch->index.x ) = patch->finalMetric; 
+        }
+        LOG << "Writing metrics to file: " << fn;
+        Ana::write( fn.string(), metrics );
+    }
+    
     for( auto& patch: patches ) {
         patch->cacheLoad(true);        // load and erase cache-file.
     }
