@@ -67,6 +67,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             
             ModeSet& operator=( const ModeSet& rhs );
+            ModeSet clone( void ) const;
             
             bool load( const std::string& filename, uint16_t pixels );
             void init( const MomfbdJob& job, const Object& ch );
@@ -75,6 +76,8 @@ namespace redux {
             void getNorms(const redux::image::Pupil&);         //!< Normalize modes so that sum(|mode*pupil|) = pupilArea
             
             void setPupilSize( uint16_t nPixels, double radiusInPixels, double rotation );
+            
+            void normalize( double scale=1.0 );
             
             ModeInfo info;
             

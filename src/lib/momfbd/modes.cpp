@@ -240,6 +240,21 @@ ModeSet& ModeSet::operator=( const ModeSet& rhs ) {
 }
 
 
+ModeSet ModeSet::clone( void ) const {
+
+    //            redux::util::Array<T>::operator=( reinterpret_cast<const redux::util::Array<T>&>(rhs) );
+    ModeSet tmp(*this);
+    copy( reinterpret_cast<redux::util::Array<double>&>(tmp) );
+    tmp.modePointers.clear();
+    for(unsigned int i=0; i<tmp.dimSize(0); ++i) {
+        tmp.modePointers.push_back( tmp.ptr(i,0,0) );
+    }
+   // tmp.assign(*this);
+   //             redux::util::Array<T>::copy(tmp);
+    return std::move(tmp);
+}
+
+
 bool ModeSet::load( const string& filename, uint16_t pixels ) {
     
     if ( bfs::is_regular_file(filename) ) {
@@ -461,3 +476,21 @@ void ModeSet::setPupilSize( uint16_t nPixels, double radiusInPixels , double rot
         
 }
 
+
+void ModeSet::normalize( double scale ) {
+    
+    size_t nPixels = info.nPupilPixels*info.nPupilPixels;
+
+    for ( uint16_t i=0; i<modePointers.size(); ++i ) {
+        double* ptr = modePointers[i];
+        double mode_scale = scale/norms[i];
+        std::transform( ptr, ptr+nPixels, ptr, std::bind1st(std::multiplies<double>(), mode_scale) );
+        if( i == tiltMode.x ) {
+            shiftToAlpha.x /= mode_scale;
+        } else if (i == tiltMode.y) {
+            shiftToAlpha.y /= mode_scale;
+        }
+        norms[i] = mode_scale;
+    }
+    
+}
