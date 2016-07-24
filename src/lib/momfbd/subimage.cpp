@@ -492,9 +492,9 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale)
 #endif
     }
     
-    tmpOTF.ift(otfPtr);
-    tmpOTF.autocorrelate();
-    tmpOTF.getFT(otfPtr);
+    tmpOTF.ft(otfPtr);
+    tmpOTF.norm();
+    tmpOTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
 
 }
@@ -516,9 +516,9 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
 #endif
     }
     
-    tmpOTF.ift(otfPtr);
-    tmpOTF.autocorrelate();
-    tmpOTF.getFT(otfPtr);
+    tmpOTF.ft(otfPtr);
+    tmpOTF.norm();
+    tmpOTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
 
@@ -550,9 +550,9 @@ void SubImage::calcOTF(void) {
 #endif
     }
 
-    tmpOTF.ift(otfPtr);
-    tmpOTF.autocorrelate();
-    tmpOTF.getFT(otfPtr);
+    tmpOTF.ft(otfPtr);
+    tmpOTF.norm();
+    tmpOTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
     //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
 
@@ -588,14 +588,53 @@ void SubImage::calcPFOTF(void) {
         otfPtr[ind.second] = normalization*pfPtr[ind.first];
     }
 
-    tmpOTF.ift(otfPtr);
-    tmpOTF.autocorrelate();
-    tmpOTF.getFT(otfPtr);
+
+    tmpOTF.ft(otfPtr);
+    tmpOTF.norm();
+    tmpOTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
-    //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
-    //object.addToPQ(imgFT,OTF,tmpC);
     
 }
+
+
+void SubImage::addPSF( double* outPSF ) const {
+    
+    redux::util::Array<complex_t> tmpC( otfSize, otfSize );
+    OTF.getIFT( tmpC.get() );     // FIXME: Using forward transform to match MvN (who conjugates the transform)
+    FourierTransform::reorder( tmpC.get(), otfSize, otfSize );
+//    double normalization(0.0);        // TBD: should the PSF be auto-scaled or filtered ??
+//     std::for_each( tmp.get(), tmp.get()+otfSize2,
+//         [&normalization]( const complex_t& c ) {
+//             normalization += std::abs(std::real(c));
+//         });
+    double normalization = 1.0 / otfSize2;
+    if( normalization > 0.0 ) {
+//         normalization = 1.0/normalization;
+        std::transform( outPSF, outPSF+otfSize2, tmpC.get(), outPSF,
+            [normalization]( const double& p, const complex_t& c ) {
+                //double val = std::max( std::real(c), 0.0 );
+                //double val = std::abs( std::real(c) );
+                //double val = std::real(c);
+                return p+normalization*std::real(c);
+            });
+    }
+
+}
+
+
+void SubImage::getPSF( double* psf ) const {
+    memset( psf, 0, otfSize2*sizeof(double) );
+    addPSF( psf );
+}
+
+
+redux::util::Array<double> SubImage::getPSF( void ) const {
+    using namespace redux::image;
+    redux::util::Array<double> tmp( otfSize, otfSize );
+    getPSF(tmp.get());
+    return std::move(tmp);
+}
+
 
 /*
 void SubImage::update(bool newVogel) {
@@ -616,6 +655,7 @@ void SubImage::dump (std::string tag) const {
     Ana::write (tag + "_phi.f0", phi);
     Ana::write (tag + "_pf.f0", PF);
     Ana::write (tag + "_otf.f0", OTF);
+    Ana::write (tag + "_psf.f0", getPSF());
     Ana::write (tag + "_imgFT.f0", imgFT);
     Ana::write (tag + "_window.f0", window);
     Ana::write (tag + "_vogel.f0", vogel);

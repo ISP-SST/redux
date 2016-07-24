@@ -80,42 +80,21 @@ namespace redux {
             void calcOTF(void);
             void calcPFOTF(void);
             
-            template <typename T>
-            void addPSF(redux::util::Array<T>& out) const {
-                redux::util::Array<T> tmp;
-                OTF.inv(tmp,redux::image::FT_REORDER);
-                out += tmp;
-            }
-
-            template <typename T=float>
-            redux::util::Array<T> getPSF (void) const {
-                using namespace redux::image;
-                redux::util::Array<T> tmp;
-                OTF.inv(tmp,FT_REORDER|FT_NORMALIZE);
-                return std::move(tmp);
-            }
-
+            void addPSF( double* psf ) const;
+            void getPSF( double* psf ) const;
+            redux::util::Array<double> getPSF( void ) const;
             
             template <typename T>
-            redux::util::Array<T> convolveImage(const redux::util::Array<T>& im) {
+            redux::util::Array<T> convolveImage( const redux::util::Array<T>& im ) const {
                 using namespace redux::image;
-                FourierTransform imFT(im, FT_REORDER|FT_FULLCOMPLEX|FT_NORMALIZE);
-                imFT *= OTF;
-                imFT.reorder();
-                imFT.directInverse(tmpOTF);
-                FourierTransform::reorder(tmpOTF);
-                return std::move(tmpOTF.copy<T>());
+                redux::util::Array<T> tmp = im.copy();
+                OTF.convolveInPlace( tmp, FT_FULLCOMPLEX );
+                return std::move( tmp );
             }
             
             template <typename T>
-            redux::util::Array<T> residual(const redux::util::Array<T>& im) {
-                using namespace redux::image;
-                FourierTransform imFT(im, FT_REORDER|FT_FULLCOMPLEX|FT_NORMALIZE);
-                imFT *= OTF;
-                imFT.reorder();
-                imFT.directInverse(tmpOTF);
-                FourierTransform::reorder(tmpOTF);
-                redux::util::Array<T> tmp = tmpOTF.copy<T>();
+            redux::util::Array<T> residual( const redux::util::Array<T>& im ) const {
+                redux::util::Array<T> tmp = convolveImage(im);
                 tmp -= img;
                 return std::move(tmp);
             }

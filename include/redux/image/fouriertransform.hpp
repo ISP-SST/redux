@@ -80,7 +80,9 @@ namespace redux {
             template <typename T>
             redux::util::Array<T> correlate( const redux::util::Array<T>& ) const;
             
-            void autocorrelate( void );
+            void conj( void );
+            void norm( void );
+
             void autocorrelate( double scale );
             template <typename T>
             static void autocorrelate( T*, size_t, size_t );
@@ -95,8 +97,6 @@ namespace redux {
             
             template <typename T>
             void convolveInPlace( redux::util::Array<T>& in, int flags=0  ) const;
-            //template <typename T>
-            //void convolveInPlace( T* in, size_t ySize, size_t xSize, int flags=0 ) const;
 
             template <typename T>
             redux::util::Array<T> convolve( const redux::util::Array<T>& in ) const {
@@ -153,13 +153,12 @@ namespace redux {
             void ift( complex_t* in );
             void ift( complex_t* in, double* out );
             void getIFT( double* out );        //!> NOTE fftw:c2r is destructive, so only use these direct functions in one-shot contexts.
-            void getIFT( complex_t* out );
-            void getFT( complex_t* out );
+            void getIFT( complex_t* out ) const;
+            void getFT( complex_t* out ) const;
             
             Plan::Ptr getPlan(void) { return plan; };
             
             void init(void);
-            //template <typename T> void init( const std::complex<T>* in, size_t ySize, size_t xSize );
             template <typename T> void init(const T*, size_t, size_t);
 
         private:
@@ -197,8 +196,6 @@ namespace redux {
             fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (tmpData), reinterpret_cast<fftw_complex*> (ptr()));
             delete[] tmpData;
         }
-  //      template <>
-  //      redux::util::Array<double> FourierTransform::convolve( const redux::util::Array<double>& ) const;
 
     }   // image
 

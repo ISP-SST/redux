@@ -246,9 +246,15 @@ void Object::getResults(ObjectData& od, double* alpha) {
         ScharmerFilter(aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     
-    avgObjFT.directInverse(tmpC.get());
-    od.img.resize(patchSize, patchSize);
-    od.img.assign(tmpC);
+    avgObjFT.getIFT( tmpC.get() );
+
+    od.img.resize( patchSize, patchSize );
+    size_t nEl = avgObjFT.nElements();
+    double normalization = 1.0 / nEl;
+    std::transform( tmpC.get(), tmpC.get()+nEl, od.img.get(),
+                [normalization]( const complex_t& a ) {
+                    return std::real(a)*normalization;
+                } );
     
     if( fittedPlane.sameSize(od.img) ) {
         LOG_DETAIL << "Re-adding fitted plane to result.";

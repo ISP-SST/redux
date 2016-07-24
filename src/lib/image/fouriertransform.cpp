@@ -21,6 +21,7 @@ FourierTransform::Plan::Index::Index (const std::vector<size_t>& dims, TYPE t, u
     }
 }
 
+
 FourierTransform::Plan::Index::Index (size_t sizeY, size_t sizeX, TYPE t, uint8_t nt) : tp (t), nThreads (nt), sizes({sizeY,sizeX}) {
     sizes.erase( remove_if( sizes.begin(), sizes.end(), [](size_t i){ return i <= 1;}), sizes.end() );
     if ( sizes.empty() ) {
@@ -28,6 +29,7 @@ FourierTransform::Plan::Index::Index (size_t sizeY, size_t sizeX, TYPE t, uint8_
         + to_string(sizeY) + ", " + to_string(sizeX) + "]");
     }
 }
+
 
 bool FourierTransform::Plan::Index::operator< (const Index& rhs) const {
 
@@ -38,7 +40,6 @@ bool FourierTransform::Plan::Index::operator< (const Index& rhs) const {
     } else return tp < rhs.tp;
 
 }
-
 
 
 FourierTransform::Plan::Plan ( const Index& i ) : id(i) {
@@ -113,37 +114,7 @@ void FourierTransform::Plan::backward( fftw_complex* in, double* out ) const {
 }
 
 
-namespace {
-    
-    /*struct PlansContainer {  // using a static instance below ensures that fftw_init_threads is called only once, and cleanup is done when program exits.
-        PlansContainer() { fftw_init_threads(); };
-        ~PlansContainer(){
-            for( auto& plan : plans) {
-                if( plan.second ) {
-                    plan.second.reset();
-                }
-            }
-            fftw_cleanup_threads();
-        };
-        std::map<FourierTransform::Plan::Index, FourierTransform::Plan::Ptr> plans;
-    };*/
-    
-}
-
-
 FourierTransform::Plan::Ptr FourierTransform::Plan::get(const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads) {
-
-/*    static PlansContainer pc;
-    
-    static mutex mtx;
-    unique_lock<mutex> lock (mtx);
-    auto plan = pc.plans.emplace( Plan::Index(dims, tp, nThreads), nullptr );
-
-    if (plan.second) {  // insertion successful, i.e. new plan -> initialize it
-        plan.first->second.reset( new Plan( plan.first->first ) );
-    }
-
-    return plan.first->second;*/
 
     Plan::Index id(dims, tp, nThreads);
     Plan::Ptr& plan = Cache::get< Plan::Index, Plan::Ptr >( id, nullptr );
@@ -295,6 +266,7 @@ template FourierTransform::FourierTransform (const double*, size_t, size_t, int,
 template FourierTransform::FourierTransform (const complex_t*, size_t, size_t, int, uint8_t);
 template FourierTransform::FourierTransform (const int32_t*, size_t, size_t, int, uint8_t);
 
+
 void FourierTransform::conjugate(void) {
     transform( get(), get()+nElements(), get(), [](const complex_t&a){ return std::conj(a); } );
 }
@@ -342,16 +314,30 @@ void FourierTransform::getIFT( double* out ) {
 }
 
 
-void FourierTransform::getIFT( complex_t* out ) {
+void FourierTransform::getIFT( complex_t* out ) const {
 
-    fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(get()), reinterpret_cast<fftw_complex*>(out) );
+    if( centered ) {
+        FourierTransform tmp(*this);
+        tmp.reorder();
+        tmp.getIFT( out );
+        return;
+    }
+    fftw_complex* dataPtr = reinterpret_cast<fftw_complex*>(const_cast<complex_t*>(get()));
+    fftw_execute_dft( plan->backward_plan, dataPtr, reinterpret_cast<fftw_complex*>(out) );
 
 }
 
 
-void FourierTransform::getFT( complex_t* out ) {
+void FourierTransform::getFT( complex_t* out ) const {
 
-    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(get()), reinterpret_cast<fftw_complex*>(out) );
+    if( centered ) {
+        FourierTransform tmp(*this);
+        tmp.reorder();
+        tmp.getFT( out );
+        return;
+    }
+    fftw_complex* dataPtr = reinterpret_cast<fftw_complex*>(const_cast<complex_t*>(get()));
+    fftw_execute_dft( plan->forward_plan, dataPtr, reinterpret_cast<fftw_complex*>(out) );
 
 }
 
@@ -365,19 +351,6 @@ void FourierTransform::init (void) {
     }
 
 }
-/*
-template <typename T>
-void FourierTransform::init( const std::complex<T>* in, size_t ySize, size_t xSize ) {
-    if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
-        Array<complex_t>::resize(ySize,xSize);
-    }
-
-    plan = Plan::get({ySize, xSize}, Plan::C2C, nThreads);
-    complex_t* dataPtr = const_cast<complex_t*>(in);    // fftw takes non-const, even if input is not modified.
-    fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (dataPtr), reinterpret_cast<fftw_complex*> (ptr()));
-}
-//template void FourierTransform::init( const std::complex<float>*, size_t, size_t );
-template void FourierTransform::init( const std::complex<double>*, size_t, size_t );*/
 
 
 template <typename T>
@@ -396,34 +369,11 @@ void FourierTransform::init (const T* in, size_t ySize, size_t xSize) {
     delete[] tmpData;
     
 }
-
-//template void FourierTransform::init( const std::complex<float>*, size_t, size_t );
-namespace redux {
-    namespace image {
-        /*template <>
-        void FourierTransform::init<complex<float>> ( const complex<float>* in, size_t ySize, size_t xSize ) {
-            if( (ySize != dimSize(0)) || (xSize != dimSize(1))) {
-                Array<complex_t>::resize(ySize,xSize);
-            }
-
-            plan = getPlan({ySize, xSize}, Plan::C2C, nThreads);
-            size_t nElements = ySize*xSize;
-            complex_t* tmpData = new complex_t[ySize*xSize];
-            std::copy(in, in+nElements, tmpData);
-            fftw_execute_dft (plan->forward_plan, reinterpret_cast<fftw_complex*> (tmpData), reinterpret_cast<fftw_complex*> (ptr()));
-            delete[] tmpData;
-        }*/
-        
-    }
-}
 template void FourierTransform::init( const uint8_t*, size_t, size_t );
 template void FourierTransform::init( const int16_t*, size_t, size_t );
 template void FourierTransform::init( const int32_t*, size_t, size_t );
 template void FourierTransform::init( const float*, size_t, size_t );
 template void FourierTransform::init( const double*, size_t, size_t );
-//template void FourierTransform::init( const complex<float>*, size_t, size_t );
-//template void FourierTransform::init( const complex<double>*, size_t, size_t );
-
 
 
 template <typename T>
@@ -537,7 +487,7 @@ Array<T> FourierTransform::correlate (const Array<T>& in) const {
     FourierTransform inFT (in, f);
     
     transform( get(), get()+nElements(), inFT.get(), inFT.get(),
-        [](const complex_t& a, const complex_t& b) { return b*conj(a); } );
+        [](const complex_t& a, const complex_t& b) { return b*std::conj(a); } );
 
     Array<T> out (in.dimensions());
     inFT.inv (out, FT_REORDER);
@@ -549,18 +499,20 @@ template Array<double> FourierTransform::correlate (const Array<double>&) const;
 template Array<complex_t> FourierTransform::correlate (const Array<complex_t>&) const;
 
 
-void FourierTransform::autocorrelate(void) {
+void FourierTransform::conj(void) {
+    transform( get(), get()+nElements(), get(), [](const complex_t&a){ return std::conj(a); } );
+}
 
-    // FourierTransform is dense by construction, so this should always be ok
-    transform( get(), get()+nElements(), get(), [](const complex_t&a){ return norm(a); } );
 
+void FourierTransform::norm(void) {
+    transform( get(), get()+nElements(), get(), [](const complex_t&a){ return std::norm(a); } );
 }
 
 
 void FourierTransform::autocorrelate( double scale ) {
 
     // FourierTransform is dense by construction, so this should always be ok
-    transform( get(), get()+nElements(), get(), [scale](const complex_t&a){ return scale*norm(a); } );
+    transform( get(), get()+nElements(), get(), [scale](const complex_t&a){ return scale*std::norm(a); } );
 
 }
 
@@ -568,7 +520,7 @@ void FourierTransform::autocorrelate( double scale ) {
 template <typename T>
 void FourierTransform::autocorrelate(T* data, size_t ySize, size_t xSize ) {
     FourierTransform ft(data, ySize, xSize);
-    ft.autocorrelate();
+    ft.norm();
     ft.directInverse(data);
     reorder(data, ySize, xSize);
 }
@@ -579,7 +531,7 @@ template void FourierTransform::autocorrelate(complex_t*, size_t, size_t);
 template <typename T>
 void FourierTransform::autocorrelate (const Array<T>& in, Array<T>& out) {
     FourierTransform ft (in);
-    ft.autocorrelate();
+    ft.norm();
     out.resize (in.dimensions());
     ft.directInverse(out.get());
     reorder(out);
@@ -590,7 +542,7 @@ template void FourierTransform::autocorrelate (const Array<complex_t>&, Array<co
 
 Array<double> FourierTransform::power (void) const {
     Array<double> tmp (dimensions());
-    transform( get(), get()+nElements(), tmp.get(),[](const complex_t&a){ return norm(a); } );
+    transform( get(), get()+nElements(), tmp.get(),[](const complex_t&a){ return std::norm(a); } );
     return std::move(tmp);
 }
 
@@ -647,7 +599,7 @@ double FourierTransform::noise (int mask, double limit) const {
         for (int y = mask; y < endY; ++y) {
             yy = std::min (y, npY - y);
             if ( (xx + yy * yy) < limits) continue;         // inside region to ignore
-            noise_power += count * norm(dataPtr[y*npX+x]);
+            noise_power += count * std::norm(dataPtr[y*npX+x]);
             N += count;
         }
     }
@@ -655,7 +607,6 @@ double FourierTransform::noise (int mask, double limit) const {
     return noise_power;
 
 }
-
 
 template <typename T>
 void FourierTransform::convolveInPlace (Array<T>& inout, int flags) const {
@@ -678,45 +629,15 @@ void FourierTransform::convolveInPlace (Array<T>& inout, int flags) const {
     }
 
     FourierTransform inFT (inout, flags, nThreads);
+    if( centered ) inFT.reorder();
     inFT *= *this;
-    inFT.inv (inout, FT_REORDER);
+    if( centered ) inFT.reorder();
+    inFT.inv (inout);
 }
 template void FourierTransform::convolveInPlace (Array<float>& inout, int flags) const;
 template void FourierTransform::convolveInPlace (Array<double>& inout, int flags) const;
 template void FourierTransform::convolveInPlace (Array<complex_t>& inout, int flags) const;
 
-/*
-template <typename T>
-void FourierTransform::convolveInPlace (T* inout, size_t ySize, size_t xSize, int flags) const {
-
-    if( xSize*ySize != nInputElements ) {
-        cout << "FourierTransform::convolveInPlace(): input dimensions does not match this FourierTransform." << endl;
-        return;
-    }
-
-    double* tmp = new double[ nInputElements ];
-    std::copy( inout, inout+nInputElements, tmp );
-    
-    fftw_execute_dft( plan->forward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
-
-    fftw_execute_dft( plan->backward_plan, reinterpret_cast<fftw_complex*>(in), reinterpret_cast<fftw_complex*>(get()) );
-
-    
-    
-    if (! normalized) {
-    }
-
-    FourierTransform inFT (inout, flags, nThreads);
-    inFT *= *this;
-    inFT.inv (inout, FT_REORDER);
-    
-    delete[] tmp;
-    
-}
-template void FourierTransform::convolveInPlace(float*, size_t, size_t, int) const;
-template void FourierTransform::convolveInPlace(double*, size_t, size_t, int) const;
-template void FourierTransform::convolveInPlace(complex_t*, size_t, size_t, int) const;
-*/
 
 void FourierTransform::normalize (FourierTransform& in) {
     if (in.normalized) return;
@@ -855,9 +776,6 @@ const FourierTransform& FourierTransform::operator*= (const FourierTransform& rh
     }
 
     if (halfComplex == rhs.halfComplex) {
-        //Array<complex_t>::operator*= (rhs);
-        //std::transform (first, first+5, second, results, std::multiplies<int>());
-        //std::transform (ptr(), ptr()+nElements(), rhs.ptr(), ptr(), std::multiplies<complex_t>());
         complex_t* thisPtr = ptr();
         const complex_t* rhsPtr = rhs.ptr();
         size_t N = nElements();
