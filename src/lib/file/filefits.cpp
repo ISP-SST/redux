@@ -25,193 +25,229 @@ static const int system_is_big_endian = 1;
 const uint8_t Fits::typeSizes[] = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
 
 namespace {
-    template <typename T> Fits::TypeIndex getDatyp( void ) { return Fits::FITS_UNDEF; }
+    template <typename T> Fits::TypeIndex getDatyp( void ) { return Fits::FITS_NOTYPE; }
     template <> Fits::TypeIndex getDatyp<uint8_t>( void ) { return Fits::FITS_BYTE; }
     template <> Fits::TypeIndex getDatyp<int16_t>( void ) { return Fits::FITS_WORD; }
-    template <> Fits::TypeIndex getDatyp<int32_t>( void ) { return Fits::FITS_LONG; }
+    template <> Fits::TypeIndex getDatyp<int32_t>( void ) { return Fits::FITS_INT; }
     template <> Fits::TypeIndex getDatyp<float  >( void ) { return Fits::FITS_FLOAT; }
     template <> Fits::TypeIndex getDatyp<double >( void ) { return Fits::FITS_DOUBLE; }
-    template <> Fits::TypeIndex getDatyp<int64_t>( void ) { return Fits::FITS_LONGLONG; }
+    template <> Fits::TypeIndex getDatyp<int64_t>( void ) { return Fits::FITS_LONG; }
     template <> Fits::TypeIndex getDatyp<complex_t>( void ) { return Fits::FITS_COMPLEX; }
-}
-
-Fits::Fits( void ) : hdrSize( 0 ) {
-    memset( &m_Header, 0, sizeof( raw_header ) );
-    memset( &m_CompressedHeader, 0, sizeof( compressed_header ) );
-    m_Header.datyp = FITS_UNDEF;    // just to make sure no default type is inferred.
-}
-
-Fits::Fits( const std::string& filename ) : hdrSize( 0 ) {
-    memset( &m_Header, 0, sizeof( raw_header ) );
-    memset( &m_CompressedHeader, 0, sizeof( compressed_header ) );
-    read( filename );
-}
-
-void Fits::read( ifstream& file ) {
-
-    hdrSize = 0;
-    file.seekg( 0 );
-
-    size_t rawSize = sizeof( struct raw_header );  // = 512 by construction
-    memset( &m_Header, 0, rawSize );
-
-    file.read( reinterpret_cast<char*>( &m_Header ), rawSize );
-    if( !file.good() ) {
-        throw ios_base::failure( "Failed to read FITS header" );
-    }
-
-    hdrSize = file.tellg();
-    bool hasMagic = ( m_Header.synch_pattern == MAGIC_FITS );
-
-    if( !( hasMagic ) ) {
-        throw logic_error( "Failed to read FITS header: initial 4 bytes does not match FITS" );
-    }
-
-    if( m_Header.nhb > 16 ) {
-        throw logic_error( "Warning: Fits::read() - extended header is longer than 16 blocks!" );
-    }
-    else {
-        size_t extraTextSize = ( m_Header.nhb - 1 ) * rawSize;
-        unique_ptr<char[]> tmpText( new char [ extraTextSize + 257 ] );
-        char* txtPtr = tmpText.get();
-        memset( txtPtr + 256, 0, extraTextSize + 1 );
-        memcpy( txtPtr, m_Header.txt, 256 );
-        file.read( txtPtr + 256, extraTextSize );
-        if( !file.good() ) {
-            if( file.eof() ) {
-                throw ios_base::failure( "Failed to read FITS header: <EOF> reached" );
+    
+    int getDataType( fitsfile* ff, int bitpix ) {
+        int ret, status;
+        long bzero(0);
+        float bscale(0);
+        ret = fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status );
+        if ( bscale == 1.0 ) {
+            ret = fits_read_key_lng( ff, "BZERO", &bzero, nullptr, &status );
+        }
+        switch( bitpix ) {
+            case( 8 ): {
+                if( bzero == -(1L<<7) ) return TSBYTE;
+                return TBYTE;
             }
-        }
-        hdrSize = file.tellg();
-
-        // Hack to strip away null-characters and copies of struct-info from the string
-        // needed to correctly read broken headers written with old software.
-        // The camera software at the sst used to pad the text string with copies of the
-        // primary block, and the momfbd code produced a zero-padded text header.
-        txtPtr += 256;  // skip part from first block
-        for( int i=0; i<m_Header.nhb-1; ++i, txtPtr+=512) {
-            if( !memcmp(txtPtr,reinterpret_cast<char*>( &m_Header ),256) ) {
-                memset(txtPtr,0,256);
+            case( 16 ): {
+                if( bzero == (1L<<15) ) return TUSHORT;
+                return TSHORT;
             }
-        }
-        txtPtr = tmpText.get(); // reset to beginning
-        char* firstNull = txtPtr;
-        while( *firstNull ) {
-            firstNull++;
-        }
-        char* ptr = firstNull;
-        while( ++ptr < txtPtr + extraTextSize + 256 ) {
-            if( *ptr ) {
-                swap( *ptr, *firstNull++ );
+            case( 32 ): {
+                if( bzero == (1L<<31)) return TUINT;
+                return TINT;
             }
-        }
-
-        
-        m_ExtendedHeader = txtPtr;
-        memset( m_Header.txt, 0, 256 );     // clear the .txt field, we store the whole text in m_ExtendedHeader
-
-    }
-
-    // m_Header.dim is always stored as little-endian, so swap endianess if system is big-endian.
-    if( system_is_big_endian ) {
-        swapEndian( &( m_Header.dim ), m_Header.ndim );
-    }
-
-    // compressed data
-    if( m_Header.subf & 1 ) {
-        size_t chdrSize = 14;
-        file.read( reinterpret_cast<char*>( &m_CompressedHeader ), chdrSize );
-        if( !file.good() ) {
-            if( file.eof() ) {
-                throw ios_base::failure( "Failed to read FITS header: <EOF> reached" );
+            case( 64 ): {
+                if( bzero == (1L<<63) ) return TULONG;
+                return TLONG;
             }
-        }
-        hdrSize += chdrSize;
-
-        if( system_is_big_endian ) { // for big endian platforms
-            swapEndian( &( m_CompressedHeader.tsize ) );
-            swapEndian( &( m_CompressedHeader.nblocks ) );
-            swapEndian( &( m_CompressedHeader.bsize ) );
-        }
-    }
-
-}
-
-void Fits::read( const std::string& filename ) {
-    ifstream file( filename, ifstream::binary );
-    read( file );
-}
-
-void Fits::write( ofstream& file ) {
-
-    size_t hdrSize = sizeof( struct raw_header );   // = 512 by construction
-    size_t textSize = m_ExtendedHeader.length();
-    m_Header.nhb = 1;
-    if( textSize > 255 ) {
-        m_Header.nhb = static_cast<uint8_t>( 1+(textSize+256)/512 );
-        if( m_Header.nhb > 16 ) {
-            cout << "Warning: Fits::write() - header text is too long, it will be truncated!! (max = 7935 characters)" << endl;
-            m_Header.nhb = 16;
-            textSize = 7935;
+            default: return 0;
         }
     }
     
-    // file header entries are in little endian order, so swap for big-endian systems.
-    if( system_is_big_endian ) {
-        m_Header.subf |= 128;   // mark file as written on big-endian machine.
-        swapEndian( &( m_Header.synch_pattern ) );
-        swapEndian( &( m_Header.cbytes ) );
-        swapEndian( &( m_Header.dim ), m_Header.ndim );
+}
+
+Fits::Fits( void ) : fitsPtr_(nullptr), status_(0)  {
+    
+}
+
+
+Fits::Fits( const std::string& filename ) : fitsPtr_(nullptr), status_(0) {
+    
+    read( filename );
+    
+}
+
+
+Fits::~Fits() {
+    
+    close();
+    
+}
+
+
+void Fits::close(void) {
+
+    if( fitsPtr_ ) {
+        if( fits_close_file( fitsPtr_, &status_ ) ) {
+            fits_report_error(stderr, status_);
+            return;
+        }
+        fitsPtr_ = nullptr;
+    }
+}
+
+
+void Fits::read( const std::string& filename ) {
+    
+    fitsfile *fptr;
+    
+    int nHDU, hduType, nKeys;
+    char data[ FLEN_VALUE ];
+    char card[FLEN_CARD];
+    memset( data, 0, FLEN_VALUE );
+    memset( card, 0, FLEN_CARD );
+
+    if( fitsPtr_ ) {
+        close();
     }
 
-    file.write( reinterpret_cast<char*>( &m_Header ), 256 );
-    if( !file.good() ) {
-        throw ios_base::failure( "Fits::write(): Failed to write m_Header" );
+    status_ = 0;
+
+    if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
+       fits_report_error(stderr, status_);
+       return;
+    }
+    
+    if( fits_get_num_hdus( fitsPtr_, &nHDU, &status_ ) ) {
+       fits_report_error(stderr, status_);
+       return;
+    }
+    
+    if ( nHDU > 1 ) {
+        cout << "Fits::read() only 1 HDU supported." << endl;
+        return;
     }
 
-    if( system_is_big_endian ) { // ...and then swap back
-        swapEndian( &( m_Header.synch_pattern ) );
-        swapEndian( &( m_Header.cbytes ) );
-        swapEndian( &( m_Header.dim ), m_Header.ndim );
+    if( fits_get_hdu_type( fitsPtr_, &hduType, &status_ ) ) {
+        fits_report_error(stderr, status_);
+        return;
     }
-
-    if( textSize > 0 ) { // we have header text
-        size_t blockSize = ( m_Header.nhb - 1 ) * hdrSize + 256;
-        unique_ptr<char[]> extHdr( new char[blockSize] );
-        memset( extHdr.get(), 0, blockSize );
-        memcpy( extHdr.get(), m_ExtendedHeader.c_str(), min(blockSize,textSize) );
-        file.write( extHdr.get(), blockSize );
-        if( !file.good() ) {
-            throw ios_base::failure( "Fits::write(): Failed to write additional header blocks (text)." );
+    
+    if ( hduType != IMAGE_HDU ) {
+        cout << "Fits::read() only primary/image HDU implemented. " << hduType << endl;
+        return;
+    }
+    if( fits_read_key( fitsPtr_, TINT, "BITPIX", &primaryHDU.bitpix, NULL, &status_ ) ) {
+        fits_report_error(stderr, status_);
+        return;
+    }
+    
+    cout << "bitpix: " << primaryHDU.bitpix << endl;
+    
+    long bzero(0);
+    float bscale(0);
+    if( fits_read_key_flt( fitsPtr_, "BSCALE", &bscale, nullptr, &status_ ) ) {
+        if( status_ != KEY_NO_EXIST ) {
+            fits_report_error(stderr, status_);
+            return;
+        } else status_ = 0;
+    }
+    cout << "BSCALE: " << bscale << endl;
+    if ( bscale == 1.0 ) {
+        if( fits_read_key_lng( fitsPtr_, "BZERO", &bzero, nullptr, &status_ ) ) {
+            if( status_ != KEY_NO_EXIST ) {
+                fits_report_error(stderr, status_);
+                return;
+            } else status_ = 0;
         }
     }
-    else {  // otherwise just write 256 zeroes
-        file.write( m_Header.txt, 256 );
-        if( !file.good() ) {
-            throw ios_base::failure( "Fits::write(): Failed to write text block." );
+    cout << "BZERO: " << bzero << endl;
+    switch( primaryHDU.bitpix ) {
+        case( 8 ): {
+            if( bzero == -(1L<<7) ) primaryHDU.dataType = TSBYTE;
+            else primaryHDU.dataType = TBYTE;
+            primaryHDU.elementSize = 1;
+            break;
         }
+        case( 16 ): {
+            if( bzero == (1L<<15) ) primaryHDU.dataType = TUSHORT;
+            else primaryHDU.dataType = TSHORT;
+            primaryHDU.elementSize = 2;
+            break;
+        }
+        case( 32 ): {
+            if( bzero == (1L<<31)) primaryHDU.dataType = TUINT;
+            else primaryHDU.dataType = TINT;
+            primaryHDU.elementSize = 4;
+            break;
+        }
+        case( 64 ): {
+            if( bzero == (1L<<63) ) primaryHDU.dataType = TULONG;
+            else primaryHDU.dataType = TLONG;
+            primaryHDU.elementSize = 8;
+            break;
+        }
+        case( -32 ): {
+            primaryHDU.dataType = TFLOAT;
+            primaryHDU.elementSize = 4;
+            break;
+        }
+        case( -64 ): {
+            primaryHDU.dataType = TDOUBLE;
+            primaryHDU.elementSize = 8;
+            break;
+        }
+        default: primaryHDU.dataType = primaryHDU.elementSize = 0;
+    }
+        
+    cout << "dataType: " << primaryHDU.dataType << endl;
+    if( fits_read_key( fitsPtr_, TINT, "NAXIS", &primaryHDU.nDims, NULL, &status_ ) ) {
+        fits_report_error(stderr, status_);
+        return;
+    }
+    cout << "naxis: " << primaryHDU.nDims << endl;
+    primaryHDU.nElements = 0;
+    if( primaryHDU.nDims > 0 ) {
+        primaryHDU.nElements = 1;
+        primaryHDU.dims.resize(primaryHDU.nDims);
+        for(uint16_t i=0; i<primaryHDU.dims.size(); ++i) {
+            string key = "NAXIS" + to_string(i+1);
+
+            if( fits_read_key( fitsPtr_, TINT, key.c_str(), &(primaryHDU.dims[i]), NULL, &status_ ) ) {
+               fits_report_error(stderr, status_);
+               return;
+            }
+            primaryHDU.nElements *= primaryHDU.dims[i];
+        }
+        cout << printArray(primaryHDU.dims,"dims") << endl;
+    }
+    
+    int nkeys, keypos, hdutype;
+    for (int ii = 1; !(fits_movabs_hdu(fitsPtr_, ii, &hdutype, &status_) ); ii++) 
+    {
+        /* get no. of keywords */
+        if (fits_get_hdrpos(fitsPtr_, &nkeys, &keypos, &status_) )
+            fits_report_error(stderr, status_);
+
+        printf("Header listing for HDU #%d:\n", ii);
+        for (int jj = 1; jj <= nkeys; jj++)  {
+            if ( fits_read_record(fitsPtr_, jj, card, &status_) )
+                 fits_report_error(stderr, status_);
+
+            printf("%s\n", card); /* print the keyword card */
+        }
+        printf("END\n\n");  /* terminate listing with END */
     }
 
-    // compressed data
-    if( m_Header.subf & 1 ) {
-        if( system_is_big_endian ) {
-            swapEndian( &( m_CompressedHeader.tsize ) );
-            swapEndian( &( m_CompressedHeader.nblocks ) );
-            swapEndian( &( m_CompressedHeader.bsize ) );
-        }
+    if (status_ == END_OF_FILE)   /* status values are defined in fitsioc.h */
+        status_ = 0;              /* got the expected EOF error; reset = 0  */
+    else
+       fits_report_error(stderr, status_);    /* got an unexpected error                */
+    
+    
+}
 
-        file.write( reinterpret_cast<char*>( &m_CompressedHeader ), 14 );
-        if( !file.good() ) {
-            throw ios_base::failure( "Fits::write(): Failed to write m_CompressedHeader" );
-        }
 
-        if( system_is_big_endian ) {
-            swapEndian( &( m_CompressedHeader.tsize ) );
-            swapEndian( &( m_CompressedHeader.nblocks ) );
-            swapEndian( &( m_CompressedHeader.bsize ) );
-        }
-    }
-
+void Fits::write( ofstream& file ) {
 
 }
 
@@ -236,11 +272,7 @@ bpx::ptime redux::file::Fits::getStartTime(void) {
     std::string hdr = getText();
     bpx::ptime startT;
     
-    boost::regex re("Ts=([0-9.\\-: ]+)");
-    boost::smatch match;
-    if (boost::regex_search (hdr, match, re)) {
-        startT = bpx::time_from_string(match[1]);
-    }
+    // TODO
 
     return startT;
     
@@ -251,11 +283,7 @@ bpx::ptime redux::file::Fits::getEndTime(void) {
     std::string hdr = getText();
     bpx::ptime endT;
     
-    boost::regex re("Te=([0-9.\\-: ]+)");
-    boost::smatch match;
-    if (boost::regex_search (hdr, match, re)) {
-        endT = bpx::time_from_string(match[1]);
-    }
+    // TODO
 
     return endT;
     
@@ -278,47 +306,73 @@ bpx::time_duration redux::file::Fits::getExposureTime(void) {
 
 size_t redux::file::Fits::dataSize(void) { 
 
-    return nElements()*typeSizes[ m_Header.datyp ];
+    return nElements()*elementSize();
     
 }
 
 
 size_t redux::file::Fits::dimSize(size_t i) {
     
-    if( i > m_Header.ndim ) return 0;
+    if( i >= primaryHDU.nDims ) return 0;
     
-    return m_Header.dim[i];
+    return primaryHDU.dims[ primaryHDU.nDims-i-1 ];
     
 }
 
 
 uint8_t redux::file::Fits::elementSize(void) { 
     
-    return typeSizes[ m_Header.datyp ];
+    return std::abs(primaryHDU.bitpix/8);
     
 }
 
 
 size_t redux::file::Fits::nElements(void) {
-    
-    uint8_t nDims = m_Header.ndim;
-    if( nDims == 0 ) return 0;
+
+    if( primaryHDU.nDims == 0 ) return 0;
     
     size_t ret = 1;
-    for( uint8_t i=0; i < nDims; ++i ) {
-        ret *= m_Header.dim[i];
+    for( auto& d: primaryHDU.dims ) {
+        ret *= d;
     }
-    
     return ret;
     
 }
 
+#define IDL_TYP_UNDEF       0
+#define IDL_TYP_BYTE            1
+#define IDL_TYP_INT             2
+#define IDL_TYP_LONG            3
+#define IDL_TYP_FLOAT           4
+#define IDL_TYP_DOUBLE          5
+#define IDL_TYP_COMPLEX         6
+#define IDL_TYP_STRING          7
+#define IDL_TYP_STRUCT          8
+#define IDL_TYP_DCOMPLEX        9
+#define IDL_TYP_PTR     10
+#define IDL_TYP_OBJREF      11
+#define IDL_TYP_UINT        12
+#define IDL_TYP_ULONG       13
+#define IDL_TYP_LONG64      14
+#define IDL_TYP_ULONG64     15
 
 // IDL type-ID = FITS type-ID + 1
 int redux::file::Fits::getIDLType(void) {
-    
-    return m_Header.datyp + 1;
-    
+    switch( primaryHDU.dataType ) {
+        case( TSBYTE ): ;
+        case( TBYTE ):          return IDL_TYP_BYTE;
+        case( TSHORT ):         return IDL_TYP_INT;
+        case( TUSHORT ):        return IDL_TYP_UINT;
+        case( TINT ):           return IDL_TYP_LONG;
+        case( TUINT ):          return IDL_TYP_ULONG;
+        case( TLONG ):          return IDL_TYP_LONG64;
+        case( TULONG ):         return IDL_TYP_ULONG64;
+        case( TFLOAT ):         return IDL_TYP_FLOAT;
+        case( TDOUBLE ):        return IDL_TYP_DOUBLE;
+        case( TCOMPLEX ):       return IDL_TYP_COMPLEX;
+        case( TDBLCOMPLEX ):    return IDL_TYP_DCOMPLEX;
+        default: return 0;
+    }
 }
 
 
@@ -326,10 +380,10 @@ double redux::file::Fits::getMinMaxMean( const char* data, double* Min, double* 
     
     ArrayStats stats;
     size_t nEl = nElements();
-    switch( m_Header.datyp ) {
+    switch( primaryHDU.dataType ) {
         case( FITS_BYTE ):   stats.getMinMaxMean( data, nEl ); break;
         case( FITS_WORD ):   stats.getMinMaxMean( reinterpret_cast<const int16_t*>(data), nEl ); break;
-        case( FITS_LONG ):   stats.getMinMaxMean( reinterpret_cast<const int32_t*>(data), nEl ); break;
+        case( FITS_INT ):    stats.getMinMaxMean( reinterpret_cast<const int32_t*>(data), nEl ); break;
         case( FITS_FLOAT ):  stats.getMinMaxMean( reinterpret_cast<const float*>(data), nEl ); break;
         case( FITS_DOUBLE ): stats.getMinMaxMean( reinterpret_cast<const double*>(data), nEl ); break;
         default: ;
@@ -342,262 +396,133 @@ double redux::file::Fits::getMinMaxMean( const char* data, double* Min, double* 
 }
 
 
-void redux::file::Fits::readCompressed( ifstream& file, char* data, size_t nElements, const Fits* hdr ) {
-
-    size_t compressedSize = hdr->m_CompressedHeader.tsize - 14;
-
-    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize+1], []( uint8_t * p ) { delete[] p; } );        // bug in anadecompress makes it go out-of-bounds by 1
-
-    file.read( reinterpret_cast<char*>( tmp.get() ), compressedSize );
-    if( !file.good() ) {
-        throw ios_base::failure( "Fits::readCompressed(): Failed to read the specified number of bytes." );
-    }
-
-    uint32_t nBlocks = hdr->m_CompressedHeader.nblocks;
-    uint32_t blockSize = hdr->m_CompressedHeader.bsize;
-    // fix a possible problem with chdr.nblocks
-    if( blockSize * nBlocks > nElements ) {
-        nBlocks = static_cast<uint32_t>( nElements / blockSize );
-    }
-
-    // consistency check
-    if( hdr->m_CompressedHeader.type % 2 == hdr->m_Header.datyp ) {
-        throw logic_error( "Fits::readCompressed(): type-mismatch between primary and compressed headers." );
-    }
-
-    uint8_t slice = hdr->m_CompressedHeader.slice_size;
-
-    /*switch( hdr->m_CompressedHeader.type ) {
-        case( 0 ):
-            anadecrunch( tmp.get(), reinterpret_cast<int16_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
-            break;
-        case( 1 ):
-            anadecrunch8( tmp.get(), reinterpret_cast<int8_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
-            break;
-        case( 2 ):
-            anadecrunchrun( tmp.get(), reinterpret_cast<int16_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
-            break;
-        case( 3 ):
-            anadecrunchrun8( tmp.get(), reinterpret_cast<int8_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
-            break;
-        case( 4 ):
-            anadecrunch32( tmp.get(), reinterpret_cast<int32_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
-            break;
-        default:
-            throw invalid_argument( "Fits::readCompressed(): unrecognized type of compressed data" );
-    }*/
-
-}
-
-
-void redux::file::Fits::readUncompressed( ifstream& file, char* data, size_t nElements, const Fits* hdr ) {
-
-    size_t nBytes = nElements * typeSizes[hdr->m_Header.datyp];
-
-    file.read( data, nBytes );
-    if( !file.good() ) {
-        throw ios_base::failure( "Fits::readUncompressed(): Failed to read the specified number of bytes." );
-    }
-
-    if( hdr->m_Header.subf & 128 ) { // saved on big endian system.
-        switch( typeSizes[hdr->m_Header.datyp] ) {
-            case  2: swapEndian( reinterpret_cast<int16_t*>( data ), nElements ); break;
-            case  4: swapEndian( reinterpret_cast<int32_t*>( data ), nElements ); break;
-            case  8: swapEndian( reinterpret_cast<int64_t*>( data ), nElements ); break;
-            case 16: swapEndian( reinterpret_cast<int64_t*>( data ), 2*nElements ); break;
-            default: ;
-        }
-    }
-
-}
-
-
-int redux::file::Fits::compressData( shared_ptr<uint8_t>& out, const char* data, int nElements, const shared_ptr<Fits>& hdr, int slice ) {
-
-    int limit = nElements * typeSizes[hdr->m_Header.datyp];
-    limit += ( limit >> 1 );
-    int nx = hdr->m_Header.dim[0];
-    int ny = nElements / nx;
-    int runlengthflag( 0 );  // runlength unused/untested
-    int res;
-    uint8_t* cdata = new uint8_t[ limit ]; // allocates +50% size since compression can fail and generate larger data.
-    out.reset( cdata, []( uint8_t * p ) { delete[] p; } );
-
-   /* switch( hdr->m_Header.datyp ) {
-        case( 0 ) : {
-            if( runlengthflag ) res = anacrunchrun8( cdata, reinterpret_cast<const uint8_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
-            else res = anacrunch8( cdata, reinterpret_cast<const uint8_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
-            break;
-        }
-        case( 1 ) : {
-            if( runlengthflag ) res = anacrunchrun( cdata, reinterpret_cast<const int16_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
-            else res = anacrunch( cdata, reinterpret_cast<const int16_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
-            break;
-        }
-        case( 2 ) : {
-            if( runlengthflag ) throw invalid_argument( "Fits::compressData: runlength not supported for 32-bit types." );
-            else res = anacrunch32( cdata, reinterpret_cast<const int32_t*>( data ), slice, nx, ny, limit, system_is_big_endian );
-            break;
-        }
-        default: throw invalid_argument( "Fits::compressData: Unsupported data type." );
-    }*/
-
-    return res;
-}
-
-
-void redux::file::Fits::read( const std::string& filename, char* data, std::shared_ptr<redux::file::Fits>& hdr ) {
-
-    ifstream file( filename, ifstream::binary );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Fits::read(): Failed to open file: " + filename );
-    }
+void redux::file::Fits::read( std::shared_ptr<redux::file::Fits>& hdr, char* data ) {
 
     if( !hdr.get() ) {
-        hdr.reset( new Fits() );
+        return;
     }
-    hdr->read( file );
-
-    file.seekg( hdr->hdrSize );
-    if( !file.good() ) {
-        throw ios_base::failure( "Fits::read(): Seek operation failed." );
+    int anynull(0), status(0);
+    int ret(0);
+    
+    bool pg_data(false);
+    char card[81];
+    memset(card,0,81);
+    if( fits_read_keyword( hdr->fitsPtr_, "SOLARNET", card, nullptr, &status ) ) {
+        if( status != KEY_NO_EXIST ) {
+            fits_report_error(stderr, status);
+            return;
+        }
+        status = 0;
+        if( fits_read_key( hdr->fitsPtr_,  TSTRING, "INSTRUME", card, nullptr, &status ) ) {
+            if( status != KEY_NO_EXIST ) {
+                fits_report_error(stderr, status);
+                return;
+            }
+            status = 0;
+        } else {
+            string strCard(card);
+            if( strCard.find("Chromis-") != string::npos ) {
+                pg_data = true;
+            }
+        }
     }
 
-    // f0 stores the dimensions with the fast index first, so swap them before allocating the array
-    int nDims = hdr->m_Header.ndim;
-    size_t nElements = 1;
-    unique_ptr<int[]> dim( new int[nDims] );
-    for( int i( 0 ); i < nDims; ++i ) {
-        dim.get()[i] = hdr->m_Header.dim[nDims - i - 1];
-        nElements *= hdr->m_Header.dim[nDims - i - 1];
+    switch( hdr->primaryHDU.dataType ) {
+        case( TBYTE ): ret = fits_read_img( hdr->fitsPtr_, TBYTE, 1, hdr->nElements(), 0,
+            reinterpret_cast<uint8_t*>( data ), &anynull, &status); break;
+        case( TSBYTE ): ret = fits_read_img( hdr->fitsPtr_, TSBYTE, 1, hdr->nElements(), 0,
+            reinterpret_cast<int8_t*>( data ), &anynull, &status); break;
+        case( TSHORT ):
+            ret = fits_read_img( hdr->fitsPtr_, TSHORT, 1, hdr->nElements(), 0, reinterpret_cast<int16_t*>( data ), &anynull, &status);
+            if( pg_data ) {     // data is actually uint16_t, stored in little-endian form and with the 4 lowest bits zeroed.
+                hdr->primaryHDU.dataType = TUSHORT;
+                uint16_t* ptr = reinterpret_cast<uint16_t*>( data );
+                size_t nEl = hdr->nElements();
+                swapEndian( ptr, nEl );
+                for( size_t i=0; i<nEl; ++i ) {
+                    ptr[i] >>= 4;
+                }
+            }
+            break;
+        case( TUSHORT ): ret = fits_read_img( hdr->fitsPtr_, TUSHORT, 1, hdr->nElements(), 0,
+            reinterpret_cast<uint16_t*>( data ), &anynull, &status); break;
+        case( TINT ): ret = fits_read_img( hdr->fitsPtr_, TINT, 1, hdr->nElements(), 0,
+            reinterpret_cast<int32_t*>( data ), &anynull, &status); break;
+        case( TUINT ): ret = fits_read_img( hdr->fitsPtr_, TUINT, 1, hdr->nElements(), 0,
+            reinterpret_cast<uint32_t*>( data ), &anynull, &status); break;
+        case( TLONG ): ret = fits_read_img( hdr->fitsPtr_, TLONG, 1, hdr->nElements(), 0,
+            reinterpret_cast<int64_t*>( data ), &anynull, &status); break;
+        case( TULONG ): ret = fits_read_img( hdr->fitsPtr_, TULONG, 1, hdr->nElements(), 0,
+            reinterpret_cast<uint64_t*>( data ), &anynull, &status); break;
+        default: ;
     }
-
-    if( hdr->m_Header.subf & 1 ) readCompressed( file, data, nElements, hdr.get() );
-    else readUncompressed( file, data, nElements, hdr.get() );
+    
+    if ( ret ) {
+        fits_report_error( stderr, status );
+    }
 
 }
 
 
 void redux::file::Fits::write( const std::string& filename, const char* data, const std::shared_ptr<redux::file::Fits> hdr, bool compress, int slice ) {
 
-    ofstream file( filename, ofstream::binary );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Failed to open file for writing: " + filename );
-    }
-
-    if( !hdr.get() ) {
-        throw invalid_argument( "Fits::write(): The header object is invalid, cannot write file." );
-    }
-
-    if( hdr->m_Header.datyp > 5 || hdr->m_Header.datyp < 0 ) {
-        throw invalid_argument( "Fits::write(): hdr.datyp is not valid." );
-    }
-
-    if( hdr->m_Header.ndim > 16 ) {
-        throw invalid_argument( "Fits::write(): the FITS/f0 format does not support more dimensions than 16." );
-    }
-
-    size_t nElements = 1;
-    for( uint8_t i = 0; i < hdr->m_Header.ndim; ++i ) {
-        if( hdr->m_Header.dim[i] < 1 ) {
-            throw logic_error( "Fits::write(): dimSize < 1" );
-        }
-        nElements *= hdr->m_Header.dim[i];
-    }
-
-    size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
-    size_t compressedSize = totalSize;
-
-    hdr->m_Header.synch_pattern = MAGIC_FITS;
-    hdr->m_Header.subf = 0;
-    memset( hdr->m_Header.cbytes, 0, 4 );
-
-    shared_ptr<uint8_t> cData;
-    if( compress ) {
-        if( hdr->m_Header.ndim == 2 ) {
-            compressedSize = compressData( cData, data, nElements, hdr, slice );
-            if( compressedSize < totalSize ) {
-                int tmp = static_cast<int>( compressedSize );
-                hdr->m_Header.subf |= 1;
-                memcpy( hdr->m_Header.cbytes, &tmp, 4 );
-                memcpy( &hdr->m_CompressedHeader, cData.get(), 14 );
-                totalSize = compressedSize;
-            }
-            else {          // compressed data larger -> store uncompressed.
-                cData.reset();
-                memset( &hdr->m_CompressedHeader, 0, 14 );
-            }
-        }
-        else {
-            throw invalid_argument( "Fits::write(): compression only supported for 2D data." );
-        }
-    }
-
-    file.seekp( 0 );
-    hdr->write( file );
-
-    if( cData ) file.write( reinterpret_cast<char*>( cData.get() ) + 14, totalSize ); // compressed header is already written, so skip 14 bytes.
-    else  file.write( data, totalSize );
-
-    if( !file.good() )
-        throw ios_base::failure( "Fits::write(): write failed: " + filename  );
-
+    // TODO
+    
 }
 
 
 template <typename T>
 void redux::file::Fits::read( const string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Fits>& hdr ) {
 
-    ifstream file( filename, ifstream::binary );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Fits::read() Failed to open file: " + filename );
-    }
-
     if( !hdr.get() ) {
+    cout << "Fits::read: making new hdr" << endl;
         hdr.reset( new Fits() );
     }
-    hdr->read( file );
+    hdr->read( filename );
 
-    file.seekg( hdr->hdrSize );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Seek operation failed." );
-    }
-
-    // f0 stores the dimensions with the fast index first, so swap them before allocating the array
-    int nDims = hdr->m_Header.ndim;
+    // fits stores the dimensions with the fast index first, so swap them before allocating the array
+    int nDims = hdr->primaryHDU.nDims;
+    cout << "Fits::read: nDims = " << nDims << endl;
     int nArrayDims = data.nDimensions();
     size_t nElements = 1;
     bool forceResize = ( nArrayDims < nDims );
     std::vector<size_t> dimSizes( nDims, 0 );
+    cout << "Fits::read: filename = " << filename << endl;
+    cout << "Fits::read: " << __LINE__ << printArray(hdr->primaryHDU.dims,"  fdims") << endl;
+    cout << "Fits::read: " << __LINE__ << printArray(data.dimensions(),"  ddims") << endl;
     for( int i( 0 ); i < nDims; ++i ) {
-        dimSizes[i] = hdr->m_Header.dim[nDims - i - 1];
+        dimSizes[i] = hdr->primaryHDU.dims[nDims - i - 1];
         if( !forceResize && ( dimSizes[i] != data.dimSize( nArrayDims - nDims + i ) ) ) {
             forceResize = true;
         }
         nElements *= dimSizes[i];
     }
+    cout << "Fits::read: " << __LINE__ << "  forceResize="  << forceResize << endl;
+    cout << "Fits::read: " << __LINE__ << "  nElements="  << nElements << endl;
 
     if( forceResize ) {
         data.resize( dimSizes );
+        cout << "Fits::read: " << __LINE__ << printArray(data.dimensions(),"  nddims") << endl;
     }
 
-    auto tmp = std::shared_ptr<char>( new char[nElements * typeSizes[hdr->m_Header.datyp]], []( char * p ) { delete[] p; } );
-    if( hdr->m_Header.subf & 1 ) {
-        readCompressed( file, tmp.get(), nElements, hdr.get() );
+    size_t dataSize = hdr->primaryHDU.nElements * hdr->primaryHDU.elementSize;
+    if( dataSize ) {
+        cout << "Fits::read: " << __LINE__ << "  dataSize = "  << dataSize << endl;
+        auto tmp = std::shared_ptr<char>( new char[dataSize], []( char * p ) { delete[] p; } );
+        read( hdr, tmp.get() );
+        switch( hdr->primaryHDU.dataType ) {
+            case( TBYTE ):   data.template copyFrom<uint8_t>( tmp.get() ); break;
+            case( TSBYTE ):  data.template copyFrom<int8_t>( tmp.get() ); break;
+            case( TSHORT ):  data.template copyFrom<int16_t>( tmp.get() ); break;
+            case( TUSHORT ): data.template copyFrom<uint16_t>( tmp.get() ); break;
+            case( TINT ):    data.template copyFrom<int32_t>( tmp.get() ); break;
+            case( TUINT ):   data.template copyFrom<uint32_t>( tmp.get() ); break;
+            case( TFLOAT ):  data.template copyFrom<float>( tmp.get() ); break;
+            case( TDOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
+            default: cerr << "Fits::read: " << __LINE__ << "  unsupported data type: "  << hdr->primaryHDU.dataType << endl;
+        }
+        cout << "Fits::read: " << __LINE__ << "  nElements="  << nElements << endl;
     }
-    else {
-        readUncompressed( file, tmp.get(), nElements, hdr.get() );
-    }
-
-    switch( hdr->m_Header.datyp ) {
-        case( FITS_BYTE ):   data.template copyFrom<char>( tmp.get() ); break;
-        case( FITS_WORD ):   data.template copyFrom<int16_t>( tmp.get() ); break;
-        case( FITS_LONG ):   data.template copyFrom<int32_t>( tmp.get() ); break;
-        case( FITS_FLOAT ):  data.template copyFrom<float>( tmp.get() ); break;
-        case( FITS_DOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
-        default: ;
-    }
-
 }
 template void redux::file::Fits::read( const string& filename, redux::util::Array<uint8_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
 template void redux::file::Fits::read( const string& filename, redux::util::Array<int16_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
@@ -609,105 +534,39 @@ template void redux::file::Fits::read( const string& filename, redux::util::Arra
 
 
 template <typename T>
-void redux::file::Fits::read( const string& filename, redux::image::Image<T>& image ) {
+void redux::file::Fits::read( const string& filename, redux::image::Image<T>& image, bool metaOnly ) {
     std::shared_ptr<Fits> hdr = static_pointer_cast<Fits>( image.meta );
-    read( filename, image, hdr );
-    image.meta = hdr;
+    cout << "Fits::read: " << __LINE__ << "  hdr ="  << hexString(hdr.get()) << "  mO = " << metaOnly << endl;
+    if( !hdr ) {
+        hdr.reset( new Fits() );
+        cout << "Fits::read: " << __LINE__ << "  new FitsHdr = " << hexString(hdr.get()) << endl;
+        image.meta = hdr;
+    }
+    if( metaOnly ) {
+        hdr->read( filename );
+    } else {
+        read( filename, image, hdr );
+    }
+    cout << "Fits::read: " << __LINE__ << "  hdr ="  << hexString(hdr.get()) << "  meta = " << hexString(image.meta.get()) << endl;
 }
-template void redux::file::Fits::read( const string & filename, redux::image::Image<uint8_t>& image );
-template void redux::file::Fits::read( const string & filename, redux::image::Image<int16_t>& image );
-template void redux::file::Fits::read( const string & filename, redux::image::Image<int32_t>& image );
-template void redux::file::Fits::read( const string & filename, redux::image::Image<int64_t>& image );
-template void redux::file::Fits::read( const string & filename, redux::image::Image<float  >& image );
-template void redux::file::Fits::read( const string & filename, redux::image::Image<double >& image );
-template void redux::file::Fits::read( const string & filename, redux::image::Image<complex_t >& image );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<uint8_t>& image, bool );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<int16_t>& image, bool );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<int32_t>& image, bool );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<int64_t>& image, bool );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<float  >& image, bool );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<double >& image, bool );
+template void redux::file::Fits::read( const string & filename, redux::image::Image<complex_t >& image, bool );
 
 
 template <typename T>
 void redux::file::Fits::write( const string & filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Fits> hdr, int sliceSize ) {
 
-    if( !hdr.get() ) {
-        hdr.reset( new Fits() );
-    }
+    // TODO
     
-    auto tmpDims = data.dimensions(true);    // TBD: should we always discard dimensions of size 1, or leave it to the user ??
-    int nDims = tmpDims.size();
-
-    if( nDims == 0 ) {      // Don't write empty files, ignore silently.
-        return;
-    }
-        
-    if( nDims > 16 ) {
-        throw invalid_argument( "Fits::write(): the FITS/f0 format does not support more dimensions than 16." );
-    }
+//    if( !hdr.get() ) {
+//        hdr.reset( new Fits() );
+//    }
     
-    std::reverse( tmpDims.begin(), tmpDims.end() );     // FITS store fast dimension first
-    hdr->m_Header.ndim = 0;
-    size_t nElements = 1;
-    for( auto &dim: tmpDims ) {
-        hdr->m_Header.dim[hdr->m_Header.ndim++] = dim;
-        nElements *= dim;
-    }
-    
-    ofstream file( filename, ifstream::binary );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Failed to open file: " + filename );
-    }
-
-    hdr->m_Header.datyp = getDatyp<T>();
-
-    size_t textSize = hdr->m_ExtendedHeader.length();
-    size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
-    size_t compressedSize = totalSize;
-
-    hdr->m_Header.synch_pattern = MAGIC_FITS;
-    hdr->m_Header.subf = 0;
-    hdr->m_Header.nhb = static_cast<uint8_t>( 1 + std::max( textSize + 256, size_t( 0 ) ) / 512 );
-    memset( hdr->m_Header.cbytes, 0, 4 );
-
-    shared_ptr<uint8_t> cData;
-    if( sliceSize > 0 ) {
-        if( hdr->m_Header.ndim == 2 ) {
-            if( data.dense() ) {
-                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.get() ), nElements, hdr, sliceSize );
-            }
-            else {
-                compressedSize = compressData( cData, reinterpret_cast<const char*>( data.copy().get() ), nElements, hdr, sliceSize );
-            }
-            if( compressedSize < totalSize ) {
-                int tmp = static_cast<int>( compressedSize );
-                hdr->m_Header.subf |= 1;
-                memcpy( hdr->m_Header.cbytes, &tmp, 4 );
-                memcpy( &hdr->m_CompressedHeader, cData.get(), 14 );
-                totalSize = compressedSize;
-            }
-            else {          // compressed data larger than original -> store uncompressed.
-                cData.reset();
-                memset( &hdr->m_CompressedHeader, 0, 14 );
-            }
-        }
-        else {
-            throw invalid_argument( "Fits::write(): compression only implemented for 2D data." );
-        }
-    }
-
-    hdr->write( file );
-
-    if( cData ) {
-        file.write( reinterpret_cast<char*>( cData.get() ) + 14, totalSize ); // compressed header is already written, so skip 14 bytes.
-    }
-    else {
-        if( data.dense() ) {
-            file.write( reinterpret_cast<const char*>( data.get() ), totalSize );
-        }
-        else {
-            file.write( reinterpret_cast<const char*>( data.copy().get() ), totalSize );
-        }
-    }
-
-    if( !file.good() )
-        throw ios_base::failure( "Fits::write(): write failed." );
-
 
 }
 template void redux::file::Fits::write( const string&, const redux::util::Array<uint8_t>&, std::shared_ptr<redux::file::Fits>, int );
@@ -735,31 +594,7 @@ template void redux::file::Fits::write( const string&, const redux::image::Image
 template <typename T>
 void redux::file::Fits::write( const string & filename, const T* data, size_t n ) {
     
-    if( n == 0 ) {
-        return;
-    }
-    
-    ofstream file( filename, ifstream::binary );
-    if( !file.good() ) {
-        throw std::ios_base::failure( "Failed to open file: " + filename );
-    }
-
-    Fits tmpHdr;
-
-    tmpHdr.m_Header.dim[0] = n;
-    tmpHdr.m_Header.ndim = 1;
-    tmpHdr.m_Header.datyp = getDatyp<T>();
-    tmpHdr.m_Header.synch_pattern = MAGIC_FITS;
-    tmpHdr.m_Header.subf = 0;
-    tmpHdr.m_Header.nhb = 1;
-
-    tmpHdr.write( file );
-
-    file.write( reinterpret_cast<const char*>( data ), tmpHdr.m_Header.dim[0]*typeSizes[tmpHdr.m_Header.datyp] );
-
-    if( !file.good() )
-        throw ios_base::failure( "Fits::write(): write failed." );
-
+    // TODO
 
 }
 template void redux::file::Fits::write( const string&, const uint8_t*, size_t n );

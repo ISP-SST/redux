@@ -31,12 +31,14 @@ namespace redux {
             void loadImage( redux::image::Image<T>& img ) const { redux::file::readFile( filename.string(), img ); }
 
             template <typename T>
-            static void load( redux::image::Image<T>& img, const std::string& fn ) {
+            static void load( redux::image::Image<T>& img, const std::string& fn, bool metaOnly=false ) {
                 CachedFile cf( fn );
                 redux::image::Image<T>& cimg = redux::util::Cache::get<CachedFile, redux::image::Image<T> >(cf);
                 {
                     std::unique_lock<std::mutex> lock( cimg.imgMutex );
-                    if( cimg.nElements() == 0 ) cf.loadImage( cimg );
+                    if( !cimg.meta || (!metaOnly && cimg.nElements() == 0) ) {
+                        redux::file::readFile( fn, cimg, metaOnly );
+                    }
                 }
                 img = cimg;
             }

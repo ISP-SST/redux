@@ -169,7 +169,8 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
             }
             shared_ptr<Fits> hdr = static_pointer_cast<Fits>(meta);
             if( hdr ) {
-                Fits::read( filename, data, hdr );
+                hdr->read( filename );
+                Fits::read( hdr, data );
             } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Fits type." << endl;
             break;
         }
@@ -209,31 +210,31 @@ template void redux::file::readFile( const string& filename, redux::util::Array<
 
 
 template <typename T>
-void redux::file::readFile( const string& filename, redux::image::Image<T>& image ) {
+void redux::file::readFile( const string& filename, redux::image::Image<T>& image, bool metaOnly ) {
     Format fmt = readFmt(filename);
     switch(fmt) {
-        case FMT_ANA: Ana::read(filename, image); break;
-        //case Fits::MAGIC_FITS: return FMT_FITS;
+        case FMT_ANA: Ana::read(filename, image, metaOnly); break;
+        case FMT_FITS: Fits::read(filename, image, metaOnly); break;
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::read(img) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }
 
 
 }
-template void redux::file::readFile( const string& filename, redux::image::Image<uint8_t>& data );
-template void redux::file::readFile( const string& filename, redux::image::Image<int16_t>& data );
-template void redux::file::readFile( const string& filename, redux::image::Image<int32_t>& data );
-template void redux::file::readFile( const string& filename, redux::image::Image<int64_t>& data );
-template void redux::file::readFile( const string& filename, redux::image::Image<float>& data );
-template void redux::file::readFile( const string& filename, redux::image::Image<double>& data );
+template void redux::file::readFile( const string& filename, redux::image::Image<uint8_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<int16_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<int32_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<int64_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<float>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<double>& data, bool );
 
 
 template <typename T>
 void redux::file::writeFile( const string& filename, redux::util::Array<T>& data ) {
     Format fmt = guessFmt(filename);
     switch(fmt) {
-        case FMT_ANA: Ana::write(filename,data); break;
-        //case Fits::MAGIC_FITS: return FMT_FITS;
+        case FMT_ANA: Ana::write(filename, data); break;
+        case FMT_FITS: Fits::write(filename, data); break;
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::write(arr) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }
@@ -253,7 +254,7 @@ void redux::file::writeFile( const string& filename, redux::image::Image<T>& ima
     Format fmt = guessFmt(filename);
     switch(fmt) {
         case FMT_ANA: Ana::write(filename, image); break;
-        //case Fits::MAGIC_FITS: return FMT_FITS;
+        case FMT_FITS: Fits::write(filename, image); break;
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::write(img) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }

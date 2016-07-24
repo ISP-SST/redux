@@ -6,6 +6,8 @@
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
 
+#include <fitsio.h>
+
 
 namespace redux {
 
@@ -21,28 +23,34 @@ namespace redux {
         struct Fits : public redux::file::FileMeta {
 
             enum Magic { MAGIC_FITS = 0x504d4953 }; // = "PMIS"
-            enum TypeIndex { FITS_BYTE = 0,      // uint8
+            enum TypeIndex { FITS_NOTYPE = 0,
+                             FITS_BYTE,          // uint8
                              FITS_WORD,          // int16
-                             FITS_LONG,          // int32
+                             FITS_INT,           // int32
                              FITS_FLOAT,
                              FITS_DOUBLE,
-                             FITS_LONGLONG,      // int64_t unsupported
-                             FITS_COMPLEX=8,     // experimental support (=8 to match IDL's DCOMPLEX)
-                             FITS_UNDEF=255 };
-            static const uint8_t typeSizes[];   // = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
-
-            typedef std::shared_ptr<Fits> Ptr;
+                             FITS_COMPLEX,
+                             FITS_STRING,
+                             FITS_DCOMPLEX=9,
+                             FITS_UWORD=12,
+                             FITS_UINT,
+                             FITS_LONG,
+                             FITS_ULONG };
+            static const uint8_t typeSizes[];   // = { 0, 1, 2, 4, 4, 8, 8, 0, 0, 16 };
             
             Fits( void );
             Fits( const std::string& );
+            ~Fits();
 
-            void read( std::ifstream& );
+            void close( void );
             void read( const std::string& );
 
             void write( std::ofstream& );
 
             std::string getText( void ) {
-                return m_Header.txt + m_ExtendedHeader;
+                std::string ret;
+                for( auto& k: primaryHDU.keywords ) ret += (k + "\n");
+                return ret;
             }
             
             size_t getNumberOfFrames(void);
@@ -54,49 +62,34 @@ namespace redux {
             size_t dataSize(void);
             size_t dimSize(size_t);
             uint8_t elementSize(void);
-            uint8_t nDims(void) { return m_Header.ndim; }
+            uint8_t nDims(void) { return primaryHDU.nDims; }
             size_t nElements(void);
             int getIDLType(void);
             
             double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr );
 
-            struct raw_header {                    // first block for ana files
-                uint32_t synch_pattern;
-                uint8_t subf;
-                uint8_t source;
-                uint8_t nhb;
-                uint8_t datyp;
-                uint8_t ndim;
-                uint8_t free1;
-                uint8_t cbytes[4];
-                uint8_t free[178];
-                uint32_t dim[16];
-                char txt[256];
-            } m_Header;
-
-            struct compressed_header {
-                uint32_t tsize, nblocks, bsize;
-                uint8_t slice_size, type;
-            } m_CompressedHeader;
-
-            std::string m_ExtendedHeader;
-            size_t hdrSize;
-
-            static void readCompressed( std::ifstream& file, char* data, size_t nElements, const Fits* hdr );
-            static void readUncompressed( std::ifstream& file, char* data, size_t nElements, const Fits* hdr );
-            static int compressData( std::shared_ptr<uint8_t>& out, const char* data, int nElements, const std::shared_ptr<Fits>& hdr, int slice );
-
-
+            struct hdu {
+                int bitpix;
+                int nDims;
+                int dataType;
+                size_t elementSize;
+                size_t nElements;
+                std::vector<int> dims;
+                std::vector<std::string> keywords;
+            } primaryHDU;
+            
+            fitsfile* fitsPtr_;
+            int status_;
 
             /*! @name Read
-             *  @brief Load an FITS file into a data block
+             *  @brief Load a FITS file into a data block
              */
             //@{
-            static void read( const std::string& filename, char* data, std::shared_ptr<redux::file::Fits>& hdr );
+            static void read( std::shared_ptr<redux::file::Fits>& hdr, char* data );
             template <typename T>
             static void read( const std::string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Fits>& hdr );
             template <typename T>
-            static void read( const std::string& filename, redux::image::Image<T>& data );
+            static void read( const std::string& filename, redux::image::Image<T>& data, bool metaOnly=false );
             //@}
             
             /*! @name Write

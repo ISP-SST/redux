@@ -48,6 +48,11 @@ Ana::Ana( const std::string& filename ) : hdrSize( 0 ) {
     read( filename );
 }
 
+
+Ana::~Ana( void ) {
+
+}
+
 void Ana::read( ifstream& file ) {
 
     hdrSize = 0;
@@ -152,6 +157,9 @@ void Ana::write( ofstream& file ) {
     if( textSize > 255 ) {
         m_Header.nhb = static_cast<uint8_t>( 1+(textSize+256)/512 );
         if( m_Header.nhb > 16 ) {
+            cout << "Warning: Ana::write() - this = " << hexString(this) << endl;
+            cout << "Warning: Ana::write() - textSize = " << textSize << "   nhb = " << m_Header.nhb << endl;
+            cout << "Warning: Ana::write() - text = \"" << m_ExtendedHeader << "\n" << endl;
             cout << "Warning: Ana::write() - header text is too long, it will be truncated!! (max = 7935 characters)" << endl;
             m_Header.nhb = 16;
             textSize = 7935;
@@ -611,18 +619,25 @@ template void redux::file::Ana::read( const string& filename, redux::util::Array
 
 
 template <typename T>
-void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image ) {
+void redux::file::Ana::read( const string& filename, redux::image::Image<T>& image, bool metaOnly ) {
     std::shared_ptr<Ana> hdr = static_pointer_cast<Ana>( image.meta );
-    read( filename, image, hdr );
-    image.meta = hdr;
+    if( !hdr ) {
+        hdr.reset( new Ana() );
+        image.meta = hdr;
+    }
+    if( metaOnly ) {
+        hdr->read( filename );
+    } else {
+        read( filename, image, hdr );
+    }
 }
-template void redux::file::Ana::read( const string & filename, redux::image::Image<uint8_t>& image );
-template void redux::file::Ana::read( const string & filename, redux::image::Image<int16_t>& image );
-template void redux::file::Ana::read( const string & filename, redux::image::Image<int32_t>& image );
-template void redux::file::Ana::read( const string & filename, redux::image::Image<int64_t>& image );
-template void redux::file::Ana::read( const string & filename, redux::image::Image<float  >& image );
-template void redux::file::Ana::read( const string & filename, redux::image::Image<double >& image );
-template void redux::file::Ana::read( const string & filename, redux::image::Image<complex_t >& image );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<uint8_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int16_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int32_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int64_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<float  >& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<double >& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<complex_t >& image, bool );
 
 
 template <typename T>

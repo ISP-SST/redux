@@ -37,6 +37,7 @@ namespace redux {
             
             Ana( void );
             Ana( const std::string& );
+            ~Ana();
 
             void read( std::ifstream& );
             void read( const std::string& );
@@ -98,7 +99,7 @@ namespace redux {
             template <typename T>
             static void read( const std::string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Ana>& hdr );
             template <typename T>
-            static void read( const std::string& filename, redux::image::Image<T>& data );
+            static void read( const std::string& filename, redux::image::Image<T>& data, bool metaOnly=false );
             //@}
             
             /*! @name Write

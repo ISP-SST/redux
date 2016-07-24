@@ -50,7 +50,7 @@ namespace redux {
             
             virtual double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr ) = 0;
             
-            std::string& at(const std::string& key) { return list[key]; };
+            /*std::string& at(const std::string& key) { return list[key]; };
             //const std::string& at (const std::string& key) const { return list[key]; };
             void clearList(void) { list.clear(); }
             bool emplace(const std::string& key, const std::string& val) { auto ret = list.emplace(key,val); return ret.second; }
@@ -58,7 +58,7 @@ namespace redux {
             
             std::string& operator[](const std::string& key) { return list[key]; };
             
-            std::map<std::string, std::string, cmp> list;
+            std::map<std::string, std::string, cmp> list;*/
             
         };
 

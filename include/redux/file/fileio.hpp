@@ -40,7 +40,7 @@ namespace redux {
         template <typename T>
         void readFile( const std::string& fn, redux::util::Array<T>& data );
         template <typename T>
-        void readFile( const std::string& fn, redux::image::Image<T>& data );
+        void readFile( const std::string& fn, redux::image::Image<T>& data, bool metaOnly=false );
 
         template <typename T>
         void writeFile( const std::string& fn, redux::util::Array<T>& data );
