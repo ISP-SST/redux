@@ -206,7 +206,15 @@ void Worker::run( void ) {
     while( getWork() ) {
         //cout << "Worker::run()  got work, calling run..." << endl;
         sleepS = 1;
-        while( wip.job && wip.job->run( wip, ioService, daemon.myInfo->status.nThreads ) ) ;
+        try {
+            while( wip.job && wip.job->run( wip, ioService, daemon.myInfo->status.nThreads ) ) ;
+        }
+        catch( const exception& e ) {
+            LOG_ERR << "Worker: Exception caught while processing job: " << e.what();
+        }
+        catch( ... ) {
+            LOG_ERR << "Worker: Unrecognized exception caught while processing job.";
+        }
     }
 
     runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(sleepS));
