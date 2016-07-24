@@ -37,6 +37,7 @@ Mat redux::arrayToMat (const IDL_VPTR& in, int verbose) {
         switch (in->type) {
             case IDL_TYP_BYTE:   type |= CV_8U; break;
             case IDL_TYP_INT:    type |= CV_16S; break;
+            case IDL_TYP_UINT:   type |= CV_16U; break;
             case IDL_TYP_LONG:   type |= CV_32S; break;
             case IDL_TYP_FLOAT:  type |= CV_32F; break;
             case IDL_TYP_DOUBLE: type |= CV_64F; break;
