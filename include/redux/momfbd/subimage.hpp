@@ -49,11 +49,7 @@ namespace redux {
             double gradientVogel(uint16_t mode, double) const;
             void calcVogelWeight(void);
             
-            //void addScaledMode( double* modePtr, double a );
-            
-            void addMode(double* phiPtr, const double* modePtr, double a) const;
-            //void addModes(size_t nModes, uint16_t* modes, const double* a) { addModes(phi.get(), nModes, modes, a); }
-            //void addModes(double* phiPtr, size_t nModes, uint16_t* modes, const double* a) const;
+            void addToPhi(double* phiPtr, const double* modePtr, double a) const;
             
             void adjustOffset(double* alpha);
 
@@ -67,13 +63,12 @@ namespace redux {
             void setAlphas(const std::vector<uint16_t>& modes, const double* a);
 
             void addAlphaOffsets(double* alphas, float* alphaOut) const;    // copy with offset correction (results)
-            void getAlphas(double* alphas) const {  // copy without offset correction
-                std::copy(alphaOffsets.begin(),alphaOffsets.end(),alphas);
-            }
             
             void resetPhi(void);
-            void addPhi(const double* p, double scale=1.0);
-            void calcPhi(const double* a);
+            inline void addToPhi(const double* a) { addToPhi( a, phi.get() ); }
+            void addToPhi(const double* a, double* phiPtr) const;
+            inline void calcPhi(const double* a) { calcPhi( a, phi.get() ); }
+            void calcPhi(const double* a, double* phiPtr) const;
 
             void calcOTF(complex_t* otf, const double* phiOffset, double scale);
             void calcOTF(complex_t* otf, const double* phi);
@@ -101,7 +96,6 @@ namespace redux {
             template <typename T>
             redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) { return std::move(cim-img); }
             
-            //void update(bool newVogel=false);
             void dump( std::string tag ) const;
 
             uint32_t index;
@@ -117,7 +111,7 @@ namespace redux {
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;
             
-            std::vector<double> alphaOffsets;
+            PointD adjustedTilts;
             bool newPhi;
             bool newOTF;
             std::mutex mtx;

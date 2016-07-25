@@ -21,7 +21,7 @@ using namespace std;
 #define logChannel "subimage"
 
 //#define USE_LUT
-#define ALPHA_CUTOFF 1E-12
+#define ALPHA_CUTOFF 0.0
 
 namespace {
 
@@ -76,6 +76,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointI& shift
     index = i;
     offset = offs;
     offsetShift = shift;
+    adjustedTilts = 0;
     
     if( patchSize != imgSize ) {
         imgSize = patchSize;
@@ -102,11 +103,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointI& shift
         vogel.zero();
     }
     
-    if( nM != nModes ) {
-        nModes = nM;
-        alphaOffsets.resize(nM);
-    }
-    memset( alphaOffsets.data(), 0, nM*sizeof(double) );
+    nModes = nM;
     
 }
 
@@ -270,9 +267,8 @@ double SubImage::gradientFiniteDifference( uint16_t modeIndex, double step ) {
     
     complex_t* otfPtr = tmpC.get();
     double* phiPtr = tmpPhi.get();
-    step /= modes.norms[modeIndex];
     memcpy(phiPtr, phi.get(), pupilSize2*sizeof(double));
-    addMode(phiPtr, modes.modePointers[modeIndex], step );
+    addToPhi(phiPtr, modes.modePointers[modeIndex], step );
     calcOTF(otfPtr, phiPtr);
     return metricChange(otfPtr)/step;
     
@@ -349,35 +345,6 @@ void SubImage::resetPhi(void) {
     //memcpy( phi.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements()*sizeof (double));
 }
 
-/*
-void SubImage::addScaledMode( double* modePtr, double a ) {
-    addMode(phi.get(), modePtr, a/object.wavelength);
-}*/
-
-void SubImage::addMode( double* phiPtr, const double* modePtr, double a ) const {
-
-    //if(fabs(a) < ALPHA_CUTOFF) return;
-    //if(index==0 && channel.ID==0 && object.ID == 0 ) {
-    //    cout << "this=" << hexString(this) << "  modePtr=" << hexString(modePtr) << "  phiPtr=" << hexString(phiPtr) << "  a=" << a << endl;
-    //}
-        
-    transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
-              [a](const double& p, const double& m) {
-                  return p + a*m;
-              });
-//     for (auto & ind : channel.pupilIndices ) {
-//         phiPtr[ind] += a * modePtr[ind];
-//     }
-
-}
-
-/*
-void SubImage::addModes (double* phiPtr, size_t nModes, uint16_t* modes, const double* alphas) const {
-    for (size_t m = 0; m < nModes; ++m) {
-        addMode (phiPtr, modes[m], alphas[m]);
-    }
-}
-*/
 
 void SubImage::adjustOffset(double* alpha) {
 
@@ -441,39 +408,43 @@ void SubImage::addAlphaOffsets(double* alphas, float* alphaOut) const {
 }
 
 
-void SubImage::addPhi( const double* p, double scale ) {
+void SubImage::addToPhi( double* phiPtr, const double* modePtr, double a ) const {
+
+    transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
+              [a](const double& p, const double& m) {
+                  return p + a*m;
+              });
+
+}
+
+
+void SubImage::addToPhi( const double* a, double* phiPtr ) const {
     
-    double* phiPtr = phi.get();
-    transform( phiPtr, phiPtr+pupilSize2, p, phiPtr,
-            [scale](const double& a, const double& b) {
-                return a + scale*b;
-            });
-    
-    newPhi = true;
+#ifdef DEBUG_
+    LOG_TRACE << "SubImage(" << index << ")::addToPhi(" << hexString(this) << ")   nModes=" << nModes << "  pupilSize2=" << pupilSize2
+    << printArray( a, nModes, "  newAlpha" );
+#endif
+
+    for( unsigned int i=0; i<nModes; ++i ) {
+        if( fabs(a[i]) > ALPHA_CUTOFF ) {
+            double scaledAlpha = a[i]; ///object.wavelength;
+            const double* modePtr = modes.modePointers[i];
+            transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
+                [scaledAlpha](const double& p, const double& m) {
+                    return p + scaledAlpha*m;
+                });
+        }
+    }
     
 }
 
 
-void SubImage::calcPhi( const double* a ) {
+void SubImage::calcPhi( const double* a, double* phiPtr ) const {
 
-#ifdef DEBUG_
-    LOG_TRACE << "SubImage::calcPhi(" << hexString(this) << ")   nModes=" << nModes << "  pupilSize2=" << pupilSize2;
-#endif
+    memcpy( phiPtr, channel.phi_channel.get(), pupilSize2*sizeof(double) );
+    //memset( phiPtr, 0, pupilSize2*sizeof(double) );    // FIXME: use phi_fixed
+    addToPhi( a, phiPtr );
 
-    resetPhi();
-    double scale = 1.0; // /(object.wavelength*pupilSize2); //*object.pupil.area);
-    double* phiPtr = phi.get();
-    for( unsigned int i=0; i<nModes; ++i) {
-        double scaledAlpha = a[i]*scale;
-        const double* modePtr = modes.modePointers[i];
-        transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
-            [scaledAlpha](const double& p, const double& m) {
-                return p + scaledAlpha*m;
-            });
-
-    }
-    
-    newPhi = true;
 }
 
 
@@ -636,15 +607,6 @@ redux::util::Array<double> SubImage::getPSF( void ) const {
 }
 
 
-/*
-void SubImage::update(bool newVogel) {
- //   cout << "SubImage::update(" << hexString(this) << ")  nV = " << newVogel << endl;
-    //calcPhi();
-    if( newPhi ) calcOTF();
-    //if( newOTF ) object.addDiffToPQ(imgFT, OTF, oldOTF);
-    if( newVogel ) calcVogelWeight(); 
-//    cout << "SubImage::update(" << hexString(this) << ")   L:" << __LINE__ << endl;
-}*/
 
 void SubImage::dump (std::string tag) const {
 
@@ -659,6 +621,19 @@ void SubImage::dump (std::string tag) const {
     Ana::write (tag + "_imgFT.f0", imgFT);
     Ana::write (tag + "_window.f0", window);
     Ana::write (tag + "_vogel.f0", vogel);
+    
+    Array<double> tmp( imgSize, imgSize );
+    tmp = 0;
+    for(int x=0;x<imgSize/2;++x)
+      for(int y=0;y<imgSize/2;++y) {
+          tmp(x,y) = 1;
+          tmp(imgSize/2+x,y) = 2;
+          tmp(x,imgSize/2+y) = 3;
+          tmp(imgSize/2+x,imgSize/2+y) = 4;
+      }
+    Ana::write (tag + "_g.f0", tmp);
+    FourierTransform::reorder( tmp.get(), imgSize, imgSize );
+    Ana::write (tag + "_g2.f0", tmp);
 
 }
 

@@ -37,21 +37,25 @@ namespace redux {
             void reset(void);
             void dumpImages( boost::asio::io_service&, std::string );
             
-
-            double my_test(const gsl_vector*, void*, gsl_vector*, std::string );
             double my_f( const gsl_vector*, void* );
             void my_df( const gsl_vector*, void*, gsl_vector* );
             void my_fdf( const gsl_vector*, void*, double*, gsl_vector* );
+            void my_precalc( const gsl_vector*, const gsl_vector* );
             
             void run(PatchData::Ptr);
+            
             void applyAlpha(void);
             void applyBeta( const gsl_vector* beta );
             void applyBeta( const gsl_vector* beta, double scale );
+            void applyBeta( double scale );
+            
             double metric(void);
+            double metricAt(double step);       // evaluate metric at alpha + step*grad
+            void calcPQ(void);
             void gradient(void);
             void gradient(gsl_vector* out);
+          
             void clear(void);
-            void getAlpha(void);
             
             void dump( std::string tag );
             
@@ -60,6 +64,8 @@ namespace redux {
             boost::asio::io_service& service;
             
             redux::util::Array<double> window, noiseWindow;
+            redux::util::Array<double> tmpPhi, tmpPhiGrad;
+            redux::util::Array<complex_t> tmpOTF;
             
             uint16_t patchSize;
             uint16_t pupilSize;
@@ -71,10 +77,15 @@ namespace redux {
             
             uint16_t *modeNumbers;
             uint16_t *enabledModes;
-            double *alpha, *grad_alpha, *init_alpha;
-            float max_mode_norm;
+
+            double *alpha, *alpha_offset, *grad_alpha, *tmp_alpha;
+            double *beta, *grad_beta, *search_dir, *tmp_beta;
+            double grad_beta_norm;
+            
+            double max_wavelength;
             
             grad_t gradientMethod;
+
             boost::timer::cpu_timer timer;
             
         };

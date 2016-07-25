@@ -6,6 +6,7 @@
 #include "redux/image/utils.hpp"
 #include "redux/logger.hpp"
 
+#include <atomic>
 #include <functional>
 #include <limits>
 #include <random>
@@ -35,12 +36,38 @@ namespace {
         std::bind(&SubImage::gradientVogel, sp::_1, sp::_2, sp::_3)
     };
 
+    struct sync_counter {
+        sync_counter() : counter(0) {}
+        atomic<int> counter;
+        mutex mtx;
+        condition_variable cv;
+        void reset(void) {
+            unique_lock<mutex> lck(mtx);
+            counter = 0;
+        }
+        void wait(void) {
+            unique_lock<mutex> lck(mtx);
+            while( counter ) cv.wait(lck);
+        }
+        sync_counter& operator--() {
+            unique_lock<mutex> lck(mtx);
+            if( --counter == 0 ) cv.notify_all();
+            return *this;
+        }
+        sync_counter& operator++() {
+            unique_lock<mutex> lck(mtx);
+            counter++;
+            return *this;
+        }
+    };
+    
+    
 }
 
 
 Solver::Solver( const MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), objects( j.getObjects() ),
     service(s), nThreads(t), nFreeParameters(0), nTotalImages(0), modeNumbers(nullptr), enabledModes(nullptr),alpha(nullptr), 
-    grad_alpha(nullptr), init_alpha(nullptr) {
+    alpha_offset(nullptr), grad_alpha(nullptr), tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr) {
 
 }
 
@@ -53,7 +80,7 @@ Solver::~Solver() {
 
 
 void Solver::init( void ) {
-    
+
     clear();
 
     patchSize = job.patchSize;
@@ -73,37 +100,36 @@ void Solver::init( void ) {
     noiseWindow = 1.0;
     redux::image::apodizeInPlace( noiseWindow, md / 16);     // FIXME: old code specifies md/16, but applies it after "window", so it is actually the product...
     
+    tmpPhi.resize( nTotalImages, pupilSize, pupilSize );
+    tmpPhiGrad.resize( nTotalImages, pupilSize, pupilSize );
+    tmpOTF.resize( nTotalImages, 2*pupilSize, 2*pupilSize );
+
     enabledModes = new uint16_t[nParameters];
     modeNumbers = new uint16_t[nParameters];
+    
     alpha = new double[nParameters];
     grad_alpha = new double[nParameters];
-    init_alpha = new double[nParameters];
+    alpha_offset = new double[nParameters];
+    tmp_alpha = new double[nParameters];
     
+    beta = new double[nFreeParameters];
+    grad_beta = new double[nFreeParameters];
+    search_dir = new double[nFreeParameters];
+    tmp_beta = new double[nFreeParameters];
+
     uint16_t* mPtr = modeNumbers;
-    for( size_t n=nTotalImages; n>0; n-- ) {
+    for( size_t n=nTotalImages; n; n-- ) {
         memcpy(mPtr,job.modeNumbers.data(),nModes*sizeof(uint16_t));
         mPtr += nModes;
     }
 
-    max_mode_norm = 0;
-//     Array<double> wrapper(init_alpha, nParameters/nModes, nModes);
-    double* gInitPtr = init_alpha;
-    memset(gInitPtr,0,nParameters*sizeof(double));
+    max_wavelength = 0;
+
     for( auto & object : objects ) {
         object->initProcessing( *this );
-        max_mode_norm = std::max( max_mode_norm, *max_element(object->modes.norms.begin(), object->modes.norms.end()));
-        if(false)
-        for( size_t im=object->nImages(); im; --im ) {
-            for ( uint16_t m=0; m<nModes; ++m ) {
-                if( m != object->modes.tiltMode.x && m != object->modes.tiltMode.y ) {
-                    //gInitPtr[m] = 0.20/object->modes.norms[m];        // completely ad hoc value for starting point
-                    gInitPtr[m] = 0.1*object->modes.atm_rms[m]/object->modes.norms[m];        // starting point, using atm_rms as weight
-                }
-            }
-            gInitPtr += nModes;
-        }
+        max_wavelength = std::max( max_wavelength, object->wavelength );
     }
-    
+
 }
 
 
@@ -127,6 +153,8 @@ void Solver::reset( void ) {
         service.post( std::bind(&Object::addAllPQ, object.get() ) );
     }
 }
+
+
 void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
     for( auto& object: objects ) {
         for( auto& ch: object->channels ) {
@@ -138,168 +166,127 @@ void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
 }
 
 
-double Solver::my_f( const gsl_vector* x, void* params ) {
+double Solver::my_f( const gsl_vector* beta, void* params ) {
 
-    double* alphaPtr = alpha;
-//    memset(alphaPtr,0,nParameters*sizeof(double));
+    applyBeta( beta );
+    return metric();
     
-    job.globalData->constraints.reverse(x->data, alphaPtr);
-   
+}
+
+
+void Solver::my_df( const gsl_vector* beta, void* params, gsl_vector* df ) {
+
+    applyBeta( beta );
+    calcPQ();
+    gradient( df );
+
+}
+
+
+void Solver::my_fdf( const gsl_vector* beta, void* params, double* f, gsl_vector* df ) {
+    
+    applyBeta( beta );
+    *f = metric();
+    gradient( df );
+    
+}
+
+
+void Solver::my_precalc( const gsl_vector* beta, const gsl_vector* beta_grad ) {
+    
+    sync_counter sc;
+    ++sc; service.post( [this, &sc] { tmpPhiGrad.zero(); --sc; } );
+    ++sc; service.post ([this, beta, &sc] { job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset, alpha ); --sc; });
+    ++sc; service.post ([this, beta_grad, &sc] { job.globalData->constraints.reverse( beta_grad->data, grad_alpha ); --sc; });
+    sc.wait();
+
+    size_t nElements = pupilSize*pupilSize;
+    double* alphaPtr = alpha;
+    double* phiPtr = tmpPhi.get();
     for( const auto& o: objects ) {
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
-                service.post ([&im, alphaPtr] {    // use a lambda to ensure these calls are sequential
-                    im->calcPhi( alphaPtr );
-                    im->calcOTF();
+                ++sc;
+                service.post ([&im, alphaPtr, phiPtr, &sc] {    // use a lambda to ensure these calls are sequential
+                    im->calcPhi( alphaPtr, phiPtr );
+                    --sc;
                 });
                 alphaPtr += nModes;
+                phiPtr += nElements;
             }
         }
     }
-    runThreadsAndWait( service, nThreads );
     
+    alphaPtr = grad_alpha;
+    phiPtr = tmpPhiGrad.get();
     for( const auto& o: objects ) {
-        service.post ([&o] {    // use a lambda to ensure these calls are sequential
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
+                ++sc;
+                service.post ([&im, alphaPtr, phiPtr, &sc] {    // use a lambda to ensure these calls are sequential
+                    im->addToPhi( alphaPtr, phiPtr );
+                    --sc;
+                });
+                alphaPtr += nModes;
+                phiPtr += nElements;
+            }
+        }
+    }
+    sc.wait();
+
+}
+
+
+double Solver::metricAt( double step ) {
+    
+    sync_counter sc;
+    
+    size_t pupilSize2 = pupilSize*pupilSize;
+    size_t otfSize2 = 4*pupilSize2;
+    complex_t* otfPtr = tmpOTF.get();
+    double* phiPtr = tmpPhi.get();
+    double* phiGradPtr = tmpPhiGrad.get();
+    for( const auto& o: objects ) {
+        double normalization = sqrt(1.0 / (o->pupil.area*otfSize2));
+        for( const auto& c: o->getChannels() ) {
+            for( const auto& im: c->getSubImages() ) {
+                ++sc;
+                service.post( [&im, &o, normalization, step, otfPtr, phiPtr, phiGradPtr, &sc] {
+                    const double* pupilPtr = o->pupil.get();
+                    for( const auto& ind: o->pupil.pupilInOTF ) {
+                        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+step*phiGradPtr[ind.first]);
+                    }
+                    im->tmpOTF.ft(otfPtr);
+                    im->tmpOTF.norm();
+                    im->tmpOTF.getIFT(im->OTF.get());
+                    FourierTransform::reorder( im->OTF.get(), im->OTF.dimSize(0), im->OTF.dimSize(1) );
+                    --sc;
+                });
+                otfPtr += otfSize2;
+                phiPtr += pupilSize2;
+                phiGradPtr += pupilSize2;
+            }
+        }
+    }
+    sc.wait();
+
+    for( const auto& o : objects ) {
+        ++sc;
+        service.post( [o,&sc] {
             o->initPQ();
             o->addAllPQ();
             o->calcMetric();
-        });
+            --sc;
+        } );
     }
-    runThreadsAndWait( service, nThreads );
-
+    sc.wait();
+    
     double sum(0);
     for( const auto& o : objects ) {
         sum += o->metric();
     }
-    return sum; // /nTotalImages;
-    
-}
 
-
-void Solver::my_df( const gsl_vector* x, void* params, gsl_vector* df ) {
-    
-    double* alphaPtr = alpha;
-    double* gAlphaPtr = grad_alpha;
-    
-    job.globalData->constraints.reverse(x->data, alphaPtr);
-    memset(gAlphaPtr,0,nParameters*sizeof(double));
-    
-    if ( checkAllSmaller( alphaPtr, nParameters, 1E-12 ) ) {
-        gradientMethod = gradientMethods[GM_DIFF];
-//        cout << "Forcing graddiff" << endl;
-    } else {
-//        cout << "Using gradvogel" << endl;
-        gradientMethod = gradientMethods[GM_VOGEL];  //gradientMethods[job.gradientMethod];
-    }
-
-    for( const auto& o: objects ) {
-        for( const auto& c: o->getChannels() ) {
-            for( const auto& im: c->getSubImages() ) {
-                service.post([this, &im, alphaPtr] {    // use a lambda to ensure these calls are sequential
-                    im->calcPhi( alphaPtr );
-                    im->calcPFOTF();
-                });
-                alphaPtr += nModes;
-            }
-        }
-    }
-    runThreadsAndWait( service, nThreads );
-    for( const auto& o: objects ) {
-        service.post([&o] {    // use a lambda to ensure these calls are sequential
-                    o->initPQ();
-                    o->addAllPQ();
-                });
-        
-    }
-    runThreadsAndWait( service, nThreads );
-    
-    for( const auto& o: objects ) {
-        const std::vector<float>& norms = o->modes.norms;
-        for( const auto& c: o->getChannels() ) {
-            for( const auto& im: c->getSubImages() ) {
-                service.post ([this, &norms, &im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
-                    im->calcVogelWeight();
-                    for ( uint16_t m=0; m<nModes; ++m ) {
-                        if( enabledModes[m] ) {
-                            gAlphaPtr[m] = gradientMethod(*im, m, job.graddiff_step ); // / norms[m]; ///nTotalImages;
-                        }
-                    }
-                });
-                gAlphaPtr += nModes;
-            }
-        }
-    }
-    runThreadsAndWait( service, nThreads );
-    
-    job.globalData->constraints.apply(grad_alpha,df->data);
-    
-    gradientMethod = gradientMethods[GM_VOGEL];     // FIXME: this is a hack to mimic the behaviour of the old code
-
-}
-
-void Solver::my_fdf( const gsl_vector* x, void* params, double* f, gsl_vector* df ) {
-    
-    double* alphaPtr = alpha;
-    double* gAlphaPtr = grad_alpha;
-    
-    job.globalData->constraints.reverse(x->data,alphaPtr);
-    memset(grad_alpha,0,nParameters*sizeof(double));
-    
-   if ( checkAllSmaller( alphaPtr, nParameters, 1E-12 ) ) {
- //       cout << "Forcing graddiff" << endl;
-       gradientMethod = gradientMethods[GM_DIFF];
-   } else {
- //       cout << "Using gradvogel" << endl;
-       gradientMethod = gradientMethods[GM_VOGEL];  //gradientMethods[job.gradientMethod];
-   }
-
-    for( const auto& o: objects ) {
-        for( const auto& c: o->getChannels() ) {
-            for( const auto& im: c->getSubImages() ) {
-                service.post([this, &im, alphaPtr] {    // use a lambda to ensure these calls are sequential
-                    im->calcPhi( alphaPtr );
-                    im->calcPFOTF();
-                });
-                alphaPtr += nModes;
-            }
-        }
-    }
-    runThreadsAndWait( service, nThreads );
-    for( const auto& o: objects ) {
-        service.post([&o] {    // use a lambda to ensure these calls are sequential
-                    o->initPQ();
-                    o->addAllPQ();
-                    o->calcMetric();
-                });
-        
-    }
-    runThreadsAndWait( service, nThreads );
-    
-    double sum=0;
-    for( const auto& o: objects ) {
-        const std::vector<float>& norms = o->modes.norms;
-        for( const auto& c: o->getChannels() ) {
-            for( const auto& im: c->getSubImages() ) {
-                service.post ([this, &norms, &im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
-                    im->calcVogelWeight();
-                    for ( uint16_t m=0; m<nModes; ++m ) {
-                        if( enabledModes[m] ) {
-                            gAlphaPtr[m] = gradientMethod(*im, m, job.graddiff_step ); // / norms[m]; ///nTotalImages;
-                        }
-                    }
-                });
-                gAlphaPtr += nModes;
-            }
-        }
-        sum += o->metric();
-    }
-    runThreadsAndWait( service, nThreads );
-    
-    *f = sum; // /nTotalImages;
-
-    job.globalData->constraints.apply(grad_alpha,df->data);
-
-    gradientMethod = gradientMethods[GM_VOGEL];     // FIXME: this is a hack to mimic the behaviour of the old code
+    return sum;
     
 }
 
@@ -314,11 +301,18 @@ void Solver::run( PatchData::Ptr data ) {
     std::function<gsl_df_t> wrapped_df = std::bind( &Solver::my_df, this, sp::_1, sp::_2, sp::_3 );
     std::function<gsl_fdf_t> wrapped_fdf = std::bind( &Solver::my_fdf, this, sp::_1, sp::_2, sp::_3 , sp::_4);
 
-    gsl_fdf_wrapper<decltype( wrapped_f ), decltype( wrapped_df ), decltype( wrapped_fdf )>
-    my_func( nFreeParameters, wrapped_f, wrapped_df, wrapped_fdf );
+    rdx_fdf my_func( nFreeParameters,
+                     std::bind( &Solver::my_f, this, sp::_1, sp::_2 ),
+                     std::bind( &Solver::my_df, this, sp::_1, sp::_2, sp::_3 ),
+                     std::bind( &Solver::my_fdf, this, sp::_1, sp::_2, sp::_3 , sp::_4)
+                   );
     
-    double init_step = 1E8; //10; //1.0/sqrt(max_mode_norm); //1000; //1e-18;   TODO tweak solver parameters
-    double init_tol = 1E-1; //0.01; //1E-12; //0.1;
+    // TODO: Tweak the new method calls/storage, it is only a marginal speedup at the moment
+//      my_func.setPreCalc( std::bind( &Solver::my_precalc, this, sp::_1, sp::_2 ),
+//                          std::bind( &Solver::metricAt, this, sp::_1 ) );
+    
+    double init_step = 1E8; //   TODO tweak solver parameters
+    double init_tol = 1E-1;
     const gsl_multimin_fdfminimizer_type *minimizerType = gsl_multimin_fdfminimizer_steepest_descent;
     switch(job.getstepMethod) {
         case GSM_BFGS:
@@ -342,12 +336,10 @@ void Solver::run( PatchData::Ptr data ) {
         case GSM_CNJG:
             LOG_DETAIL << "Using Conjugate-Gradient solver.";
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_fr;
-            minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
-            //init_step = 1E8;            // tested for _pr, needs tweaking
-            init_step = 10*max_mode_norm;            // tested for _pr, needs tweaking
-            init_tol = 0.01;            // tested for _pr, needs tweaking
-            //minimizerType = rdx_multimin_fdfminimizer_conjugate_pr;
-            //init_tol = 0; //1e-4;
+            //minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
+            minimizerType = multimin_fdfminimizer_conjugate_rdx;        // Use our own implementation
+            init_tol = 1E-6;
+            init_step = 1E-4*max_wavelength;
             break;
         default:
             LOG << "No solver specified, default is Conjugate-Gradient.";
@@ -355,17 +347,15 @@ void Solver::run( PatchData::Ptr data ) {
             init_step = 1E8;            // tested for _pr, needs tweaking
             init_tol = 0.01;            // tested for _pr, needs tweaking
     }
-    
-    //init_step = 10;
-    //init_tol = 0.01;
 
-    gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc( minimizerType, nFreeParameters );
+    //gradientMethod = gradientMethods[job.gradientMethod];
+    gradientMethod = gradientMethods[GM_VOGEL];   // FIXME: old code just uses the cfg-setting the first iteration, then switches to Vogel.
     
-    /***  Always run first iteration using finite-difference & steepest-descent ***/
-    //gradientMethod = gradientMethods[GM_DIFF];
-    gradientMethod = gradientMethods[GM_VOGEL];
+    gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc( minimizerType, nFreeParameters );
+
     gsl_vector *beta_init = gsl_vector_alloc( nFreeParameters );
     memset(beta_init->data,0,nFreeParameters*sizeof(double));
+    memset(alpha_offset,0,nParameters*sizeof(double));
     
     memset(s->x->data,0,nFreeParameters*sizeof(double));
     memset(s->dx->data,0,nFreeParameters*sizeof(double));
@@ -534,26 +524,32 @@ void Solver::run( PatchData::Ptr data ) {
 
 void Solver::applyAlpha( void ) {
 
+    sync_counter sc;
     double* alphaPtr = alpha;
     for( const auto& o: objects ) {
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
-                service.post ([&im, alphaPtr] {    // use a lambda to ensure these calls are sequential
+                ++sc;
+                service.post ([&im, alphaPtr,&sc] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( alphaPtr );
                     im->calcPFOTF();
+                    --sc;
                 });
                 alphaPtr += nModes;
             }
         }
     }
-    runThreadsAndWait( service, nThreads );
-    
+    sc.wait();
+
 }
 
 
 void Solver::applyBeta( const gsl_vector* beta ) {
 
-    job.globalData->constraints.reverse( beta->data, alpha );
+    job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset, alpha );
+//     cout << "applyBeta:" << printArray( beta->data, nFreeParameters, "\nbeta")
+//     << printArray( alpha_offset, nParameters, "\nalpha_offset")
+//     << printArray( alpha, nParameters, "\nalpha") << endl;
     applyAlpha();
 
 }
@@ -567,59 +563,84 @@ void Solver::applyBeta( const gsl_vector* beta, double scale ) {
 }
 
 
+void Solver::applyBeta( double scale ) {
+
+    job.globalData->constraints.reverse( beta, alpha, scale );
+    applyAlpha();
+    
+}
 
 
 double Solver::metric(void) {
 
+    sync_counter sc;
     for( const auto& o : objects ) {
-        service.post( [o] {
+        ++sc;
+        service.post( [o,&sc] {
             o->initPQ();
             o->addAllPQ();
             o->calcMetric();
+            --sc;
         } );
     }
-    runThreadsAndWait( service, nThreads );
+    sc.wait();
     
     double sum(0);
     for( const auto& o : objects ) {
         sum += o->metric();
     }
+
     return sum;
+    
 }
 
 
+void Solver::calcPQ(void) {
 
-void Solver::gradient(void) {
-
-    double* gAlphaPtr = grad_alpha;
-    memset(gAlphaPtr,0,nParameters*sizeof(double));
-
+    sync_counter sc;
     for( const auto& o: objects ) {
-        service.post([&o] {    // use a lambda to ensure these calls are sequential
+        ++sc;
+        service.post([&o,&sc] {    // use a lambda to ensure these calls are sequential
                     o->initPQ();
                     o->addAllPQ();
+                    --sc;
                 });
         
     }
-    runThreadsAndWait( service, nThreads );
+    sc.wait();
     
+}
+ 
+ 
+void Solver::gradient(void) {
+
+    memset( grad_alpha, 0, nParameters*sizeof(double) );
+
+    double* alphaPtr = alpha;
+    double* gAlphaPtr = grad_alpha;
+    sync_counter sc;
     for( const auto& o: objects ) {
+        double grad_step = job.graddiff_step*o->wavelength;
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
-                service.post ([this, &im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
-                    /*if ( job.gradientMethod == GM_VOGEL )*/ im->calcVogelWeight();
+                ++sc;
+                service.post ([this, &im, grad_step, alphaPtr, gAlphaPtr, &sc] {    // use a lambda to ensure these calls are sequential
+                    im->calcVogelWeight();
                     for ( uint16_t m=0; m<nModes; ++m ) {
                         if( enabledModes[m] ) {
-                            gAlphaPtr[m] = gradientMethod(*im, m, job.graddiff_step );
+                            if( fabs(alphaPtr[m]) > 1E-20 ) gAlphaPtr[m] = gradientMethod(*im, m, grad_step );
+                            else gAlphaPtr[m] = gradientMethods[GM_DIFF](*im, m, grad_step );
                         }
                     }
+                    --sc;
                 });
+                alphaPtr += nModes;
                 gAlphaPtr += nModes;
             }
         }
     }
-    runThreadsAndWait( service, nThreads );
-    
+    sc.wait();
+
 }
  
  
@@ -631,31 +652,20 @@ void Solver::gradient( gsl_vector* grad ) {
 }
 
 
-
 void Solver::clear( void ) {
     
     delete[] modeNumbers;
     delete[] enabledModes;
     delete[] alpha;
     delete[] grad_alpha;
-    delete[] init_alpha;
+    delete[] alpha_offset;
+    delete[] tmp_alpha;
+    delete[] beta;
+    delete[] grad_beta;
+    delete[] search_dir;
+    delete[] tmp_beta;
     modeNumbers = enabledModes = nullptr;
     alpha = grad_alpha = nullptr;
-
-}
-
-
-void Solver::getAlpha(void) {
-
-    double* alphaPtr = alpha;
-    for( const auto& o: objects ) {
-        for( const auto& c: o->getChannels() ) {
-            for( const auto& im: c->getSubImages() ) {
-                im->getAlphas(alphaPtr);
-                alphaPtr += nModes;
-            }
-        }
-    }
 
 }
 
@@ -669,6 +679,13 @@ void Solver::dump( string tag ) {
     Ana::write (tag + "_window.f0", window);
     Ana::write (tag + "_noisewindow.f0", noiseWindow);
 
+    Array<double> wrapper(alpha, nTotalImages, nModes);
+    Ana::write(tag + "_alpha.f0",wrapper);
+    wrapper.wrap(alpha_offset, nTotalImages, nModes);
+    Ana::write(tag + "_alpha_offset.f0",wrapper);
+    wrapper.wrap(grad_alpha, nTotalImages, nModes);
+    Ana::write(tag + "_grad_alpha.f0",wrapper);
+     
 }
 
 

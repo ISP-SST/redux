@@ -1,6 +1,7 @@
 #ifndef REDUX_MATH_HELPERS_HPP
 #define REDUX_MATH_HELPERS_HPP
 
+#include <functional>
 #include <limits>
 #include <utility>      // std::swap
 
@@ -120,6 +121,19 @@ namespace redux {
                 return max;
             }
         }
+        
+        
+        /*!
+         *  @brief      Bracket 1D function minimum. Given a & b, find c such that f(a) > f(b) < f(c) (a & b might get modified)
+         */
+        template<typename T, typename U>
+        void bracket(std::function<U(T)> f, T& a, T& b, T& c, U& fa, U& fb, U& fc, int limit=100);
+        
+        /*!
+         *  @brief      Find minimum of function f on the interval [a, b], return x and f(x)
+         */
+        template<typename T, typename U>
+        void brent(std::function<U(T)> f, T a, T b, T& x, U& fx, double tol=1E-4, int limit=100);
         
         
     }
