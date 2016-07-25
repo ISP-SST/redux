@@ -49,7 +49,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&) const;
-            uint32_t nImages(void) const { return imageNumbers.size(); } 
+            uint32_t nImages(void);
             void adjustCutout(ChannelData&, const Region16&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
             void storePatchData(boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>&);          
@@ -60,11 +60,9 @@ namespace redux {
             void initPatch(ChannelData&);
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
-            void computePhi(void);
             //void addAllFT(redux::image::FourierTransform&);
             void addAllFT(redux::util::Array<double>&);
             void addAllPQ(void) const;
-            double metric(void);
             /*****************************************************/
 
             void dump( std::string tag );
@@ -81,8 +79,9 @@ namespace redux {
             void unloadCalib(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
-            void loadImage(size_t index);
-            void preprocessImage(size_t index, redux::image::Image<float>& img);
+            void loadFile( size_t index );
+            void storeCorrected( boost::asio::io_service&, size_t index );
+            void preprocessImage( size_t index );
             void copyImagesToPatch(ChannelData&);          
             
             Point16 getImageSize(void);
@@ -99,6 +98,7 @@ namespace redux {
             redux::image::Image<int16_t> xOffset, yOffset;
             bpx::ptime startT, endT;
             std::future<bool> patchWriteFail;
+            std::vector<size_t> nFrames;                                    //!< Number of frames in each file
             /*****************************************************/
             
             /*************   Local variables for   ***************/
@@ -111,6 +111,7 @@ namespace redux {
             
             uint16_t ID;
             Point16 imgSize;
+            uint32_t nTotalFrames;
             Object& myObject;
             MomfbdJob& myJob;
 

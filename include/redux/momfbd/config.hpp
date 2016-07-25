@@ -98,8 +98,8 @@ namespace redux {
             uint8_t mmWidth;                        //!< Number of cols in modulation matrix
             std::string xOffsetFile,yOffsetFile;    //!< Alignment offsets (from pinhole-calibration)
             uint32_t imageNumberOffset;             //!< Add this offset to each image number in this channel
-            std::vector<uint32_t> imageNumbers;     //!< Use these numbers together with the template to generate file-list
-            std::vector<uint32_t> wfIndex;          //!< Identify wavefront, used to group/constrain simultaneous images if image-numbers can't be used.
+            std::vector<uint32_t> fileNumbers;      //!< Use these numbers together with the template to generate file-list
+            std::vector<uint32_t> waveFronts;       //!< Identify wavefront, used to group/constrain simultaneous images if image-numbers can't be used.
             std::vector<uint32_t> darkNumbers;      //!< Use these numbers together with the template to generate file-list
             std::vector<float> stokesWeights;
             /*****************************/

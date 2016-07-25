@@ -444,6 +444,7 @@ uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
 void Constraints::init( void ) {
     
     int32_t nModes = job.modeNumbers.size();
+//cout << "Constraints::init() " << __LINE__ << "  job.nImages = " << job.nImages() << "  nModes = " << nModes << endl;
     nParameters = job.nImages() * nModes;
 
     parameterOrder.reset( new int32_t[nParameters] );
@@ -457,7 +458,7 @@ void Constraints::init( void ) {
             int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
                 shared_ptr<Constraint> thisConstraint( new Constraint( imageCount * nModes + modeIndex, 1 ) );
-                for( size_t count=objects[0]->getChannels()[0]->imageNumbers.size(); count; --count ) {  // only for first object and channel
+                for( size_t count=objects[0]->getChannels()[0]->nImages(); count; --count ) {  // only for first object and channel
                     thisConstraint->addEntry( imageCount * nModes + modeIndex, 1.0 );
                     imageCount++;
                 }
@@ -468,7 +469,7 @@ void Constraints::init( void ) {
                     for( auto& ch : obj->getChannels() ) {
                         if( kOffset ) { // skip reference channel
                             int32_t tOffset = 0;
-                            for( size_t count=ch->imageNumbers.size(); count; --count ) {
+                            for( size_t count=ch->nImages(); count; --count ) {
 //                                 if( tOffset ) { // skip reference wavefront      TODO: select type with cfg option.
 //                                                                                  TBD:  proper dealing with fixed differences.
 //                                     thisConstraint.reset( new Constraint( modeIndex, 1 ) );                  // \alpha_{11m}
@@ -493,7 +494,8 @@ void Constraints::init( void ) {
                 map<int32_t, Constraint> wfCons;
                 for( auto& obj : objects ) {
                     for( auto& ch : obj->getChannels() ) {
-                        for( auto& wf : ch->imageNumbers ) {
+                        //cout << "ModeNumber = " << modeNumber << "   nWF = " << ch->waveFronts.size() << "   nF = " << ch->fileNumbers.size() << endl;
+                        for( auto& wf : ch->fileNumbers ) {
                             int32_t parameterOffset = imageCount * nModes;
                             auto ret = wfCons.insert( make_pair( wf, Constraint( parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
@@ -677,7 +679,6 @@ Array<double> Constraints::getReducedNullMatrix( void ) const {
             if( ret.second == false ) continue;
             int32_t nConstr = group.nullspace->nConstraints;
             int32_t nPar = group.nullspace->nParameters;
-            int32_t firstIndex = *group.indices.begin();
             int32_t rowBegin = row;
             int32_t colBegin = col;
             row += nPar;
@@ -729,12 +730,15 @@ void Constraints::write( void ) {
 }
 
 
-void Constraints::dump( string tag ) {
+void Constraints::dump( string tag ) const {
 
     LOG_DEBUG << "Dumping constraints.";
     Ana::write( tag + "_order.f0", parameterOrder.get(), nParameters );
-    Ana::write( tag + ".f0", getReducedMatrix(true) );
-    Ana::write( tag + "_ns.f0", getReducedNullMatrix() );
+    Ana::write( tag + ".f0", getMatrix(false) );
+    Ana::write( tag + "_ordered.f0", getMatrix(true) );
+    Ana::write( tag + "_reduced.f0", getReducedMatrix(true) );
+    Ana::write( tag + "_ns.f0", getNullMatrix() );
+    Ana::write( tag + "_reduced_ns.f0", getReducedNullMatrix() );
 
 }
 

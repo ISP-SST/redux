@@ -65,7 +65,8 @@ namespace {
         return false;
     }
 
-    
+    typedef std::pair<ModeInfo, double> scaled_ms_info;
+
 }
 
 Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg (j), myJob (j), currentMetric(0), reg_gamma(0),
@@ -203,7 +204,39 @@ void Object::initProcessing( const Solver& ws ) {
         for( auto& ch : channels ) {
             ch->initProcessing(ws);
         }
-        initCache();
+
+        initCache();            // load global pupil/modes
+        
+        double mode_scale = 1.0/wavelength;
+        scaled_ms_info id( modes.info, mode_scale );
+        ModeSet& ret = redux::util::Cache::get< std::pair<ModeInfo, double>, ModeSet>(id, modes);
+        unique_lock<mutex> lock(ret.mtx);
+        if( modes.get() == ret.get() ) {    // rescale local modes
+            ret = modes.clone();
+            ret.getNorms( pupil );
+            ret.normalize( mode_scale );
+        }
+        modes = ret;
+
+        //shiftToAlpha = modes.shiftToAlpha;
+        shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize);
+        
+        defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
+        alphaToDefocus = 1.0/defocusToAlpha;
+
+//          ModeSet& ret = myJob.globalData->get(info);
+//         unique_lock<mutex> lock(ret.mtx);
+//         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
+//             if( ret.load( modeFile, pupilPixels ) ) {
+//                 LOG_DEBUG << "Loaded Mode-file " << modeFile;
+//                 ret.getNorms( pupil );
+//                 modes = ret;
+//                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be (y,x)=" << modes.tiltMode
+//                          << ".  This should be auto-detected in the future...";
+//               } else LOG_ERR << "Failed to load Mode-file " << modeFile;
+//         }
+//         
+        
         //modes.init( myJob, *this );                 // will get modes from globalData
     } else {
         LOG_ERR << "Object patchSize is 0 !!!";
@@ -223,7 +256,7 @@ void Object::getResults(ObjectData& od, double* alpha) {
     
     unique_lock<mutex> lock (mtx);
     
-    FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER );
+    FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
     Array<complex_t> tmpC(patchSize, patchSize);
     Array<double> tmpD(patchSize, patchSize);
     avgObjFT.zero();
@@ -231,19 +264,30 @@ void Object::getResults(ObjectData& od, double* alpha) {
     complex_t* aoPtr = avgObjFT.get();
     double* dPtr = tmpD.get();
     double avgNoiseVariance = 0.0;
+    PointD avgShift;
+    Array<int16_t> shifts(nObjectImages,2);
+    size_t imgIndex=0;
     for (auto& ch : channels) {
         for (auto& im : ch->subImages) {
-            im->restore(aoPtr, dPtr);
+            im->restore( aoPtr, dPtr );
             avgNoiseVariance += sqr(im->stats.noise);
+            avgShift += im->offsetShift;
+            shifts(imgIndex,0) = im->offsetShift.x;
+            shifts(imgIndex++,1) = im->offsetShift.y;
         }
     }
-    avgNoiseVariance /= nObjectImages;
+    avgObjFT.conj();    // This is because we re recycling addPQ in SubImage.restore(),
+                        // which actually returns the complex conjugate of the deconvolution.
     
-    avgObjFT.safeDivide(tmpD);
+    avgNoiseVariance /= nObjectImages;
+    avgShift *= 1.0/nObjectImages;
+    //Ana::write ("shifts"+to_string(ID)+".f0", shifts);
+
+    avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
         LOG_TRACE << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance;
-        ScharmerFilter(aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
+        ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     
     avgObjFT.getIFT( tmpC.get() );
@@ -270,20 +314,23 @@ void Object::getResults(ObjectData& od, double* alpha) {
         uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
         od.psf.resize(nPSF, patchSize, patchSize);
         od.psf.zero();
+        Array<float> view( od.psf, 0, 0, 0, patchSize-1, 0, patchSize-1 );
+        tmpD.zero();
         if( nPSF > 1 ) {
-            Array<float> view(od.psf,0,0,0,patchSize-1,0,patchSize-1);
             for( auto& ch: channels) {
                 for ( auto& si: ch->subImages) {
-                    view.assign(si->getPSF<complex_t>()); //si->getPSF());
-                    view.shift(0,1);
+                    si->getPSF( tmpD.get() );
+                    view.assign( tmpD );
+                    view.shift( 0, 1 );
                 }
             }
         } else if( nPSF == 1 ) {
             for( auto& ch: channels) {
                 for ( auto& si: ch->subImages) {
-                    si->addPSF(od.psf);
+                    si->addPSF( tmpD.get() );
                 }
             }
+            view.assign( tmpD );
             od.psf *= (1.0/nObjectImages);
         }
     }
@@ -565,7 +612,7 @@ bool Object::checkCfg (void) {
             }
             tmpString.replace (p, ii - p + 1, "%d..%d");
             if (count (tmpString.begin(), tmpString.end(), '%') == 2) {
-                outputFileName = boost::str (boost::format (tmpString) % *channels[0]->imageNumbers.begin() % *channels[0]->imageNumbers.rbegin());
+                outputFileName = boost::str (boost::format (tmpString) % *channels[0]->fileNumbers.begin() % *channels[0]->fileNumbers.rbegin());
             } else {
                 LOG_CRITICAL << boost::format ("failed to generate output filename from \"%s\"  (->\"%s\").") % tpl % tmpString;
                 return false;
@@ -707,6 +754,8 @@ void Object::initCache (void) {
                 LOG_DEBUG << "Loaded Mode-file " << modeFile;
                 ret.getNorms( pupil );
                 modes = ret;
+                LOG_WARN << "Using a Mode-file will force the tilt-indices to be (y,x)=" << modes.tiltMode
+                         << ".  This should be auto-detected in the future...";
               } else LOG_ERR << "Failed to load Mode-file " << modeFile;
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
@@ -736,6 +785,7 @@ void Object::initCache (void) {
                 LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
                 ret.getNorms( pupil );
                 modes = ret; 
+                LOG_DETAIL << "Tilt-indices:  (y,x)=" << modes.tiltMode;
             }
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
@@ -763,11 +813,7 @@ void Object::initCache (void) {
     if( fabs(pixelsToAlpha) > 0 ) {
         alphaToPixels = 1.0/pixelsToAlpha;
     }
-    shiftToAlpha = modes.shiftToAlpha;
-    shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize);
-    defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
-    alphaToDefocus = 1.0/defocusToAlpha;
-
+    
     for (auto& ch : channels) {
         ch->initCache();
     }
@@ -796,6 +842,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
         if(endT.is_special()) endT = ch->endT;
         else endT = std::max(endT,ch->endT);
     }
+    LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value.";
 
     for (auto& ch : channels) {
         ch->storePatches(service, patches);
@@ -917,13 +964,14 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     if ( writeMask&MOMFBD_MODES ) {     // copy modes from local cache
         //double pupilRadiusInPixels = pupilPixels / 2.0;
         //if (channels.size()) pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
-        tmpModes.resize (myJob.modeNumbers.size() + 1, info->nPH, info->nPH);            // +1 to also fit pupil in the array
+        tmpModes.resize(myJob.modeNumbers.size()+1, info->nPH, info->nPH);            // +1 to also fit pupil in the array
         tmpModes.zero();
-        Array<float> tmp_slice (tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1);     // subarray
+        Array<double> mode_wrap(reinterpret_cast<Array<double>&>(modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1);
+        Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1);     // subarray
         tmp_slice.assign(reinterpret_cast<const Array<double>&>(pupil));
         info->phOffset = 0;
         tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1);
-        tmp_slice.assign(reinterpret_cast<const Array<double>&>(modes));
+        tmp_slice.assign(mode_wrap);
         if (myJob.modeNumbers.size()) {
             //ModeInfo id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
             info->nModes = myJob.modeNumbers.size();

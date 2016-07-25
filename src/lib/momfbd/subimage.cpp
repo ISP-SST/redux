@@ -231,13 +231,12 @@ void SubImage::addToPQ(void) const {
 }
 
 
-void SubImage::restore(complex_t* obj, double* obj_norm) const {
+void SubImage::restore( complex_t* obj, double* obj_norm ) const {
 
-    const complex_t* ftPtr = imgFT.get();
-    const complex_t* otfPtr = OTF.get();
-    for ( const size_t& ind: object.pupil.otfSupport ) {
-        obj_norm[ind] += norm(otfPtr[ind]);
-        obj[ind] += ftPtr[ind] * conj(otfPtr[ind]);
+    bool no_restore(false);         // TODO: implement NO_RESTORE cfg flag
+    if( !no_restore ) {
+        addPQ( OTF.get(), obj, obj_norm );      // Note: should really return obj = ft*conj(sj) for the deconvolution,
+                                                // and addPQ returns the conjugate.
     }
 
 }
@@ -280,13 +279,11 @@ double SubImage::gradientVogel(uint16_t modeIndex, double ) const {
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
-    double scale = -2.0 * object.pupil.area / pupilSize2;
-    //double scale = -2.0 * object.wavelength;
-    //double scale = -2.0/modes.norms[modeIndex]; // / (pupilSize2);
+    double scale = -2.0 * object.pupil.area / otfSize2;
     for (auto & ind : object.pupil.pupilSupport) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }
-
+    
     return ret;
     
 }
@@ -330,12 +327,15 @@ void SubImage::calcVogelWeight(void) {
               });
 
     tmpOTF.ft( glPtr );
+
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
 
     double* vogPtr = vogel.get();
-    for (auto & ind : object.pupil.pupilInOTF) {
-        vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*tmpOtfPtr[ind.second]);//*pupPtr[ind.first];
+    const double* pupilPtr = object.pupil.get();
+    for( auto & ind : object.pupil.pupilInOTF ) {
+        vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*tmpOtfPtr[ind.second])*pupilPtr[ind.first];
     }
+
 
 }
 
@@ -346,49 +346,52 @@ void SubImage::resetPhi(void) {
 }
 
 
-void SubImage::adjustOffset(double* alpha) {
+void SubImage::adjustOffset( double* alpha ) {
 
     PointI oldOffset = offsetShift;
     PointD oldVal(0,0),newVal(0,0);
-    int32_t mIndex = object.modes.tiltMode.y;  // NOTE: should be x, this is just because subimage is transposed!!
+    
+    int32_t mIndex = object.modes.tiltMode.x;
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.x;
         double alphaToShift = 1.0/shiftToAlpha;
-        newVal.x = oldVal.x = alpha[mIndex]*alphaToShift;
-        int adjust = -lround( oldVal.x );
-        if( adjust ) {
-            adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
+        newVal.x = oldVal.x = alpha[mIndex];
+        int adjust = -lround( oldVal.x*alphaToShift );
+        if( adjust ) {  // FIXME: should be 2, this is just because subimage is transposed!!
+            adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if( adjust ) {
                 offsetShift.x += adjust;
                 alpha[mIndex] += adjust*shiftToAlpha;
-                alphaOffsets[mIndex] = offsetShift.x*shiftToAlpha;
-                newVal.x = alpha[mIndex]*alphaToShift;
+                adjustedTilts.x = offsetShift.x*shiftToAlpha;
+                newVal.x = alpha[mIndex];
             }
         }
     }
 
-    mIndex = object.modes.tiltMode.x;  // NOTE: should be y, this is just because subimage is transposed!!
+    mIndex = object.modes.tiltMode.y;
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.y;
         double alphaToShift = 1.0/shiftToAlpha;
-        newVal.y = oldVal.y = alpha[mIndex]*alphaToShift;
-        int adjust = -lround( oldVal.y );
-        if( adjust ) {
-            adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
+        newVal.y = oldVal.y = alpha[mIndex];
+        int adjust = -lround( oldVal.y*alphaToShift );
+        if( adjust ) {  // FIXME: should be 1, this is just because subimage is transposed!!
+            adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
             if(adjust) {
                 offsetShift.y += adjust;
                 alpha[mIndex] += adjust*shiftToAlpha;
-                alphaOffsets[mIndex] = offsetShift.y*shiftToAlpha;
-                newVal.y = alpha[mIndex]*alphaToShift;
+                adjustedTilts.y = offsetShift.y*shiftToAlpha;
+                newVal.y = alpha[mIndex];
             }
         }
     }
-    
-    if(oldOffset != offsetShift) {
-        LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
-                  << ":  cutout was shifted, from " << oldOffset << " to " << offsetShift
-                  << " oldVal=" << oldVal << "  newVal=" << newVal;
+
+    if( oldOffset != offsetShift ) {
+        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha;
+        LOG_DEBUG << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+                   << ":  cutout was shifted, from " << oldOffset << " to " << offsetShift
+                   << " oldVal=" << oldVal << "  newVal=" << newVal << "  adj=" << adjustedTilts;
         newCutout();
+        //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast");
     }
     
 }
@@ -396,13 +399,16 @@ void SubImage::adjustOffset(double* alpha) {
 
 void SubImage::addAlphaOffsets(double* alphas, float* alphaOut) const {
     
+    std::copy( alphas, alphas+nModes, alphaOut );
+    
     int32_t mIndex = object.modes.tiltMode.x;
-    if( mIndex >= 0 ) {
-        alphaOut[mIndex] = (alphas[mIndex]+alphaOffsets[mIndex]); ///object.shiftToAlpha.x;
+    if( mIndex >= 0 && offsetShift.x ) {
+        alphaOut[mIndex] -= adjustedTilts.x;
     }
+    
     mIndex = object.modes.tiltMode.y;
-    if( mIndex >= 0 ) {
-        alphaOut[mIndex] = (alphas[mIndex]+alphaOffsets[mIndex]); ///object.shiftToAlpha.y;
+    if( mIndex >= 0 && offsetShift.y ) {
+        alphaOut[mIndex] -= adjustedTilts.y;
     }
     
 }

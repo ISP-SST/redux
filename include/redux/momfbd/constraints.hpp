@@ -122,6 +122,13 @@ namespace redux {
                 }
             }
 
+            template <typename T> void reverseAndAdd(const T* in, const T* offset, T* out) const {
+                memcpy( out, offset, nParameters*sizeof(T) );
+                for( auto& entry: ns_entries ) {
+                    out[entry.first.y] += entry.second * in[entry.first.x];
+                }
+            }
+
             template <typename T> void apply(const T* in, T* out, double scale) const {
                 memset(out,0,nFreeParameters*sizeof(T));
                 for( auto& entry: ns_entries ) {
@@ -146,7 +153,7 @@ namespace redux {
             void read (void);
             void write (void);
 
-            void dump (std::string tag="constraints");
+            void dump( std::string tag="constraints" ) const;
 
             std::vector<std::shared_ptr<Constraint>> constraints;
             std::vector<Group> groups;

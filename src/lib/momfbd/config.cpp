@@ -238,10 +238,11 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     xOffsetFile = tree.get<string>( "XOFFSET", "" );
     yOffsetFile = tree.get<string>( "YOFFSET", "" );
     imageNumberOffset = tree.get<uint32_t>( "DT", defaults.imageNumberOffset );
-    imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUM", defaults.imageNumbers);
-    if(imageNumbers.empty())
-        imageNumbers = tree.get<vector<uint32_t>>("IMAGE_NUMS", defaults.imageNumbers);
-    wfIndex = tree.get<vector<uint32_t>>( "WFINDEX", defaults.wfIndex );
+    fileNumbers = tree.get<vector<uint32_t>>("IMAGE_NUM", defaults.fileNumbers);
+    if( fileNumbers.empty() ) {
+        fileNumbers = tree.get<vector<uint32_t>>("IMAGE_NUMS", defaults.fileNumbers);
+    }
+    waveFronts = tree.get<vector<uint32_t>>( "WFINDEX", defaults.waveFronts );
     darkNumbers = tree.get<vector<uint32_t>>("DARK_NUM", defaults.darkNumbers);
     stokesWeights = tree.get<vector<float>>( "VECTOR", defaults.stokesWeights );
     if( mmFile.length() > 0 ) {
@@ -296,8 +297,8 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(yOffsetFile != defaults.yOffsetFile) tree.put("YOFFSET", yOffsetFile);
 
     if(imageNumberOffset != defaults.imageNumberOffset) tree.put("DT", imageNumberOffset);
-    if(imageNumbers != defaults.imageNumbers) tree.put("IMAGE_NUM", imageNumbers);
-    if(wfIndex != defaults.wfIndex) tree.put("WFINDEX", wfIndex);
+    if(fileNumbers != defaults.fileNumbers) tree.put("IMAGE_NUM", fileNumbers);
+    if(waveFronts != defaults.waveFronts) tree.put("WFINDEX", waveFronts);
     if(darkNumbers != defaults.darkNumbers) tree.put("DARK_NUM", darkNumbers);
     
     if(stokesWeights != defaults.stokesWeights) tree.put("VECTOR", stokesWeights);
@@ -320,8 +321,8 @@ uint64_t ChannelCfg::size(void) const {
     sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
     sz += xOffsetFile.length() + yOffsetFile.length() + 2;
-    sz += imageNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
-    sz += wfIndex.size()*sizeof(uint32_t) + sizeof(uint64_t);
+    sz += fileNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
+    sz += waveFronts.size()*sizeof(uint32_t) + sizeof(uint64_t);
     sz += darkNumbers.size()*sizeof(uint32_t) + sizeof(uint64_t);
     sz += stokesWeights.size()*sizeof(float) + sizeof(uint64_t);
     return sz;
@@ -355,8 +356,8 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, xOffsetFile);
     count += pack(ptr+count, yOffsetFile);
     count += pack(ptr+count, imageNumberOffset);
-    count += pack(ptr+count, imageNumbers);
-    count += pack(ptr+count, wfIndex);
+    count += pack(ptr+count, fileNumbers);
+    count += pack(ptr+count, waveFronts);
     count += pack(ptr+count, darkNumbers);
     count += pack(ptr+count, stokesWeights);
     return count;
@@ -390,8 +391,8 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, xOffsetFile);
     count += unpack(ptr+count, yOffsetFile);
     count += unpack(ptr+count, imageNumberOffset, swap_endian);
-    count += unpack(ptr+count, imageNumbers, swap_endian);
-    count += unpack(ptr+count, wfIndex, swap_endian);
+    count += unpack(ptr+count, fileNumbers, swap_endian);
+    count += unpack(ptr+count, waveFronts, swap_endian);
     count += unpack(ptr+count, darkNumbers, swap_endian);
     count += unpack(ptr+count, stokesWeights, swap_endian);
     return count;
@@ -409,8 +410,8 @@ bool ChannelCfg::operator==(const ChannelCfg& rhs) const {
            (imageDataDir == rhs.imageDataDir) &&
            (darkTemplate == rhs.darkTemplate) &&
            (imageTemplate == rhs.imageTemplate) &&
-           (imageNumbers == rhs.imageNumbers) &&
-           (wfIndex == rhs.wfIndex) &&
+           (fileNumbers == rhs.fileNumbers) &&
+           (waveFronts == rhs.waveFronts) &&
            (darkNumbers == rhs.darkNumbers);
 }
 
@@ -716,7 +717,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     }
 
     if( runFlags & RF_CALIBRATE ) {
-        saveMask |= SF_SAVE_ALPHA; // necessary for calibration runs.
+        //saveMask |= SF_SAVE_ALPHA; // necessary for calibration runs.
         outputFileType |= FT_ANA;
     }
     

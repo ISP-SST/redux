@@ -362,27 +362,26 @@ void Solver::run( PatchData::Ptr data ) {
     memset(s->gradient->data,0,nFreeParameters*sizeof(double));
     s->f = 0;
 
-    job.globalData->constraints.apply( init_alpha, beta_init->data );
-
-    init_step /= max_mode_norm;
-
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
+    LOG_TRACE << "Initial metric = " << initialMetric;
 
     double previousMetric(0);
     double thisMetric(0);
     double gradNorm(0);
-    uint16_t nModeIncrement = job.nModeIncrement;
     double* alphaPtr;
-
+    double tol = 1.0E-1;
     size_t failCount(0);
     size_t totalIterations(0);
-    size_t maxIterations(5);            // only 1 iteration while increasing modes, job.maxIterations for the last step.
-    size_t maxFails(3);         // TODO make into a cfg parameter
+    size_t maxIterations(10);           // fewer iterations while increasing modes, job.maxIterations for the last step.
+    size_t maxFails(3);                 // TODO make into a cfg parameter
     int status(0);
     uint16_t firstMode(0);
+    sync_counter sc;
 
     timer.start();
-    
+
+    memset( alpha_offset, 0, nParameters*sizeof(double) );
+
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
         modeCount = min<uint16_t>(modeCount,nModes);
@@ -392,38 +391,39 @@ void Solver::run( PatchData::Ptr data ) {
                   [&activeModes](const uint16_t& a){ return activeModes.count(a)?a:0; }
                  );
         
-        if( false && (modeCount == nModes && firstMode) ) {
-            firstMode = 0;                      // make a final run with all modes enabled
-        } else if( modeCount == nModes ) {                                     // final loop
-            modeCount = 0;                      // we use modeCount=0 to exit the external loop
-            //init_tol = job.FTOL;
+        if( modeCount == nModes ) {   // final loop, use proper FTOL and maxIterations
+            modeCount = 0;            // we use modeCount=0 to exit the external loop
+            tol = job.FTOL;
             maxIterations = job.maxIterations;
         } else {
-            //nModeIncrement += job.nModeIncrement;                                     // first 5 modes, then 15, then 30 ... 
-            //firstMode = modeCount;
-            modeCount += nModeIncrement;
-            failCount = 0;              // we don't worry until we have tried with all modes.
+            firstMode = modeCount;
+            modeCount += job.nModeIncrement;
+            failCount = 0;           // TODO: fix/test fail-reporting before using
         }
-        
-        //cout << "Step " << totalIterations << "  tol=" << init_tol << "  step=" << init_step << "  maxIter=" << maxIterations << endl;
+
+        // The previous position is saved in in alpha_offset, beta only contains the new step, so start at 0 each iteration
         gsl_multimin_fdfminimizer_set( s, static_cast<gsl_multimin_function_fdf*>(&my_func), beta_init, init_step, init_tol );
         
         size_t iter = 0;
         int successCount(0);
         bool done(false);
-        
+
 #ifdef DEBUG_
         LOG_DETAIL << "start_metric = " << s->f
+                       << printArray(alpha_offset, nParameters, "\nalpha_offset")
                        << printArray(alpha, nParameters, "\nstart_alpha")
                        << printArray(grad_alpha, nParameters, "\nstart_grad");
-            //dump("iter_"+to_string(totalIterations));
+        Array<double> gwrapper(grad_alpha, nTotalImages, nModes);
+        Ana::write("grad_alpha_"+to_string(totalIterations)+".f0",gwrapper);
+        //dump("iter_"+to_string(totalIterations));
+        job.globalData->constraints.reverse( s->gradient->data, grad_alpha );
+        Ana::write("grad_alphac_"+to_string(totalIterations)+".f0",gwrapper);
+        cout << printArray(grad_alpha, nParameters, "\nstart_gradc") << endl;
 #endif
 
-        gradientMethod = gradientMethods[GM_DIFF];
         do {
             iter++;
             status = gsl_multimin_fdfminimizer_iterate( s );
-
             if( status == GSL_ENOPROG ) {
                 LOG_TRACE << "iteration: " << iter << "  GSL reports no progress.";
                 failCount++;
@@ -440,24 +440,22 @@ void Solver::run( PatchData::Ptr data ) {
                 status = GSL_FAILURE;
                 modeCount = 0;                  // exit outer loop.
                 done = true;                    // exit inner loop.
-                dump("fail");
-                exit(0);
+                //dump("fail");
+                //exit(0);
             }
             gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric);
             if (iter>1) {
-                double relativeMetric = thisMetric/initialMetric; 
                 double relativeChange = 2.0 * fabs(thisMetric-previousMetric) / (fabs(thisMetric)+fabs(previousMetric)+job.EPS);
-//             LOG_DETAIL << "Iter: " << (totalIterations+iter) << "   thisMetric = " << thisMetric
-//                         << "   relativeChange = " << relativeChange << "   relativeMetric = " << relativeMetric << "   cnt = " << successCount;
-                if(relativeChange < job.FTOL) {      // count consecutive "marginal decreases" in metric
-                    if( successCount++ >= job.targetIterations ) { // exit after targetIterations consecutive improvements.
+                if( relativeChange < tol ) {
+                    if( ++successCount >= job.targetIterations ) { // exit after targetIterations consecutive marginal improvements.
                      successCount = 0;
                      done = true;
                     }
-                } else {    // reset counter
-                    successCount = 0;
+                } else {
+                    successCount = 0; 
                 }
-            } //else LOG_DEBUG << "Initial:   metric = " << thisMetric << "   norm(grad) = " << gradNorm;
+            }
+
             previousMetric = thisMetric;
 
             status = gsl_multimin_test_gradient( s->gradient, 1e-9 );
@@ -468,37 +466,33 @@ void Solver::run( PatchData::Ptr data ) {
         totalIterations += iter;
         if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
             size_t nActiveModes = activeModes.size();
-            LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ") << "  metric=" << thisMetric
+            LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
+             << "  metric=" << thisMetric << "  rmetric=" << (thisMetric/initialMetric)
              << " norm(grad)=" << (gradNorm/nActiveModes) << " using " << nActiveModes << "/" << nModes << " modes.";
-//            LOG_DETAIL << boost::format("After %d iteration%s  metric=%g norm(grad)=%g using %d/%d modes.") % totalIterations % (totalIterations>1?"s":" ") %
-//                s->f % gradNorm % nActiveModes % nModes;
-//             gradientMethod = gradientMethods[GM_VOGEL];
-        }  
-        //  
+        }
 
-        alphaPtr = alpha;
-        for( const auto& o: job.objects ) {
-            for( const auto& c: o->channels ) {
-                for( const auto& im: c->getSubImages() ) {
-                    service.post( [&im,alphaPtr](){ im->adjustOffset(alphaPtr); } );
-                    alphaPtr += nModes;
+        if( modeCount ) {
+            alphaPtr = alpha;
+            sc.reset();
+            for( const auto& o: job.objects ) {
+                for( const auto& c: o->channels ) {
+                    for( const auto& im: c->getSubImages() ) {
+                        ++sc;
+                        service.post( [&im,alphaPtr,&sc](){
+                            im->adjustOffset(alphaPtr);
+                            --sc;
+                        } );
+                        alphaPtr += nModes;
+                    }
                 }
             }
+            sc.wait();
+            memcpy( alpha_offset, alpha, nParameters*sizeof(double) );
         }
-        runThreadsAndWait( service, nThreads );
 
-        job.globalData->constraints.apply( alpha, beta_init->data );
-#ifdef DEBUG_
-            LOG_DETAIL << printArray(alpha, nParameters, "\nalpha")
-                       << printArray(grad_alpha, nParameters, "\ngrad_alpha")
-                       << printArray(beta_init->data, nFreeParameters, "\nbeta")
-                       << printArray(s->gradient->data, nFreeParameters, "\ngrad_beta");
-            dump("iter_"+to_string(totalIterations));
-#endif
-    }
-    
+    }       // end for-loop
+  
     LOG << "Elapsed: " << boost::timer::format(timer.elapsed());
-    job.globalData->constraints.reverse( s->x->data, alpha );
     
     alphaPtr = alpha;
     for( auto& obj: data->objects ) {

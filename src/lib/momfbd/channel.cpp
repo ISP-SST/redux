@@ -37,7 +37,7 @@ using namespace std;
 #define lg Logger::mlg
 
 
-Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), myObject (o), myJob (j) {
+Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), nTotalFrames(0), myObject (o), myJob (j) {
 
     setLogChannel(myJob.getLogChannel());
     
@@ -89,7 +89,7 @@ void Channel::cleanup(void) {
 size_t Channel::size (void) const {
 
     size_t sz = ChannelCfg::size();
-    sz += sizeof (uint16_t);          // ID
+    sz += sizeof (uint16_t) + sizeof(uint32_t);          // ID + nTotalFrames
     sz += imgSize.size();
     sz += imageStats.size() * ArrayStats::size() + sizeof (uint16_t);
     return sz;
@@ -100,6 +100,7 @@ uint64_t Channel::pack (char* ptr) const {
     using redux::util::pack;
     uint64_t count = ChannelCfg::pack (ptr);
     count += pack (ptr + count, ID);
+    count += pack (ptr + count, nTotalFrames);
     count += imgSize.pack (ptr + count);
     uint16_t statSize = imageStats.size();
     count += pack (ptr + count, statSize);
@@ -117,6 +118,7 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
 
     uint64_t count = ChannelCfg::unpack (ptr, swap_endian);
     count += unpack (ptr + count, ID, swap_endian);
+    count += unpack (ptr + count, nTotalFrames, swap_endian);
     count += imgSize.unpack (ptr + count, swap_endian);
     uint16_t statSize;
     count += unpack (ptr + count, statSize, swap_endian);
@@ -140,7 +142,7 @@ bool Channel::checkCfg (void) {
     if (nWild > 2) {
         LOG_ERR << "Filename template contains too many wildcards: \"" << imageTemplate << "\"";
         return false;
-    } else if (nWild == 1 && imageNumbers.empty()) {
+    } else if (nWild == 1 && fileNumbers.empty()) {
         LOG_ERR << "Filename template contains wildcard and no image-numbers given (with IMAGE_NUM)";
         return false;
     } /*else if( nWild == 2 && sequenceNumber == 0 ) {
@@ -185,42 +187,56 @@ bool Channel::checkData (void) {
 
     // Images
     if ( incomplete ) {   // check if files are present
-        for (size_t i (0); i < imageNumbers.size();) {
-            bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
+        for (size_t i (0); i < fileNumbers.size();) {
+            bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + fileNumbers[i])));
             if (!bfs::is_regular_file (fn)) {
-                fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + imageNumbers[i])));
+                fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + fileNumbers[i])));
                 if (!bfs::is_regular_file(fn)) {
                     LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
-                    imageNumbers.erase(imageNumbers.begin() + i);
+                    fileNumbers.erase(fileNumbers.begin() + i);
                     continue;
                 }
             }
             ++i;
         }
-        if (imageNumbers.empty()) {
+        if (fileNumbers.empty()) {
             LOG_CRITICAL << boost::format ("No files found for incomplete object with filename template \"%s\" in directory \"%s\"") % imageTemplate % imageDataDir;
             return false;
         }
     }
     
-
-    if (imageNumbers.empty()) {         // single file
+    size_t nFiles = std::max<size_t>(1,fileNumbers.size());         // If no numbers, load template as single file
+    nFrames.resize( nFiles, 1 );                                    // Assume 1 frame per file by default
+    
+    if (fileNumbers.empty()) {         // single file
         bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
         if (!bfs::is_regular_file(fn)) {
-            LOG_ERR << boost::format ("Image-file %s not found!") % fn;
+            LOG_ERR << boost::format ("Input-file %s not found!") % fn;
             return false;
         }
     } else {                            // template + numbers
-        for (auto & number : imageNumbers) {
+        for( size_t i=0; i<fileNumbers.size(); ++i) {
+            uint32_t number = fileNumbers[i];
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)));
             if (!bfs::is_regular_file(fn)) {
-                LOG_ERR << boost::format ("Image-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
+                LOG_ERR << boost::format ("Input-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
                 return false;
             }
+            Image<float> tmp;
+            CachedFile::load( tmp, fn.string(), true );       // Only read metadata
+            uint8_t nDims = tmp.meta->nDims();
+            if( nDims == 3 ) {
+                nFrames[i] = tmp.meta->dimSize(0);
+                imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
+            } else if( nDims != 2 ) {
+                LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
+                return false;
+            }
+            
         }
     }
     
-    myJob.info.progress[1] += std::max(imageNumbers.size(),1UL)*3;  // load, process, split & store (TODO more accurate progress reporting)
+    myJob.info.progress[1] += std::max(fileNumbers.size(),1UL)*3;  // load, process, split & store (TODO more accurate progress reporting)
 
     // Dark(s)
     if (!darkTemplate.empty()) {
@@ -357,14 +373,14 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         size_t nFrames(0);
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
-            CachedFile::load( tmp, darkTemplate);
+            CachedFile::load( tmp, darkTemplate );
             nFrames = tmp.meta->getNumberOfFrames();
         } else {
             Image<float> tmp2;
             for (size_t di = 0; di < darkNumbers.size(); ++di) {
                 bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
                 if (!di) {
-                    CachedFile::load( tmp, fn.string());
+                    CachedFile::load( tmp, fn.string() );
                     nFrames = tmp.meta->getNumberOfFrames();
                 } else {
                     CachedFile::load( tmp2, fn.string() );
@@ -407,7 +423,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
     if( !psfFile.empty() ) {
         service.post([this](){
             CachedFile::load<float>( psf, psfFile );
-            if( alignClip.size() ) clipImage( psf, alignClip );
+            if( alignClip.size() ) clipImage( psf, alignClip, true );
         });
     }
 
@@ -449,37 +465,45 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
 }
 
 
-void Channel::loadData(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
+void Channel::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& patches ) {
 
    //LOG_TRACE << "Channel::loadData()";
-    size_t nImages = std::max<size_t>(1,imageNumbers.size());       // If no numbers, load template as single file
+    size_t nFiles = std::max<size_t>( 1, fileNumbers.size() );       // If no numbers, load template as single file
 
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
     
+    if( nTotalFrames == 0 ) {
+        throw logic_error("No input images for channel "+to_string(myObject.ID) + ":" + to_string(ID));
+    }
+    
     // Prepare needed storage
-    images.resize( nImages, imgSize.y, imgSize.x );
-    imageStats.resize( nImages );
+    images.resize( nTotalFrames, imgSize.y, imgSize.x );
+    imageStats.resize( nTotalFrames );
+    
     service.post( std::bind(&Channel::adjustCutouts, this, std::ref(patches)) );
     
     // load data (and preprocess)
-    imageStats[0].reset(new ArrayStats());
-    service.post(std::bind(&Channel::loadImage, this, 0));           // will *not* be loaded through the cache, so only saved in "images"
-    for (size_t i = 1; i < nImages; ++i) {
-        imageStats[i].reset (new ArrayStats());
-        service.post(std::bind(&Channel::loadImage, this, i));       // will *not* be loaded through the cache, so only saved in "images"
+    for (size_t i = 0; i < nFiles; ++i) {
+        //service.post(std::bind(&Channel::loadFile, this, i));       // will *not* be loaded through the cache, so only saved in "images"
+        service.post( [&,i](){
+            loadFile(i);
+            size_t nF = nFrames[i];
+            for( size_t j=0; j<nF; ++j ) {
+                service.post(std::bind( &Channel::preprocessImage, this, i+j) );
+            }
+            service.post(std::bind( &Channel::storeCorrected, this, std::ref(service), i) );
+        });
     }
-    runThreadsAndWait(service, myJob.info.maxThreads);
+    
 }
 
 
 void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
 
-    size_t nImages = images.dimSize(0);
-    
     //images *= myObject.objMaxMean;
 
-    patchWriteFail = std::async( launch::async, [this,&patches,nImages](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
+    patchWriteFail = std::async( launch::async, [this,&patches](){                      // launch as async to do writing in the background whil loading/pre-processing the rest.
         size_t nPatchesY = patches.dimSize(0);                                          // we will synchronize all the "patchWriteFail" futures at the end of MomfbdJob::preProcess
         size_t nPatchesX = patches.dimSize(1);
         for(unsigned int py=0; py<nPatchesY; ++py) {
@@ -490,7 +514,7 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
             }
         }
         images.clear();                                                                 // release resources after storing the patch-data.
-        myJob.info.progress[0] += nImages;
+        myJob.info.progress[0] += nTotalFrames;
         myJob.setProgressString();
         return false;   // TODO return true if any error
     });
@@ -543,7 +567,7 @@ double Channel::getMaxMean(void) {
 
 void Channel::getFileNames(std::vector<std::string>& files) const {
 
-    for (auto &num: imageNumbers) {
+    for (auto &num: fileNumbers) {
         bfs::path fn = bfs::path(imageDataDir)/bfs::path(boost::str(boost::format(imageTemplate) % num));
         files.push_back(fn.string());
     }
@@ -555,9 +579,8 @@ void Channel::initProcessing( const Solver& solver ) {
     
     initPhiFixed();
 
-    size_t nImages = imageNumbers.size();
-    subImages.resize(nImages);
-    for (uint16_t i=0; i < nImages; ++i) {
+    subImages.resize(nTotalFrames);
+    for (uint16_t i=0; i < nTotalFrames; ++i) {
         if( !subImages[i] ) subImages[i].reset( new SubImage(myObject, *this, solver.window, solver.noiseWindow) );
     }
     
@@ -567,17 +590,32 @@ void Channel::initProcessing( const Solver& solver ) {
 void Channel::initPatch (ChannelData& cd) {
 
     size_t nImages = cd.images.dimSize();
-    if (imageNumbers.empty() || imageNumbers.size() != nImages) {
-        string msg = "Number of images in stack does not match the imageNumbers.  " +to_string(imageNumbers.size()) + "!=" + printArray(cd.images.dimensions(),"dims");
+    if (nTotalFrames != nImages) {
+        string msg = "Number of images in stack does not match the number of total frames.  " +to_string(nTotalFrames) + "!=" + printArray(cd.images.dimensions(),"dims");
         LOG_ERR << msg;
         throw logic_error(msg);
     }
-
+//ArrayStats tmpstats;
+//myObject.objMaxMean = 551.731543;
+//myObject.objMaxMean = 552.005248;
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
-        Array<float> view( cd.images, 0, 0, 0, cd.images.dimSize(1)-1, 0, cd.images.dimSize(2)-1 );
+        float* dataPtr = cd.images.get();
+        size_t imgPixels = cd.images.dimSize(1)*cd.images.dimSize(2);
+        //Array<float> view( cd.images, 0, 0, 0, cd.images.dimSize(1)-1, 0, cd.images.dimSize(2)-1 );
         for( uint16_t i=0; i<nImages; ++i ) {
-            view *= (myObject.objMaxMean/imageStats[i]->mean);
-            view.shift(0,1);
+            double scale = myObject.objMaxMean/imageStats[i]->mean;
+            //tmpstats.getStats( dataPtr, imgPixels, ST_VALUES );
+            //cout << "Channel: rescaling image to " << myObject.objMaxMean << endl;
+            //cout << "Channel: mean1 = " << tmpstats.mean
+            //<< "  scaled = " << (tmpstats.mean*scale) << endl;
+            //transform(dataPtr, dataPtr+imgPixels, dataPtr, [scale]( const float& v ) { return scale*v; } );
+            transform(dataPtr, dataPtr+imgPixels, dataPtr, bind1st(multiplies<double>(),scale) );
+            
+            //view *= (myObject.objMaxMean/imageStats[i]->mean);
+            //tmpstats.getStats( dataPtr, imgPixels, ST_VALUES );
+            //cout << "Channel: %d  mean2 = " << tmpstats.mean << endl;
+            dataPtr += imgPixels;
+            //view.shift(0,1);
         }
     }
     
@@ -591,36 +629,28 @@ void Channel::initPatch (ChannelData& cd) {
 
     phi_fixed.copy( phi_channel );
     
-    int32_t mIndex = myObject.modes.tiltMode.x;
+    double* phiPtr = phi_channel.get();
+    size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
+    
+    int32_t mIndex = myObject.modes.tiltMode.y;     // FIXME: should be x, but subimages are transposed...
     if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
-        /*int adjust = lround(currentAlpha[mIndex]*myObject.alphaToPixels);
-        if( adjust ) {
-            adjust = shift(2,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
-            if(adjust) {
-                offsetShift.x += adjust;        // Noll-index = 2 corresponds to x-tilt.
-                double oldval = currentAlpha[mIndex];
-                currentAlpha[mIndex] -= adjust*myObject.pixelsToAlpha;
-                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
-                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
-                adjusted = true;
-            }
-        }*/
+        const double* modePtr = myObject.modes.modePointers[mIndex];
+        float res = -cd.residualOffset.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
+        transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
+            [res](const double& p, const double& m) {
+                return p + res*m;
+            });
     }
-    /*mIndex = myObject.modes.tiltMode.y;
-    if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
-        int adjust = lround(currentAlpha[mIndex]*object.alphaToPixels);
-        if( adjust ) {
-            adjust = shift(1,adjust);           // will return the "actual" shift. (the cube-edge might restrict it)
-            if(adjust) {
-                offsetShift.y += adjust;        // Noll-index = 3 corresponds to y-tilt.
-                double oldval = currentAlpha[mIndex];
-                currentAlpha[mIndex] -= adjust*object.pixelsToAlpha;
-                LOG_TRACE << "adjustOffset:  mode " << mIndex << " was adjusted.  from " << oldval << " to "
-                << currentAlpha[mIndex] << "  (" << adjust<< " pixels)";
-                adjusted = true;
-            }
-        }
-    }*/
+    
+    mIndex = myObject.modes.tiltMode.x;     // FIXME: should be y, but subimages are transposed...
+    if( mIndex >= 0 && fabs(cd.residualOffset.y) > 0 ) {
+        const double* modePtr = myObject.modes.modePointers[mIndex];
+        float res = -cd.residualOffset.y*myObject.shiftToAlpha.y;   // positive coefficient shifts image downwards
+        transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
+            [res](const double& p, const double& m) {
+                return p + res*m;
+            });
+    }
 
     
 }
@@ -654,17 +684,7 @@ void Channel::initPhiFixed(void) {
         }
 
     }
-    computePhi();   // no tilts for now, just initialize once
-}
 
-
-void Channel::computePhi (void) {
-    phi_fixed.copy(phi_channel);
-    static int bla (0);
-    if (diversityModes.size()) {
-        redux::file::Ana::write ("phi_" + to_string (bla++) + ".f0", phi_channel);
-    }
-    // TODO: add tilt corrections
 }
 
 
@@ -680,19 +700,6 @@ void Channel::addAllPQ(void) const {
     }
 }
 
-double Channel::metric (void) {
-
-    double sum = 0.0;
-//   for(auto &im: subImages) {
-//       for( auto& a: im->wf->alpha) {
-//           double coeff = a.second.first;
-//           sum += coeff*coeff * modes.at(a.first)->inv_atm_rms;
-//       }
-//   }
-    return sum;
-
-}
-
 
 void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd ) {
 
@@ -706,34 +713,74 @@ void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEn
 }
 
 
-void Channel::loadImage(size_t i) {
+void Channel::loadFile( size_t i ) {
     
-    bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % imageNumbers[i] ) );
-    CachedFile cf( fn.string() );
-    
+    bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % fileNumbers[i] ) );
     Image<float> tmpImg;
-    Image<float> view( images, i, i, 0, imgSize.y-1, 0, imgSize.x-1 );
-    
-    LOG_DEBUG << boost::format ("Loading image "+imageTemplate+"  (%d:%d:%d  %s)") % imageNumbers[i] % myObject.ID % ID % i % printArray(alignClip,"clip");
-    cf.loadImage( tmpImg );
-    clipImage( tmpImg, alignClip );
+    CachedFile::load( tmpImg, fn.string() );
+    if( alignClip.size() ) clipImage( tmpImg, alignClip );
+    size_t nF = nFrames[i];
+    Image<float> view( images, i, i+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
+    view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );
+    string imStr = to_string(i);
+    if( nF > 1 ) imStr = to_string(i)+"-"+to_string(i+nF);
+    LOG_DEBUG << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[i] % myObject.ID % ID % imStr;
     myJob.info.progress[0]++;
     if( tmpImg.meta ) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
     }
-    preprocessImage( i, tmpImg );
-    myJob.info.progress[0]++;
     myJob.setProgressString();
-    imageStats[i]->getStats(borderClip, tmpImg);     // get stats for corrected data
-    view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );
+//    imageStats[i]->getStats(borderClip, tmpImg);     // get stats for corrected data
+    //tmpImg *= 1.0/imageStats[i]->mean;
+//    view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );
+
+
+//        fn = bfs::path (boost::str (boost::format (imageTemplate) % i));
+//        fn = bfs::path(fn.leaf().string() + ".loaded");
+//        redux::file::Ana::write( fn.string(), reinterpret_cast<Array<float>&>(tmpImg) );   // TODO: other formats
+
 }
 
 
-void Channel::preprocessImage( size_t index, Image<float>& img ) {
-
-    Array<double> tmpImg;       // local temporary with double-precision
-    tmpImg = img.copy<double>();
+void Channel::storeCorrected( boost::asio::io_service& service, size_t i ) {
     
+    if( !(myObject.saveMask & SF_SAVE_FFDATA) ) return;
+    
+    bool allOk = true;
+    for( auto& st: imageStats ) {
+        if( !st ) {
+            allOk = false;
+            break;
+        }
+    }
+
+    if( allOk ) {
+        size_t nF = nFrames[i];
+        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i]));
+        fn = bfs::path(fn.leaf().string() + ".cor");
+        Image<float> view( images, i, i+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
+        LOG_DETAIL << boost::format ("Saving corrected file %s") % fn.string();
+        //redux::file::Ana::write(fn.string(), view.copy<float>());
+        redux::file::Ana::write( fn.string(), reinterpret_cast<Array<float>&>(view) );   // TODO: other formats
+    } else {
+        std::this_thread::sleep_for( std::chrono::seconds(1) );
+        service.post( std::bind( &Channel::storeCorrected, this, std::ref(service), i) );
+    }
+}
+
+
+void Channel::preprocessImage( size_t i ) {
+
+    Image<float> view( images, i, i, 0, imgSize.y-1, 0, imgSize.x-1 );
+    Array<double> tmpImg( imgSize.y, imgSize.x );       // local temporary with double-precision
+    tmpImg = view.copy<double>();
+    
+    LOG_TRACE << boost::format ("Preprocessing image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(tmpImg.dimensions(),"dims");
+    
+//         bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % i));
+//         fn = bfs::path(fn.leaf().string() + ".inp");
+//         redux::file::Ana::write( fn.string(), tmpImg );   // TODO: other formats
+
     /*
     // Michiel's method for detecting bitshifted Sarnoff images.    TODO make this an SST-specific "filter" to be applied on raw data
     if (imgMean > 4 * avgMean) {
@@ -782,6 +829,9 @@ void Channel::preprocessImage( size_t index, Image<float>& img ) {
         }
 
         tmpImg *= gain;
+//         fn = bfs::path (boost::str (boost::format (imageTemplate) % i));
+//         fn = bfs::path(fn.leaf().string() + ".dg");
+//         redux::file::Ana::write( fn.string(), tmpImg );   // TODO: other formats
 
         namespace sp = std::placeholders;
         size_t sy = tmpImg.dimSize(0);
@@ -808,28 +858,36 @@ void Channel::preprocessImage( size_t index, Image<float>& img ) {
             }
         }
 
+        // FIXME: This is a hack to create truncated values as the old code!!
+        //for(size_t i=0; i<sy*sx; ++i) arrayPtr[0][i] = (int)arrayPtr[0][i];
+        
     }
 
-    img.assign(tmpImg);         // copy back to image
-  
-    // save corrected data if specified.
-    if((myObject.saveMask & SF_SAVE_FFDATA)) {
-        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % imageNumbers[index]));
-        fn = bfs::path(fn.leaf().string() + ".cor");
-        LOG_DETAIL << boost::format ("Saving flat/dark corrected file %s") % fn.string();
-        redux::file::Ana::write(fn.string(), tmpImg.copy<float>());   // TODO: other formats
-    }
-
+    view.assign(tmpImg);                            // copy back to image
+    imageStats[i].reset( new ArrayStats() );
+    imageStats[i]->getStats( borderClip, tmpImg );    // get stats for corrected data
+    myJob.info.progress[0]++;
+    myJob.setProgressString();
 
 }
 
 
 void Channel::copyImagesToPatch(ChannelData& chData) {
-    
-    size_t nImages = std::max<size_t>(1,imageNumbers.size());
-    Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nImages-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
+
+    Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
     chData.images = std::move(block);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
     chData.setLoaded();
+    
+}
+
+
+uint32_t Channel::nImages(void) {
+    
+    if( nTotalFrames == 0 ) {
+        nTotalFrames = std::accumulate( nFrames.begin(), nFrames.end(), 0 );
+    }
+    
+    return nTotalFrames;
     
 }
 
@@ -870,6 +928,10 @@ void Channel::adjustCutout( ChannelData& chData, const Region16& origCutout ) co
     if( chData.cutout != desiredCutout ) {
         chData.offset -= (chData.cutout.first - desiredCutout.first - chData.channelOffset);
     }
+
+// cout << "adjustCutout: desired=" << desiredCutout << "  cutout=" << chData.cutout
+//     << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
+//     << "   res=" << chData.residualOffset << endl;
     
 }
 
@@ -915,15 +977,20 @@ Point16 Channel::getImageSize(void) {
         } else {                        //  No align-map or align-clip, get full image size.
             bfs::path fn;
             if( nImages() ) {
-                fn = bfs::path(imageDataDir) / bfs::path(boost::str(boost::format (imageTemplate) % imageNumbers[0]));
+                fn = bfs::path(imageDataDir) / bfs::path(boost::str(boost::format (imageTemplate) % fileNumbers[0]));
             } else {
                 fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
             }
             Image<float> tmp;
-            CachedFile::load( tmp, fn.string() );       // Image will be cached, so this is not a "wasted" load.
-            if( tmp.nDimensions() == 2 ) {
-                imgSize = Point16( tmp.dimSize(0), tmp.dimSize(1) );
-            } else LOG_ERR << "Image " << fn << " is not 2-dimensional.";
+            CachedFile::load( tmp, fn.string(), true );       // Image will be cached, so this is not a "wasted" load.
+
+            uint8_t nDims = tmp.meta->nDims();
+
+            if( nDims == 3 ) {
+                imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
+            } else if( nDims == 2 ) {
+                imgSize = Point16( tmp.meta->dimSize(0), tmp.meta->dimSize(1) );
+            } else LOG_ERR << "Image " << fn << " is not 2D or 3D.";
         }
     }
     return imgSize;

@@ -342,11 +342,22 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
                 solver->init();
             }
             for( auto& part : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
-                // Run main processing
-                solver->run(static_pointer_cast<PatchData>(part));
-                wip.hasResults = true;
-                // Get results
-                //it = proc->result;
+                
+                boost::thread_group pool;
+                {
+                    boost::asio::io_service::work work(service);
+                    for( uint16_t t = 0; t < nThreads; ++t) {
+                        pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
+                    }
+                    // Run main processing
+                    solver->run( static_pointer_cast<PatchData>(part) );
+                    //solver->run_new(static_pointer_cast<PatchData>(part));
+                    wip.hasResults = true;
+                    // Get results
+                    //it = proc->result;
+                }
+                pool.join_all();
+                service.reset();        // reset service so that next call will not fail
             }
         }
     }
