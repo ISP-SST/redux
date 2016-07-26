@@ -9,7 +9,9 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
+#include <boost/asio.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>

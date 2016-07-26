@@ -18,6 +18,7 @@
 
 #include <functional>
 #include <math.h>
+#include <numeric>
 #include <string>
 
 #include <boost/algorithm/string.hpp>

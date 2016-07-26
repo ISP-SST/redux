@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <numeric>
 
 #include <boost/functional/hash.hpp>
 #include <boost/iterator/counting_iterator.hpp>

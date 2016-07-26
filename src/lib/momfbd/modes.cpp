@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <numeric>
 
 #include <boost/filesystem.hpp>
 

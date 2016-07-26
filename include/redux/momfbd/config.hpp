@@ -2,6 +2,9 @@
 #define REDUX_MOMFBD_CONFIG_HPP
 
 #include <map>
+#include <ostream>
+#include <string>
+#include <vector>
 
 #include <boost/property_tree/ptree.hpp>
 namespace bpt = boost::property_tree;
