@@ -78,7 +78,7 @@ namespace redux {
              */
             struct Group {
                 
-                Group (std::shared_ptr<Constraint>& con);
+                explicit Group (std::shared_ptr<Constraint>& con);
                 
                 void add (const std::shared_ptr<Constraint>& con);
                 void addConnectedConstraints (std::vector<std::shared_ptr<Constraint>>& cons);
@@ -98,7 +98,7 @@ namespace redux {
                 std::shared_ptr<NullSpace> nullspace;
             };
 
-            Constraints (const MomfbdJob&);
+            explicit Constraints (const MomfbdJob&);
             ~Constraints();
 
             void blockifyGroups (void);

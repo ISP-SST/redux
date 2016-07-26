@@ -37,11 +37,6 @@ namespace {
     
     double distMap[2*maxDistance2+1];
     
-    bool calculateCache( void ) {
-
-        return true;
-    }
-
     const double* getDistanceMap (void) {
         memset(distMap,0,(2*maxDistance2+1)*sizeof(double));
         for(int i=0; i<=2*maxDistance2; ++i) distMap[i] = pow (i + deltasqr, -beta);
@@ -309,6 +304,7 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
 void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r_c, double angle) {
 
     int xo = nph / 2, yo = nph / 2;
+    int nphi = static_cast<int>(nph);
     if (j == 1) {
         for (unsigned int x=0; x < nph; ++x) {
             for (unsigned int y=0; y < nph; ++y) {
@@ -344,14 +340,14 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
         if (m) {                                  // m!=0
             double sf = sqrt ( (double) (2 * (n + 1)));
             if (j % 2)                              // odd
-                for (int x = 0; x < nph; ++x) {
-                    for (int y = 0; y < nph; ++y) {
+                for (int x = 0; x < nphi; ++x) {
+                    for (int y = 0; y < nphi; ++y) {
                         mode[x][y] *= sf * sin ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
                     }
                 }
             else {                                   // even
-                for (int x = 0; x < nph; ++x) {
-                    for (int y = 0; y < nph; ++y) {
+                for (int x = 0; x < nphi; ++x) {
+                    for (int y = 0; y < nphi; ++y) {
                         mode[x][y] *= sf * cos ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
                     }
                 }

@@ -11,7 +11,7 @@ int redux::file::anadecrunch32(const unsigned char* x, int32_t* array, int slice
 {
     int iq;
     int r0, r1, r2, nb;
-    int j, in, i, k, ix, iy, mask;
+    int j, in, i, ix, iy, mask;
     long long y64;
     unsigned char xq;
     union {
@@ -109,8 +109,8 @@ int redux::file::anadecrunch32(const unsigned char* x, int32_t* array, int slice
                    that first byte */
                 r0 = 8 - j;
                 /* check up to 4 more bytes, if not found than an error */
-                for(k = i + 1; k < i + 5; k++) {
-                    if((xq = x[k]) != 0) {
+                for(int k = 1; k < 5; k++) {
+                    if((xq = x[i+k]) != 0) {
                         /* caught it here, find the bit and then jump from loop */
                         if((xq & 1) != 0)
                             r0 += 1;
@@ -201,7 +201,7 @@ int redux::file::anadecrunch(const unsigned char* x, int16_t* array, int slice, 
 {
     short iq;
     int r0, r1, r2, r4, nb, mask;
-    int j, in, i, k, ix, iy;
+    int j, in, i, ix, iy;
     unsigned char xq;
     union {
         int i;
@@ -300,8 +300,8 @@ int redux::file::anadecrunch(const unsigned char* x, int16_t* array, int slice, 
                    that first byte */
                 r0 = 8 - j;
                 /* check up to 4 more bytes, if not found than an error */
-                for(k = i + 1; k < i + 5; k++) {
-                    if((xq = x[k]) != 0) {
+                for(int k = 1; k < 5; k++) {
+                    if((xq = x[i+k]) != 0) {
                         /* caught it here, find the bit and then jump from loop */
                         if((xq & 1) != 0)
                             r0 += 1;
@@ -390,7 +390,7 @@ int redux::file::anadecrunch8(const unsigned char* x, int8_t* array, int slice, 
 {
     uint8_t iq;
     int r0, r1, r2, r4, nb, mask;
-    int j, in, i, k, ix, iy;
+    int j, in, i, ix, iy;
     uint8_t xq;
     union {
         int i;
@@ -468,8 +468,8 @@ int redux::file::anadecrunch8(const unsigned char* x, int8_t* array, int slice, 
                    that first byte */
                 r0 = 8 - j;
                 /* check up to 4 more bytes, if not found than an error */
-                for(k = i + 1; k < i + 5; k++) {
-                    if((xq = x[k]) != 0) {
+                for(int k = 1; k < 5; k++) {
+                    if((xq = x[i+k]) != 0) {
                         /* caught it here, find the bit and then jump from loop */
                         if((xq & 1) != 0)
                             r0 += 1;
@@ -557,7 +557,7 @@ int redux::file::anadecrunchrun(const unsigned char* x, int16_t* array, int slic
 {
     short iq;
     int r0, r1, r2, r4, nb, mask, nrun, n, nc;
-    int j, in, i, k, iy;
+    int j, in, i, iy;
     unsigned char xq;
     union {
         int i;
@@ -672,8 +672,8 @@ int redux::file::anadecrunchrun(const unsigned char* x, int16_t* array, int slic
                            that first byte */
                         r0 = 8 - j;
                         /* check up to 4 more bytes, if not found than an error */
-                        for(k = i + 1; k < i + 5; k++) {
-                            if((xq = x[k]) != 0) {
+                        for(int k = 1; k < 5; k++) {
+                            if((xq = x[i+k]) != 0) {
                                 /* caught it here, find the bit and then jump from loop */
                                 if((xq & 1) != 0)
                                     r0 += 1;
@@ -772,7 +772,7 @@ int redux::file::anadecrunchrun8(const unsigned char* x, int8_t* array, int slic
 {
     uint8_t iq;
     int r0, r1, r2, r4, nb, mask, nrun, n, nc;
-    int j, in, i, k, iy;
+    int j, in, i, iy;
     unsigned char xq;
     union {
         int i;
@@ -877,8 +877,8 @@ int redux::file::anadecrunchrun8(const unsigned char* x, int8_t* array, int slic
                            that first byte */
                         r0 = 8 - j;
                         /* check up to 4 more bytes, if not found than an error */
-                        for(k = i + 1; k < i + 5; k++) {
-                            if((xq = x[k]) != 0) {
+                        for(int k = 1; k < 5; k++) {
+                            if((xq = x[i+k]) != 0) {
                                 /* caught it here, find the bit and then jump from loop */
                                 if((xq & 1) != 0)
                                     r0 += 1;

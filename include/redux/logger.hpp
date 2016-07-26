@@ -23,7 +23,7 @@ namespace redux {
         typedef bsrc::severity_channel_logger< severity_level, std::string > logger_t;
         typedef bsrc::severity_channel_logger_mt< severity_level, std::string > logger_mt;
 
-        Logger( bpo::variables_map& );
+        explicit Logger( bpo::variables_map& );
         ~Logger( void );
 
         void addFileLog( const std::string& file );

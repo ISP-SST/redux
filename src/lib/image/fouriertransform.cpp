@@ -768,7 +768,7 @@ void FourierTransform::resize( size_t ySize, size_t xSize, int flags, uint8_t nT
 }
 
 
-const FourierTransform& FourierTransform::operator*= (const FourierTransform& rhs) {
+FourierTransform& FourierTransform::operator*= (const FourierTransform& rhs) {
 
     if (centered != rhs.centered) {
         *this *= rhs.reordered();
@@ -812,7 +812,7 @@ const FourierTransform& FourierTransform::operator*= (const FourierTransform& rh
 }
 
 
-const FourierTransform& FourierTransform::operator= (const FourierTransform& rhs) {
+FourierTransform& FourierTransform::operator= (const FourierTransform& rhs) {
     rhs.copy(*this);
     plan = rhs.plan;
     centered = rhs.centered;

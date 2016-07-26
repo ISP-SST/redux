@@ -332,12 +332,12 @@ void redux::file::loadFiles( const vector<string>& filenames, char* out, size_t 
 void redux::file::sumFiles( const std::vector<std::string>& filenames, double* out, size_t frameSize, uint8_t nThreads,
                             preSumCallback preSum ) {
     
+/*    
     size_t nImages = filenames.size();
     mutex mtx;
 
     atomic<size_t> imgIndex(0);
     atomic<size_t> threadIndex(0);
-/*    
     auto sumFunc = [=,&mtx]( double* a ) {
         std::unique_lock<mutex> lock(mtx);
         for( size_t b=0; b<nPixels; ++b ) summedData[b] += a[b];

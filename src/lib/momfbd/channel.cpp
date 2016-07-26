@@ -438,8 +438,9 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         service.post([this](){
             CachedFile::load<int16_t>( xOffset, xOffsetFile );
             if( alignClip.size() == 4 ) {
-                if( abs(alignClip[1]-alignClip[0])+1 != xOffset.dimSize(1) ||
-                    abs(alignClip[3]-alignClip[2])+1 != xOffset.dimSize(0) ) {
+                Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
+                if( clipSize.x != xOffset.dimSize(1) ||
+                    clipSize.y != xOffset.dimSize(0) ) {
                     LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip.";
                     xOffset.clear();
                 }
@@ -452,8 +453,9 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         service.post([this](){
             CachedFile::load<int16_t>( yOffset, yOffsetFile );
             if( alignClip.size() == 4 ) {
-                if( abs(alignClip[1]-alignClip[0])+1 != yOffset.dimSize(1) ||
-                    abs(alignClip[3]-alignClip[2])+1 != yOffset.dimSize(0) ) {
+                Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
+                if( clipSize.x != yOffset.dimSize(1) ||
+                    clipSize.y != yOffset.dimSize(0) ) {
                     LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip.";
                     yOffset.clear();
                 }

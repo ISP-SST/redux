@@ -21,7 +21,7 @@ namespace redux {
 
     public:
 
-        Worker( Daemon& );
+        explicit Worker( Daemon& );
         ~Worker( void );
 
         void init( void );

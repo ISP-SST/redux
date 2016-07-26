@@ -43,7 +43,7 @@ namespace redux {
                     std::vector<size_t> sizes;
                 } id;
                 fftw_plan forward_plan, backward_plan;
-                Plan( const Index& );
+                explicit Plan( const Index& );
                 ~Plan();
                 static Plan::Ptr get(const std::vector<size_t>& dims, Plan::TYPE tp, uint8_t nThreads=1);
                 static Plan::Ptr get(size_t sizeY, size_t sizeX, Plan::TYPE tp, uint8_t nThreads=1);
@@ -138,8 +138,8 @@ namespace redux {
             void resize(size_t ySize, size_t xSize, int flags=0, uint8_t nT=1);
             
             operator const redux::util::Array<complex_t>&() const { return reinterpret_cast<const redux::util::Array<complex_t>&>(*this); }
-            const FourierTransform& operator*=( const FourierTransform& rhs );
-            const FourierTransform& operator=( const FourierTransform& rhs );
+            FourierTransform& operator*=( const FourierTransform& rhs );
+            FourierTransform& operator=( const FourierTransform& rhs );
 
             template <typename T>
             const FourierTransform& operator=( const T& val ) { Array<complex_t>::operator=(val); return *this; }

@@ -839,7 +839,7 @@ IDL_VPTR rdx_fillpix( int argc, IDL_VPTR* argv, char* argk ) {
         
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
    
-    int nDims = images->value.arr->n_dim;
+    //int nDims = images->value.arr->n_dim;
     /*size_t nImages = 1;
     if( nDims == 3 ) {
         nImages = images->value.arr->dim[2];

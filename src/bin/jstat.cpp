@@ -132,10 +132,10 @@ void printPeerList( TcpConnection::Ptr conn, int ns ) {
 
     const char* ptr = buf.get();
     uint64_t count(0);
-    int hostCount(0);
     try {
         Host peer;
         cout << "    " << peer.printHeader() << endl;
+        int hostCount(0);
         while( count < blockSize ) {
             count += peer.unpack(ptr+count,conn->getSwapEndian());
             if ( hostCount == 0 ) cout << "    " << peer.print() << endl;

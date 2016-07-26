@@ -497,7 +497,7 @@ namespace redux {
             }
 
             while( ptr < end ) {
-                if( **ptr > **ptr ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
+                if( !isfinite(**ptr) ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
                     std::swap( ptr, --end );
                     nanCount++;
                 }
@@ -535,7 +535,7 @@ namespace redux {
             }
 
             while( ptr < end ) {
-                if( *ptr > *ptr ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
+                if( !isfinite(*ptr) ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
                     std::swap( ptr, --end );
                     nanCount++;
                 }

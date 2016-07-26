@@ -214,12 +214,12 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, verbosity);
     count += unpack(ptr+count, maxThreads);
     count += unpack(ptr+count, maxPartRetries);
-    uint8_t tmp;
+    uint8_t tmp(0);
     count += unpack(ptr+count, tmp);
     step.store(tmp);
     count += unpack(ptr+count, tmp);
     state.store(tmp);
-    uint32_t tmp32;
+    uint32_t tmp32(0);
     count += unpack(ptr+count, tmp32);
     progress[0].store(tmp);
     count += unpack(ptr+count, tmp32);

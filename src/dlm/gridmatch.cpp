@@ -257,13 +257,16 @@ namespace {
         IDL_LONG  di, dj, in, jn, iter, dd, badflag = 0;
         float av1, av2, cx, cy, cxx, cxy, cyy, avdif, t, res[9], buf[9], t1, t2;
 
+        memset( buf, 0, 9*sizeof(float) );
+        memset( res, 0, 9*sizeof(float) );
+        memset( done, 0, 9*sizeof(IDL_LONG) );
+        
         static IDL_LONG   itmax = 20;
 
-
-        for( i = 0; i < 9; i++ )
-            done[i] = 0;
         idelx = rint( *xoffset );
         idely = rint( *yoffset );
+        
+        unbias( p1, p2, nxa, nxb, nya, nyb, nx, ny, gwx, gwy, &av1, &av2, &cx, &cy, &cxx, &cxy, &cyy, idelx, idely );
 
         /* look at a 3x3 matrix of residuals centered at 0 offset, find the location
            of the minimum, if not at center, then look at new 3x3 centered
@@ -386,7 +389,6 @@ IDL_VPTR redux::gridmatch( int argc, IDL_VPTR argv[] )
         }            /* stretch_clip: LONG read-only scalar */
     };
     IDL_VPTR  result;
-    IDL_VARIABLE  zero;
     float         *out, *p1, *p2, *gwx, *gwy, xoffset, yoffset, gwid;
     IDL_LONG      *gx, *gy, nx, ny, nxg, nyg, dx2, dy2, nc, dx, dy, i1, i2, j1, j2;
     IDL_MEMINT    dims[IDL_MAX_ARRAY_DIM];
@@ -404,10 +406,7 @@ IDL_VPTR redux::gridmatch( int argc, IDL_VPTR argv[] )
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_RET,
                      "First two arguments (images) have unequal dimensions" );
         IDL_EzCallCleanup( argc, argv, arg_struct );
-        zero.type = IDL_TYP_INT;
-        zero.value.i = 0;
-        result = &zero;
-        return result;
+        return IDL_GettmpInt(0);    // return a dummy
     }
 
     p1 = ( float * ) arg_struct[0].value.arr->data;
@@ -421,10 +420,7 @@ IDL_VPTR redux::gridmatch( int argc, IDL_VPTR argv[] )
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_RET,
                      "3rd and 4th arguments (grid points) have unequal dimensions" );
         IDL_EzCallCleanup( argc, argv, arg_struct );
-        zero.type = IDL_TYP_INT;
-        zero.value.i = 0;
-        result = &zero;
-        return result;
+        return IDL_GettmpInt(0);    // return a dummy
     }
 
     gx = ( IDL_LONG * ) arg_struct[2].value.arr->data;
@@ -451,10 +447,7 @@ IDL_VPTR redux::gridmatch( int argc, IDL_VPTR argv[] )
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_RET,
                      "Could not allocate memory for the gaussian kernel" );
         IDL_EzCallCleanup( argc, argv, arg_struct );
-        zero.type = IDL_TYP_INT;
-        zero.value.i = 0;
-        result = &zero;
-        return result;
+        return IDL_GettmpInt(0);    // return a dummy
     }
     gwy = gwx + nx;
     nc = nxg * nyg;       /* the number of subimages */
@@ -750,8 +743,8 @@ extern "C" {
     int IDL_Load( void ) {
 
         static IDL_SYSFUN_DEF2 function_addr[] = {
-            { {(IDL_VPTR(*)())redux::gridmatch}, "RED_GRIDMATCH", 7, 8, 0 },
-            { {(IDL_VPTR(*)())redux::stretch}, "RED_STRETCH", 2, 2, 0 }
+            { {(IDL_VPTR(*)())redux::gridmatch}, (char*)"RED_GRIDMATCH", 7, 8, 0 },
+            { {(IDL_VPTR(*)())redux::stretch}, (char*)"RED_STRETCH", 2, 2, 0 }
         };
 
         /* Register our routine. The routines must be specified exactly the same as in testmodule.dlm. */

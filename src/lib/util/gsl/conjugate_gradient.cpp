@@ -137,7 +137,6 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
     gsl_vector *g0 = state->g0;
     
     size_t n = x->size;
-    double *xData = x->data;
     double *gData = gradient->data;
     double *pData = state->p->data;
 
@@ -195,7 +194,7 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
     }
 
     double fa = *f, fb, fc;
-    double stepa = 0.0, stepb, stepc = state->step, tol = state->tol;
+    double stepa = 0.0, stepb, stepc = state->step;
 
     rdx_fdf* rdx_fdf_ptr = nullptr;
     if( fdf == fdf->params ) {      // test if it is a rdx_fdf type.

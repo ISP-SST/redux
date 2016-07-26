@@ -21,7 +21,7 @@ namespace redux {
 
     public:
 
-        Daemon ( po::variables_map& vm );
+        explicit Daemon ( po::variables_map& vm );
         virtual ~Daemon ( void );
         
         void reset(void);

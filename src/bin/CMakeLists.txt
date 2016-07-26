@@ -9,9 +9,6 @@ REDUX_ADD_EXECUTABLE( rdel jdel.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
-REDUX_ADD_EXECUTABLE( dirwatch dirwatch_main.cpp )
-
-
 if (REDUX_SKIP_GUI)
     message(STATUS "REDUX_SKIP_GUI is set: not building redux-gui.")
     return()

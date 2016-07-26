@@ -130,39 +130,40 @@ void redux::math::bracket(std::function<U(T)> func, T& a, T& b, T& mid, U& fa, U
 template void redux::math::bracket(std::function<double(double)>, double&, double&, double&, double&, double&, double&, int);
 
 
-#define SIGN(a,b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
 template<typename T, typename U>
 void redux::math::brent( std::function<U(T)> func, T ax, T bx, T& x, U& fx, double tol, int limit ) {
     
     static double CGOLD = 2.0-GoldenRatio;
     
-    T a,b,u,v,w;
+    T a = std::min( ax, bx );
+    T b = std::max( ax, bx );
+    
+    T u, v, w;
+    u = v = w = x;
+    
     U fu,fv,fw;
-    double d,etemp,p,q,r,tol1,tol2,xm;
-    double e = 0.0;
-
-    a = std::min( ax, bx );
-    b = std::max( ax, bx );
-    w = v = x;
-    fw = fv = fx = func(x);
+    fu = fv = fw = fx = func(x);
+    
+    double d(0.0);
+    double e(0.0);
     
 //printf ("brent0  (%e,%e,%e) = (%e)   tol=%e\n", a, x, b, fw, tol);
     for( int iter=1; iter <= limit; ++iter ) {
-        xm = 0.5*(a+b);
-        tol1 = tol*fabs(x)+1.0E-30;
-        tol2 = 2.0*tol1;
+        double xm = 0.5*(a+b);
+        double tol1 = tol*fabs(x) + TINY;
+        double tol2 = 2.0*tol1;
 //printf ("   iter=%d  [%e, %e]  tol1=%e  tol2=%e  x=%e  val=%e   test=%e\n", iter, b, a, tol1, tol2, x, fx, fabs(x-xm)+0.5*(b-a) );
         if( fabs(x-xm) <= (tol2-0.5*(b-a)) ) {
             return;
         }
         if( fabs(e) > tol1 ) {
-            r = (x-w)*(fx-fv);
-            q = (x-v)*(fx-fw);
-            p = (x-v)*q-(x-w)*r;
+            double r = (x-w)*(fx-fv);
+            double q = (x-v)*(fx-fw);
+            double p = (x-v)*q-(x-w)*r;
             q = 2.0*(q-r);
             if( q > 0.0 ) p = -p;
             q = fabs(q);
-            etemp = e;
+            double etemp = e;
             e = d;
             if( fabs(p) >= fabs(0.5*q*etemp) || p <= q*(a-x) || p >= q*(b-x) ) {
                 e = (x >= xm ? a-x : b-x);
@@ -208,6 +209,7 @@ void redux::math::brent( std::function<U(T)> func, T ax, T bx, T& x, U& fx, doub
             }
         }
     }
+    
     cout << "Error in brent: too many iterations!" << endl;
 
 }

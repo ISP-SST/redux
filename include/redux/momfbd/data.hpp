@@ -69,7 +69,7 @@ namespace redux {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
-            ObjectData( std::shared_ptr<Object> o );
+            explicit ObjectData( std::shared_ptr<Object> o );
             ~ObjectData();
             
             void setPath(const std::string& path);
@@ -133,7 +133,7 @@ namespace redux {
             std::map<ModeInfo, ModeSet&> modes;
             std::map<redux::image::PupilInfo, redux::image::Pupil&> pupils;
             Constraints constraints;
-            GlobalData(const MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
+            explicit GlobalData(const MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
             ModeSet& get(const ModeInfo&, const ModeSet& ms=ModeSet());
             redux::image::Pupil& get(const redux::image::PupilInfo&, const redux::image::Pupil& ms=redux::image::Pupil());
             uint64_t size(void) const;

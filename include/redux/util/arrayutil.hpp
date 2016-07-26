@@ -33,7 +33,6 @@ namespace redux {
         }
         template <typename T, typename U> void castAndDelete( U* p ) {
             delete[] reinterpret_cast<T*>(p);
-            p = nullptr;
         }
         //@}
 

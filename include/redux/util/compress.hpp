@@ -23,7 +23,8 @@ namespace redux {
         class Compressed : public T {
             
         public:
-            template <class... S> Compressed(S&& ... s) : T(std::forward<S>(s)...),
+            template <class... S>
+            explicit Compressed(S&& ... s) : T(std::forward<S>(s)...),
                 isCompressed(false), compressionLevel(LVL),
                 compressedSize(0), uncompressedSize(0) { }
             

@@ -28,9 +28,6 @@ namespace redux {
             bool operator<(const CachedFile& rhs) const { return (filename < rhs.filename); }
 
             template <typename T>
-            void loadImage( redux::image::Image<T>& img ) const { redux::file::readFile( filename.string(), img ); }
-
-            template <typename T>
             static void load( redux::image::Image<T>& img, const std::string& fn, bool metaOnly=false ) {
                 CachedFile cf( fn );
                 redux::image::Image<T>& cimg = redux::util::Cache::get<CachedFile, redux::image::Image<T> >(cf);
@@ -47,18 +44,6 @@ namespace redux {
             static void unload( const std::string& fn ) {
                 CachedFile cf( fn );
                 redux::util::Cache::erase<CachedFile, redux::image::Image<T>>(cf);
-            }
-            
-            template <typename T>
-            static redux::image::Image<T>& get( const std::string& fn ) {
-                CachedFile cf( fn );
-                redux::image::Image<T>& cimg = redux::util::Cache::get<CachedFile, redux::image::Image<T> >(cf);
-                {
-                    std::unique_lock<std::mutex> lock( cimg.imgMutex );
-                    if( cimg.nElements() == 0 ) cf.loadImage( cimg );
-                    else std::cout << std::endl << "CACHED: " << fn << "  = " << cf.filename << std::endl << std::endl;
-                }
-                return cimg;
             }
 
             

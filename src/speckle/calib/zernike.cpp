@@ -1,6 +1,7 @@
 #include "zernike.hpp"
 
 #include "defs.hpp"
+#include <redux/util/datautil.hpp>
 
 #include <cstring>
 #include <fstream>
@@ -10,6 +11,7 @@
 
 
 using namespace redux::speckle;
+using namespace redux::util;
 using namespace std;
 
 #define RADIAL_SAMPLES     200001                // radial sampling points for zernikes
@@ -218,7 +220,7 @@ ZernikeData& ZernikeData::get (void) {
 
 void ZernikeData::init (const vector<float>& eff, uint32_t Imax, float cov_cutoff) {
     
-    static int dummy = initAngular();                   // static variable will only initialize once, i.e. only call initAngular once.
+    static int dummy UNUSED = initAngular();                   // static variable will only initialize once, i.e. only call initAngular once.
     int32_t n1,n2,nEff = eff.size();
     int32_t m;                                          // m is the same, or cov=0.0
     covariances.clear();

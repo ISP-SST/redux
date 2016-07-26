@@ -179,14 +179,16 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
         unpack(ptr, count, swap_endian);
         if( count ) {
             received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, count ) );    // hopefully the buffer allocated for the cfg-data is big enough for any messages.
-            vector<string> messages;
-            unpack(ptr, messages,swap_endian);
-            if( !messages.empty() ) {
-                string msgText = "Server messages:";
-                for( auto& msg: messages ) {
-                    msgText += "\n\t" + msg;
+            if( received ) {
+                vector<string> messages;
+                unpack( ptr, messages, swap_endian );
+                if( !messages.empty() ) {
+                    string msgText = "Server messages:";
+                    for( auto& msg: messages ) {
+                        msgText += "\n\t" + msg;
+                    }
+                    LOG << msgText;
                 }
-                LOG << msgText;
             }
         }
     }

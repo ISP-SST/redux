@@ -162,7 +162,7 @@ namespace redux {
         class CacheItem {
         public:
             CacheItem(void);
-            CacheItem(const std::string& path);
+            explicit CacheItem(const std::string& path);
             CacheItem(const CacheItem&);
             virtual ~CacheItem();
             

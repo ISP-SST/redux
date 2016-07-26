@@ -34,14 +34,49 @@ namespace {
     template <> Fits::TypeIndex getDatyp<int64_t>( void ) { return Fits::FITS_LONG; }
     template <> Fits::TypeIndex getDatyp<complex_t>( void ) { return Fits::FITS_COMPLEX; }
     
+    size_t getElementSize( int dataType ) {
+        switch( dataType ) {
+            case( 11 ):                
+            case( 12 ):                
+                return 1;
+            case( 20 ):                
+            case( 21 ):                
+                return 2;
+            case( 30 ):                
+            case( 31 ):                
+            case( 42 ):                
+                return 4;
+            case( 40 ):                
+            case( 41 ):                
+            case( 82 ):                
+                return 8;
+            default: ;
+        }
+        return 0;
+    }
+    
+    
     int getDataType( fitsfile* ff, int bitpix ) {
-        int ret, status;
+        
+        int status;
         long bzero(0);
         float bscale(0);
-        ret = fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status );
-        if ( bscale == 1.0 ) {
-            ret = fits_read_key_lng( ff, "BZERO", &bzero, nullptr, &status );
+        if( fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status ) ) {
+            if( status != KEY_NO_EXIST ) {
+                fits_report_error( stderr, status );
+                return 0;
+            } else status = 0;
         }
+    
+        if ( bscale == 1.0 ) {
+            if( fits_read_key_lng( ff, "BZERO", &bzero, nullptr, &status ) ) {
+                if( status != KEY_NO_EXIST ) {
+                    fits_report_error( stderr, status );
+                    return 0;
+                } else status = 0;
+            }
+        }
+        
         switch( bitpix ) {
             case( 8 ): {
                 if( bzero == -(1L<<7) ) return TSBYTE;
@@ -59,11 +94,14 @@ namespace {
                 if( bzero == (1L<<63) ) return TULONG;
                 return TLONG;
             }
+            case( -32 ): return TFLOAT;
+            case( -64 ): return TDOUBLE;
             default: return 0;
         }
     }
     
 }
+
 
 Fits::Fits( void ) : fitsPtr_(nullptr), status_(0)  {
     
@@ -98,9 +136,7 @@ void Fits::close(void) {
 
 void Fits::read( const std::string& filename ) {
     
-    fitsfile *fptr;
-    
-    int nHDU, hduType, nKeys;
+    int nHDU, hduType;
     char data[ FLEN_VALUE ];
     char card[FLEN_CARD];
     memset( data, 0, FLEN_VALUE );
@@ -143,68 +179,17 @@ void Fits::read( const std::string& filename ) {
     
     cout << "bitpix: " << primaryHDU.bitpix << endl;
     
-    long bzero(0);
-    float bscale(0);
-    if( fits_read_key_flt( fitsPtr_, "BSCALE", &bscale, nullptr, &status_ ) ) {
-        if( status_ != KEY_NO_EXIST ) {
-            fits_report_error(stderr, status_);
-            return;
-        } else status_ = 0;
-    }
-    cout << "BSCALE: " << bscale << endl;
-    if ( bscale == 1.0 ) {
-        if( fits_read_key_lng( fitsPtr_, "BZERO", &bzero, nullptr, &status_ ) ) {
-            if( status_ != KEY_NO_EXIST ) {
-                fits_report_error(stderr, status_);
-                return;
-            } else status_ = 0;
-        }
-    }
-    cout << "BZERO: " << bzero << endl;
-    switch( primaryHDU.bitpix ) {
-        case( 8 ): {
-            if( bzero == -(1L<<7) ) primaryHDU.dataType = TSBYTE;
-            else primaryHDU.dataType = TBYTE;
-            primaryHDU.elementSize = 1;
-            break;
-        }
-        case( 16 ): {
-            if( bzero == (1L<<15) ) primaryHDU.dataType = TUSHORT;
-            else primaryHDU.dataType = TSHORT;
-            primaryHDU.elementSize = 2;
-            break;
-        }
-        case( 32 ): {
-            if( bzero == (1L<<31)) primaryHDU.dataType = TUINT;
-            else primaryHDU.dataType = TINT;
-            primaryHDU.elementSize = 4;
-            break;
-        }
-        case( 64 ): {
-            if( bzero == (1L<<63) ) primaryHDU.dataType = TULONG;
-            else primaryHDU.dataType = TLONG;
-            primaryHDU.elementSize = 8;
-            break;
-        }
-        case( -32 ): {
-            primaryHDU.dataType = TFLOAT;
-            primaryHDU.elementSize = 4;
-            break;
-        }
-        case( -64 ): {
-            primaryHDU.dataType = TDOUBLE;
-            primaryHDU.elementSize = 8;
-            break;
-        }
-        default: primaryHDU.dataType = primaryHDU.elementSize = 0;
-    }
-        
+    primaryHDU.dataType = getDataType( fitsPtr_, primaryHDU.bitpix );
+    primaryHDU.elementSize = getElementSize( primaryHDU.dataType );
     cout << "dataType: " << primaryHDU.dataType << endl;
+    cout << "elementSize: " << primaryHDU.elementSize << endl;
+    
     if( fits_read_key( fitsPtr_, TINT, "NAXIS", &primaryHDU.nDims, NULL, &status_ ) ) {
         fits_report_error(stderr, status_);
         return;
     }
     cout << "naxis: " << primaryHDU.nDims << endl;
+    
     primaryHDU.nElements = 0;
     if( primaryHDU.nDims > 0 ) {
         primaryHDU.nElements = 1;
@@ -313,7 +298,7 @@ size_t redux::file::Fits::dataSize(void) {
 
 size_t redux::file::Fits::dimSize(size_t i) {
     
-    if( i >= primaryHDU.nDims ) return 0;
+    if( static_cast<int>(i) >= primaryHDU.nDims ) return 0;
     
     return primaryHDU.dims[ primaryHDU.nDims-i-1 ];
     
