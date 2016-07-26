@@ -19,6 +19,8 @@
 #include <set>
 #include <thread>
 
+#include <boost/asio.hpp>
+#include <boost/thread/thread.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/timer/timer.hpp>
 
@@ -51,6 +53,7 @@ namespace {
         float eps;
         IDL_INT margin;
         IDL_INT max_dist;
+        IDL_INT max_shift;
         float max_scale;
         IDL_INT max_points;
         IDL_INT niter;
@@ -73,6 +76,7 @@ namespace {
         { (char*) "MAX_DIST",   IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_dist) },
         { (char*) "MAX_POINTS", IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_points) },
         { (char*) "MAX_SCALE",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_scale) },
+        { (char*) "MAX_SHIFT",  IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_shift) },
         { (char*) "NITER",      IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (niter) },
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
@@ -85,8 +89,14 @@ namespace {
 
 #ifdef REDUX_WITH_OPENCV
 
-    bool transformCheck (const Mat& trans, double maxValue = 10000, double maxScaleDiff = 1.5) {
-        if (!checkRange (trans, true, 0, -maxValue, maxValue)) return false;
+    bool transformCheck (const Mat& trans, const Size& imgSize, double maxValue = 10000, double maxScaleDiff = 1.5) {
+
+        if( (trans.at<double>(0,0) > 0 && trans.at<double>(0,2) > maxValue) ||
+            (trans.at<double>(0,0) < 0 && abs(trans.at<double>(0,2)-imgSize.width) > maxValue)
+        ) return false;
+        if( (trans.at<double>(1,1) > 0 && trans.at<double>(1,2) > maxValue) ||
+            (trans.at<double>(1,1) < 0 && abs(trans.at<double>(1,2)-imgSize.height) > maxValue)
+        ) return false;
 
         double det = fabs (determinant (trans (cv::Rect_<int> (0, 0, 2, 2))));
         double minScale = std::max( 0.1, (1.0/maxScaleDiff) );
@@ -99,8 +109,8 @@ namespace {
 
 
     // find approximate (affine) transforms by matching 3 central points in the object, to a reference + its nNeighbours nearest points
-    vector<Mat> getInitializations (const vector<KeyPoint>& obj, const vector<KeyPoint>& target,
-                                    double maxValue = 10000, double maxScaleDiff=1.5) {
+    vector<Mat> getInitializations (const vector<KeyPoint>& obj, const vector<KeyPoint>& target, const Size& imgSize,
+                                    double maxShift = 10000, double maxScaleDiff=1.5) {
 
         size_t nPairs = 3;      // 3 points needed for getAffineTransform()
 
@@ -123,22 +133,28 @@ namespace {
                 map<size_t, size_t> tmp;
                 for (size_t i = 0; i < nPairs; ++i) {
                     tmp[objInd[i]] = targetInd[i];
-                    if( i ) {       // distances should be in the scale range
+                    Point2f oPoint = obj[objInd[i]].pt;
+                    Point2f tPoint = target[targetInd[i]].pt;
+                    double refDist = norm( oPoint - tPoint );
+                    refDist = min( refDist, norm( oPoint - Point2f(tPoint.x, imgSize.height-tPoint.y) ));
+                    refDist = min( refDist, norm( oPoint - Point2f(imgSize.width-tPoint.x, tPoint.y) ));
+                    refDist = min( refDist, norm( oPoint - Point2f(imgSize.width-tPoint.x, imgSize.height-tPoint.y) ));
+                    if( refDist > maxShift ) continue;      // image-shift is too large
+                    if( i ) {       // relative distances should be in the scale range
                         double objDist = norm( obj[objInd[i]].pt - obj[objInd[0]].pt );
                         double ratio = norm( target[targetInd[i]].pt - target[targetInd[0]].pt ) / objDist;
                         if( ratio > maxScaleDiff || ratio < 1.0/maxScaleDiff ) {
                             continue;
                         }
                     }
+                    if( tmp.size() != nPairs ) continue;
+                    combinations.insert (tmp);
                 }
-                if( tmp.size() != nPairs ) continue;
-                combinations.insert (tmp);
             } while (next_permutation (targetInd.begin(), targetInd.end()));
         } while (next_permutation (objInd.begin(), objInd.end()));
 
         vector<Point2f> objPoints (nPairs);
         vector<Point2f> targetPoints (nPairs);
-
         for (auto & c : combinations) {
             size_t i = 0;
             for (auto & p : c) {
@@ -147,7 +163,7 @@ namespace {
                 i++;
             }
             Mat trans = getAffineTransform (objPoints, targetPoints);
-            if (transformCheck (trans, maxValue, maxScaleDiff)) {
+            if (transformCheck (trans, imgSize, maxShift, maxScaleDiff)) {
                 Mat H_init = Mat::eye(3, 3, CV_32F);            // unit
                 trans.copyTo(H_init(cv::Rect_<int> (0, 0, 3, 2))); // copy (affine) initialization to the top 2 rows
                 initializations.push_back(H_init);
@@ -256,8 +272,9 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     kw.help = 0;
     kw.margin = 30;
     kw.max_dist = 80;
-    kw.max_scale = 1.1;
+    kw.max_scale = 1.04;
     kw.max_points = -1;
+    kw.max_shift = 200;
     kw.niter = 100;
     kw.nrefpoints = 4;
     kw.show = 0;
@@ -283,6 +300,12 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     Mat raw2 = arrayToMat(img2_in, kw.verbose);
     Mat imgFloat1 = getImgAsGrayFloat (img1_in, kw.verbose);
     Mat imgFloat2 = getImgAsGrayFloat (img2_in, kw.verbose);
+    
+    cv::Size imgSize = imgFloat1.size();
+    if( imgSize != imgFloat2.size() ) {
+        cerr << "img_align: input images must be of the same size." << endl;
+        return ret;
+    }
 
     cv::SimpleBlobDetector::Params params;
     params.minThreshold = 50;
@@ -295,9 +318,9 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
     try {
 
-        Mat result (imgFloat1.rows, imgFloat1.cols, CV_8UC3);
-        Mat imgByte1 (imgFloat1.rows, imgFloat1.cols, CV_8UC1);
-        Mat imgByte2 (imgFloat2.rows, imgFloat2.cols, CV_8UC1);
+        Mat result (imgSize, CV_8UC3);
+        Mat imgByte1 (imgSize, CV_8UC1);
+        Mat imgByte2 (imgSize, CV_8UC1);
         
         Mat H, H_init;
 
@@ -314,7 +337,6 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         imgFloat1.convertTo (imgByte1, CV_8UC1, 255);
         imgFloat2.convertTo (imgByte2, CV_8UC1, 255);
 
-        double maxTransformationValue = std::max(imgFloat1.cols, imgFloat1.rows) + 100;
 
         SimpleBlobDetector detector (params);
         vector<KeyPoint> keypoints1, keypoints2;
@@ -406,36 +428,51 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
                 IDL_VarCopy( tmp, kw.h_init );
             }
             H_init = arrayToMat(kw.h_init);
-            if( transformCheck( H_init, maxTransformationValue, kw.max_scale ) ) {
+            if( transformCheck( H_init, imgSize, kw.max_shift, kw.max_scale ) ) {
                 initializations.push_back( H_init );
             }
         }
 
         if( initializations.empty() ) {
-            initializations = getInitializations (largestKP1, largestKP2, maxTransformationValue, kw.max_scale);
+            initializations = getInitializations (largestKP1, largestKP2, imgSize, kw.max_shift, kw.max_scale);
         }
         if ( kw.verbose > 1 && initializations.size() > 1 ) {
             cout << "Matching the " << kw.nrefpoints << " largest keypoints in the images." << endl;
-            cout << "Restricting the transformation to have shifts smaller than " << maxTransformationValue
+            cout << "Restricting the transformation to have shifts smaller than " << kw.max_shift
                  << " and a maximal scaling of " << kw.max_scale << " gave " << initializations.size()
                  << " valid permutations." << endl;
         }
 
         std::map<double, Mat> results;
-
-        for (auto & i : initializations) {
-            try {
-                double correlation = findTransformECC (imgByte1, imgByte2, i, MOTION_HOMOGRAPHY,
-                                                       TermCriteria (TermCriteria::COUNT + TermCriteria::EPS,
-                                                                     kw.niter, kw.eps));
-
-                if (correlation > 0) {
-                    results.insert (make_pair (correlation, i));
-                    if (fabs (1.0 - correlation) < kw.eps) break;
-                }
-            } catch (cv::Exception& e) { }
+        std::vector<std::future<double>> correlations;
+        std::vector<double> correlations2(initializations.size());
+        TermCriteria term_crit = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, kw.niter, kw.eps);
+        auto fit_func = std::bind( findTransformECC, std::ref(imgByte1), std::ref(imgByte2), std::placeholders::_1,
+            MOTION_HOMOGRAPHY, term_crit, noArray()
+        );
+        
+        boost::asio::io_service service;
+        boost::thread_group pool;
+        std::mutex mtx;
+        
+        for ( size_t i=0; i<initializations.size(); ++i) {
+            service.post([&,i](){
+                try {
+                    const Mat& init = initializations[i];
+                    double correlation = fit_func( init );
+                    if ( correlation > 0 ) {    // negative correlation means findTransformECC failed.
+                        std::unique_lock<std::mutex> lock(mtx);
+                        results.insert( make_pair(correlation, init) );
+                    }
+                } catch (cv::Exception& e) { }
+            });
         }
-
+        
+        for(uint16_t t = 0; t < thread::hardware_concurrency(); ++t) {
+            pool.create_thread(boost::bind(&boost::asio::io_service::run, &service));
+        }
+        pool.join_all();
+        
         if( results.empty() ) {
             cout << "Failed to match detected pinholes, try to increase nref (current: "
                  << kw.nrefpoints << ")  or adjust threshold (current: "
@@ -500,7 +537,16 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
         if (kw.verbose) {
             cout << "Transformation matrix:\n" << H << endl;
-        }
+            cout << "Scaling: " << fabs(determinant (H (cv::Rect_<int> (0, 0, 2, 2)))) << endl;
+            cv::Point2f shift( H.at<double>(0,2), H.at<double>(1,2) );
+            if( H.at<double>(0,0) < 0 ) {
+                shift.x -= imgSize.width;
+            }
+            if( H.at<double>(1,1) < 0 ) {
+                shift.y -= imgSize.height;
+            }
+            cout << "Shift: " << shift << endl;
+         }
         
         H.assignTo( retMat, retMat.type() );
         

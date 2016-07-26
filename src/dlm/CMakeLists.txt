@@ -23,6 +23,8 @@ if (DEFINED IDL_FOUND)
     if (REDUX_WITH_OPENCV)
         add_definitions(-DREDUX_WITH_OPENCV)
     endif()
+    
+    add_definitions(-DBOOST_ALL_DYN_LINK)
 
     set(CMAKE_DEBUG_POSTFIX "")   # no debug-suffix for dlm libraries
     
