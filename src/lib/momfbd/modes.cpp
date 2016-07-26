@@ -1,16 +1,12 @@
 #include "redux/momfbd/modes.hpp"
 
-#include "redux/momfbd/momfbdjob.hpp"
+
 #include "redux/momfbd/util.hpp"
 
-#include "redux/constants.hpp"
-#include "redux/logger.hpp"
 #include "redux/file/fileio.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/image/zernike.hpp"
-#include "redux/util/arrayutil.hpp"
 #include "redux/util/cache.hpp"
-#include "redux/util/stringutil.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -25,10 +21,6 @@ using namespace redux::util;
 using namespace std;
 
 namespace bfs = boost::filesystem;
-
-
-#define lg Logger::mlg
-#define logChannel "mode"
 
 
 ModeInfo::ModeInfo( string filename, uint16_t nPixels )
@@ -243,16 +235,14 @@ ModeSet& ModeSet::operator=( const ModeSet& rhs ) {
 
 ModeSet ModeSet::clone( void ) const {
 
-    //            redux::util::Array<T>::operator=( reinterpret_cast<const redux::util::Array<T>&>(rhs) );
     ModeSet tmp(*this);
     copy( reinterpret_cast<redux::util::Array<double>&>(tmp) );
     tmp.modePointers.clear();
     for(unsigned int i=0; i<tmp.dimSize(0); ++i) {
         tmp.modePointers.push_back( tmp.ptr(i,0,0) );
     }
-   // tmp.assign(*this);
-   //             redux::util::Array<T>::copy(tmp);
     return std::move(tmp);
+    
 }
 
 
@@ -261,8 +251,6 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
     if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
         if( nDimensions() != 3 || dimSize(1) != pixels || dimSize(2) != pixels ) {    // mismatch
-            LOG_WARN << "File: " << filename << " does not match this " << pixels << "x" << pixels << " ModeSet."
-            << printArray(dimensions(),"  filedims");
             clear();
         } else {
             // TODO rescale file to right size
@@ -280,75 +268,6 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
     }
     return false;
     
-}
-
-
-
-void ModeSet::init( const MomfbdJob& job, const Object& obj ) {
-    
-    // From file
-    bfs::path fn(obj.modeFile);
-    if ( bfs::is_regular_file(fn) ) {
-        ModeInfo info( obj.modeFile, obj.pupilPixels );
-        ModeSet& ret = job.globalData->get(info);
-        unique_lock<mutex> lock(ret.mtx);
-        if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
-            LOG << "Loading mode-file: " << obj.modeFile;
-            redux::file::readFile( fn.string(), ret );
-            if( ret.nDimensions() != 3 || ret.dimSize(1) != obj.pupilPixels || ret.dimSize(2) != obj.pupilPixels ) {    // mismatch
-                LOG_WARN << "File: " << obj.modeFile << " does not match this " << obj.pupilPixels << "x" << obj.pupilPixels << " ModeSet."
-                << printArray(ret.dimensions(),"  retdims");
-            } else {
-                // TODO rescale file to right size and detect tilt-modes
-                ret.info.nPupilPixels = ret.dimSize(1);
-                ret.modeNumbers.resize(ret.dimSize(0));
-                ret.info.pupilRadius = info.angle = 0;
-                std::iota(ret.modeNumbers.begin(), ret.modeNumbers.end(), 0);
-                ret.modePointers.clear();
-                for(unsigned int i=0; i<ret.dimSize(0); ++i) ret.modePointers.push_back( ret.ptr(i,0,0) );
-                *this = ret;
-                return;
-            }
-        } else {
-            if( ret.info.nPupilPixels && ret.info.nPupilPixels == obj.pupilPixels ) {    // matching modes
-                LOG_TRACE << "Cloning ModeSet";
-                *this = ret;
-                return;
-            } else {
-                LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet).";
-            }
-        }
-    }
-    
-    // From configuration
-    ModeInfo info(job.klMinMode, job.klMaxMode, 0, obj.pupilPixels, obj.pupilRadiusInPixels, obj.rotationAngle, job.klCutoff);
-    if (job.modeBasis == ZERNIKE) {     // force use of Zernike modes for all tilts
-        info.firstMode = info.lastMode = 0;
-    }
-    ModeSet& ret = job.globalData->get(info);
-    unique_lock<mutex> lock(ret.mtx);
-    if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
-        if(job.modeBasis == ZERNIKE) {
-            ret.generate( obj.pupilPixels, obj.pupilRadiusInPixels, obj.rotationAngle, job.modeNumbers );
-        } else {
-            ret.generate( obj.pupilPixels, obj.pupilRadiusInPixels, obj.rotationAngle, job.klMinMode, job.klMaxMode, job.modeNumbers, job.klCutoff );
-        }
-
-        if( ret.nDimensions() != 3 || ret.dimSize(1) != obj.pupilPixels || ret.dimSize(2) != obj.pupilPixels ) {    // mismatch
-            LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
-        } else {
-           *this = ret;
-        }
-    } else {
-        if( ret.info.nPupilPixels && ret.info.nPupilPixels == obj.pupilPixels ) {    // matching modes
-            LOG_TRACE << "Cloning ModeSet";
-            *this = ret;
-        } else {
-            LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!";
-        }
-    }
-
-
 }
 
 

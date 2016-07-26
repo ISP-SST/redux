@@ -9,8 +9,6 @@
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
 
-#include <map>
-
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
 

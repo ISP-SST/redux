@@ -1,13 +1,14 @@
 #ifndef REDUX_FILE_FILEFITS_HPP
 #define REDUX_FILE_FILEFITS_HPP
 
+#ifdef REDUX_WITH_FITS
+
 #include "redux/file/filemeta.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
 
 #include <fitsio.h>
-
 
 namespace redux {
 
@@ -116,5 +117,6 @@ namespace redux {
 
 } // end namespace redux
 
+#endif  // REDUX_WITH_FITS
 
 #endif // REDUX_FILE_FILEFITS_HPP

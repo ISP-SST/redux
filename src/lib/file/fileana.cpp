@@ -1,6 +1,5 @@
 #include "redux/file/fileana.hpp"
 
-#include "redux/util/arraystats.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/types.hpp"
 
@@ -328,26 +327,6 @@ size_t redux::file::Ana::nElements(void) {
 int redux::file::Ana::getIDLType(void) {
     
     return m_Header.datyp + 1;
-    
-}
-
-
-double redux::file::Ana::getMinMaxMean( const char* data, double* Min, double* Max ){
-    
-    ArrayStats stats;
-    size_t nEl = nElements();
-    switch( m_Header.datyp ) {
-        case( ANA_BYTE ):   stats.getMinMaxMean( data, nEl ); break;
-        case( ANA_WORD ):   stats.getMinMaxMean( reinterpret_cast<const int16_t*>(data), nEl ); break;
-        case( ANA_LONG ):   stats.getMinMaxMean( reinterpret_cast<const int32_t*>(data), nEl ); break;
-        case( ANA_FLOAT ):  stats.getMinMaxMean( reinterpret_cast<const float*>(data), nEl ); break;
-        case( ANA_DOUBLE ): stats.getMinMaxMean( reinterpret_cast<const double*>(data), nEl ); break;
-        default: ;
-    }
-    if( Min ) *Min = stats.min;
-    if( Max ) *Max = stats.max;
-    
-    return stats.mean;
     
 }
 

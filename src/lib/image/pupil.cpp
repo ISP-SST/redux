@@ -1,12 +1,9 @@
 #include "redux/image/pupil.hpp"
 
-#include "redux/logger.hpp"
 #include "redux/file/fileio.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/image/grid.hpp"
 #include "redux/image/utils.hpp"
-#include "redux/momfbd/momfbdjob.hpp"
-#include "redux/momfbd/channel.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/util/arraystats.hpp"
 
@@ -15,7 +12,6 @@
 using namespace redux;
 using namespace redux::file;
 using namespace redux::image;
-using namespace redux::momfbd;
 using namespace redux::util;
 
 using namespace std;
@@ -23,11 +19,8 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 
-#define lg Logger::mlg
-#define logChannel "pupil"
-
 namespace {
-        
+/*
     double makePupil(double** pupil, uint16_t nPoints, double radius) {
 
         double area = 0.0, origin = 0.5;
@@ -91,7 +84,7 @@ namespace {
 
     }
 
-    
+*/    
 }
 
 
@@ -229,8 +222,6 @@ bool Pupil::load( const string& filename, uint16_t pixels ) {
     if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
         if( nDimensions() != 2 || dimSize(0) != pixels || dimSize(1) != pixels ) {    // mismatch
-            LOG_WARN << "File: " << filename << " does not match this " << pixels << "x" << pixels << " Pupil."
-            << printArray(dimensions(),"  filedims");
             clear();
         } else {
             *this *= 1.1;
@@ -254,7 +245,7 @@ void Pupil::generate( uint16_t pixels, double pupilRadius ) {
     radius = pupilRadius;
     resize( nPixels, nPixels );
     auto ptr = reshape( nPixels, nPixels );        // returns a 2D shared_ptr
-    area = makePupil( ptr.get(), nPixels, radius );
+    area = makePupil_mvn( ptr.get(), nPixels, radius );
     
     normalize();
     generateSupport(1E-9);                         // TODO: tweak or make into a config parameter?
@@ -288,14 +279,13 @@ void Pupil::generateSupport(double threshold){
     
     FourierTransform::autocorrelate(OTF);                               // auto-correlate the pupil to generate the support of the OTF.
 
-    //LOG_DEBUG << "Generated pupilSupport with " << pupilSupport.size() << " elements. (full size = " << nElements() << ", area = " << area << " )";
     double* tmpPtr = OTF.get();
     for (size_t index = 0; index < OTF.nElements(); ++index) {           // map indices where the OTF-mask (auto-correlated pupil-mask) is non-zero.
         if (fabs(tmpPtr[index]) > threshold) {
             otfSupport.push_back(index);
         }
     }
-    //LOG_DEBUG << "Generated otfSupport with " << otfSupport.size() << " elements. (full size = " << OTF.nElements() << ", area ~ " << (4.0*area) << " )";
+    
 }
 
 
@@ -305,13 +295,13 @@ void Pupil::normalize( void ) {
     stats.getMinMaxMean(*this);
 
     if( stats.min != 0.0 || stats.max != 1.0 ) {
-        LOG_WARN << "The pupil will be naively re-scaled to the interval [0,1], if this is not what you want, ask someone to implement a better normalization.";
+        //cerr << "The pupil will be naively re-scaled to the interval [0,1].\n";
     }
 
     // FIXME:  decide better normalization scheme to allow max values < 1 and min values > 0 (i.e. realistic transmission of an aperture)
     *this -= stats.min;
     if( stats.min == stats.max ) {
-        LOG_WARN << "The pupil is a constant value.";
+        //cerr << "The pupil is a constant value.\n";
     } else {
         *this *= 1.0/(stats.max-stats.min);
     }

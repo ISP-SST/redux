@@ -2,9 +2,7 @@
 #define REDUX_FILE_FILEMOMFBD_HPP
 
 #include "redux/file/filemeta.hpp"
-#include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
-#include "redux/util/arrayutil.hpp"
 
 #include <fstream>
 
@@ -67,8 +65,6 @@ namespace redux {
                 return "";
             }
 
-            double getMinMaxMean( const char* data, double* min=nullptr, double* max=nullptr ) { return 0; };
-            
             float version, pix2cf, cf2pix;
             std::string dateString, timeString, versionString;
             std::vector<std::string> fileNames;

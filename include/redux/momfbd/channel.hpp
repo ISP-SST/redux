@@ -6,6 +6,7 @@
 
 #include <redux/image/image.hpp>
 #include <redux/util/arraystats.hpp>
+#include <redux/util/region.hpp>
 
 #include <future>
 
@@ -50,7 +51,7 @@ namespace redux {
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&) const;
             uint32_t nImages(void);
-            void adjustCutout(ChannelData&, const Region16&) const;
+            void adjustCutout(ChannelData&, const redux::util::Region16&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
             void storePatchData(boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>&);          
             
@@ -84,7 +85,7 @@ namespace redux {
             void preprocessImage( size_t index );
             void copyImagesToPatch(ChannelData&);          
             
-            Point16 getImageSize(void);
+            redux::util::Point16 getImageSize(void);
             void logAndThrow( std::string );
 
 
@@ -110,7 +111,7 @@ namespace redux {
             /*****************************************************/
             
             uint16_t ID;
-            Point16 imgSize;
+            redux::util::Point16 imgSize;
             uint32_t nTotalFrames;
             Object& myObject;
             MomfbdJob& myJob;

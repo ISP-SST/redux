@@ -7,8 +7,6 @@
 
 #include <mutex>
 
-#include <fftw3.h>
-
 namespace redux {
 
     namespace image {

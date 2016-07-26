@@ -6,6 +6,7 @@
 #include "redux/momfbd/data.hpp"
 
 #include "redux/util/array.hpp"
+#include "redux/util/point.hpp"
 #include "redux/work.hpp"
 
 #include <boost/asio.hpp>
@@ -83,7 +84,7 @@ namespace redux {
             void writeResults(const redux::util::Array<PatchData::Ptr>&);
             void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
             
-            Point16 getImageSize(void);
+            redux::util::Point16 getImageSize(void);
             
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/
@@ -94,7 +95,7 @@ namespace redux {
             redux::util::Array<float> fittedPlane;
             redux::image::Pupil pupil;
             ModeSet modes;                                                  //!< modes used in this object
-            PointF shiftToAlpha;                                            //!< Conversion factors for the tilt-modes. Derived from modes, pupilSize, imgSize & wavelength
+            redux::util::PointF shiftToAlpha;                               //!< Conversion factors for the tilt-modes. Derived from modes, pupilSize, imgSize & wavelength
             double currentMetric;
             double reg_gamma;
             double frequencyCutoff, pupilRadiusInPixels;
@@ -102,7 +103,7 @@ namespace redux {
 
             uint16_t ID;
             double objMaxMean;
-            Point16 imgSize;
+            redux::util::Point16 imgSize;
             mutable uint32_t nObjectImages;
             bpx::ptime startT, endT;
             friend class MomfbdJob;

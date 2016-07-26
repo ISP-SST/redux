@@ -10,14 +10,7 @@
 #include <idl_export.h>
 
 namespace redux {
-    
-    
-   // void rdx_info( int argc, IDL_VPTR argv[], char* argk );
 
-/*    size_t dumpStruct( IDL_VPTR data, int current=0, int indent=0 );
-    void printStruct( int argc, IDL_VPTR argv[], char* argk );
-    IDL_VPTR structInfo( int argc, IDL_VPTR argv[], char* argk );
- */   
 
 }
 

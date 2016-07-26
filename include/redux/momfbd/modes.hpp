@@ -1,10 +1,12 @@
 #ifndef REDUX_MOMFBD_MODES_HPP
 #define REDUX_MOMFBD_MODES_HPP
 
-#include "redux/util/array.hpp"
+#include "redux/util/point.hpp"
 #include "redux/image/pupil.hpp"
 
+#include <memory>
 #include <mutex>
+#include <vector>
 
 #define MT_NONE   0
 #define MT_PUPIL  1
@@ -13,9 +15,6 @@
 namespace redux {
 
     namespace momfbd {
-        
-        class MomfbdJob;
-        class Object;
         
         struct ModeInfo {
             
@@ -70,7 +69,6 @@ namespace redux {
             ModeSet clone( void ) const;
             
             bool load( const std::string& filename, uint16_t pixels );
-            void init( const MomfbdJob& job, const Object& ch );
             void generate( uint16_t pixels, double radius, double angle, const std::vector<uint16_t>& modes );  // Zernike
             void generate( uint16_t pixels, double radius, double angle, uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modes, double cutoff ); // Karhunen-Loeve
             void getNorms(const redux::image::Pupil&);         //!< Normalize modes so that sum(|mode*pupil|) = pupilArea
@@ -81,13 +79,13 @@ namespace redux {
             
             ModeInfo info;
             
-            PointI tiltMode;                    //!< Contains the indices for the tilt modes. (-1 if no tilts are present)
-            PointF shiftToAlpha;                //!< Converts a shift of 1 pixel into corresponding mode-coefficient (NB. if image-size != pupil-size it has to be re-scaled accordingly)
+            redux::util::PointI tiltMode;                   //!< Contains the indices for the tilt modes. (-1 if no tilts are present)
+            redux::util::PointF shiftToAlpha;               //!< Converts a shift of 1 pixel into corresponding mode-coefficient (NB. if image-size != pupil-size it has to be re-scaled accordingly)
             
             std::vector<uint16_t> modeNumbers;
             std::vector<double*> modePointers;
             std::vector<float> atm_rms;
-            std::vector<float> norms;          //!< (square of) L_{2,2} norms for the modes over the pupil
+            std::vector<float> norms;                       //!< (square of) L_{2,2} norms for the modes over the pupil
             std::mutex mtx;
 
             

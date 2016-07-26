@@ -1,11 +1,6 @@
 #include "momfbd.hpp"
 
 #include "redux/file/filemomfbd.hpp"
-#include "redux/math/functions.hpp"
-#include "redux/util/array.hpp"
-#include "redux/util/datautil.hpp"
-#include "redux/util/endian.hpp"
-#include "redux/util/stringutil.hpp"
 
 #include <algorithm>
 #include <map>
@@ -34,22 +29,6 @@ using namespace std;
 //setenv IDL_DLM_PATH '/home/hillberg/lib/dlm-x86_64:<IDL_DEFAULT>'
 //setenv IDL_DLM_PATH '/home/hillberg/lib/dlm-old:<IDL_DEFAULT>'
 //http://idlastro.gsfc.nasa.gov/idl_html_help/Structure_Variables.html
-
-// Local implementation to avoid including boost dependencies in the DLM
-bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase ) {
-
-    auto it = std::search (
-                  haystack.begin(), haystack.end(),
-                  needle.begin(),   needle.end(),
-    [ignoreCase] ( char ch1, char ch2 ) {
-        if ( ignoreCase ) return std::toupper ( ch1 ) == std::toupper ( ch2 );
-        return ch1 == ch2;
-    }
-              );
-    if ( it != haystack.end() ) return true;
-    return false;
-
-}
 
 
 namespace {

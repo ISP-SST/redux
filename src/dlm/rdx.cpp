@@ -3,13 +3,10 @@
 #include "idlutil.hpp"
 #include "imgtools.hpp"
 
-#include "redux/file/fileio.hpp"
-#include "redux/image/fouriertransform.hpp"
-#include "redux/momfbd/modes.hpp"
-#include "redux/util/arraystats.hpp"
+#include "redux/util/arrayutil.hpp"
 #include "redux/util/cache.hpp"
-#include "redux/util/stringutil.hpp"
-#include "redux/revision.hpp"
+#include "redux/util/datautil.hpp"
+#include "redux/file/fileio.hpp"
 #include "redux/version.hpp"
 
 #include <iomanip>
@@ -22,8 +19,6 @@
 #include <boost/timer/timer.hpp>
 
 using namespace redux::file;
-using namespace redux::momfbd;
-using namespace redux::image;
 using namespace redux::util;
 using namespace redux;
 using namespace std;

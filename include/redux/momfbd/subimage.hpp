@@ -3,7 +3,7 @@
 
 #include "redux/momfbd/modes.hpp"
 
-#include "redux/types.hpp"
+#include "redux/util/point.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/util/arraystats.hpp"
 #include "redux/util/array.hpp"
@@ -34,7 +34,7 @@ namespace redux {
                      uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);*/
             ~SubImage(void);
             
-            void setPatchInfo(uint32_t, const PointI&, const PointI&, uint16_t, uint16_t, uint16_t);
+            void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointI&, uint16_t, uint16_t, uint16_t);
             void init(void);
             void newCutout(void);
             
@@ -99,8 +99,8 @@ namespace redux {
             void dump( std::string tag ) const;
 
             uint32_t index;
-            PointI offset;                                      //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
-            PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
+            redux::util::PointI offset;                                      //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
+            redux::util::PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, nModes;
             uint32_t otfSize, pupilSize2, otfSize2;
             double oldRG;
@@ -111,7 +111,7 @@ namespace redux {
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;
             
-            PointD adjustedTilts;
+            redux::util::PointD adjustedTilts;
             bool newPhi;
             bool newOTF;
             std::mutex mtx;

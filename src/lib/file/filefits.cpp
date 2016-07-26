@@ -1,5 +1,7 @@
 #include "redux/file/filefits.hpp"
 
+#ifdef REDUX_WITH_FITS
+
 #include "redux/util/arraystats.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/types.hpp"
@@ -591,5 +593,6 @@ template void redux::file::Fits::write( const string&, const double*, size_t n )
 template void redux::file::Fits::write( const string&, const complex_t*, size_t n );
 
 
+#endif  // REDUX_WITH_FITS
 
 

@@ -474,7 +474,7 @@ if( EXT_COMPONENTS )
         set( ${EXT_NAME}_REQUIRED_COMPONENTS_FOUND FALSE  )
     endif()
 
-    if( NOT ${EXT_NAME}_REQUIRED_COMPONENTS_FOUND )
+    if( EXT_DEBUG AND NOT ${EXT_NAME}_REQUIRED_COMPONENTS_FOUND )
         message( "The following required ${EXT_NAME} components"
                              " were not found: \"${${EXT_NAME}_COMPONENTS}\"" )
         notFound()

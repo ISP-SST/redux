@@ -375,7 +375,6 @@ void Solver::run( PatchData::Ptr data ) {
     size_t maxIterations(10);           // fewer iterations while increasing modes, job.maxIterations for the last step.
     size_t maxFails(3);                 // TODO make into a cfg parameter
     int status(0);
-    uint16_t firstMode(0);
     sync_counter sc;
 
     timer.start();
@@ -385,7 +384,7 @@ void Solver::run( PatchData::Ptr data ) {
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
         modeCount = min<uint16_t>(modeCount,nModes);
-        std::set<uint16_t> activeModes(job.modeNumbers.begin()+firstMode,job.modeNumbers.begin()+modeCount);
+        std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
         
         transform(modeNumbers,modeNumbers+nParameters,enabledModes,
                   [&activeModes](const uint16_t& a){ return activeModes.count(a)?a:0; }
@@ -396,7 +395,6 @@ void Solver::run( PatchData::Ptr data ) {
             tol = job.FTOL;
             maxIterations = job.maxIterations;
         } else {
-            firstMode = modeCount;
             modeCount += job.nModeIncrement;
             failCount = 0;           // TODO: fix/test fail-reporting before using
         }

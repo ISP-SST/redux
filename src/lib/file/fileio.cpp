@@ -53,7 +53,9 @@ Format redux::file::readFmt( const string& filename ) {
             switch( magic ) {
                 case Ana::MAGIC_ANA: ;
                 case Ana::MAGIC_ANAR: return FMT_ANA;
+#ifdef REDUX_WITH_FITS
                 case Fits::MAGIC_FITS: return FMT_FITS;
+#endif
                 //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
                 default: cout << "readFmt needs to be implemented for this file-type: \"" << filename << "\""  << endl; return FMT_NONE; 
             }
@@ -136,10 +138,12 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
             meta.reset( new Ana(fn) );
             break;
         }
+#ifdef REDUX_WITH_FITS
         case FMT_FITS: {
             meta.reset( new Fits(fn) );
             break;
         }
+#endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::getMeta(arr) needs to be implemented for this file-type: " << fmt << "   \"" << fn << "\""  << endl;
     }
@@ -163,6 +167,7 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
             } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Ana type." << endl;
             break;
         }
+#ifdef REDUX_WITH_FITS
         case FMT_FITS: {
             if( !meta ) {
                 meta.reset( new Fits() );
@@ -174,6 +179,7 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
             } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Fits type." << endl;
             break;
         }
+#endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::readFile(string,char*,meta) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\"" << endl;
     }
@@ -190,11 +196,13 @@ void redux::file::readFile( const string& filename, redux::util::Array<T>& data 
             Ana::read(filename,data,hdr);
             break;
         }
+#ifdef REDUX_WITH_FITS
         case FMT_FITS: {
             shared_ptr<Fits> hdr(new Fits());
             Fits::read(filename,data,hdr);
             break;
         }
+#endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::read(arr) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }
@@ -214,7 +222,9 @@ void redux::file::readFile( const string& filename, redux::image::Image<T>& imag
     Format fmt = readFmt(filename);
     switch(fmt) {
         case FMT_ANA: Ana::read(filename, image, metaOnly); break;
+#ifdef REDUX_WITH_FITS
         case FMT_FITS: Fits::read(filename, image, metaOnly); break;
+#endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::read(img) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }
@@ -234,7 +244,9 @@ void redux::file::writeFile( const string& filename, redux::util::Array<T>& data
     Format fmt = guessFmt(filename);
     switch(fmt) {
         case FMT_ANA: Ana::write(filename, data); break;
+#ifdef REDUX_WITH_FITS
         case FMT_FITS: Fits::write(filename, data); break;
+#endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::write(arr) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }
@@ -254,7 +266,9 @@ void redux::file::writeFile( const string& filename, redux::image::Image<T>& ima
     Format fmt = guessFmt(filename);
     switch(fmt) {
         case FMT_ANA: Ana::write(filename, image); break;
+#ifdef REDUX_WITH_FITS
         case FMT_FITS: Fits::write(filename, image); break;
+#endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
         default: cout << "file::write(img) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
     }

@@ -7,11 +7,6 @@
 #include <vector>
 
 namespace redux {
-    
-    namespace momfbd {
-        class MomfbdJob;
-        class Channel;
-    }
 
     namespace image {
         

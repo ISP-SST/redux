@@ -1,7 +1,7 @@
 #ifndef REDUX_IMAGE_GRID_HPP
 #define REDUX_IMAGE_GRID_HPP
 
-#include "redux/types.hpp"
+#include "redux/util/point.hpp"
 
 #include <memory>
 
@@ -15,12 +15,12 @@ namespace redux {
          */
         struct Grid {
             struct ID {
-                ID( uint32_t nPoints );
+                explicit ID( uint32_t nPoints );
                 ID( uint32_t nPoints, float originY, float originX );
-                ID( uint32_t nPoints, PointF origin ) : ID(nPoints,origin.y,origin.x) {};
+                ID( uint32_t nPoints, redux::util::PointF origin ) : ID( nPoints, origin.y, origin.x ) {};
                 ID( uint32_t nPointsY, uint32_t nPointsX, float originY, float originX );
-                Point size;
-                PointF origin;
+                redux::util::Point size;
+                redux::util::PointF origin;
                 bool operator<( const ID& rhs ) const;
             } id;
             std::shared_ptr<float*> distance;

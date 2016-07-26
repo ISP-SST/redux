@@ -2,24 +2,10 @@
 
 #include "cvutil.hpp"
 
-//#include "rdx.hpp"
-/*
-#include <opencv2/core/core.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>*/
-
 #include <iostream>
 
 using namespace cv;
 
-/*
-using namespace redux::file;
-using namespace redux::image;
-using namespace redux::util;
-
-using namespace std;
-namespace bfs = boost::filesystem;*/
 
 Mat redux::arrayToMat (const IDL_VPTR& in, int verbose) {
 

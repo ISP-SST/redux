@@ -1,7 +1,11 @@
-
 USE_REDUX(redux)
 
 add_definitions(-DBOOST_ALL_DYN_LINK)
+
+if( REDUX_WITH_FFTW3 )
+    add_definitions(-DREDUX_WITH_FFTW3)
+endif()
+
 
 REDUX_ADD_EXECUTABLE( rsub jsub.cpp )
 REDUX_ADD_EXECUTABLE( rstat jstat.cpp )
@@ -9,8 +13,7 @@ REDUX_ADD_EXECUTABLE( rdel jdel.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
-if (REDUX_SKIP_GUI)
-    message(STATUS "REDUX_SKIP_GUI is set: not building redux-gui.")
+if( REDUX_SKIP_GUI )
     return()
 endif()
 

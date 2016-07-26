@@ -1,5 +1,5 @@
-USE_REDUX(redux)
-USE_EXTERNAL(idl)
+#USE_REDUX(redux)
+USE_EXTERNAL( boost fftw3 fits gsl idl opencv threads )
 
 
 if (DEFINED IDL_FOUND)
@@ -20,32 +20,83 @@ if (DEFINED IDL_FOUND)
     set(IDL_DLM_DIR "${IDL_DLM_DIR}" CACHE PATH "")
     message(STATUS "IDL DLM will be installed into: \"${IDL_DLM_DIR}\"")
     
-    if (REDUX_WITH_OPENCV)
+    if( REDUX_WITH_FFTW3 )
+        add_definitions(-DREDUX_WITH_FFTW3)
+    endif()
+
+    if( REDUX_WITH_FITS )
+        add_definitions(-DREDUX_WITH_FITS)
+    endif()
+
+    if( REDUX_WITH_GSL )
+        add_definitions(-DREDUX_WITH_GSL)
+    endif()
+
+    if( REDUX_WITH_OPENCV )
         add_definitions(-DREDUX_WITH_OPENCV)
     endif()
     
     add_definitions(-DBOOST_ALL_DYN_LINK)
 
+    #set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,defs")
     set(CMAKE_DEBUG_POSTFIX "")   # no debug-suffix for dlm libraries
     
     REDUX_SETDIRS()     # this will populate REDUX_CURRENT_LIBRARIES with the necessary dependencies
     
-    add_library(ana SHARED ana.cpp )
-    SET(ANA_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libana.dlm")
+    set( REDUX_LIB_BASE "${REDUX_DIR}/src/lib/" )
+    
+    set( REDUX_ANA_DEPS
+         "${REDUX_LIB_BASE}/file/fileana.cpp"
+         "${REDUX_LIB_BASE}/file/anacompress.cpp"
+         "${REDUX_LIB_BASE}/file/anadecompress.cpp"
+    )
+    add_library(ana SHARED ana.cpp ${REDUX_ANA_DEPS} )
+    set(ANA_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libana.dlm")
     configure_file("libana.dlm.in" "${ANA_DLM_FILE_LOCATION}")
     target_link_libraries (ana ${REDUX_CURRENT_LIBRARIES})
     
-    add_library(momfbd SHARED momfbd.cpp )
-    SET(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
+    set( REDUX_MOMFBD_DEPS
+         "${REDUX_LIB_BASE}/file/filemomfbd.cpp"
+         "${REDUX_LIB_BASE}/math/functions.cpp"
+         "${REDUX_LIB_BASE}/util/stringutil.cpp"
+    )
+    add_library(momfbd SHARED momfbd.cpp ${REDUX_MOMFBD_DEPS} )
+    set(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
     configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")
     target_link_libraries (momfbd ${REDUX_CURRENT_LIBRARIES})
     
     add_library(gridmatch SHARED gridmatch.cpp )
-    SET(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
+    set(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
     configure_file("libgridmatch.dlm.in" "${GRIDMATCH_DLM_FILE_LOCATION}")
         
-    add_library(rdx SHARED cvutil.cpp fft.cpp idlutil.cpp imgtools.cpp modes.cpp rdx.cpp string.cpp)
-    SET(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
+    set( REDUX_RDX_DEPS idlutil.cpp imgtools.cpp modes.cpp string.cpp
+         ${REDUX_ANA_DEPS} ${REDUX_MOMFBD_DEPS}
+         "${REDUX_LIB_BASE}/file/fileio.cpp"
+         "${REDUX_LIB_BASE}/image/descatter.cpp"
+         "${REDUX_LIB_BASE}/image/grid.cpp"
+         "${REDUX_LIB_BASE}/image/pupil.cpp"
+         "${REDUX_LIB_BASE}/image/utils.cpp"
+         "${REDUX_LIB_BASE}/image/zernike.cpp"
+         "${REDUX_LIB_BASE}/math/linalg.cpp"
+         "${REDUX_LIB_BASE}/momfbd/modes.cpp"
+         "${REDUX_LIB_BASE}/util/arraystats.cpp"
+         "${REDUX_LIB_BASE}/util/cache.cpp"
+         "${REDUX_LIB_BASE}/version.cpp"
+         "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
+    )
+    if( REDUX_WITH_FFTW3 )
+        set( REDUX_RDX_DEPS ${REDUX_RDX_DEPS} fft.cpp "${REDUX_LIB_BASE}/image/fouriertransform.cpp")
+    endif()
+    if( REDUX_WITH_FITS )
+        set( REDUX_RDX_DEPS ${REDUX_RDX_DEPS} "${REDUX_LIB_BASE}/file/filefits.cpp")
+    endif()
+    if( REDUX_WITH_OPENCV )
+        file( GLOB REDUX_UTIL_OPENCV_CPP "${REDUX_LIB_BASE}/util/opencv/*.cpp")
+        set( REDUX_RDX_DEPS ${REDUX_RDX_DEPS} cvutil.cpp ${REDUX_UTIL_OPENCV_CPP} )
+    endif()
+    
+    add_library(rdx SHARED rdx.cpp ${REDUX_RDX_DEPS} )
+    set(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${REDUX_CURRENT_LIBRARIES})
     

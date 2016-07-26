@@ -23,7 +23,7 @@
 //#       include <opencv2/photo/photo.hpp>
 #endif
 using namespace redux::image;
-using namespace redux::momfbd;
+//using namespace redux::momfbd;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
@@ -609,6 +609,9 @@ double redux::image::inverseDistanceWeight (T** array, size_t sizeY, size_t size
     }
     return 0.0;
 }
+template double redux::image::inverseDistanceWeight (unsigned char**, size_t, size_t, size_t, size_t);
+template double redux::image::inverseDistanceWeight (short**, size_t, size_t, size_t, size_t);
+template double redux::image::inverseDistanceWeight (int**, size_t, size_t, size_t, size_t);
 template double redux::image::inverseDistanceWeight (float**, size_t, size_t, size_t, size_t);
 template double redux::image::inverseDistanceWeight (double**, size_t, size_t, size_t, size_t);
 

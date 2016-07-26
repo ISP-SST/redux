@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <algorithm>
+#include <string.h>
 
 namespace redux {
 

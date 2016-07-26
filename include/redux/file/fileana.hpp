@@ -4,7 +4,6 @@
 #include "redux/file/filemeta.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
-#include "redux/util/arrayutil.hpp"
 
 #include <fstream>
 
@@ -61,8 +60,6 @@ namespace redux {
             size_t nElements(void);
             int getIDLType(void);
             
-            double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr );
-
             struct raw_header {                    // first block for ana files
                 uint32_t synch_pattern;
                 uint8_t subf;

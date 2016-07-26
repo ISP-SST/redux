@@ -4,7 +4,7 @@
 #include "redux/util/stringutil.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/cache.hpp"
-#include "redux/types.hpp"
+#include "redux/util/point.hpp"
 
 #include <cstdint>
 #include <string>
@@ -69,7 +69,7 @@ namespace redux {
                 int32_t nParameters;
                 int32_t nConstraints;
                 redux::util::Array<double> ns;
-                std::map<redux::PointI, double> ns_entries;  //!< (row,col) and value of (non-zero) nullspace-matrix elements
+                std::map<redux::util::PointI, double> ns_entries;  //!< (row,col) and value of (non-zero) nullspace-matrix elements
                 
             };
 
@@ -91,9 +91,9 @@ namespace redux {
                 std::vector<std::shared_ptr<Constraint>> constraints;
                 std::set<int32_t> indices;
                 std::map<int32_t, int8_t> entries;                         //!< Index and value of (non-zero) constraint-matrix elements
-                std::map<redux::PointI, double> ns_entries;                 //!< (row,col) and value of (non-zero) nullspace-matrix elements
+                std::map<redux::util::PointI, double> ns_entries;          //!< (row,col) and value of (non-zero) nullspace-matrix elements
                 int32_t nParameters;
-                PointI groupOffset;                                         //!< Offset of this group in the nullspace matrix (y=row,x=col)
+                redux::util::PointI groupOffset;                           //!< Offset of this group in the nullspace matrix (y=row,x=col)
                 size_t entriesHash;
                 std::shared_ptr<NullSpace> nullspace;
             };
@@ -166,7 +166,7 @@ namespace redux {
             int32_t nParameters;
             int32_t nFreeParameters;
             std::unique_ptr<int32_t[]> parameterOrder;
-            std::map<redux::PointI, double> ns_entries;        //!< (row,col) and value of (non-zero) nullspace-matrix elements
+            std::map<redux::util::PointI, double> ns_entries;        //!< (row,col) and value of (non-zero) nullspace-matrix elements
 
         };
 
