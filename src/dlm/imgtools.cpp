@@ -1,6 +1,5 @@
 #include "imgtools.hpp"
 
-#include "cvutil.hpp"
 #include "idlutil.hpp"
 
 #include <redux/file/fileio.hpp>
@@ -26,6 +25,7 @@
 #include <boost/timer/timer.hpp>
 
 #ifdef REDUX_WITH_OPENCV
+#    include "cvutil.hpp"
 #    include <opencv2/core/core.hpp>
 #    include <opencv2/features2d/features2d.hpp>
 #    include <opencv2/calib3d/calib3d.hpp>
@@ -45,7 +45,6 @@ namespace bfs = boost::filesystem;
 namespace {
 
     static char nl[] = "\n";
-    static IDL_MEMINT dims3x3[] = { 3, 3 };
 
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
@@ -66,7 +65,11 @@ namespace {
         IDL_VPTR points;
     } KW_RESULT;
 
+    
+#ifdef REDUX_WITH_OPENCV
+    
     // NOTE:  The keywords MUST be listed in alphabetical order !!
+    static IDL_MEMINT dims3x3[] = { 3, 3 };
     static IDL_KW_PAR kw_pars[] = {
         IDL_KW_FAST_SCAN,
         { (char*) "BY_DIST",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (by_distance) },
@@ -86,10 +89,7 @@ namespace {
         { (char*) "VERBOSE",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (verbose) },
         { NULL }
     };
-
-
-#ifdef REDUX_WITH_OPENCV
-
+    
     bool transformCheck (const Mat& trans, const Size& imgSize, double maxValue = 10000, double maxScaleDiff = 1.5) {
 
         if( (trans.at<double>(0,0) > 0 && trans.at<double>(0,2) > maxValue) ||
@@ -1129,11 +1129,6 @@ string make_mask_info( int lvl ) {
 
 IDL_VPTR rdx_make_mask( int argc, IDL_VPTR* argv, char* argk ) {
     
-#ifndef REDUX_WITH_OPENCV
-    cerr << "rdx_make_mask: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
-    return IDL_GettmpInt(0);
-#else
-
     MAKE_MASK_KW kw;
     kw.threshold = 0;
     int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, make_mask_kw_pars, (IDL_VPTR*)0, 255, &kw );
@@ -1147,6 +1142,11 @@ IDL_VPTR rdx_make_mask( int argc, IDL_VPTR* argv, char* argk ) {
         return IDL_GettmpInt(0);
     }
     
+#ifndef REDUX_WITH_OPENCV
+    cerr << "rdx_make_mask: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
+    return IDL_GettmpInt(0);
+#else
+
     try {
         
         IDL_VPTR input = argv[0];

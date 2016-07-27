@@ -4,8 +4,11 @@
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
-#include "redux/util/opencv.hpp"
 #include "redux/types.hpp"
+
+#ifdef REDUX_WITH_OPENCV
+#   include "redux/util/opencv.hpp"
+#endif
 
 #include <atomic>
 #include <functional>

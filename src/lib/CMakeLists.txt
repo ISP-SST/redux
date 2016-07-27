@@ -52,6 +52,7 @@ if( DEFINED Fits_FOUND )
         add_definitions(-DREDUX_WITH_FITS)
     endif()
 else()
+    unset(REDUX_WITH_FITS CACHE)
     message(STATUS "CFITSIO not found. Try your systems equivalent of \"apt-get install libcfitsio-dev\"" )
 endif()
 
@@ -70,6 +71,7 @@ if( DEFINED FFTW3_FOUND )
         add_definitions(-DREDUX_WITH_FFTW3)
     endif()
 else()
+    unset(REDUX_WITH_FFTW3 CACHE)
     message(STATUS "FFTW3 not found. Try your systems equivalent of \"apt-get install libfftw3-dev\"" )
 endif()
 
@@ -80,6 +82,7 @@ if( DEFINED GSL_FOUND )
         add_definitions(-DREDUX_WITH_GSL)
     endif()
 else()
+    unset(REDUX_WITH_GSL CACHE)
     message(STATUS "GSL not found. Try your systems equivalent of \"apt-get install libgsl0-dev\"" )
 endif()
 
@@ -91,6 +94,7 @@ if( DEFINED OpenCV_FOUND )
         file(GLOB REDUX_UTIL_OPENCV_CPP "util/opencv/*.cpp")
     endif()
 else()
+    unset(REDUX_WITH_OPENCV CACHE)
     message(STATUS "OpenCV not found. Try your systems equivalent of \"apt-get install libopencv-*-dev\"" )
 endif()
 
@@ -106,7 +110,7 @@ endif()
 
 ##### revison info ######
 set(REDUX_REVISION_SRC_FILE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
-SET_SOURCE_FILES_PROPERTIES(${REDUX_REVISION_SRC_FILE} GENERATED)
+set_source_files_properties( ${REDUX_REVISION_SRC_FILE} GENERATED )
 CHECK_REVISION(LIBREDUX "${CMAKE_CURRENT_LIST_DIR}/revision.cpp.template" "${REDUX_REVISION_SRC_FILE}")
 
 REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}

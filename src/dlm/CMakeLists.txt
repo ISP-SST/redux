@@ -20,6 +20,10 @@ if (DEFINED IDL_FOUND)
     set(IDL_DLM_DIR "${IDL_DLM_DIR}" CACHE PATH "")
     message(STATUS "IDL DLM will be installed into: \"${IDL_DLM_DIR}\"")
     
+    if( REDUX_WITH_BOOSTLOG )
+        add_definitions(-DREDUX_WITH_BOOSTLOG)
+    endif()
+    
     if( REDUX_WITH_FFTW3 )
         add_definitions(-DREDUX_WITH_FFTW3)
     endif()
@@ -38,7 +42,6 @@ if (DEFINED IDL_FOUND)
     
     add_definitions(-DBOOST_ALL_DYN_LINK)
 
-    #set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,defs")
     set(CMAKE_DEBUG_POSTFIX "")   # no debug-suffix for dlm libraries
     
     REDUX_SETDIRS()     # this will populate REDUX_CURRENT_LIBRARIES with the necessary dependencies
@@ -58,7 +61,7 @@ if (DEFINED IDL_FOUND)
     set( REDUX_MOMFBD_DEPS
          "${REDUX_LIB_BASE}/file/filemomfbd.cpp"
          "${REDUX_LIB_BASE}/math/functions.cpp"
-         "${REDUX_LIB_BASE}/util/stringutil.cpp"
+#         "${REDUX_LIB_BASE}/util/stringutil.cpp"
     )
     add_library(momfbd SHARED momfbd.cpp ${REDUX_MOMFBD_DEPS} )
     set(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
@@ -68,6 +71,15 @@ if (DEFINED IDL_FOUND)
     add_library(gridmatch SHARED gridmatch.cpp )
     set(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
     configure_file("libgridmatch.dlm.in" "${GRIDMATCH_DLM_FILE_LOCATION}")
+    
+    install(TARGETS ana momfbd gridmatch DESTINATION ${IDL_DLM_DIR} )
+    install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
+        
+    if( Boost_VERSION VERSION_LESS "1.48" )
+        message(STATUS "The rdx DLM will not be built (requires boost >= 1.48).")
+        return()
+    endif()
+
         
     set( REDUX_RDX_DEPS idlutil.cpp imgtools.cpp modes.cpp string.cpp
          ${REDUX_ANA_DEPS} ${REDUX_MOMFBD_DEPS}
@@ -84,6 +96,7 @@ if (DEFINED IDL_FOUND)
          "${REDUX_LIB_BASE}/version.cpp"
          "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )
+    set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp" GENERATED )
     if( REDUX_WITH_FFTW3 )
         set( REDUX_RDX_DEPS ${REDUX_RDX_DEPS} fft.cpp "${REDUX_LIB_BASE}/image/fouriertransform.cpp")
     endif()
@@ -104,8 +117,8 @@ if (DEFINED IDL_FOUND)
         add_dependencies(rdx GIT_CHECK_LIBREDUX)
     endif()
     
-    install(TARGETS ana momfbd gridmatch rdx DESTINATION ${IDL_DLM_DIR} )
-    install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} ${RDX_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
+    install(TARGETS rdx DESTINATION ${IDL_DLM_DIR} )
+    install(FILES ${RDX_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
    
 else()
      message(WARNING "IDL headers not found, can not build the DLMs")
