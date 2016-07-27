@@ -140,11 +140,12 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
         
         FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( ySize, xSize, FourierTransform::Plan::R2C, 1 );
 
-        std::shared_ptr<fftw_complex> tmpComplex( fftw_alloc_complex((kw.nthreads+1)*(ftSize+fftAlign)), fftw_free );
+        size_t tmpSize = (kw.nthreads+1)*(ftSize+fftAlign);
+        std::shared_ptr<fftw_complex> tmpComplex( (fftw_complex*)fftw_malloc(tmpSize*sizeof(fftw_complex)), fftw_free );
         fftw_complex* psfFT = tmpComplex.get();
         fftw_complex* ptrC = psfFT + ftSize + fftAlign;
 
-        shared_ptr<double> psf( fftw_alloc_real(dataSize), fftw_free );
+        shared_ptr<double> psf( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free );
         double* psfData = psf.get();
         copyToRaw( psfVar, psfData );
 
@@ -172,7 +173,7 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
             return IDL_GettmpInt (-1);
         } else {
             //dataAlign = 0;
-            allocatedData = fftw_alloc_real(nImages*dataSize);
+            allocatedData = (double*)fftw_malloc(nImages*dataSize*sizeof(double));
             dataPtr = allocatedData;
             copyToRaw( imageVar, dataPtr );
         }
@@ -353,10 +354,10 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         
         shared_ptr<double> psf, gain;
         if( kw.padding ) {
-            gain.reset( fftw_alloc_real(dataSize), fftw_free);
+            gain.reset( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free);
             memset( gain.get(), 0, dataSize*sizeof(double) );
             copyInto( gainVar, gain.get(), paddedY, paddedX, posY, posX );
-            psf.reset( fftw_alloc_real(dataSize), fftw_free);
+            psf.reset( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free);
             memset( psf.get(), 0, dataSize*sizeof(double) );
             copyInto( psfVar, psf.get(), paddedY, paddedX, posY, posX );
         } else {
@@ -376,7 +377,7 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         FourierTransform::reorder( psfPtr, paddedY, paddedX );
         
         FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( paddedY, paddedX, FourierTransform::Plan::R2C, kw.nthreads );
-        std::shared_ptr<fftw_complex> otf( fftw_alloc_complex(ftSize), fftw_free );
+        std::shared_ptr<fftw_complex> otf( (fftw_complex*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
         fftw_complex* otfPtr = otf.get();
         plan->forward( psfPtr, otfPtr );
        
@@ -397,7 +398,7 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
             return IDL_GettmpInt (-1);
         } else {
             //dataAlign = 0;
-            allocatedData = fftw_alloc_real(nImages*dataSize);
+            allocatedData = (double*)fftw_malloc(nImages*dataSize*sizeof(double));
             dataPtr = allocatedData;
             copyToRaw( imageVar, dataPtr );
         }
@@ -528,7 +529,7 @@ void fft_memalign( int argc, IDL_VPTR* argv ) {
         switch(array->type) {
             case IDL_TYP_DOUBLE: {
                 double* data = reinterpret_cast<double*>( array->value.arr->data );
-                double* newData = fftw_alloc_real( nElements );
+                double* newData = (double*)fftw_malloc(nElements*sizeof(double));
                 memcpy( newData, data, totalSize );
                 IDL_VPTR tmpVar = IDL_ImportArray( array->value.arr->n_dim, array->value.arr->dim, array->type, (UCHAR*)newData, (IDL_ARRAY_FREE_CB)fftw_free, NULL );
                 IDL_VarCopy( tmpVar, array );
@@ -536,7 +537,7 @@ void fft_memalign( int argc, IDL_VPTR* argv ) {
             }
             case IDL_TYP_DCOMPLEX: {
                 fftw_complex* data = reinterpret_cast<fftw_complex*>( array->value.arr->data );
-                fftw_complex* newData = fftw_alloc_complex( nElements );
+                fftw_complex* newData = (fftw_complex*)fftw_malloc(nElements*sizeof(fftw_complex));
                 memcpy( newData, data, totalSize );
                 IDL_VPTR tmpVar = IDL_ImportArray( array->value.arr->n_dim, array->value.arr->dim, array->type, (UCHAR*)newData, (IDL_ARRAY_FREE_CB)fftw_free, NULL );
                 IDL_VarCopy( tmpVar, array );

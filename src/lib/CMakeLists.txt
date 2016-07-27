@@ -107,6 +107,10 @@ if( NOT DEFINED Boost_FOUND OR NOT REDUX_WITH_FFTW3 OR NOT REDUX_WITH_GSL OR NOT
     return()
 endif()
 
+if( Boost_VERSION VERSION_LESS "1.54" )
+    message(STATUS "The redux library will not be built (requires boost >= 1.54).")
+    return()
+endif()
 
 ##### revison info ######
 set(REDUX_REVISION_SRC_FILE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
@@ -129,6 +133,12 @@ REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
 if(REDUX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)
     add_dependencies(redux GIT_CHECK_LIBREDUX)
 endif()
+
+# Installation (distribution) settings
+install(DIRECTORY ${REDUX_DIR}/include/redux
+        DESTINATION ${REDUX_INSTALL_DIR}/include/
+        FILES_MATCHING PATTERN "*.hpp"
+)
 
 
 if( REDUX_SKIP_GUI )

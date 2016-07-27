@@ -6,11 +6,11 @@
 #include <redux/file/fileana.hpp>
 #include <redux/image/image.hpp>
 #include <redux/image/descatter.hpp>
+#include <redux/image/fouriertransform.hpp>
 #include <redux/image/utils.hpp>
 #include <redux/util/array.hpp>
 #include <redux/util/stringutil.hpp>
 #include <redux/util/arraystats.hpp>
-#include <redux/util/opencv.hpp>
 
 #include <atomic>
 #include <future>
@@ -22,10 +22,10 @@
 #include <boost/asio.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/timer/timer.hpp>
 
 #ifdef REDUX_WITH_OPENCV
 #    include "cvutil.hpp"
+#    include <redux/util/opencv.hpp>
 #    include <opencv2/core/core.hpp>
 #    include <opencv2/features2d/features2d.hpp>
 #    include <opencv2/calib3d/calib3d.hpp>
@@ -1344,12 +1344,14 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                     size_t ySizePadded = bsYsize + 2*kw.padding;
                     size_t dataSize = xSizePadded*ySizePadded;
 
-                    bsGainData.reset( fftw_alloc_real(dataSize), fftw_free );
+                    //bsGainData.reset( fftw_alloc_real(dataSize), fftw_free );
+                    bsGainData.reset( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free );
+                    
                     bsGainPtr = bsGainData.get();
                     memset( bsGainPtr, 0, dataSize*sizeof(double) );
                     copyInto( kw.bs_gain, bsGainPtr, ySizePadded, xSizePadded, kw.padding, kw.padding );
                     
-                    shared_ptr<double> bsPsfData( fftw_alloc_real(dataSize), fftw_free );
+                    shared_ptr<double> bsPsfData( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free );
                     double* psfPtr = bsPsfData.get();
                     memset( psfPtr, 0, dataSize*sizeof(double) );
                     copyInto( kw.bs_psf, psfPtr, ySizePadded, xSizePadded, kw.padding, kw.padding );
@@ -1363,7 +1365,8 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                     FourierTransform::reorder( psfPtr, ySizePadded, xSizePadded );
                     
                     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( ySizePadded, xSizePadded, FourierTransform::Plan::R2C, 1 );
-                    bsOtfData.reset( fftw_alloc_complex( ySizePadded*(xSizePadded/2+1) ), fftw_free );
+                    //bsOtfData.reset( fftw_alloc_complex( ySizePadded*(xSizePadded/2+1) ), fftw_free );
+                    bsOtfData.reset( (fftw_complex*)fftw_malloc(ySizePadded*(xSizePadded/2+1)*sizeof(fftw_complex)), fftw_free );
                     bsOtfPtr = bsOtfData.get();
                     plan->forward( bsPsfData.get(), bsOtfPtr );
                     

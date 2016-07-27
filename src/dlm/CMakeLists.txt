@@ -61,7 +61,6 @@ if (DEFINED IDL_FOUND)
     set( REDUX_MOMFBD_DEPS
          "${REDUX_LIB_BASE}/file/filemomfbd.cpp"
          "${REDUX_LIB_BASE}/math/functions.cpp"
-#         "${REDUX_LIB_BASE}/util/stringutil.cpp"
     )
     add_library(momfbd SHARED momfbd.cpp ${REDUX_MOMFBD_DEPS} )
     set(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
@@ -75,8 +74,8 @@ if (DEFINED IDL_FOUND)
     install(TARGETS ana momfbd gridmatch DESTINATION ${IDL_DLM_DIR} )
     install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
         
-    if( Boost_VERSION VERSION_LESS "1.48" )
-        message(STATUS "The rdx DLM will not be built (requires boost >= 1.48).")
+    if( Boost_VERSION VERSION_LESS "1.41" OR NOT REDUX_WITH_FFTW3 OR NOT REDUX_WITH_GSL OR NOT Threads_FOUND )
+        message(STATUS "The rdx DLM will not be built (requires Boost>=1.41, FFTW3, GSL and Threads).")
         return()
     endif()
 
@@ -93,6 +92,7 @@ if (DEFINED IDL_FOUND)
          "${REDUX_LIB_BASE}/momfbd/modes.cpp"
          "${REDUX_LIB_BASE}/util/arraystats.cpp"
          "${REDUX_LIB_BASE}/util/cache.cpp"
+         "${REDUX_LIB_BASE}/util/stopwatch.cpp"
          "${REDUX_LIB_BASE}/version.cpp"
          "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )

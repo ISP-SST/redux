@@ -24,11 +24,11 @@ void redux::image::descatter( double* img, size_t imgY, size_t imgX, double* gai
     
     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( paddedY, paddedX, FourierTransform::Plan::R2C, nthreads );
     
-    std::shared_ptr<fftw_complex> ft( fftw_alloc_complex(ftSize), fftw_free );
+    std::shared_ptr<fftw_complex> ft( (fftw_complex*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
     fftw_complex* ftPtr = ft.get();        
-    std::shared_ptr<double> tmp( fftw_alloc_real(nPaddedPixels), fftw_free );
+    std::shared_ptr<double> tmp( (double*)fftw_malloc(nPaddedPixels*sizeof(double)), fftw_free );
     double* tmpPtr = tmp.get();
-    std::shared_ptr<double> tmpC( fftw_alloc_real(nPaddedPixels), fftw_free );
+    std::shared_ptr<double> tmpC( (double*)fftw_malloc(nPaddedPixels*sizeof(double)), fftw_free );
     double* tmpPtrC = tmpC.get();
     
     if( (paddedX==imgX) && (paddedY==imgY) ) {
@@ -80,7 +80,7 @@ void redux::image::descatter( double* img, size_t szY, size_t szX, double* gain,
 
     size_t ftSize = szY*(szX/2+1);
     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( szY, szX, FourierTransform::Plan::R2C, 1 );
-    std::shared_ptr<fftw_complex> otf( fftw_alloc_complex(ftSize), fftw_free );
+    std::shared_ptr<fftw_complex> otf( (fftw_complex*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
     plan->forward( psf, otf.get() );
     descatter( img, szY, szX, gain, otf.get(), paddedY, paddedX, nthreads, niter, epsilon );
 

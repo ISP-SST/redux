@@ -6,6 +6,7 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/cache.hpp"
 #include "redux/util/datautil.hpp"
+#include "redux/util/stopwatch.hpp"
 #include "redux/file/fileio.hpp"
 #include "redux/version.hpp"
 
@@ -13,17 +14,10 @@
 #include <iostream>
 #include <typeinfo>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/chrono.hpp>
-#include <boost/numeric/ublas/io.hpp> 
-#include <boost/timer/timer.hpp>
-
 using namespace redux::file;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
-using namespace boost::timer;
-using namespace boost::chrono;
 
 
 namespace {
@@ -409,9 +403,9 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
-cpu_timer& getTimer(void) {
-    static cpu_timer timer;
-    return timer;
+StopWatch& getTimer(void) {
+    static StopWatch sw;
+    return sw;
 }
 
 typedef struct {
@@ -453,14 +447,14 @@ string timer_info( int lvl ) {
 
 void timer_start(int argc, IDL_VPTR* argv) {
     
-    cpu_timer& timer = getTimer();
-    timer.start();
+    StopWatch& sw = getTimer();
+    sw.start();
     
 }
 
 void timer_elapsed( int argc, IDL_VPTR* argv, char* argk ) {
     
-    cpu_timer& timer = getTimer();
+    StopWatch& sw = getTimer();
     KW_TIMER kw;
     kw.help = 0;
     (void) IDL_KWProcessByOffset(argc, argv, argk, kw_timer_pars, (IDL_VPTR*)0, 255, &kw);
@@ -469,20 +463,14 @@ void timer_elapsed( int argc, IDL_VPTR* argv, char* argk ) {
         cout << timer_info(2) << endl;
         return;
     }
-    
-    nanoseconds elapsedTime;
-    if( kw.cpu ) {
-        elapsedTime = nanoseconds(timer.elapsed().user + timer.elapsed().system);
-    } else {
-        elapsedTime = nanoseconds(timer.elapsed().wall);
-    }
 
     if( kw.seconds ) {
         IDL_ALLTYPES tmp;
-        tmp.f = elapsedTime.count()*1E-9;
-        IDL_StoreScalar(kw.seconds, IDL_TYP_FLOAT, &tmp);
+        tmp.f = sw.getSeconds();
+        cout << "Secs: " << tmp.f << endl;;
+        IDL_StoreScalar( kw.seconds, IDL_TYP_FLOAT, &tmp );
     } else {
-        cout << "Elapsed: " << format( timer.elapsed() );
+        cout << sw.print() << endl;
     }
     
 }

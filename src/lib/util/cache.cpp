@@ -83,7 +83,7 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
         if(!isLoaded) {
             unique_lock<mutex> lock(itemMutex);
             if ( bfs::exists(fullPath) ) {
-                ifstream in(fullPath.c_str(), ofstream::binary|ios_base::ate);
+                ifstream in(fullPath.string().c_str(), ofstream::binary|ios_base::ate);
                 if( in.good() ) {
                     size_t sz = in.tellg();
                     unique_ptr<char[]> buf( new char[sz] );
@@ -125,7 +125,7 @@ bool CacheItem::cacheStore(bool clearAfterStore){
             unique_ptr<char[]> buf( new char[cachedSize] );
             size_t psz = cpack(buf.get());
             if( psz <= cachedSize ) {
-                ofstream out(fullPath.c_str(), ofstream::binary);
+                ofstream out(fullPath.string().c_str(), ofstream::binary);
                 if( out.good() ) {
                     out.write( buf.get(), cachedSize );
                     ret = true;

@@ -6,6 +6,11 @@ if( REDUX_WITH_FFTW3 )
     add_definitions(-DREDUX_WITH_FFTW3)
 endif()
 
+if( Boost_VERSION VERSION_LESS "1.54" )
+    message(STATUS "The redux binaries will not be built (requires boost >= 1.54).")
+    return()
+endif()
+
 
 REDUX_ADD_EXECUTABLE( rsub jsub.cpp )
 REDUX_ADD_EXECUTABLE( rstat jstat.cpp )

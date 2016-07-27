@@ -25,9 +25,3 @@ include_directories(${REDUX_DIR}/include)
 add_subdirectory(src)
 add_subdirectory(testsuite EXCLUDE_FROM_ALL)
 
-# Installation (distribution) settings
-install(DIRECTORY include/redux
-        DESTINATION ${REDUX_INSTALL_DIR}/include/
-        FILES_MATCHING PATTERN "*.hpp"
-)
-
