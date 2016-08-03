@@ -294,7 +294,7 @@ int main (int argc, char *argv[]) {
         boost::filesystem::path outputDir = boost::filesystem::current_path();
         if( vm.count ("output-dir") ) {
             boost::filesystem::path tmpPath = vm["output-dir"].as<string>();
-            if( tmpPath.is_relative() && !outputDir.empty() ) {
+            if( isRelative( tmpPath ) && !outputDir.empty() ) {
                 outputDir = outputDir / tmpPath;
             }
         }

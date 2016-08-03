@@ -6,6 +6,7 @@
 #include <string>
 #include <ostream>
 
+#include <boost/io/ios_state.hpp>
 #include <boost/thread/xtime.hpp>
 
 namespace redux {
