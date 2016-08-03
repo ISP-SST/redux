@@ -7,7 +7,7 @@
 #include "redux/translators.hpp"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/range/algorithm.hpp>
+//#include <boost/range/algorithm.hpp>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
@@ -64,7 +64,8 @@ namespace {
             LOGC_ERR("channel") << "Different mode-types in specified mode range \"" << elem << "\"";
         } else if( tp == 0 ) tp = ZERNIKE;
         
-        elem.erase( boost::remove_if( elem, boost::is_any_of( "ZzKk" ) ), elem.end() );
+        elem.erase( remove_if( elem.begin(), elem.end(),
+                               [](const char&a ){ return (a == 'Z' || a == 'z' || a == 'K' || a == 'k'); } ), elem.end() );
         if( n == 0 ) {
             divs.push_back( boost::lexical_cast<uint16_t>( elem ) );
             types.push_back( tp );
@@ -162,7 +163,9 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         double tmpD = 1.0;
         if( tmpString.find( "mm" ) != string::npos ) tmpD = 1.00E-03;
         else if( tmpString.find( "cm" ) != string::npos ) tmpD = 1.00E-02;
-        tmpString.erase( boost::remove_if( tmpString, boost::is_any_of( "cm\" " ) ), tmpString.end() );
+        //tmpString.erase( boost::remove_if( tmpString, boost::is_any_of( "cm\" " ) ), tmpString.end() );
+        tmpString.erase( remove_if( tmpString.begin(), tmpString.end(),
+                               [](const char&a ){ return (a == 'c' || a == 'm' || a == ' ' || a == '"'); } ), tmpString.end() );
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
         tmpTree.put( "tmp", tmpString );
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
@@ -220,18 +223,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     }
 
     
-    //imageDataDir = cleanPath(tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDir));
     imageDataDir = tree.get<string>("IMAGE_DATA_DIR", defaults.imageDataDir);
-    //imageTemplate = cleanPath( tree.get<string>( "FILENAME_TEMPLATE", "" ) );
     imageTemplate = tree.get<string>( "FILENAME_TEMPLATE", defaults.imageTemplate );
     darkTemplate = tree.get<string>( "DARK_TEMPLATE", defaults.darkTemplate );
     gainFile = tree.get<string>( "GAIN_FILE", defaults.gainFile );
     responseFile = tree.get<string>( "CCD_RESPONSE", defaults.responseFile );
-    //backgainFile = cleanPath( tree.get<string>( "BACK_GAIN", "" ), imageDataDirl );
     backgainFile = tree.get<string>( "BACK_GAIN", defaults.backgainFile );
-    //psfFile = cleanPath( tree.get<string>( "PSF", "" ), imageDataDirl );
     psfFile = tree.get<string>( "PSF", defaults.psfFile );
-    //mmFile = cleanPath( tree.get<string>( "MODMAT", "" ), imageDataDirl );
     mmFile = tree.get<string>( "MODMAT", defaults.mmFile );
     mmRow = tree.get<uint8_t>( "MMROW", defaults.mmRow );
     mmWidth = tree.get<uint8_t>( "MMWIDTH",defaults.mmWidth);
@@ -456,9 +454,7 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     if( tree.get<bool>( "GET_PSF_AVG", defaults.saveMask&SF_SAVE_PSF_AVG ) ) saveMask |= SF_SAVE_PSF_AVG;
     if( tree.get<bool>( "GET_RESIDUAL", defaults.saveMask&SF_SAVE_RESIDUAL ) ) saveMask |= SF_SAVE_RESIDUAL;
     if( tree.get<bool>( "SAVE_FFDATA", defaults.saveMask&SF_SAVE_FFDATA ) ) saveMask |= SF_SAVE_FFDATA;
-    //outputFileName = cleanPath(tree.get<string>("OUTPUT_FILE", defaults.outputFileName), imageDataDir);
     outputFileName = tree.get<string>("OUTPUT_FILE", defaults.outputFileName);
-    //pupilFile = cleanPath(tree.get<string>("PUPIL", defaults.pupilFile), imageDataDir);
     modeFile = tree.get<string>("MODE_FILE", defaults.modeFile);
     pupilFile = tree.get<string>("PUPIL", defaults.pupilFile);
     wavelength = tree.get<double>("WAVELENGTH", defaults.wavelength);
