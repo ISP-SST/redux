@@ -8,7 +8,7 @@ set( EXT_NAME "Boost" )
 set( EXT_LIB_PREFIX boost_ )
 
 set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR}" )
-set( EXT_COMPONENTS date_time filesystem program_options serialization system thread regex timer )
+set( EXT_COMPONENTS date_time filesystem program_options serialization system thread regex )
 
 set( EXT_HEADER_FILE boost/version.hpp )
 set( EXT_VERSION_FILE boost/version.hpp )

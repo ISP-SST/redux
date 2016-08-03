@@ -6,10 +6,9 @@
 #include "redux/momfbd/subimage.hpp"
 
 #include "redux/util/gsl.hpp"
+#include "redux/util/stopwatch.hpp"
 
 #include <memory>
-
-#include <boost/timer/timer.hpp>
 
 
 namespace redux {
@@ -86,7 +85,7 @@ namespace redux {
             
             grad_t gradientMethod;
 
-            boost::timer::cpu_timer timer;
+            redux::util::StopWatch timer;
             
         };
 
