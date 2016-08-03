@@ -1,3 +1,4 @@
+#ifdef DISABLED_FOR_NOW_BREAKS_OLDER_BOOST
 #include "redux/file/dirwatch.hpp"
 
 //#include <errno.h>
@@ -161,3 +162,4 @@ std::string DirWatch::get_dirname(int wd) {
     return it != watchList_.left.end() ? it->second : "";
 }
 
+#endif

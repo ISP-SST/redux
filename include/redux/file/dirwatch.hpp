@@ -1,3 +1,5 @@
+#ifdef DISABLED_FOR_NOW_BREAKS_OLDER_BOOST
+
 #ifndef REDUX_FILE_DIRWATCH_HPP
 #define REDUX_FILE_DIRWATCH_HPP
 
@@ -104,3 +106,5 @@ namespace redux {
 }
 
 #endif      // REDUX_FILE_DIRWATCH_HPP
+
+#endif

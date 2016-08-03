@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <typeinfo>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/bind/protect.hpp>
@@ -95,6 +96,7 @@ namespace redux {
             operator bool() const { return mySocket.is_open(); };
 
             void connect( std::string host, std::string service );
+            callback getCallback( void ) const { return activityCallback; };
             void setCallback( callback cb = nullptr ) { activityCallback = cb; };
             void setErrorCallback( callback cb = nullptr ) { errorCallback = cb; };
             void idle( void );
@@ -108,6 +110,22 @@ namespace redux {
 
             TcpConnection& operator<<( const Command& );
             TcpConnection& operator>>( Command& );
+
+            template <typename T>
+            TcpConnection& operator<<( const T& in ) {
+                syncWrite(&in, sizeof(T));
+                return *this;
+            }
+
+
+            template <typename T>
+            TcpConnection& operator>>( T& out ) {
+                if( boost::asio::read( mySocket, boost::asio::buffer( &out, sizeof(T) ) ) < sizeof(T) ) {
+                    out = T();
+                    throw std::ios_base::failure( std::string("TcpConnection: Failed to receive ")+typeid(T).name() );
+                }
+                return *this;
+            }
 
        private:
             TcpConnection( boost::asio::io_service& io_service );
