@@ -93,6 +93,7 @@ if (DEFINED IDL_FOUND)
          "${REDUX_LIB_BASE}/util/arraystats.cpp"
          "${REDUX_LIB_BASE}/util/cache.cpp"
          "${REDUX_LIB_BASE}/util/stopwatch.cpp"
+         "${REDUX_LIB_BASE}/util/stringutil.cpp"
          "${REDUX_LIB_BASE}/version.cpp"
          "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )

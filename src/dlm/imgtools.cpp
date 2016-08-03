@@ -1177,6 +1177,69 @@ IDL_VPTR rdx_make_mask( int argc, IDL_VPTR* argv, char* argk ) {
 
 }
 
+
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_INT help;
+    IDL_INT verbose;
+} MAKE_WIN_KW;
+
+
+// NOTE:  The keywords MUST be listed in alphabetical order !!
+static IDL_KW_PAR make_win_kw_pars[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "HELP",           IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MAKE_WIN_KW,help) },
+    { (char*) "VERBOSE",        IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MAKE_WIN_KW,verbose) },
+    { NULL }
+};
+
+
+string make_win_info( int lvl ) {
+    string ret = "RDX_MAKE_WINDOW";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"      ");          // newline if lvl>1
+        ret += "   Syntax:   win = rdx_make_window(img_size, blend_region, /KEYWORDS)\n";
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      HELP                Display this info.\n"
+                    "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+        }
+    } else ret += "\n";
+    return ret;
+}
+
+
+IDL_VPTR rdx_make_win( int argc, IDL_VPTR* argv, char* argk ) {
+    
+    MAKE_WIN_KW kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, make_win_kw_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if( kw.help ) {
+        cout << make_win_info(2) << endl;
+        return IDL_GettmpInt(0);
+    }
+    
+    if( nPlainArgs < 2 ) {
+        cout << "rdx_make_window: needs 2 arguments: nPixels & pupil-radius (in pixels). " << endl;
+        return IDL_GettmpInt (0);
+    }
+    
+    IDL_LONG nPixels = IDL_LongScalar(argv[0]);
+    IDL_LONG nBlend = IDL_LongScalar(argv[1]);
+    IDL_VPTR tmp;
+ 
+    Array<float> win(nPixels, nPixels);
+    win = 1.0;
+    redux::image::apodizeInPlace( win, nBlend );
+        
+    IDL_MEMINT dims[] = { nPixels, nPixels };
+    float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_NOP, &tmp );
+    win.copyTo<float>(tmpData);
+    
+    return tmp;
+
+}
+
 namespace {
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
@@ -2369,6 +2432,7 @@ namespace {
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_fillpix, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)load_files, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, load_files_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_mask,  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_win_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_images, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_files,  (char*)"RDX_SUMFILES",  1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_files_info );
 }
