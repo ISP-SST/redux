@@ -6,6 +6,8 @@ set( EXT_NAME "Boost" )
 #set( EXT_DEBUG "1" )
 
 set( EXT_LIB_PREFIX boost_ )
+set( EXT_LIB_SUFFIXES "-mt" "" )
+set( EXT_LIB_DEBUG_SUFFIX "-mt-d" )
 
 set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR}" )
 set( EXT_COMPONENTS date_time filesystem program_options serialization system thread regex )
