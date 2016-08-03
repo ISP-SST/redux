@@ -1,6 +1,7 @@
 #include "redux/util/stringutil.hpp"
 
 #include "redux/translators.hpp"
+#include "redux/util/datautil.hpp"
 
 #include <cstdlib>
 #include <mutex>
@@ -13,6 +14,7 @@
 #include <boost/regex.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/version.hpp>
 
 namespace bf = boost::filesystem;
 namespace bpt = boost::property_tree;
@@ -274,3 +276,49 @@ template string redux::util::uIntsToString(const vector<uint8_t>& );
 template string redux::util::uIntsToString(const vector<uint16_t>& );
 template string redux::util::uIntsToString(const vector<uint32_t>& );
 template string redux::util::uIntsToString(const vector<uint64_t>& );
+
+
+std::string redux::util::colorString( const std::string& in, StringColor col ) {
+
+    static std::string a("\033[");
+    static std::string b("m");
+    static std::string c("\033[0m");
+    return a + to_string(col) + b + in + c;
+
+}
+
+
+string redux::util::tvToString( const timeval& a, bool millis ) {
+
+
+    char tmp[15];
+    strftime( tmp, 14, "%H:%M:%S\0", gmtime( &a.tv_sec ) );
+    string ret( tmp );
+
+    if ( millis ) {
+        sprintf( tmp, ".%.3u", ( uint )( a.tv_usec / 1000 ) );
+        ret += tmp;
+    }
+
+    return ret;
+
+}
+
+
+string redux::util::tsToString( const timespec& a, bool millis ) {
+
+
+    char tmp[15];
+    strftime( tmp, 14, "%H:%M:%S\0", gmtime( &a.tv_sec ) );
+    string ret( tmp );
+
+    if ( millis ) {
+        sprintf( tmp, ".%.6u", ( uint )( a.tv_nsec / 1000 ) );
+        ret += tmp;
+    }
+
+    return ret;
+
+}
+
+

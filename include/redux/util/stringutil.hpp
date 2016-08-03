@@ -469,6 +469,34 @@ namespace redux {
         //@}
 
 
+        enum StringColor { BLACK = 30, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE,
+                           BBLACK= 90, BRED, BGREEN, BYELLOW, BBLUE, BMAGENTA, BCYAN, BWHITE
+        };
+        /* ! @fn std::string colorString( const std::string& t, color col = WHITE )
+        *  @brief Function to wrap console color-codes around a std::string.
+        *  @param t input variable
+        *  @param col color
+        *  @param n width/precision parameter to be passed on to toString()
+        */
+        std::string colorString( const std::string& in, StringColor col=WHITE );
+
+        /*! @fn string tvToString ( const timeval& a, bool millis )
+        *  @brief Convert timeval to a string of the form: "HH:MM:SS.mmm"
+        *  @param a timeval structure.
+        *  @param millis Should milliseconds be included ?
+        *  @returns "HH:MM:SS.mmm"
+        */
+        std::string tvToString( const timeval&, bool millis = false );
+                
+                
+        /*! @fn string tsToString ( const timespec& a, bool millis )
+        *  @brief Convert timeval to a string of the form: "HH:MM:SS.mmm"
+        *  @param a timespec structure.
+        *  @param millis Should milliseconds be included ?
+        *  @returns "HH:MM:SS.mmm"
+        */
+        std::string tsToString( const timespec&, bool millis = false );
+
 
         /*! @} */
 
