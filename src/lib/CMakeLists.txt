@@ -11,8 +11,8 @@ add_definitions(-DBOOST_LOG_DYN_LINK)
 file(GLOB REDUX_CPP "*.cpp")
 file(GLOB REDUX_HPP "${REDUX_HDR_BASE}/*.hpp")
 
-file(GLOB REDUX_ALGO_CPP "algo/*.cpp")
-file(GLOB REDUX_ALGO_HPP "${REDUX_HDR_BASE}/algo/*.hpp")
+#file(GLOB REDUX_ALGO_CPP "algo/*.cpp")
+#file(GLOB REDUX_ALGO_HPP "${REDUX_HDR_BASE}/algo/*.hpp")
 
 file(GLOB REDUX_FILE_CPP "file/*.cpp")
 file(GLOB REDUX_FILE_HPP "${REDUX_HDR_BASE}/file/*.hpp")
