@@ -11,6 +11,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/regex.hpp>
+#include <boost/preprocessor/stringize.hpp>
 #include <boost/property_tree/ptree.hpp>
 
 namespace bf = boost::filesystem;
@@ -75,6 +76,12 @@ bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
                                                [] ( char ch1, char ch2 ) { return std::toupper( ch1 ) < std::toupper( ch2 ); }
                                              );
 
+}
+
+
+
+bool redux::util::isRelative( const std::string &s ) {
+    return (!s.empty() && s[0] != '/');
 }
 
 
@@ -195,29 +202,33 @@ string expandTilde(string in) {
 string redux::util::cleanPath(string in, string base) {
 
     if(in.empty()) return in;
+    bf::path fn, result, ain(in);
     if(!base.empty() && base[0] == '~') base = expandTilde(base);
+    if(!base.empty() && base[0] != '/') result = bf::current_path() / bf::path(base);
     if(in[0] == '~') in = expandTilde(in);
 
-    bf::path fn, result, ain(in);
     if(bf::is_regular_file(ain)) {
         fn = ain.filename();
         ain = ain.parent_path();
     }
     auto it = ain.begin();
     if(in[0] != '/' && !base.empty()) {
-        result = bf::absolute(base);
         if(!bf::is_directory(result)) return in;
     }
-    else result /= *it++;
+    else result = *it++;
 
     bool docanonical RDX_UNUSED = (result.string()[0] == '/');         // don't canonicalize relative paths
     for(; it != ain.end(); ++it) {
         if(*it == "..") result = result.parent_path();
         else if(*it != ".") {
-            if(!exists(result / *it) && docanonical) {      // canonicalize the existing part
+#if BOOST_VERSION > 104800
+            if(!exists(result / *it) && docanonical) {      // canonicalize the existing part (boost >= 1.48)
                 result = canonical(result);
                 docanonical = false;
             }
+#else
+            docanonical = false;
+#endif
             result /= *it;
         }
     }

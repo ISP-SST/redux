@@ -9,6 +9,10 @@
 #include <typeinfo>
 #include <iomanip>
 
+#include <boost/filesystem.hpp>
+
+namespace bfs = boost::filesystem;
+
 namespace redux {
 
     namespace util {
@@ -39,6 +43,8 @@ namespace redux {
         bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false);
         bool nocaseLess(const std::string& lhs, const std::string& rhs);
         
+        bool isRelative( const std::string& );
+        inline bool isRelative( const bfs::path &p ) { return isRelative( p.string() ); }
         std::vector<std::set<std::string>> make_template( const std::vector<std::string>& list, std::string& out, std::string split_chars="." );
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )
