@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <math.h>
+#include <type_traits>
 
 namespace redux {
 
@@ -495,15 +496,15 @@ namespace redux {
             else {
                 medianOf3( ptr, end );
             }
-
-            while( ptr < end ) {
-                if( !isfinite(**ptr) ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
-                    std::swap( ptr, --end );
-                    nanCount++;
+            if( !std::is_integral<T>::value ) {
+                while( ptr < end ) {
+                    if( !isfinite(**ptr) ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
+                        std::swap( ptr, --end );
+                        nanCount++;
+                    }
+                    ++ptr;
                 }
-                ++ptr;
             }
-
             if( nanCount ) {
                 ptr = data + n - 1;
                 std::swap( end, ptr );
@@ -534,14 +535,15 @@ namespace redux {
                 medianOf3( ptr, end );
             }
 
-            while( ptr < end ) {
-                if( !isfinite(*ptr) ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
-                    std::swap( ptr, --end );
-                    nanCount++;
+            if( !std::is_integral<T>::value ) {
+                while( ptr < end ) {
+                    if( !isfinite(*ptr) ) {   // check for uncomparable objects (e.g. NaN's) and place them at the end.
+                        std::swap( ptr, --end );
+                        nanCount++;
+                    }
+                    ++ptr;
                 }
-                ++ptr;
             }
-
             if( nanCount ) {
                 std::swap( end, data + n - 1 );
             }
