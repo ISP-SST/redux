@@ -17,12 +17,17 @@ namespace bpt = boost::property_tree;
 
 namespace redux {
 
+    namespace logging {
+        class Logger;
+    }
+
     namespace momfbd {
 
         /*! @ingroup momfbd
          *  @{
          */
         
+
         class MomfbdJob;
         class Object;
         class Solver;
@@ -115,6 +120,7 @@ namespace redux {
             uint32_t nTotalFrames;
             Object& myObject;
             MomfbdJob& myJob;
+            logging::Logger& logger;
 
             friend class Object;
             friend class MomfbdJob;

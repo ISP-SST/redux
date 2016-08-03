@@ -35,14 +35,3 @@ if(Boost_VERSION VERSION_GREATER 100)
 endif()
 
 appendPaths()
-
-if( Boost_VERSION AND Boost_VERSION VERSION_GREATER "1.53" )
-    set( EXT_NAME "BoostLog" )
-    set( EXT_LIB_PREFIX boost_ )
-    set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR}" )
-    set( EXT_COMPONENTS log )
-    set( EXT_HEADER_FILE boost/version.hpp )
-    include("${CMAKE_CURRENT_LIST_DIR}/FindExternal.cmake")
-    appendPaths()
-endif()
-

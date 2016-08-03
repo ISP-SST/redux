@@ -1,6 +1,5 @@
 #include "redux/application.hpp"
 #include "redux/job.hpp"
-#include "redux/logger.hpp"
 #include "redux/network/tcpconnection.hpp"
 #include "redux/network/host.hpp"
 #include "redux/util/endian.hpp"
@@ -15,7 +14,7 @@ using namespace redux;
 using namespace std;
 using namespace boost::posix_time;
 
-#define lg Logger::lg
+
 namespace {
 
     const string logChannel = "jstat";
@@ -112,10 +111,10 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
             cout << alignRight(to_string(i+1),4) << info << endl;
         }
     } catch ( const exception& e) {
-        LOG_ERR << "printJobList: Exception caught while parsing block: " << e.what();
+        cerr << "printJobList: Exception caught while parsing block: " << e.what() << endl;
     }
     if( count != blockSize ) {
-        LOG_ERR << "printJobList: Parsing of datablock failed,  count = " << count << "   blockSize = " << blockSize << "  bytes.";
+        cerr << "printJobList: Parsing of datablock failed,  count = " << count << "   blockSize = " << blockSize << "  bytes." << endl;
     }
 
 }
@@ -144,10 +143,10 @@ void printPeerList( TcpConnection::Ptr conn, int ns ) {
         }
         if (ns!=0 && hostCount > ns) cout << "   :" << endl << alignRight(to_string(hostCount),4) << peer.print() << endl;
     } catch ( const exception& e) {
-        LOG_ERR << "printPeerList: Exception caught while parsing block: " << e.what();
+        cerr << "printPeerList: Exception caught while parsing block: " << e.what() << endl;
     }
     if( count != blockSize ) {
-        LOG_ERR << "printPeerList: Parsing of datablock failed, count = " << count << "  blockSize = " << blockSize << "  bytes.";
+        cerr << "printPeerList: Parsing of datablock failed, count = " << count << "  blockSize = " << blockSize << "  bytes." << endl;
     }
 }
 
@@ -160,8 +159,12 @@ int main( int argc, char *argv[] ) {
 
     // load matched environment variables according to the getOptionName() above.
     bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
-    vm.notify();
 
+#if BOOST_VERSION > 104800  // TODO check which version notify appears in
+    vm.notify();
+#endif
+
+    
     if( vm.count( "help" ) ) {
         cout << allOptions << endl;
         return EXIT_SUCCESS;
@@ -169,7 +172,6 @@ int main( int argc, char *argv[] ) {
 
     bool loop = vm.count( "time" );
     try {
-        Logger logger( vm );
         boost::asio::io_service ioservice;
         auto conn = TcpConnection::newPtr( ioservice );
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
@@ -189,7 +191,7 @@ int main( int argc, char *argv[] ) {
                 boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             }
             if( cmd != CMD_OK ) {
-                LOG_ERR << "Handshake with server failed.";
+                cerr << "Handshake with server failed." << endl;
                 return EXIT_FAILURE;
             }
             int c = 0;

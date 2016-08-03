@@ -1,6 +1,6 @@
 #include "redux/daemon.hpp"
 
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/protocol.hpp"
@@ -8,10 +8,11 @@
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
 
+using namespace redux::logging;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::lg
+
 namespace {
 
     const string logChannel = "reduxd";
@@ -64,28 +65,30 @@ int main( int argc, char *argv[] ) {
 
     // load matched environment variables according to the getOptionName() above.
     bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
+    
+#if BOOST_VERSION > 104800  // TODO check which version notify appears in
     vm.notify();
+#endif
 
     try {
         while( true ) {
             try {
                 Daemon daemon( vm );
                 int res = daemon.run();
-                LOG << "Application stopped (exit code " << res << ")\n";
                 return res;
             }
             catch( Application::KillException ) {
-                LOG << "Application terminated by kill request\n";
+                cerr << "Application terminated by kill request." << endl;
                 break;
             }
             catch( Application::ResetException ) {
-                LOG_DETAIL << "Application restarting\n";
+                cout << "Application restarting." << endl;
                 continue;
             }
         }
     }
     catch( const exception &e ) {
-        LOG_ERR << "Uncaught exception (fatal): " << e.what();
+        cerr << "Uncaught exception (fatal): " << e.what() << endl;
     }
 
     return EXIT_SUCCESS;

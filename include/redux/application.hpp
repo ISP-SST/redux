@@ -1,7 +1,7 @@
 #ifndef REDUX_APPLICATION_HPP
 #define REDUX_APPLICATION_HPP
 
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 
 #include <string>
 
@@ -42,7 +42,7 @@ namespace redux {
         typedef void ( parserFunction )( bpo::options_description&, bpo::variables_map& );
 
         static std::pair<std::string, std::string> appCmdParser( const std::string& s );
-        static bpo::options_description& parseCmdLine( int argc, const char* const argv[], bpo::variables_map& vm,
+        static bpo::options_description& parseCmdLine( int argc, char* argv[], bpo::variables_map& vm,
                                                       bpo::options_description* programOptions = nullptr,
                                                       bpo::positional_options_description * positionalOptions = nullptr,
                                                       parserFunction customParser = nullptr );
@@ -71,7 +71,7 @@ namespace redux {
         std::string settingsFile;
 
         bpt::ptree propTree;
-        redux::Logger logger;
+        redux::logging::Logger logger;
         
         
     };

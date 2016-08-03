@@ -16,6 +16,11 @@
 
 
 namespace redux {
+    
+    namespace logging {
+        class Logger;
+    }
+
 
     namespace momfbd {
 
@@ -107,6 +112,7 @@ namespace redux {
             
             Object& object;
             const Channel& channel;
+            logging::Logger& logger;
             const ModeSet& modes;
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;

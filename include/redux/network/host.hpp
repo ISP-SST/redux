@@ -3,6 +3,7 @@
 
 #include "redux/network/tcpconnection.hpp"
 
+#include <atomic>
 #include <memory>
 #include <set>
 #include <string>
@@ -32,8 +33,9 @@ namespace redux {
                 pid_t pid;
                 uint8_t peerType;
                 uint16_t nCores;
+                uint16_t connectPort;
                 boost::posix_time::ptime startedAt;
-                std::string name, os, arch;
+                std::string name, os, arch, connectName;
                 HostInfo( void );
                 uint64_t size(void) const;
                 uint64_t pack( char* ) const;
@@ -65,6 +67,7 @@ namespace redux {
             void touch(void);
             void active(void);
             
+            static Host& myInfo(void);
             static std::string printHeader(void);
             std::string print(void);
             

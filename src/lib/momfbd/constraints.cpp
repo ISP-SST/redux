@@ -1,6 +1,6 @@
 #include "redux/momfbd/constraints.hpp"
 
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/math/linalg.hpp"
@@ -20,9 +20,6 @@ using namespace redux::util;
 using namespace redux;
 
 using namespace std;
-
-#define lg Logger::mlg
-#define logChannel "constraints"
 
 
 void Constraints::Constraint::replaceIndices( const map<int32_t, int32_t>& indexMap ) {
@@ -67,7 +64,7 @@ Constraints::NullSpace::NullSpace(const std::map<int32_t, int8_t>& e, int32_t np
 void Constraints::NullSpace::mapNullspace(void) {
     ns_entries.clear();
     int nCols = nParameters - nConstraints;
-    LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace.";
+    //LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace.";
     int count = 0;
     for( auto& value: ns ) {
         if( abs(value) > NS_THRESHOLD ) {
@@ -86,7 +83,7 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
         ns.clear();
     } else {
         if(NS_ANALYTIC) {
-            LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group.";
+            //LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group.";
             ns.resize(nParameters,nParameters-nConstraints);
             if (nParameters == nConstraints+1) {    // 1D nullspace
                 ns = 1.0/sqrt(nParameters);
@@ -95,7 +92,7 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
             }
             
         } else {
-            LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group.";
+            //LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group.";
             Array<double> C,R;
             C.resize(nConstraints, nParameters);
             ns.resize(nParameters, nParameters);    // use ns rather than a temporary "Q" array
@@ -130,11 +127,11 @@ bool Constraints::NullSpace::verify(const std::map<int32_t, int8_t>& e, int32_t 
     if( !isLoaded )  {
         if( cacheLoad() ) {
             if(nP == nParameters && nC == nConstraints && c_entries == e) {
-                LOG_DEBUG << "Found matching constraint-group in file: " << itemPath;
+                //LOG_DEBUG << "Found matching constraint-group in file: " << itemPath;
                 return true;
             }
         } else {
-            LOG_DEBUG << "No matching constraint-group found.";
+            //LOG_DEBUG << "No matching constraint-group found.";
             ns.resize(0);
             ns_entries.clear();
         }
@@ -299,8 +296,8 @@ void Constraints::Group::mapNullspace(void) {
         bool storeNS = true;
         
         if( !nullspace->verify(entries,nParameters,nConstraints) ) {
-            LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance.";
-            LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries");
+            //LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance.";
+            //LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries");
             nullspace = tmpNS;
             storeNS = false;    // storing will overwrite the group we collided with.
             nullspace->ns.clear();
@@ -371,7 +368,7 @@ void Constraints::blockifyGroups( void ) {
         output.clear();
         std::copy(unused2.begin(), unused2.end(), std::back_inserter(output));
         redux::file::Ana::write("unused2",output);
-        LOG_ERR << "Size mismatch in Constraints::blockifyGroups(). This should *never* happen, so go looking for the bug. :-P";
+        //LOG_ERR << "Size mismatch in Constraints::blockifyGroups(). This should *never* happen, so go looking for the bug. :-P";
     }
     
     blockified = true;
@@ -733,7 +730,7 @@ void Constraints::write( void ) {
 
 void Constraints::dump( string tag ) const {
 
-    LOG_DEBUG << "Dumping constraints.";
+    //LOG_DEBUG << "Dumping constraints.";
     Ana::write( tag + "_order.f0", parameterOrder.get(), nParameters );
     Ana::write( tag + ".f0", getMatrix(false) );
     Ana::write( tag + "_ordered.f0", getMatrix(true) );

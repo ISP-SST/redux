@@ -1,9 +1,9 @@
 #include "redux/work.hpp"
 
-#include "redux/util/datautil.hpp"
-#include "redux/util/stringutil.hpp"
 #include "redux/job.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
+#include "redux/util/convert.hpp"
+#include "redux/util/datautil.hpp"
 
 using namespace redux::util;
 using namespace redux;
@@ -12,7 +12,6 @@ using namespace std;
 #ifdef DEBUG_
 //#define DBG_PART_
 //#define DBG_WIP_
-#define lg Logger::mlg
 #endif
 
 namespace {

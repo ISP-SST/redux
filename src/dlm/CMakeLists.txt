@@ -20,10 +20,6 @@ if (DEFINED IDL_FOUND)
     set(IDL_DLM_DIR "${IDL_DLM_DIR}" CACHE PATH "")
     message(STATUS "IDL DLM will be installed into: \"${IDL_DLM_DIR}\"")
     
-    if( REDUX_WITH_BOOSTLOG )
-        add_definitions(-DREDUX_WITH_BOOSTLOG)
-    endif()
-    
     if( REDUX_WITH_FFTW3 )
         add_definitions(-DREDUX_WITH_FFTW3)
     endif()

@@ -48,6 +48,7 @@ namespace redux {
         WorkInProgress wip;
 
         Daemon& daemon;
+        network::Host& myInfo;
 
         
     };

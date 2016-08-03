@@ -1,6 +1,6 @@
 #include "redux/network/tcpconnection.hpp"
 
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
@@ -17,8 +17,6 @@ using namespace std;
 //#define DBG_NET_
 #endif
 
-#define lg Logger::mlg
-#define logChannel "net"
 
 namespace {
 
@@ -53,13 +51,16 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
     received = 0;
 
     char sz[sizeof(uint64_t)];
-    boost::system::error_code ec;
-    uint64_t count = boost::asio::read( socket(), boost::asio::buffer(sz, sizeof(uint64_t)), ec );
-    if( ec ) {
+    //boost::system::error_code ec;
+    uint64_t count;
+    //try {
+        count = boost::asio::read( socket(), boost::asio::buffer(sz, sizeof(uint64_t)) ); //, ec );
+    //} catch( const exception& ) {
         //LOG_ERR << "TcpConnection::receiveBlock(" << hexString(this) << ")  failed to receive blockSize.  error: " + ec.message();
         //cerr << "TcpConnection::receiveBlock(" << hexString(this) << ")  Failed to receive blockSize.  error: " + ec.message() << endl;
-        return buf;
-    }
+    //    return buf;
+    //}
+
 
     unpack( sz, blockSize, swapEndian );
     if( blockSize == 0 ) return buf;
@@ -96,7 +97,7 @@ void TcpConnection::connect( string host, string service ) {
         mySocket.connect( *destination++ );
         if( mySocket.is_open() ) return;
     }
-    LOG_ERR << "Connection failed";
+    //LOG_ERR << "Connection failed";
 }
 
 void TcpConnection::idle( void ) {
@@ -150,3 +151,4 @@ TcpConnection& TcpConnection::operator>>( Command& out ) {
     }
     return *this;
 }
+

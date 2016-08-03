@@ -4,7 +4,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/constants.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/math/linalg.hpp"
 #include "redux/util/arrayutil.hpp"

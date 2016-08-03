@@ -106,6 +106,7 @@ namespace redux {
             friend class Object;
             friend class Channel;
             friend class Solver;
+            friend class SubImage;
             friend struct ModeSet;
             friend struct redux::image::Pupil;
 

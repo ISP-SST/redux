@@ -12,6 +12,10 @@
 
 
 namespace redux {
+    
+    namespace logging {
+        class Logger;
+    }
 
     namespace momfbd {
 
@@ -27,7 +31,7 @@ namespace redux {
             
             typedef std::shared_ptr<Solver> Ptr;
             
-            Solver(const redux::momfbd::MomfbdJob&, boost::asio::io_service&, uint16_t nThreads);
+            Solver(redux::momfbd::MomfbdJob&, boost::asio::io_service&, uint16_t nThreads);
             ~Solver();
             
             void init(void);
@@ -58,7 +62,8 @@ namespace redux {
             
             void dump( std::string tag );
             
-            const MomfbdJob& job;
+            MomfbdJob& job;
+            logging::Logger& logger;
             const std::vector<std::shared_ptr<Object>>& objects;
             boost::asio::io_service& service;
             

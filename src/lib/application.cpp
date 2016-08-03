@@ -1,6 +1,6 @@
 #include "redux/application.hpp"
 
-#include "redux/logger.hpp"
+
 #include "redux/revision.hpp"
 #include "redux/version.hpp"
 
@@ -10,13 +10,11 @@
 #include <boost/property_tree/info_parser.hpp>
 
 namespace fs = boost::filesystem;
+using namespace redux::logging;
 using namespace redux;
 using namespace std;
 
 string Application::executableName;
-
-#define lg Logger::mlg
-#define logChannel "app"
 
 
 void Application::getOptions( bpo::options_description& options, const string& name ) {
@@ -39,15 +37,15 @@ void Application::getOptions( bpo::options_description& options, const string& n
       " using the same name." )
     ;
 
-    options.add( general ).add( config ).add( Logger::getOptions( name ) );
+    options.add( general ).add( config ).add( logging::Logger::getOptions( name ) );
 }
 
 pair<string, string> Application::appCmdParser( const string& s ) {
     // Nothing implemented for the Application class, so just return the customParser from the Logger.
-    return Logger::customParser( s );
+    return logging::Logger::customParser( s );
 }
 
-bpo::options_description& Application::parseCmdLine( int argc, const char* const argv[],  bpo::variables_map& vm,
+bpo::options_description& Application::parseCmdLine( int argc, char* argv[],  bpo::variables_map& vm,
                                                     bpo::options_description* programOptions,
                                                     bpo::positional_options_description *positionalOptions,
                                                     parserFunction custom_parser ) {
@@ -56,7 +54,8 @@ bpo::options_description& Application::parseCmdLine( int argc, const char* const
         all.add( *programOptions );
     }
 
-    Application::executableName = fs::path( string(argv[0]) ).filename().string();
+    fs::path tmpPath = fs::path(string(argv[0])).filename();
+    Application::executableName = tmpPath.string();
     getOptions( all, Application::executableName );
     
     bpo::command_line_parser parser( argc, argv );
@@ -75,7 +74,8 @@ bpo::options_description& Application::parseCmdLine( int argc, const char* const
     // If e.g. --help was specified, just dump output and exit.
     checkGeneralOptions( all, vm );
 
-    vm.notify();
+    //vm.notify();
+    //bpo::variables_map::notify(vm);
 
     return all;
 
@@ -119,10 +119,10 @@ Application::Application( bpo::variables_map& vm, RunMode rm ) : runMode(rm), re
     if( vm.count("settings") ) {
         settingsFile = vm["settings"].as<string>();
         if( fs::is_regular(settingsFile) ) {
-            LOG_DETAIL << "Loading file \"" <<  settingsFile << "\"";
+            LOG_DETAIL << "Loading file \"" <<  settingsFile << "\"" << ende;
             bpt::read_info( settingsFile, propTree );
         } else {
-            LOG_ERR << "Failed to load file \"" << settingsFile << "\", starting with default settings.";
+            LOG_ERR << "Failed to load file \"" << settingsFile << "\", starting with default settings." << ende;
             //throw KillException();
         }
     }

@@ -2,7 +2,7 @@
 
 #include "redux/momfbd/util.hpp"
 
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/util/bitoperations.hpp"
 #include "redux/util/stringutil.hpp"
@@ -13,6 +13,7 @@
 #include <boost/format.hpp>
 using boost::algorithm::iequals;
 
+using namespace redux::logging;
 using namespace redux::momfbd;
 using namespace redux::momfbd::util;
 using namespace redux::file;
@@ -20,11 +21,11 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::mlg
-#define logChannel jobLogChannel
 
 MomfbdJob::MomfbdJob( void ) {
+    
     info.typeString = "momfbd";
+    
 }
 
 
@@ -70,7 +71,7 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap
 void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
 
     Job::parsePropertyTree( vm, tree );
-    //LOG_DEBUG << "MomfbdJob::parsePropertyTree()";
+    //LOG_DEBUG << "MomfbdJob::parsePropertyTree()" << ende;
     
     // possibly override cfg-entries with command-line arguments
     if( vm.count( "simx" ) ) tree.put( "SIM_X", vm["simx"].as<string>() );
@@ -95,9 +96,9 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
         }
     }
     if( outputFiles.size() > objects.size() ) {
-        LOG_WARN << outputFiles.size() << " output file names specified but only " << objects.size() << " objects found.";
+        LOG_WARN << outputFiles.size() << " output file names specified but only " << objects.size() << " objects found." << ende;
     }
-    //LOG_DEBUG << "MomfbdJob::parsePropertyTree() done.";
+    //LOG_DEBUG << "MomfbdJob::parsePropertyTree() done." << ende;
 
 }
 
@@ -228,7 +229,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStart
             checkParts();
             for( auto & patch : patches ) {
                 if( patch && (patch->step == JSTEP_QUEUED) ) {
-                    //LOG_DETAIL << "Starting patch: #" << patch->id << "   step=" << (int)patch->step << "  ptr = " << hexString(patch.get());
+                    //LOG_DETAIL << "Starting patch: #" << patch->id << "   step=" << (int)patch->step << "  ptr = " << hexString(patch.get()) << ende;
                     patch->step = JSTEP_RUNNING;
                     wip.parts.push_back( patch );
                     if( wip.previousJob.get() != this ) {     // First time for this slave -> include global data
@@ -240,7 +241,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStart
             }
         }
     }
-    //  LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection;
+    //  LOG_DEBUG << "getWork(): step = " << (int)step << " conn = " << (bool)wip.connection << ende;
     if( ret ) {
         auto lock = getLock();
         checkParts();
@@ -287,7 +288,7 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
     info.maxProcessingTime = max<uint32_t>( info.maxProcessingTime, elapsed.total_seconds() );
     if( info.maxProcessingTime ) {
         uint32_t newTimeout = info.maxProcessingTime * (20 - info.progress[0]*18.0/info.progress[1]);    // TBD: start with large margin, then shrink to ~2*maxProcessingTime ?
-        LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds.";
+        LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds." << ende;
         info.timeout = newTimeout;    // TBD: fixed timeout or 10 * maxProcTime ?
     }
     
@@ -353,9 +354,10 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
         postProcess(service, nThreads);                          // postprocess on master, collect results, save...
     }
     else {
-        LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load();
+        LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load() << ende;
         info.step.store( JSTEP_ERR );
     }
+    
     return false;
     
 }
@@ -375,12 +377,10 @@ void MomfbdJob::setLogChannel(std::string channel) {
 
 void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
-    // TODO: start logging (to file)
-
-    LOG_TRACE << "MomfbdJob::preProcess()   nThreads = " << nThreads;
+    LOG_TRACE << "MomfbdJob::preProcess()   nThreads = " << nThreads << ende;
     
     if ( !checkData() ) {
-        LOG_ERR << "MomfbdJob::preProcess(): sanity check failed.";
+        LOG_ERR << "MomfbdJob::preProcess(): sanity check failed." << ende;
         info.step.store( JSTEP_ERR );
         info.state.store( JSTATE_IDLE );
         return;
@@ -402,18 +402,18 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
     // TODO: do split per channel instead, to allow for different image-scales and/or hardware
     // NOTE:  subImagePosX/Y are kept 1-based, so ffset by 1 during cut-out.
-    LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap;
+    LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
     if( subImagePosX.empty() ) { // x-coordinate of patch-centre
         subImagePosX = segment<uint16_t>(halfPatchSize+1,imageSizes.x-halfPatchSize+1,patchSize,totalOverlap);
-        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X");
+        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
     }
     if( subImagePosY.empty() ) { // y-coordinate of patch-centre
         subImagePosY = segment<uint16_t>(halfPatchSize+1,imageSizes.y-halfPatchSize+1,patchSize,totalOverlap);
-        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y");
+        LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
     }
  
     if( subImagePosX.empty() || subImagePosY.empty() ) {
-        LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue.";
+        LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue." << ende;
         info.step.store( JSTEP_ERR );
         info.state.store( JSTATE_IDLE );
         return;
@@ -422,7 +422,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     for( uint16_t& pos : subImagePosY ) {
         uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.y-halfPatchSize+1);       // stay inside borders
         if( adjustedPos != pos ) {
-            LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos;
+            LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
             pos = adjustedPos;
         }
     }
@@ -430,7 +430,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     for( uint16_t& pos : subImagePosX ) {
         uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.x-halfPatchSize+1);       // stay inside borders
         if( adjustedPos != pos ) {
-            LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos;
+            LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
             pos = adjustedPos;
         }
     }
@@ -471,9 +471,10 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         }
         nTotalImages += obj->nImages();
     }
-    if( writeFailed ) LOG_ERR<< "MomfbdJob::preProcess()  Hmmmmm, that's odd, I haven't implemented any error-reporting yet.";
+    if( writeFailed ) LOG_ERR<< "MomfbdJob::preProcess()  Hmmmmm, that's odd, I haven't implemented any error-reporting yet." << ende;
 
-    LOG_DETAIL << "MomfbdJob::preProcess()  Done.  nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << "   nImages = " << nTotalImages;
+    LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued." << ende;
+    LOG_DEBUG << "       nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << "   nImages = " << nTotalImages << ende;
 
     info.step.store( JSTEP_QUEUED );
     info.state.store( JSTATE_IDLE );
@@ -484,7 +485,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
 }
 
 void MomfbdJob::initCache(void) {
-    LOG_DETAIL << "MomfbdJob::initCache()";
+    LOG_DETAIL << "MomfbdJob::initCache()" << ende;
     if(!globalData) {       // create GlobalData if they don't exist
         globalData.reset(new GlobalData(*this));
     }
@@ -500,7 +501,7 @@ void MomfbdJob::initCache(void) {
  
 
 void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& service, uint8_t nThreads) {
-    LOG << "MomfbdJob::storePatches()";
+    LOG << "MomfbdJob::storePatches()" << ende;
     for( auto& obj: objects ) {
         obj->storePatches(wip, service, nThreads);
     }
@@ -516,7 +517,7 @@ void MomfbdJob::storePatches( WorkInProgress& wip, boost::asio::io_service& serv
 
 void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
-    LOG_DEBUG << "MomfbdJob::postProcess()";
+    LOG_DEBUG << "MomfbdJob::postProcess()" << ende;
     info.progress[0] = 0;
     info.progress[1] = objects.size();
     {
@@ -525,12 +526,12 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads
     }
     
     if( saveMask&SF_SAVE_METRIC ) {
-        bfs::path fn = bfs::path(info.outputDir) / bfs::path("metrics_"+to_string(info.id)+".f0");
+        bfs::path fn = bfs::path(info.outputDir) / bfs::path(info.name+"_metrics.f0");
         Array<float> metrics( patches.dimensions() );
         for( auto& patch: patches ) {
             metrics( patch->index.y, patch->index.x ) = patch->finalMetric; 
         }
-        LOG << "Writing metrics to file: " << fn;
+        LOG << "Writing metrics to file: " << fn << ende;
         Ana::write( fn.string(), metrics );
     }
     
@@ -581,7 +582,7 @@ bool MomfbdJob::check(void) {
         case JSTEP_RUNNING: ;
         case JSTEP_POSTPROCESS: ;
         case JSTEP_COMPLETED: ret = true; break;
-        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step;
+        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << ende;
     }
     return ret;
 }
@@ -590,7 +591,7 @@ bool MomfbdJob::check(void) {
 bool MomfbdJob::checkCfg(void) {
     
     if( (runFlags&RF_FLATFIELD) && (runFlags&RF_CALIBRATE) ) {
-        LOG_ERR << "Both FLATFIELD and CALIBRATE mode requested";
+        LOG_ERR << "Both FLATFIELD and CALIBRATE mode requested" << ende;
         return false;
     }
     if( objects.empty() ) return false;     // need at least 1 object

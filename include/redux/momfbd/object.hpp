@@ -15,6 +15,11 @@ namespace bpt = boost::property_tree;
 
 
 namespace redux {
+    
+    namespace logging {
+        class Logger;
+    }
+
 
     namespace momfbd {
 
@@ -49,6 +54,7 @@ namespace redux {
             const MomfbdJob& getJob(void) const { return myJob; };
         
             MomfbdJob& myJob;
+            logging::Logger& logger;
             std::vector<std::shared_ptr<Channel>> channels;
             
             /*************   Processing on slave   ***************/

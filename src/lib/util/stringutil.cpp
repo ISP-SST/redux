@@ -81,7 +81,6 @@ bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
 }
 
 
-
 bool redux::util::isRelative( const std::string &s ) {
     return (!s.empty() && s[0] != '/');
 }
@@ -238,7 +237,6 @@ string redux::util::cleanPath(string in, string base) {
     return (result / fn).string();
 
 }
-
 
 void redux::util::printProgress( const string& text, float progress ) {
     static mutex mtx;

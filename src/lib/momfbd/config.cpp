@@ -3,7 +3,7 @@
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/constants.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/translators.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -21,8 +21,6 @@ using namespace redux::momfbd;
 using namespace redux::util;
 using namespace std;
 using boost::algorithm::iequals;
-
-#define lg redux::Logger::mlg
 
 
 namespace {
@@ -61,7 +59,7 @@ namespace {
         if( elem.find_first_of( "Zz" ) != string::npos ) tp |= ZERNIKE;
         if( elem.find_first_of( "Kk" ) != string::npos ) tp |= KARHUNEN_LOEVE;
         if( tp == 3 ) {
-            LOGC_ERR("channel") << "Different mode-types in specified mode range \"" << elem << "\"";
+            //LLOG_ERR("channel") << "Different mode-types in specified mode range \"" << elem << "\"";
         } else if( tp == 0 ) tp = ZERNIKE;
         
         elem.erase( remove_if( elem.begin(), elem.end(),
@@ -172,7 +170,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         tmpString = tree.get<string>( "DIV_ORDERS", "" );
         if( tmpString.empty() ) {
             if( diversity.size() > 1 ) {
-                LOG_ERR << "Multiple diversity coefficients specified, but no orders provided!";
+                //LOG_ERR << "Multiple diversity coefficients specified, but no orders provided!";
             } else if( diversity.size() == 1 ) {  // A single diversity value is interpreted as (de)focus.
                 diversityModes.resize( 1, 4 );
                 diversityTypes.resize( 1,  ZERNIKE );
@@ -192,13 +190,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
                 }
             }
         } else {
-            LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!";
+            //LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!";
         }
         
         if( diversity.size() ) {
-            LOG << "Diversity: " << printArray(diversityModes, "modes")
-                << "    " << printArray(diversityTypes, "types")
-                << "    " << printArray(diversity, "values");
+//             LOG << "Diversity: " << printArray(diversityModes, "modes")
+//                 << "    " << printArray(diversityTypes, "types")
+//                 << "    " << printArray(diversity, "values");
         }
         
     }
@@ -212,14 +210,14 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     subImagePosY = tree.get<vector<uint16_t>>( "SIM_Y", defaults.subImagePosY );
     if( tree.get<bool>( "CAL_X", false ) ) {
         if( tree.get<bool>( "CAL_Y", false ) ) {
-            if( subImagePosX.size() || subImagePosY.size() ) LOG << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y";
+            //if( subImagePosX.size() || subImagePosY.size() ) LOG << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y";
             subImagePosX = tree.get<vector<uint16_t>>( "CAL_X", defaults.subImagePosX );
             subImagePosY = tree.get<vector<uint16_t>>( "CAL_Y", defaults.subImagePosY );
             if( subImagePosX.empty() || ( subImagePosX.size() != subImagePosY.size() ) ) {
-                LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!";
+                //LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!";
             }
         }
-        else LOG_ERR << "CAL_Y must be provided if CAL_X is!";
+        //else LOG_ERR << "CAL_Y must be provided if CAL_X is!";
     }
 
     
@@ -245,15 +243,15 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     stokesWeights = tree.get<vector<float>>( "VECTOR", defaults.stokesWeights );
     if( mmFile.length() > 0 ) {
         if( !mmRow ) {
-            LOG_CRITICAL << "a modulation matrix was provided but no row specified (MMROW).";
+            //LOG_FATAL << "a modulation matrix was provided but no row specified (MMROW).";
         }
         if( !mmWidth ) {
-            LOG_CRITICAL << "modulation matrix dimensions cannot be autodetected (yet): you must provide the matrix width (MMWIDTH)!";
+            //LOG_FATAL << "modulation matrix dimensions cannot be autodetected (yet): you must provide the matrix width (MMWIDTH)!";
         }
         if( stokesWeights.size() == 0 ) {
-            LOG_ERR << "modulation matrix specified but no VECTOR input given!";
+            //LOG_ERR << "modulation matrix specified but no VECTOR input given!";
         } else if( stokesWeights.size() != mmWidth ) {
-            LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << (int)mmWidth;
+            //LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << (int)mmWidth;
         }
     }
     else {  // TODO: don't modify cfg values!! ...make the main code use weight 1 as default instead.
@@ -460,7 +458,7 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     wavelength = tree.get<double>("WAVELENGTH", defaults.wavelength);
 
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
-        LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
+        //LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
     }
 
     ChannelCfg::parseProperties(tree, defaults);
@@ -630,7 +628,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
             if(iequals(tmpString, "Zernike")) {
                 modeBasis = ZERNIKE;
             } else {
-                LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \"" << basisTags[globalDefaults.modeBasis] << "\"";
+                //LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \"" << basisTags[globalDefaults.modeBasis] << "\"";
                 //modeBasis = defaults.modeBasis;
             }
     }
@@ -657,7 +655,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
         } else {
             string msg = "Unrecognized FPMETHOD value \"" + tmpString + "\"\n  Valid entries are: ";
             for(const auto& entry: fillpixMap) msg += "\"" + entry.first + "\" ";
-            LOG_ERR << msg;
+            //LOG_ERR << msg;
         }
     }
     gradientMethod = defaults.gradientMethod;
@@ -669,7 +667,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
         } else {
             string msg = "Unrecognized GRADIENT value \"" + tmpString + "\"\n  Valid entries are: ";
             for(const auto& entry: gradientMap) msg += "\"" + entry.first + "\" ";
-            LOG_ERR << msg;
+            //LOG_ERR << msg;
         }
     }
     getstepMethod = defaults.getstepMethod;
@@ -681,7 +679,7 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
         } else {
             string msg = "Unrecognized GETSTEP value \"" + tmpString + "\"\n  Valid entries are: ";
             for(const auto& entry: getstepMap) msg += "\"" + entry.first + "\" ";
-            LOG_ERR << msg;
+            //LOG_ERR << msg;
         }
     }
     badPixelThreshold = tree.get<float>("BADPIXEL", defaults.badPixelThreshold);
@@ -692,13 +690,13 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
 
     vector<FileType> filetypes = tree.get<vector<FileType>>("FILE_TYPE", vector<FileType>(1, (runFlags & RF_CALIBRATE) ? FT_ANA : FT_FITS));
     for(const FileType& it : filetypes) outputFileType |= it;
-    if((outputFileType & FT_MASK) == 0) LOG_ERR << "\"FILE_TYPE\" has to be one of ANA/FITS/MOMFBD.";
+    if((outputFileType & FT_MASK) == 0) cout << "\"FILE_TYPE\" has to be one of ANA/FITS/MOMFBD." << endl;
 
     tmpString = tree.get<string>("DATA_TYPE", dtTags[defaults.outputDataType]);
     if(iequals(tmpString, "FLOAT")) outputDataType = DT_F32T;
     else if(iequals(tmpString, "SHORT")) outputDataType = DT_I16T;
     else {
-        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default (" +dtTags[defaults.outputDataType]+ ")";
+        //LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default (" +dtTags[defaults.outputDataType]+ ")";
     }
 
     sequenceNumber = tree.get<uint32_t>("SEQUENCE_NUM", defaults.sequenceNumber);

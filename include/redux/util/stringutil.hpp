@@ -45,6 +45,7 @@ namespace redux {
         
         bool isRelative( const std::string& );
         inline bool isRelative( const bfs::path &p ) { return isRelative( p.string() ); }
+        
         std::vector<std::set<std::string>> make_template( const std::vector<std::string>& list, std::string& out, std::string split_chars="." );
 
         /*! @fn std::string alignCenter( const std::string& s, size_t n=20, unsigned char c=' ' )

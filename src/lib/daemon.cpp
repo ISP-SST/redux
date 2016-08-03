@@ -1,12 +1,12 @@
 #include "redux/daemon.hpp"
 
 
+#include "redux/logging/logger.hpp"
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
-#include "redux/logger.hpp"
 #include "redux/translators.hpp"
 
 #include <functional>
@@ -18,14 +18,12 @@
 
 using boost::algorithm::iequals;
 
+using namespace redux::logging;
 using namespace redux::network;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-
-#define lg Logger::mlg
-#define logChannel "deamon"
 
 namespace {
 
@@ -35,13 +33,11 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
-    hostTimeout(3600), timer( ioService ), worker( *this ) {
-
-    myInfo.reset( new Host() );
+    hostTimeout(3600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
     uint16_t nThreads = params["threads"].as<uint16_t>();
     if( nThreads ) {
-        myInfo->status.nThreads = myInfo->status.maxThreads = nThreads;
+        myInfo.status.nThreads = myInfo.status.maxThreads = nThreads;
     }
 
     if( params.count("cache-dir") ) {
@@ -52,7 +48,7 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
     uint16_t port = params["port"].as<uint16_t>();
     string master = params["master"].as<string>();
     if( port < 1024 ) {
-        LOG_CRITICAL << "Daemon:  using a port < 1024 requires root permissions, which this program should *not* have.";
+        LOG_FATAL << "Daemon:  using a port < 1024 requires root permissions, which this program should *not* have." << ende;
         stop();
         return;
     }
@@ -61,14 +57,14 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
         try {
             server.reset( new TcpServer( ioService, port ) );
         } catch ( const exception& e ) {
-            LOG_CRITICAL << "Daemon:  failed to start server: " << e.what();
+            LOG_FATAL << "Daemon:  failed to start server: " << e.what() << ende;
             server.reset();
             stop();
             return;
         }
     }
     
-    LOG << "Daemon:  using " << myInfo->status.nThreads << " threads.";
+    LOG << "Daemon:  using " << myInfo.status.nThreads << " threads." << ende;
     
 
 }
@@ -82,12 +78,12 @@ Daemon::~Daemon( void ) {
 
 void Daemon::serverInit( void ) {
 
-    LOG_TRACE << "serverInit()";
+    LOG_TRACE << "serverInit()" << ende;
     if( server ) {
         server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
         server->accept();
-        myInfo->info.peerType |= Host::TP_MASTER;
-        LOG_DETAIL << "Starting server on port " << params["port"].as<uint16_t>() << ".";
+        myInfo.info.peerType |= Host::TP_MASTER;
+        LOG_DETAIL << "Starting server on port " << params["port"].as<uint16_t>() << "." << ende;
     }
 }
 
@@ -103,7 +99,7 @@ void Daemon::stop( void ) {
     if( myMaster.conn && myMaster.conn->socket().is_open() ) {
         *myMaster.conn << CMD_DISCONNECT;
         myMaster.conn->socket().close();
-        myInfo->info.peerType &= ~Host::TP_WORKER;
+        myInfo.info.peerType &= ~Host::TP_WORKER;
     }
     ioService.stop();
     worker.stop();
@@ -112,11 +108,12 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-//     LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
-//     << "  nPeers = " << peers.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size();
+     LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
+     << "  nPeers = " << connections.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size() << ende;
 
     updateLoadAvg();
     cleanup();
+    logger.flushAll();
     static int cnt(0);
     if( (++cnt % 6) == 0 ) {
         updateStatus();   // TODO: use a secondary connection for auxiliary communications
@@ -134,7 +131,7 @@ bool Daemon::doWork( void ) {
         // start the server
         serverInit();
         // start the maintenance loop
-        LOG_TRACE << "Initializing maintenance timer.";
+        LOG_DEBUG << "Initializing maintenance timer." << ende;
         timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
         // Add some threads for the async work.
@@ -142,22 +139,23 @@ bool Daemon::doWork( void ) {
             shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioService ) ) );
             threads.push_back( t );
         }
-        LOG_TRACE << "Initializing worker.";
+        LOG_DEBUG << "Initializing worker." << ende;
         workerInit();
         worker.init();
-        LOG_TRACE << "Running the asio service.";
+        LOG_DEBUG << "Running the asio service." << ende;
         ioService.run();
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
-        LOG_TRACE << "Waiting for all threads to terminate.";
+        LOG_DETAIL << "Waiting for all threads to terminate." << ende;
         for( auto & t : threads ) {
             t->join();
         }
-        myInfo->info.peerType = 0;
+        myInfo.info.peerType = 0;
         threads.clear();
         worker.stop();
+        LOG_DETAIL << "Shutting down Daemon." << ende;
     }
     catch( const exception& e ) {
-        LOG_CRITICAL << "Unhandled exception: If something got here, you forgot to catch it !!!\nI will do a hard reset now....\n   reason: " << e.what();
+        LOG_FATAL << "Unhandled exception: If something got here, you forgot to catch it !!!\nI will do a hard reset now....\n   reason: " << e.what() << ende;
         throw; // Application::ResetException();
     }
 
@@ -171,58 +169,67 @@ void Daemon::workerInit( void ) {
     string master = params["master"].as<string>();
     
     if( master.empty() ) {
-        LOG_DEBUG << "Running local worker only.";
+        LOG_DEBUG << "Running local worker only." << ende;
     } else {
-        LOG_DEBUG << "Running slave.";
+        LOG_DEBUG << "Running slave." << ende;
         myMaster.host.reset( new Host() );
-        myMaster.conn = TcpConnection::newPtr( ioService );
-        connect();
+        myMaster.host->info.connectName = master;
+        myMaster.host->info.connectPort = params["port"].as<uint16_t>();
+       
+        connect( myMaster.host->info, myMaster.conn );
+        TcpConnection::Ptr logConn;
+        connect( myMaster.host->info, logConn );
+        logger.addNetwork( logConn, 0, Logger::getDefaultMask(), 1 );
+        
     }
     
+    myInfo.info.peerType = Host::TP_WORKER;
+
 }
 
 
-void Daemon::connect(void) {
-
-    uint16_t port = params["port"].as<uint16_t>();
-    string master = params["master"].as<string>();
+void Daemon::connect( network::Host::HostInfo& host, network::TcpConnection::Ptr& conn ) {
     
-    if( master.empty() ) {
+    if( host.connectName.empty() ) {
         return;
+    }
+    
+    if( !conn ) {
+        conn = TcpConnection::newPtr( ioService );
     }
     
     try {
-        auto test RDX_UNUSED = myMaster->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
+        auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
         return;
     } catch ( ... ) { }
 
-    if( myMaster.conn->socket().is_open() ) {
-        myMaster.conn->socket().close();
+    if( conn->socket().is_open() ) {
+        conn->socket().close();
     }
 
-    LOG_TRACE << "Attempting to connect to master at " << master << ":" << port;
+    LOG_TRACE << "Attempting to connect to " << host.connectName << ":" << host.connectPort << ende;
 
-    myMaster.conn->connect( master, to_string(port) );
-    if( myMaster.conn->socket().is_open() ) {
+    conn->connect( host.connectName, to_string(host.connectPort) );
+    if( conn->socket().is_open() ) {
 
         Command cmd;
 
-        myInfo->info.peerType |= Host::TP_WORKER;
-        *myMaster.conn << CMD_CONNECT;
-        *myMaster.conn >> cmd;
+        //myInfo.info.peerType |= Host::TP_WORKER;
+        *conn << CMD_CONNECT;
+        *conn >> cmd;
         if( cmd == CMD_AUTH ) {
             // implement
         }
         if( cmd == CMD_CFG ) {  // handshake requested
-            *myMaster.conn << myInfo->info;
-            *myMaster.conn >> myMaster.host->info;
-            *myMaster.conn >> cmd;       // ok or err
+            *conn << myInfo.info;
+            *conn >> host;
+            *conn >> cmd;       // ok or err
         }
         if( cmd != CMD_OK ) {
-            LOG_ERR << "Handshake with master failed  (server replied: " << cmd << ")";
-            myMaster.conn->socket().close();
-            myInfo->info.peerType &= ~Host::TP_WORKER;
-        } else LOG_TRACE << "Connected.";
+            LOG_ERR << "Handshake with master failed  (server replied: " << cmd << ")" << ende;
+            conn->socket().close();
+            //myInfo.info.peerType &= ~Host::TP_WORKER;
+        } else LOG_TRACE << "Connected." << ende;
 
     }
 
@@ -232,13 +239,13 @@ void Daemon::connect(void) {
 void Daemon::updateStatus( void ) {
 
     network::TcpConnection::Ptr conn = getMaster();
-    //myInfo->touch();
+    //myInfo.touch();
     
     if( conn && conn->socket().is_open() ) {
 #ifdef DEBUG_
-        LOG_TRACE << "Sending statusupdate to server";
+        LOG_TRACE << "Sending statusupdate to server" << ende;
 #endif
-        size_t blockSize = myInfo->status.size();
+        size_t blockSize = myInfo.status.size();
         size_t totSize = blockSize + sizeof( size_t ) + 1;
         shared_ptr<char> buf( new char[totSize], []( char* p ){ delete[] p; } );
         char* ptr = buf.get();
@@ -246,7 +253,7 @@ void Daemon::updateStatus( void ) {
 
         uint64_t count = pack( ptr, CMD_STAT );
         count += pack( ptr+count, blockSize );
-        count += myInfo->status.pack( ptr+count );
+        count += myInfo.status.pack( ptr+count );
 
         conn->asyncWrite( buf, totSize );
     }
@@ -261,14 +268,14 @@ network::TcpConnection::Ptr Daemon::getMaster(void) {
     if ( myMaster.conn ) {
         try {
             myMaster.conn->lock();
-            connect();          // will return without doing anything if the remote endpoint exists.
+            connect( myMaster.host->info, myMaster.conn );          // will return without doing anything if the remote endpoint exists.
             if( myMaster.conn->socket().is_open() ) return myMaster.conn;
         }
         catch( exception& e ) {
-            LOG_DEBUG << "getMaster: Exception caught while getting connection to master: " << e.what();
+            LOG_DEBUG << "getMaster: Exception caught while getting connection to master: " << e.what() << ende;
         }
         catch( ... ) {
-            LOG_DEBUG << "getMaster: Uncaught exception while getting connection to master.";
+            LOG_DEBUG << "getMaster: Uncaught exception while getting connection to master." << ende;
         }
         myMaster.conn->unlock();        
     }
@@ -293,9 +300,9 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
         *conn << CMD_CFG;           // request handshake
         Host::HostInfo remote_info;
         *conn >> remote_info;
-        *conn << myInfo->info;
+        *conn << myInfo.info;
 
-        //LOG_DEBUG << "connected()  Handshake successful.";
+        LOG_DEBUG << "connected()  Handshake successful." << ende;
         addConnection( remote_info, conn );
 
         conn->setCallback( bind( &Daemon::activity, this, std::placeholders::_1 ) );
@@ -305,9 +312,9 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
         return;
     }
     catch( const exception& e ) {
-        LOG_ERR << "connected() Failed to process new connection. Reason: " << e.what();
+        LOG_ERR << "connected() Failed to process new connection. Reason: " << e.what() << ende;
     } catch( ... ) {
-        LOG_ERR << "Daemon::connected() Unhandled exception.";
+        LOG_ERR << "Daemon::connected() Unhandled exception." << ende;
     }
     conn->socket().close();
 }
@@ -324,7 +331,7 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
         return;
     }
 
-    //LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")";
+    //LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")" << ende;
 
     try {
         
@@ -340,20 +347,23 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
             case CMD_STAT: updateHostStatus(conn); break;
             case CMD_JSTAT: sendJobStats(conn); break;
             case CMD_PSTAT: sendPeerList(conn); break;
+            case CMD_LOG_CONNECT: addToLog(conn); break;
             case CMD_DISCONNECT: removeConnection(conn); break;
-            default: LOG_DEBUG << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd );
+            default: LOG_DEBUG << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd ) << ende;
                 removeConnection(conn);
                 return;
         }
 
     }
     catch( const exception& e ) {
-        LOG_DEBUG << "activity(): Exception when parsing incoming command: " << e.what();
+        LOG_DEBUG << "activity(): Exception when parsing incoming command: " << e.what() << ende;
         removeConnection(conn);
         return;
     }
 
     conn->idle();
+    logger.flushBuffer();
+    
 
 }
 
@@ -361,9 +371,10 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
 void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Ptr& conn ) {
     
     unique_lock<mutex> lock( peerMutex );
-    if( myInfo->info == remote_info ) {
-        myInfo->info.peerType |= remote_info.peerType;
-        connections[conn] = myInfo;
+    if( myInfo.info == remote_info ) {
+        myInfo.info.peerType |= remote_info.peerType;
+        LOG_ERR << "addConnection(): Looks like this process is connecting to itself...weird. " << ende;
+        //connections[conn] = myInfo;
         return;
     }
     
@@ -387,11 +398,11 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
         if( id ) {
             host.reset( newHost );
             if( host->info.peerType & (Host::TP_WORKER|Host::TP_MASTER) ) {  // filter out the "ui" connections which will connect/disconnect silently
-                LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id;
+                LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
             }
             //peers.insert( make_pair( id, host ) );
-        } else LOG_DEBUG << "New connection from existing host: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id;
-        conn->setSwapEndian(remote_info.littleEndian != myInfo->info.littleEndian);
+        } else LOG_DEBUG << "New connection from existing host: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
+        conn->setSwapEndian(remote_info.littleEndian != myInfo.info.littleEndian);
     }
     
     host->touch();
@@ -407,7 +418,7 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
     if( it != connections.end()) {
         if( it->second && (it->second->info.peerType & (Host::TP_WORKER|Host::TP_MASTER))) {  // filter out the "ui" connections which will connect/disconnect silently
             it->second->nConnections--;
-            LOG_DEBUG << "Host #" << it->second->id << "  (" << it->second->info.name << ":" << it->second->info.pid << ") disconnected.";
+            LOG_DEBUG << "Host #" << it->second->id << "  (" << it->second->info.name << ":" << it->second->info.pid << ") disconnected." << ende;
         }
         connections.erase(it);
     }
@@ -434,7 +445,7 @@ void Daemon::cleanup( void ) {
                 /-*auto wip = peerWIP.find( it->second );
                 if( wip != peerWIP.end() ) {
                     if( wip->second.job ) {
-                        LOG_DETAIL << "Peer #" << it->first << " disconnected, returning unfinished work to queue: " << wip->second.print();
+                        LOG_DETAIL << "Peer #" << it->first << " disconnected, returning unfinished work to queue: " << wip->second.print() << ende;
                         wip->second.job->ungetWork( wip->second );
                         for( auto& part: wip->second.parts ) {
                             part->cacheLoad();
@@ -456,14 +467,14 @@ void Daemon::cleanup( void ) {
             Host::Ptr host = it->first;
             boost::posix_time::time_duration elapsed = (now - it->second.workStarted);
             if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
-                LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << it->second.print();
-                LOG_WARN << "Returning unfinished work to queue: " << it->second.print();
+                LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << it->second.print() << ende;
+                LOG_NOTICE << "Returning unfinished work to queue: " << it->second.print() << ende;
                 job->failWork( it->second );
                 for( auto& part: it->second.parts ) {
                     if( part ) {
                         part->cacheLoad();
                         part->cacheStore(true);
-                        //LOG_TRACE << "Returned part: #" << part->id << "   step=" << (int)part->step;
+                        //LOG_TRACE << "Returned part: #" << part->id << "   step=" << (int)part->step << ende;
                     }
                 }
                 it->second.parts.clear();
@@ -475,7 +486,7 @@ void Daemon::cleanup( void ) {
             if( host && host->nConnections > 0 ) {
                 elapsed = (now - host->status.lastSeen);
                 if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
-                    LOG_DETAIL << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << "   nConn = " << host->nConnections;
+                    LOG_NOTICE << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << "   nConn = " << host->nConnections << ende;
                     for( auto it2 = begin(connections); it2 != end(connections); ++it2 ) {
                         if( (*it2->second) == (*host) ) {
                             it2->first->socket().close();
@@ -493,7 +504,9 @@ void Daemon::cleanup( void ) {
         unique_lock<mutex> lock( jobsMutex );
         for( auto& job : jobs ) {
             if( job && (job->info.step == Job::JSTEP_COMPLETED) ) {
-                LOG_DEBUG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue.";
+                LOG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
+                LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
+                job->logger.flushAll();
                 job.reset();
                 //job->cleanup();
             }
@@ -505,7 +518,7 @@ void Daemon::cleanup( void ) {
 
 
 void Daemon::die( TcpConnection::Ptr& conn ) {
-    LOG_DEBUG << "Received exit command.";
+    LOG_DEBUG << "Received exit command." << ende;
     unique_lock<mutex> lock( peerMutex );
     connections.clear();
     conn->socket().close();
@@ -541,12 +554,11 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     job->info.id = ++jobCounter;
                     if( job->info.name.empty() ) job->info.name = "job_" + to_string( job->info.id );
                     if( job->info.logFile.empty() ) {
-                        job->setLogChannel(logChannel);
-                    } else {
-                        job->startLog();
-                        job->setLogChannel( job->getLogChannel() );
+                        job->info.logFile = job->info.name + ".log";
                     }
+                    job->startLog();
                     if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
+
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
                     ids.push_back( job->info.id );
                     ids[0]++;
@@ -564,17 +576,17 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
             return (a->info.id < b->info.id);
         } );
     } catch( const exception& e ) {
-        LOG_ERR << "addJobs: Exception caught while parsing block: " << e.what();
+        LOG_ERR << "addJobs: Exception caught while parsing block: " << e.what() << ende;
     } catch( ... ) {
-        LOG_ERR << "addJobs: Unrecognized exception thrown when parsing cfg file.";
+        LOG_ERR << "addJobs: Unrecognized exception thrown when parsing cfg file." << ende;
     }
 
     if( count == blockSize ) {
-        if( ids[0] ) LOG << "Received " << ids[0] << " jobs." << printArray(ids.data()+1,ids[0],"  IDs");
+        if( ids[0] ) LOG << "Received " << ids[0] << " jobs." << printArray(ids.data()+1,ids[0],"  IDs") << ende;
         *conn << CMD_OK;           // all ok, return IDs
         conn->syncWrite(ids);
     } else {
-        LOG_ERR << "addJobs: Parsing of datablock failed, count = " << count << "   blockSize = " << blockSize << "  bytes.";
+        LOG_ERR << "addJobs: Parsing of datablock failed, count = " << count << "   blockSize = " << blockSize << "  bytes." << ende;
         *conn << CMD_ERR;
     }
 
@@ -607,7 +619,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
         string jobString = string( buf.get() );
         if( iequals( jobString, "all" ) ) {
             unique_lock<mutex> lock( jobsMutex );
-            if( jobs.size() ) LOG << "Clearing joblist.";
+            if( jobs.size() ) LOG << "Clearing joblist." << ende;
             jobs.clear();
             return;
         }
@@ -628,7 +640,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
                         return false;
                     }), jobs.end() );
             }
-            if( !deleted_ids.empty() ) LOG << "Removed " << printArray(deleted_ids,"jobs");
+            if( !deleted_ids.empty() ) LOG << "Removed " << printArray(deleted_ids,"jobs") << ende;
             return;
         }
         catch( const boost::bad_lexical_cast& e ) {
@@ -650,11 +662,11 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
                     return false;
                 }), jobs.end() );
             }
-            if( !deletedList.empty() ) LOG << "Removed " << printArray(deletedList,"jobs");
+            if( !deletedList.empty() ) LOG << "Removed " << printArray(deletedList,"jobs") << ende;
             return;
         }
         catch( const std::exception& e ) {
-            LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what();
+            LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
             throw e;
         }
 
@@ -733,7 +745,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         if( it == peerWIP.end() ) {
             auto rit = peerWIP.emplace( connections[conn], WorkInProgress() );
             if( !rit.second ) {
-                LOG_ERR << "Failed to insert new connection into peerWIP";
+                LOG_ERR << "Failed to insert new connection into peerWIP" << ende;
             }
             it = rit.first;
         }
@@ -746,7 +758,8 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         wip.isRemote = true;
         if( getWork( wip, host->status.nThreads ) ) {
             blockSize += wip.workSize();
-            LOGC_DETAIL(wip.job->getLogChannel()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip.print();
+            //LLOG_DETAIL(wip.job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip.print() << ende;
+            LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip.print() << ende;
             host->status.state = Host::ST_ACTIVE;
         }
 
@@ -779,12 +792,12 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if( blockSize == 0 ) {
-        LOG_ERR << "Received empty result.";
+        LOG_ERR << "Received empty result." << ende;
     } else {
         unique_lock<mutex> lock( peerMutex );
         auto it = peerWIP.find(connections[conn]);
         if( it == peerWIP.end() ) {
-            LOG_ERR << "Received results from unexpected host. (probably timed out)";
+            LOG_ERR << "Received results from unexpected host. (probably timed out)" << ende;
         } else {
 
             shared_ptr<WorkInProgress> wip( new WorkInProgress() );
@@ -794,13 +807,14 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
             bool endian = conn->getSwapEndian();
             it->first->status.state = Host::ST_IDLE;
             string msg = "Received results from " + it->first->info.name + ":" + to_string(it->first->info.pid);
-            std::thread([buf,wip,endian,msg](){
+            std::thread([this,buf,wip,endian,msg](){
                 try {
                     wip->unpackWork( buf.get(), endian );
-                    LOGC_DETAIL(wip->job->getLogChannel()) << msg << "   " + wip->print();
+                    LOG_DETAIL << msg << "   " + wip->print() << ende;
+                    //LLOG_DETAIL(wip->job->getLogger()) << msg << "   " + wip->print() << ende;
                     wip->returnResults();
                 } catch ( exception& e ) {
-                    LOG_ERR << "putParts:  exception when unpacking results: " << e.what();
+                    LOG_ERR << "putParts:  exception when unpacking results: " << e.what() << ende;
                 }
             }).detach();
             reply = CMD_OK;         // all ok
@@ -829,7 +843,7 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
     if( packedSize > blockSize ) {
         string msg = "sendJobList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
-        //LOG_DEBUG << msg;
+        //LOG_DEBUG << msg << ende;
     }
     totalSize = packedSize + sizeof( uint64_t );
     pack( buf.get(), packedSize );                                                // store real blockSize
@@ -850,7 +864,7 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
             connections[conn]->touch();     // Note: lastSeen is copied over, so do a new "touch()" afterwards.
         }
         catch( const exception& e ) {
-            LOG_ERR << "updateStatus: Exception caught while parsing block: " << e.what();
+            LOG_ERR << "updateStatus: Exception caught while parsing block: " << e.what() << ende;
         }
     }
 
@@ -880,7 +894,7 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
     if( packedSize > blockSize ) {
         string msg = "sendJobStats(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
-        //LOG_DEBUG << msg;
+        //LOG_DEBUG << msg << ende;
     }
     totalSize = packedSize + sizeof( uint64_t );
     pack( buf.get(), packedSize );                                                // store real blockSize
@@ -891,23 +905,25 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 
 void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
 
-    uint64_t blockSize = myInfo->size();
-    unique_lock<mutex> lock( peerMutex );
+    uint64_t blockSize = myInfo.size();
 
+    unique_lock<mutex> lock( peerMutex );
     for( auto & peer : connections ) {
         if(peer.second && peer.second->info.peerType&Host::TP_WORKER) blockSize += peer.second->size();
     }
     uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
     shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
     char* ptr =  buf.get()+sizeof( uint64_t );
-    uint64_t packedSize = myInfo->pack( ptr );
+    uint64_t packedSize = myInfo.pack( ptr );
     for( auto & peer : connections ) {
         if(peer.second && peer.second->info.peerType&Host::TP_WORKER) packedSize += peer.second->pack( ptr+packedSize );
     }
+    lock.unlock();
+    
     if( packedSize > blockSize ) {
         string msg = "sendPeerList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
-        //LOG_DEBUG << msg;
+        //LOG_DEBUG << msg << ende;
     }
     totalSize = packedSize + sizeof( uint64_t );
     pack( buf.get(), packedSize );                                                // store real blockSize
@@ -916,18 +932,41 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
 }
 
 
+void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
+    
+    uint32_t logid(0);
+    *conn >> logid;
+
+    Command ret = CMD_ERR;
+    if( logid == 0 ) {
+        logger.addConnection( conn, connections[conn] );
+        ret = CMD_OK;
+    } else {
+        unique_lock<mutex>( jobsMutex );
+        for( Job::JobPtr & job : jobs ) {
+            if( job->info.id == logid ) {
+                job->logger.addConnection( conn, connections[conn] );
+                ret = CMD_OK;
+            }
+        }
+    }
+    *conn << ret;
+    
+}
+
+
 void Daemon::updateLoadAvg( void ) {
-    //LOG_TRACE << "updateLoadAvg()";
+    //LOG_TRACE << "updateLoadAvg()" << ende;
 
     static double loadAvg[3];
 
     int ret = getloadavg( loadAvg, 3 );
     if( ret != 3 ) {
-        LOG_ERR << "updateLoadAvg(): failed to get loadavg.";
-        myInfo->status.loadAvg = 0;
+        LOG_ERR << "updateLoadAvg(): failed to get loadavg." << ende;
+        myInfo.status.loadAvg = 0;
         return;
     }
 
-    myInfo->status.loadAvg = loadAvg[0]; // / myInfo->info.nCores * 100.0;
-    //LOG_TRACE << "updateLoadAvg()  = " << myInfo->status.loadAvg;
+    myInfo.status.loadAvg = loadAvg[0]; // / myInfo.info.nCores * 100.0;
+    //LOG_TRACE << "updateLoadAvg()  = " << myInfo.status.loadAvg << ende;
 }

@@ -20,7 +20,7 @@ namespace bfs = boost::filesystem;
 
 
 namespace {
-/*
+
     double makePupil(double** pupil, uint16_t nPoints, double radius) {
 
         double area = 0.0, origin = 0.5;
@@ -84,7 +84,7 @@ namespace {
 
     }
 
-*/    
+
 }
 
 

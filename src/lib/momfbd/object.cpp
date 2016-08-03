@@ -13,7 +13,7 @@
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/constants.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/revision.hpp"
 
 #include <cstdio>
@@ -26,16 +26,16 @@
 #include <boost/property_tree/info_parser.hpp>
 
 namespace bfs = boost::filesystem;
-using namespace redux::momfbd;
 using namespace redux::file;
-using namespace redux::math;
 using namespace redux::image;
+using namespace redux::logging;
+using namespace redux::math;
+using namespace redux::momfbd;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 using boost::algorithm::iequals;
 
-#define lg Logger::mlg
 
 namespace {
     
@@ -46,12 +46,12 @@ namespace {
         count += A > 0 ? 1 : 0;
         count += P > 0 ? 1 : 0;
         if (count > 2) {
-            LOG_WARN << "Too many parameters specified: replacing telescope focal length (" << F
-                     << ") with computed value (" << (P * rad2asec / A) << ")";
+//             LOG_WARN << "Too many parameters specified: replacing telescope focal length (" << F
+//                      << ") with computed value (" << (P * rad2asec / A) << ")" << ende;
             F = P * rad2asec / A;
             return true;
         } else if (count < 2) {
-            LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided.";
+//             LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided." << ende;
         } else {    // count == 2
             if (F <= 0) {
                 F = P * rad2asec / A;
@@ -69,7 +69,7 @@ namespace {
 
 }
 
-Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg (j), myJob (j), currentMetric(0), reg_gamma(0),
+Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg(j), myJob(j), logger(j.logger), currentMetric(0), reg_gamma(0),
     frequencyCutoff(0),pupilRadiusInPixels(0), ID (id), objMaxMean(0), imgSize(0), nObjectImages(0) {
 
     setLogChannel(myJob.getLogChannel());
@@ -95,7 +95,7 @@ void Object::parsePropertyTree( bpt::ptree& tree ) {
         }
     }
 
-    //LOG_DEBUG << "Object::parseProperties() done.";
+    //LOG_DEBUG << "Object::parseProperties() done." << ende;
 
 }
 
@@ -144,7 +144,7 @@ uint64_t Object::pack(char* ptr) const {
     }
     count += pack (ptr + count, nObjectImages);
     if (count != size()) {
-        LOG_ERR << "(" << hexString (this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size();
+        LOG_ERR << "(" << hexString (this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size() << ende;
     }
     return count;
 }
@@ -228,18 +228,18 @@ void Object::initProcessing( const Solver& ws ) {
 //         unique_lock<mutex> lock(ret.mtx);
 //         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
 //             if( ret.load( modeFile, pupilPixels ) ) {
-//                 LOG_DEBUG << "Loaded Mode-file " << modeFile;
+//                 LOG_DEBUG << "Loaded Mode-file " << modeFile << ende;
 //                 ret.getNorms( pupil );
 //                 modes = ret;
 //                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be (y,x)=" << modes.tiltMode
-//                          << ".  This should be auto-detected in the future...";
-//               } else LOG_ERR << "Failed to load Mode-file " << modeFile;
+//                          << ".  This should be auto-detected in the future..." << ende;
+//               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
 //         }
 //         
         
         //modes.init( myJob, *this );                 // will get modes from globalData
     } else {
-        LOG_ERR << "Object patchSize is 0 !!!";
+        LOG_ERR << "Object patchSize is 0 !!!" << ende;
     }
     
 }
@@ -286,7 +286,7 @@ void Object::getResults(ObjectData& od, double* alpha) {
     avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
-        LOG_TRACE << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance;
+        LOG_DETAIL << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
         ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     
@@ -301,10 +301,10 @@ void Object::getResults(ObjectData& od, double* alpha) {
                 } );
     
     if( fittedPlane.sameSize(od.img) ) {
-        LOG_DETAIL << "Re-adding fitted plane to result.";
+        LOG_DETAIL << "Re-adding fitted plane to result." << ende;
         od.img += fittedPlane;
     } else if( !fittedPlane.empty() ) {
-        LOG_WARN << "Size mismatch when re-adding fitted plane.";
+        LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
     }
 
     
@@ -514,7 +514,7 @@ void Object::fitAvgPlane(ObjectData& od) {
             Array<float> view(cd.images, first, last);
             for( unsigned int i=0; i<nImg; ++i ) {
                 if( ! view.sameSize(fittedPlane) ) {
-                    LOG_ERR << "Size mismatch when fitting average plane for object #" << ID;
+                    LOG_ERR << "Size mismatch when fitting average plane for object #" << ID << ende;
                     fittedPlane.clear();
                     return;
                 }
@@ -532,7 +532,7 @@ void Object::fitAvgPlane(ObjectData& od) {
             return;
         }
         
-        LOG_DETAIL << "Subtracting average plane before processing.";
+        LOG_DETAIL << "Subtracting average plane before processing." << ende;
         
         for( auto& cd : od.channels ) {
             size_t nImg = cd.images.dimSize(0);
@@ -578,10 +578,10 @@ void Object::calcMetric (void) {
 bool Object::checkCfg (void) {
 
     if ( (saveMask & SF_SAVE_PSF) && (saveMask & SF_SAVE_PSF_AVG)) {
-        LOG_WARN << "Both GET_PSF and GET_PSF_AVG mode specified.";
+        LOG_WARN << "Both GET_PSF and GET_PSF_AVG mode specified." << ende;
     }
     if (channels.empty()) {
-        LOG_CRITICAL << "Each object must have at least 1 channel specified.";
+        LOG_FATAL << "Each object must have at least 1 channel specified." << ende;
     }
 
     for (auto& ch : channels) {
@@ -614,14 +614,14 @@ bool Object::checkCfg (void) {
             if (count (tmpString.begin(), tmpString.end(), '%') == 2) {
                 outputFileName = boost::str (boost::format (tmpString) % *channels[0]->fileNumbers.begin() % *channels[0]->fileNumbers.rbegin());
             } else {
-                LOG_CRITICAL << boost::format ("failed to generate output filename from \"%s\"  (->\"%s\").") % tpl % tmpString;
+                LOG_FATAL << boost::format ("failed to generate output filename from \"%s\"  (->\"%s\").") % tpl % tmpString << ende;
                 return false;
             }
-        } else LOG_CRITICAL << boost::format ("first filename template \"%s\" does not contain valid format specifier.") % tpl;
+        } else LOG_FATAL << boost::format ("first filename template \"%s\" does not contain valid format specifier.") % tpl << ende;
     }
     
     /*if( !modeFile.empty() && !modeNumbers.empty() ) {
-        LOG_WARN << "A modefile was specified together with mode-numbers. BE AWARE that these numbers will be interpreted as indices in the supplied file and NOT Zernike/KL indices!!";
+        LOG_WARN << "A modefile was specified together with mode-numbers. BE AWARE that these numbers will be interpreted as indices in the supplied file and NOT Zernike/KL indices!!" << ende;
         return false;
     }*/
     
@@ -635,35 +635,34 @@ bool Object::checkData (void) {
     bfs::path outDir( myJob.info.outputDir );
     bfs::path tmpOF(outputFileName+".ext");
     
-    if( tmpOF.is_relative() && !outDir.empty() ) {
+    if( isRelative(tmpOF) && !outDir.empty() ) {
         tmpOF = outDir / tmpOF;
     }
     bfs::path tmpPath = tmpOF.parent_path();
     
-    boost::system::error_code ec;
-    if( !tmpPath.empty() && !bfs::exists(tmpPath,ec) ) {
-        if( !bfs::create_directories(tmpPath,ec) ) {
-            LOG_CRITICAL << boost::format ("failed to create directory for output: %s") % tmpPath;
-            return false;
-        } else LOG_TRACE << boost::format ("create output directory %s") % tmpPath;
-    }
+
     try {
-        bfs::path slask(tmpPath);
-        slask += "_test_writability_";
+        if( !tmpPath.empty() && !bfs::exists(tmpPath) ) {
+            if( !bfs::create_directories(tmpPath) ) {
+                LOG_FATAL << boost::format ("failed to create directory for output: %s") % tmpPath << ende;
+                return false;
+            } else LOG_TRACE << boost::format ("create output directory %s") % tmpPath << ende;
+        }
+        bfs::path slask(tmpPath.string()+"_test_writability_");
         bfs::create_directory(slask);
         bfs::remove_all(slask);
     } catch( bfs::filesystem_error& e ) {
-        LOG_CRITICAL << boost::format ("output directory %s not writable: %s") % tmpPath % e.what();
+        LOG_FATAL << boost::format ("output directory %s not writable: %s") % tmpPath % e.what() << ende;
         return false;
     }
     for (int i = 1; i & FT_MASK; i <<= 1) {
         if (i & myJob.outputFileType) {  // this filetype is specified.
             tmpOF.replace_extension(FileTypeExtensions.at ( (FileType) i));
             if( bfs::exists(tmpOF) && !(myJob.runFlags & RF_FORCE_WRITE) ) {
-                LOG_CRITICAL << boost::format ("output file %s already exists! Use -f (or OVERWRITE) to replace file.") % tmpOF;
+                LOG_FATAL << boost::format ("output file %s already exists! Use -f (or OVERWRITE) to replace file.") % tmpOF << ende;
                 return false;
             } else {
-                LOG_DETAIL << "Output filename: " << tmpOF;
+                LOG_DETAIL << "Output filename: " << tmpOF << ende;
             }
         }
     }
@@ -677,9 +676,9 @@ bool Object::checkData (void) {
             bfs::path fn = bfs::path(imageDataDir) / bfs::path(pupilFile);
             if (! bfs::is_regular_file(fn)) {
                 //logAndThrow("Pupil-file " + pupilFile + " not found!");
-                LOG_CRITICAL << boost::format ("Pupil-file %s not found!") % pupilFile;
+                LOG_FATAL << boost::format ("Pupil-file %s not found!") % pupilFile << ende;
                 return false;
-            } else pupilFile = fn.c_str();
+            } else pupilFile = fn.string();
         }
     }
 
@@ -688,9 +687,9 @@ bool Object::checkData (void) {
             bfs::path fn = bfs::path(imageDataDir) / bfs::path(modeFile);
             if (!bfs::is_regular_file(fn)) {
                 //logAndThrow("Mode-file " + modeFile + " not found!");
-                LOG_CRITICAL << boost::format ("Mode-file %s not found!") % modeFile;
+                LOG_FATAL << boost::format ("Mode-file %s not found!") % modeFile << ende;
                 return false;
-            } else modeFile = fn.c_str();
+            } else modeFile = fn.string();
         }
     }
 
@@ -712,14 +711,14 @@ void Object::initCache (void) {
         unique_lock<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( pupilFile, pupilPixels ) ) {
-                LOG_DEBUG << "Loaded Pupil-file " << pupilFile;
+                LOG_DEBUG << "Loaded Pupil-file " << pupilFile << ende;
                 pupil = ret;
-            } else LOG_ERR << "Failed to load Pupil-file " << pupilFile;
+            } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
                 pupil = ret;
             } else {
-                LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet).";
+                LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet)." << ende;
             }
         }
     }
@@ -731,16 +730,16 @@ void Object::initCache (void) {
         if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
             ret.generate( pupilPixels, pupilRadiusInPixels );
             if( ret.nDimensions() != 2 || ret.dimSize(0) != pupilPixels || ret.dimSize(1) != pupilPixels ) {    // mismatch
-                LOG_ERR << "Generated Pupil does not match. This should NOT happen!!";
+                LOG_ERR << "Generated Pupil does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated pupil (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
+                LOG_DEBUG << "Generated pupil (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret; 
             }
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
                 pupil = ret;
             } else {
-                LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!";
+                LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!" << ende;
             }
         }
     }
@@ -751,17 +750,17 @@ void Object::initCache (void) {
         unique_lock<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( modeFile, pupilPixels ) ) {
-                LOG_DEBUG << "Loaded Mode-file " << modeFile;
+                LOG_DEBUG << "Loaded Mode-file " << modeFile << ende;
                 ret.getNorms( pupil );
                 modes = ret;
                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be (y,x)=" << modes.tiltMode
-                         << ".  This should be auto-detected in the future...";
-              } else LOG_ERR << "Failed to load Mode-file " << modeFile;
+                         << ".  This should be auto-detected in the future..." << ende;
+              } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
                 modes = ret;
             } else {
-                LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet).";
+                LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet)." << ende;
             }
         }
     }
@@ -780,18 +779,17 @@ void Object::initCache (void) {
                 ret.generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
             }
             if( ret.nDimensions() != 3 || ret.dimSize(1) != pupilPixels || ret.dimSize(2) != pupilPixels ) {    // mismatch
-                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
+                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")";
+                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 ret.getNorms( pupil );
                 modes = ret; 
-                LOG_DETAIL << "Tilt-indices:  (y,x)=" << modes.tiltMode;
             }
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
                 modes = ret;
             } else {
-                LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!";
+                LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!" << ende;
             }
         }
     }
@@ -842,7 +840,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
         if(endT.is_special()) endT = ch->endT;
         else endT = std::max(endT,ch->endT);
     }
-    LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value.";
+    LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
 
     for (auto& ch : channels) {
         ch->storePatches(service, patches);
@@ -854,14 +852,14 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
 
 void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
-    LOG << "BARELY writing output to ANA.   baseName=\"" << outputFileName << "\"";
+    LOG << "BARELY writing output to ANA.   baseName=\"" << outputFileName << "\"" << ende;
     
-    LOG_WARN << "Writing to ANA still not properly implemented...";
+    LOG_WARN << "Writing to ANA still not properly implemented..." << ende;
 
     for (unsigned int y = 0; y < patches.dimSize(0); ++y) {
         for (unsigned int x = 0; x < patches.dimSize(1); ++x) {
             bfs::path fn = bfs::path(outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
-            if( fn.is_relative() ) {
+            if( isRelative(fn) ) {
                 fn = bfs::path(myJob.info.outputDir) / fn;
             }
             Ana::write(fn.string(), patches(y,x)->objects[ID].img);
@@ -870,10 +868,10 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
     if( saveMask & SF_SAVE_ALPHA ) {
         bfs::path fn = bfs::path(outputFileName + ".alpha.f0");
-        if( fn.is_relative() ) {
+        if( isRelative(fn) ) {
             fn = bfs::path(myJob.info.outputDir) / fn;
         }
-        LOG << "Saving alpha-coefficients to: " << fn;
+        LOG << "Saving alpha-coefficients to: " << fn << ende;
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size());
         for( auto& patch: patches ) {
             Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1);
@@ -887,11 +885,11 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
 
 void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
     bfs::path fn = bfs::path(outputFileName + ".fits");
-    if( fn.is_relative() ) {
+    if( isRelative(fn) ) {
         fn = bfs::path(myJob.info.outputDir) / fn;
     }
-    LOG << "NOT writing output to file: " << fn;
-    LOG_ERR << "Writing to FITS still not implemented...";
+    LOG << "NOT writing output to file: " << fn << ende;
+    LOG_ERR << "Writing to FITS still not implemented..." << ende;
 }
 
 
@@ -899,10 +897,10 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
     bfs::path fn = bfs::path(outputFileName + ".momfbd");      // TODO: fix storage properly
 
-    if( fn.is_relative() ) {
+    if( isRelative(fn) ) {
         fn = bfs::path(myJob.info.outputDir) / fn;
     }
-    LOG << "Writing output to file: " << fn;
+    LOG << "Writing output to file: " << fn << ende;
 
     std::shared_ptr<FileMomfbd> info (new FileMomfbd());
 
@@ -912,7 +910,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
     sscanf (reduxCommitTime, "%4d-%2d-%2d %2d", &year, &month, &day, &hour);
     sprintf (buffer, "%4d%02d%02d.%01d", year, month, day, hour);
     info->versionString = buffer;
-    info->version = atof (info->versionString.c_str());
+    info->version = atof( info->versionString.c_str() );
 
     info->dateString = myJob.observationDate;
     if(startT.is_special() && endT.is_special()) {
@@ -1107,7 +1105,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
                 }
                 info->patches(x,y).diversityPos = offset;
                 offset += divSize;
-            } else LOG_ERR << "NullPatch or index out-of-bounds:  id=" << ID;
+            } else LOG_ERR << "NullPatch or index out-of-bounds:  id=" << ID << ende;
         }
     }
 
@@ -1127,12 +1125,12 @@ void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service
     fn.replace_extension ("momfbd");
     std::shared_ptr<FileMomfbd> info (new FileMomfbd (fn.string()));
 
-    LOG_DEBUG << "storePatches()";
+    LOG_DEBUG << "storePatches()" << ende;
 
     for (auto & part : wip.parts) {
         auto patch = static_pointer_cast<PatchData> (part);
         LOG_DEBUG << "storePatches() index: (" << patch->index.x << "," << patch->index.y << ")  offset = "
-                  << info->patches (patch->index.x , patch->index.y).offset;
+                  << info->patches (patch->index.x , patch->index.y).offset << ende;
         patch->step = MomfbdJob::JSTEP_COMPLETED;
     }
 

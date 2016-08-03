@@ -1,5 +1,5 @@
 #include "redux/application.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/tcpconnection.hpp"
@@ -16,6 +16,7 @@
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/program_options.hpp>
 
+using namespace redux::logging;
 using namespace redux::util;
 using namespace redux::network;
 using namespace redux;
@@ -23,7 +24,6 @@ using namespace redux;
 using namespace std;
 
 
-#define lg Logger::lg
 namespace {
 
     const string logChannel = "jsub";
@@ -77,7 +77,7 @@ namespace {
 }
 
 
-void killServer(TcpConnection::Ptr conn) {
+void killServer(TcpConnection::Ptr conn, Logger& logger) {
     
     Host::HostInfo me, master;
     uint8_t cmd = CMD_CONNECT;
@@ -88,12 +88,13 @@ void killServer(TcpConnection::Ptr conn) {
         // implement
     }
     if( cmd == CMD_CFG ) {  // handshake requested
+        LOG << "Requesting server to shutdown..." << ende;
         *conn << me;
         *conn >> master;
         boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
     }
     if( cmd != CMD_OK ) {
-        LOG_ERR << "Handshake with server failed.";
+        LOG_ERR << "Handshake with server failed." << ende;
         return;
     }
    
@@ -103,7 +104,7 @@ void killServer(TcpConnection::Ptr conn) {
 }
 
 
-void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
+void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Logger& logger) {
     
     Host::HostInfo me, master;
     uint8_t cmd = CMD_CONNECT;
@@ -120,7 +121,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
         boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
     }
     if( cmd != CMD_OK ) {
-        LOG_ERR << "Handshake with server failed.";
+        LOG_ERR << "Handshake with server failed." << ende;
         return;
     }
    
@@ -164,13 +165,13 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
             size_t thisSize = count*sizeof(uint64_t);
             received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, thisSize ) );
             if( received == thisSize ) {
-                if( count ) LOG_DETAIL << "Upload of " << count << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),count,"IDs");
+                if( count ) LOG << "Upload of " << count << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),count,"IDs") << ende;
             } else {
-                LOG_ERR << "Failed to read job IDs.  received=" << received << " thisSize=" << thisSize;
+                LOG_ERR << "Failed to read job IDs.  received=" << received << " thisSize=" << thisSize << ende;
             }
-        } else LOG_ERR << "Failed to read number of job IDs.";
+        } else LOG_ERR << "Failed to read number of job IDs." << ende;
     } else {
-        LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")";
+        LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")" << ende;
     }
     
     ptr = buf.get();
@@ -187,7 +188,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio) {
                     for( auto& msg: messages ) {
                         msgText += "\n\t" + msg;
                     }
-                    LOG << msgText;
+                    cout << msgText << endl;
                 }
             }
         }
@@ -249,7 +250,9 @@ int main (int argc, char *argv[]) {
 
         // load matched environment variables according to the environmentMap() above.
         bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
+#if BOOST_VERSION > 104800  // TODO check which version notify appears in
         vm.notify();
+#endif
     }
     catch( const exception &e ) {
         cerr << "Error parsing commandline: " << e.what() << endl;// << programOptions << endl;
@@ -259,14 +262,28 @@ int main (int argc, char *argv[]) {
 
     try {
         
+        string globalLog;
+        if( vm.count ("log-file") ) {
+            vector<string> logFiles = vm["log-file"].as<vector<string>>();
+            if( logFiles.size() ) {
+                globalLog = logFiles[0];
+            }
+            if( logFiles.size() > 1 ) {
+                cerr << "Only 1 log-file supported at the moment. Using: " << globalLog << endl;
+            }
+        }
+
+        vm.erase("log-file");       // always log to cout for rsub
+        vm.insert( std::make_pair("log-stdout", bpo::variable_value()) );
+        
         Logger logger( vm );
         bpt::ptree momfbd;
         
         if( !vm.count ("config") ) {
-            cerr << "No configuration file supplied." << endl;
+            LOG_FATAL << "No configuration file supplied." << ende;
             return 0;
         }
-        
+
         vector<string> files = vm["config"].as<vector<string>>();
 
         string globalName;
@@ -281,17 +298,6 @@ int main (int argc, char *argv[]) {
                 outputDir = outputDir / tmpPath;
             }
         }
-        
-        string globalLog;
-        if( vm.count ("log-file") ) {
-            vector<string> logFiles = vm["log-file"].as<vector<string>>();
-            if( logFiles.size() ) {
-                globalLog = logFiles[0];
-            }
-            if( logFiles.size() > 1 ) {
-                cerr << "Only 1 log-file supported at the moment. Using: " << globalLog << endl;
-            }
-        }
 
         stringstream filteredCfg;
         for( auto it: files ) {
@@ -303,7 +309,7 @@ int main (int argc, char *argv[]) {
         }
 
         bpt::read_info (filteredCfg , momfbd);
-        bool check = vm.count ("no-check") == 0;
+        bool check = (vm.count ("no-check") == 0);
         vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
 
         if (vm.count ("print")) {       // dump configuration to console and exit
@@ -321,7 +327,7 @@ int main (int argc, char *argv[]) {
 
         if( conn->socket().is_open() ) {
             if(vm.count ("kill")) {
-                killServer(conn);
+                killServer(conn, logger);
             } else {
                 std::vector<std::shared_ptr<std::thread> > threads;
                 for ( int i=0; i<5; ++i) {
@@ -329,11 +335,11 @@ int main (int argc, char *argv[]) {
                     threads.push_back( t );
                 }
                 int priority = vm["priority"].as<int>();
-                shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs, priority) ) );
+                shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs, priority, std::ref(logger)) ) );
                 threads.push_back( t );
                 //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
                 //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
-                //uploadJobs(conn, jobs);
+                //uploadJobs(conn, jobs, logger);
                 //ioservice.run();
                 //t.join();
                 //tt.join();

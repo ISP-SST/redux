@@ -1,5 +1,4 @@
 #include "redux/application.hpp"
-#include "redux/logger.hpp"
 
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
@@ -26,7 +25,7 @@ using namespace redux;
 
 using namespace std;
 
-#define lg Logger::lg
+
 namespace {
 
     const string logChannel = "jdel";
@@ -79,7 +78,10 @@ int main( int argc, char *argv[] ) {
 
     // load matched environment variables according to the getOptionName() above.
     bpo::store( bpo::parse_environment( allOptions, environmentMap ), vm );
+
+#if BOOST_VERSION > 104800  // TODO check which version notify appears in
     vm.notify();
+#endif
 
 //     if( !vm.count( "jobs" ) && !vm.count( "all" ) ) {
 //         return EXIT_SUCCESS;
@@ -95,7 +97,6 @@ int main( int argc, char *argv[] ) {
             return EXIT_SUCCESS;
         }
         
-        Logger logger( vm );
         boost::asio::io_service ioservice;
         auto conn = TcpConnection::newPtr( ioservice );
         
@@ -116,7 +117,7 @@ int main( int argc, char *argv[] ) {
                 boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             }
             if( cmd != CMD_OK ) {
-                LOG_ERR << "Handshake with server failed.";
+                cerr << "Handshake with server failed." << endl;
                 return EXIT_FAILURE;
             }
 

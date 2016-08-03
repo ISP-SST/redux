@@ -4,7 +4,7 @@
 
 #include "redux/file/fileana.hpp"
 #include "redux/image/utils.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 
 #include <atomic>
 #include <functional>
@@ -16,16 +16,16 @@
 #include <boost/format.hpp>
 
 using namespace redux::file;
-using namespace redux::momfbd;
 using namespace redux::image;
+using namespace redux::logging;
+using namespace redux::momfbd;
 using namespace redux::util;
 using namespace redux::util::gsl;
 using namespace redux;
 using namespace std;
 namespace sp=std::placeholders;
 
-#define lg Logger::mlg
-#define logChannel "solver"
+
 
 //#define DEBUG_
 
@@ -65,7 +65,7 @@ namespace {
 }
 
 
-Solver::Solver( const MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), objects( j.getObjects() ),
+Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), logger(j.logger), objects( j.getObjects() ),
     service(s), nThreads(t), nFreeParameters(0), nTotalImages(0), modeNumbers(nullptr), enabledModes(nullptr),alpha(nullptr), 
     alpha_offset(nullptr), grad_alpha(nullptr), tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr) {
 
@@ -295,7 +295,8 @@ void Solver::run( PatchData::Ptr data ) {
     
     data->initPatch();
 
-    LOG << "run()  patch#" << data->id << "   index=" << data->index << " region=" << data->roi << "   nThreads=" << nThreads;
+    LOG << "Starting  patch#" << data->id << "  index=" << data->index << "  region=" << data->roi
+        << "  nModes=" << nModes << "  nThreads=" << nThreads << ende;
 
     std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, sp::_1, sp::_2 );
     std::function<gsl_df_t> wrapped_df = std::bind( &Solver::my_df, this, sp::_1, sp::_2, sp::_3 );
@@ -316,25 +317,25 @@ void Solver::run( PatchData::Ptr data ) {
     const gsl_multimin_fdfminimizer_type *minimizerType = gsl_multimin_fdfminimizer_steepest_descent;
     switch(job.getstepMethod) {
         case GSM_BFGS:
-            LOG_DETAIL << "Using BFGS solver.";
-            LOG_WARN << "The BFGS method has not been properly tweaked/tested yet.";
+            LOG_DETAIL << "Using BFGS solver." << ende;
+            LOG_WARN << "The BFGS method has not been properly tweaked/tested yet." << ende;
             minimizerType = gsl_multimin_fdfminimizer_vector_bfgs;
             init_step = 1E8;            // tested for old modes only
             init_tol = 0.01;            // tested for old modes only
             break;
         case GSM_BFGS_inv:
-            LOG_DETAIL << "Using BFGS-2 solver.";
-            LOG_WARN << "The BFGS-2 method has not been properly tweaked/tested yet.";
+            LOG_DETAIL << "Using BFGS-2 solver." << ende;
+            LOG_WARN << "The BFGS-2 method has not been properly tweaked/tested yet." << ende;
             minimizerType = gsl_multimin_fdfminimizer_vector_bfgs2;
             //minimizerType = gsl_multimin_fdfminimizer_vector_bfgs;
             //init_step = 1e-18; //1e-18;
             break;
         case GSM_SDSC:
-            LOG_DETAIL << "Using Steepest-Descent solver.";
+            LOG_DETAIL << "Using Steepest-Descent solver." << ende;
             minimizerType = gsl_multimin_fdfminimizer_steepest_descent;
             break;
         case GSM_CNJG:
-            LOG_DETAIL << "Using Conjugate-Gradient solver.";
+            LOG_DETAIL << "Using Conjugate-Gradient solver." << ende;
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_fr;
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
             minimizerType = multimin_fdfminimizer_conjugate_rdx;        // Use our own implementation
@@ -342,7 +343,7 @@ void Solver::run( PatchData::Ptr data ) {
             init_step = 1E-4*max_wavelength;
             break;
         default:
-            LOG << "No solver specified, default is Conjugate-Gradient.";
+            LOG << "No solver specified, default is Conjugate-Gradient." << ende;
             minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
             init_step = 1E8;            // tested for _pr, needs tweaking
             init_tol = 0.01;            // tested for _pr, needs tweaking
@@ -363,7 +364,7 @@ void Solver::run( PatchData::Ptr data ) {
     s->f = 0;
 
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
-    LOG_TRACE << "Initial metric = " << initialMetric;
+    LOG_TRACE << "Initial metric = " << initialMetric << ende;
 
     double previousMetric(0);
     double thisMetric(0);
@@ -410,7 +411,7 @@ void Solver::run( PatchData::Ptr data ) {
         LOG_DETAIL << "start_metric = " << s->f
                        << printArray(alpha_offset, nParameters, "\nalpha_offset")
                        << printArray(alpha, nParameters, "\nstart_alpha")
-                       << printArray(grad_alpha, nParameters, "\nstart_grad");
+                       << printArray(grad_alpha, nParameters, "\nstart_grad") << ende;
         Array<double> gwrapper(grad_alpha, nTotalImages, nModes);
         Ana::write("grad_alpha_"+to_string(totalIterations)+".f0",gwrapper);
         //dump("iter_"+to_string(totalIterations));
@@ -423,18 +424,18 @@ void Solver::run( PatchData::Ptr data ) {
             iter++;
             status = gsl_multimin_fdfminimizer_iterate( s );
             if( status == GSL_ENOPROG ) {
-                LOG_TRACE << "iteration: " << iter << "  GSL reports no progress.";
+                LOG_TRACE << "iteration: " << iter << "  GSL reports no progress." << ende;
                 failCount++;
                 break;
             } else if( status ) {
-                LOG_WARN << "GSL error in iteration " << iter << ".  type: " << gsl_strerror(status);
+                LOG_WARN << "GSL error in iteration " << iter << ".  type: " << gsl_strerror(status) << ende;
             }
             thisMetric = s->f;
             if( std::isnan(thisMetric) || std::isinf(thisMetric) ) {
                 failCount++;
             } 
             if( failCount > maxFails ) {
-                LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")";
+                LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")" << ende;
                 status = GSL_FAILURE;
                 modeCount = 0;                  // exit outer loop.
                 done = true;                    // exit inner loop.
@@ -464,9 +465,11 @@ void Solver::run( PatchData::Ptr data ) {
         totalIterations += iter;
         if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
             size_t nActiveModes = activeModes.size();
-            LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
-             << "  metric=" << thisMetric << "  rmetric=" << (thisMetric/initialMetric)
-             << " norm(grad)=" << (gradNorm/nActiveModes) << " using " << nActiveModes << "/" << nModes << " modes.";
+            if( modeCount ) {
+                LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
+                 << "  metric=" << thisMetric << "  rmetric=" << (thisMetric/initialMetric)
+                 << " norm(grad)=" << (gradNorm/nActiveModes) << " using " << nActiveModes << "/" << nModes << " modes." << ende;
+            }
         }
 
         if( modeCount ) {
@@ -490,7 +493,8 @@ void Solver::run( PatchData::Ptr data ) {
 
     }       // end for-loop
   
-    LOG << "Elapsed: " << boost::timer::format(timer.elapsed());
+    LOG << "After " << totalIterations << " iterations:  Metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
+    LOG << timer.print() << ende;
     
     alphaPtr = alpha;
     for( auto& obj: data->objects ) {

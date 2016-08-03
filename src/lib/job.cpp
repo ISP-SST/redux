@@ -1,9 +1,10 @@
 #include "redux/job.hpp"
 
-#include "redux/logger.hpp"
+#include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/version.hpp"
 
 #include <mutex>
 
@@ -12,6 +13,7 @@
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
+using namespace redux::logging;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
@@ -21,8 +23,6 @@ using namespace std;
 //#define DBG_JOB_
 #endif
 
-#define lg Logger::lg
-#define logChannel jobLogChannel
 
 namespace {
 
@@ -51,17 +51,12 @@ void redux::runThreadsAndWait(boost::asio::io_service& service, uint16_t nThread
 }
 
 
-size_t Job::registerJob(const string& name, JobCreator f) {
-    std::locale::global(std::locale("C"));
-    std::cout.imbue(std::locale("C"));
-    std::cerr.imbue(std::locale("C"));
-    std::cin.imbue(std::locale("C"));
-    boost::filesystem::path::imbue(std::locale("C"));
-
+size_t Job::registerJob( const string& name, JobCreator f ) {
+    
     static size_t nJobTypes(0);
     std::unique_lock<mutex> lock(globalJobMutex);
-    auto ret = getMap().insert({ boost::to_upper_copy(name, std::locale("C")), {nJobTypes + 1, f}});
-    if(ret.second) {
+    auto ret = getMap().insert({ boost::to_upper_copy(name), {nJobTypes + 1, f}});
+    if( !ret.second ) {
         return ret.first->second.first;
     }
     return nJobTypes++;
@@ -73,16 +68,16 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, boo
     std::unique_lock<mutex> lock(globalJobMutex);
     for(auto & property : tree) {
         string name = property.first;
-        auto it2 = getMap().find(boost::to_upper_copy(name, std::locale("C")));       // check if the current tag matches a registered (Job-derived) class.
+        auto it2 = getMap().find(boost::to_upper_copy(name));       // check if the current tag matches a registered (Job-derived) class.
         if(it2 != getMap().end()) {
             Job* tmpJob = it2->second.second();
             tmpJob->parsePropertyTree(vm, property.second);
             if(!check || tmpJob->check()) {
                 tmp.push_back(shared_ptr<Job>(tmpJob));
-            } else LOGC_WARN("job") << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping.";
+            } else cerr << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << endl;
         } else {
 #ifdef DEBUG_
-            LOGC_WARN("job") << "No job-class with tag \"" << name << "\" registered.";
+            cerr << "No job-type with tag \"" << name << "\" registered." << endl;
 #endif
         }
     }
@@ -91,14 +86,15 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, boo
 
 
 Job::JobPtr Job::newJob(const string& name) {
+
     JobPtr tmp;
     std::unique_lock<mutex> lock(globalJobMutex);
-    auto it = getMap().find(boost::to_upper_copy(name, std::locale("C")));
+    auto it = getMap().find(boost::to_upper_copy(name));
     if(it != getMap().end()) {
         tmp.reset(it->second.second());
     } else {
 #ifdef DEBUG__
-        LOG_WARN << "No job with tag \"" << name << "\" registered.";
+        cerr << "No job with tag \"" << name << "\" registered." << endl;
 #endif
     }
     return tmp;
@@ -268,8 +264,8 @@ void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree) {
 
     if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, use it.
         defaults.verbosity = vm["verbosity"].as<int>();
-    } else defaults.verbosity = Logger::getDefaultSeverity();
-        
+    } else defaults.verbosity = Logger::getDefaultLevel();
+    
     if( vm.count( "name" ) > 0 ) {
         defaults.name = vm["name"].as<string>();
     }
@@ -318,21 +314,29 @@ Job::Job(void) : cachePath("") {
     info.user = getUname();
     info.host = boost::asio::ip::host_name();
 #ifdef DBG_JOB_
-    LOG_DEBUG << "Constructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_add(1)+1);
+    LOG_DEBUG << "Constructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_add(1)+1) << ende;
 #endif
+
 }
 
 
 Job::~Job(void) {
 #ifdef DBG_JOB_
-    LOG_DEBUG << "Destructing Job: (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1);
+    LOG_DEBUG << "Destructing Job#" << info.id << ": (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1) << ende;
 #endif
+
+
     cleanup();
     
     if( !cachePath.empty() ) {
-        boost::system::error_code ec;
-        bfs::remove_all( bfs::path(Cache::get().path()) / bfs::path(cachePath), ec );
+        try {
+            bfs::remove_all( bfs::path(Cache::get().path()) / bfs::path(cachePath) );
+        } catch( const exception& e) {
+            cerr << "Failed to remove path: " << bfs::path(Cache::get().path()) / bfs::path(cachePath) << endl
+                 << "  reason: " << e.what() << endl;
+        }
     }
+    
 }
 
 
@@ -365,33 +369,30 @@ string Job::cfg(void) {
 void Job::startLog( bool overwrite ) {
     
     bfs::path logFilePath = bfs::path( info.logFile );
-    try {
-        string tmpChan = "job "+to_string( info.id );
-        if( logFilePath.is_relative() ) {
-            bfs::path outDir( info.outputDir );
-            boost::system::error_code ec;
-            if( !outDir.empty() && !bfs::exists(outDir,ec) ) {
-                if( !bfs::create_directories(outDir,ec) ) {
-                    cerr << "failed to create directory for output: " << outDir << endl;
-                    return;
-                }
+
+    string tmpChan = "job "+to_string( info.id );
+    if( isRelative( logFilePath ) ) {
+        bfs::path outDir( info.outputDir );
+        if( !outDir.empty() && !bfs::exists(outDir) ) {
+            if( !bfs::create_directories(outDir) ) {
+                cerr << "failed to create directory for output: " << outDir << endl;
+                return;
             }
-            logFilePath = bfs::path(info.outputDir) / logFilePath;
         }
-        setLogChannel(tmpChan);
-        FileSink* tmpLog = new FileSink( tmpChan+"|"+logFilePath.string(), info.verbosity, overwrite );
-        jlog.reset( tmpLog );
-        LOG_DETAIL << "Job configuration:\n" << cfg();
-        info.logFile = bfs::canonical(tmpLog->fileName).string();
-    } catch( bfs::filesystem_error& e ) {
-        cerr << "failed to create logfile: " << logFilePath << endl;
+        logFilePath = bfs::path(info.outputDir) / logFilePath;
     }
+
+    logger.setLevel( info.verbosity );
+    logger.addFile( logFilePath.string(), 0, overwrite );
+    LOG_NOTICE << "Redux version = " << getLongVersionString();
+    LOG_NOTICE << "\nJob configuration:\n" << cfg() << ende;
 
 }
 
 
 void Job::stopLog(void) {
-    jlog.reset();
+    logger.removeAllOutputs();
+    //jlog.reset();
 }
 
 

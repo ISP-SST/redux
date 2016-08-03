@@ -2,7 +2,7 @@
 
 #include "redux/translators.hpp"
 #include "redux/file/fileana.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/bitoperations.hpp"
 #include "redux/util/datautil.hpp"
@@ -12,11 +12,12 @@
 #include <thread>
 
 using namespace redux::file;
+using namespace redux::logging;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::mlg
+
 namespace {
 
     const string logChannel = "debugjob";
@@ -130,7 +131,7 @@ uint64_t DebugJob::pack( char* ptr ) const {
     count += pack( ptr+count, coordinates, 4 );
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::pack():  count=" << count << " sz=" << size();
+    LOG_TRACE << "DebugJob::pack():  count=" << count << " sz=" << size() << ende;
 #endif
     
     return count;
@@ -151,7 +152,7 @@ uint64_t DebugJob::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, coordinates, 4, swap_endian );
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::unpack():  swap_endian=" << swap_endian << "  count=" << count << " sz=" << size();
+    LOG_TRACE << "DebugJob::unpack():  swap_endian=" << swap_endian << "  count=" << count << " sz=" << size() << ende;
 #endif
 
     return count;
@@ -171,7 +172,7 @@ void DebugJob::checkParts( void ) {
     }
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::checkParts():   nParts=" << jobParts.size() << "   state=" << bitString(mask);
+    LOG_TRACE << "DebugJob::checkParts():   nParts=" << jobParts.size() << "   state=" << bitString(mask) << ende;
 #endif
     
     if( mask & JSTEP_ERR ) {    // TODO: handle failed parts.
@@ -196,7 +197,7 @@ bool DebugJob::check(void) {
         case JSTEP_RUNNING: ;
         case JSTEP_POSTPROCESS: ;
         case JSTEP_COMPLETED: ret = true; break;
-        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step;
+        default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << ende;
     }
     return ret;
 }
@@ -204,7 +205,7 @@ bool DebugJob::check(void) {
 bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")";
+    LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")" << ende;
 #endif
     
     uint8_t step = info.step.load();
@@ -262,7 +263,7 @@ void DebugJob::returnResults( WorkInProgress& wip ) {
 bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint16_t maxThreads ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::run("<<(int)maxThreads<<") ";
+    LOG_TRACE << "DebugJob::run("<<(int)maxThreads<<") " << ende;
 #endif
 
     uint8_t step = info.step.load();
@@ -285,7 +286,7 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint1
             pool.create_thread( boost::bind( &boost::asio::io_service::run, &service ) );
         }
 
-        LOG_DEBUG << "DebugJob::run ThreadCount = "<<(int)pool.size();
+        LOG_DEBUG << "DebugJob::run ThreadCount = "<<(int)pool.size() << ende;
         pool.join_all();
 
     }
@@ -293,7 +294,7 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint1
         postProcess();                          // postprocess on master, collect results, save...
     }
     else {
-        LOG << "DebugJob::run()  unrecognized step = " << ( int )info.step.load();
+        LOG << "DebugJob::run()  unrecognized step = " << ( int )info.step.load() << ende;
         info.step.store( JSTEP_ERR );
     }
     return false;
@@ -303,7 +304,7 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint1
 void DebugJob::preProcess( void ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::preProcess()";
+    LOG_TRACE << "DebugJob::preProcess()" << ende;
 #endif
 
     if( xSize < 2 || ySize < 2 ) return;
@@ -349,7 +350,7 @@ void DebugJob::preProcess( void ) {
 void DebugJob::runMain( Part::Ptr& part ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::runMain()";
+    LOG_TRACE << "DebugJob::runMain()" << ende;
 #endif
     
     auto pptr = static_pointer_cast<DebugPart>( part );
@@ -408,7 +409,7 @@ void DebugJob::runMain( Part::Ptr& part ) {
 void DebugJob::postProcess( void ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "DebugJob::postProcess()";
+    LOG_TRACE << "DebugJob::postProcess()" << ende;
 #endif
     //info.step.store( JSTEP_COMPLETED );
     //info.state.store( JSTATE_IDLE );

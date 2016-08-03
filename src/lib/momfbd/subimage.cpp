@@ -1,24 +1,22 @@
 #include "redux/momfbd/subimage.hpp"
 
-#include "redux/momfbd/channel.hpp"
-#include "redux/momfbd/object.hpp"
+#include "redux/momfbd/momfbdjob.hpp"
 
 #include "redux/file/fileana.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <algorithm>
 
 using namespace redux::file;
+using namespace redux::logging;
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::mlg
-#define logChannel "subimage"
 
 //#define USE_LUT
 #define ALPHA_CUTOFF 0.0
@@ -58,7 +56,7 @@ namespace {
 }
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind)
-    : imgSize(0), pupilSize(0), nModes(0), oldRG(0), object (obj), channel(ch), modes(obj.modes),
+    : imgSize(0), pupilSize(0), nModes(0), oldRG(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
       window (wind), noiseWindow(nwind) {
 
 #ifdef USE_LUT
@@ -165,7 +163,7 @@ void SubImage::init (void) {
     object.addRegGamma( rg );
     object.addToFT( imgFT );
 
-    LOG_TRACE << str << "  initial shift=" << (string)offsetShift;
+    LOG_TRACE << str << "  initial shift=" << (string)offsetShift << ende;
     
 }
 
@@ -292,7 +290,7 @@ double SubImage::gradientVogel(uint16_t modeIndex, double ) const {
 void SubImage::calcVogelWeight(void) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size();
+    LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size() << ende;
 #endif
   
     const complex_t* pPtr = object.P.get();
@@ -345,6 +343,7 @@ void SubImage::resetPhi(void) {
     //memcpy( phi.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements()*sizeof (double));
 }
 
+#include <iomanip>      // std::setiosflags, std::resetiosflags
 
 void SubImage::adjustOffset( double* alpha ) {
 
@@ -386,12 +385,12 @@ void SubImage::adjustOffset( double* alpha ) {
     }
 
     if( oldOffset != offsetShift ) {
-        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha;
+        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << ende;
         LOG_DEBUG << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                    << ":  cutout was shifted, from " << oldOffset << " to " << offsetShift
-                   << " oldVal=" << oldVal << "  newVal=" << newVal << "  adj=" << adjustedTilts;
+                   << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << "  adj=" << adjustedTilts << ende;
         newCutout();
-        //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast");
+        //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast") << ende;
     }
     
 }
@@ -428,7 +427,7 @@ void SubImage::addToPhi( const double* a, double* phiPtr ) const {
     
 #ifdef DEBUG_
     LOG_TRACE << "SubImage(" << index << ")::addToPhi(" << hexString(this) << ")   nModes=" << nModes << "  pupilSize2=" << pupilSize2
-    << printArray( a, nModes, "  newAlpha" );
+    << printArray( a, nModes, "  newAlpha" ) << ende;
 #endif
 
     for( unsigned int i=0; i<nModes; ++i ) {
@@ -508,7 +507,7 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
 void SubImage::calcOTF(void) {
     
     //if( !newPhi ) return;
-   //     LOG_TRACE << "SubImage::calcOTF(" << hexString(this) << ")";
+   //     LOG_TRACE << "SubImage::calcOTF(" << hexString(this) << ")" << ende;
     
     complex_t* otfPtr = OTF.get();
     const double* phiPtr = phi.get();
@@ -542,7 +541,7 @@ void SubImage::calcOTF(void) {
 void SubImage::calcPFOTF(void) {
     
 #ifdef DEBUG_
-    LOG_TRACE << "SubImage::calcPFOTF(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size();
+    LOG_TRACE << "SubImage::calcPFOTF(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size() << ende;
 #endif
 
     complex_t* pfPtr = PF.get();

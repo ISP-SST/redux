@@ -34,7 +34,7 @@ namespace redux {
         bool doWork(void);
         
         void workerInit( void );
-        void connect(void);
+        void connect( network::Host::HostInfo& host, network::TcpConnection::Ptr& conn );
         void updateStatus(void);
         network::TcpConnection::Ptr getMaster(void);
         void unlockMaster(void);
@@ -55,6 +55,7 @@ namespace redux {
         void updateHostStatus( network::TcpConnection::Ptr& );
         void sendJobStats( network::TcpConnection::Ptr& );
         void sendPeerList( network::TcpConnection::Ptr& );
+        void addToLog( network::TcpConnection::Ptr& );
         void updateLoadAvg( void );
         
         const po::variables_map& params;
@@ -66,7 +67,7 @@ namespace redux {
         uint32_t hostTimeout;
         
         std::mutex peerMutex;
-        network::Host::Ptr myInfo;
+        network::Host& myInfo;
         std::map<network::TcpConnection::Ptr, network::Host::Ptr> connections;
         std::map<network::Host::Ptr, WorkInProgress, network::Host::Compare> peerWIP;
         

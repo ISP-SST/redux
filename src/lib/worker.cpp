@@ -1,27 +1,24 @@
 #include "redux/worker.hpp"
 
 #include "redux/daemon.hpp"
-#include "redux/logger.hpp"
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
-
+using namespace redux::logging;
 using namespace redux::network;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::mlg
-#define logChannel "worker"
 
 namespace {
     typedef boost::asio::time_traits<boost::posix_time::ptime> time_traits_t;
 }
 
 
-Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), daemon( d ) {
+Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), daemon( d ), myInfo(Host::myInfo()) {
 
 }
 
@@ -69,8 +66,8 @@ bool Worker::fetchWork( void ) {
                     throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
                 }
                 wip.isRemote = true;
-
-                LOG_TRACE << "Received work: " << wip.print();
+                
+                LLOG_TRACE(daemon.logger) << "Received work: " << wip.print() << ende;
                 
                 ret = true;
                 
@@ -80,12 +77,12 @@ bool Worker::fetchWork( void ) {
         
     }
     catch( const exception& e ) {
-        LOG_ERR << "fetchWork: Exception caught while fetching job: " << e.what();
+        LLOG_ERR(daemon.logger) << "fetchWork: Exception caught while fetching job: " << e.what() << ende;
         if( conn ) conn->socket().close();
         ret = false;
     }
     catch( ... ) {
-        LOG_ERR << "fetchWork: Unrecognized exception caught while fetching job.";
+        LLOG_ERR(daemon.logger) << "fetchWork: Unrecognized exception caught while fetching job." << ende;
         if( conn ) conn->socket().close();
         ret = false;
     }
@@ -103,45 +100,55 @@ bool Worker::getWork( void ) {
         returnWork();
         int count(0);
         while( wip.hasResults && count++ < 5 ) {
-            LOG_DEBUG << "Failed to return data, trying again in 5 seconds.";
+            LLOG_DEBUG(daemon.logger) << "Failed to return data, trying again in 5 seconds." << ende;
             runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(5));
             runTimer.wait();
             returnWork();
         }
-        daemon.myInfo->active();
+        myInfo.active();
     } else if ( wip.hasResults ) {
         wip.returnResults();
-        daemon.myInfo->active();
+        myInfo.active();
     }
 
     if( wip.hasResults ) {
-        LOG_WARN << "Failed to return data, this part will be discarded.";
+        LLOG_WARN(daemon.logger) << "Failed to return data, this part will be discarded." << ende;
     }
     
     wip.isRemote = wip.hasResults = false;
     
-    if( daemon.getWork( wip, daemon.myInfo->status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
+    if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
-            LOG_DEBUG << "Initializing new job: " + wip.print();
+            wip.job->logger.setLevel( wip.job->info.verbosity );
+            LLOG_DEBUG(daemon.logger) << "Initializing new job: " + wip.print() << ende;
+
+            if( wip.isRemote ) {
+                if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
+                    wip.job->logger.addLogger( daemon.logger );
+                }
+                TcpConnection::Ptr logConn;
+                daemon.connect( daemon.myMaster.host->info, logConn );
+                wip.job->logger.addNetwork( logConn, wip.job->info.id, 0, 0 );
+            }
             wip.job->init();
             wip.previousJob = wip.job;
-        } else LOG_DEBUG << "Starting new part of the same job: " + wip.print();
+        } else LLOG_DEBUG(daemon.logger) << "Starting new part of the same job: " + wip.print() << ende;
         for( auto& part: wip.parts ) {
             part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
         }
-        daemon.myInfo->active();
+        myInfo.active();
         return true;
     }
     
 #ifdef DEBUG_
-    LOG_TRACE << "No work available.";
+    LLOG_TRACE(daemon.logger) << "No work available." << ende;
 #endif
 
     wip.job.reset();
     wip.previousJob.reset();
     wip.parts.clear();
     
-    daemon.myInfo->status.state = Host::ST_IDLE;
+    myInfo.status.state = Host::ST_IDLE;
     return false;
 
 }
@@ -158,7 +165,7 @@ void Worker::returnWork( void ) {
 
             if( conn && conn->socket().is_open() ) {
 
-                LOG_DEBUG << "Returning result: " + wip.print();
+                LLOG_DEBUG(daemon.logger) << "Returning result: " + wip.print() << ende;
                 uint64_t blockSize = wip.workSize();
                 size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
                 
@@ -187,10 +194,10 @@ void Worker::returnWork( void ) {
             
         }
         catch( const exception& e ) {
-            LOG_ERR << "getJob: Exception caught while returning work: " << e.what();
+            LLOG_ERR(daemon.logger) << "getJob: Exception caught while returning work: " << e.what() << ende;
         }
         catch( ... ) {
-            LOG_ERR << "getJob: Unrecognized exception caught while returning work.";
+            LLOG_ERR(daemon.logger) << "getJob: Unrecognized exception caught while returning work." << ende;
         }
 
     }
@@ -207,13 +214,14 @@ void Worker::run( void ) {
         //cout << "Worker::run()  got work, calling run..." << endl;
         sleepS = 1;
         try {
-            while( wip.job && wip.job->run( wip, ioService, daemon.myInfo->status.nThreads ) ) ;
+            while( wip.job && wip.job->run( wip, ioService, myInfo.status.nThreads ) ) ;
+            if( wip.job) wip.job->logger.flushAll(); 
         }
         catch( const exception& e ) {
-            LOG_ERR << "Worker: Exception caught while processing job: " << e.what();
+            LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;
         }
         catch( ... ) {
-            LOG_ERR << "Worker: Unrecognized exception caught while processing job.";
+            LLOG_ERR(daemon.logger) << "Worker: Unrecognized exception caught while processing job." << ende;
         }
     }
 

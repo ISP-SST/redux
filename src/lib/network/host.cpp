@@ -1,10 +1,11 @@
 #include "redux/network/host.hpp"
 
 #include "redux/util/arrayutil.hpp"
+#include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/version.hpp"
 
 #include <thread>
@@ -25,10 +26,8 @@ using namespace std;
 const std::string Host::StateNames[] = { "offline", "idle", "active", "error" };
 const std::string Host::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
 
-#define lg Logger::lg
-#define logChannel "net"
 
-Host::HostInfo::HostInfo( void ) : peerType(0) {
+Host::HostInfo::HostInfo( void ) : peerType(0), connectPort(0) {
 
     int one = 1;
     littleEndian = *(char*)&one;
@@ -105,6 +104,14 @@ void Host::active(void) {
 
     status.lastActive = boost::posix_time::second_clock::local_time();
     status.state = ST_ACTIVE;
+    
+}
+
+
+Host& Host::myInfo(void) {
+
+    static Host singleton;
+    return singleton;
     
 }
 
@@ -275,7 +282,7 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostI
     
     size_t written = boost::asio::write( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( written != sz ) {
-        LOG_ERR << "TcpConnection << HostInfo: Failed to write buffer.";
+        //LOG_ERR << "TcpConnection << HostInfo: Failed to write buffer.";
     }
     
     return conn;
@@ -290,7 +297,7 @@ TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& i
 
     size_t readBytes = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( readBytes != sz ) {
-        LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
+        //LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
     int one = 1;
@@ -303,7 +310,7 @@ TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& i
 
     count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( count != sz ) {
-        LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
+        //LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
     in.unpack(buf.get(), swap_endian);

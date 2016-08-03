@@ -6,8 +6,8 @@ if( REDUX_WITH_FFTW3 )
     add_definitions(-DREDUX_WITH_FFTW3)
 endif()
 
-if( Boost_VERSION VERSION_LESS "1.54" )
-    message(STATUS "The redux binaries will not be built (requires boost >= 1.54).")
+if( Boost_VERSION VERSION_LESS "1.41" )
+    message(STATUS "The redux binaries will not be built (only tested with boost >= 1.41).")
     return()
 endif()
 

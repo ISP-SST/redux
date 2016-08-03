@@ -1,7 +1,7 @@
 #ifndef REDUX_JOB_HPP
 #define REDUX_JOB_HPP
 
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/work.hpp"
 
 #include <atomic>
@@ -148,6 +148,7 @@ namespace redux {
         
         virtual void setLogChannel(std::string channel) { jobLogChannel = channel; };
         std::string getLogChannel(void) { return jobLogChannel; }
+        redux::logging::Logger& getLogger(void) { return logger; }
         void startLog(bool overwrite=false);
         void stopLog(void);
         
@@ -161,7 +162,10 @@ namespace redux {
         std::mutex jobMutex;
         std::string cachePath;
         std::string jobLogChannel;
-        std::shared_ptr<LogSink> jlog;
+        redux::logging::Logger logger;
+        
+        friend class Daemon;
+        friend class Worker;
 
     };
 

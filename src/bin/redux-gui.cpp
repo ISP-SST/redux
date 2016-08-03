@@ -12,7 +12,7 @@ using namespace redux::gui;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::lg
+
 namespace {
 
     const string logChannel = "redux-gui";

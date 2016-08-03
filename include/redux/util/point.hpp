@@ -2,7 +2,7 @@
 #define REDUX_UTIL_POINT_HPP
 
 #include <cstdio>
-#include <iostream>
+#include <sstream>
 
 #include "redux/util/datautil.hpp"
 
@@ -47,8 +47,8 @@ namespace redux {
                 tmp.x=std::min<T>(tmp.x,rhs.x);
                 tmp.y=std::min<T>(tmp.y,rhs.y);
                 return std::move(tmp); }
-            //operator std::string() const { std::ostringstream out; out << "(" << y << "," << x << ")"; return out.str(); }
-            operator std::string() const { return "(" + std::to_string(y) + "," + std::to_string(x) + ")"; }
+            operator std::string() const { std::ostringstream out; out << "(" << y << "," << x << ")"; return out.str(); }
+            //operator std::string() const { return "(" + std::to_string(y) + "," + std::to_string(x) + ")"; }
             template <typename U> PointType<T>& operator+=(const PointType<U>& rhs) { x += rhs.x; y += rhs.y; return *this; }
             template <typename U> PointType<T>& operator-=(const PointType<U>& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
             template <typename U> PointType<T> operator+(const PointType<U>& rhs) const { PointType<T> res(*this); return std::move(res+=rhs); }

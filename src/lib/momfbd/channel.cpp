@@ -12,7 +12,7 @@
 #include "redux/image/fouriertransform.hpp"
 #include "redux/image/descatter.hpp"
 #include "redux/image/utils.hpp"
-#include "redux/logger.hpp"
+#include "redux/logging/logger.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
 
@@ -22,7 +22,7 @@
 #include <string>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/range/algorithm.hpp>
+//#include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
@@ -30,15 +30,16 @@
 namespace bfs = boost::filesystem;
 using namespace redux::file;
 using namespace redux::image;
+using namespace redux::logging;
 using namespace redux::momfbd;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#define lg Logger::mlg
 
 
-Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), nTotalFrames(0), myObject (o), myJob (j) {
+Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), nTotalFrames(0), myObject(o),
+    myJob(j), logger(j.logger) {
 
     setLogChannel(myJob.getLogChannel());
     
@@ -108,7 +109,7 @@ uint64_t Channel::pack (char* ptr) const {
     for (auto & stat : imageStats)
         count += stat->pack (ptr + count);
     if (count != size()) {
-        LOG_ERR << "(" << hexString (this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size();
+        LOG_ERR << "(" << hexString (this) << "): Packing failed, there is a size mismatch:  count = " << count << "  sz = " << size() << ende;
     }
     return count;
 }
@@ -136,46 +137,46 @@ bool Channel::checkCfg (void) {
 
     // Do we have a correct filename template ?
     if (imageTemplate.empty()) {
-        LOG_ERR << "No filename template specified.";
+        LOG_ERR << "No filename template specified." << ende;
         return false;
     }
     size_t nWild = std::count (imageTemplate.begin(), imageTemplate.end(), '%');
     if (nWild > 2) {
-        LOG_ERR << "Filename template contains too many wildcards: \"" << imageTemplate << "\"";
+        LOG_ERR << "Filename template contains too many wildcards: \"" << imageTemplate << "\"" << ende;
         return false;
     } else if (nWild == 1 && fileNumbers.empty()) {
-        LOG_ERR << "Filename template contains wildcard and no image-numbers given (with IMAGE_NUM)";
+        LOG_ERR << "Filename template contains wildcard and no image-numbers given (with IMAGE_NUM)" << ende;
         return false;
     } /*else if( nWild == 2 && sequenceNumber == 0 ) {
-        LOG_ERR << "Filename template contains 2 wildcards and no sequence-number given (with SEQUENCE_NUM)";
+        LOG_ERR << "Filename template contains 2 wildcards and no sequence-number given (with SEQUENCE_NUM)" << ende;
         return false;
     }*/
 
 
     if( darkTemplate.empty() != gainFile.empty() ) {
-        LOG_ERR << "Either BOTH or NONE of DARK_TEMPLATE/GAIN_FILE has to be specified!!!";
+        LOG_ERR << "Either BOTH or NONE of DARK_TEMPLATE/GAIN_FILE has to be specified!!!" << ende;
         return false;
     } else if (darkTemplate.empty()) {
-        LOG_WARN << "No dark/gain files specified, assuming the data is pre-processed already.";
+        LOG_WARN << "No dark/gain files specified, assuming the data is pre-processed already." << ende;
         if ( !responseFile.empty() ) {
-            LOG_ERR << "Detector response correction only possible when flatfielding, It will NOT be performed!!!";
+            LOG_ERR << "Detector response correction only possible when flatfielding, It will NOT be performed!!!" << ende;
         }
     } else {
         nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild > 1) {
-            LOG_ERR << "Dark template contains too many wildcards: \"" << darkTemplate << "\"";
+            LOG_ERR << "Dark template contains too many wildcards: \"" << darkTemplate << "\"" << ende;
             return false;
         } else if (nWild == 1 && darkNumbers.empty()) {
-            LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)";
+            LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)" << ende;
             return false;
         } else if (nWild == 0 && darkNumbers.size()) {
-            LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename.";
+            LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename." << ende;
             darkNumbers.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
         }
     }
     
     if( !alignClip.empty() && alignClip.size() != 4 ) {
-        LOG_WARN << "ALIGN_CLIP does not seem to contain 4 integers. Whole image area will be used.";
+        LOG_WARN << "ALIGN_CLIP does not seem to contain 4 integers. Whole image area will be used." << ende;
         alignClip.clear();
     }
     
@@ -193,7 +194,7 @@ bool Channel::checkData (void) {
             if (!bfs::is_regular_file (fn)) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + fileNumbers[i])));
                 if (!bfs::is_regular_file(fn)) {
-                    LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers.";
+                    LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers." << ende;
                     fileNumbers.erase(fileNumbers.begin() + i);
                     continue;
                 }
@@ -201,7 +202,7 @@ bool Channel::checkData (void) {
             ++i;
         }
         if (fileNumbers.empty()) {
-            LOG_CRITICAL << boost::format ("No files found for incomplete object with filename template \"%s\" in directory \"%s\"") % imageTemplate % imageDataDir;
+            LOG_FATAL << boost::format ("No files found for incomplete object with filename template \"%s\" in directory \"%s\"") % imageTemplate % imageDataDir << ende;
             return false;
         }
     }
@@ -212,7 +213,7 @@ bool Channel::checkData (void) {
     if (fileNumbers.empty()) {         // single file
         bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
         if (!bfs::is_regular_file(fn)) {
-            LOG_ERR << boost::format ("Input-file %s not found!") % fn;
+            LOG_ERR << boost::format ("Input-file %s not found!") % fn << ende;
             return false;
         }
     } else {                            // template + numbers
@@ -220,7 +221,7 @@ bool Channel::checkData (void) {
             uint32_t number = fileNumbers[i];
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)));
             if (!bfs::is_regular_file(fn)) {
-                LOG_ERR << boost::format ("Input-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
+                LOG_ERR << boost::format ("Input-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)) << ende;
                 return false;
             }
             Image<float> tmp;
@@ -230,7 +231,7 @@ bool Channel::checkData (void) {
                 nFrames[i] = tmp.meta->dimSize(0);
                 imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
             } else if( nDims != 2 ) {
-                LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number));
+                LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)) << ende;
                 return false;
             }
             
@@ -247,7 +248,7 @@ bool Channel::checkData (void) {
                 bfs::path fn = bfs::path (imageDataDir) / bfs::path (darkTemplate);
                 if (!bfs::is_regular_file(fn)) {
                     logAndThrow("Dark-file " + darkTemplate + " not found!");
-                } else darkTemplate = fn.c_str();
+                } else darkTemplate = fn.string();
             }
         } else {                            // template
             for (auto & number : darkNumbers) {
@@ -256,7 +257,7 @@ bool Channel::checkData (void) {
                     fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (darkTemplate) % number));
                     if (!bfs::is_regular_file(fn)) {
                         logAndThrow("Dark-file " + (boost::format(darkTemplate) % number).str() + " not found!");
-                    } else darkTemplate = (bfs::path(imageDataDir) / bfs::path(darkTemplate)).c_str();      // found in imageDataDir, prepend it to darkTemplate
+                    } else darkTemplate = (bfs::path(imageDataDir) / bfs::path(darkTemplate)).string();      // found in imageDataDir, prepend it to darkTemplate
                 }
             }
         }
@@ -268,7 +269,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (gainFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Gain-file " + gainFile + " not found!");
-            } else gainFile = fn.c_str();
+            } else gainFile = fn.string();
         }
     }
 
@@ -277,7 +278,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path(imageDataDir) / bfs::path(responseFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Response-file " + responseFile + " not found!");
-            } else responseFile = fn.c_str();
+            } else responseFile = fn.string();
         }
     }
 
@@ -286,7 +287,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (backgainFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Backgain-file " + backgainFile + " not found!");
-            } else backgainFile = fn.c_str();
+            } else backgainFile = fn.string();
         }
     }
 
@@ -295,7 +296,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path(imageDataDir) / bfs::path(psfFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("PSF-file " + psfFile + " not found!");
-            } else psfFile = fn.c_str();
+            } else psfFile = fn.string();
         }
     }
 
@@ -304,7 +305,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path (imageDataDir) / bfs::path (mmFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Modulation-matrix file " + mmFile + " not found!");
-            } else mmFile = fn.c_str();
+            } else mmFile = fn.string();
         }
     }
 
@@ -313,7 +314,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path(imageDataDir) / bfs::path(xOffsetFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Offset-file " + xOffsetFile + " not found!");
-            } else xOffsetFile = fn.c_str();
+            } else xOffsetFile = fn.string();
         }
     }
 
@@ -322,7 +323,7 @@ bool Channel::checkData (void) {
             bfs::path fn = bfs::path(imageDataDir) / bfs::path(yOffsetFile);
             if (!bfs::is_regular_file(fn)) {
                 logAndThrow("Offset-file " + yOffsetFile + " not found!");
-            } else yOffsetFile = fn.c_str();
+            } else yOffsetFile = fn.string();
         }
     }
 
@@ -352,9 +353,10 @@ void Channel::initCache (void) {
                 ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff );
             }
             if( ret.nDimensions() != 3 || ret.dimSize(1) != myObject.pupilPixels || ret.dimSize(2) != myObject.pupilPixels ) {    // mismatch
-                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!";
+                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")";
+                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels
+                << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
                 ret.getNorms( myObject.pupil );
             }
         }  
@@ -365,7 +367,7 @@ void Channel::initCache (void) {
 
 void Channel::loadCalib( boost::asio::io_service& service ) {     // load through cache-functionality, so the same data is recycled for other objects
 
-    //LOG_TRACE << "Channel::loadCalib()";
+    //LOG_TRACE << "Channel::loadCalib() << ende";
     // TODO: absolute/relative paths
     // TODO: cache files and just fetch shared_ptr
 
@@ -442,7 +444,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
                 Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
                 if( clipSize.x != xOffset.dimSize(1) ||
                     clipSize.y != xOffset.dimSize(0) ) {
-                    LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip.";
+                    LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip." << ende;
                     xOffset.clear();
                 }
                 //clipImage( xOffset, alignClip );
@@ -457,7 +459,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
                 Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
                 if( clipSize.x != yOffset.dimSize(1) ||
                     clipSize.y != yOffset.dimSize(0) ) {
-                    LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip.";
+                    LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip." << ende;
                     yOffset.clear();
                 }
                 //clipImage( yOffset, alignClip );
@@ -470,7 +472,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
 
 void Channel::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& patches ) {
 
-   //LOG_TRACE << "Channel::loadData()";
+   //LOG_TRACE << "Channel::loadData()" << ende;
     size_t nFiles = std::max<size_t>( 1, fileNumbers.size() );       // If no numbers, load template as single file
 
     startT = bpx::pos_infin;
@@ -594,8 +596,9 @@ void Channel::initPatch (ChannelData& cd) {
 
     size_t nImages = cd.images.dimSize();
     if (nTotalFrames != nImages) {
-        string msg = "Number of images in stack does not match the number of total frames.  " +to_string(nTotalFrames) + "!=" + printArray(cd.images.dimensions(),"dims");
-        LOG_ERR << msg;
+        string msg = "Number of images in stack does not match the number of total frames.  " +to_string(nTotalFrames)
+        + "!=" + printArray(cd.images.dimensions(),"dims");
+        LOG_ERR << msg << ende;
         throw logic_error(msg);
     }
 //ArrayStats tmpstats;
@@ -727,7 +730,7 @@ void Channel::loadFile( size_t i ) {
     view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );
     string imStr = to_string(i);
     if( nF > 1 ) imStr = to_string(i)+"-"+to_string(i+nF);
-    LOG_DEBUG << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[i] % myObject.ID % ID % imStr;
+    LOG_DEBUG << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[i] % myObject.ID % ID % imStr << ende;
     myJob.info.progress[0]++;
     if( tmpImg.meta ) {
         addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
@@ -759,10 +762,10 @@ void Channel::storeCorrected( boost::asio::io_service& service, size_t i ) {
 
     if( allOk ) {
         size_t nF = nFrames[i];
-        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i]));
-        fn = bfs::path(fn.leaf().string() + ".cor");
+        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
+        fn = bfs::path(fn.string() + ".cor");
         Image<float> view( images, i, i+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
-        LOG_DETAIL << boost::format ("Saving corrected file %s") % fn.string();
+        LOG_DETAIL << boost::format ("Saving corrected file %s") % fn.string() << ende;
         //redux::file::Ana::write(fn.string(), view.copy<float>());
         redux::file::Ana::write( fn.string(), reinterpret_cast<Array<float>&>(view) );   // TODO: other formats
     } else {
@@ -778,7 +781,7 @@ void Channel::preprocessImage( size_t i ) {
     Array<double> tmpImg( imgSize.y, imgSize.x );       // local temporary with double-precision
     tmpImg = view.copy<double>();
     
-    LOG_TRACE << boost::format ("Preprocessing image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(tmpImg.dimensions(),"dims");
+    LOG_TRACE << boost::format ("Preprocessing image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(tmpImg.dimensions(),"dims") << ende;
     
 //         bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % i));
 //         fn = bfs::path(fn.leaf().string() + ".inp");
@@ -787,26 +790,29 @@ void Channel::preprocessImage( size_t i ) {
     /*
     // Michiel's method for detecting bitshifted Sarnoff images.    TODO make this an SST-specific "filter" to be applied on raw data
     if (imgMean > 4 * avgMean) {
-        LOG_WARN << boost::format ("Image bit shift detected for image %s (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!") % fn;
+        LOG_WARN << boost::format ("Image bit shift detected for image %s (mean > 4*avgMean). adjust factor=0.625 (keep your fingers crossed)!") % fn << ende;
         tmpImg *= 0.625;
         modified = true;
     } else if (imgMean < 0.25 * avgMean) {
-        LOG_WARN << boost::format ("Image bit shift detected for image %s (mean < 0.25*avgMean). adjust factor=16 (keep your fingers crossed)!") % fn;
+        LOG_WARN << boost::format ("Image bit shift detected for image %s (mean < 0.25*avgMean). adjust factor=16 (keep your fingers crossed)!") % fn << ende;
         tmpImg *= 16;
         modified = true;
     }*/
 
     if (dark.valid() && gain.valid()) {
         if (! tmpImg.sameSize (dark)) {
-            LOG_ERR << boost::format ("Dimensions of dark (%s) does not match this image (%s), skipping flatfielding !!") % printArray (dark.dimensions(), "") % printArray (tmpImg.dimensions(), "");
+            LOG_ERR << boost::format ("Dimensions of dark (%s) does not match this image (%s), skipping flatfielding !!")
+                    % printArray (dark.dimensions(), "") % printArray (tmpImg.dimensions(), "") << ende;
             return;
         }
         if (! tmpImg.sameSize (gain)) {
-            LOG_ERR << boost::format ("Dimensions of gain (%s) does not match this image (%s), skipping flatfielding !!") % printArray (gain.dimensions(), "") % printArray (tmpImg.dimensions(), "");
+            LOG_ERR << boost::format ("Dimensions of gain (%s) does not match this image (%s), skipping flatfielding !!")
+                    % printArray (gain.dimensions(), "") % printArray (tmpImg.dimensions(), "") << ende;
             return;
         }
         if (ccdResponse.valid() && !tmpImg.sameSize (ccdResponse)) {
-            LOG_WARN << boost::format ("Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!") % printArray (ccdResponse.dimensions(), "") % printArray (tmpImg.dimensions(), "");
+            LOG_WARN << boost::format ("Dimensions of ccd-response (%s) does not match this image (%s), will not be used !!")
+                    % printArray (ccdResponse.dimensions(), "") % printArray (tmpImg.dimensions(), "") << ende;
             ccdResponse.resize();
         }
         
@@ -823,11 +829,11 @@ void Channel::preprocessImage( size_t i ) {
 
         if (ccdScattering.valid() && psf.valid()) {           // apply backscatter correction
             if (tmpImg.sameSize (ccdScattering) && tmpImg.sameSize (psf)) {
-                LOG_DETAIL << "Applying correction for CCD transparency.";
+                LOG_DETAIL << "Applying correction for CCD transparency." << ende;
                 redux::image::descatter (tmpImg, ccdScattering, psf);
             } else {
                 LOG_ERR << boost::format ("Dimensions of ccdScattering (%s) or psf (%s) does not match this image (%s), skipping flatfielding !!")
-                        % printArray (ccdScattering.dimensions(), "") % printArray (psf.dimensions(), "") % printArray (tmpImg.dimensions(), "");
+                        % printArray (ccdScattering.dimensions(), "") % printArray (psf.dimensions(), "") % printArray (tmpImg.dimensions(), "") << ende;
             }
         }
 
@@ -844,7 +850,7 @@ void Channel::preprocessImage( size_t i ) {
         double** arrayPtr = array.get();
         switch (myJob.fillpixMethod) {
             case FPM_HORINT: {
-                //LOG_DETAIL << "Filling bad pixels using horizontal interpolation.";
+                //LOG_DETAIL << "Filling bad pixels using horizontal interpolation." << ende;
                 function<double (size_t, size_t) > func = bind (horizontalInterpolation<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
                 fillPixels (arrayPtr, sy, sx, func, std::bind2nd (std::less_equal<double>(), myJob.badPixelThreshold));
                 break;
@@ -855,7 +861,7 @@ void Channel::preprocessImage( size_t i ) {
             }
             case FPM_INVDISTWEIGHT:       // inverse distance weighting is the default method, so fall through
             default: {
-                //LOG_DETAIL << "Filling bad pixels using inverse distance weighted average.";
+                //LOG_DETAIL << "Filling bad pixels using inverse distance weighted average." << ende;
                 function<double (size_t, size_t) > func = bind (inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
                 fillPixels (arrayPtr, sy, sx, func, std::bind2nd (std::less_equal<double>(), myJob.badPixelThreshold));
             }
@@ -905,7 +911,7 @@ void Channel::adjustCutout( ChannelData& chData, const Region16& origCutout ) co
     chData.residualOffset = 0;
     
     if( imgSize == 0 ) {
-        LOG_ERR << "No valid imgSize when adjusting cutout, that should not happen...";
+        LOG_ERR << "No valid imgSize when adjusting cutout, that should not happen..." << ende;
         return;
     }
     
@@ -993,7 +999,7 @@ Point16 Channel::getImageSize(void) {
                 imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
             } else if( nDims == 2 ) {
                 imgSize = Point16( tmp.meta->dimSize(0), tmp.meta->dimSize(1) );
-            } else LOG_ERR << "Image " << fn << " is not 2D or 3D.";
+            } else LOG_ERR << "Image " << fn << " is not 2D or 3D." << ende;
         }
     }
     return imgSize;
@@ -1003,7 +1009,7 @@ Point16 Channel::getImageSize(void) {
 
 void Channel::logAndThrow( string msg ) {
     msg = to_string(myObject.ID)+":"+to_string(ID)+": "+msg;
-    LOG_ERR << msg;
+    LOG_ERR << msg << ende;
     throw job_check_failed(msg);
     
 }

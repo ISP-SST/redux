@@ -20,6 +20,9 @@ file(GLOB REDUX_FILE_HPP "${REDUX_HDR_BASE}/file/*.hpp")
 file(GLOB REDUX_IMAGE_CPP "image/*.cpp")
 file(GLOB REDUX_IMAGE_HPP "${REDUX_HDR_BASE}/image/*.hpp")
 
+file(GLOB REDUX_LOGGING_CPP "logging/*.cpp")
+file(GLOB REDUX_LOGGING_HPP "${REDUX_HDR_BASE}/logging/*.hpp")
+
 file(GLOB REDUX_MATH_CPP "math/*.cpp")
 file(GLOB REDUX_MATH_HPP "${REDUX_HDR_BASE}/math/*.hpp")
 
@@ -35,14 +38,6 @@ file(GLOB REDUX_UTIL_HPP "${REDUX_HDR_BASE}/util/*.hpp")
 
 if( NOT DEFINED Boost_FOUND )
     message(STATUS "Boost not found. Try your systems equivalent of \"apt-get install libboost-all-dev\"" )
-endif()
-
-if( DEFINED BoostLog_FOUND )
-    option(REDUX_WITH_BOOSTLOG "Build with BoostLog support" ON)
-    if( REDUX_WITH_BOOSTLOG )
-        message(STATUS "Building with BoostLog support")
-        add_definitions(-DREDUX_WITH_BOOSTLOG)
-    endif()
 endif()
 
 if( DEFINED Fits_FOUND )
@@ -113,13 +108,13 @@ if( NOT REDUX_WITH_OPENCV )
     message(STATUS "Building without OpenCV support, some functionality might not be compiled.")
 endif()
 
-if( NOT DEFINED Boost_FOUND OR NOT REDUX_WITH_FFTW3 OR NOT REDUX_WITH_GSL OR NOT Threads_FOUND )
-    message(STATUS "The redux library will not be built (requires Boost, FFTW3, GSL and Threads).")
+if( NOT DEFINED Boost_FOUND OR NOT REDUX_WITH_FFTW3 OR NOT REDUX_WITH_GSL OR NOT REDUX_WITH_ZLIB OR NOT Threads_FOUND )
+    message(STATUS "The redux library will not be built (requires Boost, FFTW3, GSL, zlib and Threads).")
     return()
 endif()
 
-if( Boost_VERSION VERSION_LESS "1.54" )
-    message(STATUS "The redux library will not be built (requires boost >= 1.54).")
+if( Boost_VERSION VERSION_LESS "1.41" )
+    message(STATUS "The redux library will not be built (only tested with boost >= 1.41).")
     return()
 endif()
 
@@ -133,6 +128,7 @@ REDUX_ADD_LIBRARY(redux ${REDUX_REVISION_SRC_FILE}
                     ${REDUX_ALGO_CPP} ${REDUX_ALGO_HPP}
                     ${REDUX_FILE_CPP} ${REDUX_FILE_HPP}
                     ${REDUX_IMAGE_CPP} ${REDUX_IMAGE_HPP}
+                    ${REDUX_LOGGING_CPP} ${REDUX_LOGGING_HPP}
                     ${REDUX_MATH_CPP} ${REDUX_MATH_HPP}
                     ${REDUX_MOMFBD_CPP} ${REDUX_MOMFBD_HPP}
                     ${REDUX_NETWORK_CPP} ${REDUX_NETWORK_HPP}
