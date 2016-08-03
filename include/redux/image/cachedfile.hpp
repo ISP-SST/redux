@@ -4,6 +4,7 @@
 #include "redux/file/fileio.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/cache.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <iostream>
 #include <mutex>
@@ -20,7 +21,7 @@ namespace redux {
         struct CachedFile {
             
             CachedFile( const std::string& fn ) : filename(fn) {
-                filename = bfs::canonical( filename ) ;
+                filename = redux::util::cleanPath( filename.string() ) ;
             }
             
             bfs::path filename;
