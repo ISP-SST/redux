@@ -210,7 +210,7 @@ string redux::util::cleanPath(string in, string base) {
     }
     else result /= *it++;
 
-    bool docanonical = (result.string()[0] == '/');         // don't canonicalize relative paths
+    bool docanonical RDX_UNUSED = (result.string()[0] == '/');         // don't canonicalize relative paths
     for(; it != ain.end(); ++it) {
         if(*it == "..") result = result.parent_path();
         else if(*it != ".") {

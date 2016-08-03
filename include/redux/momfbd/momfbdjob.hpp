@@ -15,6 +15,20 @@ namespace bpo = boost::program_options;
 namespace redux {
 
     namespace momfbd {
+        class MomfbdJob;
+    }
+    
+    /*!
+    *  This is just a trick to trigger the registration of the JobType MomfbdJob by only including the header file.
+    *  See below for the actual triggering.
+    */
+    template<typename Dummy>
+    class StaticJobTypeInit<momfbd::MomfbdJob, Dummy> {
+        public:
+            static size_t const jobType;
+    };
+    
+    namespace momfbd {
 
         /*! @defgroup momfbd MOMFBD
          *  @{
@@ -98,11 +112,19 @@ namespace redux {
 
         };
 
-        const MomfbdJob MomfbdJobDummy UNUSED;       // this will trigger the registration of MomfbdJob in Job::jobMap
-
         /*! @} */
 
     }   // momfbd
+
+    template<typename Dummy>
+    size_t const StaticJobTypeInit<momfbd::MomfbdJob, Dummy>::jobType = Job::registerJob( "momfbd", momfbd::MomfbdJob::create );
+
+    /*! @} */
+    
+    namespace momfbd {
+        // this will trigger the registration of MomfbdJob in Job::jobMap
+        const size_t MomfbdJobDummy RDX_UNUSED = StaticJobTypeInit<MomfbdJob, void>::jobType;
+    }
 
 }   // redux
 

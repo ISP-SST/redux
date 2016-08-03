@@ -40,7 +40,6 @@ namespace {
 
 
 }
-size_t DebugJob::jobType = Job::registerJob( "DebugJob", DebugJob::create );
 
 
 uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {

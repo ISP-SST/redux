@@ -13,10 +13,21 @@ namespace redux {
      *  @{
      */
 
-    /*! Dummy job for testing the framework. Also usable as a tutorial for how to implement a new/custom job.
-     * 
+    /*!
+     *  This is just a trick to trigger the registration of the JobType DebugJob by only including the header file.
+     *  See below for the actual triggering.
      */
-    class DebugJob : public Job {
+    class DebugJob;
+    template<typename Dummy>
+    class StaticJobTypeInit<DebugJob, Dummy> {
+        public:
+            static size_t const jobType;
+    };
+    
+    /*!
+     *  Dummy job for testing the framework. Also usable as a tutorial for how to implement a new/custom job.
+     */
+    class DebugJob : public Job, private StaticJobTypeInit<DebugJob,void> {
         
         enum Step { JSTEP_SUBMIT=1, JSTEP_PREPROCESS=2, JSTEP_QUEUED=4, JSTEP_RUNNING=8, JSTEP_POSTPROCESS=16, JSTEP_COMPLETED=32, JSTEP_ERR=255 };
         
@@ -34,8 +45,6 @@ namespace redux {
         uint64_t unpackParts(const char*, WorkInProgress&, bool);
 
     public:
-
-        static size_t jobType;
 
         DebugJob(void);
         DebugJob( const DebugJob& ) = delete;
@@ -65,7 +74,6 @@ namespace redux {
         void postProcess(void);
         
         void checkParts(void);
-
         uint32_t maxIterations, patchSize;
         double gamma;
         uint32_t xSize, ySize;
@@ -74,10 +82,14 @@ namespace redux {
 
     };
    
+    template<typename Dummy>
+    size_t const StaticJobTypeInit<DebugJob, Dummy>::jobType = Job::registerJob( "DebugJob", DebugJob::create );
+
     /*! @} */
     
     namespace debugjob {
-        const DebugJob DebugJobDummy UNUSED;       // this will trigger the registration of DebugJob in Job::jobMap
+        // this will trigger the registration of DebugJob in Job::jobMap
+        const size_t DebugJobDummy RDX_UNUSED = StaticJobTypeInit<DebugJob, void>::jobType;
     }
 
 }

@@ -561,7 +561,7 @@ void fft_cleanup(void) {
 
 
 namespace {
-    static int dummy UNUSED =
+    static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)convolve, (char*)"RDX_CONVOLVE", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, convolve_info, convolve_cleanup ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_descatter, (char*)"RDX_DESCATTER", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_descatter_info/*, descatter_cleanup*/ ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)fft_reorder, (char*)"RDX_REORDER", 1, 1, 0, 0 }, 0 , fft_reorder_info) +

@@ -192,7 +192,7 @@ void Daemon::connect(void) {
     }
     
     try {
-        auto test UNUSED = myMaster.conn->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
+        auto test RDX_UNUSED = myMaster->socket().remote_endpoint();  // check if endpoint exists, if not we need to re-establish connection.
         return;
     } catch ( ... ) { }
 

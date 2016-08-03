@@ -23,9 +23,6 @@ using namespace std;
 #define lg Logger::mlg
 #define logChannel jobLogChannel
 
-size_t MomfbdJob::jobType = Job::registerJob( "momfbd", MomfbdJob::create );
-
-
 MomfbdJob::MomfbdJob( void ) {
     info.typeString = "momfbd";
 }
@@ -34,16 +31,7 @@ MomfbdJob::MomfbdJob( void ) {
 MomfbdJob::~MomfbdJob( void ) {
     
 }
-
-/*        enum Step : uint8_t { //  JSTEP_SUBMIT = 1,   Defined in job.hpp
-                    JSTEP_PREPROCESS = 2,
-                    JSTEP_QUEUED = 4,
-                    JSTEP_RUNNING = 8,
-                    JSTEP_POSTPROCESS = 16
-                    //JSTEP_COMPLETED = 64,           Defined in job.hpp
-                    //JSTEP_ERR = 128                 Defined in job.hpp
-                  };
-*/        
+     
 
 void MomfbdJob::setProgressString( void ) {
     

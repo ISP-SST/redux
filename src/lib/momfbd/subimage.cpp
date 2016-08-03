@@ -62,7 +62,7 @@ SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, c
       window (wind), noiseWindow(nwind) {
 
 #ifdef USE_LUT
-    static int dummy UNUSED = initSineLUT(); 
+    static int dummy RDX_UNUSED = initSineLUT(); 
 #endif
 }
 

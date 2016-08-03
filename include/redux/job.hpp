@@ -165,6 +165,8 @@ namespace redux {
 
     };
 
+    template<class JobType, typename Dummy>
+    class StaticJobTypeInit { };
 
     /*! @} */
         

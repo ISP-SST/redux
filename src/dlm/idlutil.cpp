@@ -686,7 +686,7 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
 
 
 namespace {
-    static int dummy UNUSED = 
+    static int dummy RDX_UNUSED = 
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)structinfo, (char*)"RDX_STRUCTINFO", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },  0, structinfo_help );
 }
 

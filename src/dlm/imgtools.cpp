@@ -2364,7 +2364,7 @@ IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 namespace {
-    static int dummy UNUSED =
+    static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_find_shift, (char*)"RDX_FIND_SHIFT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_fillpix, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)load_files, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, load_files_info ) +

@@ -591,11 +591,11 @@ namespace redux {
 
 
 #if defined(__GNUC__)
-#  define UNUSED __attribute__ ((unused))
+#  define RDX_UNUSED __attribute__ ((unused))
 #elif defined(_MSC_VER)
-#  define UNUSED __pragma(warning(suppress:4100))
+#  define RDX_UNUSED __pragma(warning(suppress:4100))
 #else
-#  define UNUSED
+#  define RDX_UNUSED
 #endif
 
 
