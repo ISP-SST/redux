@@ -12,9 +12,9 @@ if( Boost_VERSION VERSION_LESS "1.54" )
 endif()
 
 
-REDUX_ADD_EXECUTABLE( rsub jsub.cpp )
-REDUX_ADD_EXECUTABLE( rstat jstat.cpp )
-REDUX_ADD_EXECUTABLE( rdel jdel.cpp )
+REDUX_ADD_EXECUTABLE( rsub rsub.cpp )
+REDUX_ADD_EXECUTABLE( rstat rstat.cpp )
+REDUX_ADD_EXECUTABLE( rdel rdel.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
