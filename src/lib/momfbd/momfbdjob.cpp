@@ -479,7 +479,11 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued." << ende;
     LOG_DEBUG << "       nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << "   nImages = " << nTotalImages << ende;
 
-    info.step.store( JSTEP_QUEUED );
+    if( runFlags & RF_FLATFIELD ) {
+        info.step.store( JSTEP_COMPLETED );
+    } else {
+        info.step.store( JSTEP_QUEUED );
+    }
     info.state.store( JSTATE_IDLE );
     
     auto lock = getLock();
