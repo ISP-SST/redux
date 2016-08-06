@@ -110,17 +110,13 @@ void Daemon::maintenance( void ) {
 
 //      LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
 //      << "  nPeers = " << connections.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size() << ende;
-
     updateLoadAvg();
     cleanup();
     logger.flushAll();
-    static int cnt(0);
-    if( (++cnt % 6) == 0 ) {
-        updateStatus();   // TODO: use a secondary connection for auxiliary communications
-        cnt = 0;
-    }
+    updateStatus();   // TODO: use a secondary connection for auxiliary communications
     timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
+    
 }
 
 
@@ -379,29 +375,38 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
     
     auto& host = connections[conn];
     if( host == nullptr ) { // new connection
+        conn->setSwapEndian( remote_info.littleEndian != myInfo.info.littleEndian );
         set<uint64_t> used_ids;
-        for( auto& p: connections ) if(p.second) used_ids.insert(p.second->id);
-        uint64_t id = 1; // start indexing peers with 1
-        while( used_ids.find(id) != used_ids.end() ) id++;
-        Host* newHost = new Host( remote_info, id );
-        for( auto& h: peerWIP ) {
-            if( h.first && (*newHost) == (*h.first) ) {
-                delete newHost;
-                host = h.first;
-                host->id = id;
-                id = 0;
-                break;
+        for( auto& p: connections ) {
+            if( p.second ) {
+                if( p.second->info == remote_info ) {
+                    host = p.second;
+                    host->touch();
+                    host->nConnections++;
+                    return;
+                }
+                used_ids.insert(p.second->id);
             }
         }
         
-        if( id ) {
-            host.reset( newHost );
-            if( host->info.peerType & (Host::TP_WORKER|Host::TP_MASTER) ) {  // filter out the "ui" connections which will connect/disconnect silently
-                LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
-            }
-            //peers.insert( make_pair( id, host ) );
-        } else LOG_DEBUG << "New connection from existing host: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
-        conn->setSwapEndian(remote_info.littleEndian != myInfo.info.littleEndian);
+        uint64_t id = 1; // start indexing peers with 1
+        while( used_ids.find(id) != used_ids.end() ) id++;
+        Host::Ptr newHost( new Host( remote_info, id ) );
+        
+        auto it = peerWIP.find(newHost);
+        if( it != peerWIP.end() ) {
+            LOG_DEBUG << "Re-connection from host with WIP: " << it->first->info.name << ":" << it->first->info.pid << "  ID=" << it->first->id << ende;
+            host = it->first;
+            host->touch();
+            host->nConnections++;
+            return;
+        }
+        host = newHost;
+
+        if( host->info.peerType & (Host::TP_WORKER|Host::TP_MASTER) ) {
+            LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
+        }
+
     }
     
     host->touch();
@@ -414,16 +419,31 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
     unique_lock<mutex> lock( peerMutex );
     auto it = connections.find(conn);
-    if( it != connections.end()) {
-        if( it->second && (it->second->info.peerType & (Host::TP_WORKER|Host::TP_MASTER))) {  // filter out the "ui" connections which will connect/disconnect silently
-            it->second->nConnections--;
-            LOG_DEBUG << "Host #" << it->second->id << "  (" << it->second->info.name << ":" << it->second->info.pid << ") disconnected." << ende;
+    if( it != connections.end() ) {
+        auto wip = peerWIP.find( it->second );
+        if( wip != peerWIP.end() ) {
+            LOG_NOTICE << "Host #" << it->second->id << "  (" << it->second->info.name << ":" << it->second->info.pid << ") disconnected." << ende;
+            if( wip->second.job ) {
+                LOG_NOTICE << "Returning unfinished work to queue: " << wip->second.print() << ende;
+                wip->second.job->failWork( wip->second );
+            }
+            for( auto& part: wip->second.parts ) {
+                if( part ) {
+                    part->cacheLoad();
+                    part->cacheStore(true);
+                }
+            }
+            wip->second.parts.clear();
+            wip->second.previousJob.reset();
+            peerWIP.erase(wip);
         }
+        it->second->nConnections--;
         connections.erase(it);
     }
     conn->setErrorCallback(nullptr);
     conn->setCallback(nullptr);
     conn->socket().close();
+
 }
 
 
@@ -907,22 +927,21 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
     uint64_t blockSize = myInfo.size();
 
     unique_lock<mutex> lock( peerMutex );
-    for( auto & peer : connections ) {
-        if(peer.second && peer.second->info.peerType&Host::TP_WORKER) blockSize += peer.second->size();
+    for( auto & peer : peerWIP ) {
+        if( peer.first ) blockSize += peer.first->size();
     }
-    uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
+    uint64_t totalSize = 2*blockSize + sizeof( uint64_t );                    // status updates might change packed size slightly, so add a margin
     shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
     char* ptr =  buf.get()+sizeof( uint64_t );
     uint64_t packedSize = myInfo.pack( ptr );
-    for( auto & peer : connections ) {
-        if(peer.second && peer.second->info.peerType&Host::TP_WORKER) packedSize += peer.second->pack( ptr+packedSize );
+    for( auto & peer : peerWIP ) {
+        if( peer.first ) packedSize += peer.first->pack( ptr+packedSize );
     }
     lock.unlock();
     
     if( packedSize > blockSize ) {
         string msg = "sendPeerList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
-        //LOG_DEBUG << msg << ende;
     }
     totalSize = packedSize + sizeof( uint64_t );
     pack( buf.get(), packedSize );                                                // store real blockSize

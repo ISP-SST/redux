@@ -5,6 +5,7 @@
 #include "redux/file/fileana.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/logging/logger.hpp"
+#include "redux/network/host.hpp"
 
 #include <atomic>
 #include <functional>
@@ -65,9 +66,10 @@ namespace {
 }
 
 
-Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), logger(j.logger), objects( j.getObjects() ),
-    service(s), nThreads(t), nFreeParameters(0), nTotalImages(0), modeNumbers(nullptr), enabledModes(nullptr),alpha(nullptr), 
-    alpha_offset(nullptr), grad_alpha(nullptr), tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr) {
+Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), myInfo( network::Host::myInfo() ),
+    logger(j.logger), objects( j.getObjects() ), service(s), nThreads(t), nFreeParameters(0), nTotalImages(0),
+    modeNumbers(nullptr), enabledModes(nullptr),alpha(nullptr), alpha_offset(nullptr), grad_alpha(nullptr),
+    tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr) {
 
 }
 
