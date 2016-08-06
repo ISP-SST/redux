@@ -286,7 +286,7 @@ void Object::getResults(ObjectData& od, double* alpha) {
     avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
-        LOG_DETAIL << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
+        LOG_DEBUG << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
         ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     

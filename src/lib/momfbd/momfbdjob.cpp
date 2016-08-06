@@ -316,6 +316,8 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
     uint8_t patchStep = 0;
     uint16_t nThreads = std::min( maxThreads, info.maxThreads );
     
+    logger.setContext( "job "+to_string(info.id) );
+    
     if(wip.parts.size() && wip.parts[0]) patchStep = wip.parts[0]->step;
 
     if( jobStep == JSTEP_PREPROCESS ) {
@@ -332,6 +334,7 @@ bool MomfbdJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint
             }
             for( auto& part : wip.parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 
+                logger.setContext( "job "+to_string(info.id)+":"+to_string(part->id) );
                 boost::thread_group pool;
                 {
                     boost::asio::io_service::work work(service);

@@ -384,6 +384,7 @@ void Job::startLog( bool overwrite ) {
 
     logger.setLevel( info.verbosity );
     logger.addFile( logFilePath.string(), 0, overwrite );
+    logger.setContext( "job "+to_string(info.id) );
     LOG_NOTICE << "Redux version = " << getLongVersionString();
     LOG_NOTICE << "\nJob configuration:\n" << cfg() << ende;
 

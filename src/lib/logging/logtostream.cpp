@@ -61,8 +61,8 @@ void LogToStream::writeFormatted( const LogItem &i ) {
             out << level_tags[ i.entry.getMask() ];
         }
 
-        if( ! i.context.scope.empty() ) {
-            out << " (" << i.context.scope << ")";
+        if( ! i.context.empty() ) {
+            out << " (" << i.context << ")";
         }
         out << " " << i.entry.getMessage() << endl;
     }

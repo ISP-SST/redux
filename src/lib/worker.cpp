@@ -120,7 +120,6 @@ bool Worker::getWork( void ) {
     if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
             wip.job->logger.setLevel( wip.job->info.verbosity );
-            LLOG_DEBUG(daemon.logger) << "Initializing new job: " + wip.print() << ende;
 
             if( wip.isRemote ) {
                 if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
@@ -128,11 +127,11 @@ bool Worker::getWork( void ) {
                 }
                 TcpConnection::Ptr logConn;
                 daemon.connect( daemon.myMaster.host->info, logConn );
-                wip.job->logger.addNetwork( logConn, wip.job->info.id, 0, 0 );
+                wip.job->logger.addNetwork( logConn, wip.job->info.id, 0, 100 );   // by default only send after 100 log-items
             }
             wip.job->init();
             wip.previousJob = wip.job;
-        } else LLOG_DEBUG(daemon.logger) << "Starting new part of the same job: " + wip.print() << ende;
+        }
         for( auto& part: wip.parts ) {
             part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
         }
@@ -215,7 +214,7 @@ void Worker::run( void ) {
         sleepS = 1;
         try {
             while( wip.job && wip.job->run( wip, ioService, myInfo.status.nThreads ) ) ;
-            if( wip.job) wip.job->logger.flushAll(); 
+            if( wip.job ) wip.job->logger.flushAll(); 
         }
         catch( const exception& e ) {
             LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;

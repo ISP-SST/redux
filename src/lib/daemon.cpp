@@ -35,6 +35,8 @@ namespace {
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
     hostTimeout(3600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
+    logger.setContext( "master" );
+
     uint16_t nThreads = params["threads"].as<uint16_t>();
     if( nThreads ) {
         myInfo.status.nThreads = myInfo.status.maxThreads = nThreads;
@@ -63,8 +65,6 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
             return;
         }
     }
-    
-    LOG << "Daemon:  using " << myInfo.status.nThreads << " threads." << ende;
     
 
 }
@@ -108,8 +108,8 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-     LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
-     << "  nPeers = " << connections.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size() << ende;
+//      LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
+//      << "  nPeers = " << connections.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size() << ende;
 
     updateLoadAvg();
     cleanup();
@@ -168,10 +168,7 @@ void Daemon::workerInit( void ) {
     
     string master = params["master"].as<string>();
     
-    if( master.empty() ) {
-        LOG_DEBUG << "Running local worker only." << ende;
-    } else {
-        LOG_DEBUG << "Running slave." << ende;
+    if( !master.empty() ) {
         myMaster.host.reset( new Host() );
         myMaster.host->info.connectName = master;
         myMaster.host->info.connectPort = params["port"].as<uint16_t>();
@@ -180,6 +177,8 @@ void Daemon::workerInit( void ) {
         TcpConnection::Ptr logConn;
         connect( myMaster.host->info, logConn );
         logger.addNetwork( logConn, 0, Logger::getDefaultMask(), 1 );
+        logger.setContext( myInfo.info.name );
+        LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
         
     }
     
@@ -214,7 +213,7 @@ void Daemon::connect( network::Host::HostInfo& host, network::TcpConnection::Ptr
 
         Command cmd;
 
-        //myInfo.info.peerType |= Host::TP_WORKER;
+        myInfo.info.peerType |= Host::TP_WORKER;
         *conn << CMD_CONNECT;
         *conn >> cmd;
         if( cmd == CMD_AUTH ) {
@@ -302,7 +301,7 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
         *conn >> remote_info;
         *conn << myInfo.info;
 
-        LOG_DEBUG << "connected()  Handshake successful." << ende;
+//        LOG_DEBUG << "connected()  Handshake successful." << ende;
         addConnection( remote_info, conn );
 
         conn->setCallback( bind( &Daemon::activity, this, std::placeholders::_1 ) );

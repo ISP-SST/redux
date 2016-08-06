@@ -302,7 +302,9 @@ void Logger::netReceive( TcpConnection::Ptr conn ) {
             while( count < blockSize ) {
                 LogItemPtr tmpItem( new LogItem() );
                 tmpItem->setLogger( this );
-                tmpItem->context.scope = hostname;
+                if( tmpItem->context.empty() ) {
+                    tmpItem->context = hostname;
+                }
                 count += tmpItem->unpack( ptr+count, conn->getSwapEndian() );
                 tmpQueue.push_back( tmpItem );
             }

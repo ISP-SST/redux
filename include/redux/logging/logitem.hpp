@@ -2,7 +2,6 @@
 #define REDUX_LOGGING_LOGITEM_HPP
 
 #include "logentry.hpp"
-#include "logcontext.hpp"
 
 
 namespace redux {
@@ -62,7 +61,7 @@ namespace redux {
 
             Logger* logger;
             LogEntry entry;
-            LogContextSnapshot context;
+            std::string context;
             
         };
         

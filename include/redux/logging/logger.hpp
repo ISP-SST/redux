@@ -39,10 +39,12 @@ namespace redux {
             void addConnection( network::TcpConnection::Ptr& conn, network::Host::Ptr& host );
             void removeConnection( network::TcpConnection::Ptr& conn );
             void netReceive( network::TcpConnection::Ptr conn );
+            void setContext( const std::string& c ) { context = c; };
             
             LogItem& getItem( LogMask m=LOG_MASK_NORMAL ) {
                 threadItem.setLogger( this );
                 threadItem.entry.setMask(m);
+                threadItem.context = context;
                 return threadItem;
             }
 
@@ -61,7 +63,7 @@ namespace redux {
             static bpo::options_description getOptions( const std::string& application_name );
 
         private:
-            LogContext context;
+            std::string context;
             
             typedef std::map<std::string, LogOutputPtr> OutputMap;
             OutputMap outputs;

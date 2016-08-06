@@ -295,7 +295,7 @@ void Solver::run( PatchData::Ptr data ) {
     
     data->initPatch();
 
-    LOG << "Starting  patch#" << data->id << "  index=" << data->index << "  region=" << data->roi
+    LOG << "Starting  patch.  index=" << data->index << "  region=" << data->roi
         << "  nModes=" << nModes << "  nThreads=" << nThreads << ende;
 
     std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, sp::_1, sp::_2 );
@@ -317,25 +317,25 @@ void Solver::run( PatchData::Ptr data ) {
     const gsl_multimin_fdfminimizer_type *minimizerType = gsl_multimin_fdfminimizer_steepest_descent;
     switch(job.getstepMethod) {
         case GSM_BFGS:
-            LOG_DETAIL << "Using BFGS solver." << ende;
+            LOG_DEBUG << "Using BFGS solver." << ende;
             LOG_WARN << "The BFGS method has not been properly tweaked/tested yet." << ende;
             minimizerType = gsl_multimin_fdfminimizer_vector_bfgs;
             init_step = 1E8;            // tested for old modes only
             init_tol = 0.01;            // tested for old modes only
             break;
         case GSM_BFGS_inv:
-            LOG_DETAIL << "Using BFGS-2 solver." << ende;
+            LOG_DEBUG << "Using BFGS-2 solver." << ende;
             LOG_WARN << "The BFGS-2 method has not been properly tweaked/tested yet." << ende;
             minimizerType = gsl_multimin_fdfminimizer_vector_bfgs2;
             //minimizerType = gsl_multimin_fdfminimizer_vector_bfgs;
             //init_step = 1e-18; //1e-18;
             break;
         case GSM_SDSC:
-            LOG_DETAIL << "Using Steepest-Descent solver." << ende;
+            LOG_DEBUG << "Using Steepest-Descent solver." << ende;
             minimizerType = gsl_multimin_fdfminimizer_steepest_descent;
             break;
         case GSM_CNJG:
-            LOG_DETAIL << "Using Conjugate-Gradient solver." << ende;
+            LOG_DEBUG << "Using Conjugate-Gradient solver." << ende;
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_fr;
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
             minimizerType = multimin_fdfminimizer_conjugate_rdx;        // Use our own implementation
@@ -379,6 +379,7 @@ void Solver::run( PatchData::Ptr data ) {
     sync_counter sc;
 
     timer.start();
+    logger.flushAll();
 
     memset( alpha_offset, 0, nParameters*sizeof(double) );
 
@@ -543,9 +544,6 @@ void Solver::applyAlpha( void ) {
 void Solver::applyBeta( const gsl_vector* beta ) {
 
     job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset, alpha );
-//     cout << "applyBeta:" << printArray( beta->data, nFreeParameters, "\nbeta")
-//     << printArray( alpha_offset, nParameters, "\nalpha_offset")
-//     << printArray( alpha, nParameters, "\nalpha") << endl;
     applyAlpha();
 
 }
