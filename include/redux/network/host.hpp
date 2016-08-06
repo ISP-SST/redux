@@ -2,6 +2,7 @@
 #define REDUX_NETWORK_HOST_HPP
 
 #include "redux/network/tcpconnection.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <atomic>
 #include <memory>
@@ -18,7 +19,9 @@ namespace redux {
 
             typedef std::shared_ptr<Host> Ptr;
             struct Compare {
-                bool operator()( const Ptr &a, const Ptr &b ) const { return ( (*a) < (*b) ); }
+                bool operator()( const Ptr &a, const Ptr &b ) const {
+                    if( !a || !b ) return a < b;
+                    return ( (*a) < (*b) ); }
             };
             typedef std::set<Ptr, Compare> Set;
              
@@ -49,6 +52,7 @@ namespace redux {
                 State state;
                 float loadAvg;
                 float progress;
+                std::string statusString;
                 boost::posix_time::ptime lastSeen;
                 boost::posix_time::ptime lastActive;
                 HostStatus( void );

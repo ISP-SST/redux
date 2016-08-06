@@ -382,11 +382,16 @@ void Solver::run( PatchData::Ptr data ) {
     logger.flushAll();
 
     memset( alpha_offset, 0, nParameters*sizeof(double) );
+    
+    string patchString = alignLeft(to_string(job.info.id) + ":" + to_string(data->id),8);
 
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
         modeCount = min<uint16_t>(modeCount,nModes);
         std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
+        
+        string progressString = boost::str( boost::format(" (%03.1f%%)") % ((modeCount-job.nInitialModes)*100.0/nModes));
+        myInfo.status.statusString = patchString + progressString;
         
         transform(modeNumbers,modeNumbers+nParameters,enabledModes,
                   [&activeModes](const uint16_t& a){ return activeModes.count(a)?a:0; }
@@ -496,6 +501,7 @@ void Solver::run( PatchData::Ptr data ) {
   
     LOG << "After " << totalIterations << " iterations:  Metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
     LOG << timer.print() << ende;
+    myInfo.status.statusString = patchString + " completed";
     
     alphaPtr = alpha;
     for( auto& obj: data->objects ) {

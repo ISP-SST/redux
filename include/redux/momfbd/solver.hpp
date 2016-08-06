@@ -17,6 +17,10 @@ namespace redux {
         class Logger;
     }
 
+    namespace network {
+        class Host;
+    }
+
     namespace momfbd {
 
         /*! @ingroup momfbd
@@ -63,6 +67,7 @@ namespace redux {
             void dump( std::string tag );
             
             MomfbdJob& job;
+            network::Host& myInfo;
             logging::Logger& logger;
             const std::vector<std::shared_ptr<Object>>& objects;
             boost::asio::io_service& service;

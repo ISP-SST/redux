@@ -120,7 +120,6 @@ bool Worker::getWork( void ) {
     if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
             wip.job->logger.setLevel( wip.job->info.verbosity );
-
             if( wip.isRemote ) {
                 if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
                     wip.job->logger.addLogger( daemon.logger );
@@ -136,6 +135,7 @@ bool Worker::getWork( void ) {
             part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
         }
         myInfo.active();
+        myInfo.status.statusString = "...";
         return true;
     }
     
@@ -148,6 +148,7 @@ bool Worker::getWork( void ) {
     wip.parts.clear();
     
     myInfo.status.state = Host::ST_IDLE;
+    myInfo.status.statusString = "idle";
     return false;
 
 }
