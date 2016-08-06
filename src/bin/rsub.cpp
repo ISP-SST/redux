@@ -40,6 +40,7 @@ namespace {
           "Port to use when connecting to a master."
           " The environment variable RDX_PORT can be used to override the default value." )
         ( "priority", bpo::value<int>()->default_value( 10 ), "Job priority" )
+        ( "reg_alpha", bpo::value<float>(), "REG_ALPHA override" )
         ( "force,f", "Overwrite output file if exists" )
         ( "kill,k", "Send exit command to Server." )
         ( "swap,s", "swap mode: write auxiliary data to files instead of keeping it in memory (compatibility flag, always enabled)" )
@@ -312,6 +313,12 @@ int main (int argc, char *argv[]) {
         bool check = (vm.count ("no-check") == 0);
         vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
 
+        if( vm.count ("reg_alpha") ) {       // FIXME: this is just while testing...
+            for( auto & job : jobs ) {
+                static_pointer_cast<momfbd::MomfbdJob>(job)->reg_alpha = vm["reg_alpha"].as<float>();
+            }
+        }
+        
         if (vm.count ("print")) {       // dump configuration to console and exit
             bpt::ptree dump;
             for( auto & job : jobs ) {

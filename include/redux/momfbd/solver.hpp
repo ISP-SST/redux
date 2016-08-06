@@ -90,6 +90,7 @@ namespace redux {
             double *alpha, *alpha_offset, *grad_alpha, *tmp_alpha;
             double *beta, *grad_beta, *search_dir, *tmp_beta;
             double grad_beta_norm;
+            double *regAlphaWeights;
             
             double max_wavelength;
             

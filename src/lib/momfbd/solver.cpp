@@ -69,7 +69,8 @@ namespace {
 Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), myInfo( network::Host::myInfo() ),
     logger(j.logger), objects( j.getObjects() ), service(s), nThreads(t), nFreeParameters(0), nTotalImages(0),
     modeNumbers(nullptr), enabledModes(nullptr),alpha(nullptr), alpha_offset(nullptr), grad_alpha(nullptr),
-    tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr) {
+    tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr),
+    regAlphaWeights(nullptr) {
 
 }
 
@@ -113,6 +114,7 @@ void Solver::init( void ) {
     grad_alpha = new double[nParameters];
     alpha_offset = new double[nParameters];
     tmp_alpha = new double[nParameters];
+    regAlphaWeights = new double[nParameters];
     
     beta = new double[nFreeParameters];
     grad_beta = new double[nFreeParameters];
@@ -121,14 +123,21 @@ void Solver::init( void ) {
 
     uint16_t* mPtr = modeNumbers;
     for( size_t n=nTotalImages; n; n-- ) {
-        memcpy(mPtr,job.modeNumbers.data(),nModes*sizeof(uint16_t));
+        memcpy( mPtr, job.modeNumbers.data(), nModes*sizeof(uint16_t));
         mPtr += nModes;
     }
 
     max_wavelength = 0;
-
+    double* raPtr = regAlphaWeights;
     for( auto & object : objects ) {
         object->initProcessing( *this );
+        double scale = job.reg_alpha/object->wavelength;
+        scale *= nTotalImages*patchSize*patchSize;      // FIXME the other term in the metric should be normalized instead
+        for( size_t i=0; i<object->nImages(); ++i ) {
+            transform(object->modes.atm_rms.begin(), object->modes.atm_rms.end(), raPtr,
+               [scale](const float& a) { if(a==0) return 0.0; return scale/(a*a); } );
+            raPtr += nModes;
+        }
         max_wavelength = std::max( max_wavelength, object->wavelength );
     }
 
@@ -299,7 +308,7 @@ void Solver::run( PatchData::Ptr data ) {
 
     LOG << "Starting  patch.  index=" << data->index << "  region=" << data->roi
         << "  nModes=" << nModes << "  nThreads=" << nThreads << ende;
-
+    
     std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, sp::_1, sp::_2 );
     std::function<gsl_df_t> wrapped_df = std::bind( &Solver::my_df, this, sp::_1, sp::_2, sp::_3 );
     std::function<gsl_fdf_t> wrapped_fdf = std::bind( &Solver::my_fdf, this, sp::_1, sp::_2, sp::_3 , sp::_4);
@@ -314,8 +323,8 @@ void Solver::run( PatchData::Ptr data ) {
 //      my_func.setPreCalc( std::bind( &Solver::my_precalc, this, sp::_1, sp::_2 ),
 //                          std::bind( &Solver::metricAt, this, sp::_1 ) );
     
-    double init_step = 1E8; //   TODO tweak solver parameters
-    double init_tol = 1E-1;
+    double init_step = 1E-4*max_wavelength; //   TODO tweak solver parameters
+    double init_tol = 1E-6;
     const gsl_multimin_fdfminimizer_type *minimizerType = gsl_multimin_fdfminimizer_steepest_descent;
     switch(job.getstepMethod) {
         case GSM_BFGS:
@@ -341,14 +350,10 @@ void Solver::run( PatchData::Ptr data ) {
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_fr;
             //minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
             minimizerType = multimin_fdfminimizer_conjugate_rdx;        // Use our own implementation
-            init_tol = 1E-6;
-            init_step = 1E-4*max_wavelength;
             break;
         default:
             LOG << "No solver specified, default is Conjugate-Gradient." << ende;
-            minimizerType = gsl_multimin_fdfminimizer_conjugate_pr;
-            init_step = 1E8;            // tested for _pr, needs tweaking
-            init_tol = 0.01;            // tested for _pr, needs tweaking
+            minimizerType = multimin_fdfminimizer_conjugate_rdx;
     }
 
     //gradientMethod = gradientMethods[job.gradientMethod];
@@ -364,7 +369,7 @@ void Solver::run( PatchData::Ptr data ) {
     memset(s->dx->data,0,nFreeParameters*sizeof(double));
     memset(s->gradient->data,0,nFreeParameters*sizeof(double));
     s->f = 0;
-
+        
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
     LOG_TRACE << "Initial metric = " << initialMetric << ende;
 
@@ -414,7 +419,7 @@ void Solver::run( PatchData::Ptr data ) {
         size_t iter = 0;
         int successCount(0);
         bool done(false);
-
+        
 #ifdef DEBUG_
         LOG_DETAIL << "start_metric = " << s->f
                        << printArray(alpha_offset, nParameters, "\nalpha_offset")
@@ -591,6 +596,12 @@ double Solver::metric(void) {
     for( const auto& o : objects ) {
         sum += o->metric();
     }
+    
+    if( job.reg_alpha > 0 ) {
+        for( size_t i=0; i<nParameters; ++i ) {
+            sum += 0.5*alpha[i]*alpha[i]*regAlphaWeights[i];
+        }
+    }
 
     return sum;
     
@@ -616,7 +627,12 @@ void Solver::calcPQ(void) {
  
 void Solver::gradient(void) {
 
-    memset( grad_alpha, 0, nParameters*sizeof(double) );
+    if( job.reg_alpha > 0 ) {
+        std::transform( alpha, alpha+nParameters, regAlphaWeights, grad_alpha,
+            std::multiplies<double>() );
+    } else {
+        memset( grad_alpha, 0, nParameters*sizeof(double) );
+    }
 
     double* alphaPtr = alpha;
     double* gAlphaPtr = grad_alpha;
@@ -662,12 +678,14 @@ void Solver::clear( void ) {
     delete[] grad_alpha;
     delete[] alpha_offset;
     delete[] tmp_alpha;
+    delete[] regAlphaWeights;
     delete[] beta;
     delete[] grad_beta;
     delete[] search_dir;
     delete[] tmp_beta;
     modeNumbers = enabledModes = nullptr;
-    alpha = grad_alpha = nullptr;
+    alpha = grad_alpha = alpha_offset = tmp_alpha = nullptr;
+    regAlphaWeights = nullptr;
 
 }
 

@@ -141,7 +141,7 @@ void cfgTest( void ) {
         gcfg.telescopeD = gcfg.minIterations = gcfg.maxIterations = gcfg.targetIterations = 119;
         gcfg.fillpixMethod = gcfg.getstepMethod = 3;
         gcfg.gradientMethod = 2;
-        gcfg.badPixelThreshold = gcfg.FTOL = gcfg.EPS = gcfg.reg_gamma = gcfg.sequenceNumber = 117;
+        gcfg.badPixelThreshold = gcfg.FTOL = gcfg.EPS = gcfg.reg_alpha = gcfg.sequenceNumber = 117;
         gcfg.outputFileType = gcfg.outputDataType = 1;
         gcfg.modeNumbers = {2,56};
         gcfg.observationTime = "time";

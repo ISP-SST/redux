@@ -167,15 +167,15 @@ ModeSet::ModeSet() : info(""), tiltMode(-1,-1) {
 
 
 ModeSet::ModeSet(ModeSet&& rhs) : redux::util::Array<double>(std::move(reinterpret_cast<redux::util::Array<double>&>(rhs))),
-    info(std::move(rhs.info)), tiltMode(std::move(rhs.tiltMode)),
-    modeNumbers(std::move(rhs.modeNumbers)), modePointers(std::move(rhs.modePointers)) {
+    info(std::move(rhs.info)), tiltMode(std::move(rhs.tiltMode)), modeNumbers(std::move(rhs.modeNumbers)),
+    modePointers(std::move(rhs.modePointers)), atm_rms(std::move(rhs.atm_rms)) {
 
 }
 
 
 ModeSet::ModeSet(const ModeSet& rhs) : redux::util::Array<double>(reinterpret_cast<const redux::util::Array<double>&>(rhs)),
-    info(rhs.info), tiltMode(rhs.tiltMode),
-    modeNumbers(rhs.modeNumbers), modePointers(rhs.modePointers) {
+    info(rhs.info), tiltMode(rhs.tiltMode), modeNumbers(rhs.modeNumbers), modePointers(rhs.modePointers),
+    atm_rms(rhs.atm_rms) {
     
 }
 

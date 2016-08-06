@@ -204,7 +204,7 @@ namespace redux {
             float badPixelThreshold;
             float FTOL;
             float EPS;
-            float reg_gamma;       // not used atm.? def: 1E-4
+            float reg_alpha;
             float graddiff_step;            //!< step-length when calculating numerical derivative
             /*****************************/
 
