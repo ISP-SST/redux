@@ -429,7 +429,9 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
                 IDL_VarCopy( tmp, kw.h_init );
             }
             H_init = arrayToMat(kw.h_init);
-            if( transformCheck( H_init, imgSize, kw.max_shift, kw.max_scale ) ) {
+            Mat H_initd;
+            H_init.assignTo(H_initd,CV_64F);
+            if( transformCheck( H_initd, imgSize, kw.max_shift, kw.max_scale ) ) {
                 initializations.push_back( H_init );
             }
         }
