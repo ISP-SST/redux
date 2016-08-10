@@ -405,9 +405,10 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
 
         if( host->info.peerType & (Host::TP_WORKER|Host::TP_MASTER) ) {
             LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
+            peerWIP[host];
         }
 
-    }
+    } else LOG_DEBUG << "Host reconnected: " << host->info.name << ":" << host->info.pid << "  conn=" << hexString(conn.get()) << ende;
     
     host->touch();
     host->nConnections++;
@@ -423,21 +424,25 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
         auto wip = peerWIP.find( it->second );
         if( wip != peerWIP.end() ) {
             LOG_NOTICE << "Host #" << it->second->id << "  (" << it->second->info.name << ":" << it->second->info.pid << ") disconnected." << ende;
-            if( wip->second.job ) {
-                LOG_NOTICE << "Returning unfinished work to queue: " << wip->second.print() << ende;
-                wip->second.job->failWork( wip->second );
-            }
-            for( auto& part: wip->second.parts ) {
-                if( part ) {
-                    part->cacheLoad();
-                    part->cacheStore(true);
+            LOG_NOTICE << "    nConnections: " << it->second->nConnections << "    ptrCnt: " << it->second.use_count() << ende;
+            if( it->second->nConnections==0 ) {
+                if( wip->second.job ) {
+                    LOG_NOTICE << "Returning unfinished work to queue: " << wip->second.print() << ende;
+                    wip->second.job->failWork( wip->second );
                 }
+                for( auto& part: wip->second.parts ) {
+                    if( part ) {
+                        part->cacheLoad();
+                        part->cacheStore(true);
+                    }
+                }
+                wip->second.parts.clear();
+                wip->second.previousJob.reset();
+                peerWIP.erase(wip);
             }
-            wip->second.parts.clear();
-            wip->second.previousJob.reset();
-            peerWIP.erase(wip);
         }
         it->second->nConnections--;
+        it->second.reset();
         connections.erase(it);
     }
     conn->setErrorCallback(nullptr);
@@ -447,7 +452,6 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 }
 
 
-// TODO a timeout to allow a peer to reconnect before removing it (which would clear stats/id when/if it reconnects).
 void Daemon::cleanup( void ) {
 
     {
@@ -459,62 +463,34 @@ void Daemon::cleanup( void ) {
             } else ++it;
         }
 
-    /*    for( auto it=peers.begin(); it != peers.end(); ) {
-            if( it->second->nConnections < 1 ) {
-                /-*auto wip = peerWIP.find( it->second );
-                if( wip != peerWIP.end() ) {
-                    if( wip->second.job ) {
-                        LOG_DETAIL << "Peer #" << it->first << " disconnected, returning unfinished work to queue: " << wip->second.print() << ende;
-                        wip->second.job->ungetWork( wip->second );
-                        for( auto& part: wip->second.parts ) {
-                            part->cacheLoad();
-                            part->cacheStore(true);
-                        }
-                    }
-                    wip->second.parts.clear();
-                    wip->second.previousJob.reset();
-                    peerWIP.erase(wip);
-                }*-/
-                peers.erase( it++ );
-            } else ++it;
-        }
-     */   
-
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         for( auto it=peerWIP.begin(); it != peerWIP.end(); ) {
-            Job::JobPtr job = it->second.job;
+            Job::JobPtr& job = it->second.job;
             Host::Ptr host = it->first;
             boost::posix_time::time_duration elapsed = (now - it->second.workStarted);
             if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
                 LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << it->second.print() << ende;
-                LOG_NOTICE << "Returning unfinished work to queue: " << it->second.print() << ende;
-                job->failWork( it->second );
-                for( auto& part: it->second.parts ) {
-                    if( part ) {
-                        part->cacheLoad();
-                        part->cacheStore(true);
-                        //LOG_TRACE << "Returned part: #" << part->id << "   step=" << (int)part->step << ende;
-                    }
-                }
-                it->second.parts.clear();
-                it->second.previousJob.reset();
-                peerWIP.erase(it++);
+                failedWIP( it->second );
+                peerWIP.erase(it++);                // N.B iterator is invalidated on erase, so the postfix increment is necessary.
                 continue;
             }
             
-            if( host && host->nConnections > 0 ) {
+            if( host ) {
                 elapsed = (now - host->status.lastSeen);
                 if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
-                    LOG_NOTICE << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << "   nConn = " << host->nConnections << ende;
+                    LOG_NOTICE << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << ende;
+                    failedWIP( it->second );
                     for( auto it2 = begin(connections); it2 != end(connections); ++it2 ) {
                         if( (*it2->second) == (*host) ) {
                             it2->first->socket().close();
                             break;
                         }
                     }
+                    peerWIP.erase(it++);            // N.B iterator is invalidated on erase, so the postfix increment is necessary.
+                    continue;
                 }
             }
-
+            
             ++it;
         }
     }
@@ -525,14 +501,36 @@ void Daemon::cleanup( void ) {
             if( job && (job->info.step == Job::JSTEP_COMPLETED) ) {
                 LOG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
                 LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
-                job->logger.flushAll();
+                ioService.post( [job](){
+                    job->cleanup();
+                    job->logger.flushAll();
+                });
                 job.reset();
-                //job->cleanup();
             }
         }
         jobs.erase(std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){return (j == nullptr);}), jobs.end());
     }
 
+}
+
+
+void Daemon::failedWIP( WorkInProgress& wip ) {
+    
+    if( wip.job ) {
+        LOG_NOTICE << "Returning failed/unfinished part to queue: " << wip.print() << ende;
+        wip.job->failWork( wip );
+        for( auto& part: wip.parts ) {
+            if( part ) {
+                ioService.post( [part](){
+                    part->cacheLoad();
+                    part->cacheStore(true);
+                });
+            }
+        }
+        wip.parts.clear();
+        wip.previousJob = std::move(wip.job);
+        //it->second.job.reset();
+    }
 }
 
 
@@ -814,30 +812,39 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
         LOG_ERR << "Received empty result." << ende;
     } else {
         unique_lock<mutex> lock( peerMutex );
-        auto it = peerWIP.find(connections[conn]);
+        Host::Ptr host = connections[conn];
+        if( !host ) {
+            LOG_ERR << "This connection is not listed in connections: " << hexString(conn.get()) << "  ignoring." << ende;
+            return;
+        }
+        auto it = peerWIP.find(host);
         if( it == peerWIP.end() ) {
-            LOG_ERR << "Received results from unexpected host. (probably timed out)" << ende;
+            LOG_ERR << "This slave is not listed in peerWIP: " << host->info.name << ":" << host->info.pid << ende;
         } else {
 
             shared_ptr<WorkInProgress> wip( new WorkInProgress() );
             std::swap( it->second, *wip );
 
-            it->second.job = wip->job;
-            bool endian = conn->getSwapEndian();
-            it->first->status.state = Host::ST_IDLE;
-            string msg = "Received results from " + it->first->info.name + ":" + to_string(it->first->info.pid);
-            std::thread([this,buf,wip,endian,msg](){
-                try {
-                    wip->unpackWork( buf.get(), endian );
-                    LOG_DETAIL << msg << "   " + wip->print() << ende;
-                    //LLOG_DETAIL(wip->job->getLogger()) << msg << "   " + wip->print() << ende;
-                    wip->returnResults();
-                } catch ( exception& e ) {
-                    LOG_ERR << "putParts:  exception when unpacking results: " << e.what() << ende;
-                }
-            }).detach();
-            reply = CMD_OK;         // all ok
-            //lock.release();
+            if( wip->job ) {
+                it->second.job = wip->job;
+                bool endian = conn->getSwapEndian();
+                it->first->status.state = Host::ST_IDLE;
+                string msg = "Received results from " + it->first->info.name + ":" + to_string(it->first->info.pid);
+                std::thread([this,buf,wip,endian,msg](){
+                    try {
+                        wip->unpackWork( buf.get(), endian );
+                        LOG_DETAIL << msg << "   " + wip->print() << ende;
+                        //LLOG_DETAIL(wip->job->getLogger()) << msg << "   " + wip->print() << ende;
+                        wip->returnResults();
+                    } catch ( exception& e ) {
+                        LOG_ERR << "putParts:  exception when unpacking results: " << e.what() << ende;
+                        failedWIP(*wip);
+                    }
+                }).detach();
+                reply = CMD_OK;         // all ok
+            } else {
+                LOG_DETAIL << "Received results from unexpected host. It probably timed out." << ende;
+            }
         }
     }
     *conn << reply;
@@ -927,19 +934,26 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
     uint64_t blockSize = myInfo.size();
 
     unique_lock<mutex> lock( peerMutex );
-    for( auto & peer : peerWIP ) {
-        if( peer.first ) blockSize += peer.first->size();
+    std::set<Host::Ptr, Host::Compare> hostList;
+    for( auto& conn : connections ) {
+        if( peerWIP.find(conn.second) != peerWIP.end() ) {
+            auto ret = hostList.emplace( conn.second );
+            if( ret.second ) {
+                blockSize += conn.second->size();
+            }
+        }
     }
+    lock.unlock();
+    
     uint64_t totalSize = 2*blockSize + sizeof( uint64_t );                    // status updates might change packed size slightly, so add a margin
     shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
     char* ptr =  buf.get()+sizeof( uint64_t );
     uint64_t packedSize = myInfo.pack( ptr );
-    for( auto & peer : peerWIP ) {
-        if( peer.first ) packedSize += peer.first->pack( ptr+packedSize );
+    for( auto &host : hostList ) {
+        packedSize += host->pack( ptr+packedSize );
     }
-    lock.unlock();
     
-    if( packedSize > blockSize ) {
+    if( packedSize > 2*blockSize ) {
         string msg = "sendPeerList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
     }
@@ -951,7 +965,8 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
 
 
 void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
-    
+
+    try {
     uint32_t logid(0);
     *conn >> logid;
 
@@ -962,14 +977,26 @@ void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
     } else {
         unique_lock<mutex>( jobsMutex );
         for( Job::JobPtr & job : jobs ) {
-            if( job->info.id == logid ) {
+            if( job && (job->info.id == logid) ) {
                 job->logger.addConnection( conn, connections[conn] );
                 ret = CMD_OK;
             }
         }
     }
+    if( ret == CMD_OK ) {
+        unique_lock<mutex> lock( peerMutex );
+        auto it = connections.find(conn);
+        if( it != connections.end() ) {     // Let the Logger class deal with this connection from now on.
+            it->second->nConnections--;
+            it->second.reset();
+            connections.erase(it);
+        }
+    }
     *conn << ret;
-    
+    } catch ( const std::exception& e ) {
+        
+        
+    }
 }
 
 

@@ -44,6 +44,7 @@ namespace redux {
         void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
         void removeConnection(network::TcpConnection::Ptr);
         void cleanup(void);
+        void failedWIP( WorkInProgress& wip );
         void die( network::TcpConnection::Ptr& );
         void addJobs( network::TcpConnection::Ptr& );
         void removeJobs( network::TcpConnection::Ptr& );
