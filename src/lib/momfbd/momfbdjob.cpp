@@ -174,18 +174,18 @@ uint8_t MomfbdJob::checkParts( void ) {
 
     uint8_t mask = 0;
     for( auto & patch : patches ) {
-        if( (patch->step & JSTEP_ERR) && (patch->nRetries < info.maxPartRetries)) {
-            patch->nRetries++;
-            patch->step = JSTEP_QUEUED;
+        if( patch->step & JSTEP_ERR ) {
+            if( patch->nRetries++ < info.maxPartRetries ) {
+                patch->step = JSTEP_QUEUED;
+            }
         }
         mask |= patch->step;
     }
 
-    if( mask & JSTEP_ERR ) {    // TODO: handle failed parts.
-
-    }
-
-    if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
+    if( mask & JSTEP_ERR ) {
+        info.step.store( JSTEP_ERR );
+        info.state.store( JSTATE_ERR );
+    } else if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
         info.step.store( mask );
     }
     
@@ -199,7 +199,7 @@ bool MomfbdJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool allowStart
     bool ret(false);
     uint8_t step = info.step.load();
     wip.parts.clear();
-    if( step == JSTEP_COMPLETED ) {
+    if( step == JSTEP_COMPLETED || step == JSTEP_ERR ) {
         return false;
     }
 
@@ -265,7 +265,7 @@ void MomfbdJob::failWork( WorkInProgress& wip ) {
     for( auto& part : wip.parts ) {
         part->step = JSTEP_ERR;
     }
-    
+    checkParts();
 }
 
 
@@ -287,7 +287,7 @@ void MomfbdJob::returnResults( WorkInProgress& wip ) {
 
     info.maxProcessingTime = max<uint32_t>( info.maxProcessingTime, elapsed.total_seconds() );
     if( info.maxProcessingTime ) {
-        uint32_t newTimeout = info.maxProcessingTime * (20 - info.progress[0]*18.0/info.progress[1]);    // TBD: start with large margin, then shrink to ~2*maxProcessingTime ?
+        uint32_t newTimeout = info.maxProcessingTime * (20 - info.progress[0]*15.0/info.progress[1]);    // TBD: start with large margin, then shrink to ~5*maxProcessingTime ?
         LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds." << ende;
         info.timeout = newTimeout;    // TBD: fixed timeout or 10 * maxProcTime ?
     }
@@ -589,6 +589,7 @@ bool MomfbdJob::check(void) {
         case JSTEP_RUNNING: ;
         case JSTEP_POSTPROCESS: ;
         case JSTEP_COMPLETED: ret = true; break;
+        case JSTEP_ERR: ret = false; break;
         default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << ende;
     }
     return ret;
