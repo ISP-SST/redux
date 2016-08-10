@@ -33,7 +33,7 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
-    hostTimeout(3600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+    hostTimeout(600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
     logger.setContext( "master" );
 
