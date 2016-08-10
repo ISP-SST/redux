@@ -327,7 +327,11 @@ namespace redux {
                     std::vector<size_t> tmp;
                     count += unpack( dataPtr+count, tmp, swap_endian );
                     resize( tmp );
-                    count += unpack( dataPtr+count, datablock.get(), nElements_, swap_endian );
+                    if( datablock ) {
+                        count += unpack( dataPtr+count, datablock.get(), nElements_, swap_endian );
+                    } else {
+                        throw std::runtime_error("Array unpacking failed.");
+                    }
                 } else resize();
                 return count;
             }
@@ -1189,7 +1193,11 @@ namespace redux {
 
             void create( void ) {
                 if( dataSize ) {
-                    datablock.reset( new T[dataSize], [](T*& p){ delete[] p; p = nullptr; } );
+                    try {
+                        datablock.reset( new T[dataSize], [](T*& p){ delete[] p; p = nullptr; } );
+                    } catch( const std::bad_alloc& ba ) {
+                        datablock.reset();
+                    }
                 }
                 else {
                     datablock.reset();

@@ -56,12 +56,18 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap
     using redux::util::unpack;
     uint64_t count(0);
     if( wip.nParts ) {
-        wip.parts.resize(1);
-        wip.parts[0].reset(new PatchData(*this));
-        count += wip.parts[0]->unpack( ptr+count, swap_endian );
-        if( wip.nParts > 1 ) {
-            globalData.reset( new GlobalData(*this) );
-            count += globalData->unpack( ptr+count, swap_endian );
+        try {
+            wip.parts.resize(1);
+            wip.parts[0].reset(new PatchData(*this));
+            count += wip.parts[0]->unpack( ptr+count, swap_endian );
+            if( wip.nParts > 1 ) {
+                globalData.reset( new GlobalData(*this) );
+                count += globalData->unpack( ptr+count, swap_endian );
+            }
+        } catch( const std::exception& e ) {
+            LOG_ERR << "Unpacking of parts failed: " << e.what() << ende;
+            wip.parts.clear();
+            throw;
         }
     }
     return count;
