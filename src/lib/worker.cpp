@@ -119,6 +119,9 @@ bool Worker::getWork( void ) {
     
     if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
         if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
+            if( wip.previousJob ) {
+                wip.previousJob->logger.flushAll();
+            }
             wip.job->logger.setLevel( wip.job->info.verbosity );
             if( wip.isRemote ) {
                 if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
@@ -126,7 +129,7 @@ bool Worker::getWork( void ) {
                 }
                 TcpConnection::Ptr logConn;
                 daemon.connect( daemon.myMaster.host->info, logConn );
-                wip.job->logger.addNetwork( logConn, wip.job->info.id, 0, 100 );   // by default only send after 100 log-items
+                wip.job->logger.addNetwork( logConn, wip.job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
             }
             wip.job->init();
             wip.previousJob = wip.job;

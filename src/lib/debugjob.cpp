@@ -130,10 +130,6 @@ uint64_t DebugJob::pack( char* ptr ) const {
     count += pack( ptr+count, ySize );
     count += pack( ptr+count, coordinates, 4 );
 
-#ifdef DEBUG_
-    LOG_TRACE << "DebugJob::pack():  count=" << count << " sz=" << size() << ende;
-#endif
-    
     return count;
 
 }
@@ -150,10 +146,6 @@ uint64_t DebugJob::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, xSize, swap_endian );
     count += unpack( ptr+count, ySize, swap_endian );
     count += unpack( ptr+count, coordinates, 4, swap_endian );
-
-#ifdef DEBUG_
-    LOG_TRACE << "DebugJob::unpack():  swap_endian=" << swap_endian << "  count=" << count << " sz=" << size() << ende;
-#endif
 
     return count;
 

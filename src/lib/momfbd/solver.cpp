@@ -306,7 +306,7 @@ void Solver::run( PatchData::Ptr data ) {
     
     data->initPatch();
 
-    LOG << "Starting  patch.  index=" << data->index << "  region=" << data->roi
+    LOG << "Starting patch.  index=" << data->index << "  region=" << data->roi
         << "  nModes=" << nModes << "  nThreads=" << nThreads << ende;
     
     std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, sp::_1, sp::_2 );
@@ -397,7 +397,8 @@ void Solver::run( PatchData::Ptr data ) {
         modeCount = min<uint16_t>(modeCount,nModes);
         std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
         
-        string progressString = boost::str( boost::format(" (%03.1f%%)") % ((modeCount-job.nInitialModes)*100.0/nModes));
+        string progressString = boost::str( boost::format(" (%03.1f%%)") %
+        ((modeCount-min(job.nInitialModes,nModes))*100.0/nModes));
         myInfo.status.statusString = patchString + progressString;
         
         transform(modeNumbers,modeNumbers+nParameters,enabledModes,

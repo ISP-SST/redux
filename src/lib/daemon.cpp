@@ -35,7 +35,8 @@ namespace {
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
     hostTimeout(600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
-    logger.setContext( "master" );
+    logger.setFlushPeriod( 100 );   // delay log-flushing until we have set local/remote logging in workerInit
+    logger.setContext( myInfo.info.name + ":" +to_string(myInfo.info.pid) + " init" );
 
     uint16_t nThreads = params["threads"].as<uint16_t>();
     if( nThreads ) {
@@ -78,7 +79,9 @@ Daemon::~Daemon( void ) {
 
 void Daemon::serverInit( void ) {
 
+#ifdef DEBUG_
     LOG_TRACE << "serverInit()" << ende;
+#endif
     if( server ) {
         server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
         server->accept();
@@ -108,8 +111,10 @@ void Daemon::stop( void ) {
 
 void Daemon::maintenance( void ) {
 
-//      LOG_DEBUG << "Maintenance:   nJobs = " << jobs.size() << "  nConn = " << connections.size()
-//      << "  nPeers = " << connections.size() << " nPeerWIP = " << peerWIP.size() << " nThreads = " << threads.size() << ende;
+#ifdef DEBUG_
+      LOG_TRACE << "Maintenance:  nJobs = " << jobs.size() << "  nConn = " << connections.size() << "  nPeerWIP = " << peerWIP.size() << ende;
+#endif
+
     updateLoadAvg();
     cleanup();
     logger.flushAll();
@@ -164,7 +169,10 @@ void Daemon::workerInit( void ) {
     
     string master = params["master"].as<string>();
     
-    if( !master.empty() ) {
+    if( master.empty() ) {
+        logger.setContext( "master" );
+        logger.setFlushPeriod(1);
+    } else {
         myMaster.host.reset( new Host() );
         myMaster.host->info.connectName = master;
         myMaster.host->info.connectPort = params["port"].as<uint16_t>();
@@ -172,8 +180,10 @@ void Daemon::workerInit( void ) {
         connect( myMaster.host->info, myMaster.conn );
         TcpConnection::Ptr logConn;
         connect( myMaster.host->info, logConn );
-        logger.addNetwork( logConn, 0, Logger::getDefaultMask(), 1 );
+        int remoteLogFlushPeriod = 5;       // TODO make this a config setting.
+        logger.addNetwork( logConn, 0, Logger::getDefaultMask(), remoteLogFlushPeriod );
         logger.setContext( myInfo.info.name );
+        logger.setFlushPeriod( remoteLogFlushPeriod );
         LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
         
     }
@@ -224,7 +234,7 @@ void Daemon::connect( network::Host::HostInfo& host, network::TcpConnection::Ptr
             LOG_ERR << "Handshake with master failed  (server replied: " << cmd << ")" << ende;
             conn->socket().close();
             //myInfo.info.peerType &= ~Host::TP_WORKER;
-        } else LOG_TRACE << "Connected." << ende;
+        }
 
     }
 
@@ -317,6 +327,7 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
 
 void Daemon::activity( TcpConnection::Ptr conn ) {
 
+    
     Command cmd = CMD_ERR;
     try {
         *conn >> cmd;
@@ -577,6 +588,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
 
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
+                    LLOG_DETAIL(job->logger) << "Sanity check passed, adding to queue." << ende;
                     ids.push_back( job->info.id );
                     ids[0]++;
                     newjobs.push_back( job );
