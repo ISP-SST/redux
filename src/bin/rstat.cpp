@@ -26,8 +26,8 @@ namespace {
         options.add_options()
         ( "master,m", bpo::value<string>()->default_value( "localhost" ), "Hostname/IP of the master" )
         ( "port,p", bpo::value<string>()->default_value( "30000" ), "Port to use, either when connecting to the master." )
-        ( "jobs,j", "Get joblist" )
-        ( "slaves,s", "Get slavelist" )
+        ( "jobs,j", bpo::value<int>()->implicit_value( 0 ), "Get joblist" )
+        ( "slaves,s", bpo::value<int>()->implicit_value( 0 ), "Get slavelist" )
         ( "count,c", bpo::value<int>()->implicit_value( 0 ), "List only n first slaves/jobs, and the last." )
         ( "time,t", bpo::value<int>()->implicit_value( 1 ), "Loop and display list every (n) seconds" )
         ;
@@ -194,17 +194,23 @@ int main( int argc, char *argv[] ) {
                 cerr << "Handshake with server failed." << endl;
                 return EXIT_FAILURE;
             }
-            int c = 0;
-            int js = vm.count( "jobs" ) + vm.count( "slaves" );
-            if( vm.count( "count" ) ) c = vm["count"].as<int>();
-            if( vm.count( "jobs" ) || !js ) printJobList( conn, c );
-            if( js != 1 ) cout << endl;
-            if( vm.count( "slaves" ) || !js ) printPeerList( conn, c );
+            int maxItems = 0;
+            int hasFlags = vm.count( "jobs" ) + vm.count( "slaves" );
+            if( vm.count( "count" ) ) maxItems = vm["count"].as<int>();
+            int maxJobs = maxItems;
+            if( vm.count( "jobs" ) ) maxJobs = vm["jobs"].as<int>();
+            if( vm.count( "jobs" ) || !hasFlags ) printJobList( conn, maxJobs );
+            
+            if( hasFlags != 1 ) cout << endl;   // separator
+            
+            int maxSlaves = maxItems;
+            if( vm.count( "slaves" ) ) maxSlaves = vm["slaves"].as<int>();
+            if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves );
             while( loop ) {
                 sleep(vm["time"].as<int>());
-                if( vm.count( "jobs" ) || !js ) printJobList( conn, c );
-                if( js != 1 ) cout << endl;
-                if( vm.count( "slaves" ) || !js ) printPeerList( conn, c );
+                if( vm.count( "jobs" ) || !hasFlags ) printJobList( conn, maxJobs );
+                if( hasFlags != 1 ) cout << endl;
+                if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves );
             }
         }
     }
