@@ -72,6 +72,27 @@ bool redux::util::contains ( const string & haystack, const string & needle, boo
 }
 
 
+string redux::util::replace_n( std::string input, const std::string& loc, const std::string& replace, size_t n) {
+    
+    if(n == 0) return input;
+    
+    size_t count(0);
+    for( size_t offset = input.find(loc); offset != std::string::npos; ) {
+        count++;
+        offset = input.find(loc, offset+loc.length());
+    }
+
+    count = std::min(n, count);
+    
+    while( count-- ) {
+        boost::replace_first( input, loc, replace );
+    }
+    
+    return input;
+    
+}
+
+
 bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
 
           return std::lexicographical_compare( lhs.begin (), lhs.end (), rhs.begin (), rhs.end (),

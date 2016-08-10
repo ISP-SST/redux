@@ -41,6 +41,7 @@ namespace redux {
         bool isInteger( const std::string &s );
         bool isHex( const std::string &s );
         bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false);
+        std::string replace_n(std::string input, const std::string& loc, const std::string& replace, size_t n=1);
         bool nocaseLess(const std::string& lhs, const std::string& rhs);
         
         bool isRelative( const std::string& );

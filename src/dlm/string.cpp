@@ -289,10 +289,90 @@ IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
+
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_INT help;
+    IDL_INT max_n;
+} STR_REPLACE_KW;
+
+
+// NOTE:  The keywords MUST be listed in alphabetical order !!
+static IDL_KW_PAR str_replace_pars[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "HELP",        IDL_TYP_INT,    1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(STR_REPLACE_KW, help) },
+    { (char*) "N",           IDL_TYP_INT,    1,           0,            0, (char*) IDL_KW_OFFSETOF2(STR_REPLACE_KW, max_n) },
+    { NULL }
+};
+
+
+string strreplace_info( int lvl ) {
+    
+    string ret = "RDX_STRREPLACE";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"  ");          // newline if lvl>1
+        ret += "   Syntax:   result = rdx_strreplace(input,findstring,replacestring,/KEYWORDS)\n";
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      HELP                Display this info.\n"
+                    "      N                   How many occurances to replace (default=1)\n";
+        }
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+
+IDL_VPTR str_replace(int argc, IDL_VPTR* argv, char* argk) {
+    
+    STR_REPLACE_KW kw;
+    kw.max_n = 1;
+    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, str_replace_pars, (IDL_VPTR*)0, 255, &kw);
+    
+    if( nPlainArgs < 3 ) {
+        return IDL_StrToSTRING( (char*)"" );
+    }
+
+    IDL_VPTR strlist = argv[0];
+    IDL_ENSURE_STRING( strlist );
+    IDL_ENSURE_SIMPLE( strlist );
+    IDL_ENSURE_STRING( argv[1] );
+    IDL_ENSURE_SIMPLE( argv[1] );
+    IDL_ENSURE_STRING( argv[2] );
+    IDL_ENSURE_SIMPLE( argv[2] );
+    
+    IDL_STRING findStr = argv[1]->value.str;
+    IDL_STRING replaceStr = argv[2]->value.str;
+    
+    if ( !(strlist->flags & IDL_V_ARR) ) {
+        IDL_STRING strptr = strlist->value.str;
+        string tmp = replace_n( strptr.s, findStr.s, replaceStr.s, kw.max_n );
+        return IDL_StrToSTRING( (char*)tmp.c_str() );
+    }
+    
+    IDL_VPTR results;
+    IDL_ARRAY* strarr = strlist->value.arr;
+    IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(strarr->data);
+    IDL_MEMINT dims[] = { strarr->n_elts };    // x/y, im#, nMatches 
+    IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &results );
+    IDL_STRING* resptr = reinterpret_cast<IDL_STRING*>(results->value.arr->data);
+    for( int i=0; i<strarr->n_elts; ++i ) {
+        string tmp = replace_n( strptr[i].s, findStr.s, replaceStr.s, kw.max_n );
+        IDL_StrStore( &(resptr[i]), (char*)tmp.c_str());
+    }
+    
+    return results;
+
+
+}
+
+
 namespace {
     static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)str2ints, (char*)"RDX_STR2INTS", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, str2ints_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)ints2str, (char*)"RDX_INTS2STR", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, ints2str_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)maketemplate, (char*)"RDX_MAKE_TEMPLATE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, maketemplate_info );
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)maketemplate, (char*)"RDX_MAKE_TEMPLATE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, maketemplate_info ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)str_replace, (char*)"RDX_STRREPLACE", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, strreplace_info );
 }
 
