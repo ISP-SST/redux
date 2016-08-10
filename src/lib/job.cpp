@@ -131,7 +131,7 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(1), maxThreads(255), 
+Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(5), maxThreads(255), 
          step(JSTEP_NONE), state(JSTATE_NONE) {
 
     memset( progressString, 0, 20 );
