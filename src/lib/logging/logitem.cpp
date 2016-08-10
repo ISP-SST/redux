@@ -7,7 +7,7 @@ using namespace redux::logging;
 
 void LogItem::endEntry(void) {
     entry.finalize();
-    if( logger) {
+    if( logger ) {
         logger->append( *this );
     }
 }

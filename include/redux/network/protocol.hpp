@@ -27,6 +27,7 @@ namespace redux {
                                  CMD_CFG,
                                  CMD_DISCONNECT,
                                  CMD_LOG_CONNECT,
+                                 CMD_PUT_LOG,
                                  CMD_RESET,
                                  CMD_DIE,
                                  CMD_ERR = 255

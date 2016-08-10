@@ -52,7 +52,7 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
     ( "quiet,q", bpo::value<vector<string>>()->implicit_value( vector<string>( 1, "-1" ), "" )
       ->composing(), "Less output. (ignored if --verbosity is specified)" )
 
-    ( "log-file,L", bpo::value< vector<string> >()->default_value( vector<string>( 1, "" ), "" )
+    ( "log-file,L", bpo::value< vector<string> >()->implicit_value( vector<string>( 1, "" ), "" )
       ->composing(),
       "Print logevents to file. If no log-file name is"
       " specified the log will be written to ./<name>.log,"
@@ -65,7 +65,7 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
 
 
 
-Logger::Logger( bpo::variables_map& vm ) : LogOutput(defaultLevelMask,1) {
+Logger::Logger( bpo::variables_map& vm ) : LogOutput( defaultLevelMask, 1 ) {
 
     if( vm.count( "verbosity" ) > 0 ) {         // if --verbosity N is specified, use it.
         defaultLevelMask = LOG_UPTO(vm["verbosity"].as<int>());
@@ -128,7 +128,6 @@ void Logger::flushBuffer( void ) {
     for( auto &it: outputs ) {
         it.second->addItems( tmpQueue );
     }
-
     
 }
 
@@ -260,11 +259,20 @@ void Logger::addConnection( TcpConnection::Ptr& conn, network::Host::Ptr& host )
 
 void Logger::removeConnection( TcpConnection::Ptr& conn ) {
     
-    TcpConnection::callback oldCallback = conn->getCallback();
     unique_lock<mutex> lock( outputMutex );
     auto it = connections.find( conn );
     if( it != connections.end() ) {
-        conn->setCallback( it->second.second );
+        try {
+            if( conn ) {
+                if (it->second.second ) {
+                    conn->setCallback( it->second.second );
+                }
+                conn->socket().close();
+                //conn->idle();
+            }
+        } catch( std::exception& e ) {
+            getItem(LOG_MASK_ERROR) << "Exception caught while removing a connection: " << e.what() << ende; 
+        }
         connections.erase( it );
     }
     
@@ -273,11 +281,24 @@ void Logger::removeConnection( TcpConnection::Ptr& conn ) {
 
 void Logger::netReceive( TcpConnection::Ptr conn ) {
     
+    Command cmd = CMD_ERR;
+    try {
+        *conn >> cmd;
+        if( cmd != CMD_PUT_LOG ) {
+            throw std::exception();
+        }
+    } catch( ... ) {      // disconnected or wrong first byte -> remove connection and return.  TODO narrower catch
+        removeConnection(conn);
+        return;
+    }
+
     
+    unique_lock<mutex> lock( outputMutex );
     auto it = connections.find( conn );
     string hostname = "client";
     if( it != connections.end() ) {
         if( it->second.first ) {
+            it->second.first->touch();
             hostname = it->second.first->info.name;
             size_t pos = hostname.find_first_of(". ");
             if( pos != string::npos) {
@@ -285,15 +306,17 @@ void Logger::netReceive( TcpConnection::Ptr conn ) {
             }
         }
     }
-
+    lock.unlock();
+    
     try {
         auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists
         if( !conn->socket().is_open() ) {
-            throw exception();
+            throw runtime_error("Connection closed.");
         }
 
         size_t blockSize;
         shared_ptr<char> buf = conn->receiveBlock( blockSize );               // reply
+        *conn << CMD_OK;
 
         if( blockSize ) {
             vector<LogItemPtr> tmpQueue;
@@ -311,7 +334,9 @@ void Logger::netReceive( TcpConnection::Ptr conn ) {
             addItems(tmpQueue);
         }
 
-    } catch ( ... ) {
+    } catch ( const std::exception& e ) {
+        getItem(LOG_MASK_WARNING) << "Exception caught while receiving log messages from " << hostname
+            << ": " << e.what() << ende; 
         removeConnection(conn);
         return;
     }

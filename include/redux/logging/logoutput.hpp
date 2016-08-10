@@ -57,6 +57,8 @@ namespace redux {
             virtual ~LogOutput();
 
             
+            inline void setFlushPeriod( unsigned int fp ) { flushPeriod = fp; }
+            
             inline void setName( const std::string& n ) { name_ = n; }
             inline std::string name(void) const { return name_; }
             
