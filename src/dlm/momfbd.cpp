@@ -467,25 +467,16 @@ namespace {
         float* fPtr;
 
         // Version string
-        strPtr[0].slen = info->versionString.length();
-        strPtr[0].s = new char[strPtr->slen + 1];
-        strPtr[0].s[strPtr[0].slen] = '\0';
-        info->versionString.copy ( strPtr[0].s, strPtr[0].slen );
-        strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        IDL_StrStore(&strPtr[0], const_cast<char*>(info->versionString.c_str()));
+        // strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
 
         // Time string
-        strPtr[1].slen = info->timeString.length();
-        strPtr[1].s = new char[strPtr[1].slen + 1];
-        strPtr[1].s[strPtr[1].slen] = '\0';
-        info->timeString.copy ( strPtr[1].s, strPtr[1].slen );
-        strPtr[1].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        IDL_StrStore(&strPtr[1], const_cast<char*>(info->timeString.c_str()));
+        // strPtr[1].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
 
         // Date string
-        strPtr[2].slen = info->dateString.length();
-        strPtr[2].s = new char[strPtr[2].slen + 1];
-        strPtr[2].s[strPtr[2].slen] = '\0';
-        info->dateString.copy ( strPtr[2].s, strPtr[2].slen );
-        strPtr[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        IDL_StrStore(&strPtr[2], const_cast<char*>(info->dateString.c_str()));
+        // strPtr[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
 
         count += 3*sizeof ( IDL_STRING );
 
@@ -518,12 +509,8 @@ namespace {
             strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
             container->ptr = strPtr;
             for ( auto &fn: info->fileNames ) {
-                size_t nameLength = fn.length();
-                strPtr[i].slen = nameLength;
-                strPtr[i].s = new char[nameLength + 1];
-                strncpy ( strPtr[i].s, fn.c_str(), nameLength );
-                strPtr[i].s[nameLength] = 0;
-                strPtr[i++].stype = 0;
+                IDL_StrStore(&strPtr[i++], const_cast<char*>(fn.c_str()));
+                //strPtr[i++].stype = 0;
             }
             container->nNames = i;
             count += i * sizeof ( IDL_STRING );
