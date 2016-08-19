@@ -1242,6 +1242,7 @@ IDL_VPTR rdx_make_win( int argc, IDL_VPTR* argv, char* argk ) {
 
 }
 
+
 namespace {
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
@@ -1738,6 +1739,184 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     
+}
+
+
+namespace {
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_VPTR header;
+        IDL_INT help;
+        IDL_INT structhead;
+       // IDL_STRING split_chars;
+    } RD_KW;
+    // NOTE:  The keywords MUST be listed in alphabetical order !!
+    static IDL_KW_PAR rd_kw_pars[] = {
+        IDL_KW_FAST_SCAN,
+        { (char*) "HEADER",           IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(RD_KW,header) },
+        { (char*) "HELP",             IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(RD_KW,help) },
+        { (char*) "STRUCTHEAD",       IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(RD_KW,structhead) },
+        { NULL }
+    };
+}
+
+
+string readdata_info( int lvl ) {
+    string ret = "RDX_READDATA";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"       ");          // newline if lvl>1
+        ret += "   Syntax:   out = rdx_readdata(filename, /KEYWORDS)\n";
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      HELP                Display this info.\n"
+                    "      HEADER              Return metadata.\n"
+                    "      STRUCT              Convert metadata to an IDL struct.\n";
+        }
+    } else ret += "\n";
+    return ret;
+}
+
+
+IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
+    
+    IDL_VPTR filenames = argv[0];
+    IDL_ENSURE_SIMPLE( filenames );
+    
+    if( filenames->type != IDL_TYP_STRING ) {
+        return IDL_GettmpInt(0);
+    }
+    
+    RD_KW kw;
+    kw.header = nullptr;
+    (void)IDL_KWProcessByOffset( argc, argv, argk, rd_kw_pars, (IDL_VPTR*)0, 255, &kw );
+    
+    if( kw.help ) {
+        cout << readdata_info(2) << endl;
+        return IDL_GettmpInt(0);
+    }
+    
+    //kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
+    
+    try {
+        
+        IDL_VPTR ret;
+        shared_ptr<double> darkData, gainData, bsGainData;
+        shared_ptr<uint8_t> maskData;
+        shared_ptr<uint8_t*> mask2D;
+        shared_ptr<fftw_complex> bsOtfData;
+        double *darkPtr = nullptr;
+        double *gainPtr = nullptr;
+        double *bsGainPtr = nullptr;
+        fftw_complex *bsOtfPtr = nullptr;
+        IDL_MEMINT xCalibSize(0);
+        IDL_MEMINT yCalibSize(0);
+        
+        vector<string> existingFiles;
+        if ( !(filenames->flags & IDL_V_ARR) ) {
+            bfs::path fn( string(filenames->value.str.s) );
+            if( bfs::is_regular_file(fn) ) {
+                existingFiles.push_back( fn.string() );
+            } else return IDL_GettmpInt(0);
+        } else {
+            IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(filenames->value.arr->data);
+            for( int i=0; i<filenames->value.arr->n_elts; ++i ) {
+                bfs::path fn( string(strptr[i].s) );
+                if( bfs::is_regular_file(fn) ) {
+                    existingFiles.push_back( fn.string() );
+                }
+            }
+        }
+        size_t nImages = existingFiles.size();
+        //kw.nthreads = static_cast<UCHAR>( min<size_t>(kw.nthreads, nImages) );
+
+        if( !nImages ) { 
+            cout << "rdx_readdata: No input files." << endl;
+            return IDL_GettmpInt(0);
+        } else if ( nImages > 1 ) { 
+            cout << "rdx_readdata: Only a single file supported at the moment." << endl;
+            return IDL_GettmpInt(0);
+        }
+        
+
+        //cout << "single file:" << existingFiles[0] << endl;
+        try {
+            shared_ptr<redux::file::FileMeta> myMeta = getMeta( existingFiles[0] );
+            //cout << "nElements: " << myMeta->nElements() << endl;
+            //cout << "elementSize: " << (int)myMeta->elementSize() << endl;
+            //cout << "dataSize: " << myMeta->dataSize() << endl;
+            //cout << "nDims: " << (int)myMeta->nDims() << endl;
+            //cout << "IDLType: " << myMeta->getIDLType() << endl;
+            //cout << "Text: " << myMeta->getText() << endl;
+            vector<IDL_MEMINT> dims;
+            for( size_t i=0; i<myMeta->nDims(); ++i ) {
+                dims.push_back( myMeta->dimSize(i) );
+            }
+            std::reverse( dims.begin(), dims.end() );
+//cout << printArray(dims,"idlDims") << endl;
+            char* data = (char*)IDL_MakeTempArray( myMeta->getIDLType(), myMeta->nDims(), dims.data(), IDL_ARR_INI_NOP, &ret ); //IDL_ARR_INI_ZERO
+            readFile( existingFiles[0], data, myMeta );
+        } catch (const exception& e ) {
+            cout << "rdx_readdata: sf : unhandled exception: " << e.what() << endl;
+            return IDL_GettmpInt(0);
+        }
+
+        return ret;
+
+    
+        return IDL_GettmpInt(0);
+/*        
+        string statusString;
+        if( kw.verbose ) {
+            statusString = (kw.check?"Checking and summing ":"Summing ") + to_string(nImages)
+            + " files using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":".");
+            cout << statusString << ((kw.verbose == 1)?"\n":"") << flush;
+        }
+        
+        IDL_MEMINT dims[] = { ySize, xSize }; 
+        double* summedData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &ret ); //IDL_ARR_INI_ZERO
+        
+        unique_ptr<char[]> loadBuffer( new char[ kw.nthreads*frameSize ] );
+        char* loadPtr = loadBuffer.get();
+        
+
+        std::vector<std::thread> threads;
+        for( UCHAR t=0; t<kw.nthreads; ++t ) {
+            threads.push_back( std::thread(
+                [&](){
+                    size_t myImgIndex;
+                    size_t myThreadIndex = threadIndex.fetch_add(1);
+                    double* mySumPtr = sumPtr+myThreadIndex*nPixels;
+                    double* myTmpPtr = tmpPtr+myThreadIndex*nPixels;
+                    char* myLoadPtr = loadPtr+myThreadIndex*frameSize;
+                    shared_ptr<redux::file::FileMeta> myMeta;
+                    while( (myImgIndex=imgIndex.fetch_add(1)) < nImages ) {
+                        try {
+                            readFile( existingFiles[myImgIndex], myLoadPtr, myMeta );
+                            sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
+                            if( kw.time ) {
+                                 times[myImgIndex] = myMeta->getAverageTime().time_of_day();
+                            }
+                           size_t ns = nSummed++;
+                            if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nImages-1)));
+                        } catch( const exception& e ) {
+                            cout << "rdx_sumfiles: Failed to load file: " << existingFiles[myImgIndex] << "  Reason: " << e.what() << endl;
+                        }
+                    }
+                    std::unique_lock<mutex> lock(mtx);
+                    for( size_t i=0; i<nPixels; ++i ) summedData[i] += mySumPtr[i];
+                }));
+        }
+        for (auto& th : threads) th.join();
+*/        
+                
+        return ret;
+        
+    } catch (const exception& e ) {
+        cout << "rdx_readdata: unhandled exception: " << e.what() << endl;
+        return IDL_GettmpInt(0);
+    }
+
+
 }
 
 
@@ -2434,6 +2613,7 @@ namespace {
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_fillpix, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)load_files, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, load_files_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_mask,  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readdata, (char*)"RDX_READDATA", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readdata_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_win_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_images, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_files,  (char*)"RDX_SUMFILES",  1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_files_info );
