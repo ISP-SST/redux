@@ -150,6 +150,7 @@ namespace redux {
         std::string getLogChannel(void) { return jobLogChannel; }
         redux::logging::Logger& getLogger(void) { return logger; }
         void startLog(bool overwrite=false);
+        void printJobInfo(void);
         void stopLog(void);
         
         std::unique_lock<std::mutex> getLock(void) { return std::move( std::unique_lock<std::mutex>(jobMutex) ); }

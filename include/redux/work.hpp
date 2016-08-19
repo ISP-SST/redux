@@ -21,7 +21,10 @@ namespace redux {
         Part();
         //Part(const Part&) = delete;
         virtual ~Part();
-        virtual uint64_t size( void ) const;
+        virtual inline uint64_t size( void ) const {
+            static uint64_t fixed_sz = sizeof(id)+sizeof(step)+sizeof(nRetries)+sizeof(partType);
+            return fixed_sz;
+        }
         virtual uint64_t pack( char* ) const;
         virtual uint64_t unpack( const char*, bool swap_endian=false );
         size_t csize(void) const { return size(); };
@@ -30,7 +33,8 @@ namespace redux {
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
         uint64_t id;
         boost::posix_time::ptime partStarted;
-        uint8_t step, nRetries, partType;
+        uint16_t step;
+        uint8_t nRetries, partType;
     };
 
 

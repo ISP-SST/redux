@@ -32,7 +32,7 @@ namespace {
 }
 
 
-Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 0 ), nQueuedJobs( 0 ),
+Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
     hostTimeout(600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
     logger.setFlushPeriod( 100 );   // delay log-flushing until we have set local/remote logging in workerInit
@@ -579,19 +579,22 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                 nJobs++;
                 try {
                     count += job->unpack( ptr+count, swap_endian );
-                    job->info.id = ++jobCounter;
+                    job->info.id = jobCounter;
                     if( job->info.name.empty() ) job->info.name = "job_" + to_string( job->info.id );
                     if( job->info.logFile.empty() ) {
                         job->info.logFile = job->info.name + ".log";
                     }
                     job->startLog();
+                    job->printJobInfo();
                     if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
 
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
                     LLOG_DETAIL(job->logger) << "Sanity check passed, adding to queue." << ende;
                     ids.push_back( job->info.id );
                     ids[0]++;
+                    jobCounter++;
                     newjobs.push_back( job );
+                    job->stopLog();
                 } catch( const job_check_failed& e ) {
                     messages.push_back( e.what() );
                 }
@@ -657,19 +660,18 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
             tmpTree.put( "jobs", jobString );
             vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
+            std::set<size_t> jobSet( jobList.begin(), jobList.end() );
             unique_lock<mutex> lock( jobsMutex );
-            vector<size_t> deleted_ids; 
-            for( auto & jobId : jobList ) {
-                jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [jobId, &deleted_ids](const Job::JobPtr& j) {
-                        if( !j ) return true;
-                        if( j->info.id == jobId ) {
-                            deleted_ids.push_back(jobId);
-                            return true;
-                        }
-                        return false;
-                    }), jobs.end() );
-            }
-            if( !deleted_ids.empty() ) LOG << "Removed " << printArray(deleted_ids,"jobs") << ende;
+            jobList.clear(); 
+            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&jobSet, &jobList](const Job::JobPtr& job) {
+                    if( !job ) return true;
+                    if( jobSet.count( job->info.id ) ) {
+                        jobList.push_back(job->info.id);
+                        return true;
+                    }
+                    return false;
+                }), jobs.end() );
+            if( !jobList.empty() ) LOG << "Removed " << printArray(jobList,"jobs") << ende;
             return;
         }
         catch( const boost::bad_lexical_cast& e ) {
@@ -679,19 +681,19 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
         try {   // remove by name
             vector<string> jobList;
             boost::split( jobList, jobString, boost::is_any_of( "," ) );
+            std::set<string> jobSet( jobList.begin(), jobList.end() );
             unique_lock<mutex> lock( jobsMutex );
-            vector<string> deletedList;
-            for( auto & jobId : jobList ) {
-                jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [jobId, &deletedList](const Job::JobPtr& j) {
-                    if( !j ) return true;
-                    if( j->info.name == jobId ) {
-                        deletedList.push_back(jobId);
+            jobList.clear(); 
+            vector<size_t> deletedList;
+            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&jobSet, &deletedList](const Job::JobPtr& job) {
+                    if( !job ) return true;
+                    if( jobSet.count( job->info.name ) ) {
+                        deletedList.push_back(job->info.id);
                         return true;
                     }
                     return false;
                 }), jobs.end() );
-            }
-            if( !deletedList.empty() ) LOG << "Removed " << printArray(deletedList,"jobs") << ende;
+            if( !jobList.empty() ) LOG << "Removed " << printArray(jobList,"jobs") << ende;
             return;
         }
         catch( const std::exception& e ) {

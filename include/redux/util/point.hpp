@@ -26,7 +26,7 @@ namespace redux {
             PointType ( PointType<T>&& rhs ) : x(std::move(rhs.x)), y(std::move(rhs.y)) {}
             PointType ( const PointType<T>& rhs ) : x(rhs.x), y(rhs.y) {}
             template <typename U> PointType ( const PointType<U>& rhs ) : x(rhs.x), y(rhs.y) {}
-            static uint64_t size(void) { return 2*sizeof(T); };
+            static inline uint64_t size(void) { return 2*sizeof(T); };
             uint64_t pack(char* ptr) const {
                 uint64_t count = redux::util::pack(ptr,x);
                 count += redux::util::pack(ptr+count,y);
