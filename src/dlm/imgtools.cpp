@@ -1260,7 +1260,7 @@ namespace {
         IDL_VPTR gain;
         IDL_VPTR bs_gain;
         IDL_VPTR bs_psf;
-        IDL_VPTR time;
+        IDL_VPTR time_avg;
         IDL_VPTR xyc;
        // IDL_STRING split_chars;
     } SI_KW;
@@ -1281,7 +1281,7 @@ namespace {
         { (char*) "PADDING",          IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(SI_KW,padding) },
         { (char*) "PINHOLE_ALIGN",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,pinh_align) },
         { (char*) "SUMMED",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,summed) },
-        { (char*) "TIME",             IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time) },
+        { (char*) "TIME_AVERAGE",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_avg) },
         { (char*) "VERBOSE",          IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,verbose) },
         { (char*) "XYC",              IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,xyc) },
        // { (char*) "SPLIT_CHARS", IDL_TYP_STRING, 1, 0, 0, (char*)IDL_KW_OFFSETOF2(SI_KW,split_chars) },
@@ -1761,7 +1761,7 @@ string sum_files_info( int lvl ) {
                     "      PADDING             Padding size for the descattering procedure. (256)\n"
                     "      PINHOLE_ALIGN       Do sub-pixel alignment before summing.\n"
                     "      SUMMED              (output) Raw sum.\n"
-                    "      TIME                (output) Average timestamp from file-headers.\n"
+                    "      TIME_AVERAGE        (output) Average timestamp from file-headers.\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                     "      XYC                 (output) Coordinates of align-feature and image-shifts.\n";
         }
@@ -1932,7 +1932,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         size_t ySizePadded = ySize + 2*kw.padding;
         
         vector<boost::posix_time::time_duration> times;
-        if( kw.time ) {
+        if( kw.time_avg ) {
             times.resize( nImages );
         }
         
@@ -2105,7 +2105,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                         try {
                             readFile( existingFiles[myImgIndex], myLoadPtr, myMeta );
                             sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
-                            if( kw.time ) {
+                            if( kw.time_avg ) {
                                  times[myImgIndex] = myMeta->getAverageTime().time_of_day();
                             }
                            size_t ns = nSummed++;
@@ -2162,7 +2162,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                 if( checkedPtr[myImgIndex] == 0 ) {     // subtract discarded images
                                     try {
                                         readFile( existingFiles[myImgIndex], loadPtr, myMeta );
-                                        if( kw.time ) times[myImgIndex] = boost::posix_time::time_duration(0,0,0);
+                                        if( kw.time_avg ) times[myImgIndex] = boost::posix_time::time_duration(0,0,0);
                                         sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
                                         --nSummed;
                                         if( shifts ) {
@@ -2225,7 +2225,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             IDL_VarCopy( tmp, kw.xyc );
         }
         
-        if( kw.time ) {
+        if( kw.time_avg ) {
             boost::posix_time::time_duration avgTime(0,0,0);
             for( auto& t: times ) {
                 avgTime += t;
@@ -2235,7 +2235,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             }
             string tStr = boost::posix_time::to_simple_string(avgTime);
             IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
-            IDL_VarCopy( tmpTimeString, kw.time );
+            IDL_VarCopy( tmpTimeString, kw.time_avg );
         }
 
         if( nSummed ) {
