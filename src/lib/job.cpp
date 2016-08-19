@@ -26,11 +26,6 @@ using namespace std;
 
 namespace {
 
-    const string thisChannel = "job";
-
-    const std::string StateNames[10] = { "undefined", "preprocessed", "queued", "done", "completed", "postprocess", "idle", "active", "paused", "error" };
-    const std::string StateTags[10] = { "-", "Pre", "Q", "D", "C", "Post", "I", "A", "P", "E" };
-
     mutex globalJobMutex;
     /*const*/ Job::Info globalDefaults;
     
@@ -165,12 +160,19 @@ Job::Info::Info(const Info& rhs) {
 
 
 uint64_t Job::Info::size(void) const {
-    uint64_t sz = 4*sizeof(uint32_t) + sizeof(uint16_t) + 5;
-    sz += typeString.length() + name.length() + user.length() + host.length() + 4;
-    sz += logFile.length() + outputDir.length() + 2;
-    sz += 20;   // fixed size for progressString
-    sz += 3*sizeof(time_t);
+    
+    static uint64_t fixed_sz = 4*sizeof(uint32_t)       // id, timeout, maxProcessingTime, progress[]
+                             + 2*sizeof(uint16_t)       // maxThreads, step
+                             + 4                        // priority, verbosity, maxPartRetries, state
+                             + 3*sizeof(time_t)         // submitTime, startedTime, completedTime
+                             + 20 + 6;                  // progressString + \0 for typeString/name/user/host/logFile/outputDir
+                                                        // fixed size for progressString, so it doesn't matter if it's updated between size() & pack()
+
+    uint64_t sz = fixed_sz + typeString.length() + name.length() + user.length() + host.length();
+    sz += logFile.length() + outputDir.length();
+    
     return sz;
+    
 }
 
 
@@ -210,16 +212,17 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, verbosity);
     count += unpack(ptr+count, maxThreads);
     count += unpack(ptr+count, maxPartRetries);
-    uint8_t tmp(0);
-    count += unpack(ptr+count, tmp);
-    step.store(tmp);
-    count += unpack(ptr+count, tmp);
-    state.store(tmp);
+    uint16_t tmp16(0);
+    count += unpack(ptr+count, tmp16);
+    step.store(tmp16);
+    uint8_t tmp8(0);
+    count += unpack(ptr+count, tmp8);
+    state.store(tmp8);
     uint32_t tmp32(0);
     count += unpack(ptr+count, tmp32);
-    progress[0].store(tmp);
+    progress[0].store(tmp32);
     count += unpack(ptr+count, tmp32);
-    progress[1].store(tmp);
+    progress[1].store(tmp32);
     count += unpack(ptr+count, name);
     count += unpack(ptr+count, user);
     count += unpack(ptr+count, host);
@@ -325,8 +328,6 @@ Job::~Job(void) {
     LOG_DEBUG << "Destructing Job#" << info.id << ": (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1) << ende;
 #endif
 
-
-    cleanup();
     
     if( !cachePath.empty() ) {
         try {

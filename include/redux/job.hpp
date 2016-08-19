@@ -61,13 +61,13 @@ namespace redux {
                                JSTATE_CANCELLED = 64,
                                JSTATE_ERR       = 128           // Error flag. Should not be used, dynamic error handling is better...
                              };
-        enum Step : uint8_t { JSTEP_NONE = 0,
-                              JSTEP_SUBMIT = 1,
-                              // Intermediate steps can be defined per job. The ones listed here are needed by the Deamon class.
-                              JSTEP_COMPLETED = 64,
-                              JSTEP_ERR = 128
+        enum Step : uint16_t { JSTEP_SUBMIT = 0,
+                               // Intermediate steps can be defined per job. The ones listed here are needed by the Deamon class.
+                               JSTEP_NONE = 0x100,
+                               JSTEP_COMPLETED = 0x4000,
+                               JSTEP_ERR = 0x8000
                             };
-        constexpr static uint8_t StepUserMask = 0x3E;      // the job-specific steps
+        constexpr static uint16_t StepUserMask = 0xFF;      // the job-specific steps
 
         typedef std::shared_ptr<Job> JobPtr;
         struct JobCompare {
@@ -90,7 +90,7 @@ namespace redux {
             uint32_t id, timeout, maxProcessingTime;
             uint8_t priority, verbosity, maxPartRetries;
             uint16_t maxThreads;
-            std::atomic<uint8_t> step;
+            std::atomic<uint16_t> step;
             std::atomic<uint8_t> state;
             std::atomic<uint32_t> progress[2];
             std::string typeString, name, user, host;

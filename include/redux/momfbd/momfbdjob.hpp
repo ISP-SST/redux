@@ -40,14 +40,16 @@ namespace redux {
          */
         class MomfbdJob : public Job, public GlobalCfg {
 
-        enum Step : uint8_t { //  JSTEP_SUBMIT = 1,   Defined in job.hpp
-                    JSTEP_CHECKED = 2,
-                    JSTEP_PREPROCESS = 4,
-                    JSTEP_QUEUED = 8,
-                    JSTEP_RUNNING = 16,
-                    JSTEP_POSTPROCESS = 32
-                    //JSTEP_COMPLETED = 64,           Defined in job.hpp
-                    //JSTEP_ERR = 128                 Defined in job.hpp
+        enum Step : uint16_t { 
+                    JSTEP_CHECKED = 1,
+                    JSTEP_PREPROCESS = 2,
+                    JSTEP_QUEUED = 4,
+                    JSTEP_RUNNING = 8,
+                    JSTEP_POSTPROCESS = 0x40,
+                    JSTEP_WRITING = 0x80
+                 // JSTEP_SUBMIT = 0x100,              Defined in job.hpp
+                 // JSTEP_COMPLETED = 0x4000,          Defined in job.hpp
+                 // JSTEP_ERR = 0x8000                 Defined in job.hpp
                   };
         
         public:
