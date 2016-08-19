@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,6 +41,21 @@ namespace redux {
             }
         }
 
+
+        template <typename T>
+        struct ObjCompare {
+            bool operator()( const std::shared_ptr<T> &a, const std::shared_ptr<T> &b ) const {
+                if( !a || !b ) return a < b;
+                return ( (*a) < (*b) ); }
+        };
+
+
+        template <typename T>
+        struct PtrCompare {
+            bool operator()( const std::shared_ptr<T> &a, const std::shared_ptr<T> &b ) const {
+                if( !a || !b ) return a < b;
+                return ( a.get() < b.get() ); }
+        };
 
 
         /*! @brief Find the new location of element "i" after transposing an MxN matrix.
