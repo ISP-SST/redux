@@ -890,7 +890,7 @@ namespace redux {
             
             
             
-            virtual void zero( void ) { if( nElements_ ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
+            virtual void zero( void ) { if( nElements_ && datablock ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
 
 
             template <typename U, typename V>
@@ -1012,8 +1012,8 @@ namespace redux {
              *
              */
             //@{
-            T* get( void ) { return datablock.get(); };
-            const T* get( void ) const { return datablock.get(); };
+            inline T* get( void ) { return datablock.get(); };
+            inline const T* get( void ) const { return datablock.get(); };
             template <typename ...S>
             auto reshape(S ...s) -> std::shared_ptr<typename redux::util::detail::Dummy<T,S...>::dataType> {
                 return redux::util::reshapeArray(datablock.get(),s...);
