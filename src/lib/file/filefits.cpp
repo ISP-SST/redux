@@ -60,7 +60,7 @@ namespace {
     
     int getDataType( fitsfile* ff, int bitpix ) {
         
-        int status;
+        int status(0);
         long bzero(0);
         float bscale(0);
         if( fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status ) ) {
@@ -179,18 +179,18 @@ void Fits::read( const std::string& filename ) {
         return;
     }
     
-    cout << "bitpix: " << primaryHDU.bitpix << endl;
+    //cout << "bitpix: " << primaryHDU.bitpix << endl;
     
     primaryHDU.dataType = getDataType( fitsPtr_, primaryHDU.bitpix );
     primaryHDU.elementSize = getElementSize( primaryHDU.dataType );
-    cout << "dataType: " << primaryHDU.dataType << endl;
-    cout << "elementSize: " << primaryHDU.elementSize << endl;
+    //cout << "dataType: " << primaryHDU.dataType << endl;
+    //cout << "elementSize: " << primaryHDU.elementSize << endl;
     
     if( fits_read_key( fitsPtr_, TINT, "NAXIS", &primaryHDU.nDims, NULL, &status_ ) ) {
         fits_report_error(stderr, status_);
         return;
     }
-    cout << "naxis: " << primaryHDU.nDims << endl;
+    //cout << "naxis: " << primaryHDU.nDims << endl;
     
     primaryHDU.nElements = 0;
     if( primaryHDU.nDims > 0 ) {
@@ -205,30 +205,30 @@ void Fits::read( const std::string& filename ) {
             }
             primaryHDU.nElements *= primaryHDU.dims[i];
         }
-        cout << printArray(primaryHDU.dims,"dims") << endl;
+        //cout << printArray(primaryHDU.dims,"dims") << endl;
     }
     
-    int nkeys, keypos, hdutype;
-    for (int ii = 1; !(fits_movabs_hdu(fitsPtr_, ii, &hdutype, &status_) ); ii++) 
-    {
+    //int nkeys, keypos, hdutype;
+    //for (int ii = 1; !(fits_movabs_hdu(fitsPtr_, ii, &hdutype, &status_) ); ii++) 
+    //{
         /* get no. of keywords */
-        if (fits_get_hdrpos(fitsPtr_, &nkeys, &keypos, &status_) )
-            fits_report_error(stderr, status_);
+        //if (fits_get_hdrpos(fitsPtr_, &nkeys, &keypos, &status_) ) {
+            //fits_report_error(stderr, status_);
+        //}
+        //printf("Header listing for HDU #%d:\n", ii);
+        //for (int jj = 1; jj <= nkeys; jj++)  {
+        //    if ( fits_read_record(fitsPtr_, jj, card, &status_) )
+        //         fits_report_error(stderr, status_);
 
-        printf("Header listing for HDU #%d:\n", ii);
-        for (int jj = 1; jj <= nkeys; jj++)  {
-            if ( fits_read_record(fitsPtr_, jj, card, &status_) )
-                 fits_report_error(stderr, status_);
+            //printf("%s\n", card); /* print the keyword card */
+        //}
+        //printf("END\n\n");  /* terminate listing with END */
+    //}
 
-            printf("%s\n", card); /* print the keyword card */
-        }
-        printf("END\n\n");  /* terminate listing with END */
-    }
-
-    if (status_ == END_OF_FILE)   /* status values are defined in fitsioc.h */
-        status_ = 0;              /* got the expected EOF error; reset = 0  */
-    else
-       fits_report_error(stderr, status_);    /* got an unexpected error                */
+//     if (status_ == END_OF_FILE)   /* status values are defined in fitsioc.h */
+//         status_ = 0;              /* got the expected EOF error; reset = 0  */
+//     else
+//        fits_report_error(stderr, status_);    /* got an unexpected error                */
     
     
 }
@@ -462,21 +462,21 @@ template <typename T>
 void redux::file::Fits::read( const string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Fits>& hdr ) {
 
     if( !hdr.get() ) {
-    cout << "Fits::read: making new hdr" << endl;
+    //cout << "Fits::read: making new hdr" << endl;
         hdr.reset( new Fits() );
     }
     hdr->read( filename );
 
     // fits stores the dimensions with the fast index first, so swap them before allocating the array
     int nDims = hdr->primaryHDU.nDims;
-    cout << "Fits::read: nDims = " << nDims << endl;
+    //cout << "Fits::read: nDims = " << nDims << endl;
     int nArrayDims = data.nDimensions();
     size_t nElements = 1;
     bool forceResize = ( nArrayDims < nDims );
     std::vector<size_t> dimSizes( nDims, 0 );
-    cout << "Fits::read: filename = " << filename << endl;
-    cout << "Fits::read: " << __LINE__ << printArray(hdr->primaryHDU.dims,"  fdims") << endl;
-    cout << "Fits::read: " << __LINE__ << printArray(data.dimensions(),"  ddims") << endl;
+    //cout << "Fits::read: filename = " << filename << endl;
+    //cout << "Fits::read: " << __LINE__ << printArray(hdr->primaryHDU.dims,"  fdims") << endl;
+    //cout << "Fits::read: " << __LINE__ << printArray(data.dimensions(),"  ddims") << endl;
     for( int i( 0 ); i < nDims; ++i ) {
         dimSizes[i] = hdr->primaryHDU.dims[nDims - i - 1];
         if( !forceResize && ( dimSizes[i] != data.dimSize( nArrayDims - nDims + i ) ) ) {
@@ -484,17 +484,17 @@ void redux::file::Fits::read( const string& filename, redux::util::Array<T>& dat
         }
         nElements *= dimSizes[i];
     }
-    cout << "Fits::read: " << __LINE__ << "  forceResize="  << forceResize << endl;
-    cout << "Fits::read: " << __LINE__ << "  nElements="  << nElements << endl;
+    //cout << "Fits::read: " << __LINE__ << "  forceResize="  << forceResize << endl;
+    //cout << "Fits::read: " << __LINE__ << "  nElements="  << nElements << endl;
 
     if( forceResize ) {
         data.resize( dimSizes );
-        cout << "Fits::read: " << __LINE__ << printArray(data.dimensions(),"  nddims") << endl;
+        //cout << "Fits::read: " << __LINE__ << printArray(data.dimensions(),"  nddims") << endl;
     }
 
     size_t dataSize = hdr->primaryHDU.nElements * hdr->primaryHDU.elementSize;
     if( dataSize ) {
-        cout << "Fits::read: " << __LINE__ << "  dataSize = "  << dataSize << endl;
+        //cout << "Fits::read: " << __LINE__ << "  dataSize = "  << dataSize << endl;
         auto tmp = std::shared_ptr<char>( new char[dataSize], []( char * p ) { delete[] p; } );
         read( hdr, tmp.get() );
         switch( hdr->primaryHDU.dataType ) {
@@ -508,7 +508,7 @@ void redux::file::Fits::read( const string& filename, redux::util::Array<T>& dat
             case( TDOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
             default: cerr << "Fits::read: " << __LINE__ << "  unsupported data type: "  << hdr->primaryHDU.dataType << endl;
         }
-        cout << "Fits::read: " << __LINE__ << "  nElements="  << nElements << endl;
+        //cout << "Fits::read: " << __LINE__ << "  nElements="  << nElements << endl;
     }
 }
 template void redux::file::Fits::read( const string& filename, redux::util::Array<uint8_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
@@ -523,10 +523,10 @@ template void redux::file::Fits::read( const string& filename, redux::util::Arra
 template <typename T>
 void redux::file::Fits::read( const string& filename, redux::image::Image<T>& image, bool metaOnly ) {
     std::shared_ptr<Fits> hdr = static_pointer_cast<Fits>( image.meta );
-    cout << "Fits::read: " << __LINE__ << "  hdr ="  << hexString(hdr.get()) << "  mO = " << metaOnly << endl;
+    //cout << "Fits::read: " << __LINE__ << "  hdr ="  << hexString(hdr.get()) << "  mO = " << metaOnly << endl;
     if( !hdr ) {
         hdr.reset( new Fits() );
-        cout << "Fits::read: " << __LINE__ << "  new FitsHdr = " << hexString(hdr.get()) << endl;
+        //cout << "Fits::read: " << __LINE__ << "  new FitsHdr = " << hexString(hdr.get()) << endl;
         image.meta = hdr;
     }
     if( metaOnly ) {
@@ -534,7 +534,7 @@ void redux::file::Fits::read( const string& filename, redux::image::Image<T>& im
     } else {
         read( filename, image, hdr );
     }
-    cout << "Fits::read: " << __LINE__ << "  hdr ="  << hexString(hdr.get()) << "  meta = " << hexString(image.meta.get()) << endl;
+    //cout << "Fits::read: " << __LINE__ << "  hdr ="  << hexString(hdr.get()) << "  meta = " << hexString(image.meta.get()) << endl;
 }
 template void redux::file::Fits::read( const string & filename, redux::image::Image<uint8_t>& image, bool );
 template void redux::file::Fits::read( const string & filename, redux::image::Image<int16_t>& image, bool );
