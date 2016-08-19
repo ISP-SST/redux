@@ -35,9 +35,8 @@ void ChannelData::initPatch(void) {
 
 
 uint64_t ChannelData::size( void ) const {
-    uint64_t sz = channelOffset.size() + offset.size() + residualOffset.size();
-    sz += images.size();
-    return sz;
+    static uint64_t fixed_sz = channelOffset.size() + offset.size() + residualOffset.size();
+    return fixed_sz + images.size();
 }
 
 
@@ -65,6 +64,21 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
 
 void ChannelData::cclear(void) {
     images.clear();
+}
+
+
+const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
+    
+    images = rhs.images;
+    cutout = rhs.cutout;
+    channelOffset = rhs.channelOffset;
+    offset = rhs.offset;
+    residualOffset = rhs.residualOffset;
+
+    isLoaded = images.nElements();
+    
+    return *this;
+    
 }
 
 
@@ -175,6 +189,31 @@ void ObjectData::cclear(void) {
     res.clear();
     alpha.clear();
     div.clear();
+}
+
+
+const ObjectData& ObjectData::operator=( const ObjectData& rhs ) {
+    
+    if( channels.size() != rhs.channels.size() ) {
+        throw runtime_error("Can not copy ObjectData if they contain different number of channels.");
+    }
+
+    img = rhs.img;
+    psf = rhs.psf;
+    cobj = rhs.cobj;
+    res = rhs.res;
+    alpha = rhs.alpha;
+    div = rhs.div;
+    
+    isLoaded = (img.nElements() || psf.nElements() || cobj.nElements()
+             || res.nElements() || alpha.nElements() || div.nElements() );
+
+    for( size_t i=0; i<channels.size(); ++i ) {
+        channels[i] = rhs.channels[i];
+    }
+    
+    return *this;
+    
 }
 
 
@@ -302,6 +341,15 @@ Pupil& GlobalData::get(const PupilInfo& id, const Pupil& ms) {
 }
 
 
+bool GlobalData::verify( void ) const {
+
+    if( !constraints.verify() ) return false;
+    
+    return true;
+    
+}
+
+
 uint64_t GlobalData::size( void ) const {
     uint64_t sz = 2*sizeof(uint16_t); // nModes & nPupils
     for( auto& mode: modes) {
@@ -319,6 +367,7 @@ uint64_t GlobalData::size( void ) const {
 
 uint64_t GlobalData::pack( char* ptr ) const {
     using redux::util::pack;
+    unique_lock<mutex> lock(const_cast<mutex&>(mtx));
     uint64_t count = pack(ptr,(uint16_t)modes.size());
     for(auto& mode: modes) {
         count += mode.first.pack(ptr+count);
@@ -336,6 +385,7 @@ uint64_t GlobalData::pack( char* ptr ) const {
 
 uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
+    unique_lock<mutex> lock(mtx);
     uint16_t tmp;
     uint64_t count = unpack(ptr,tmp,swap_endian);
     if(tmp) {

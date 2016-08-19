@@ -58,6 +58,7 @@ namespace redux {
             uint64_t cpack(char* p) const { return pack(p); };
             uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
             void cclear(void);
+            const ChannelData& operator=(const ChannelData&);
 
             std::shared_ptr<Channel> myChannel;
             
@@ -83,6 +84,7 @@ namespace redux {
             bool cacheLoad(bool removeAfterLoad=false);
             bool cacheStore(bool clearAfterStore=false);
             void cclear(void);
+            const ObjectData& operator=(const ObjectData&);
             
             std::vector<redux::util::Compressed<ChannelData,5>> channels;
             
@@ -125,6 +127,8 @@ namespace redux {
             bool cacheStore(bool clearAfterStore=false);
 
             bool operator==(const PatchData&);
+            const PatchData& operator=(const PatchData&);
+            
         };
        
         struct GlobalData : public Part {   // Used for sending e.g. modes/pupils to the slaves.
@@ -133,9 +137,10 @@ namespace redux {
             std::map<ModeInfo, ModeSet&> modes;
             std::map<redux::image::PupilInfo, redux::image::Pupil&> pupils;
             Constraints constraints;
-            explicit GlobalData(const MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
+            explicit GlobalData(MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
             ModeSet& get(const ModeInfo&, const ModeSet& ms=ModeSet());
             redux::image::Pupil& get(const redux::image::PupilInfo&, const redux::image::Pupil& ms=redux::image::Pupil());
+            bool verify(void) const;
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
