@@ -27,7 +27,7 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 
-LogOutput::LogOutput( uint8_t m, unsigned int flushPeriod ) : flushPeriod(flushPeriod), mask(m),
+LogOutput::LogOutput( uint8_t m, unsigned int flushPeriod ) : flushPeriod(flushPeriod), async_(false), mask(m),
         itemCount(0) {
 
 }
@@ -35,17 +35,6 @@ LogOutput::LogOutput( uint8_t m, unsigned int flushPeriod ) : flushPeriod(flushP
 
 LogOutput::~LogOutput( )  {
     
-    this->flushBuffer();
-
-}
-
-
-void LogOutput::maybeFlush( void ) {
-    unique_lock<mutex> lock(flushMutex);
-    if( (flushPeriod == 0) || (itemCount > flushPeriod) ) {
-        this->flushBuffer();
-        itemCount = 0;
-    }
 }
 
 
@@ -54,16 +43,32 @@ void LogOutput::addItem( LogItemPtr item ) {
     unique_lock<mutex> lock(queueMutex);
     itemQueue.push_back(item);
     itemCount = itemQueue.size();
-    std::thread( std::bind(&LogOutput::maybeFlush, this) ).detach();
+    if( (flushPeriod == 0) || (itemCount > flushPeriod) ) {
+        if(async_) {
+            std::thread( std::bind(&LogOutput::flushBuffer, this) ).detach();
+        } else {
+            lock.unlock();
+            this->flushBuffer();
+        }
+    }
     
 }
 
 
 void LogOutput::addItems( const vector<LogItemPtr>& items ) {
     
+    if( items.empty() ) return;
+    
     unique_lock<mutex> lock(queueMutex);
     std::move( std::begin(items), std::end(items), back_inserter(itemQueue) );
     itemCount = itemQueue.size();
-    std::thread( std::bind(&LogOutput::maybeFlush,this) ).detach();
+    if( (flushPeriod == 0) || (itemCount > flushPeriod) ) {
+        if(async_) {
+            std::thread( std::bind(&LogOutput::flushBuffer, this) ).detach();
+        } else {
+            lock.unlock();
+            this->flushBuffer();
+        }
+    }
 
 }

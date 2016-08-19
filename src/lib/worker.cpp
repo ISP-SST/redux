@@ -18,7 +18,8 @@ namespace {
 }
 
 
-Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), daemon( d ), myInfo(Host::myInfo()) {
+Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), wip(new WorkInProgress()),
+    daemon( d ), myInfo(Host::myInfo()) {
 
 }
 
@@ -32,13 +33,20 @@ void Worker::init( void ) {
 
     runTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 1 ) );
     runTimer.async_wait(strand.wrap(boost::bind(&Worker::run, this)));
+    workLoop.reset( new boost::asio::io_service::work(ioService) );
+
+    for( uint16_t t=0; t < myInfo.status.nThreads; ++t ) {
+        pool.create_thread( boost::bind( &boost::asio::io_service::run, &ioService ) );
+    }
 
 }
 
 
 void Worker::stop( void ) {
 
+    workLoop.reset();
     ioService.stop();
+    pool.join_all();
 
 }
 
@@ -60,17 +68,19 @@ bool Worker::fetchWork( void ) {
             if( blockSize ) {
 
                 const char* ptr = buf.get();
-                uint64_t count = wip.unpackWork( ptr, conn->getSwapEndian() );
+                uint64_t count = wip->unpackWork( ptr, conn->getSwapEndian() );
 
                 if( count != blockSize ) {
                     throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
                 }
-                wip.isRemote = true;
+                wip->isRemote = true;
                 
-                LLOG_TRACE(daemon.logger) << "Received work: " << wip.print() << ende;
+                LLOG_TRACE(daemon.logger) << "Received work: " << wip->print() << ende;
                 
                 ret = true;
                 
+            } else {
+                // This just means there is no work available at the moment.
             }
 
         }
@@ -96,59 +106,65 @@ bool Worker::fetchWork( void ) {
 
 bool Worker::getWork( void ) {
 
-    if( wip.isRemote ) {            // remote work: return parts.
+    if( wip->isRemote ) {            // remote work: return parts.
         returnWork();
         int count(0);
-        while( wip.hasResults && count++ < 5 ) {
+        while( wip->hasResults && count++ < 5 ) {
             LLOG_DEBUG(daemon.logger) << "Failed to return data, trying again in 5 seconds." << ende;
             runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(5));
             runTimer.wait();
             returnWork();
         }
         myInfo.active();
-    } else if ( wip.hasResults ) {
-        wip.returnResults();
+    } else if ( wip->hasResults ) {
+        wip->returnResults();
         myInfo.active();
     }
 
-    if( wip.hasResults ) {
+    if( wip->hasResults ) {
         LLOG_WARN(daemon.logger) << "Failed to return data, this part will be discarded." << ende;
     }
     
-    wip.isRemote = wip.hasResults = false;
+    try {
+        
+        wip->isRemote = wip->hasResults = false;
+        shared_ptr<Job> previousJob = wip->job;     // keep a temporary pointer while getting next job.
+        wip->previousJob = wip->job;
+        if( wip->job ) {
+            wip->job->logger.flushAll();
+        }
     
-    if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-        if( wip.job && (!wip.previousJob || *(wip.job) != *(wip.previousJob)) ) {
-            if( wip.previousJob ) {
-                wip.previousJob->logger.flushAll();
-            }
-            wip.job->logger.setLevel( wip.job->info.verbosity );
-            if( wip.isRemote ) {
-                if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
-                    wip.job->logger.addLogger( daemon.logger );
+        if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
+           if( wip->job && (!previousJob || *(wip->job) != *(previousJob)) ) {
+                wip->job->logger.setLevel( wip->job->info.verbosity );
+                if( wip->isRemote ) {
+                    if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
+                        wip->job->logger.addLogger( daemon.logger );
+                    }
+                    TcpConnection::Ptr logConn;
+                    daemon.connect( daemon.myMaster.host->info, logConn );
+                    wip->job->logger.addNetwork( logConn, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
                 }
-                TcpConnection::Ptr logConn;
-                daemon.connect( daemon.myMaster.host->info, logConn );
-                wip.job->logger.addNetwork( logConn, wip.job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
+                wip->job->init();
+                wip->previousJob = wip->job;
             }
-            wip.job->init();
-            wip.previousJob = wip.job;
+            for( auto& part: wip->parts ) {
+                part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
+            }
+            myInfo.active();
+            myInfo.status.statusString = "...";
+            return true;
         }
-        for( auto& part: wip.parts ) {
-            part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
-        }
-        myInfo.active();
-        myInfo.status.statusString = "...";
-        return true;
+    } catch (const std::exception& e) {
+        LLOG_TRACE(daemon.logger) << "Failed to get new work: reson: " << e.what() << ende;
     }
     
 #ifdef DEBUG_
     LLOG_TRACE(daemon.logger) << "No work available." << ende;
 #endif
 
-    wip.job.reset();
-    wip.previousJob.reset();
-    wip.parts.clear();
+    wip->job.reset();
+    wip->parts.clear();
     
     myInfo.status.state = Host::ST_IDLE;
     myInfo.status.statusString = "idle";
@@ -160,7 +176,7 @@ bool Worker::getWork( void ) {
 
 void Worker::returnWork( void ) {
 
-    if( wip.hasResults ) {
+    if( wip->hasResults ) {
         
         try {
             
@@ -168,8 +184,8 @@ void Worker::returnWork( void ) {
 
             if( conn && conn->socket().is_open() ) {
 
-                LLOG_DEBUG(daemon.logger) << "Returning result: " + wip.print() << ende;
-                uint64_t blockSize = wip.workSize();
+                LLOG_DEBUG(daemon.logger) << "Returning result: " + wip->print() << ende;
+                uint64_t blockSize = wip->workSize();
                 size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
                 
                 shared_ptr<char> data( new char[totalSize], []( char* p ){ delete[] p; } );
@@ -178,7 +194,7 @@ void Worker::returnWork( void ) {
                 uint64_t count = pack( ptr, CMD_PUT_PARTS );
                 count += pack( ptr+count, blockSize );
                 if(blockSize) {
-                    count += wip.packWork(ptr+count);
+                    count += wip->packWork(ptr+count);
 
                 }
 
@@ -188,7 +204,7 @@ void Worker::returnWork( void ) {
                 *(conn) >> cmd;
                 
                 if( cmd == CMD_OK ) {
-                    wip.hasResults = false;
+                    wip->hasResults = false;
                 } 
                 
             }
@@ -211,14 +227,12 @@ void Worker::returnWork( void ) {
 void Worker::run( void ) {
 
     static int sleepS(1);
-
- //   LOG_TRACE << "run:   nWipParts = " << wip.parts.size() << "  conn = " << hexString(wip.connection.get()) << "  job = " << hexString(wip.job.get());
+ //   LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
     while( getWork() ) {
-        //cout << "Worker::run()  got work, calling run..." << endl;
         sleepS = 1;
         try {
-            while( wip.job && wip.job->run( wip, ioService, myInfo.status.nThreads ) ) ;
-            if( wip.job ) wip.job->logger.flushAll(); 
+            while( wip->job && wip->job->run( wip, ioService, myInfo.status.nThreads ) ) ;
+            if( wip->job ) wip->job->logger.flushAll(); 
         }
         catch( const exception& e ) {
             LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;

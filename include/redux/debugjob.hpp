@@ -42,7 +42,7 @@ namespace redux {
         };
         typedef std::shared_ptr<DebugPart> PartPtr;
         
-        uint64_t unpackParts(const char*, WorkInProgress&, bool);
+        uint64_t unpackParts(const char*, WorkInProgress::Ptr, bool);
 
     public:
 
@@ -61,11 +61,11 @@ namespace redux {
         
         bool check(void);
         
-        bool getWork(WorkInProgress&, uint16_t, bool);
-        void ungetWork(WorkInProgress&);
-        void returnResults(WorkInProgress&);
+        bool getWork(WorkInProgress::Ptr, uint16_t, bool);
+        void ungetWork(WorkInProgress::Ptr);
+        void returnResults(WorkInProgress::Ptr);
         
-        bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
+        bool run( WorkInProgress::Ptr, boost::asio::io_service&, uint16_t );
 
     private:
 

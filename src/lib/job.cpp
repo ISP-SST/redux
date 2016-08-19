@@ -129,8 +129,6 @@ string Job::stateTag(uint8_t state) {
 Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(5), maxThreads(255), 
          step(JSTEP_NONE), state(JSTATE_NONE) {
 
-    memset( progressString, 0, 20 );
-
 }
 
 
@@ -151,13 +149,12 @@ Job::Info::Info(const Info& rhs) {
     host = rhs.host;
     logFile = rhs.logFile;
     outputDir = rhs.outputDir;
-    memset( progressString, 0, 20 );
+    progressString = "";
     submitTime = rhs.submitTime;
     startedTime = rhs.startedTime;
     completedTime = rhs.completedTime;
 
 }
-
 
 uint64_t Job::Info::size(void) const {
     
@@ -192,8 +189,7 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, name);
     count += pack(ptr+count, user);
     count += pack(ptr+count, host);
-    string tmpS(progressString);
-    count += pack(ptr+count, tmpS);
+    count += pack(ptr+count, progressString);
     count += pack(ptr+count, logFile);
     count += pack(ptr+count, outputDir);
     count += pack(ptr+count, redux::util::to_time_t(submitTime));
@@ -226,10 +222,7 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, name);
     count += unpack(ptr+count, user);
     count += unpack(ptr+count, host);
-    memset( progressString, 0, 20 );
-    string tmpS;
-    count += unpack(ptr+count, tmpS);
-    strncpy( progressString, tmpS.c_str(), 19 );
+    count += unpack(ptr+count, progressString);
     count += unpack(ptr+count, logFile);
     count += unpack(ptr+count, outputDir);
     time_t timestamp;

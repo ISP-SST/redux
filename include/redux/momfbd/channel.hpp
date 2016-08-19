@@ -6,6 +6,7 @@
 
 #include <redux/image/image.hpp>
 #include <redux/util/arraystats.hpp>
+#include <redux/util/progresswatch.hpp>
 #include <redux/util/region.hpp>
 
 #include <future>
@@ -80,9 +81,9 @@ namespace redux {
             void initCache(void);
             
             void loadCalib(boost::asio::io_service&);
-            void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
+            void loadData(boost::asio::io_service&);
             void storePatches(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
-            void unloadCalib(void);
+            void unloadData(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
             void loadFile( size_t index );
@@ -110,6 +111,7 @@ namespace redux {
             /*************   Local variables for   ***************/
             /*************   Processing on slave   ***************/
             std::mutex mtx;
+            redux::util::ProgressWatch progWatch;
             std::vector<std::shared_ptr<SubImage>> subImages;
             redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
             redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel

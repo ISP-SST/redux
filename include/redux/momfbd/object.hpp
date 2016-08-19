@@ -7,6 +7,7 @@
 
 #include "redux/util/array.hpp"
 #include "redux/util/point.hpp"
+#include "redux/util/progresswatch.hpp"
 #include "redux/work.hpp"
 
 #include <boost/asio.hpp>
@@ -72,7 +73,7 @@ namespace redux {
             void addAllPQ(void);
             void fitAvgPlane(ObjectData&);
             void calcMetric(void);
-            double metric(void) const { return currentMetric; };
+            inline double metric(void) const { return currentMetric; };
             /*****************************************************/
             
             void dump( std::string tag );
@@ -88,13 +89,14 @@ namespace redux {
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
             void writeResults(const redux::util::Array<PatchData::Ptr>&);
-            void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
+            void storePatches( WorkInProgress::Ptr, boost::asio::io_service&, uint8_t );
             
             redux::util::Point16 getImageSize(void);
             
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/
             std::mutex mtx;
+            redux::util::ProgressWatch progWatch;
             redux::util::Array<double>  ftSum;                              //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;
             redux::util::Array<complex_t> P;

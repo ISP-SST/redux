@@ -5,6 +5,7 @@
 #include <redux/logging/logoutput.hpp>
 #include <redux/network/host.hpp>
 #include <redux/network/tcpconnection.hpp>
+#include <redux/util/datautil.hpp>
 
 
 #include <mutex>
@@ -25,6 +26,7 @@ namespace redux {
 
             Logger(void);
             Logger( bpo::variables_map& );
+            ~Logger();
             
             void append( LogItem& );
             void flushBuffer( void );
@@ -33,11 +35,11 @@ namespace redux {
             void addLogger( Logger& );      // forward output to another Logger instance.
             void addStream( std::ostream&, uint8_t m=0, unsigned int flushPeriod=1 );
             void addFile( const std::string &filename, uint8_t m=0, bool replace=false, unsigned int flushPeriod=1 );
-            void addNetwork( const network::TcpConnection::Ptr&, uint32_t id, uint8_t m=0, unsigned int flushPeriod=5 );
+            void addNetwork( const network::TcpConnection::Ptr, uint32_t id, uint8_t m=0, unsigned int flushPeriod=5 );
             void removeOutput( const std::string& );
             void removeAllOutputs( void );
-            void addConnection( network::TcpConnection::Ptr& conn, network::Host::Ptr& host );
-            void removeConnection( network::TcpConnection::Ptr& conn );
+            void addConnection( network::TcpConnection::Ptr conn, network::Host::Ptr host );
+            void removeConnection( network::TcpConnection::Ptr conn );
             void netReceive( network::TcpConnection::Ptr conn );
             void setContext( const std::string& c ) { context = c; };
             
@@ -69,8 +71,8 @@ namespace redux {
             OutputMap outputs;
             std::mutex outputMutex;
             
-            typedef std::pair<network::Host::Ptr, network::TcpConnection::callback> host_info_t;
-            std::map<network::TcpConnection::Ptr, host_info_t> connections;
+            std::map<network::TcpConnection::Ptr, network::Host::Ptr,
+                     redux::util::PtrCompare<network::TcpConnection>> connections;
             
             static uint8_t defaultLevelMask;
             static thread_local LogItem threadItem;

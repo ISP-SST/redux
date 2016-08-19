@@ -308,11 +308,31 @@ bool PatchData::cacheStore(bool clearAfterStore) {
     return stored;
 }
 
+
 bool PatchData::operator==(const PatchData& rhs) {
     if(Part::operator==(rhs)) {
         return (index == rhs.index);
     }
     return false;
+}
+
+
+const PatchData& PatchData::operator=( const PatchData& rhs ) {
+    
+    if( objects.size() != rhs.objects.size() ) {
+        throw runtime_error("Can not copy PatchData if they contain different number of objects.");
+    }
+    
+    index = rhs.index;
+    roi = rhs.roi;
+    finalMetric = rhs.finalMetric;
+
+    for( size_t i=0; i<objects.size(); ++i ) {
+        objects[i] = rhs.objects[i];
+    }
+    
+    return *this;
+    
 }
 
 

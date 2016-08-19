@@ -36,7 +36,8 @@ namespace redux {
         class LogOutput {
             
             unsigned int flushPeriod;
-            void maybeFlush( void );
+            bool async_;
+            //void maybeFlush( void );
             
         protected:
 
@@ -50,6 +51,7 @@ namespace redux {
             std::string name_;
 
             virtual void flushBuffer( void ) {};
+            void setAsync( bool a ) { async_ = a; }
             
             LogOutput( uint8_t m=LOG_MASK_ANY, unsigned int flushPeriod=1 );
 

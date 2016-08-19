@@ -101,6 +101,17 @@ Logger::Logger(void) : LogOutput(defaultLevelMask,1) {
 }
 
 
+Logger::~Logger() {
+
+    this->flushAll();
+    
+    // clear them now so that the flushBuffer call from the LogOutput destructor does not attempt to access deleted items.
+    connections.clear();
+    outputs.clear();
+
+}
+
+
 void Logger::append( LogItem &i ) {
     
     if( mask && !(i.entry.getMask() & mask) ) {
@@ -122,6 +133,7 @@ void Logger::flushBuffer( void ) {
     unique_lock<mutex> lock( queueMutex );
     vector<LogItemPtr> tmpQueue( itemQueue.begin(), itemQueue.end() );
     itemQueue.clear();
+    itemCount = 0;
     lock.unlock();
 
     unique_lock<mutex> lock2( outputMutex );
@@ -146,7 +158,7 @@ void Logger::flushAll( void ) {
 
 
 void Logger::addLogger( Logger& out ) {
-    
+
     if( &out == this ) return;                  // avoid infinite loop
     out.removeOutput( hexString(this) );        // avoid infinite loop
     
@@ -196,7 +208,7 @@ void Logger::addFile( const std::string &filename, uint8_t m, bool replace, unsi
 }
 
 
-void Logger::addNetwork( const TcpConnection::Ptr& conn, uint32_t id, uint8_t m, unsigned int flushPeriod ) {
+void Logger::addNetwork( const TcpConnection::Ptr conn, uint32_t id, uint8_t m, unsigned int flushPeriod ) {
     
     if( !conn ) {
         return;
@@ -217,13 +229,15 @@ void Logger::addNetwork( const TcpConnection::Ptr& conn, uint32_t id, uint8_t m,
             *conn >> cmd;
             if( cmd != CMD_OK ) {
                 getItem(LOG_MASK_ERROR) << "Failed to connect to logging server (reply: " << cmd << ")" << ende;
-                conn->socket().close();
             } else {
                 std::shared_ptr<LogOutput> output( new LogToNetwork( conn, id, m, flushPeriod) );
                 outputs.insert(make_pair( name, output ));
             }
         }
-    } catch ( ... ) { }
+    } catch ( std::exception& e ) {
+        getItem(LOG_MASK_ERROR) << "Logger::addNetwork exception: " << e.what() << ende;
+        throw;
+    }
     
 }
 
@@ -233,47 +247,50 @@ void Logger::removeOutput( const string& name ) {
     unique_lock<mutex> lock( outputMutex );
     OutputMap::iterator it = outputs.find( name );
     if( it != outputs.end() ) {
-        outputs.erase (it);
+        it->second->flushBuffer();
+        outputs.erase(it);
     }
 }
 
 
 void Logger::removeAllOutputs( void ) {
 
+    unique_lock<mutex> lockq( queueMutex );
     unique_lock<mutex> lock( outputMutex );
+    for( auto &op: outputs ) {
+        op.second->flushBuffer();
+    }
     outputs.clear();
 
 }
 
 
-void Logger::addConnection( TcpConnection::Ptr& conn, network::Host::Ptr& host ) {
+void Logger::addConnection( TcpConnection::Ptr conn, network::Host::Ptr host ) {
     
-    TcpConnection::callback oldCallback = conn->getCallback();
     conn->setCallback( bind( &Logger::netReceive, this, std::placeholders::_1 ) );
+    conn->setErrorCallback( bind( &Logger::removeConnection, this, std::placeholders::_1 ) );
     unique_lock<mutex> lock( outputMutex );
-    auto cinfo = make_pair( host, oldCallback );
-    connections.insert( make_pair(conn, cinfo) );
+    connections.insert( make_pair(conn, host) );
     
 }
 
 
-void Logger::removeConnection( TcpConnection::Ptr& conn ) {
+void Logger::removeConnection( TcpConnection::Ptr conn ) {
     
     unique_lock<mutex> lock( outputMutex );
-    auto it = connections.find( conn );
-    if( it != connections.end() ) {
-        try {
-            if( conn ) {
-                if (it->second.second ) {
-                    conn->setCallback( it->second.second );
-                }
-                conn->socket().close();
-                //conn->idle();
-            }
-        } catch( std::exception& e ) {
-            getItem(LOG_MASK_ERROR) << "Exception caught while removing a connection: " << e.what() << ende; 
+    try {
+        auto it = connections.find( conn );
+        if( it != connections.end() ) {
+            connections.erase( it );
         }
-        connections.erase( it );
+        if( conn ) {
+            conn->setErrorCallback(nullptr);
+            conn->setCallback(nullptr);
+            conn->socket().close();
+            //conn->idle();
+        }
+    } catch( std::exception& e ) {
+        getItem(LOG_MASK_ERROR) << "Exception caught while removing a connection: " << e.what() << ende; 
     }
     
 }
@@ -285,9 +302,14 @@ void Logger::netReceive( TcpConnection::Ptr conn ) {
     try {
         *conn >> cmd;
         if( cmd != CMD_PUT_LOG ) {
-            throw std::exception();
+            throw std::runtime_error("Unexpected input.");
         }
+    } catch( const std::exception& e ) {      // disconnected or wrong first byte -> remove connection and return.  TODO narrower catch
+        //cout << "netReceive() exception: " << e.what() << endl;
+        removeConnection(conn);
+        return;
     } catch( ... ) {      // disconnected or wrong first byte -> remove connection and return.  TODO narrower catch
+        //cout << "netReceive() uncaught exception. " << hexString(conn.get()) << endl;
         removeConnection(conn);
         return;
     }
@@ -297,9 +319,9 @@ void Logger::netReceive( TcpConnection::Ptr conn ) {
     auto it = connections.find( conn );
     string hostname = "client";
     if( it != connections.end() ) {
-        if( it->second.first ) {
-            it->second.first->touch();
-            hostname = it->second.first->info.name;
+        if( it->second ) {
+            it->second->touch();
+            hostname = it->second->info.name;
             size_t pos = hostname.find_first_of(". ");
             if( pos != string::npos) {
                 hostname.erase( pos );

@@ -3,6 +3,7 @@
 
 #include "redux/application.hpp"
 #include "redux/job.hpp"
+#include "redux/work.hpp"
 #include "redux/worker.hpp"
 #include "redux/network/host.hpp"
 #include "redux/network/tcpserver.hpp"
@@ -44,12 +45,12 @@ namespace redux {
         void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
         void removeConnection(network::TcpConnection::Ptr);
         void cleanup(void);
-        void failedWIP( WorkInProgress& wip );
+        void failedWIP( WorkInProgress::Ptr wip );
         void die( network::TcpConnection::Ptr& );
         void addJobs( network::TcpConnection::Ptr& );
         void removeJobs( network::TcpConnection::Ptr& );
         //Job::JobPtr selectJob(bool);
-        bool getWork( WorkInProgress&, uint8_t nThreads = 1);
+        bool getWork( WorkInProgress::Ptr&, uint8_t nThreads = 1);
         void sendWork( network::TcpConnection::Ptr& );
         void putParts( network::TcpConnection::Ptr& );
         void sendJobList( network::TcpConnection::Ptr& );
@@ -69,8 +70,9 @@ namespace redux {
         
         std::mutex peerMutex;
         network::Host& myInfo;
-        std::map<network::TcpConnection::Ptr, network::Host::Ptr> connections;
-        std::map<network::Host::Ptr, WorkInProgress, network::Host::Compare> peerWIP;
+        std::map<network::TcpConnection::Ptr, network::Host::Ptr,
+                 redux::util::PtrCompare<network::TcpConnection>> connections;
+        std::map<network::Host::Ptr, WorkInProgress::Ptr, network::Host::Compare> peerWIP;
         
         struct {
             network::TcpConnection::Ptr conn;

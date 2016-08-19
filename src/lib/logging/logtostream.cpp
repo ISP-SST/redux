@@ -1,9 +1,11 @@
 #include "redux/logging/logtostream.hpp"
 
+#include "redux/util/stringutil.hpp"
 
 #include <boost/date_time/posix_time/time_formatters.hpp>
 
 using namespace redux::logging;
+using namespace redux::util;
 using namespace std;
 namespace bfs = boost::filesystem;
 
@@ -55,7 +57,7 @@ void LogToStream::writeFormatted( const LogItem &i ) {
     if( out.good() ) {
         boost::io::ios_all_saver settings(out);
         out << to_iso_extended_string( i.entry.getTime() ) << " ";
-        if( false ) {   // FIXME: enable colors
+        if( true ) {   // FIXME: enable colors
             out << color_level_tags[ i.entry.getMask() ];
         } else {
             out << level_tags[ i.entry.getMask() ];
@@ -75,13 +77,12 @@ void LogToStream::flushBuffer( void ) {
     unique_lock<mutex> lock( queueMutex );
     vector<LogItemPtr> tmpQueue( itemQueue.begin(), itemQueue.end() );
     itemQueue.clear();
+    itemCount = 0;
     lock.unlock();
-    uint64_t count = tmpQueue.size();
 
     for( LogItemPtr& it: tmpQueue ) {
         if( it ) {
             writeFormatted( *it );
-            count++;
         }
     }
 

@@ -42,10 +42,12 @@ namespace redux {
         
         boost::asio::io_service ioService;
 
+        std::shared_ptr<boost::asio::io_service::work> workLoop;
+        boost::thread_group pool;
         boost::asio::strand strand;
         boost::asio::deadline_timer runTimer;
         
-        WorkInProgress wip;
+        WorkInProgress::Ptr wip;
 
         Daemon& daemon;
         network::Host& myInfo;

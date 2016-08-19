@@ -38,7 +38,7 @@ namespace redux {
     };
 
 
-    struct WorkInProgress {
+    struct WorkInProgress : std::enable_shared_from_this<WorkInProgress> {
         typedef std::shared_ptr<WorkInProgress> Ptr;
         WorkInProgress(void);
         WorkInProgress(const WorkInProgress&);
@@ -52,7 +52,8 @@ namespace redux {
         uint64_t unpackWork(const char*, bool swap_endian=false);
         void returnResults(void);
         std::string print(void);
-        std::shared_ptr<Job> job, previousJob;
+        std::shared_ptr<Job> job;
+        std::weak_ptr<Job> previousJob;
         std::vector<Part::Ptr> parts;
         boost::posix_time::ptime workStarted;
         bool isRemote;

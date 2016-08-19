@@ -8,6 +8,7 @@
 
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
+#include "redux/util/progresswatch.hpp"
 
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
@@ -60,8 +61,7 @@ namespace redux {
 
             static Job* create(void) { return new MomfbdJob(); }
 
-            void setProgressString(void);
-            uint64_t unpackParts(const char* ptr, WorkInProgress&, bool);
+            uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr, bool);
             
             void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
@@ -72,13 +72,13 @@ namespace redux {
 
             size_t nImages(void) const;
             
-            bool getWork( WorkInProgress&, uint16_t, bool );
-            void ungetWork( WorkInProgress& );
-            void failWork( WorkInProgress& );
-            void returnResults( WorkInProgress& );
+            bool getWork( WorkInProgress::Ptr, uint16_t, bool );
+            void ungetWork( WorkInProgress::Ptr );
+            void failWork( WorkInProgress::Ptr );
+            void returnResults( WorkInProgress::Ptr );
 
             void cleanup(void);
-            bool run( WorkInProgress&, boost::asio::io_service&, uint16_t );
+            bool run( WorkInProgress::Ptr, boost::asio::io_service&, uint16_t );
             
             void setLogChannel(std::string channel);
             
@@ -86,16 +86,18 @@ namespace redux {
             bool check(void);
             bool checkCfg(void);
             bool checkData(void);
+            bool checkPre(void);
+            bool checkWriting(void);
             const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
 
             const MomfbdJob& operator=(const GlobalCfg&);
 
         private:
 
-            uint8_t checkParts( void );
+            uint16_t checkParts( void );
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );
-            void storePatches( WorkInProgress&, boost::asio::io_service&, uint8_t );
+            void storePatches( WorkInProgress::Ptr, boost::asio::io_service&, uint8_t );
             void postProcess( boost::asio::io_service&, uint16_t nThreads );
 
             std::vector<std::shared_ptr<Object>> objects;
@@ -104,7 +106,10 @@ namespace redux {
             
             GlobalData::Ptr globalData;
             Solver::Ptr solver;
+            
+            redux::util::ProgressWatch progWatch;
         
+            friend class Constraints;
             friend class Object;
             friend class Channel;
             friend class Solver;

@@ -281,7 +281,8 @@ void Object::getResults(ObjectData& od, double* alpha) {
     
     avgNoiseVariance /= nObjectImages;
     avgShift *= 1.0/nObjectImages;
-    //Ana::write ("shifts"+to_string(ID)+".f0", shifts);
+    
+    LOG_DETAIL << "Average shift for object #" << ID << ":" << avgShift << ende;
 
     avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
     
@@ -308,7 +309,6 @@ void Object::getResults(ObjectData& od, double* alpha) {
     }
 
     
-
     // PSF
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
         uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
@@ -442,6 +442,7 @@ void Object::addToFT( const redux::image::FourierTransform& ft ) {
 
 
 void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft ) {
+    
     unique_lock<mutex> lock( mtx );
     const complex_t* ftPtr = ft.get();
     const complex_t* oftPtr = oldft.get();
@@ -450,9 +451,7 @@ void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& ol
     for(size_t ind=0; ind<nElements; ++ind ) {
         ftSumPtr[ind] += (norm(ftPtr[ind])-norm(oftPtr[ind]));
     }
-//     transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
-//               [&oftPtr](const double& a, const complex_t& b) { return a+norm(b)-norm(*oftPtr++); }
-//              );
+    
 }
 
 
@@ -821,32 +820,28 @@ void Object::initCache (void) {
 
 void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Array<PatchData::Ptr>& patches ) {
     
-    nImages();
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
     
-    for( auto& ch : channels ) {
-        ch->loadCalib( service );
-    }
-    runThreadsAndWait( service, nThreads );
+    progWatch.set( nImages() );
+    progWatch.setTicker(nullptr);
+    progWatch.setHandler([this,&service,&patches](){        // this will be triggered after all images in this object are loaded/pre-processed
+        objMaxMean = std::numeric_limits<double>::lowest();
+        for (auto& ch : channels) {
+            objMaxMean = std::max(objMaxMean,ch->getMaxMean());
+            if(startT.is_special()) startT = ch->startT;
+            else startT = std::min(startT,ch->startT);
+            if(endT.is_special()) endT = ch->endT;
+            else endT = std::max(endT,ch->endT);
+            ch->storePatches(service, patches);
+        }
+        LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
+    });
     
-    objMaxMean = std::numeric_limits<double>::lowest();
-    for (auto& ch : channels) {
-        ch->loadData(service, patches);
-        runThreadsAndWait(service, nThreads);
-        objMaxMean = std::max(objMaxMean,ch->getMaxMean());
-        if(startT.is_special()) startT = ch->startT;
-        else startT = std::min(startT,ch->startT);
-        if(endT.is_special()) endT = ch->endT;
-        else endT = std::max(endT,ch->endT);
+    for( auto& ch: channels ) {
+        ch->loadData( service );
     }
-    LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
-
-    for (auto& ch : channels) {
-        ch->storePatches(service, patches);
-    }
-    runThreadsAndWait(service, nThreads);
-    
+ 
 }
 
 
@@ -1119,7 +1114,7 @@ void Object::writeResults (const redux::util::Array<PatchData::Ptr>& patches) {
     if (myJob.outputFileType & FT_MOMFBD) writeMomfbd (patches);
 }
 
-void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service, uint8_t nThreads) {
+void Object::storePatches (WorkInProgress::Ptr wip, boost::asio::io_service& service, uint8_t nThreads) {
 
     bfs::path fn = bfs::path (outputFileName);
     fn.replace_extension ("momfbd");
@@ -1127,7 +1122,7 @@ void Object::storePatches (WorkInProgress& wip, boost::asio::io_service& service
 
     LOG_DEBUG << "storePatches()" << ende;
 
-    for (auto & part : wip.parts) {
+    for (auto & part : wip->parts) {
         auto patch = static_pointer_cast<PatchData> (part);
         LOG_DEBUG << "storePatches() index: (" << patch->index.x << "," << patch->index.y << ")  offset = "
                   << info->patches (patch->index.x , patch->index.y).offset << ende;
@@ -1154,6 +1149,7 @@ Point16 Object::getImageSize (void) {
 
 void Object::dump (std::string tag) {
     tag += "_o"+to_string(ID);
+
     Ana::write (tag + "_ftsum.f0", ftSum);
     Ana::write (tag + "_q.f0", Q);
     Ana::write (tag + "_p.f0", P);

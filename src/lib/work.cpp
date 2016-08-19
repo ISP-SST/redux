@@ -124,7 +124,8 @@ void WorkInProgress::resetParts( void ) {
 
 uint64_t WorkInProgress::workSize(void) {
     uint64_t sz = this->size() + 1; // + newJob
-    if(job && job != previousJob) {
+    auto pJob = previousJob.lock();
+    if(job && job != pJob) {
         sz += job->size();
     }
     nParts = 0;
@@ -141,7 +142,8 @@ uint64_t WorkInProgress::workSize(void) {
 uint64_t WorkInProgress::packWork( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = this->pack( ptr );
-    bool newJob = (job && job != previousJob);
+    auto pJob = previousJob.lock();
+    bool newJob = (job && job != pJob);
     count += pack( ptr+count, newJob );
     if(newJob) {
         count += job->pack(ptr+count);
@@ -161,16 +163,16 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
     bool newJob;
     count += unpack( ptr+count, newJob );
     if( newJob ) {
-        swap(job,previousJob);
+        cout << "WorkInProgress::unpackWork()  WIP contains new job.  nParts = "<< nParts << endl;
         string tmpS = string( ptr+count );
         job = Job::newJob( tmpS );
         if( job ) {
+        cout << "WorkInProgress::unpackWork()  Unpacking new job." << endl;
             count += job->unpack( ptr+count, swap_endian );
-        }
-        else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
-    } else job = previousJob;
+        } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
+    } else job = previousJob.lock();
     if( job ) {
-        count += job->unpackParts( ptr+count, *this, swap_endian );
+        count += job->unpackParts( ptr+count, shared_from_this(), swap_endian );
     } else throw invalid_argument( "Can't unpack parts without a job instance..." );
     
     return count;
@@ -179,12 +181,14 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
 
 void WorkInProgress::returnResults(void) {
     if( job ) {
-        job->returnResults( *this );
+        for( auto& part : parts ) {
+            part->cacheLoad();
+        }
+        job->returnResults( shared_from_this() );
         for( auto& part : parts ) {
             part->cacheStore(true);
         }
-        parts.clear();
-        hasResults = false;
+        resetParts();
     }
 }
 

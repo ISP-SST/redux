@@ -43,12 +43,12 @@ namespace {
 }
 
 
-uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress& wip, bool swap_endian ) {
+uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool swap_endian ) {
 
     using redux::util::unpack;
     uint64_t count(0);
-    wip.parts.resize( wip.nParts );
-    for( auto& part : wip.parts ) {
+    wip->parts.resize( wip->nParts );
+    for( auto& part : wip->parts ) {
         if(!part) part.reset( new DebugPart() );
         count += part->unpack( ptr+count, swap_endian );
     }
@@ -194,16 +194,16 @@ bool DebugJob::check(void) {
     return ret;
 }
 
-bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool ) {
+bool DebugJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, bool ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")" << ende;
 #endif
     
     uint8_t step = info.step.load();
-    wip.parts.clear();
+    wip->parts.clear();
      // run pre-/postprocessing if local
-    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip.isRemote ) {
+    if( ((step == JSTEP_PREPROCESS)||(step == JSTEP_POSTPROCESS)) && !wip->isRemote ) {
         return true;
     }
     
@@ -214,45 +214,45 @@ bool DebugJob::getWork( WorkInProgress& wip, uint16_t nThreads, bool ) {
     if( step == JSTEP_RUNNING ) {
         auto lock = getLock();
         size_t nParts = std::min( nThreads, info.maxThreads) * 2;
-        if(wip.isRemote) {
+        if(wip->isRemote) {
             for( auto & part : jobParts ) {
                 if( part.second->step == JSTEP_QUEUED ) {
                     part.second->step = JSTEP_RUNNING;
-                    wip.parts.push_back( part.second );
+                    wip->parts.push_back( part.second );
                     info.state.store( JSTATE_ACTIVE );
-                    if( wip.parts.size() == nParts ) break;
+                    if( wip->parts.size() == nParts ) break;
                 }
             }
         }
         checkParts();
     }
-    return wip.parts.size();
+    return wip->parts.size();
 }
 
 
-void DebugJob::ungetWork( WorkInProgress& wip ) {
+void DebugJob::ungetWork( WorkInProgress::Ptr wip ) {
     auto lock = getLock();
-    for( auto & part : wip.parts ) {
+    for( auto & part : wip->parts ) {
         part->step = JSTEP_QUEUED;
     }
-    wip.parts.clear();
+    wip->parts.clear();
 }
 
 
-void DebugJob::returnResults( WorkInProgress& wip ) {
+void DebugJob::returnResults( WorkInProgress::Ptr wip ) {
     auto lock = getLock();
     checkParts();
-    for( auto & part : wip.parts ) {
+    for( auto & part : wip->parts ) {
         auto dpart = static_pointer_cast<DebugPart>( part );
         jobParts[part->id]->step = dpart->step;
         jobParts[part->id]->result = std::move(dpart->result);
     }
-    wip.parts.clear();
+    wip->parts.clear();
     checkParts();
 }
 
 
-bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint16_t maxThreads ) {
+bool DebugJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, uint16_t maxThreads ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::run("<<(int)maxThreads<<") " << ende;
@@ -268,7 +268,7 @@ bool DebugJob::run( WorkInProgress& wip, boost::asio::io_service& service, uint1
     }
     else if( step == JSTEP_RUNNING || step == JSTEP_QUEUED ) {          // main processing
         service.reset();
-        for( auto & part : wip.parts ) {
+        for( auto & part : wip->parts ) {
             service.post( boost::bind( &DebugJob::runMain, this, boost::ref( part ) ) );
         }
         

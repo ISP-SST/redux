@@ -28,8 +28,6 @@ namespace redux {
      */
     
     void runThreadsAndWait(boost::asio::io_service& service, uint16_t nThreads );
-
-    struct WorkInProgress;
     
     class job_check_failed: public std::exception {
         
@@ -82,7 +80,6 @@ namespace redux {
         static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, bool check=false );
         static JobPtr newJob( const std::string& );
         
-        virtual void setProgressString(void) { strcpy(info.progressString,""); };
         static std::string stateString(uint8_t);
         static std::string stateTag(uint8_t);
         
@@ -96,7 +93,7 @@ namespace redux {
             std::string typeString, name, user, host;
             std::string logFile;
             std::string outputDir;                  //!< Where the output goes (defaults to current directory of rsub)
-            char progressString[20];
+            std::string progressString;
             boost::posix_time::ptime submitTime;
             boost::posix_time::ptime startedTime;
             boost::posix_time::ptime completedTime;
@@ -109,7 +106,7 @@ namespace redux {
             std::string print(void);
         } info;
         
-        virtual uint64_t unpackParts(const char* ptr, WorkInProgress& wip, bool) { wip.parts.clear(); return 0; };
+        virtual uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr wip, bool) { wip->parts.clear(); return 0; };
         
         virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree& );
         /*! @brief Returns a boost::property_tree containing the settings for this job.
@@ -135,14 +132,14 @@ namespace redux {
         virtual bool active(void) { return false; };
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
         
-        virtual bool getWork(WorkInProgress&, uint16_t, bool) { return false; };
-        virtual void ungetWork(WorkInProgress&) { };
-        virtual void failWork(WorkInProgress&) { };
-        virtual void returnResults(WorkInProgress&) { };
+        virtual bool getWork(WorkInProgress::Ptr, uint16_t, bool) { return false; };
+        virtual void ungetWork(WorkInProgress::Ptr) { };
+        virtual void failWork(WorkInProgress::Ptr) { };
+        virtual void returnResults(WorkInProgress::Ptr) { };
 
         virtual void init(void) {};
         virtual void cleanup(void) {};
-        virtual bool run(WorkInProgress&, boost::asio::io_service&, uint16_t) = 0;
+        virtual bool run(WorkInProgress::Ptr, boost::asio::io_service&, uint16_t) = 0;
         
         std::string cfg(void);
         
@@ -153,7 +150,10 @@ namespace redux {
         void printJobInfo(void);
         void stopLog(void);
         
-        std::unique_lock<std::mutex> getLock(void) { return std::move( std::unique_lock<std::mutex>(jobMutex) ); }
+        std::unique_lock<std::mutex> getLock(bool trylock=false) {
+            if(trylock) return std::move( std::unique_lock<std::mutex>(jobMutex,std::try_to_lock) );
+            return std::move( std::unique_lock<std::mutex>(jobMutex) );
+        }
         
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);

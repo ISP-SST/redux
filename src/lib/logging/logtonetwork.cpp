@@ -8,7 +8,8 @@ using namespace redux::util;
 using namespace std;
 
 
-LogToNetwork::LogToNetwork( const network::TcpConnection::Ptr& c, uint32_t id, uint8_t m, unsigned int flushPeriod) : LogOutput(m,flushPeriod), conn(c) {
+LogToNetwork::LogToNetwork( const network::TcpConnection::Ptr& c, uint32_t id, uint8_t m, unsigned int flushPeriod)
+    : LogOutput(m,flushPeriod), conn(c) {
 
 
 }
@@ -27,13 +28,12 @@ LogToNetwork::~LogToNetwork() {
 void LogToNetwork::flushBuffer( void ) {
 
     unique_lock<mutex> lock( queueMutex );
-    
     if( itemQueue.empty() ) return;
-    
     vector<LogItemPtr> sendBuffer( itemQueue.begin(), itemQueue.end() );
     itemQueue.clear();
-    
+    itemCount = 0;
     lock.unlock();
+    
     uint64_t blockSize(0);
     for( LogItemPtr& it: sendBuffer ) {
         blockSize += it->size();
@@ -67,5 +67,6 @@ void LogToNetwork::flushBuffer( void ) {
         itemQueue.push_front(*it);
     }
 
+    itemCount = itemQueue.size();;
 }
 

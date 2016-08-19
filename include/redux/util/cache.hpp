@@ -1,6 +1,7 @@
 #ifndef REDUX_UTIL_CACHE_HPP
 #define REDUX_UTIL_CACHE_HPP
 
+#include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <fstream>
@@ -9,6 +10,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 #include <boost/filesystem.hpp>
@@ -36,12 +38,10 @@ namespace redux {
         
         
         class Cache {
-            struct ptrcomp {
-                template <class T>
-                bool operator() (const std::shared_ptr<T>& lhs, const std::shared_ptr<T>& rhs) const { return (*lhs)<(*rhs); }
-            };
+
         public:
             static void cleanup(void);
+            static std::string getStats(void);
             static Cache& get(void);
             std::string path(void);
             void setPath(const std::string&);
@@ -66,7 +66,7 @@ namespace redux {
             }
             template<class T>
             static const std::shared_ptr<T>& get(const std::shared_ptr<T>& entry) {
-                auto s = get().getSet<std::shared_ptr<T>,ptrcomp>();
+                auto s = get().getSet<std::shared_ptr<T>, PtrCompare<T>>();
                 auto ret = s.second.emplace(entry);
                 return *ret.first;
             }
@@ -85,6 +85,17 @@ namespace redux {
             static void clear(void) {
                 auto s = get().getSet<T>();
                 s.second.clear();
+            }
+            template<class KeyT, class T>
+            static std::string stats(void) {
+                auto m = get().getMap<KeyT,T>();
+                return  std::string(typeid(KeyT).name()) + " -> " + std::string(typeid(T).name())
+                    + "   count: " + std::to_string(m.second.size());
+            }
+            template<class T>
+            static std::string stats(void) {
+                auto s = get().getSet<T>();
+                return std::string(typeid(T).name()) + "   count: " + std::to_string(s.second.size());
             }
             template<class KeyT, class T>
             static size_t size(void) {
@@ -134,9 +145,11 @@ namespace redux {
                 static std::map<KeyT,T> m;
                 std::function<void(void)> func = std::bind(&Cache::mapMaintenance<KeyT,T>,this);
                 std::function<void(void)> cfunc = std::bind(&Cache::clear<KeyT,T>);
+                std::function<std::string(void)> sfunc = std::bind(&Cache::stats<KeyT,T>);
                 std::unique_lock<std::mutex> lock(mtx);
                 funcs.push_back(func);
                 cleanup_funcs.push_back(cfunc);
+                stats_funcs.push_back(sfunc);
                 return m;
             }
             template<class T, class U>
@@ -144,9 +157,11 @@ namespace redux {
                 static std::set<T,U> s;
                 std::function<void(void)> func = std::bind(&Cache::setMaintenance<T,U>,this);
                 std::function<void(void)> cfunc = std::bind(&Cache::clear<T>);
+                std::function<std::string(void)> sfunc = std::bind(&Cache::stats<T>);
                 std::unique_lock<std::mutex> lock(mtx);
                 funcs.push_back(func);
                 cleanup_funcs.push_back(cfunc);
+                stats_funcs.push_back(sfunc);
                 return s;
             }
 
@@ -155,6 +170,7 @@ namespace redux {
             pid_t pid_;
             std::vector<std::function<void(void)>> funcs;
             std::vector<std::function<void(void)>> cleanup_funcs;
+            std::vector<std::function<std::string(void)>> stats_funcs;
             int pollTime;
         };
         
@@ -181,6 +197,7 @@ namespace redux {
             virtual const std::string& getFullPath(void) { return fullPath.string(); }
             virtual void setPath( const std::string& path );
             std::string path(void) const { return itemPath.string(); };
+        
             
         protected:
             bfs::path itemPath;

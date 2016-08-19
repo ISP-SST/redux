@@ -15,6 +15,7 @@
 
 using namespace redux::momfbd;
 using namespace redux::file;
+using namespace redux::logging;
 using namespace redux::math;
 using namespace redux::util;
 using namespace redux;
@@ -52,8 +53,8 @@ bool Constraints::Constraint::operator>( const Constraint& rhs ) const {
 }
 
 
-Constraints::NullSpace::NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc) :
-    c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc) {
+Constraints::NullSpace::NullSpace(logging::Logger& l, const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc) :
+    c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc), logger(l) {
     
     isLoaded = false;
     
@@ -64,7 +65,7 @@ Constraints::NullSpace::NullSpace(const std::map<int32_t, int8_t>& e, int32_t np
 void Constraints::NullSpace::mapNullspace(void) {
     ns_entries.clear();
     int nCols = nParameters - nConstraints;
-    //LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace.";
+    LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace." << ende;
     int count = 0;
     for( auto& value: ns ) {
         if( abs(value) > NS_THRESHOLD ) {
@@ -83,7 +84,7 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
         ns.clear();
     } else {
         if(NS_ANALYTIC) {
-            //LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group.";
+            LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group." << ende;
             ns.resize(nParameters,nParameters-nConstraints);
             if (nParameters == nConstraints+1) {    // 1D nullspace
                 ns = 1.0/sqrt(nParameters);
@@ -92,7 +93,8 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
             }
             
         } else {
-            //LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group.";
+            LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group." << ende;
+            cout << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group." << endl;
             Array<double> C,R;
             C.resize(nConstraints, nParameters);
             ns.resize(nParameters, nParameters);    // use ns rather than a temporary "Q" array
@@ -127,11 +129,11 @@ bool Constraints::NullSpace::verify(const std::map<int32_t, int8_t>& e, int32_t 
     if( !isLoaded )  {
         if( cacheLoad() ) {
             if(nP == nParameters && nC == nConstraints && c_entries == e) {
-                //LOG_DEBUG << "Found matching constraint-group in file: " << itemPath;
+                LOG_DEBUG << "Found matching constraint-group in file: " << itemPath << ende;
                 return true;
             }
         } else {
-            //LOG_DEBUG << "No matching constraint-group found.";
+            LOG_DETAIL << "No matching constraint-group found." << ende;
             ns.resize(0);
             ns_entries.clear();
         }
@@ -185,7 +187,7 @@ bool Constraints::NullSpace::operator<(const NullSpace& rhs) {
 }
 
 
-Constraints::Group::Group( shared_ptr<Constraint>& con ) : nParameters(0), entriesHash(0) {
+Constraints::Group::Group( logging::Logger& l, shared_ptr<Constraint>& con ) : nParameters(0), entriesHash(0), logger(l) {
     add( con );
 }
 
@@ -291,13 +293,13 @@ void Constraints::Group::mapNullspace(void) {
     ns_entries.clear();
     if( nParameters > nConstraints ) {
         
-        shared_ptr<NullSpace> tmpNS( new NullSpace(entries,nParameters,nConstraints) );
+        shared_ptr<NullSpace> tmpNS( new NullSpace(logger, entries,nParameters,nConstraints) );
         nullspace = redux::util::Cache::get( entriesHash, tmpNS );
         bool storeNS = true;
         
         if( !nullspace->verify(entries,nParameters,nConstraints) ) {
-            //LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance.";
-            //LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries");
+            LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance." << ende;
+            LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries") << ende;
             nullspace = tmpNS;
             storeNS = false;    // storing will overwrite the group we collided with.
             nullspace->ns.clear();
@@ -322,7 +324,7 @@ void Constraints::Group::mapNullspace(void) {
 }
 
 
-Constraints::Constraints( const MomfbdJob& j ) : job( j ), blockified(false) {
+Constraints::Constraints( MomfbdJob& j ) : job( j ), logger(j.logger), blockified(false), loaded(false) {
 
 }
 
@@ -379,7 +381,7 @@ void Constraints::groupConnectedVariables( void ) {
 
     auto tmpC = constraints;
     while( tmpC.size() ) {
-        Group g( tmpC[0] );
+        Group g( logger, tmpC[0] );
         g.addConnectedConstraints( tmpC );  // adds connected constraints to group and removes them from tmpC
         g.sortRows();
         groups.push_back( g );
@@ -455,7 +457,7 @@ void Constraints::init( void ) {
             uint16_t modeNumber = job.modeNumbers[modeIndex];
             int32_t imageCount = 0;
             if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
-                shared_ptr<Constraint> thisConstraint( new Constraint( imageCount * nModes + modeIndex, 1 ) );
+                shared_ptr<Constraint> thisConstraint( new Constraint( logger, imageCount * nModes + modeIndex, 1 ) );
                 for( size_t count=objects[0]->getChannels()[0]->nImages(); count; --count ) {  // only for first object and channel
                     thisConstraint->addEntry( imageCount * nModes + modeIndex, 1.0 );
                     imageCount++;
@@ -477,7 +479,7 @@ void Constraints::init( void ) {
 //                                     constraints.push_back( thisConstraint );
 //                                 }
                                 //if( tOffset ) { // skip reference wavefront
-                                    thisConstraint.reset( new Constraint( tOffset + modeIndex, 1 ) ); // \alpha_{tkm}
+                                    thisConstraint.reset( new Constraint( logger, tOffset + modeIndex, 1 ) ); // \alpha_{tkm}
                                     thisConstraint->addEntry( kOffset + tOffset + modeIndex, -1 );          // \alpha_{t(k-1)m}
                                     constraints.push_back( thisConstraint );
                                 //}
@@ -495,9 +497,9 @@ void Constraints::init( void ) {
                         //cout << "ModeNumber = " << modeNumber << "   nWF = " << ch->waveFronts.size() << "   nF = " << ch->fileNumbers.size() << endl;
                         for( auto& wf : ch->fileNumbers ) {
                             int32_t parameterOffset = imageCount * nModes;
-                            auto ret = wfCons.insert( make_pair( wf, Constraint( parameterOffset + modeIndex, 1 ) ) );
+                            auto ret = wfCons.insert( make_pair( wf, Constraint( logger, parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
-                                shared_ptr<Constraint> thisConstraint( new Constraint( ret.first->second ) );
+                                shared_ptr<Constraint> thisConstraint( new Constraint( logger, ret.first->second ) );
                                 thisConstraint->addEntry( parameterOffset + modeIndex, -1 );
                                 constraints.push_back( thisConstraint );
                             }
@@ -513,6 +515,8 @@ void Constraints::init( void ) {
         groupConnectedVariables();
         
         blockifyGroups();
+        
+        loaded = true;
 
     }
 }

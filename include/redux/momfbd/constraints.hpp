@@ -17,6 +17,10 @@
 
 namespace redux {
 
+    namespace logging {
+        class Logger;
+    }
+    
     namespace momfbd {
 
         /*! @ingroup momfbd
@@ -37,9 +41,9 @@ namespace redux {
              * Contains one constraint (= one row in the constraint matrix)
              */
             struct Constraint {
-                Constraint (const Constraint& rhs) : entries (rhs.entries) {};
-                Constraint (Constraint && rhs) : entries (std::move (rhs.entries)) {};
-                Constraint (int32_t i, int8_t v) { entries[i] = v; }
+                Constraint (logging::Logger& l, const Constraint& rhs) : entries (rhs.entries),logger(l) {};
+                Constraint (Constraint && rhs) : entries (std::move (rhs.entries)),logger(rhs.logger) {};
+                Constraint (logging::Logger& l, int32_t i, int8_t v) : logger(l)  { entries[i] = v; }
                 void addEntry (int32_t i, int8_t v) { entries[i] = v; }
                 int32_t firstEntry (void) { return entries.begin()->first; }
                 int8_t entry (int32_t ind) { return (entries.find (ind) != entries.end()) ? entries[ind] : 0.0; }
@@ -47,12 +51,13 @@ namespace redux {
                 void replaceIndices (const std::map<int32_t, int32_t>& indexMap);
                 bool operator> (const Constraint& rhs) const;
                 std::map<int32_t, int8_t> entries;      //!< Index and value of non-zero matrix elements
+                logging::Logger& logger;
             };
             
             
             struct NullSpace : public redux::util::CacheItem {
                 
-                NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc);
+                NullSpace(logging::Logger& l, const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc);
                 
                 void mapNullspace(void);
                 void calculateNullspace(bool store=true);
@@ -70,6 +75,7 @@ namespace redux {
                 int32_t nConstraints;
                 redux::util::Array<double> ns;
                 std::map<redux::util::PointI, double> ns_entries;  //!< (row,col) and value of (non-zero) nullspace-matrix elements
+                logging::Logger& logger;
                 
             };
 
@@ -78,7 +84,7 @@ namespace redux {
              */
             struct Group {
                 
-                explicit Group (std::shared_ptr<Constraint>& con);
+                explicit Group (logging::Logger& l, std::shared_ptr<Constraint>& con);
                 
                 void add (const std::shared_ptr<Constraint>& con);
                 void addConnectedConstraints (std::vector<std::shared_ptr<Constraint>>& cons);
@@ -96,9 +102,10 @@ namespace redux {
                 redux::util::PointI groupOffset;                           //!< Offset of this group in the nullspace matrix (y=row,x=col)
                 size_t entriesHash;
                 std::shared_ptr<NullSpace> nullspace;
+                logging::Logger& logger;
             };
 
-            explicit Constraints (const MomfbdJob&);
+            explicit Constraints(MomfbdJob&);
             ~Constraints();
 
             void blockifyGroups (void);
@@ -152,6 +159,7 @@ namespace redux {
             redux::util::Array<int16_t> getSubMatrix (int32_t groupID) const;
             void read (void);
             void write (void);
+            inline bool verify (void) const { return loaded; }
 
             void dump( std::string tag="constraints" ) const;
 
@@ -161,7 +169,9 @@ namespace redux {
             ConstraintType type;
 
             const MomfbdJob& job;
+            logging::Logger& logger;
             bool blockified;
+            bool loaded;
 
             int32_t nParameters;
             int32_t nFreeParameters;

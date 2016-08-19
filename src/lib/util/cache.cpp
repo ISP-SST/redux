@@ -15,6 +15,14 @@ void Cache::cleanup(void) {
     }
 }
 
+std::string Cache::getStats(void) {
+    string ret;
+    for( auto& func: get().stats_funcs ) {
+        ret += func() + "\n";
+    }
+    return ret;
+}
+
 Cache& Cache::get(void) {
     static Cache cache;
     return cache;
