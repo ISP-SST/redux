@@ -227,6 +227,7 @@ bool Channel::checkData (void) {
             Image<float> tmp;
             CachedFile::load( tmp, fn.string(), true );       // Only read metadata
             uint8_t nDims = tmp.meta->nDims();
+            CachedFile::unload<float>( fn.string() );
             if( nDims == 3 ) {
                 nFrames[i] = tmp.meta->dimSize(0);
                 imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );

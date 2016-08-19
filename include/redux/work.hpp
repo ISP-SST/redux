@@ -46,6 +46,7 @@ namespace redux {
         uint64_t size(void) const;
         uint64_t pack(char*) const;
         uint64_t unpack(const char*, bool swap_endian=false);
+        void resetParts(void);
         uint64_t workSize(void);
         uint64_t packWork(char*) const;
         uint64_t unpackWork(const char*, bool swap_endian=false);

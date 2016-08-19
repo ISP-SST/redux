@@ -29,6 +29,7 @@ namespace sp=std::placeholders;
 
 
 //#define DEBUG_
+//RDX_DUMP_PATCHDATA
 
 namespace {
 
@@ -140,6 +141,7 @@ void Solver::init( void ) {
         }
         max_wavelength = std::max( max_wavelength, object->wavelength );
     }
+
 
 }
 
@@ -303,7 +305,7 @@ double Solver::metricAt( double step ) {
 
 
 void Solver::run( PatchData::Ptr data ) {
-    
+
     data->initPatch();
 
     LOG << "Starting patch.  index=" << data->index << "  region=" << data->roi
@@ -507,18 +509,26 @@ void Solver::run( PatchData::Ptr data ) {
 
     }       // end for-loop
   
-    LOG << "After " << totalIterations << " iterations:  Metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
+    LOG << "After " << totalIterations << " iterations:  metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
     LOG << timer.print() << ende;
     myInfo.status.statusString = patchString + " completed";
     
+
+#ifdef RDX_DUMP_PATCHDATA
+    dump( "patch_"+(string)data->index );
+#endif
+    
     alphaPtr = alpha;
-    for( auto& obj: data->objects ) {
-        obj.myObject->getResults(obj,alphaPtr);
-        alphaPtr += obj.myObject->nObjectImages*nModes;
-        obj.setLoaded( obj.size()>6*sizeof(uint64_t) );
-        for( auto& ch: obj.channels ) {
+    for( auto& objData: data->objects ) {
+        objData.myObject->getResults(objData,alphaPtr);
+        alphaPtr += objData.myObject->nObjectImages*nModes;
+        objData.setLoaded( objData.size()>6*sizeof(uint64_t) );
+        for( auto& ch: objData.channels ) {
             ch.images.clear();         // don't need input data anymore.
         }
+#ifdef RDX_DUMP_PATCHDATA
+        Ana::write( "patch_"+(string)data->index+"_obj_"+to_string(objData.myObject->ID)+"_result.f0", objData.img );
+#endif
     }
     
     data->finalMetric = thisMetric;
@@ -687,6 +697,7 @@ void Solver::clear( void ) {
     modeNumbers = enabledModes = nullptr;
     alpha = grad_alpha = alpha_offset = tmp_alpha = nullptr;
     regAlphaWeights = nullptr;
+    beta = grad_beta = search_dir = tmp_beta = nullptr;
 
 }
 

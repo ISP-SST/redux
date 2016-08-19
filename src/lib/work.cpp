@@ -38,10 +38,6 @@ Part::~Part() {
 #endif
 }
 
-uint64_t Part::size( void ) const {
-    return sizeof( id ) + sizeof( step ) + sizeof( nRetries )  + sizeof( partType ) ;
-}
-
 
 uint64_t Part::pack( char* ptr ) const {
 
@@ -114,6 +110,15 @@ uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count,timestamp,swap_endian);
     workStarted = boost::posix_time::from_time_t( timestamp );
     return count;
+}
+
+
+void WorkInProgress::resetParts( void ) {
+    
+    parts.clear();
+    hasResults = false;
+    nParts = nCompleted = 0;
+    
 }
 
 

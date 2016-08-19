@@ -64,8 +64,15 @@ CacheItem::~CacheItem() {
 
 
 void CacheItem::cacheRemove(void) {
+
     unique_lock<mutex> lock(itemMutex);
-    bfs::remove(fullPath);
+    try {
+        bfs::remove(fullPath);
+    } catch( exception& e ) {
+        cerr << "CacheItem::cacheRemove() failed: " << e.what() << endl;
+    } catch( ... ) {
+        cerr << "CacheItem::cacheRemove() failed for unknown reasons." << endl;
+    }
 }
 
 
@@ -79,9 +86,12 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
 
     bool ret(false);
     try {
-        if(fullPath.empty()) return ret;
+        unique_lock<mutex> lock(itemMutex);
+        if(fullPath.empty()) {
+            return ret;
+        }
+
         if(!isLoaded) {
-            unique_lock<mutex> lock(itemMutex);
             if ( bfs::exists(fullPath) ) {
                 ifstream in(fullPath.string().c_str(), ofstream::binary|ios_base::ate);
                 if( in.good() ) {
@@ -98,13 +108,14 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                 }
             }
         }
-        
+
         if(isLoaded && removeAfterLoad) {
-            unique_lock<mutex> lock(itemMutex);
             bfs::remove(fullPath);
         }
     } catch( exception& e ) {
-        cout << "CacheItem::cacheLoad() failed: " << e.what() << endl;;
+        cerr << "CacheItem::cacheLoad() failed: " << e.what() << endl;
+    } catch( ... ) {
+        cerr << "CacheItem::cacheLoad() failed for unknown reasons." << endl;
     }
     return ret;
 }
@@ -114,9 +125,12 @@ bool CacheItem::cacheStore(bool clearAfterStore){
 
     bool ret(false);
     try {
-        if(fullPath.empty()) return ret;
+        unique_lock<mutex> lock(itemMutex);
+        if(fullPath.empty()) {
+            return ret;
+        }
+
         if(isLoaded) {
-            unique_lock<mutex> lock(itemMutex);
             bfs::path parent = fullPath.parent_path();
             if( !parent.empty() ) {
                 bfs::create_directories( fullPath.parent_path() );
@@ -138,7 +152,9 @@ bool CacheItem::cacheStore(bool clearAfterStore){
             isLoaded = false;
         }
     } catch( exception& e ) {
-        cout << "CacheItem::cacheStore() failed: " << e.what() << endl;;
+        cerr << "CacheItem::cacheStore() failed: " << e.what() << endl;
+    } catch( ... ) {
+        cerr << "CacheItem::cacheStore() failed for unknown reasons." << endl;
     }
     return ret;
 }

@@ -45,7 +45,7 @@ ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, u
 
 
 ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, std::vector<uint16_t> modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
-    : firstMode(firstMode), lastMode(lastMode), nPupilPixels(nPoints), modeNumbers(modeNumbers),
+    : firstMode(firstMode), lastMode(lastMode), modeNumber(0), nPupilPixels(nPoints), modeNumbers(modeNumbers),
       pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename("") {
           
 }
