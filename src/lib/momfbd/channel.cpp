@@ -526,10 +526,13 @@ void Channel::loadData( boost::asio::io_service& service ) {
                             bfs::path fn;
                             try {
                                 fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
-                                fn = bfs::path(fn.string() + ".cor");
+                                bfs::path ext = fn.extension();
+                                if(ext.string().empty() || ext.string().length() > 5 ) {     // we assume the filename does not have a proper extenstion, add a temporary dummy
+                                    fn = bfs::path( fn.string() + ".ext" );
+                                }
+                                fn.replace_extension(".cor.f0");
                                 Image<float> view( images, i, i+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
-                                LOG_DETAIL << boost::format ("Saving corrected file %s") % fn.string() << ende;
-                                //redux::file::Ana::write(fn.string(), view.copy<float>());
+                                LOG_DEBUG << boost::format ("Saving dark/flat corrected file %s") % fn.string() << ende;
                                 redux::file::Ana::write( fn.string(), reinterpret_cast<Array<float>&>(view) );   // TODO: other formats
                             } catch ( const std::exception& e ) {
                                 LOG_ERR << "Failed to save corrected file: " << fn << "  reason: " << e.what() << ende;
@@ -546,21 +549,7 @@ void Channel::loadData( boost::asio::io_service& service ) {
         
     });
     loadCalib(service);
-    
-//     
-//     // load data (and preprocess)
-//     for (size_t i = 0; i < nFiles; ++i) {
-//         //service.post(std::bind(&Channel::loadFile, this, i));       // will *not* be loaded through the cache, so only saved in "images"
-//         service.post( [&,i](){
-//             loadFile(i);
-//             size_t nF = nFrames[i];
-//             for( size_t j=0; j<nF; ++j ) {
-//                 service.post(std::bind( &Channel::preprocessImage, this, i+j) );
-//             }
-//             service.post(std::bind( &Channel::storeCorrected, this, std::ref(service), i) );
-//         });
-//     }
-    
+
 }
 
 
@@ -670,27 +659,14 @@ void Channel::initPatch (ChannelData& cd) {
         LOG_ERR << msg << ende;
         throw logic_error(msg);
     }
-//ArrayStats tmpstats;
-//myObject.objMaxMean = 551.731543;
-//myObject.objMaxMean = 552.005248;
+
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         float* dataPtr = cd.images.get();
         size_t imgPixels = cd.images.dimSize(1)*cd.images.dimSize(2);
-        //Array<float> view( cd.images, 0, 0, 0, cd.images.dimSize(1)-1, 0, cd.images.dimSize(2)-1 );
         for( uint16_t i=0; i<nImages; ++i ) {
             double scale = myObject.objMaxMean/imageStats[i]->mean;
-            //tmpstats.getStats( dataPtr, imgPixels, ST_VALUES );
-            //cout << "Channel: rescaling image to " << myObject.objMaxMean << endl;
-            //cout << "Channel: mean1 = " << tmpstats.mean
-            //<< "  scaled = " << (tmpstats.mean*scale) << endl;
-            //transform(dataPtr, dataPtr+imgPixels, dataPtr, [scale]( const float& v ) { return scale*v; } );
             transform(dataPtr, dataPtr+imgPixels, dataPtr, bind1st(multiplies<double>(),scale) );
-            
-            //view *= (myObject.objMaxMean/imageStats[i]->mean);
-            //tmpstats.getStats( dataPtr, imgPixels, ST_VALUES );
-            //cout << "Channel: %d  mean2 = " << tmpstats.mean << endl;
             dataPtr += imgPixels;
-            //view.shift(0,1);
         }
     }
     
@@ -821,42 +797,7 @@ void Channel::loadFile( size_t i ) {
     } catch ( ... ) {
         LOG_ERR << "Failed to load file " << fn << " for unknown reason."  << ende;
     }
-//    imageStats[i]->getStats(borderClip, tmpImg);     // get stats for corrected data
-    //tmpImg *= 1.0/imageStats[i]->mean;
-//    view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );
 
-
-//        fn = bfs::path (boost::str (boost::format (imageTemplate) % i));
-//        fn = bfs::path(fn.leaf().string() + ".loaded");
-//        redux::file::Ana::write( fn.string(), reinterpret_cast<Array<float>&>(tmpImg) );   // TODO: other formats
-
-}
-
-
-void Channel::storeCorrected( boost::asio::io_service& service, size_t i ) {
-    
-    if( !(myObject.saveMask & SF_SAVE_FFDATA) ) return;
-    
-    bool allOk = true;
-    for( auto& st: imageStats ) {
-        if( !st ) {
-            allOk = false;
-            break;
-        }
-    }
-
-    if( allOk ) {
-        size_t nF = nFrames[i];
-        bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
-        fn = bfs::path(fn.string() + ".cor");
-        Image<float> view( images, i, i+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
-        LOG_DETAIL << boost::format ("Saving corrected file %s") % fn.string() << ende;
-        //redux::file::Ana::write(fn.string(), view.copy<float>());
-        redux::file::Ana::write( fn.string(), reinterpret_cast<Array<float>&>(view) );   // TODO: other formats
-    } else {
-        std::this_thread::sleep_for( std::chrono::seconds(1) );
-        service.post( std::bind( &Channel::storeCorrected, this, std::ref(service), i) );
-    }
 }
 
 

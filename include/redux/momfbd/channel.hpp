@@ -67,7 +67,6 @@ namespace redux {
             void initPatch(ChannelData&);
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
-            //void addAllFT(redux::image::FourierTransform&);
             void addAllFT(redux::util::Array<double>&);
             void addAllPQ(void) const;
             /*****************************************************/
@@ -87,7 +86,6 @@ namespace redux {
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
             void loadFile( size_t index );
-            void storeCorrected( boost::asio::io_service&, size_t index );
             void preprocessImage( size_t index );
             void copyImagesToPatch(ChannelData&);          
             
