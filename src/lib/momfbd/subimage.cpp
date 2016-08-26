@@ -114,9 +114,21 @@ void SubImage::init (void) {
     
     stats.getStats( img.get(), imgSize*imgSize, ST_VALUES );
 
-    transform(img.get(), img.get()+img.nElements(), window.get(), img.get(),
-              [&](const double& a, const double& b) { return (a-stats.mean)*b+stats.mean; }
-             );
+    double avg = stats.mean;
+    size_t nEl = img.nElements();
+    double* imgPtr = img.get();
+    const double* winPtr = window.get();
+    if( object.fittedPlane.nElements() == nEl ) {
+        const float* planePtr = object.fittedPlane.get();
+        for( size_t i=0; i<nEl; ++i) {
+            // Note: mean(plane) = 0, so subtracting it will not affect the mean value.
+            imgPtr[i] = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
+        }
+    } else {
+        transform(imgPtr, imgPtr+nEl, window.get(), imgPtr,
+                [avg](const double& a, const double& b) { return (a-avg)*b+avg; }
+                );
+    }
     stats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
     string str = "Initializing image " + to_string(object.ID) + ":" + to_string(channel.ID) + ":" + to_string(index)
     + "   mean=" + to_string (stats.mean) + " stddev=" + to_string (stats.stddev);
@@ -163,7 +175,52 @@ void SubImage::init (void) {
     object.addRegGamma( rg );
     object.addToFT( imgFT );
 
-    LOG_TRACE << str << "  initial shift=" << (string)offsetShift << ende;
+    LOG_DEBUG << str << "  initial shift=" << (string)offsetShift << ende;
+    
+}
+
+
+void SubImage::reInitialize(void) {
+
+    memcpy(tmpFT.get(),imgFT.get(),imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
+    
+    copy(img);                                                                                  // copy current cut-out to (double) working copy.
+
+    stats.getStats( img.get(), imgSize*imgSize, ST_VALUES );     // TODO test if this is necessary or if the stats for the larger area is sufficient
+
+    double avg = stats.mean;
+    size_t nEl = img.nElements();
+    double* imgPtr = img.get();
+    const double* winPtr = window.get();
+    if( object.fittedPlane.nElements() == nEl ) {
+        const float* planePtr = object.fittedPlane.get();
+        for( size_t i=0; i<nEl; ++i) {
+            // Note: mean(plane) = 0, so subtracting it will not affect the mean value.
+            imgPtr[i] = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
+        }
+    } else {
+        transform(imgPtr, imgPtr+nEl, window.get(), imgPtr,
+                [avg](const double& a, const double& b) { return (a-avg)*b+avg; }
+                );
+    }
+    transpose(imgPtr,imgSize,imgSize);                                                       // to match MvN
+    
+    if (imgSize == otfSize) {                                                                   // imgSize = 2*pupilSize
+        imgFT.reset(imgPtr, imgSize, imgSize, FT_FULLCOMPLEX );                              // full-complex for now, perhaps half-complex later for performance
+    } else {                                                                                    // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
+        int offset = (otfSize - imgSize) / 2;
+        Array<double> tmp (otfSize, otfSize);
+        tmp.zero();
+        double* tmpPtr = tmp.get();
+        for (int i = 0; i < imgSize; ++i) {
+            memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));
+        }
+        imgFT.reset (tmp.get(), otfSize, otfSize, FT_FULLCOMPLEX );                             // full-complex for now, perhaps half-complex later for performance
+    }
+   
+  
+    FourierTransform::reorder(imgFT);                                                           // keep FT in centered form
+    object.addDiffToFT( imgFT, tmpFT );
     
 }
 
@@ -345,10 +402,11 @@ void SubImage::resetPhi(void) {
 
 #include <iomanip>      // std::setiosflags, std::resetiosflags
 
-void SubImage::adjustOffset( double* alpha ) {
+bool SubImage::adjustOffset( double* alpha ) {
 
     PointI oldOffset = offsetShift;
     PointD oldVal(0,0),newVal(0,0);
+    bool ret(false);
     
     int32_t mIndex = object.modes.tiltMode.x;
     if( mIndex >= 0 ) {
@@ -386,13 +444,14 @@ void SubImage::adjustOffset( double* alpha ) {
 
     if( oldOffset != offsetShift ) {
         //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << ende;
-        LOG_DEBUG << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+        LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                    << ":  cutout was shifted, from " << oldOffset << " to " << offsetShift
                    << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << "  adj=" << adjustedTilts << ende;
-        newCutout();
+        //newCutout();
+        ret = true;
         //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast") << ende;
     }
-    
+    return ret;
 }
 
 

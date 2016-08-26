@@ -71,7 +71,7 @@ namespace redux {
             void addToPQ(const complex_t* ft, const complex_t* otf);
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
-            void fitAvgPlane(ObjectData&);
+            void fitAvgPlane(void);
             void calcMetric(void);
             inline double metric(void) const { return currentMetric; };
             /*****************************************************/

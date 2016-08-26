@@ -221,7 +221,6 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, bool allowS
             return true;
         }
     } else {
-
         if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
             progWatch.set(patches.nElements());
             progWatch.setTicker([this](){
@@ -305,6 +304,7 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
 
 void MomfbdJob::cleanup(void) {
     
+    progWatch.clear();
     for( auto &o: objects ) {
         o->cleanup();
     }

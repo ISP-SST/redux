@@ -201,6 +201,9 @@ void Object::initProcessing( const Solver& ws ) {
         P.resize(2*pupilPixels,2*pupilPixels);
         Q.resize(2*pupilPixels,2*pupilPixels);
         ftSum.resize(patchSize,patchSize);          // full-complex for now
+        if( myJob.runFlags & RF_FIT_PLANE ) {
+            fittedPlane.resize( patchSize, patchSize );
+        }
         for( auto& ch : channels ) {
             ch->initProcessing(ws);
         }
@@ -301,14 +304,6 @@ void Object::getResults(ObjectData& od, double* alpha) {
                     return std::real(a)*normalization;
                 } );
     
-    if( fittedPlane.sameSize(od.img) ) {
-        LOG_DETAIL << "Re-adding fitted plane to result." << ende;
-        od.img += fittedPlane;
-    } else if( !fittedPlane.empty() ) {
-        LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
-    }
-
-    
     // PSF
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
         uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
@@ -379,6 +374,17 @@ void Object::getResults(ObjectData& od, double* alpha) {
             od.res.clear();
         }
     }
+    
+    
+    // Note: re-adding the plane has to be done *after* calculating the convolved objects and residuals
+    if( fittedPlane.sameSize(od.img) ) {
+        transpose( fittedPlane.get(), fittedPlane.dimSize(0), fittedPlane.dimSize(1) );                 // to match the transposed subimage.
+        LOG_DETAIL << "Re-adding fitted plane to result." << ende;
+        od.img += fittedPlane;
+    } else if( !fittedPlane.empty() ) {
+        LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
+    }
+    
     
     // Mode coefficients
     if( saveMask & SF_SAVE_ALPHA ) {
@@ -494,65 +500,35 @@ void Object::addAllPQ(void) {
 }
 
 
-void Object::fitAvgPlane(ObjectData& od) {
+void Object::fitAvgPlane( void ) {
     
-    if( (myJob.runFlags&RF_FIT_PLANE) && od.channels.size() && od.channels[0].images.nDimensions() == 3 ) {
-        
+    if( myJob.runFlags & RF_FIT_PLANE ) {
         size_t count(0);
-        size_t ySize = od.channels[0].images.dimSize(1);
-        size_t xSize = od.channels[0].images.dimSize(2);
-        
-        fittedPlane.resize(ySize,xSize);
         fittedPlane.zero();
-        
-        for( auto& cd : od.channels ) {
-            size_t nImg = cd.images.dimSize(0);
-            vector<int64_t> first = cd.images.first();
-            vector<int64_t> last = cd.images.last();
-            last[0] = first[0];                         // only select first image
-            Array<float> view(cd.images, first, last);
-            for( unsigned int i=0; i<nImg; ++i ) {
-                if( ! view.sameSize(fittedPlane) ) {
+        for( const shared_ptr<Channel>& c: channels ) {
+            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                if( !im->sameSize(fittedPlane) ) {
                     LOG_ERR << "Size mismatch when fitting average plane for object #" << ID << ende;
                     fittedPlane.clear();
                     return;
                 }
-                fittedPlane += view;
-                view.shift(0,1);
+                fittedPlane += *im;
                 count++;
             }
         }
-        
-        if(count) {
-            fittedPlane /= count;
-            fittedPlane = fitPlane(fittedPlane, true);          // fit plane to the average image, and subtract average
-        } else {
+        if( count == 0 ) {
+            LOG_ERR << "No images present when fitting average plane for object #" << ID << ende;
             fittedPlane.clear();
             return;
         }
         
-        LOG_DETAIL << "Subtracting average plane before processing." << ende;
-        
-        for( auto& cd : od.channels ) {
-            size_t nImg = cd.images.dimSize(0);
-            vector<int64_t> first = cd.images.first();
-            vector<int64_t> last = cd.images.last();
-            last[0] = first[0];                         // only select first image
-            Array<float> view(cd.images, first, last);
-            for( unsigned int i=0; i<nImg; ++i ) {
-                view -= fittedPlane;                    // subract fitted plane from all images
-                view.shift(0, 1);                       // shift view to next image in stack
-            }
-        }
-        
-        fittedPlane.setLimits( myJob.maxLocalShift, myJob.maxLocalShift+myJob.patchSize-1, myJob.maxLocalShift, myJob.maxLocalShift+myJob.patchSize-1);
-        fittedPlane.trim();             // we fit/subtract the whole cutout area, but only re-add it for the patch, so store it in that size.
-        transpose(fittedPlane.get(),fittedPlane.dimSize(0),fittedPlane.dimSize(1));                 // to match the transposed subimage.
+        fittedPlane /= count;
+        vector<double> coeffs(3,0.0);
+        fittedPlane = fitPlane( fittedPlane, true, coeffs.data() );          // fit plane to the average image, and subtract average
+        LOG_DEBUG << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
     }
-
-
+    
 }
-
 
 
 void Object::calcMetric (void) {
@@ -710,11 +686,12 @@ void Object::initCache (void) {
         unique_lock<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( pupilFile, pupilPixels ) ) {
-                LOG_DEBUG << "Loaded Pupil-file " << pupilFile << ende;
+                LOG << "Loaded Pupil-file " << pupilFile << ende;
                 pupil = ret;
             } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
         } else {
-            if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
+            if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching pupil
+                LOG << "Using existing pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet)." << ende;
@@ -731,11 +708,12 @@ void Object::initCache (void) {
             if( ret.nDimensions() != 2 || ret.dimSize(0) != pupilPixels || ret.dimSize(1) != pupilPixels ) {    // mismatch
                 LOG_ERR << "Generated Pupil does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated pupil (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                LOG << "Generated pupil (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret; 
             }
         } else {
-            if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching modes
+            if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching pupil
+                LOG << "Using existing pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!" << ende;
@@ -749,7 +727,7 @@ void Object::initCache (void) {
         unique_lock<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( modeFile, pupilPixels ) ) {
-                LOG_DEBUG << "Loaded Mode-file " << modeFile << ende;
+                LOG << "Loaded Mode-file " << modeFile << ende;
                 ret.getNorms( pupil );
                 modes = ret;
                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be (y,x)=" << modes.tiltMode
@@ -757,9 +735,10 @@ void Object::initCache (void) {
               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
+                LOG << "Using existing modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
-                LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet)." << ende;
+                LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet!!)." << ende;
             }
         }
     }
@@ -786,6 +765,7 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
+                LOG << "Using existing modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!" << ende;
@@ -811,6 +791,8 @@ void Object::initCache (void) {
         alphaToPixels = 1.0/pixelsToAlpha;
     }
     
+    LOG << "Tilt-to-pixels conversion: " << alphaToPixels << ende;
+
     for (auto& ch : channels) {
         ch->initCache();
     }
@@ -835,7 +817,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
             else endT = std::max(endT,ch->endT);
             ch->storePatches(service, patches);
         }
-        LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
+        LOG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     });
     
     for( auto& ch: channels ) {

@@ -163,11 +163,9 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
     bool newJob;
     count += unpack( ptr+count, newJob );
     if( newJob ) {
-        cout << "WorkInProgress::unpackWork()  WIP contains new job.  nParts = "<< nParts << endl;
         string tmpS = string( ptr+count );
         job = Job::newJob( tmpS );
         if( job ) {
-        cout << "WorkInProgress::unpackWork()  Unpacking new job." << endl;
             count += job->unpack( ptr+count, swap_endian );
         } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
     } else job = previousJob.lock();

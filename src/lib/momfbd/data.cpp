@@ -104,10 +104,10 @@ void ObjectData::setPath(const std::string& path) {
 
 void ObjectData::initPatch(void) {
     myObject->initPatch(*this);
-    myObject->fitAvgPlane(*this);
     for( auto& ch: channels ) {
         ch.initPatch();
     }
+    myObject->fitAvgPlane();
     myObject->initPQ();
     myObject->addAllPQ();
 }

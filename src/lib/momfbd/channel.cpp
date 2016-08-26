@@ -535,7 +535,6 @@ void Channel::loadData( boost::asio::io_service& service ) {
                                 LOG_ERR << "Failed to save corrected file: " << fn << "  reason: " << e.what() << ende;
                             }
                         });
-                        //service.post(std::bind( &Channel::storeCorrected, this, std::ref(service), i) );
                     } 
                 } catch ( const std::exception& e ) {
                     LOG_ERR << "Failed to load/preprocess file. reason: " << e.what() << ende;
@@ -700,7 +699,6 @@ void Channel::initPatch (ChannelData& cd) {
         subImages[i]->setPatchInfo( i, cd.offset, cd.channelOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->wrap( cd.images, i, i, cd.offset.y, cd.offset.y+patchSize-1, cd.offset.x, cd.offset.x+patchSize-1 );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), cd.images.dimSize(1)*cd.images.dimSize(2), ST_VALUES|ST_RMS );
-        subImages[i]->init();
     }
 
     phi_fixed.copy( phi_channel );

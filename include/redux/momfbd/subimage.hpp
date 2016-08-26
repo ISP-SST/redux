@@ -41,6 +41,7 @@ namespace redux {
             
             void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointI&, uint16_t, uint16_t, uint16_t);
             void init(void);
+            void reInitialize(void);
             void newCutout(void);
             
             void addFT(redux::util::Array<double>& ftsum) const;
@@ -56,7 +57,7 @@ namespace redux {
             
             void addToPhi(double* phiPtr, const double* modePtr, double a) const;
             
-            void adjustOffset(double* alpha);
+            bool adjustOffset(double* alpha);
 
             void addPhases(const double* a) { addPhases(phi.get(), a); };
             void addPhases(double* phiPtr, const double* a) const;

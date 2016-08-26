@@ -372,6 +372,21 @@ void Solver::run( PatchData::Ptr data ) {
     memset(s->gradient->data,0,nFreeParameters*sizeof(double));
     s->f = 0;
         
+    sync_counter sc;
+    sc.reset();
+    for( const auto& o: job.objects ) {
+        for( const shared_ptr<Channel>& c: o->channels ) {
+            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                ++sc;
+                service.post( [&](){
+                    im->init();
+                    --sc;
+                } );
+            }
+        }
+    }
+    sc.wait();
+            
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
     LOG_TRACE << "Initial metric = " << initialMetric << ende;
 
@@ -385,7 +400,6 @@ void Solver::run( PatchData::Ptr data ) {
     size_t maxIterations(10);           // fewer iterations while increasing modes, job.maxIterations for the last step.
     size_t maxFails(3);                 // TODO make into a cfg parameter
     int status(0);
-    sync_counter sc;
 
     timer.start();
     logger.flushAll();
@@ -492,12 +506,30 @@ void Solver::run( PatchData::Ptr data ) {
             alphaPtr = alpha;
             sc.reset();
             for( const auto& o: job.objects ) {
+                atomic<int> imgShifted(0);
+                o->progWatch.set( o->nImages() );
+                o->progWatch.setTicker(nullptr);
+                o->progWatch.setHandler([&](){
+                    if( imgShifted && (job.runFlags&RF_FIT_PLANE) ) {
+                        o->fitAvgPlane();
+                        for( const shared_ptr<Channel>& c: o->channels ) {
+                            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                                ++sc;
+                                service.post( [&](){
+                                    im->reInitialize();
+                                    --sc;
+                                } );
+                            }
+                        }
+                    }
+                    --sc;
+                });
+                ++sc;
                 for( const auto& c: o->channels ) {
                     for( const auto& im: c->getSubImages() ) {
-                        ++sc;
-                        service.post( [&im,alphaPtr,&sc](){
-                            im->adjustOffset(alphaPtr);
-                            --sc;
+                        service.post( [&,alphaPtr](){
+                            imgShifted.fetch_or(im->adjustOffset(alphaPtr));
+                            ++o->progWatch;
                         } );
                         alphaPtr += nModes;
                     }

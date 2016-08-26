@@ -395,7 +395,7 @@ void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r
 
 
 template <typename T>
-redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, bool subtract_mean) {
+redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, bool subtract_mean, double* coeffs) {
 
     int ySize = in.dimSize(0);
     int xSize = in.dimSize(1);
@@ -413,10 +413,10 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, b
     int xHalf = xSize/2;
     const T* inPtr = in.ptr();
     for (int i = 0; i < ySize; ++i) {
-        double y = i-yHalf;
+        double y = static_cast<double>(i-yHalf);
         for (int j = 0; j < xSize; ++j) {
-            double x = j-xHalf;
-            int offset = i * xSize + j;
+            double x = static_cast<double>(j-xHalf);
+            int offset = i*xSize + j;
             gsl_matrix_set (X, offset, 0, x);
             gsl_matrix_set (X, offset, 1, y);
             gsl_matrix_set (X, offset, 2, 1);
@@ -432,6 +432,15 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, b
     double a = gsl_vector_get (coeff, 0);
     double b = gsl_vector_get (coeff, 1);
     double c = gsl_vector_get (coeff, 2);
+    if (subtract_mean) {
+        c = 0;                                          // ignore c-coefficient (mean), to just fit the tilts, not the offset.
+    }
+
+    if( coeffs ) {
+        coeffs[0] = a;
+        coeffs[1] = b;
+        coeffs[2] = c;
+    }
 
     gsl_vector_free (data);
     gsl_vector_free (coeff);
@@ -439,22 +448,19 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, b
     gsl_matrix_free (covar);
 
     T* retPtr = ret.ptr();
-    if (subtract_mean) {
-        c = 0;                                          // ignore c-coefficient (mean), to just fit the tilts, not the offset.
-    }
     for (int i = 0; i < ySize; ++i) {
-        double y = static_cast<double> (i) / (ySize - 1) - 0.5;
+        double y = static_cast<double>(i-yHalf);
         for (int j = 0; j < xSize; ++j) {
-            double x = static_cast<double> (j) / (xSize - 1) - 0.5;
+            double x = static_cast<double>(j-xHalf);
             int offset = i * xSize + j;
-            retPtr[offset] = a * x + b * y + c;
+            retPtr[offset] = a*x + b*y + c;
         }
     }
-
+    
     return ret;
 }
-template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&, bool);
-template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&, bool);
+template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&, bool, double*);
+template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&, bool, double*);
 
 
 template <typename T>
