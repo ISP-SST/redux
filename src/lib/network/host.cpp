@@ -118,19 +118,19 @@ Host& Host::myInfo(void) {
 
 std::string Host::printHeader(void) {
     string hdr = alignRight("ID",5) + alignCenter("NAME",25) + alignCenter("PID",7) + alignCenter("THREADS",9);
-    hdr += alignLeft("VERSION",9) + alignCenter("loadavg",9) + alignCenter("Last Activity",17) + alignCenter("Uptime",15) + "STATUS";
+    hdr += alignLeft("VERSION",9) + alignCenter("loadavg",9) + alignCenter("Uptime",12) + alignCenter("Runtime",12) + "STATUS";
     return hdr;
 }
 
 std::string Host::print(void) {
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-    boost::posix_time::time_duration elapsed = (now - status.lastSeen); //status.lastActive);
+    boost::posix_time::time_duration elapsed = (now - status.lastActive);
     boost::posix_time::time_duration uptime = (now - info.startedAt);
     string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
     ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),9);
     ret += alignCenter(getVersionString(info.reduxVersion),9);
     ret += alignCenter(boost::str(boost::format("%.2f") % status.loadAvg),9);
-    ret += alignCenter(to_simple_string(elapsed),17) + alignCenter(to_simple_string(uptime),15);
+    ret += alignCenter(to_simple_string(uptime),12) + alignCenter(to_simple_string(elapsed),12);
     ret += status.statusString; 
     return ret;
 }
