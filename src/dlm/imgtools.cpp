@@ -11,6 +11,7 @@
 #include <redux/util/array.hpp>
 #include <redux/util/stringutil.hpp>
 #include <redux/util/arraystats.hpp>
+#include <redux/util/progresswatch.hpp>
 
 #include <atomic>
 #include <future>
@@ -284,7 +285,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     IDL_VPTR ret;
-    IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_NOP, &ret);
+    IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_ZERO, &ret);
     Mat retMat = arrayToMat (ret);
 
     if (nPlainArgs < 2) {
@@ -1222,7 +1223,7 @@ IDL_VPTR rdx_make_win( int argc, IDL_VPTR* argv, char* argk ) {
     }
     
     if( nPlainArgs < 2 ) {
-        cout << "rdx_make_window: needs 2 arguments: nPixels & pupil-radius (in pixels). " << endl;
+        cout << "rdx_make_window: needs 2 arguments: nPixels & blend_region (in pixels). " << endl;
         return IDL_GettmpInt (0);
     }
     
@@ -1253,6 +1254,7 @@ namespace {
         IDL_INT pinh_align;
         IDL_INT verbose;
         IDL_INT lun;
+        IDL_INT filter;
         float fp_thres;
         float limit;
         IDL_VPTR summed;
@@ -1261,6 +1263,8 @@ namespace {
         IDL_VPTR gain;
         IDL_VPTR bs_gain;
         IDL_VPTR bs_psf;
+        IDL_VPTR time_beg;
+        IDL_VPTR time_end;
         IDL_VPTR time_avg;
         IDL_VPTR xyc;
        // IDL_STRING split_chars;
@@ -1273,6 +1277,7 @@ namespace {
         { (char*) "CHECK",            IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,check) },
         { (char*) "DARK",             IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,dark) },
         { (char*) "FILLPIX_THRESHOLD",IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,fp_thres) },
+        { (char*) "FILTER",           IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,filter) },
         { (char*) "GAIN",             IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,gain) },
         { (char*) "HELP",             IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,help) },
         { (char*) "LIMIT",            IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(SI_KW,limit) },
@@ -1283,6 +1288,8 @@ namespace {
         { (char*) "PINHOLE_ALIGN",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,pinh_align) },
         { (char*) "SUMMED",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,summed) },
         { (char*) "TIME_AVERAGE",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_avg) },
+        { (char*) "TIME_BEGIN",       IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_beg) },
+        { (char*) "TIME_END",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_end) },
         { (char*) "VERBOSE",          IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,verbose) },
         { (char*) "XYC",              IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,xyc) },
        // { (char*) "SPLIT_CHARS", IDL_TYP_STRING, 1, 0, 0, (char*)IDL_KW_OFFSETOF2(SI_KW,split_chars) },
@@ -1302,6 +1309,7 @@ string sum_images_info( int lvl ) {
                     "      BACKSCATTER_PSF     Image containing the scattering PSF. (for descattering).\n"
                     "      CHECK               Discard images which are statistically deviant.\n"
                     "      DARK                Dark field.\n"
+                    "      FILTER              Size of median-filter to be applied to means before checking. (3)\n"
                     "      GAIN                Gain table (inverted flat-field).\n"
                     "      LIMIT               Allowed deviation from the median. (0.0175)\n"
                     "      NSUMMED             (output) Number of images actually summed.\n"
@@ -1341,6 +1349,10 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
     if( kw.help ) {
         cout << sum_images_info(2) << endl;
         return IDL_GettmpInt(0);
+    }
+    
+    if( kw.filter<2 && kw.check ) {
+        kw.filter = 3;
     }
     
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
@@ -1460,9 +1472,13 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
             return IDL_GettmpInt(0);
         }
         
+        if( kw.filter > 0 ) {
+            kw.check = 1;
+        }
+        
         if( kw.check && nImages < 3 ) {
             cerr << "rdx_sumimages: Not enough statistics, skipping check." << endl;
-            kw.check = 0;
+            kw.check = kw.filter = 0;
         }
 
         size_t xSizePadded = xSize + 2*kw.padding;
@@ -1747,14 +1763,16 @@ namespace {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_VPTR header;
         IDL_INT help;
+        IDL_VPTR status;
         IDL_INT structhead;
        // IDL_STRING split_chars;
     } RD_KW;
     // NOTE:  The keywords MUST be listed in alphabetical order !!
     static IDL_KW_PAR rd_kw_pars[] = {
         IDL_KW_FAST_SCAN,
-        { (char*) "HEADER",           IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(RD_KW,header) },
+        { (char*) "HEADER",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(RD_KW,header) },
         { (char*) "HELP",             IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(RD_KW,help) },
+        { (char*) "STATUS",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(RD_KW,status) },
         { (char*) "STRUCTHEAD",       IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(RD_KW,structhead) },
         { NULL }
     };
@@ -1788,6 +1806,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
     
     RD_KW kw;
     kw.header = nullptr;
+    kw.status = nullptr;
     (void)IDL_KWProcessByOffset( argc, argv, argk, rd_kw_pars, (IDL_VPTR*)0, 255, &kw );
     
     if( kw.help ) {
@@ -1796,6 +1815,9 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
     }
     
     //kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
+    if( kw.status ) {
+        IDL_VarCopy( IDL_GettmpInt(-1), kw.status );
+    }
     
     try {
         
@@ -1837,78 +1859,49 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
             return IDL_GettmpInt(0);
         }
         
-
-        //cout << "single file:" << existingFiles[0] << endl;
         try {
             shared_ptr<redux::file::FileMeta> myMeta = getMeta( existingFiles[0] );
-            //cout << "nElements: " << myMeta->nElements() << endl;
-            //cout << "elementSize: " << (int)myMeta->elementSize() << endl;
-            //cout << "dataSize: " << myMeta->dataSize() << endl;
-            //cout << "nDims: " << (int)myMeta->nDims() << endl;
-            //cout << "IDLType: " << myMeta->getIDLType() << endl;
-            //cout << "Text: " << myMeta->getText() << endl;
+            if( kw.header ) {
+                IDL_VPTR tmpHdr;
+                myMeta->getAverageTime();
+                myMeta->getEndTime();
+                myMeta->getStartTime();
+                string txt = myMeta->getText();
+                size_t txtSize = txt.length();
+                int fmt = myMeta->getFormat();
+                if( (fmt == FMT_FITS) || (fmt == FMT_ANA && txt.substr(0,6) == "SIMPLE")) {
+                    if( txtSize%80 ) {
+                        cout << "Header text-size is not a multiple of 80. " << myMeta->getText() << endl;
+                    } else {
+                        size_t nKeys = txtSize/80;
+                        IDL_MEMINT dims[] = { nKeys };
+                        IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &tmpHdr );
+                        IDL_STRING* strPtr = reinterpret_cast<IDL_STRING*>(tmpHdr->value.arr->data);
+                        for( int i=0; i<nKeys; ++i ) {
+                            string tmp = txt.substr(i*80,80);
+                            IDL_StrStore( &(strPtr[i]), (char*)tmp.c_str() );
+                        }
+                    }
+                } else {
+                    tmpHdr = IDL_StrToSTRING((char*)txt.c_str());
+                }
+                IDL_VarCopy( tmpHdr, kw.header );
+            }
             vector<IDL_MEMINT> dims;
             for( size_t i=0; i<myMeta->nDims(); ++i ) {
                 dims.push_back( myMeta->dimSize(i) );
             }
             std::reverse( dims.begin(), dims.end() );
-//cout << printArray(dims,"idlDims") << endl;
             char* data = (char*)IDL_MakeTempArray( myMeta->getIDLType(), myMeta->nDims(), dims.data(), IDL_ARR_INI_NOP, &ret ); //IDL_ARR_INI_ZERO
             readFile( existingFiles[0], data, myMeta );
         } catch (const exception& e ) {
-            cout << "rdx_readdata: sf : unhandled exception: " << e.what() << endl;
+            cout << "rdx_readdata: unhandled exception: " << e.what() << endl;
             return IDL_GettmpInt(0);
         }
 
-        return ret;
-
-    
-        return IDL_GettmpInt(0);
-/*        
-        string statusString;
-        if( kw.verbose ) {
-            statusString = (kw.check?"Checking and summing ":"Summing ") + to_string(nImages)
-            + " files using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":".");
-            cout << statusString << ((kw.verbose == 1)?"\n":"") << flush;
+        if( kw.status ) {
+            IDL_VarCopy( IDL_GettmpInt(0), kw.status );
         }
-        
-        IDL_MEMINT dims[] = { ySize, xSize }; 
-        double* summedData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &ret ); //IDL_ARR_INI_ZERO
-        
-        unique_ptr<char[]> loadBuffer( new char[ kw.nthreads*frameSize ] );
-        char* loadPtr = loadBuffer.get();
-        
-
-        std::vector<std::thread> threads;
-        for( UCHAR t=0; t<kw.nthreads; ++t ) {
-            threads.push_back( std::thread(
-                [&](){
-                    size_t myImgIndex;
-                    size_t myThreadIndex = threadIndex.fetch_add(1);
-                    double* mySumPtr = sumPtr+myThreadIndex*nPixels;
-                    double* myTmpPtr = tmpPtr+myThreadIndex*nPixels;
-                    char* myLoadPtr = loadPtr+myThreadIndex*frameSize;
-                    shared_ptr<redux::file::FileMeta> myMeta;
-                    while( (myImgIndex=imgIndex.fetch_add(1)) < nImages ) {
-                        try {
-                            readFile( existingFiles[myImgIndex], myLoadPtr, myMeta );
-                            sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
-                            if( kw.time ) {
-                                 times[myImgIndex] = myMeta->getAverageTime().time_of_day();
-                            }
-                           size_t ns = nSummed++;
-                            if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nImages-1)));
-                        } catch( const exception& e ) {
-                            cout << "rdx_sumfiles: Failed to load file: " << existingFiles[myImgIndex] << "  Reason: " << e.what() << endl;
-                        }
-                    }
-                    std::unique_lock<mutex> lock(mtx);
-                    for( size_t i=0; i<nPixels; ++i ) summedData[i] += mySumPtr[i];
-                }));
-        }
-        for (auto& th : threads) th.join();
-*/        
-                
         return ret;
         
     } catch (const exception& e ) {
@@ -1932,6 +1925,7 @@ string sum_files_info( int lvl ) {
                     "      BACKSCATTER_PSF     Image containing the scattering PSF. (for descattering).\n"
                     "      CHECK               Discard images which are statistically deviant.\n"
                     "      DARK                Dark field.\n"
+                    "      FILTER              Size of median-filter to be applied to means before checking. (3)\n"
                     "      GAIN                Gain table (inverted flat-field).\n"
                     "      LIMIT               Allowed deviation from the median. (0.0175)\n"
                     "      LUN                 IDL file unit (id) where discarded files will be logged.\n"
@@ -1940,6 +1934,8 @@ string sum_files_info( int lvl ) {
                     "      PADDING             Padding size for the descattering procedure. (256)\n"
                     "      PINHOLE_ALIGN       Do sub-pixel alignment before summing.\n"
                     "      SUMMED              (output) Raw sum.\n"
+                    "      TIME_BEGIN          (output) Begin-time from file-headers.\n"
+                    "      TIME_END            (output) End-time from file-headers.\n"
                     "      TIME_AVERAGE        (output) Average timestamp from file-headers.\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                     "      XYC                 (output) Coordinates of align-feature and image-shifts.\n";
@@ -1976,6 +1972,10 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
     if( kw.help ) {
         cout << sum_files_info(2) << endl;
         return IDL_GettmpInt(0);
+    }
+    
+    if( kw.filter<2 && kw.check ) {
+        kw.filter = 3;
     }
     
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
@@ -2087,46 +2087,100 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 }
             }
         }
-        size_t nImages = existingFiles.size();
-        kw.nthreads = static_cast<UCHAR>( min<size_t>(kw.nthreads, nImages) );
+        size_t nFiles = existingFiles.size();
+        //kw.nthreads = static_cast<UCHAR>( min<size_t>(kw.nthreads, nFiles) );
 
-        if( !nImages ) { 
+        if( !nFiles ) { 
             cout << "rdx_sumfiles: No input files." << endl;
             return IDL_GettmpInt(0);
         }
         // Get size etc from first image.
         std::shared_ptr<redux::file::FileMeta> meta = redux::file::getMeta( existingFiles[0] );
-        if( !meta || (meta->nDims() != 2) ) {        // Only allow 2D images
-            cout << "rdx_sumfiles: Failed to get meta, or not 2D input." << endl;
+        if( !meta ) {        // Only allow 2D images
+            cout << "rdx_sumfiles: Failed to get metadata." << endl;
+            return IDL_GettmpInt(0);
+        }
+        size_t nDims = meta->nDims();
+
+        IDL_MEMINT xSize, ySize;
+        size_t nTotalFrames( nFiles );
+        vector<size_t> nFrames( nFiles, 1 );
+        if( nDims == 2 ) {
+            xSize = meta->dimSize(1);
+            ySize = meta->dimSize(0);
+        } else if( nDims == 3 ) {
+            xSize = meta->dimSize(2);
+            ySize = meta->dimSize(1);
+        } else {                                // Only allow 2D & 3D files
+            cout << "rdx_sumfiles: Only 2D and 3D files supported." << endl;
             return IDL_GettmpInt(0);
         }
         
-        IDL_MEMINT xSize = meta->dimSize(1);
-        IDL_MEMINT ySize = meta->dimSize(0);
         size_t nPixels = xSize*ySize;
-        size_t frameSize = meta->dataSize();
+        size_t frameSize = nPixels * meta->elementSize();
         UCHAR dataType = meta->getIDLType();
-        
         size_t xSizePadded = xSize + 2*kw.padding;
         size_t ySizePadded = ySize + 2*kw.padding;
         
-        vector<boost::posix_time::time_duration> times;
-        if( kw.time_avg ) {
-            times.resize( nImages );
+        bool done(false);
+        mutex mtx;
+        boost::asio::io_service ioService;
+        std::shared_ptr<boost::asio::io_service::work> workLoop( new boost::asio::io_service::work(ioService) );
+        boost::thread_group pool;
+        for( uint16_t t=0; t < kw.nthreads; ++t ) {
+            pool.create_thread( [&](){
+                while( !done ) {
+                    try {
+                        ioService.run();
+                    } catch( exception& e ) {
+                        cerr << "Exception in summing thread: " << e.what() << endl;
+                    } catch( ... ) {
+                        cerr << "Unhandled exception in thread." << endl;
+                    }
+                }
+            });
+        }
+        ProgressWatch progWatch;
+        if( nDims == 3 ) {
+            nFrames.clear();
+            nTotalFrames = 0;
+            progWatch.set( nFiles );
+            for( auto &fn: existingFiles ) {
+                ioService.post([&](){
+                    auto tmpMeta = redux::file::getMeta( fn );
+                    if( meta ) {
+                        size_t frames = meta->dimSize(0);
+                        unique_lock<mutex> lock(mtx);
+                        nFrames.push_back( frames );
+                        nTotalFrames += frames;
+                    }
+                    ++progWatch;
+                });
+            }
+        }
+        progWatch.wait();
+
+        
+        size_t maxFileSize = *std::max_element( nFrames.begin(), nFrames.end() ) * frameSize;
+        atomic<size_t> nSummed(0);
+        atomic<size_t> frameIndex(0);
+        
+        vector<bpx::ptime> time_beg;
+        vector<bpx::ptime> time_end;
+        if( kw.time_beg || kw.time_end || kw.time_avg ) {
+            time_beg.resize( nTotalFrames );
+            time_end.resize( nTotalFrames );
         }
         
         string statusString;
         if( kw.verbose ) {
-            statusString = (kw.check?"Checking and summing ":"Summing ") + to_string(nImages)
-            + " files using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":".");
+            statusString = (kw.check?"Checking and summing ":"Summing ") + to_string(nTotalFrames)
+            + " frames using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":":");
             cout << statusString << ((kw.verbose == 1)?"\n":"") << flush;
         }
         
-        IDL_MEMINT dims[] = { ySize, xSize }; 
-        double* summedData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &ret ); //IDL_ARR_INI_ZERO
-        
-        unique_ptr<char[]> loadBuffer( new char[ kw.nthreads*frameSize ] );
-        char* loadPtr = loadBuffer.get();
+        IDL_MEMINT dims[] = { xSize, ySize }; 
+        double* summedData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_ZERO, &ret ); //IDL_ARR_INI_ZERO
         
         unique_ptr<double[]> checked;
         unique_ptr<double[]> sums( new double [ nPixels*kw.nthreads ] );
@@ -2135,31 +2189,31 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         shared_ptr<float*> shiftsData;
         float** shifts = nullptr;
         if( kw.pinh_align ) {
-            shiftsData = sharedArray<float>( nImages, 2 );
+            shiftsData = sharedArray<float>( nTotalFrames, 2 );
             shifts = shiftsData.get();
+        }
+        
+        if( kw.filter > 1 ) {
+            kw.check = 1;
         }
         
         double* sumPtr = sums.get();
         double* tmpPtr = tmp.get();
         memset( sumPtr, 0, nPixels*kw.nthreads*sizeof(double) );
-        memset( summedData, 0, nPixels*sizeof(double) );
         double* checkedPtr = nullptr;
-        
         if( kw.check ) {
-            if( nImages < 3 ) {
+            if( nTotalFrames < 3 ) {
                 cerr << "rdx_sumimages: Not enough statistics, skipping check." << endl;
-                kw.check = 0;
+                kw.check = kw.filter = 0;
+            } else if( kw.pinh_align ) {
+                cerr << "rdx_sumimages: Checking together with aligning is not yet supported, skipping check." << endl;
+                kw.check = kw.filter = 0;
             } else {
-                checked.reset( new double [ 2*nImages ] );
+                checked.reset( new double [ 2*nTotalFrames ] );
                 checkedPtr = checked.get();
             }
         }
-        
-        atomic<size_t> imgIndex(0);
         atomic<size_t> threadIndex(0);
-        atomic<size_t> nSummed(0);
-        
-        mutex mtx;
 
         Mat refImg;
         promise<cv::Rect> subImgROI;
@@ -2175,13 +2229,22 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         int borderMode = BORDER_CONSTANT;
         const Scalar borderValue = Scalar();
 
-        auto sumFunc = [&]( size_t imgIndex, double* mySumPtr, double* myTmpPtr, UCHAR* myLoadPtr ) {
-
+        thread_local int myThreadIndex(-1);
+        
+        auto sumFunc = [&]( size_t frameIndex, shared_ptr<char> threadBuffer, size_t frameOffset ) {
+            
+                if( myThreadIndex == -1 ) myThreadIndex = threadIndex.fetch_add(1);
+                
+                double* threadSum = sumPtr+myThreadIndex*nPixels;
+                double* threadTmp = tmpPtr+myThreadIndex*nPixels;
+                UCHAR* framePtr = reinterpret_cast<UCHAR*>( threadBuffer.get() + frameOffset );
+                
                 if( checkedPtr  ) {
                     bool hasInf;
-                    checkedPtr[imgIndex] = getMinMaxMean( myLoadPtr, nPixels, dataType, 0, 0, &hasInf );
+                    checkedPtr[frameIndex] = getMinMaxMean( framePtr, nPixels, dataType, 0, 0, &hasInf );
                     if( hasInf ) {
-                        checkedPtr[imgIndex] = std::numeric_limits<double>::infinity();
+                        checkedPtr[frameIndex] = std::numeric_limits<double>::infinity();
+                        ++progWatch;
                         return;
                     }
                 }
@@ -2189,22 +2252,22 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 if( kw.pinh_align ) {
                     
                     if( darkPtr || gainPtr ) {
-                        applyDarkAndGain( myLoadPtr, myTmpPtr, darkPtr, gainPtr, nPixels, dataType );
+                        applyDarkAndGain( framePtr, threadTmp, darkPtr, gainPtr, nPixels, dataType );
                     } else {
-                        copyToRaw( myLoadPtr, myTmpPtr, nPixels, dataType );
+                        copyToRaw( framePtr, threadTmp, nPixels, dataType );
                     }
                     if( bsOtfPtr ) {
-                        redux::image::descatter( myTmpPtr, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
+                        redux::image::descatter( threadTmp, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
                     }
                     
                     if ( mask2D ) {
-                        shared_ptr<double*> tmp2D = reshapeArray( myTmpPtr, ySize, xSize );
+                        shared_ptr<double*> tmp2D = reshapeArray( threadTmp, ySize, xSize );
                         fillPixels( tmp2D.get(), (size_t)ySize, (size_t)xSize, mask2D.get() );
                     }
                     
-                    Mat cvImg( ySize, xSize, CV_64FC1, myTmpPtr );
+                    Mat cvImg( ySize, xSize, CV_64FC1, threadTmp );
                     cv::Rect roi;
-                    if( !imgIndex ) {
+                    if( !frameIndex ) {
                         
                         int margin = 100;
                         int refSize = 99;
@@ -2251,65 +2314,79 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                         Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
                         findTransformECC( subImgFloat, refImg, warp_matrix, warp_mode, criteria );
 
-                        shifts[imgIndex][0] = warp_matrix.at<float>(0,2);
-                        shifts[imgIndex][1] = warp_matrix.at<float>(1,2);
+                        shifts[frameIndex][0] = warp_matrix.at<float>(0,2);
+                        shifts[frameIndex][1] = warp_matrix.at<float>(1,2);
 
-                        double* slaskPtr = myTmpPtr+nPixels*kw.nthreads;
+                        double* slaskPtr = threadTmp+nPixels*kw.nthreads;
                         Mat slask( ySize, xSize, CV_64FC1, slaskPtr );
                         warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
 
-                        memcpy( myTmpPtr, slaskPtr, nPixels*sizeof(double) );
+                        memcpy( threadTmp, slaskPtr, nPixels*sizeof(double) );
                         
                     }
                     
-                    for( size_t n=0; n<nPixels; ++n ) mySumPtr[n] += myTmpPtr[n];
+                    for( size_t n=0; n<nPixels; ++n ) threadSum[n] += threadTmp[n];
 
                 } else {
-                    addToRaw( myLoadPtr, mySumPtr, nPixels, dataType );
+                    addToRaw( framePtr, threadSum, nPixels, dataType );
                 }
                 
+                size_t ns = nSummed++;
+                if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nTotalFrames-1)));
+                ++progWatch;
         };
 
-        std::vector<std::thread> threads;
-        for( UCHAR t=0; t<kw.nthreads; ++t ) {
-            threads.push_back( std::thread(
-                [&](){
-                    size_t myImgIndex;
-                    size_t myThreadIndex = threadIndex.fetch_add(1);
-                    double* mySumPtr = sumPtr+myThreadIndex*nPixels;
-                    double* myTmpPtr = tmpPtr+myThreadIndex*nPixels;
-                    char* myLoadPtr = loadPtr+myThreadIndex*frameSize;
-                    shared_ptr<redux::file::FileMeta> myMeta;
-                    while( (myImgIndex=imgIndex.fetch_add(1)) < nImages ) {
-                        try {
-                            readFile( existingFiles[myImgIndex], myLoadPtr, myMeta );
-                            sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
-                            if( kw.time_avg ) {
-                                 times[myImgIndex] = myMeta->getAverageTime().time_of_day();
-                            }
-                           size_t ns = nSummed++;
-                            if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nImages-1)));
-                        } catch( const exception& e ) {
-                            cout << "rdx_sumfiles: Failed to load file: " << existingFiles[myImgIndex] << "  Reason: " << e.what() << endl;
+        progWatch.set( nFiles+nTotalFrames );
+        size_t frameCount(0);
+        for( size_t i=0; i<existingFiles.size(); ++i ) {
+            ioService.post([&,i,frameCount](){
+                shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
+                shared_ptr<redux::file::FileMeta> threadMeta;
+                try {
+                    readFile( existingFiles[i], threadBuffer.get(), threadMeta );
+                    if( threadMeta && !time_beg.empty() ) {
+                        vector<bpx::ptime> startTimes = meta->getStartTimes();
+                        bpx::time_duration expTime = meta->getExposureTime();
+                        if( startTimes.size() == nFrames[i] ) {
+                            std::copy( startTimes.begin(), startTimes.end(), time_beg.begin()+frameCount);
+                            std::transform( startTimes.begin(), startTimes.end(), time_end.begin()+frameCount,
+                                [expTime](const bpx::ptime& pt){ return pt+expTime; }
+                            );
                         }
                     }
-                    std::unique_lock<mutex> lock(mtx);
-                    for( size_t i=0; i<nPixels; ++i ) summedData[i] += mySumPtr[i];
-                }));
+                    size_t bufferOffset(0);
+                    for( size_t j=0; j<nFrames[i]; ++j ) {
+                        //sumFunc( frameCount+j, threadBuffer, bufferOffset);
+                        ioService.post( std::bind(sumFunc,frameCount+j,threadBuffer, bufferOffset) );
+                        bufferOffset += frameSize;
+                    }
+
+                } catch( const exception& e ) {
+                    cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                    progWatch.decreaseTarget( nFrames[i] );
+                }
+                ++progWatch;
+            });
+            frameCount += nFrames[i];
         }
-        for (auto& th : threads) th.join();
+        progWatch.wait();
+
+        for( size_t t=0; t<kw.nthreads; ++t ) {
+            std::transform( summedData, summedData+nPixels, sumPtr+t*nPixels, summedData, std::plus<double>() );
+        }
         
         size_t nDiscarded(0);
         if( checkedPtr ) {
             set<size_t> discarded;
-            memcpy( checkedPtr+nImages, checkedPtr, nImages*sizeof(double) );
-            nth_element( checkedPtr, checkedPtr+nImages/2, checkedPtr+nImages );        // median
-            double tmean = kw.limit*checkedPtr[ nImages/2 ];
-            memcpy( checkedPtr, checkedPtr+nImages, nImages*sizeof(double) );
-            for( size_t i=0; i<nImages; ++i ) {
+            memcpy( checkedPtr+nTotalFrames, checkedPtr, nTotalFrames*sizeof(double) );
+            nth_element( checkedPtr, checkedPtr+nTotalFrames/2, checkedPtr+nTotalFrames );        // total median
+            double tmean = kw.limit*checkedPtr[ nTotalFrames/2 ];
+            memcpy( checkedPtr, checkedPtr+nTotalFrames, nTotalFrames*sizeof(double) );
+            median_filter( checkedPtr, nTotalFrames, kw.filter );
+            for( size_t i=0; i<nTotalFrames; ++i ) {
                 if( isfinite(checkedPtr[i]) ) {
-                    size_t offset = std::min( std::max(nImages+i-1, nImages), 2*nImages-3 );       // restrict to array
-                    checkedPtr[i] = (abs(checkedPtr[i]-medianOf3(checkedPtr+offset)) <= tmean);
+                    size_t offset = std::min( std::max(nTotalFrames+i-1, nTotalFrames), 2*nTotalFrames-3 );       // restrict to array
+                    checkedPtr[i] = (abs(checkedPtr[i]-checkedPtr[nTotalFrames+i]) <= tmean);
                     if ( checkedPtr[i] == 0 ) {
                         if ( kw.lun ) {
                             IDL_PoutRaw( kw.lun, (char*)existingFiles[i].c_str(), existingFiles[i].length() );
@@ -2324,42 +2401,59 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 }
             }
             if( nDiscarded ) {
-                imgIndex = 0;
+                memset( sumPtr, 0, nPixels*kw.nthreads*sizeof(double) );
+                frameIndex = 0;
                 threadIndex = 0;
-                threads.clear();
-                for( UCHAR t=0; t<kw.nthreads; ++t ) {
-                    threads.push_back( std::thread(
-                        [&](){
-                            size_t myImgIndex;
-                            size_t myThreadIndex = threadIndex.fetch_add(1);
-                            double* mySumPtr = sumPtr+myThreadIndex*nPixels;
-                            memset( mySumPtr, 0, nPixels*sizeof(double) );
-                            double* myTmpPtr = tmpPtr+myThreadIndex*nPixels;
-                            char* myLoadPtr = loadPtr+myThreadIndex*frameSize;
-                            shared_ptr<redux::file::FileMeta> myMeta;
-                            while( (myImgIndex=imgIndex.fetch_add(1)) < nImages ) {
-                                if( checkedPtr[myImgIndex] == 0 ) {     // subtract discarded images
-                                    try {
-                                        readFile( existingFiles[myImgIndex], loadPtr, myMeta );
-                                        if( kw.time_avg ) times[myImgIndex] = boost::posix_time::time_duration(0,0,0);
-                                        sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myLoadPtr) );
-                                        --nSummed;
-                                        if( shifts ) {
-                                            shifts[myImgIndex][0] = 0;
-                                            shifts[myImgIndex][1] = 0;
-                                        }
-                                    } catch( const exception& e ) {
-                                        cout << "rdx_sumfiles: Failed to load file: " << existingFiles[myImgIndex] << "  Reason: " << e.what() << endl;
+                progWatch.set( 0 );
+                size_t frameCount(0);
+                for( size_t i=0; i<existingFiles.size(); ++i ) {
+                    bool allOk(true);
+                    for( size_t j=0; j<nFrames[i]; ++j ) allOk &= bool( checkedPtr[frameCount+j] == 0 );
+                    if( allOk ) continue;
+                    progWatch.increaseTarget(1);
+                    ioService.post([&,i,frameCount](){
+                        shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
+                        shared_ptr<redux::file::FileMeta> threadMeta;
+                        try {
+                            readFile( existingFiles[0], threadBuffer.get(), threadMeta );
+                            size_t bufferOffset(0);
+                            for( size_t j=0; j<nFrames[i]; ++j ) {
+                                if( checkedPtr[frameCount+j] == 0 ) {     // subtract discarded images
+                                    progWatch.increaseTarget(1);
+                                    ioService.post( std::bind(sumFunc, frameCount+j, threadBuffer, bufferOffset) );
+                                    --nSummed;
+                                    if( shifts ) {
+                                        shifts[frameCount+j][0] = 0;
+                                        shifts[frameCount+j][1] = 0;
                                     }
-                                } 
+                                    if( !time_beg.empty() ) {
+                                        time_beg[frameCount+j] = time_end[frameCount+j] = bpx::ptime();
+                                    }
+                                    bufferOffset += frameSize;
+                                }
                             }
-                            std::unique_lock<mutex> lock(mtx);
-                            for( size_t i=0; i<nPixels; ++i ) summedData[i] -= mySumPtr[i];
-                        }));
+                        } catch( const exception& e ) {
+                            cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                        }
+                        ++progWatch;
+                    });
+                    frameCount += nFrames[i];
                 }
-                for (auto& th : threads) th.join();
+                progWatch.wait();
+
+                for( size_t t=0; t<kw.nthreads; ++t ) {
+                    std::transform( summedData, summedData+nPixels, sumPtr+t*nPixels, summedData, std::minus<double>() );
+                }
+
             }
         }
+        
+        
+        done = true;
+        workLoop.reset();
+        ioService.stop();
+        pool.join_all();
+
         
         if( kw.pinh_align > 1 ) {
             Mat cvImg( ySize, xSize, CV_64FC1, summedData );
@@ -2398,21 +2492,40 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         
         if( kw.pinh_align && kw.xyc ) {
             IDL_VPTR tmp;
-            IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nImages) }; 
+            IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nFiles) }; 
             float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmp ); //IDL_ARR_INI_ZERO
-            memcpy( tmpData, *shifts, 2*nImages*sizeof(float));
+            memcpy( tmpData, *shifts, 2*nFiles*sizeof(float));
             IDL_VarCopy( tmp, kw.xyc );
         }
         
+        if( kw.time_beg ) {
+            std::sort( time_beg.begin(), time_beg.end() );
+            string tStr = bpx::to_simple_string(time_beg.begin()->time_of_day());
+            IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
+            IDL_VarCopy( tmpTimeString, kw.time_beg );
+        }
+
+        if( kw.time_end ) {
+            std::sort( time_end.begin(), time_end.end() );
+            string tStr = bpx::to_simple_string(time_end.rbegin()->time_of_day());
+            IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
+            IDL_VarCopy( tmpTimeString, kw.time_end );
+        }
+
         if( kw.time_avg ) {
-            boost::posix_time::time_duration avgTime(0,0,0);
-            for( auto& t: times ) {
-                avgTime += t;
+            bpx::time_duration avgTime(0,0,0);
+            time_beg.insert( time_beg.end(), time_end.begin(), time_end.end() );
+            size_t tCount(0);
+            for( bpx::ptime& t: time_beg ) {
+                if( !t.is_special() ) {
+                    avgTime += t.time_of_day();
+                    tCount++;
+                }
             }
-            if( nSummed ) {
-                avgTime /= nSummed;
+            if( tCount ) {
+                avgTime /= tCount;
             }
-            string tStr = boost::posix_time::to_simple_string(avgTime);
+            string tStr = bpx::to_simple_string(avgTime);
             IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
             IDL_VarCopy( tmpTimeString, kw.time_avg );
         }

@@ -47,7 +47,9 @@ void ProgressWatch::test(void) {
 
 void ProgressWatch::wait(void) {
     unique_lock<mutex> lck(mtx);
-    cv.wait(lck);
+    while ( counter_ != target_ ) {
+        cv.wait(lck);
+    }
 }
 
 

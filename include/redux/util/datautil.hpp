@@ -3,6 +3,7 @@
 
 #include "redux/util/endian.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -373,6 +374,31 @@ namespace redux {
 
         }
         //@}
+        
+        template <typename T>
+        void median_filter( T* data, size_t nElements, size_t size ) {
+            if( size && nElements>2*size ) {  // TODO deal with size > nElements/2
+                if( !(size&1) ) ++size;       // force odd filtersize
+                size_t halfSize = size/2;
+                T* view = new T[size];
+                T* result = new T[nElements];
+                T* ptr = data;
+                size_t last = nElements-halfSize;
+                for( size_t i=0; i<=last; ++i ) {
+                    std::copy( data+i, data+i+size, view );
+                    std::nth_element( view, view+halfSize, view+size );
+                    result[i] = view[halfSize];
+                }
+                std::copy( result, result+last, data+halfSize );
+                delete[] view;
+                delete[] result;
+                for( size_t i=0; i<halfSize; ++i ) {
+                    data[halfSize-i-1] = data[halfSize-i];
+                    data[last+i] = data[last+i-1];
+                }
+            }
+        }
+        
 
         //@{
         /*! @fn void partition( T** begin, T** end, bool descending=false )

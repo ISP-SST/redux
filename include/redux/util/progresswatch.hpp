@@ -25,8 +25,8 @@ namespace redux {
             
             void set(int target, int start=0);
             inline void setTarget(int t) { target_ = t; }
-            inline void increaseTarget(int t=1) { target_ += t; }
-            inline void decreaseTarget(int t=1) { target_ -= t; }
+            void increaseTarget(int t=1) { if(t) target_ += t; }
+            void decreaseTarget(int t=1) { if(t) target_ -= t; }
             inline void setStart(int s) { start_ = s; }
             inline void tick(void) const { if(onChange) onChange(); }
             
