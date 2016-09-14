@@ -125,7 +125,7 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), borderClip(10), incomplete(0),
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), borderClip(100), incomplete(0),
         mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel("config") {
 
 }
