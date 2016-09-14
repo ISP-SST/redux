@@ -32,11 +32,9 @@ namespace redux {
             static void load( redux::image::Image<T>& img, const std::string& fn, bool metaOnly=false ) {
                 CachedFile cf( fn );
                 redux::image::Image<T>& cimg = redux::util::Cache::get<CachedFile, redux::image::Image<T> >(cf);
-                {
-                    std::unique_lock<std::mutex> lock( cimg.imgMutex );
-                    if( !cimg.meta || (!metaOnly && cimg.nElements() == 0) ) {
-                        redux::file::readFile( fn, cimg, metaOnly );
-                    }
+                std::unique_lock<std::mutex> lock( cimg.imgMutex );
+                if( !cimg.meta || (!metaOnly && cimg.nElements() == 0) ) {
+                    redux::file::readFile( fn, cimg, metaOnly );
                 }
                 img = cimg;
             }
@@ -44,6 +42,8 @@ namespace redux {
             template <typename T>
             static void unload( const std::string& fn ) {
                 CachedFile cf( fn );
+                redux::image::Image<T>& cimg = redux::util::Cache::get<CachedFile, redux::image::Image<T> >(cf);
+                std::unique_lock<std::mutex> lock( cimg.imgMutex );
                 redux::util::Cache::erase<CachedFile, redux::image::Image<T>>(cf);
             }
 
