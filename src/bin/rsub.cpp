@@ -109,94 +109,99 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
     
     Host::HostInfo me, master;
     uint8_t cmd = CMD_CONNECT;
+    try {
+        boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
+        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 
-    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
-    boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
-
-    if( cmd == CMD_AUTH ) {
-        // implement
-    }
-    if( cmd == CMD_CFG ) {  // handshake requested
-        *conn << me;
-        *conn >> master;
-        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
-    }
-    if( cmd != CMD_OK ) {
-        LOG_ERR << "Handshake with server failed." << ende;
-        return;
-    }
-   
-    // all ok, upload jobs.
-    uint64_t jobsSize(0);
-    for( auto &job: jobs ) {
-        if( job ) {
-            job->info.priority = prio;
-            jobsSize += job->size();
+        if( cmd == CMD_AUTH ) {
+            // implement
         }
-    }
-    
-    shared_ptr<char> buf( new char[jobsSize+sizeof(uint64_t)+1], []( char* p ){ delete[] p; } );
-    char* ptr = buf.get()+sizeof(uint64_t)+1;
-    uint64_t packedBytes(0);
-    for( auto &job: jobs ) {
-        if( job ) {
-            packedBytes += job->pack(ptr+packedBytes);
+        if( cmd == CMD_CFG ) {  // handshake requested
+            *conn << me;
+            *conn >> master;
+            boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
         }
-    }
-    
-    uint64_t totalSize = packedBytes+sizeof(uint64_t)+1;                    // cmd & blockSize will be sent before block
-    ptr = buf.get();
-    pack( ptr, CMD_ADD_JOB);
-    pack( ptr+1, packedBytes );
-    
-    //conn->asyncWrite( buf, packedBytes );
-    conn->syncWrite( buf.get(), totalSize );
-    //boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),packedBytes));
+        if( cmd != CMD_OK ) {
+            LOG_ERR << "Handshake with server failed." << ende;
+            return;
+        }
+       
+        // all ok, upload jobs.
+        uint64_t jobsSize(0);
+        for( auto &job: jobs ) {
+            if( job ) {
+                job->info.priority = prio;
+                jobsSize += job->size();
+            }
+        }
+        
+        shared_ptr<char> buf( new char[jobsSize+sizeof(uint64_t)+1], []( char* p ){ delete[] p; } );
+        char* ptr = buf.get()+sizeof(uint64_t)+1;
+        uint64_t packedBytes(0);
+        for( auto &job: jobs ) {
+            if( job ) {
+                packedBytes += job->pack(ptr+packedBytes);
+            }
+        }
+        
+        uint64_t totalSize = packedBytes+sizeof(uint64_t)+1;                    // cmd & blockSize will be sent before block
+        ptr = buf.get();
+        pack( ptr, CMD_ADD_JOB);
+        pack( ptr+1, packedBytes );
+        
+        //conn->asyncWrite( buf, packedBytes );
+        conn->syncWrite( buf.get(), totalSize );
+        //boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),packedBytes));
 
-    boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
+        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 
-    bool swap_endian = (me.littleEndian != master.littleEndian);
-    uint64_t count, received;
-    ptr = buf.get();
+        bool swap_endian = (me.littleEndian != master.littleEndian);
+        uint64_t count, received;
+        ptr = buf.get();
 
-    if( cmd == CMD_OK ) {
+        if( cmd == CMD_OK ) {
+            received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(uint64_t) ) );
+            if( received == sizeof(uint64_t) ) {
+                unpack(ptr, count, swap_endian);
+                size_t thisSize = count*sizeof(uint64_t);
+                received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, thisSize ) );
+                if( received == thisSize ) {
+                    if( count ) LOG << "Upload of " << count << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),count,"IDs") << ende;
+                } else {
+                    LOG_ERR << "Failed to read job IDs.  received=" << received << " thisSize=" << thisSize << ende;
+                }
+            } else LOG_ERR << "Failed to read number of job IDs." << ende;
+        } else {
+            LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")" << ende;
+        }
+        
+        ptr = buf.get();
         received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(uint64_t) ) );
         if( received == sizeof(uint64_t) ) {
             unpack(ptr, count, swap_endian);
-            size_t thisSize = count*sizeof(uint64_t);
-            received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, thisSize ) );
-            if( received == thisSize ) {
-                if( count ) LOG << "Upload of " << count << " job(s) completed successfully. " << printArray(reinterpret_cast<size_t*>(buf.get()),count,"IDs") << ende;
-            } else {
-                LOG_ERR << "Failed to read job IDs.  received=" << received << " thisSize=" << thisSize << ende;
-            }
-        } else LOG_ERR << "Failed to read number of job IDs." << ende;
-    } else {
-        LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")" << ende;
-    }
-    
-    ptr = buf.get();
-    received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(uint64_t) ) );
-    if( received == sizeof(uint64_t) ) {
-        unpack(ptr, count, swap_endian);
-        if( count ) {
-            received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, count ) );    // hopefully the buffer allocated for the cfg-data is big enough for any messages.
-            if( received ) {
-                vector<string> messages;
-                unpack( ptr, messages, swap_endian );
-                if( !messages.empty() ) {
-                    string msgText = "Server messages:";
-                    for( auto& msg: messages ) {
-                        msgText += "\n\t" + msg;
+            if( count ) {
+                received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, count ) );    // hopefully the buffer allocated for the cfg-data is big enough for any messages.
+                if( received ) {
+                    vector<string> messages;
+                    unpack( ptr, messages, swap_endian );
+                    if( !messages.empty() ) {
+                        string msgText = "Server messages:";
+                        for( auto& msg: messages ) {
+                            msgText += "\n\t" + msg;
+                        }
+                        LOG_WARN << "Error uploading jobs: " << msgText << ende;
                     }
-                    cout << msgText << endl;
                 }
             }
         }
     }
+    catch( const exception &e ) {
+        LOG_ERR << "Error uploading jobs: " << e.what() << ende;
+    }
 
 
 }
+
 
 bool replace(std::string& str, const std::string& from, const std::string& to) {
     size_t start_pos = str.find(from);
@@ -310,9 +315,14 @@ int main (int argc, char *argv[]) {
         }
 
         bpt::read_info (filteredCfg , momfbd);
-        bool check = (vm.count ("no-check") == 0);
+        bool check = (vm.count ("no-check") == 0 && !vm.count ("print"));
         vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
-
+        
+        if( jobs.empty() ) {
+            LOG_WARN << "No jobs to upload." << ende;
+            return EXIT_SUCCESS;
+        }
+        
         if( vm.count ("reg_alpha") ) {       // FIXME: this is just while testing...
             for( auto & job : jobs ) {
                 static_pointer_cast<momfbd::MomfbdJob>(job)->reg_alpha = vm["reg_alpha"].as<float>();
