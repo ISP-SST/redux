@@ -88,6 +88,7 @@ if (DEFINED IDL_FOUND)
          "${REDUX_LIB_BASE}/momfbd/modes.cpp"
          "${REDUX_LIB_BASE}/util/arraystats.cpp"
          "${REDUX_LIB_BASE}/util/cache.cpp"
+         "${REDUX_LIB_BASE}/util/progresswatch.cpp"
          "${REDUX_LIB_BASE}/util/stopwatch.cpp"
          "${REDUX_LIB_BASE}/util/stringutil.cpp"
          "${REDUX_LIB_BASE}/version.cpp"
