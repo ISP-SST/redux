@@ -3,6 +3,7 @@
 
 #ifdef REDUX_WITH_FITS
 
+#include "redux/file/fileio.hpp"
 #include "redux/file/filemeta.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
@@ -50,15 +51,28 @@ namespace redux {
 
             std::string getText( void ) {
                 std::string ret;
-                for( auto& k: primaryHDU.keywords ) ret += (k + "\n");
+                for( auto& k: primaryHDU.cards ) {
+                    ret += k;
+                }
                 return ret;
             }
+            
+            template <typename T>
+            std::string makeCard( std::string key, T value, std::string comment="" );
+            void insertCard( std::string card, size_t location=std::string::npos );
+            void insertCardAfter( std::string card, std::string after );
+            void insertCardBefore( std::string card, std::string before );
+            template <typename T>
+            T getValue(std::string key);
+            template <typename T>
+            std::vector<T> getTableArray( std::string key );
             
             size_t getNumberOfFrames(void);
             bpx::ptime getStartTime(void);
             bpx::ptime getEndTime(void);
             bpx::ptime getAverageTime(void);
             bpx::time_duration getExposureTime(void);
+            std::vector<bpx::ptime> getStartTimes(void);
             
             size_t dataSize(void);
             size_t dimSize(size_t);
@@ -73,12 +87,38 @@ namespace redux {
             struct hdu {
                 int bitpix;
                 int nDims;
-                int dataType;
-                size_t elementSize;
+                int dataType;               // data type as defined in cfitsio
+                size_t elementSize;         // element size (in bytes) = abs(bitpix/8)
                 size_t nElements;
                 std::vector<int> dims;
-                std::vector<std::string> keywords;
-            } primaryHDU;
+                std::vector<std::string> cards;
+                virtual void dummy(void)=0;
+            };
+            
+            struct image_hdu : public hdu {
+                void dummy(void){};
+            };
+            
+            struct ascii_hdu : public hdu {
+                void dummy(void){};
+                struct table_info_t {
+                    int columnStart;            // = TBCOL, offset where this column starts
+                    std::string columnName;     // = TTYPEn, name of this data-column
+                    std::string columnFormat;   // = TFORM, Fortran ISO 2004 format string
+                    std::string columnUnit;     // = TUNIT, physical unit of the data
+                };
+                uint16_t nColumns;              // = TFIELDS, number of columns in this table
+                std::vector<table_info_t> table_info;
+                redux::util::Array<char> data;
+            };
+            
+            struct binary_hdu : public hdu {
+                void dummy(void){};
+                std::vector<std::string> data;
+            };
+            
+            struct image_hdu primaryHDU;
+            std::vector<std::shared_ptr<struct hdu>> extHDUs;
             
             fitsfile* fitsPtr_;
             int status_;
