@@ -2,6 +2,7 @@
 
 #include "redux/file/fileana.hpp"
 #include "redux/file/filefits.hpp"
+#include "redux/file/filemomfbd.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <iostream>
@@ -53,6 +54,7 @@ Format redux::file::readFmt( const string& filename ) {
             switch( magic ) {
                 case Ana::MAGIC_ANA: ;
                 case Ana::MAGIC_ANAR: return FMT_ANA;
+                case FileMomfbd::MAGIC_MOMFBD: return FMT_MOMFBD;
 #ifdef REDUX_WITH_FITS
                 case Fits::MAGIC_FITS: return FMT_FITS;
 #endif
@@ -77,6 +79,8 @@ Format redux::file::guessFmt( const string& filename ) {
             return FMT_ANA;
         } else if( ext == "FITS" ) {
             return FMT_FITS;
+        } else if( ext == "MOMFBD" ) {
+            return FMT_MOMFBD;
         }
     }
     return FMT_NONE;

@@ -21,6 +21,7 @@ namespace redux {
                                 FMT_ANA,
                                 FMT_FITS,
                                 FMT_NCDF,
+                                FMT_MOMFBD,
                                 FMT_PLAIN
                               };
 

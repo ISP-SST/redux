@@ -623,6 +623,7 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
             case FMT_ANA: return IDL_StrToSTRING( (char*)"ANA" );
             case FMT_FITS: return IDL_StrToSTRING( (char*)"FITS" );
             case FMT_NCDF: return IDL_StrToSTRING( (char*)"NCDF" );
+            case FMT_MOMFBD: return IDL_StrToSTRING( (char*)"MOMFBD" );
             default: return IDL_StrToSTRING( (char*)"" );
         }
     } else {
@@ -645,6 +646,7 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
                 case FMT_ANA: fileTypes.push_back("ANA"); break;
                 case FMT_FITS: fileTypes.push_back("FITS"); break;
                 case FMT_NCDF: fileTypes.push_back("NCDF"); break;
+                case FMT_MOMFBD: fileTypes.push_back("MOMFBD"); break;
                 default: fileTypes.push_back("");
             }
         }

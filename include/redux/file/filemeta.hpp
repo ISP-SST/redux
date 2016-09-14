@@ -38,6 +38,7 @@ namespace redux {
             virtual uint8_t nDims(void) { return 0; }
             virtual size_t nElements(void) { return 0; };
             virtual int getIDLType(void) { return 0; };
+            virtual int getFormat(void) { return 0; };
             
         };
 

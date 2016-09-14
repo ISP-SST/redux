@@ -1,6 +1,7 @@
 #ifndef REDUX_FILE_FILEANA_HPP
 #define REDUX_FILE_FILEANA_HPP
 
+#include "redux/file/fileio.hpp"
 #include "redux/file/filemeta.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
@@ -59,6 +60,7 @@ namespace redux {
             uint8_t nDims(void) { return m_Header.ndim; }
             size_t nElements(void);
             int getIDLType(void);
+            int getFormat(void) { return FMT_ANA; };
             
             struct raw_header {                    // first block for ana files
                 uint32_t synch_pattern;

@@ -2,6 +2,7 @@
 #define REDUX_FILE_FILEMOMFBD_HPP
 
 #include "redux/file/filemeta.hpp"
+#include "redux/file/fileio.hpp"
 #include "redux/util/array.hpp"
 
 #include <fstream>
@@ -24,6 +25,10 @@ namespace redux {
 
         struct FileMomfbd : public redux::file::FileMeta {
 
+            enum Magic {
+                MAGIC_MOMFBD = 0x00000b00     // FIXME: this assumes version-string is always 10 chars long
+                //,MAGIC_MOMFBD_BE = 0x00000001    // file written on a big-endian system (first 5 bytes = 0x0b00000001)
+            };
             typedef std::shared_ptr<FileMomfbd> Ptr;
                        
             struct PatchInfo {
@@ -61,9 +66,8 @@ namespace redux {
             
             size_t load ( std::ifstream& file, char* data, uint8_t loadMask, int verbosity=0, uint8_t alignTo=4 );
             
-            std::string getText( void ) {
-                return "";
-            }
+            std::string getText( void ) { return ""; }
+            int getFormat(void) { return FMT_MOMFBD; };
 
             float version, pix2cf, cf2pix;
             std::string dateString, timeString, versionString;

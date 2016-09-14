@@ -68,6 +68,7 @@ namespace redux {
             int getIDLType(void);
             
             double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr );
+            int getFormat(void) { return FMT_FITS; };
 
             struct hdu {
                 int bitpix;
