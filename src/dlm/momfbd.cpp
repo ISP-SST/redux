@@ -505,7 +505,7 @@ namespace {
         count += info->load ( file, data+count , loadMask, verbosity, 4 );
 
         // add list of filenames, if requested
-        if ( loadMask & MOMFBD_NAMES ) {
+        if (info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {
             while ( count % 8 ) count++;        // pad struct to 8-byte boundary.
             int i = 0;
             strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
@@ -723,11 +723,8 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nPatchesX * info->nPatchesY * patchSize;
     }
 
-    while ( totalSize % 8 ) {  // pad if not on 8-byte boundary
-        totalSize++;
-    }
-
     if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                    // if filenames are stored and loaded
+        while ( totalSize % 8 ) totalSize++;  // pad if not on 8-byte boundary
         totalSize += info->nFileNames * sizeof ( IDL_STRING );
     }
 
@@ -740,6 +737,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     size_t count = loadData ( file, data.get(), loadMask, info.get(), verbosity );
     if ( count != totalSize ) {
         cout << "Load mismatch:  totalSize = " << totalSize << "  count = " << count <<  "  diff = " << ( ( int64_t ) totalSize- ( int64_t ) count ) << endl;
+        
     }
 
     // Dump structure layout if requested
