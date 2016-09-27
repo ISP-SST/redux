@@ -723,9 +723,8 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nPatchesX * info->nPatchesY * patchSize;
     }
 
-    size_t padding(0);
-    while ( (totalSize+padding) % 8 ) {  // pad if not on 8-byte boundary
-        padding++;
+    while ( totalSize % 8 ) {  // pad if not on 8-byte boundary
+        totalSize++;
     }
 
     if ( info->nFileNames && ( loadMask & MOMFBD_NAMES ) ) {                    // if filenames are stored and loaded
@@ -734,7 +733,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
 
     // Allocate the datablock needed.
-    std::unique_ptr<char> data ( new char [ totalSize+padding ] );
+    std::unique_ptr<char> data ( new char [ totalSize ] );
 
     v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
 
