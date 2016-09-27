@@ -417,7 +417,9 @@ namespace {
 
 
     size_t getPatchSize ( const FileMomfbd* const info, uint8_t loadMask, const float& version ) {
-
+        
+        if ( !(loadMask & MOMFBD_PATCH) ) return 0;
+        
         size_t patchSize  = 4 * sizeof ( IDL_INT );                                 // xl, yl, xh, yl
         if ( version >= 20110714.0 ) {
             patchSize += 2 * sizeof ( IDL_INT );                                    // off, offy
@@ -704,8 +706,11 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     // Calculate size of data to load.
-    size_t totalSize = 3 * sizeof ( IDL_STRING );                               // VERSION - TIME - DATE
+    size_t totalSize = sizeof ( MomfdContainer );
+
+    totalSize += 3 * sizeof ( IDL_STRING );                               // VERSION - TIME - DATE
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );                      // clip-values for each channel
+
     if ( loadMask & MOMFBD_MODES ) {
         if ( info->version >= 20110714.0 ) {
             totalSize += 2*sizeof ( float );                                    // pix2cf, cf2pix
@@ -713,7 +718,11 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nPH * info->nPH * sizeof ( float );                  // Pupil Data
         totalSize += info->nModes * info->nPH * info->nPH * sizeof ( float );   // Mode Data
     }
-    totalSize += info->nPatchesX * info->nPatchesY * patchSize;
+
+    if ( loadMask & MOMFBD_PATCH && info->nPatchesX > 0 && info->nPatchesY > 0 ) {
+        totalSize += info->nPatchesX * info->nPatchesY * patchSize;
+    }
+
     size_t padding(0);
     while ( (totalSize+padding) % 8 ) {  // pad if not on 8-byte boundary
         padding++;
@@ -723,7 +732,6 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         totalSize += info->nFileNames * sizeof ( IDL_STRING );
     }
 
-    totalSize += sizeof ( MomfdContainer );
 
     // Allocate the datablock needed.
     std::unique_ptr<char> data ( new char [ totalSize+padding ] );
