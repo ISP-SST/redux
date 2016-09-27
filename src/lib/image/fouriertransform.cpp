@@ -58,19 +58,19 @@ FourierTransform::Plan::~Plan() {
 void FourierTransform::Plan::init (void) {
     
     fftw_plan_with_nthreads(id.nThreads);
-    
+  
     if (id.tp == R2C) {
         if (id.sizes.size() == 2) {
             auto in = sharedArray<double> (id.sizes[0], id.sizes[1]);
             auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1] / 2 + 1);
-            forward_plan = fftw_plan_dft_r2c_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_ESTIMATE);   // FFTW_MEASURE|FFTW_UNALIGNED
-            backward_plan = fftw_plan_dft_c2r_2d (id.sizes[0], id.sizes[1], *out.get(), *in.get(), FFTW_ESTIMATE);
+            forward_plan = fftw_plan_dft_r2c_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_MEASURE);   // FFTW_MEASURE|FFTW_UNALIGNED
+            backward_plan = fftw_plan_dft_c2r_2d (id.sizes[0], id.sizes[1], *out.get(), *in.get(), FFTW_MEASURE);
         } else
             if (id.sizes.size() == 1) {
                 auto in = sharedArray<double> (id.sizes[0]);
                 auto out = sharedArray<fftw_complex> (id.sizes[0] / 2 + 1);
-                forward_plan = fftw_plan_dft_r2c_1d (id.sizes[0], in.get(), out.get(), FFTW_ESTIMATE);
-                backward_plan = fftw_plan_dft_c2r_1d (id.sizes[0] / 2 + 1, out.get(), in.get(), FFTW_ESTIMATE);
+                forward_plan = fftw_plan_dft_r2c_1d (id.sizes[0], in.get(), out.get(), FFTW_MEASURE);
+                backward_plan = fftw_plan_dft_c2r_1d (id.sizes[0] / 2 + 1, out.get(), in.get(), FFTW_MEASURE);
             } else {
                 throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
             }
@@ -79,14 +79,14 @@ void FourierTransform::Plan::init (void) {
             if (id.sizes.size() == 2) {
                 auto in = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
                 auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
-                forward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_FORWARD, FFTW_ESTIMATE);
-                backward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_BACKWARD, FFTW_ESTIMATE);
+                forward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_FORWARD, FFTW_MEASURE);
+                backward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_BACKWARD, FFTW_MEASURE);
             } else {
                 if (id.sizes.size() == 1) {
                     auto in = sharedArray<fftw_complex> (id.sizes[0]);
                     auto out = sharedArray<fftw_complex> (id.sizes[0]);
-                    forward_plan = fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_FORWARD, FFTW_ESTIMATE);
-                    backward_plan =  fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_BACKWARD, FFTW_ESTIMATE);
+                    forward_plan = fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_FORWARD, FFTW_MEASURE);
+                    backward_plan =  fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_BACKWARD, FFTW_MEASURE);
                 } else {
                     throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
                 }
@@ -345,7 +345,9 @@ void FourierTransform::getFT( complex_t* out ) const {
 void FourierTransform::init (void) {
 
     if( halfComplex ) { 
-        plan = Plan::get(dimensions(), Plan::R2C, nThreads);
+        auto dims = dimensions();
+        dims[1] = (dims[1]-1)*2;
+        plan = Plan::get(dims, Plan::R2C, nThreads);
     } else {
         plan = Plan::get(dimensions(), Plan::C2C, nThreads);
     }
