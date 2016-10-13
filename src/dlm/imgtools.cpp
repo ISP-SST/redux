@@ -93,10 +93,10 @@ namespace {
     
     bool transformCheck (const Mat& trans, const Size& imgSize, double maxValue = 10000, double maxScaleDiff = 1.5) {
 
-        if( (trans.at<double>(0,0) > 0 && trans.at<double>(0,2) > maxValue) ||
+        if( (trans.at<double>(0,0) > 0 && abs(trans.at<double>(0,2)) > maxValue) ||
             (trans.at<double>(0,0) < 0 && abs(trans.at<double>(0,2)-imgSize.width) > maxValue)
         ) return false;
-        if( (trans.at<double>(1,1) > 0 && trans.at<double>(1,2) > maxValue) ||
+        if( (trans.at<double>(1,1) > 0 && abs(trans.at<double>(1,2)) > maxValue) ||
             (trans.at<double>(1,1) < 0 && abs(trans.at<double>(1,2)-imgSize.height) > maxValue)
         ) return false;
 
@@ -313,32 +313,60 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     params.minThreshold = 50;
     params.thresholdStep = 10;
     params.maxThreshold = 240;
+    params.minDistBetweenBlobs = 10;
     params.filterByColor = false;
     params.filterByInertia = false;
     params.filterByConvexity = false;
     params.filterByArea = false;
+    //params.minArea = 2;
+    //params.maxArea = 150;
+    
+    kw.threshold = std::min( std::max(kw.threshold, 0.0f), 1.0f );
 
     try {
 
         Mat result (imgSize, CV_8UC3);
         Mat imgByte1 (imgSize, CV_8UC1);
         Mat imgByte2 (imgSize, CV_8UC1);
-        
+        Mat imgMask1 (imgSize, CV_8UC1, Scalar(0));
+        Mat imgMask2 (imgSize, CV_8UC1, Scalar(0));
+//     cv::make_mask( InputArray image, InputOutputArray mask, double thres, int smooth, bool filterLarger, bool invert)
+
         Mat H, H_init;
 
-        if (kw.threshold > 0.0 && kw.threshold < 1.0) {
-            if (kw.verbose > 1) {
-                cout << "Applying threshold " << kw.threshold << " to input images." << endl;
-            }
-            params.minThreshold = kw.threshold*255;
-            // apply hard/noise threshold at threshold/4 to make the cross-correlation more distinct.
-            threshold (imgFloat1, imgFloat1, kw.threshold/4, 0, THRESH_TOZERO);
-            threshold (imgFloat2, imgFloat2, kw.threshold/4, 0, THRESH_TOZERO);
+
+        if (kw.verbose > 1) {
+            cout << "Applying threshold " << kw.threshold << " to input images." << endl;
         }
+        params.minThreshold = kw.threshold*255;
+        // apply hard/noise threshold at threshold/4 to make the cross-correlation more distinct.
+        
+        
+        imgFloat1.convertTo(imgMask1, CV_8UC1, 255);
+        imgFloat2.convertTo(imgMask2, CV_8UC1, 255);
+        threshold (imgMask1, imgMask1, params.minThreshold, 255, CV_THRESH_BINARY);
+        threshold (imgMask2, imgMask2, params.minThreshold, 255, CV_THRESH_BINARY);
+        imgMask1 /= 255;
+        imgMask2 /= 255;
+        
+        morphologyEx( imgMask1, imgMask1, MORPH_ERODE,
+                      getStructuringElement( MORPH_RECT, Size( 3, 3 ), Point(2,2) ), Point(2,2), 1, BORDER_REFLECT_101 );
+        morphologyEx( imgMask1, imgMask1, MORPH_DILATE,
+                      getStructuringElement( MORPH_RECT, Size( 9, 9 ), Point(5,5) ), Point(5,5), 1, BORDER_REFLECT_101 ); 
+        morphologyEx( imgMask2, imgMask2, MORPH_ERODE,
+                      getStructuringElement( MORPH_RECT, Size( 3, 3 ), Point(2,2) ), Point(2,2), 1, BORDER_REFLECT_101 );
+        morphologyEx( imgMask2, imgMask2, MORPH_DILATE,
+                      getStructuringElement( MORPH_RECT, Size( 9, 9 ), Point(5,5) ), Point(5,5), 1, BORDER_REFLECT_101 ); 
+
+        
+        //threshold (imgFloat1, imgFloat1, kw.threshold/4, 0, THRESH_TOZERO);
+        //threshold (imgFloat2, imgFloat2, kw.threshold/4, 0, THRESH_TOZERO);
 
         imgFloat1.convertTo (imgByte1, CV_8UC1, 255);
         imgFloat2.convertTo (imgByte2, CV_8UC1, 255);
 
+        //cv::make_mask( imgFloat1, imgMask1, kw.threshold, 5, false, false );
+        
 
         SimpleBlobDetector detector (params);
         vector<KeyPoint> keypoints1, keypoints2;
@@ -377,50 +405,70 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             return ret;
         }
         
+        for( KeyPoint& kp: keypoints1 ) {   // calculate something roughly proportional to the power of each peak
+            kp.response = kp.size * imgByte1.at<uchar>( kp.pt );
+            kp.size *= 5;
+            //cout << "kp1 resp : " << kp.response << "   sz : " << kp.size << "   pt : " << kp.pt << endl;
+        }
+        
+        for( KeyPoint& kp: keypoints2 ) {
+            kp.response = kp.size * imgByte2.at<uchar>( kp.pt );
+            kp.size *= 5;
+            //cout << "kp2 resp : " << kp.response << "   sz : " << kp.size << "   pt : " << kp.pt << endl;
+        }
+        
+        // sort w.r.t. something proportional to the power of each peak
         std::sort (keypoints1.begin(), keypoints1.end(),
         [] (const KeyPoint & a, const KeyPoint & b) {
-            return (a.size > b.size);
+            return (a.response > b.response);
         });
         std::sort (keypoints2.begin(), keypoints2.end(),
         [] (const KeyPoint & a, const KeyPoint & b) {
-            return (a.size > b.size);
+            return (a.response > b.response);
         });
-    
-        size_t nLargest = std::min<size_t>(keypoints1.size(),3*kw.nrefpoints);
-        nLargest = std::min(keypoints2.size(),nLargest);
-        vector<KeyPoint> largestKP1 (keypoints1.begin(), keypoints1.begin() + nLargest);
-        vector<KeyPoint> largestKP2 (keypoints2.begin(), keypoints2.begin() + nLargest);
-      
-        Point2f mid (imgFloat1.cols / 2, imgFloat1.rows / 2);
-        std::sort (largestKP1.begin(), largestKP1.end(),
-        [mid] (const KeyPoint & a, const KeyPoint & b) {
-            return (norm(a.pt - mid) < norm(b.pt - mid));
-        });
-        std::sort (largestKP2.begin(), largestKP2.end(),
-        [mid] (const KeyPoint & a, const KeyPoint & b) {
-            return (norm(a.pt - mid) < norm(b.pt - mid));
-        });
-
-//         if( kw.show > 1 ) {
-//             drawKeypoints(imgByte1, largestKP1, result, Scalar(0,0,255) );
-//             imshow( "Good Matches & Object detection", result );
-//             waitKey(0); 
-//             drawKeypoints(imgByte2, largestKP2, result, Scalar(0,0,255) );
-//             imshow( "Good Matches & Object detection", result );
-//             waitKey(0); 
+//         for(size_t i=0; i<std::min<size_t>(keypoints1.size(),5); ++i) {
+//             cout << "sortd kp1 resp : " << keypoints1[i].response << "   sz : " << keypoints1[i].size << "   pt : " << keypoints1[i].pt << endl;
 //         }
-      
-        largestKP1.resize(kw.nrefpoints);
-        largestKP2.resize(kw.nrefpoints);
+//         for(size_t i=0; i<std::min<size_t>(keypoints2.size(),5); ++i) {
+//             cout << "sortd kp2 resp : " << keypoints2[i].response << "   sz : " << keypoints2[i].size << "   pt : " << keypoints2[i].pt << endl;
+//         }
+        vector<KeyPoint> selectedKP1( keypoints1.begin(), keypoints1.end() );
+        vector<KeyPoint> selectedKP2( keypoints2.begin(), keypoints2.end() );
         
-//         if( kw.show ) {
-//             drawKeypoints(imgByte1, largestKP1, result, Scalar(0,0,255) );
-//             imshow( "Good Matches & Object detection", result );
-//             waitKey(0); 
-//             drawKeypoints(imgByte2, largestKP2, result, Scalar(0,0,255) );
-//             imshow( "Good Matches & Object detection", result );
-//             waitKey(0); 
-//         }
+        // only do inital matching with the central pinholes, later we improve the fit using all.
+        Point2f mid (imgFloat1.cols / 2, imgFloat1.rows / 2);
+        selectedKP1.erase( std::remove_if(selectedKP1.begin(), selectedKP1.end(),
+                                         [&kw,&mid](const KeyPoint& kp) {
+                                             if ( norm(kp.pt - mid) < 2*kw.max_shift ) {
+                                                 return false;
+                                             }
+                                             return true;
+                                        }),
+                          selectedKP1.end());
+        selectedKP2.erase( std::remove_if(selectedKP2.begin(), selectedKP2.end(),
+                                         [&kw,&mid](const KeyPoint& kp) {
+                                             if ( norm(kp.pt - mid) < 2*kw.max_shift ) {
+                                                 return false;
+                                             }
+                                             return true;
+                                        }),
+                          selectedKP2.end());
+        
+        // sort again, giving more weight to central pinholes
+        /*auto sortFunc = [mid] (const KeyPoint & a, const KeyPoint & b) {
+            float da = sqrt(norm(a.pt - mid)) + 100;
+            float db = sqrt(norm(b.pt - mid)) + 100;
+            //return (a.size*db > b.size*da);
+            return (a.response > b.response);
+        };
+        std::sort( largestKP1.begin(), largestKP1.end(), sortFunc );
+        std::sort( largestKP2.begin(), largestKP2.end(), sortFunc );*/
+
+
+      
+        selectedKP1.resize(kw.nrefpoints);
+        selectedKP2.resize(kw.nrefpoints);
+
       
         std::vector<Mat> initializations;
         if( kw.h_init ) {
@@ -438,7 +486,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         }
 
         if( initializations.empty() ) {
-            initializations = getInitializations (largestKP1, largestKP2, imgSize, kw.max_shift, kw.max_scale);
+            initializations = getInitializations (selectedKP1, selectedKP2, imgSize, kw.max_shift, kw.max_scale);
         }
         if ( kw.verbose > 1 && initializations.size() > 1 ) {
             cout << "Matching the " << kw.nrefpoints << " largest keypoints in the images." << endl;
@@ -452,7 +500,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         std::vector<double> correlations2(initializations.size());
         TermCriteria term_crit = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, kw.niter, kw.eps);
         auto fit_func = std::bind( findTransformECC, std::ref(imgByte1), std::ref(imgByte2), std::placeholders::_1,
-            MOTION_HOMOGRAPHY, term_crit, noArray()
+            MOTION_HOMOGRAPHY, term_crit, imgMask2 //noArray()
         );
         
         boost::asio::io_service service;
@@ -515,12 +563,14 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
             vector<Point2f> obj, scene;
 
-//             if( kw.show > 1 ) {
-//                 drawKeypoints(imgByte1, keypoints1, result, Scalar(0,0,255) );
-//                 imshow( "Good Matches & Object detection", result );
-//                 waitKey(0); 
-//             }
-        
+#ifdef DEBUG_
+            if( kw.show > 1 ) {
+                drawKeypoints(imgByte1, keypoints1, result, Scalar(0,0,255) );
+                imshow( "Good Matches & Object detection", result );
+                waitKey(0); 
+            }
+#endif
+
             if (kw.verbose > 1) {
                 cout << "Using " << matches.size() << " pairs to refine the fit." << endl;
             }
@@ -771,7 +821,7 @@ IDL_VPTR rdx_find_shift(int argc, IDL_VPTR* argv, char* argk) {
         warp_matrix.assignTo( retMat, retMat.type() );
 
     } catch( const cv::Exception& e ) {
-        cout << "OpenCV error: " << e.msg << endl;
+        cout << "OpenCv error: " << e.msg << endl;
     }
 
     return ret;
@@ -1826,13 +1876,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
         shared_ptr<uint8_t> maskData;
         shared_ptr<uint8_t*> mask2D;
         shared_ptr<fftw_complex> bsOtfData;
-        double *darkPtr = nullptr;
-        double *gainPtr = nullptr;
-        double *bsGainPtr = nullptr;
-        fftw_complex *bsOtfPtr = nullptr;
-        IDL_MEMINT xCalibSize(0);
-        IDL_MEMINT yCalibSize(0);
-        
+
         vector<string> existingFiles;
         if ( !(filenames->flags & IDL_V_ARR) ) {
             bfs::path fn( string(filenames->value.str.s) );
@@ -1873,7 +1917,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
                     if( txtSize%80 ) {
                         cout << "Header text-size is not a multiple of 80. " << myMeta->getText() << endl;
                     } else {
-                        size_t nKeys = txtSize/80;
+                        IDL_MEMINT nKeys = txtSize/80;
                         IDL_MEMINT dims[] = { nKeys };
                         IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &tmpHdr );
                         IDL_STRING* strPtr = reinterpret_cast<IDL_STRING*>(tmpHdr->value.arr->data);
@@ -2221,8 +2265,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
 
         const int warp_mode = MOTION_TRANSLATION; // MOTION_EUCLIDEAN;
  
-        int number_of_iterations = 200;
-        double termination_eps = 1e-10;
+        int number_of_iterations = 50;
+        double termination_eps = 1e-4;
         TermCriteria criteria(TermCriteria::COUNT+TermCriteria::EPS, number_of_iterations, termination_eps);
 
         int flags = INTER_CUBIC;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
@@ -2230,9 +2274,17 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         const Scalar borderValue = Scalar();
 
         thread_local int myThreadIndex(-1);
+        atomic<bool> refLoaded(false);
         
-        auto sumFunc = [&]( size_t frameIndex, shared_ptr<char> threadBuffer, size_t frameOffset ) {
+        function<void(size_t,shared_ptr<char>,size_t)> 
+            sumFunc = [&]( size_t frameIndex, shared_ptr<char> threadBuffer, size_t frameOffset ) {
             
+                // for pinh_align we need the reference (first) image before the rest, so re-post other images until we get it.
+                if( kw.pinh_align && frameIndex && !refLoaded.load()  ) {
+                    ioService.post( std::bind(sumFunc,frameIndex,threadBuffer, frameOffset) );
+                    return;
+                }
+                
                 if( myThreadIndex == -1 ) myThreadIndex = threadIndex.fetch_add(1);
                 
                 double* threadSum = sumPtr+myThreadIndex*nPixels;
@@ -2251,81 +2303,92 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 
                 if( kw.pinh_align ) {
                     
-                    if( darkPtr || gainPtr ) {
-                        applyDarkAndGain( framePtr, threadTmp, darkPtr, gainPtr, nPixels, dataType );
-                    } else {
-                        copyToRaw( framePtr, threadTmp, nPixels, dataType );
-                    }
-                    if( bsOtfPtr ) {
-                        redux::image::descatter( threadTmp, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
-                    }
+                    if( !frameIndex ) refLoaded.store(true);
                     
-                    if ( mask2D ) {
-                        shared_ptr<double*> tmp2D = reshapeArray( threadTmp, ySize, xSize );
-                        fillPixels( tmp2D.get(), (size_t)ySize, (size_t)xSize, mask2D.get() );
-                    }
-                    
-                    Mat cvImg( ySize, xSize, CV_64FC1, threadTmp );
-                    cv::Rect roi;
-                    if( !frameIndex ) {
-                        
-                        int margin = 100;
-                        int refSize = 99;
-
-                        roi = cv::Rect( cv::Point(margin,margin), cv::Point(ySize-margin, xSize-margin) );
-                        Mat clippedImg( cvImg, roi );
-                        
-                        double minVal, maxVal;
-                        cv::Point maxLoc;
-                        minMaxLoc( clippedImg, &minVal, &maxVal, nullptr, &maxLoc );
-                        maxLoc += cv::Point(margin,margin);
-                        
-                        shifts[0][0] = maxLoc.x;    // save location as shift for the reference image.
-                        shifts[0][1] = maxLoc.y;
-
-                        roi = cv::Rect( maxLoc-cv::Point(refSize/2,refSize/2), cv::Size(refSize,refSize) );
-                        
-                        Mat subImg( cvImg, roi );
-                        refImg.create( refSize, refSize, CV_32FC1 );
-                        subImg.convertTo( refImg, CV_32F );
-
-                        threshold( refImg, refImg, minVal+0.2*(maxVal-minVal), 0, THRESH_TOZERO );
-                         
-                        int nonZ = cv::countNonZero(refImg);
-                        while( cv::countNonZero(refImg) == nonZ ) {
-                             refImg.adjustROI( -1, -1, -1, -1 );
-                             refSize -= 2;
+                    try {
+                            
+                        if( darkPtr || gainPtr ) {
+                            applyDarkAndGain( framePtr, threadTmp, darkPtr, gainPtr, nPixels, dataType );
+                        } else {
+                            copyToRaw( framePtr, threadTmp, nPixels, dataType );
                         }
-                        refImg.adjustROI( 2, 2, 2, 2 );
-                        refSize += 4;
-                        refImg = refImg.clone();
-
-                        roi = cv::Rect( maxLoc-cv::Point(refSize/2,refSize/2), cv::Size(refSize,refSize) );
-                        Mat( cvImg, roi ).convertTo( refImg, CV_32F );
-
-                        subImgROI.set_value( roi );
-                         
-                    } else {
-
-                        roi = fut.get();
-                        Mat subImgFloat( roi.size(), CV_32FC1 );
-                        Mat( cvImg, roi ).convertTo( subImgFloat, CV_32F );
-
-                        Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
-                        findTransformECC( subImgFloat, refImg, warp_matrix, warp_mode, criteria );
-
-                        shifts[frameIndex][0] = warp_matrix.at<float>(0,2);
-                        shifts[frameIndex][1] = warp_matrix.at<float>(1,2);
-
-                        double* slaskPtr = threadTmp+nPixels*kw.nthreads;
-                        Mat slask( ySize, xSize, CV_64FC1, slaskPtr );
-                        warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
-
-                        memcpy( threadTmp, slaskPtr, nPixels*sizeof(double) );
+                        if( bsOtfPtr ) {
+                            redux::image::descatter( threadTmp, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
+                        }
                         
+                        if ( mask2D ) {
+                            shared_ptr<double*> tmp2D = reshapeArray( threadTmp, ySize, xSize );
+                            fillPixels( tmp2D.get(), (size_t)ySize, (size_t)xSize, mask2D.get() );
+                        }
+                        
+                        Mat cvImg( ySize, xSize, CV_64FC1, threadTmp );
+                        cv::Rect roi;
+                        if( !frameIndex ) {
+                            
+                            int margin = 100;
+                            int refSize = 29;
+
+                            roi = cv::Rect( cv::Point(margin, margin), cv::Point(xSize-margin, ySize-margin) );
+                            Mat clippedImg( cvImg, roi );
+
+                            double minVal, maxVal;
+                            cv::Point maxLoc;
+                            minMaxLoc( clippedImg, &minVal, &maxVal, nullptr, &maxLoc );
+                            maxLoc += cv::Point(margin,margin);
+                            
+                            shifts[0][0] = maxLoc.x;    // save location as shift for the reference image.
+                            shifts[0][1] = maxLoc.y;
+
+                            roi = cv::Rect( maxLoc-cv::Point(refSize/2,refSize/2), cv::Size(refSize,refSize) );
+                            
+                            Mat subImg( cvImg, roi );
+                            refImg.create( refSize, refSize, CV_32FC1 );
+                            subImg.convertTo( refImg, CV_32F );
+
+//                             int nonZ = cv::countNonZero(refImg);
+//                             while( cv::countNonZero(refImg) == nonZ ) {
+//                                  refImg.adjustROI( -1, -1, -1, -1 );
+//                                  refSize -= 2;
+//                             }
+//                             refImg.adjustROI( 2, 2, 2, 2 );
+//                             refSize += 4;
+//                             refImg = refImg.clone();
+// 
+//                             roi = cv::Rect( maxLoc-cv::Point(refSize/2,refSize/2), cv::Size(refSize,refSize) );
+                            Mat( cvImg, roi ).convertTo( refImg, CV_32F );
+
+                            subImgROI.set_value( roi );
+                             
+                        } else {
+
+                            roi = fut.get();
+
+                            Mat subImgFloat( roi.size(), CV_32FC1 );
+                            double* slaskPtr = threadTmp+nPixels*kw.nthreads;
+                            Mat slask( ySize, xSize, CV_64FC1, slaskPtr );
+                            
+                            Mat( cvImg, roi ).convertTo( subImgFloat, CV_32F );
+
+                            Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
+                            findTransformECC( subImgFloat, refImg, warp_matrix, warp_mode, criteria );
+
+                            shifts[frameIndex][0] = warp_matrix.at<float>(0,2);
+                            shifts[frameIndex][1] = warp_matrix.at<float>(1,2);
+
+                            warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
+
+                            memcpy( threadTmp, slaskPtr, nPixels*sizeof(double) );
+                            
+                        }
+                        
+                        for( size_t n=0; n<nPixels; ++n ) threadSum[n] += threadTmp[n];
+                        
+                    } catch( const cv::Exception& e ) {
+                        nSummed--;
+                        if( checkedPtr  ) {
+                            checkedPtr[frameIndex] = std::numeric_limits<double>::infinity();
+                        }
                     }
-                    
-                    for( size_t n=0; n<nPixels; ++n ) threadSum[n] += threadTmp[n];
 
                 } else {
                     addToRaw( framePtr, threadSum, nPixels, dataType );
@@ -2369,11 +2432,13 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             });
             frameCount += nFrames[i];
         }
+
         progWatch.wait();
 
         for( size_t t=0; t<kw.nthreads; ++t ) {
             std::transform( summedData, summedData+nPixels, sumPtr+t*nPixels, summedData, std::plus<double>() );
         }
+
         
         size_t nDiscarded(0);
         if( checkedPtr ) {
@@ -2385,20 +2450,10 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             median_filter( checkedPtr, nTotalFrames, kw.filter );
             for( size_t i=0; i<nTotalFrames; ++i ) {
                 if( isfinite(checkedPtr[i]) ) {
-                    size_t offset = std::min( std::max(nTotalFrames+i-1, nTotalFrames), 2*nTotalFrames-3 );       // restrict to array
                     checkedPtr[i] = (abs(checkedPtr[i]-checkedPtr[nTotalFrames+i]) <= tmean);
-                    if ( checkedPtr[i] == 0 ) {
-                        if ( kw.lun ) {
-                            IDL_PoutRaw( kw.lun, (char*)existingFiles[i].c_str(), existingFiles[i].length() );
-                            IDL_PoutRaw( kw.lun, nl, 1 );
-                        }
-                        ++nDiscarded;
-                    }
-                } else {
-                    IDL_PoutRaw( kw.lun, (char*)existingFiles[i].c_str(), existingFiles[i].length() );
-                    IDL_PoutRaw( kw.lun, nl, 1 );
-                    ++nDiscarded;
-                }
+                    if ( checkedPtr[i] > 0 ) continue;      // check passed
+                } else checkedPtr[i] = 0;
+                ++nDiscarded;
             }
             if( nDiscarded ) {
                 memset( sumPtr, 0, nPixels*kw.nthreads*sizeof(double) );
@@ -2408,7 +2463,17 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 size_t frameCount(0);
                 for( size_t i=0; i<existingFiles.size(); ++i ) {
                     bool allOk(true);
-                    for( size_t j=0; j<nFrames[i]; ++j ) allOk &= bool( checkedPtr[frameCount+j] == 0 );
+                    for( size_t j=0; j<nFrames[i]; ++j ) {
+                        if( checkedPtr[frameCount+j] == 0 ) {
+                            if( kw.lun ) {
+                                string msg = existingFiles[i];
+                                if( nFrames[i] > 1 ) msg += ", frame # " + to_string(j);
+                                IDL_PoutRaw( kw.lun, (char*)msg.c_str(), msg.length() );
+                                IDL_PoutRaw( kw.lun, nl, 1 );
+                            }
+                            allOk = false;
+                        }
+                    }
                     if( allOk ) continue;
                     progWatch.increaseTarget(1);
                     ioService.post([&,i,frameCount](){
@@ -2429,8 +2494,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                     if( !time_beg.empty() ) {
                                         time_beg[frameCount+j] = time_end[frameCount+j] = bpx::ptime();
                                     }
-                                    bufferOffset += frameSize;
                                 }
+                                bufferOffset += frameSize;
                             }
                         } catch( const exception& e ) {
                             cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
@@ -2439,6 +2504,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     });
                     frameCount += nFrames[i];
                 }
+
                 progWatch.wait();
 
                 for( size_t t=0; t<kw.nthreads; ++t ) {
@@ -2455,7 +2521,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         pool.join_all();
 
         
-        if( kw.pinh_align > 1 ) {
+        if( kw.pinh_align ) {
             Mat cvImg( ySize, xSize, CV_64FC1, summedData );
             Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
             for( size_t n=1; n<nSummed; ++n ) {
@@ -2472,7 +2538,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         if( kw.verbose > 1 ) {
             printProgress( statusString, 100.0 );
             if( nDiscarded ) {
-                cout << "  Check failed for " << nDiscarded << " file" << ((nDiscarded>1)?"s.":".") << endl;
+                cout << "  Check failed for " << nDiscarded << " frame" << ((nDiscarded>1)?"s.":".") << endl;
             } else {
                 cout << "  All ok." << endl;
             }
@@ -2485,6 +2551,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             IDL_VarCopy( tmpSummed, kw.summed );
         }
         
+        if( nDiscarded <= nSummed ) nSummed -= nDiscarded;
+
         if( kw.nsummed ) {
             IDL_VPTR tmpNS = IDL_GettmpLong( nSummed );
             IDL_VarCopy( tmpNS, kw.nsummed );
@@ -2492,9 +2560,9 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         
         if( kw.pinh_align && kw.xyc ) {
             IDL_VPTR tmp;
-            IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nFiles) }; 
+            IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nTotalFrames) }; 
             float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmp ); //IDL_ARR_INI_ZERO
-            memcpy( tmpData, *shifts, 2*nFiles*sizeof(float));
+            memcpy( tmpData, *shifts, 2*nTotalFrames*sizeof(float));
             IDL_VarCopy( tmp, kw.xyc );
         }
         
