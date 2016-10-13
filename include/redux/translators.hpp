@@ -155,7 +155,9 @@ namespace redux {
                             count++;
                         }
                         if(count > 2) {
-                            oss << *first << ":";
+                            oss << *first;
+                            if( step == 1 ) oss << "-";
+                            else  oss << ":";
                             if( step != 1 ) oss << step << ":";
                             oss << *(last-1);
                         } else {
