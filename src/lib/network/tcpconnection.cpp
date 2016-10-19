@@ -102,11 +102,13 @@ void TcpConnection::connect( string host, string service ) {
 
 void TcpConnection::idle( void ) {
 
+    unique_lock<mutex> lock(mtx);
     if( !activityCallback ) {
         throw invalid_argument( "TcpConnection::idle()  Attempting to idle without callback !!" );
     }
 
     if( mySocket.is_open() ) {
+        lock.unlock();
         mySocket.async_read_some( ba::null_buffers(),
                                   boost::bind( &TcpConnection::onActivity, this, shared_from_this(), ba::placeholders::error) );
 
@@ -116,6 +118,7 @@ void TcpConnection::idle( void ) {
 
 void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& error ) {
 
+    unique_lock<mutex> lock(mtx);
     if( !error ) {
         if( activityCallback ) {
             //LOG_DEBUG << "Activity on connection \"" << connptr->socket().remote_endpoint().address().to_string() << "\"";

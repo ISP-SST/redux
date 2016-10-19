@@ -97,9 +97,9 @@ namespace redux {
             operator bool() const { return mySocket.is_open(); };
 
             void connect( std::string host, std::string service );
-            callback getCallback( void ) const { return activityCallback; };
-            void setCallback( callback cb = nullptr ) { activityCallback = cb; };
-            void setErrorCallback( callback cb = nullptr ) { errorCallback = cb; };
+            callback getCallback( void ) { std::unique_lock<std::mutex> lock(mtx); return activityCallback; };
+            void setCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); activityCallback = cb; };
+            void setErrorCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); errorCallback = cb; };
             void idle( void );
             void onActivity( Ptr conn, const boost::system::error_code& error );
             void setSwapEndian(bool se) { swapEndian = se; };
