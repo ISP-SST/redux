@@ -337,9 +337,15 @@ namespace redux {
             for( auto& th : threads ) th.join();
 
         }
+        
+        template <typename T>
+        void apodizeInPlace( T** data, size_t nY, size_t nX, size_t blendRegion );
 
         template <typename T>
         void apodizeInPlace( redux::util::Array<T>& array, size_t blendRegion );
+
+        template <typename T>
+        void windowInPlace( redux::util::Array<T>& array, size_t blendRegion );
         template <typename T>
         redux::util::Array<T> apodize( const redux::util::Array<T>& array, size_t blendRegion );
         

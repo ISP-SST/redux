@@ -655,6 +655,37 @@ template double redux::image::horizontalInterpolation (double**, size_t, size_t,
 
 
 template <typename T>
+void redux::image::apodizeInPlace(T** data, size_t nY, size_t nX, size_t blendRegion) {
+
+    blendRegion = std::min (std::min (blendRegion, nY >> 1), nX >> 1);
+
+    double* tmp = new double[2*blendRegion+1];
+    tmp[0] = 0.0;
+    redux::math::apodize (tmp, 2*blendRegion+1, 1.0);
+    cout << printArray(tmp,2*blendRegion+1,"weights") << endl;
+    for( size_t x=0; x<nX; ++x ) {
+        for( size_t y=0; y<blendRegion; ++y ) {
+            data[y][x] = data[y][x]*tmp[blendRegion+y] + data[nY-y-1][x]*tmp[blendRegion-y];
+            data[nY-y-1][x] = data[y][x]*tmp[blendRegion-y] + data[nY-y-1][x]*tmp[blendRegion+y];
+        }
+    }
+    for( size_t y=0; y<nY; ++y ) {
+        for( size_t x=0; x<blendRegion; ++x ) {
+            data[y][x] = data[y][x]*tmp[blendRegion+x] + data[y][nX-x-1]*tmp[blendRegion-x];
+            data[y][nX-x-1] = data[y][x]*tmp[blendRegion-x] + data[y][nX-x-1]*tmp[blendRegion+x];
+        }
+    }
+    delete[] tmp;
+
+}
+template void redux::image::apodizeInPlace(int16_t**, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace(int32_t**, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace(float**, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace(double**, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace(complex_t**, size_t, size_t, size_t);
+
+
+template <typename T>
 void redux::image::apodizeInPlace (Array<T>& array, size_t blendRegion) {
 
     size_t sizeY = array.dimSize (0);
@@ -687,11 +718,43 @@ template void redux::image::apodizeInPlace (Array<complex_t>&, size_t);
 
 
 template <typename T>
+void redux::image::windowInPlace (Array<T>& array, size_t blendRegion) {
+
+    size_t sizeY = array.dimSize (0);
+    size_t sizeX = array.dimSize (1);
+    blendRegion = std::min (std::min (blendRegion, sizeY >> 1), sizeX >> 1);
+
+    double* tmp = new double[blendRegion];
+    tmp[0] = 0;
+    redux::math::apodize (tmp, blendRegion, 1.0);
+    for (size_t y = 0; y < blendRegion; ++y) {
+        for (size_t x = 0; x < sizeX; ++x) {
+            array (y, x) *= tmp[y];
+            array (sizeY - y - 1, x)  *= tmp[y];
+        }
+    }
+    for (size_t x = 0; x < blendRegion; ++x) {
+        for (size_t y = 0; y < sizeY; ++y) {
+            array (y, x)  *= tmp[x];
+            array (y, sizeX - x - 1) *= tmp[x];
+        }
+    }
+    delete[] tmp;
+
+}
+template void redux::image::windowInPlace (Array<int16_t>&, size_t);
+template void redux::image::windowInPlace (Array<int32_t>&, size_t);
+template void redux::image::windowInPlace (Array<double>&, size_t);
+template void redux::image::windowInPlace (Array<float>&, size_t);
+template void redux::image::windowInPlace (Array<complex_t>&, size_t);
+
+
+template <typename T>
 Array<T> redux::image::apodize (const Array<T>& in, size_t blendRegion) {
     if (!blendRegion) return in;       // nothing to do
     Array<T> array;
     in.copy (array);
-    apodizeInPlace (array, blendRegion);
+    windowInPlace (array, blendRegion);
     return array;
 }
 template Array<int16_t> redux::image::apodize (const Array<int16_t>&, size_t);
