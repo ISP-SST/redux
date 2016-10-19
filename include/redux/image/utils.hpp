@@ -180,44 +180,63 @@ namespace redux {
 
         template <typename T>
         void clipImage( redux::util::Array<T>& img, const std::vector<int16_t> clip, bool symmetricClip=false )  {
-            
-            std::vector<int16_t> thisClip = clip;
-            if( thisClip.size() == 2 ) {        // apply same values to both dimensions.
-                thisClip.insert( thisClip.end(), clip.begin(), clip.end() );
+            size_t nDims = img.nDimensions();
+            if( nDims < 2 ) return;
+            std::vector<size_t> finalClip;
+            size_t nImgs = 1;
+            if( nDims > 2 ) {
+                for( size_t i=0; i<nDims-2; ++i ) {
+                    size_t sz = img.dimSize(i);
+                    nImgs *= sz;
+                    finalClip.push_back(0);
+                    finalClip.push_back(sz-1);
+                }
+            }
+            std::vector<int16_t> tmpClip = clip;
+            if( tmpClip.size() == 2 ) {        // apply same values to both dimensions.
+                tmpClip.insert( tmpClip.end(), clip.begin(), clip.end() );
             }
             
-            if( thisClip.size() == 4 ) {
+            if( tmpClip.size() == 4 ) {
                 bool flipX = false, flipY = false;
                 // we have the y (row/slow) dimension first, momfbd cfg-files (and thus alignClip) has x first.
-                if ( thisClip[0] > thisClip[1] ) {
-                    std::swap( thisClip[0], thisClip[1] );
+                if ( tmpClip[0] > tmpClip[1] ) {
+                    std::swap( tmpClip[0], tmpClip[1] );
                     flipX = true;
                 }
-                if ( thisClip[2] > thisClip[3] ) {
-                    std::swap( thisClip[2], thisClip[3] );
+                if ( tmpClip[2] > tmpClip[3] ) {
+                    std::swap( tmpClip[2], tmpClip[3] );
                     flipY = true;
                 }
-                for( auto & index : thisClip )
+                for( auto & index : tmpClip )
                     --index;       // NOTE: momfbd cfg files uses 1-based indexes, internally we start with 0.
-                size_t sy = thisClip[3] - thisClip[2] + 1;
-                size_t sx = thisClip[1] - thisClip[0] + 1;
+                size_t sy = tmpClip[3] - tmpClip[2] + 1;
+                size_t sx = tmpClip[1] - tmpClip[0] + 1;
                 if( symmetricClip ) {
                     const std::vector<size_t>& dims = img.dimensions();
-                    int skewY = (dims[0] - sy) / 2  - thisClip[2];
-                    int skewX = (dims[1] - sx) / 2  - thisClip[0];
-                    thisClip[0] += skewX;
-                    thisClip[1] += skewX;
-                    thisClip[2] += skewY;
-                    thisClip[3] += skewY;
+                    int skewY = (dims[0] - sy) / 2  - tmpClip[2];
+                    int skewX = (dims[1] - sx) / 2  - tmpClip[0];
+                    tmpClip[0] += skewX;
+                    tmpClip[1] += skewX;
+                    tmpClip[2] += skewY;
+                    tmpClip[3] += skewY;
                 }
-                img.setLimits( thisClip[2], thisClip[3], thisClip[0], thisClip[1] );
+                
+                finalClip.push_back(tmpClip[2]);
+                finalClip.push_back(tmpClip[3]);
+                finalClip.push_back(tmpClip[0]);
+                finalClip.push_back(tmpClip[1]);
+                img.setLimits( finalClip );
                 img.trim();
 
                 if( flipX || flipY ) {
-                    std::shared_ptr<T*> arrayPtr = img.reshape(sy, sx);
+                    std::shared_ptr<T*> arrayPtr = img.reshape(nImgs*sy, sx);
                     T** imgPtr = arrayPtr.get();
-                    if (flipX) redux::util::reverseX(imgPtr, sy, sx);
-                    if (flipY) redux::util::reverseY(imgPtr, sy, sx);
+                    for( size_t i=0; i<nImgs; ++i) {
+                        if (flipX) redux::util::reverseX(imgPtr, sy, sx);
+                        if (flipY) redux::util::reverseY(imgPtr, sy, sx);
+                        imgPtr += sy;
+                    }
                 }
             }
         }
