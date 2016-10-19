@@ -46,6 +46,7 @@ namespace redux {
         boost::thread_group pool;
         boost::asio::strand strand;
         boost::asio::deadline_timer runTimer;
+        bool running_;
         
         WorkInProgress::Ptr wip;
 

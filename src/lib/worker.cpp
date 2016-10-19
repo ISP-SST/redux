@@ -18,8 +18,8 @@ namespace {
 }
 
 
-Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), wip(new WorkInProgress()),
-    daemon( d ), myInfo(Host::myInfo()) {
+Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), running_(false),
+    wip(new WorkInProgress()), daemon( d ), myInfo(Host::myInfo()) {
 
 }
 
@@ -34,9 +34,22 @@ void Worker::init( void ) {
     runTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 1 ) );
     runTimer.async_wait(strand.wrap(boost::bind(&Worker::run, this)));
     workLoop.reset( new boost::asio::io_service::work(ioService) );
-
+    running_ = true;
+    
     for( uint16_t t=0; t < myInfo.status.nThreads; ++t ) {
-        pool.create_thread( boost::bind( &boost::asio::io_service::run, &ioService ) );
+        pool.create_thread( [&](){
+            while( running_ ) {
+                try {
+                    ioService.run();
+                } catch( job_error& e ) {
+                    LLOG_ERR(daemon.logger) << "Job error: " << e.what() << ende;
+                } catch( exception& e ) {
+                    LLOG_ERR(daemon.logger) << "Exception in thread: " << e.what() << ende;
+                } catch( ... ) {
+                    LLOG_ERR(daemon.logger) << "Unhandled exception in thread." << ende;
+                }
+            }
+        });
     }
 
 }
@@ -44,6 +57,7 @@ void Worker::init( void ) {
 
 void Worker::stop( void ) {
 
+    running_ = false;
     workLoop.reset();
     ioService.stop();
     pool.join_all();

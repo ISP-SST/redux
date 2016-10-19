@@ -138,14 +138,37 @@ bool Daemon::doWork( void ) {
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
         // Add some threads for the async work.
         for( std::size_t i = 0; i < 50; ++i ) {
-            shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioService ) ) );
+            //shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioService ) ) );
+            shared_ptr<thread> t( new thread( [&](){
+                while( runMode == LOOP ) {
+                    try {
+                        ioService.run();
+                    } catch( job_error& e ) {
+                        LOG_ERR << "Job error: " << e.what() << ende;
+                    } catch( exception& e ) {
+                        LOG_ERR << "Exception in thread: " << e.what() << ende;
+                    } catch( ... ) {
+                        LOG_ERR << "Unhandled exception in thread." << ende;
+                    }
+                }
+            }));
             threads.push_back( t );
         }
         LOG_DEBUG << "Initializing worker." << ende;
         workerInit();
         worker.init();
         LOG_DEBUG << "Running the asio service." << ende;
-        ioService.run();
+        while( runMode == LOOP ) {
+            try {
+                ioService.run();
+            } catch( job_error& e ) {
+                LOG_ERR << "Job error: " << e.what() << ende;
+            } catch( exception& e ) {
+                LOG_ERR << "Exception in main thread: " << e.what() << ende;
+            } catch( ... ) {
+                LOG_ERR << "Unhandled exception in main thread." << ende;
+            }
+        }
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
         LOG_DETAIL << "Waiting for all threads to terminate." << ende;
         for( auto & t : threads ) {
@@ -183,7 +206,7 @@ void Daemon::workerInit( void ) {
         connect( myMaster.host->info, logConn );
         int remoteLogFlushPeriod = 5;       // TODO make this a config setting.
         logger.addNetwork( logConn, 0, Logger::getDefaultMask(), remoteLogFlushPeriod );
-        logger.setContext( myInfo.info.name );
+        logger.setContext( myInfo.info.name+":"+to_string(myInfo.info.pid) );
         logger.setFlushPeriod( remoteLogFlushPeriod );
         LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
         
@@ -613,7 +636,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     }
                     job->startLog();
                     job->printJobInfo();
-                    if( !job->check() ) throw job_check_failed( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
+                    if( !job->check() ) throw job_error( "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name );
 
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
                     LLOG_DETAIL(job->logger) << "Sanity check passed, adding to queue." << ende;
@@ -622,7 +645,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     jobCounter++;
                     newjobs.push_back( job );
                     job->stopLog();
-                } catch( const job_check_failed& e ) {
+                } catch( const job_error& e ) {
                     messages.push_back( e.what() );
                 }
             } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );

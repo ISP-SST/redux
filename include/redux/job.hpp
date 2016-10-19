@@ -29,17 +29,22 @@ namespace redux {
     
     void runThreadsAndWait(boost::asio::io_service& service, uint16_t nThreads );
     
-    class job_check_failed: public std::exception {
+    class job_error: public std::exception {
         
     public:
-        explicit job_check_failed(const char* message) : msg_(message) { }
-        explicit job_check_failed(const std::string& message) : msg_(message) { }
-        virtual ~job_check_failed() throw () {}
+        explicit job_error(const char* message) : msg_(message) { }
+        explicit job_error(const std::string& message) : msg_(message) { }
+        virtual ~job_error() throw () {}
 
         virtual const char* what() const throw () { return msg_.c_str(); }
 
     protected:
         std::string msg_;
+
+    };
+        
+    class job_fatal: public job_error {
+
 
     };
         
