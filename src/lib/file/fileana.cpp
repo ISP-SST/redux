@@ -294,9 +294,9 @@ size_t redux::file::Ana::dataSize(void) {
 
 size_t redux::file::Ana::dimSize(size_t i) {
     
-    if( i > m_Header.ndim ) return 0;
+    if( i >= m_Header.ndim ) return 0;
     
-    return m_Header.dim[i];
+    return m_Header.dim[ m_Header.ndim-i-1 ];
     
 }
 
@@ -452,13 +452,9 @@ void redux::file::Ana::read( const std::string& filename, char* data, std::share
         throw ios_base::failure( "Ana::read(): Seek operation failed." );
     }
 
-    // f0 stores the dimensions with the fast index first, so swap them before allocating the array
-    int nDims = hdr->m_Header.ndim;
     size_t nElements = 1;
-    unique_ptr<int[]> dim( new int[nDims] );
-    for( int i( 0 ); i < nDims; ++i ) {
-        dim.get()[i] = hdr->m_Header.dim[nDims - i - 1];
-        nElements *= hdr->m_Header.dim[nDims - i - 1];
+    for( uint8_t i(0); i < hdr->m_Header.ndim; ++i ) {
+        nElements *= hdr->m_Header.dim[i];
     }
 
     if( hdr->m_Header.subf & 1 ) readCompressed( file, data, nElements, hdr.get() );
@@ -558,8 +554,9 @@ void redux::file::Ana::read( const string& filename, redux::util::Array<T>& data
     size_t nElements = 1;
     bool forceResize = ( nArrayDims < nDims );
     std::vector<size_t> dimSizes( nDims, 0 );
+
     for( int i( 0 ); i < nDims; ++i ) {
-        dimSizes[i] = hdr->m_Header.dim[nDims - i - 1];
+        dimSizes[i] = hdr->dimSize(i);
         if( !forceResize && ( dimSizes[i] != data.dimSize( nArrayDims - nDims + i ) ) ) {
             forceResize = true;
         }
