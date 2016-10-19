@@ -382,7 +382,6 @@ namespace redux {
                 size_t halfSize = size/2;
                 T* view = new T[size];
                 T* result = new T[nElements];
-                T* ptr = data;
                 size_t last = nElements-halfSize;
                 for( size_t i=0; i<=last; ++i ) {
                     std::copy( data+i, data+i+size, view );
