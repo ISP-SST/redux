@@ -843,7 +843,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
             LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
             host->status.state = Host::ST_ACTIVE;
-        }
+        } else wip->previousJob.reset();
 
         data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
         char* ptr = data.get()+sizeof(uint64_t);
