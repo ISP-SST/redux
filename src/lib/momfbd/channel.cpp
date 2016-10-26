@@ -1043,7 +1043,7 @@ Point16 Channel::getImageSize(void) {
 void Channel::logAndThrow( string msg ) {
     msg = to_string(myObject.ID)+":"+to_string(ID)+": "+msg;
     LOG_ERR << msg << ende;
-    throw job_check_failed(msg);
+    throw job_error(msg);
     
 }
 
