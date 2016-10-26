@@ -34,7 +34,7 @@ typedef struct {
     double pnorm;
     gsl_vector *p;      // search direction
     double g0norm;
-    gsl_vector *g0;     // gradient
+    gsl_vector *previousGradient;     // gradient
 } conjugate_rdx_state_t;
 
 
@@ -56,9 +56,9 @@ static int conjugate_rdx_alloc (void *vstate, size_t n) {
         GSL_ERROR ("failed to allocate space for p", GSL_ENOMEM);
     }
 
-    state->g0 = gsl_vector_calloc (n);
+    state->previousGradient = gsl_vector_calloc (n);
 
-    if (state->g0 == 0)
+    if (state->previousGradient == 0)
     {
         gsl_vector_free (state->p);
         gsl_vector_free (state->x1);
@@ -90,7 +90,7 @@ static void conjugate_rdx_free (void *vstate) {
     
     conjugate_rdx_state_t *state = (conjugate_rdx_state_t *) vstate;
 
-    gsl_vector_free (state->g0);
+    gsl_vector_free (state->previousGradient);
     gsl_vector_free (state->p);
     gsl_vector_free (state->x1);
     
@@ -134,7 +134,7 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
 
     gsl_vector *x1 = state->x1;
     gsl_vector *p = state->p;
-    gsl_vector *g0 = state->g0;
+    gsl_vector *oldGradPtr = state->previousGradient;
     
     size_t n = x->size;
     double *gData = gradient->data;
@@ -163,13 +163,14 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
         // p' = g1 - beta * p
 
         double g0g1(0);
-        std::transform( gData, gData+n, g0->data, g0->data,
+        std::transform( gData, gData+n, oldGradPtr->data, oldGradPtr->data,
                         [&g0g1]( const double& a, const double& b ) {
                             double tmp = b-a;       // g0' = g0 - g1
                             g0g1 += tmp*a;          // g1g0 = (g0-g1).g1
                             return tmp;
                         });
         double beta = g0g1 / (g0norm*g0norm);               // Polak-Ribiere:    beta = -((g1-g0).g1)/(g0.g0)
+        //beta = std::min( beta, 0.0 );
         //double beta = -pow( g1norm / g0norm, 2.0 );         // Fletcher-Reeve
         std::transform( gData, gData+n, pData, pData,
                         [beta]( const double& a, const double& b ) {
@@ -185,7 +186,7 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
     double lambda = (pg >= 0.0) ? +1.0/pnorm : -1.0/pnorm;
 
 #ifdef DEBUG_
-    printf ("gnorm: %.18e   pnorm: %.18e   pg: %.18e   orth: %g\n", g1norm, pnorm, pg, fabs(pg * lambda/ g1norm));
+    printf ("gnorm: %.12e   pnorm: %.12e   pg: %.12e   orth: %g\n", g1norm, pnorm, pg, fabs(pg * lambda/ g1norm));
 #endif
     
     if( pnorm == 0.0 ) {
@@ -194,7 +195,7 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
     }
 
     double fa = *f, fb, fc;
-    double stepa = 0.0, stepb, stepc = state->step;
+    double stepa = 0.0, stepb, stepc = 1E-21/lambda; //1E-21/lambda; //state->step;
 
     rdx_fdf* rdx_fdf_ptr = nullptr;
     if( fdf == fdf->params ) {      // test if it is a rdx_fdf type.
@@ -216,21 +217,21 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
     // Evaluate function value at stepc
     fc = my_value_at(stepc);
 #ifdef DEBUG_
-    printf ("got a=%.18e  f(a)=%.18e  step=%.18e f(step)=%.18e\n", stepa, fa, stepc, fc);
+    printf ("got a=%.12e  f(a)=%.12e  step=%.12e f(step)=%.12e\n", stepa, fa, stepc, fc);
 #endif
 
     // Find a region (xa,fa) (xc,fc) which contains an intermediate (xb,fb) satisifying fa > fb < fc.
     bracket( my_value_at, stepa, stepc, stepb, fa, fc, fb );
 
 #ifdef DEBUG_
-    printf ("got (%.18e,%.18e,%.18e) = (%.18e,%.18e,%.18e)\n", stepa, stepb, stepc, fa, fb, fc);
+    printf ("got pos=[%.12e,%.12e,%.12e] => val=[%.12e,%.12e,%.12e]\n", stepa, stepb, stepc, fa, fb, fc);
 #endif
 
     // Do a line minimization using Brent's method.
     brent( my_value_at, stepa, stepc, stepb, fb, 0.1 );
 
 #ifdef DEBUG_
-    printf( "got min at = %.18e f(x) = %.18e\n", stepb, fb );
+    printf( "got min at = %.12e f(x) = %.12e    lambda=%.12e   lambda*x=%.12e\n", stepb, fb, lambda, lambda*stepb );
 #endif
   //exit(0);
 
@@ -241,7 +242,7 @@ static int conjugate_rdx_iterate( void *vstate, gsl_multimin_function_fdf * fdf,
     state->step = 0.5*std::max(fabs(stepb),2.0E-9);
 
     state->g0norm = g1norm;
-    gsl_vector_memcpy( g0, gradient );
+    gsl_vector_memcpy( oldGradPtr, gradient );
     
     state->iter = state->iter % x->size;
 
