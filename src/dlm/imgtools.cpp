@@ -50,7 +50,7 @@ namespace {
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_INT help;
-        IDL_INT by_distance;
+        IDL_INT by_size;
         float eps;
         IDL_INT margin;
         IDL_INT max_dist;
@@ -73,7 +73,7 @@ namespace {
     static IDL_MEMINT dims3x3[] = { 3, 3 };
     static IDL_KW_PAR kw_pars[] = {
         IDL_KW_FAST_SCAN,
-        { (char*) "BY_DIST",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (by_distance) },
+        { (char*) "BY_SIZE",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (by_size) },
         { (char*) "EPS",        IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (eps) },
         { (char*) "HELP",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
         { (char*) "H_INIT",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (h_init) },
@@ -91,91 +91,127 @@ namespace {
         { NULL }
     };
     
-    bool transformCheck (const Mat& trans, const Size& imgSize, double maxValue = 10000, double maxScaleDiff = 1.5) {
+    bool transformCheck (const Mat& trans, const Size& imgSize1, const Size& imgSize2, double approximateScale, double maxShift = 10000, double maxScaleDiff = 1.5) {
 
-        if( (trans.at<double>(0,0) > 0 && abs(trans.at<double>(0,2)) > maxValue) ||
-            (trans.at<double>(0,0) < 0 && abs(trans.at<double>(0,2)-imgSize.width) > maxValue)
-        ) return false;
-        if( (trans.at<double>(1,1) > 0 && abs(trans.at<double>(1,2)) > maxValue) ||
-            (trans.at<double>(1,1) < 0 && abs(trans.at<double>(1,2)-imgSize.height) > maxValue)
-        ) return false;
-
-        double det = fabs (determinant (trans (cv::Rect_<int> (0, 0, 2, 2))));
-        double minScale = std::max( 0.1, (1.0/maxScaleDiff) );
-        if (det < minScale || det > maxScaleDiff ) {
+        // check that orthogonality is approximately preserved
+        double ortho = trans.at<float>(0,0)*trans.at<float>(0,1) + trans.at<float>(1,0)*trans.at<float>(1,1);
+        if( fabs(ortho) > 0.05 ) {
+            //cout << "   Discarding: ortho = " << ortho << endl;
+            return false;
+        }
+        
+        // check that the scaling is close enough to the one measured from pinhole distances.
+        double det = sqrt(fabs (determinant (trans (cv::Rect_<int> (0, 0, 2, 2)))));
+        if (det < approximateScale/maxScaleDiff || det > approximateScale*maxScaleDiff ) {
+            //cout << "   Discarding: det = " << det << " min = " << (approximateScale/maxScaleDiff) << " max = " << (approximateScale*maxScaleDiff) << endl;
+            return false;
+        }
+        
+        // check that the midpoint of img1 is mapped close enough to the midpoint of img2
+        vector<Point2f> refMid(1, Point2f(imgSize1.width/2,imgSize1.height/2));
+        vector<Point2f> mappedRefMid(1);
+        perspectiveTransform( refMid, mappedRefMid, trans );
+        double shift = norm( mappedRefMid[0] - Point2f(imgSize2.width/2,imgSize2.height/2) );
+        if( shift > maxShift ) {
+            //cout << "   Discarding: shift = " << shift << " maxShift = " << maxShift << endl;
             return false;
         }
 
         return true;
     }
 
+    vector<int> getNearestIndex( const vector<Point2f>& pts, const vector<KeyPoint>& kps, double maxDistance=30 ) {
+
+        int nPoints = pts.size();
+        int nKP = kps.size();
+        vector<int> ret(nPoints,-1);
+        
+        std::pair<int, double> nearest;
+
+        for( int i=0; i<nPoints; ++i ) {
+            nearest = make_pair (-1, 1E12);
+            for (int j=0; j<nKP; ++j) {
+                double dist = norm( pts[i] - kps[j].pt);
+                if( fabs (dist) < nearest.second ) {
+                    nearest.second = dist;
+                    nearest.first = j;
+                }
+            }
+            if (nearest.first >= 0 && nearest.second < maxDistance) {
+                ret[i] = nearest.first;
+            }
+        }
+
+        return std::move (ret);
+
+    }
 
     // find approximate (affine) transforms by matching 3 central points in the object, to a reference + its nNeighbours nearest points
-    vector<Mat> getInitializations (const vector<KeyPoint>& obj, const vector<KeyPoint>& target, const Size& imgSize,
-                                    double maxShift = 10000, double maxScaleDiff=1.5) {
-
-        size_t nPairs = 3;      // 3 points needed for getAffineTransform()
+    vector<Mat> getInitializations( const vector<KeyPoint>& ref, const vector<KeyPoint>& target, const Size& imgSize1, const Size& imgSize2,
+                                    double approximateScale, double maxShift = 10000, double maxScaleDiff=1.5) {
 
         vector<Mat> initializations;
-
-        if (obj.size() < nPairs || target.size() < nPairs) {    // not enough input keypoints
-            return std::move (initializations);
+        size_t nRP = ref.size();
+        size_t nTP = target.size();
+        
+        if( nRP < 3 || nTP < 3 ) {    // not enough input keypoints
+            return std::move(initializations);
         }
+        
+        double minScale = approximateScale/maxScaleDiff;
+        double maxScale = approximateScale*maxScaleDiff;
 
-        vector<size_t> objInd (obj.size());
-        vector<size_t> targetInd (target.size());
-        std::iota (objInd.begin(), objInd.end(), 0);
-        std::iota (targetInd.begin(), targetInd.end(), 0);
+        vector<Point2f> refPoints(3);
+        vector<Point2f> targetPoints(3);
+        vector<Point2f> allRefPoints,mappedRefPoints;
 
-        std::set< map<size_t, size_t> > combinations;
+        KeyPoint::convert(ref, allRefPoints);
+        mappedRefPoints.resize( nRP );
 
-        do {
-            std::sort (targetInd.begin(), targetInd.end());
-            do {
-                map<size_t, size_t> tmp;
-                for (size_t i = 0; i < nPairs; ++i) {
-                    tmp[objInd[i]] = targetInd[i];
-                    Point2f oPoint = obj[objInd[i]].pt;
-                    Point2f tPoint = target[targetInd[i]].pt;
-                    double refDist = norm( oPoint - tPoint );
-                    refDist = min( refDist, norm( oPoint - Point2f(tPoint.x, imgSize.height-tPoint.y) ));
-                    refDist = min( refDist, norm( oPoint - Point2f(imgSize.width-tPoint.x, tPoint.y) ));
-                    refDist = min( refDist, norm( oPoint - Point2f(imgSize.width-tPoint.x, imgSize.height-tPoint.y) ));
-                    if( refDist > maxShift ) continue;      // image-shift is too large
-                    if( i ) {       // relative distances should be in the scale range
-                        double objDist = norm( obj[objInd[i]].pt - obj[objInd[0]].pt );
-                        double ratio = norm( target[targetInd[i]].pt - target[targetInd[0]].pt ) / objDist;
-                        if( ratio > maxScaleDiff || ratio < 1.0/maxScaleDiff ) {
-                            continue;
+        std::map<vector<int>, Mat> maps;
+
+        for( size_t r0=0; r0<nRP-2; ++r0 ) {
+        for( size_t r1=r0+1; r1<nRP-1; ++r1 ) {
+        for( size_t r2=r1+1; r2<nRP; ++r2 ) {
+            refPoints[0] = ref[r0].pt;
+            refPoints[1] = ref[r1].pt;
+            refPoints[2] = ref[r2].pt;
+            double norm01 = norm( refPoints[0] - refPoints[1] );
+            double norm02 = norm( refPoints[0] - refPoints[2] );
+            double norm12 = norm( refPoints[1] - refPoints[2] );
+            for( size_t i=0; i<nTP; ++i ) {
+                for( size_t j=0; j<nTP; ++j ) {
+                    if( j == i ) continue;
+                    double normij = norm( target[i].pt - target[j].pt );
+                    if( (normij < norm01*minScale) || (normij > norm01*maxScale) ) continue;
+                    for( size_t k=0; k<nTP; ++k ) {
+                        if( k==i || k==j ) continue;
+                        double normik = norm( target[i].pt - target[k].pt );
+                        if( (normik < norm02*minScale) || (normik > norm02*maxScale) ) continue;
+                        double normjk = norm( target[j].pt - target[k].pt );
+                        if( (normjk < norm12*minScale) || (normjk > norm12*maxScale) ) continue;
+                        targetPoints[0] = target[i].pt;
+                        targetPoints[1] = target[j].pt;
+                        targetPoints[2] = target[k].pt;
+                        Mat trans = getAffineTransform( refPoints, targetPoints );
+                        Mat H_init = Mat::eye(3, 3, CV_32F);            // unit
+                        trans.copyTo(H_init(cv::Rect_<int> (0, 0, 3, 2))); // copy (affine) initialization to the top 2 rows
+                        if (transformCheck (H_init, imgSize1, imgSize2, approximateScale, maxShift, maxScaleDiff)) {
+                            perspectiveTransform( allRefPoints, mappedRefPoints, H_init );
+                            maps.emplace( getNearestIndex(mappedRefPoints,target), H_init);
                         }
                     }
-                    if( tmp.size() != nPairs ) continue;
-                    combinations.insert (tmp);
                 }
-            } while (next_permutation (targetInd.begin(), targetInd.end()));
-        } while (next_permutation (objInd.begin(), objInd.end()));
-
-        vector<Point2f> objPoints (nPairs);
-        vector<Point2f> targetPoints (nPairs);
-        for (auto & c : combinations) {
-            size_t i = 0;
-            for (auto & p : c) {
-                objPoints[i] = obj[ p.first ].pt;
-                targetPoints[i] = target[ p.second ].pt;
-                i++;
             }
-            Mat trans = getAffineTransform (objPoints, targetPoints);
-            if (transformCheck (trans, imgSize, maxShift, maxScaleDiff)) {
-                Mat H_init = Mat::eye(3, 3, CV_32F);            // unit
-                trans.copyTo(H_init(cv::Rect_<int> (0, 0, 3, 2))); // copy (affine) initialization to the top 2 rows
-                initializations.push_back(H_init);
-            }
-        }
+        }}}
+        
+        for( auto &it: maps ) initializations.push_back( it.second );
 
         return std::move (initializations);
 
     }
 
+    
     double metric (const Mat& H, const vector<Point2f>& obj, const vector<Point2f>& scene, double* maxVal = nullptr) {
         double ret (0), mx (0);
         size_t nP = std::min(obj.size(),scene.size());
@@ -190,7 +226,8 @@ namespace {
         return ret / nP;
     }
 
-    vector<DMatch> matchNearest (const vector<KeyPoint>& kp1, const vector<KeyPoint>& kp2, const Mat& H, double maxDistance = 30) {
+    
+    vector<DMatch> matchNearest (const vector<KeyPoint>& kp1, const vector<KeyPoint>& kp2, const Mat& H, double maxDistance=30, double scale=1.0) {
 
         vector<DMatch> matches;
         vector<Point2f> points1, points2, mappedPoints;
@@ -214,7 +251,7 @@ namespace {
                 }
             }
 
-            if (nearest.first >= 0 && nearest.second < maxDistance) {
+            if (nearest.first >= 0 && nearest.second < maxDistance*scale) {
                 matches.push_back (DMatch (i, nearest.first, nearest.second));
             }
         }
@@ -246,10 +283,10 @@ namespace {
             return a.queryIdx < b.queryIdx;
         });
 
-        auto last = std::unique (matches.begin(), matches.end(),
+        auto imgEnd1 = std::unique (matches.begin(), matches.end(),
         [] (const DMatch & a, const DMatch & b) { return (a.queryIdx == b.queryIdx && a.trainIdx == b.trainIdx); });
 
-        matches.erase (last, matches.end());
+        matches.erase (imgEnd1, matches.end());
 
         std::sort (matches.begin(), matches.end());
 
@@ -261,7 +298,6 @@ namespace {
 }
 
 
-
 IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
 #ifndef REDUX_WITH_OPENCV
@@ -269,7 +305,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     return IDL_GettmpInt(0);
 #else
     KW_RESULT kw;
-    kw.by_distance = 0;
+    kw.by_size = 0;
     kw.eps = 1E-3;
     kw.help = 0;
     kw.margin = 30;
@@ -277,7 +313,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     kw.max_scale = 1.04;
     kw.max_points = -1;
     kw.max_shift = 200;
-    kw.niter = 100;
+    kw.niter = 30;
     kw.nrefpoints = 4;
     kw.show = 0;
     kw.verbose = 0;
@@ -300,96 +336,80 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
     Mat raw1 = arrayToMat(img1_in, kw.verbose);
     Mat raw2 = arrayToMat(img2_in, kw.verbose);
-    Mat imgFloat1 = getImgAsGrayFloat (img1_in, kw.verbose);
-    Mat imgFloat2 = getImgAsGrayFloat (img2_in, kw.verbose);
+
+    Mat imgIn1 = getImgAsGrayFloat( img1_in, kw.verbose );
+    Mat imgIn2 = getImgAsGrayFloat( img2_in, kw.verbose );
+    cv::Size imgSize1 = imgIn1.size();
+    cv::Size imgSize2 = imgIn2.size();
+    int maxSize = max( imgIn1.size().height, imgIn1.size().width );
+    maxSize = max( maxSize, imgIn2.size().height );
+    maxSize = max( maxSize, imgIn2.size().width );
     
-    cv::Size imgSize = imgFloat1.size();
-    if( imgSize != imgFloat2.size() ) {
-        cerr << "img_align: input images must be of the same size." << endl;
-        return ret;
-    }
+    cv::Size imgSize(maxSize, maxSize);   // The smallest square that fits both images
+
+    Mat imgFloat1(imgSize, imgIn1.type(), Scalar(0));
+    Mat imgFloat2(imgSize, imgIn2.type(), Scalar(0));
+    imgIn1.copyTo(imgFloat1(cv::Rect_<int>(0, 0, imgIn1.size().width, imgIn1.size().height)));
+    imgIn2.copyTo(imgFloat2(cv::Rect_<int>(0, 0, imgIn2.size().width, imgIn2.size().height)));
 
     cv::SimpleBlobDetector::Params params;
-    params.minThreshold = 50;
+    params.minThreshold = 30;
     params.thresholdStep = 10;
-    params.maxThreshold = 240;
-    params.minDistBetweenBlobs = 10;
+    params.maxThreshold = 255;
+    params.minDistBetweenBlobs = 20;
     params.filterByColor = false;
     params.filterByInertia = false;
     params.filterByConvexity = false;
-    params.filterByArea = false;
-    //params.minArea = 2;
-    //params.maxArea = 150;
+    params.filterByArea = true;
+    params.minArea = 10;
+    params.maxArea = 150;
     
-    kw.threshold = std::min( std::max(kw.threshold, 0.0f), 1.0f );
+    kw.threshold = std::min( std::max(kw.threshold, 0.0f), 1.0f );      // restrict threshold to [0,1]
 
     try {
 
-        Mat result (imgSize, CV_8UC3);
-        Mat imgByte1 (imgSize, CV_8UC1);
-        Mat imgByte2 (imgSize, CV_8UC1);
-        Mat imgMask1 (imgSize, CV_8UC1, Scalar(0));
-        Mat imgMask2 (imgSize, CV_8UC1, Scalar(0));
-//     cv::make_mask( InputArray image, InputOutputArray mask, double thres, int smooth, bool filterLarger, bool invert)
-
+        Mat imgByte1( imgSize, CV_8UC1 );
+        Mat imgByte2( imgSize, CV_8UC1 );
         Mat H, H_init;
 
+#ifdef DEBUG_
+        Mat result( imgSize, CV_8UC3 );
+#endif
 
         if (kw.verbose > 1) {
             cout << "Applying threshold " << kw.threshold << " to input images." << endl;
         }
         params.minThreshold = kw.threshold*255;
-        // apply hard/noise threshold at threshold/4 to make the cross-correlation more distinct.
-        
-        
-        imgFloat1.convertTo(imgMask1, CV_8UC1, 255);
-        imgFloat2.convertTo(imgMask2, CV_8UC1, 255);
-        threshold (imgMask1, imgMask1, params.minThreshold, 255, CV_THRESH_BINARY);
-        threshold (imgMask2, imgMask2, params.minThreshold, 255, CV_THRESH_BINARY);
-        imgMask1 /= 255;
-        imgMask2 /= 255;
-        
-        morphologyEx( imgMask1, imgMask1, MORPH_ERODE,
-                      getStructuringElement( MORPH_RECT, Size( 3, 3 ), Point(2,2) ), Point(2,2), 1, BORDER_REFLECT_101 );
-        morphologyEx( imgMask1, imgMask1, MORPH_DILATE,
-                      getStructuringElement( MORPH_RECT, Size( 9, 9 ), Point(5,5) ), Point(5,5), 1, BORDER_REFLECT_101 ); 
-        morphologyEx( imgMask2, imgMask2, MORPH_ERODE,
-                      getStructuringElement( MORPH_RECT, Size( 3, 3 ), Point(2,2) ), Point(2,2), 1, BORDER_REFLECT_101 );
-        morphologyEx( imgMask2, imgMask2, MORPH_DILATE,
-                      getStructuringElement( MORPH_RECT, Size( 9, 9 ), Point(5,5) ), Point(5,5), 1, BORDER_REFLECT_101 ); 
 
-        
-        //threshold (imgFloat1, imgFloat1, kw.threshold/4, 0, THRESH_TOZERO);
-        //threshold (imgFloat2, imgFloat2, kw.threshold/4, 0, THRESH_TOZERO);
-
-        imgFloat1.convertTo (imgByte1, CV_8UC1, 255);
-        imgFloat2.convertTo (imgByte2, CV_8UC1, 255);
-
-        //cv::make_mask( imgFloat1, imgMask1, kw.threshold, 5, false, false );
-        
+        imgFloat1.convertTo( imgByte1, CV_8UC1, 255 );
+        imgFloat2.convertTo( imgByte2, CV_8UC1, 255 );
 
         SimpleBlobDetector detector (params);
         vector<KeyPoint> keypoints1, keypoints2;
         
-        detector.detect (imgByte1, keypoints1);
-        detector.detect (imgByte2, keypoints2);
-        Point2f last(imgFloat1.cols-kw.margin, imgFloat1.rows-kw.margin);
+        Point2f mid1(imgIn1.cols/2, imgIn1.rows/2);
+        Point2f mid2(imgIn2.cols/2, imgIn2.rows/2);
+
+        detector.detect( imgByte1, keypoints1 );
+        detector.detect( imgByte2, keypoints2 );
+        Point2f imgEnd1(imgIn1.cols-kw.margin, imgIn1.rows-kw.margin);
         keypoints1.erase( std::remove_if(keypoints1.begin(), keypoints1.end(),
-                                         [&kw,&last](const KeyPoint& kp) {
+                                         [&](const KeyPoint& kp) {
                                              if ( std::isfinite( norm(kp.pt) ) ) {
                                                  if( (kp.pt.x > kw.margin) && (kp.pt.y > kw.margin) &&
-                                                     (kp.pt.x < last.x) && (kp.pt.y < last.y)
+                                                     (kp.pt.x < imgEnd1.x) && (kp.pt.y < imgEnd1.y)
                                                  ) return false;
                                              }
                                              return true;
                                         }),
                           keypoints1.end());
         
+        Point2f imgEnd2(imgIn2.cols-kw.margin, imgIn2.rows-kw.margin);
         keypoints2.erase( std::remove_if(keypoints2.begin(), keypoints2.end(),
-                                         [&kw,&last](const KeyPoint& kp) {
+                                         [&kw,&imgEnd2](const KeyPoint& kp) {
                                              if ( std::isfinite( norm(kp.pt) ) ) {
                                                  if( (kp.pt.x > kw.margin) && (kp.pt.y > kw.margin) &&
-                                                     (kp.pt.x < last.x) && (kp.pt.y < last.y)
+                                                     (kp.pt.x < imgEnd2.x) && (kp.pt.y < imgEnd2.y)
                                                  ) return false;
                                              }
                                              return true;
@@ -405,71 +425,62 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             return ret;
         }
         
+        vector<float> nearestNeighbours1;
         for( KeyPoint& kp: keypoints1 ) {   // calculate something roughly proportional to the power of each peak
+            double nearestNeighbour = numeric_limits<float>::max();
+            for( KeyPoint& tmpkp: keypoints1 ) {
+                if( &tmpkp != &kp ) {
+                    nearestNeighbour = min(nearestNeighbour,cv::norm(kp.pt - tmpkp.pt));
+                }
+            }
+            nearestNeighbour = min(nearestNeighbour,cv::norm(kp.pt-mid1));
+            nearestNeighbours1.push_back(nearestNeighbour);
             kp.response = kp.size * imgByte1.at<uchar>( kp.pt );
-            kp.size *= 5;
-            //cout << "kp1 resp : " << kp.response << "   sz : " << kp.size << "   pt : " << kp.pt << endl;
         }
-        
+        std::nth_element( nearestNeighbours1.begin(), nearestNeighbours1.begin() + nearestNeighbours1.size()/2, nearestNeighbours1.end() );
+        float medianNN1 = *( nearestNeighbours1.begin() + nearestNeighbours1.size() / 2 );
+
+        vector<float> nearestNeighbours2;
         for( KeyPoint& kp: keypoints2 ) {
+            double nearestNeighbour = numeric_limits<float>::max();
+            for( KeyPoint& tmpkp: keypoints2 ) {
+                if( &tmpkp != &kp ) {
+                    nearestNeighbour = min(nearestNeighbour,cv::norm(kp.pt - tmpkp.pt));
+                }
+            }
+            nearestNeighbours2.push_back(nearestNeighbour);
             kp.response = kp.size * imgByte2.at<uchar>( kp.pt );
-            kp.size *= 5;
-            //cout << "kp2 resp : " << kp.response << "   sz : " << kp.size << "   pt : " << kp.pt << endl;
         }
+        std::nth_element( nearestNeighbours2.begin(), nearestNeighbours2.begin() + nearestNeighbours2.size()/2, nearestNeighbours2.end() );
+        float medianNN2 = *( nearestNeighbours2.begin() + nearestNeighbours2.size() / 2 );
+
+        float approximateScale = medianNN2/medianNN1;
         
         // sort w.r.t. something proportional to the power of each peak
         std::sort (keypoints1.begin(), keypoints1.end(),
-        [] (const KeyPoint & a, const KeyPoint & b) {
-            return (a.response > b.response);
+            [] (const KeyPoint& a, const KeyPoint& b) {
+                return (a.response > b.response);
         });
         std::sort (keypoints2.begin(), keypoints2.end(),
-        [] (const KeyPoint & a, const KeyPoint & b) {
-            return (a.response > b.response);
+            [] (const KeyPoint& a, const KeyPoint& b) {
+                return (a.response > b.response);
         });
-//         for(size_t i=0; i<std::min<size_t>(keypoints1.size(),5); ++i) {
-//             cout << "sortd kp1 resp : " << keypoints1[i].response << "   sz : " << keypoints1[i].size << "   pt : " << keypoints1[i].pt << endl;
-//         }
-//         for(size_t i=0; i<std::min<size_t>(keypoints2.size(),5); ++i) {
-//             cout << "sortd kp2 resp : " << keypoints2[i].response << "   sz : " << keypoints2[i].size << "   pt : " << keypoints2[i].pt << endl;
-//         }
+        
         vector<KeyPoint> selectedKP1( keypoints1.begin(), keypoints1.end() );
         vector<KeyPoint> selectedKP2( keypoints2.begin(), keypoints2.end() );
-        
-        // only do inital matching with the central pinholes, later we improve the fit using all.
-        Point2f mid (imgFloat1.cols / 2, imgFloat1.rows / 2);
-        selectedKP1.erase( std::remove_if(selectedKP1.begin(), selectedKP1.end(),
-                                         [&kw,&mid](const KeyPoint& kp) {
-                                             if ( norm(kp.pt - mid) < 2*kw.max_shift ) {
-                                                 return false;
-                                             }
-                                             return true;
-                                        }),
-                          selectedKP1.end());
-        selectedKP2.erase( std::remove_if(selectedKP2.begin(), selectedKP2.end(),
-                                         [&kw,&mid](const KeyPoint& kp) {
-                                             if ( norm(kp.pt - mid) < 2*kw.max_shift ) {
-                                                 return false;
-                                             }
-                                             return true;
-                                        }),
-                          selectedKP2.end());
-        
-        // sort again, giving more weight to central pinholes
-        /*auto sortFunc = [mid] (const KeyPoint & a, const KeyPoint & b) {
-            float da = sqrt(norm(a.pt - mid)) + 100;
-            float db = sqrt(norm(b.pt - mid)) + 100;
-            //return (a.size*db > b.size*da);
-            return (a.response > b.response);
-        };
-        std::sort( largestKP1.begin(), largestKP1.end(), sortFunc );
-        std::sort( largestKP2.begin(), largestKP2.end(), sortFunc );*/
+        if( selectedKP1.size() > size_t(kw.nrefpoints) ) selectedKP1.resize(kw.nrefpoints);
+        if( selectedKP2.size() > size_t(2*kw.nrefpoints) ) selectedKP2.resize(2*kw.nrefpoints);
 
+#ifdef DEBUG_
+        if( kw.show > 1 ) {
+            drawKeypoints(imgByte1, selectedKP1, result, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+            imshow( "Good Matches & Object detection 1", result );
+            drawKeypoints(imgByte2, selectedKP2, result, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+            imshow( "Good Matches & Object detection 2", result );
+            waitKey(0); 
+        }
+#endif
 
-      
-        selectedKP1.resize(kw.nrefpoints);
-        selectedKP2.resize(kw.nrefpoints);
-
-      
         std::vector<Mat> initializations;
         if( kw.h_init ) {
             if( kw.h_init->type == IDL_TYP_UNDEF ) {
@@ -477,30 +488,43 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
                 IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_ZERO, &tmp);
                 IDL_VarCopy( tmp, kw.h_init );
             }
-            H_init = arrayToMat(kw.h_init);
-            Mat H_initd;
-            H_init.assignTo(H_initd,CV_64F);
-            if( transformCheck( H_initd, imgSize, kw.max_shift, kw.max_scale ) ) {
-                initializations.push_back( H_init );
+            H_init = arrayToMat( kw.h_init );
+            Mat H_initf;
+            H_init.assignTo(H_initf, CV_32F);
+            if( transformCheck( H_initf, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale ) ) {
+                initializations.push_back( H_initf );
             }
         }
 
         if( initializations.empty() ) {
-            initializations = getInitializations (selectedKP1, selectedKP2, imgSize, kw.max_shift, kw.max_scale);
+            initializations = getInitializations( selectedKP1, selectedKP2, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale);
         }
+
         if ( kw.verbose > 1 && initializations.size() > 1 ) {
             cout << "Matching the " << kw.nrefpoints << " largest keypoints in the images." << endl;
             cout << "Restricting the transformation to have shifts smaller than " << kw.max_shift
-                 << " and a maximal scaling of " << kw.max_scale << " gave " << initializations.size()
+                 << " and a maximal scaling of " << (approximateScale*kw.max_scale) << " gave " << initializations.size()
                  << " valid permutations." << endl;
         }
 
+        
+        // Create mask with the strongest 50% of the pinholes.
+        // This will introduce asymmetry so that the crosscorrelation gives a clearer unique maximum
+        Mat ccMask( imgSize, CV_8UC1, Scalar(0) );
+        for( size_t i=0; i<keypoints2.size()/2; ++i ) {
+            KeyPoint& kp = keypoints2[i];
+            circle( ccMask, kp.pt, 2*kp.size, Scalar(255), -1 );
+        }
+        
+        if ( kw.verbose > 2 ) {
+            Array<uint8_t> slask( ccMask.data, ccMask.rows, ccMask.cols );
+            Ana::write("cc_mask.f0",slask);
+        }
+        
         std::map<double, Mat> results;
-        std::vector<std::future<double>> correlations;
-        std::vector<double> correlations2(initializations.size());
         TermCriteria term_crit = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, kw.niter, kw.eps);
         auto fit_func = std::bind( findTransformECC, std::ref(imgByte1), std::ref(imgByte2), std::placeholders::_1,
-            MOTION_HOMOGRAPHY, term_crit, imgMask2 //noArray()
+            MOTION_HOMOGRAPHY, term_crit, ccMask //noArray()
         );
         
         boost::asio::io_service service;
@@ -533,7 +557,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         }
         H = results.rbegin()->second;
 
-        vector< DMatch > matches = matchNearest (keypoints1, keypoints2, H, kw.max_dist);
+        vector< DMatch > matches = matchNearest( keypoints1, keypoints2, H, medianNN1/3, approximateScale );
 
         if (kw.verbose) {
             if (kw.verbose > 1) {
@@ -545,69 +569,8 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
         }
 
-        if (kw.max_points < 0) kw.max_points = keypoints1.size() * 0.85;   // by default, do refinement by dropping the weakest 15%
+        if( kw.max_points < 0 ) kw.max_points = 25;   // by default, do refinement by using the strongest 25 pinholes
 
-        if (kw.max_points > 3) {     // at least 4 points needed for findHomography
-            //vector< DMatch > refineMatches;
-            if ( size_t(kw.max_points) < keypoints1.size() ) {
-                if (kw.by_distance) {         // sort according to distance from image centre
-                    Point2f mid (imgFloat1.cols / 2, imgFloat1.rows / 2);
-                    std::sort (keypoints1.begin(), keypoints1.end(),
-                    [mid] (const KeyPoint & a, const KeyPoint & b) {
-                        return (norm(a.pt - mid) > norm(b.pt - mid));
-                    });
-                } 
-                keypoints1.resize (kw.max_points);
-                matches = matchNearest (keypoints1, keypoints2, H, kw.max_dist);
-            } //else refineMatches = matches;
-
-            vector<Point2f> obj, scene;
-
-#ifdef DEBUG_
-            if( kw.show > 1 ) {
-                drawKeypoints(imgByte1, keypoints1, result, Scalar(0,0,255) );
-                imshow( "Good Matches & Object detection", result );
-                waitKey(0); 
-            }
-#endif
-
-            if (kw.verbose > 1) {
-                cout << "Using " << matches.size() << " pairs to refine the fit." << endl;
-            }
-            for (auto & m : matches) {
-                obj.push_back (keypoints1[ m.queryIdx ].pt);
-                scene.push_back (keypoints2[ m.trainIdx ].pt);
-            }
-
-            double max1, max2;
-            double metric1 = metric (H, obj, scene, &max1);
-            H = findHomography (obj, scene, CV_LMEDS, 0.5);       //  CV_RANSAC  CV_LMEDS  0
-            double metric2 = metric (H, obj, scene, &max2);
-
-            if (kw.verbose > 1) {
-                cout << "   -> error (avg,max): (" << metric1 << "," << max1 << ") -> (" << metric2 << "," << max2 << ")" << endl;
-            }
-        }
-
-        if (kw.verbose) {
-            cout << "Transformation matrix:\n" << H << endl;
-            cout << "Scaling: " << fabs(determinant (H (cv::Rect_<int> (0, 0, 2, 2)))) << endl;
-            cv::Point2f shift( H.at<double>(0,2), H.at<double>(1,2) );
-            if( H.at<double>(0,0) < 0 ) {
-                shift.x -= imgSize.width;
-            }
-            if( H.at<double>(1,1) < 0 ) {
-                shift.y -= imgSize.height;
-            }
-            cout << "Shift: " << shift << endl;
-         }
-        
-        H.assignTo( retMat, retMat.type() );
-        
-        if( kw.h_init ) {
-            H.assignTo( H_init, H_init.type() );
-        }
-        
         if( kw.points && matches.size()) {
             IDL_VPTR points;
             IDL_MEMINT dims[] = { 2, 2, static_cast<IDL_MEMINT>(matches.size()) };    // x/y, im#, nMatches 
@@ -623,6 +586,71 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
         }
 
+        if( matches.size() > 3 && kw.max_points > 3 ) {     // at least 4 points needed for findHomography
+
+            if( kw.by_size ) {                              // sort by size*intensity
+                std::sort( matches.begin(), matches.end(),
+                    [&] (const DMatch& a, const DMatch& b) {
+                        return (keypoints1[ a.queryIdx ].response*keypoints2[ a.trainIdx ].response >
+                                keypoints1[ b.queryIdx ].response*keypoints2[ b.trainIdx ].response);
+                });
+            } else {                                        // sort according to distance from image centre
+                std::sort( matches.begin(), matches.end(),
+                    [&] (const DMatch& a, const DMatch& b) {
+                        return (norm(keypoints1[ a.queryIdx ].pt - mid1) > norm(keypoints1[ b.queryIdx ].pt - mid1));
+                });
+            }
+
+            if( size_t(kw.max_points) < matches.size() ) matches.resize( kw.max_points );
+        }
+        
+        
+#ifdef DEBUG_
+            if( kw.show > 1 ) {
+                drawKeypoints(imgByte1, keypoints1, result, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+                imshow( "Good Matches & Object detection 1", result );
+                waitKey(0); 
+            }
+#endif
+
+        if( matches.size() > 3 ) {
+            
+            if( kw.verbose > 1 ) {
+                cout << "Using " << matches.size() << " pairs to refine the fit." << endl;
+            }
+
+            vector<Point2f> obj, scene;
+            for (auto & m : matches) {
+                obj.push_back (keypoints1[ m.queryIdx ].pt);
+                scene.push_back (keypoints2[ m.trainIdx ].pt);
+            }
+
+            double max1, max2;
+            double metric1 = metric (H, obj, scene, &max1);
+            H = findHomography( obj, scene, CV_LMEDS );
+            double metric2 = metric (H, obj, scene, &max2);
+         
+            if (kw.verbose > 1) {
+                cout << "   -> error (avg,max): (" << metric1 << "," << max1 << ") -> (" << metric2 << "," << max2 << ")" << endl;
+            }
+        }
+
+        if (kw.verbose) {
+            cout << "Transformation matrix:\n" << H << endl;
+            cout << "Scale: " << sqrt(fabs(determinant (H (cv::Rect_<int> (0, 0, 2, 2))))) << endl;
+            vector<Point2f> refMid(1, Point2f(imgSize1.height/2,imgSize1.width/2));
+            vector<Point2f> mappedRefMid(1);
+            perspectiveTransform( refMid, mappedRefMid, H );
+            double shift = norm( mappedRefMid[0] - Point2f(imgSize2.height/2,imgSize2.width/2) );
+            cout << "Shift: " << shift << " " << (mappedRefMid[0]-Point2f(imgSize2.height/2,imgSize2.width/2)) << endl;
+         }
+        
+        H.assignTo( retMat, retMat.type() );
+        
+        if( kw.h_init ) {
+            H.assignTo( H_init, H_init.type() );
+        }
+        
         return ret;
 
     } catch( const cv::Exception& e ) {
@@ -782,7 +810,7 @@ IDL_VPTR rdx_find_shift(int argc, IDL_VPTR* argv, char* argk) {
     Mat retMat = arrayToMat( ret );
 
     KW_RESULT kw;
-    kw.by_distance = 0;
+    kw.by_size = 0;
     kw.eps = 1E-3;
     kw.help = 0;
     kw.margin = 30;
