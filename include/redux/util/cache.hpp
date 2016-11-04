@@ -189,6 +189,7 @@ namespace redux {
             virtual void cclear(void) {};                                  //!< free whatever memory possible, while being able to restore with "cunpack"
             /************************************/
             
+            void cacheClear(void);
             void cacheRemove(void);
             virtual void cacheTouch(void);
             virtual bool cacheLoad(bool removeAfterLoad=false);

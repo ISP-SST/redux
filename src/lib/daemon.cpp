@@ -481,12 +481,6 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
                     LOG_NOTICE << "Returning unfinished work to queue: " << wip->print() << ende;
                     wip->job->failWork( wip );
                 }
-                for( auto& part: wip->parts ) {
-                    if( part ) {
-                        part->cacheLoad();
-                        part->cacheStore(true);
-                    }
-                }
                 wip->parts.clear();
                 wip->previousJob.reset();
                 peerWIP.erase(wipit);
@@ -839,6 +833,10 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         uint64_t blockSize = 0;
         wip->isRemote = true;
         if( getWork( wip, host->status.nThreads ) ) {
+            auto jlock = wip->job->getLock();
+            for( auto& part: wip->parts ) {
+                part->cacheLoad();
+            }
             blockSize += wip->workSize();
             //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
             LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
@@ -847,13 +845,11 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
         data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
         char* ptr = data.get()+sizeof(uint64_t);
-        if(wip->job) {
-            for(auto& part: wip->parts) {
-                part->cacheLoad();
-            }
+        if( wip->job ) {
+            auto jlock = wip->job->getLock();
             count += wip->packWork( ptr+count );
-            for(auto& part: wip->parts) {
-                part->cacheStore(true);
+            for( auto& part: wip->parts ) {
+                part->cacheClear();
             }
             wip->previousJob = wip->job;
         }

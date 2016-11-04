@@ -71,6 +71,21 @@ CacheItem::~CacheItem() {
 }
 
 
+void CacheItem::cacheClear(void) {
+
+    unique_lock<mutex> lock(itemMutex);
+    try {
+        cclear();
+        isLoaded = false;
+    } catch( exception& e ) {
+        cerr << "CacheItem::cacheClear() failed: " << e.what() << endl;
+    } catch( ... ) {
+        cerr << "CacheItem::cacheClear() failed for unknown reasons." << endl;
+    }
+    
+}
+
+
 void CacheItem::cacheRemove(void) {
 
     unique_lock<mutex> lock(itemMutex);
