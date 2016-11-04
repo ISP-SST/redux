@@ -285,9 +285,9 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
     for( auto& part : wip->parts ) {
         auto tmpPatch = static_pointer_cast<PatchData>( part );
         PatchData::Ptr patch = patches( tmpPatch->index.y, tmpPatch->index.x );
+        patch->copyResults(*tmpPatch);         // copies the returned results without overwriting other variables.
         patch->step = JSTEP_POSTPROCESS;
-        *patch = *tmpPatch;         // copies the returned results without overwriting other variables.
-        part = patch;               // so that the right patch gets stored from wip::returnResults()
+        patch->cacheStore(true);
         ++progWatch;
         info.progress[0]++;
     }
