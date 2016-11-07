@@ -8,6 +8,8 @@ set(EXT_NAME "Fits")
 if(WIN32)
     set(EXT_HINT "${THIRDPARTY_DIR}/vendor/cfitsio/3.360" )
     set( EXT_LIB_SUFFIXES "" "-3" )
+else()
+    set(EXT_HINT "/usr/include/cfitsio/" )
 endif()
 
 set(EXT_HEADER_FILE fitsio.h)
