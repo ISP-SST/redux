@@ -30,9 +30,11 @@ namespace redux {
 
         public:
 
+          StopWatch();
           void start(void);
           void stop(void);
           
+          float getLoad( void );
           float getSeconds( void );
 
           std::string print( void );

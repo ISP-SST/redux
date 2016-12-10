@@ -180,8 +180,7 @@ bool Worker::getWork( void ) {
     wip->job.reset();
     wip->parts.clear();
     
-    myInfo.status.state = Host::ST_IDLE;
-    myInfo.status.statusString = "idle";
+    myInfo.idle();
     return false;
 
 }

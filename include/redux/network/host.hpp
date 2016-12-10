@@ -50,7 +50,7 @@ namespace redux {
                 uint64_t currentJob;
                 uint16_t nThreads, maxThreads;
                 State state;
-                float loadAvg;
+                float load[2];
                 float progress;
                 std::string statusString;
                 boost::posix_time::ptime lastSeen;
@@ -69,6 +69,7 @@ namespace redux {
             uint64_t unpack( const char*, bool );
             
             void touch(void);
+            void idle(void);
             void active(void);
             
             static Host& myInfo(void);

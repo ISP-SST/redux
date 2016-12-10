@@ -49,12 +49,12 @@ Host::HostInfo::HostInfo( void ) : peerType(0), connectPort(0) {
 
 
 Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
-    loadAvg( 0 ), progress( 0 ), statusString("idle") {
+    progress( 0 ), statusString("idle") {
         
     lastSeen = boost::posix_time::second_clock::local_time(); 
     lastActive = boost::posix_time::second_clock::local_time();
     nThreads = maxThreads;
-    
+    load[0] = load[1] = 0;
 }
 
 Host::Host() : id(0), nConnections(0) {
@@ -108,6 +108,15 @@ void Host::active(void) {
 }
 
 
+void Host::idle(void) {
+
+    status.lastActive = boost::posix_time::ptime(boost::posix_time::not_a_date_time);
+    status.state = ST_IDLE;
+    status.statusString = "idle";
+
+}
+
+
 Host& Host::myInfo(void) {
 
     static Host singleton;
@@ -118,7 +127,7 @@ Host& Host::myInfo(void) {
 
 std::string Host::printHeader(void) {
     string hdr = alignRight("ID",5) + alignCenter("NAME",25) + alignCenter("PID",7) + alignCenter("THREADS",9);
-    hdr += alignLeft("VERSION",9) + alignCenter("loadavg",9) + alignCenter("Uptime",12) + alignCenter("Runtime",12) + "STATUS";
+    hdr += alignLeft("VERSION",9) + alignLeft("Usage/Load",12) + alignCenter("Uptime",12) + alignCenter("Runtime",12) + "STATUS";
     return hdr;
 }
 
@@ -126,11 +135,13 @@ std::string Host::print(void) {
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
     boost::posix_time::time_duration elapsed = (now - status.lastActive);
     boost::posix_time::time_duration uptime = (now - info.startedAt);
+    string elapsedString = "";
+    if( ! elapsed.is_not_a_date_time() ) elapsedString = to_simple_string(elapsed);
     string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
     ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),9);
     ret += alignCenter(getVersionString(info.reduxVersion),9);
-    ret += alignCenter(boost::str(boost::format("%.2f") % status.loadAvg),9);
-    ret += alignCenter(to_simple_string(uptime),12) + alignCenter(to_simple_string(elapsed),12);
+    ret += alignLeft(boost::str(boost::format("%.2f/%.2f") % status.load[0] % status.load[1]),12);
+    ret += alignCenter(to_simple_string(uptime),12) + alignCenter(elapsedString,12);
     ret += status.statusString; 
     return ret;
 }
@@ -225,7 +236,7 @@ bool Host::HostInfo::operator==(const HostInfo& rhs) const {
 
 uint64_t Host::HostStatus::size(void) const {
     uint64_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads);
-    sz += sizeof(state) + sizeof(loadAvg) + sizeof(progress) + 2*sizeof(time_t);
+    sz += sizeof(state) + sizeof(load) + sizeof(progress) + 2*sizeof(time_t);
     sz += statusString.length() + 1;
     return sz;
 }
@@ -239,11 +250,15 @@ uint64_t Host::HostStatus::pack( char* ptr ) const {
     count += pack(ptr+count,maxThreads);
     count += pack(ptr+count,state);
     count += pack(ptr+count,currentJob);
-    count += pack(ptr+count,loadAvg);
+    count += pack(ptr+count,load,2);
     count += pack(ptr+count,progress);
     count += pack(ptr+count,statusString);
-    count += pack(ptr+count,redux::util::to_time_t( lastSeen ));
-    count += pack(ptr+count,redux::util::to_time_t( lastActive ));
+    time_t tmpT(0);
+    if( !lastSeen.is_not_a_date_time() ) tmpT = redux::util::to_time_t( lastSeen );
+    count += pack(ptr+count, tmpT);
+    tmpT = 0;
+    if( !lastActive.is_not_a_date_time() ) tmpT = redux::util::to_time_t( lastActive );
+    count += pack(ptr+count, tmpT);
     
     return count;
     
@@ -254,18 +269,21 @@ uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
     
     using redux::util::unpack;
     
+    lastSeen = boost::posix_time::ptime( boost::posix_time::not_a_date_time );
+    lastActive = boost::posix_time::ptime( boost::posix_time::not_a_date_time );
+    
     uint64_t count = unpack(ptr,nThreads, swap_endian);
     count += unpack(ptr+count,maxThreads, swap_endian);
     count += unpack(ptr+count,state, swap_endian);
     count += unpack(ptr+count,currentJob, swap_endian);
-    count += unpack(ptr+count,loadAvg, swap_endian);
+    count += unpack(ptr+count,load, 2, swap_endian);
     count += unpack(ptr+count,progress, swap_endian);
     count += unpack(ptr+count,statusString, swap_endian);
     time_t timestamp;
     count += unpack(ptr+count,timestamp,swap_endian);
-    lastSeen = boost::posix_time::from_time_t( timestamp );
+    if( timestamp ) lastSeen = boost::posix_time::from_time_t( timestamp );
     count += unpack(ptr+count,timestamp,swap_endian);
-    lastActive = boost::posix_time::from_time_t( timestamp );
+    if( timestamp ) lastActive = boost::posix_time::from_time_t( timestamp );
     
     return count;
     

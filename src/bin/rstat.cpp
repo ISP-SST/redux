@@ -30,6 +30,7 @@ namespace {
         ( "slaves,s", bpo::value<int>()->implicit_value( 0 ), "Get slavelist" )
         ( "count,c", bpo::value<int>()->implicit_value( 0 ), "List only n first slaves/jobs, and the last." )
         ( "time,t", bpo::value<int>()->implicit_value( 1 ), "Loop and display list every (n) seconds" )
+        ( "runtime,r", bpo::value<int>()->implicit_value( 1 ), "Sort slaves according to runtime." )
         ;
 
         return options;
@@ -119,7 +120,19 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
 
 }
 
-void printPeerList( TcpConnection::Ptr conn, int ns ) {
+
+namespace {
+    
+    enum{ by_name=1, by_runtime };
+    
+    bool host_by_runtime( const Host::Ptr& a, const Host::Ptr& b ){
+        return (a->status.lastActive < b->status.lastActive);
+    }
+    
+}
+
+
+void printPeerList( TcpConnection::Ptr conn, int ns, int sorting ) {
 
     uint8_t cmd = CMD_PSTAT;
     boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
@@ -132,16 +145,30 @@ void printPeerList( TcpConnection::Ptr conn, int ns ) {
     const char* ptr = buf.get();
     uint64_t count(0);
     try {
-        Host peer;
-        cout << "    " << peer.printHeader() << endl;
-        int hostCount(0);
+        vector<Host::Ptr> hosts;
+        cout << "    " << Host::printHeader() << endl;
         while( count < blockSize ) {
-            count += peer.unpack(ptr+count,conn->getSwapEndian());
-            if ( hostCount == 0 ) cout << "    " << peer.print() << endl;
-            else if ( ns==0 || hostCount < ns) cout << alignRight(to_string(hostCount),4) << peer.print() << endl;
-            hostCount++;
+            Host::Ptr peer(new Host);
+            count += peer->unpack( ptr+count, conn->getSwapEndian() );
+            hosts.push_back(peer);
         }
-        if (ns!=0 && hostCount > ns) cout << "   :" << endl << alignRight(to_string(hostCount),4) << peer.print() << endl;
+        if( sorting == by_runtime ) std::sort( hosts.begin()+1, hosts.end(), host_by_runtime );
+        int nHosts = hosts.size();
+        bool addComma(false);
+        if ( ns != 0 ) {
+            if ( ns < nHosts ) addComma = true;
+            nHosts = min(ns,nHosts);
+        }
+        for( int i=0; i<nHosts; ++i ) {
+            if ( i == 0 ) {
+                cout << "    ";
+            } else if( i == nHosts-1 ) {
+                i = hosts.size()-1;
+                if( addComma ) cout << "   :" << endl;
+            }
+            if ( i ) cout << alignRight(to_string(i),4);
+            cout << hosts[i]->print() << endl;
+        }
     } catch ( const exception& e) {
         cerr << "printPeerList: Exception caught while parsing block: " << e.what() << endl;
     }
@@ -171,6 +198,7 @@ int main( int argc, char *argv[] ) {
     }
 
     bool loop = vm.count( "time" );
+    int sorting = by_name;
     try {
         boost::asio::io_service ioservice;
         auto conn = TcpConnection::newPtr( ioservice );
@@ -204,13 +232,14 @@ int main( int argc, char *argv[] ) {
             if( hasFlags != 1 ) cout << endl;   // separator
             
             int maxSlaves = maxItems;
+            if( vm.count( "runtime" ) ) sorting = by_runtime;
             if( vm.count( "slaves" ) ) maxSlaves = vm["slaves"].as<int>();
-            if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves );
+            if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves, sorting );
             while( loop ) {
                 sleep(vm["time"].as<int>());
                 if( vm.count( "jobs" ) || !hasFlags ) printJobList( conn, maxJobs );
                 if( hasFlags != 1 ) cout << endl;
-                if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves );
+                if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves, sorting );
             }
         }
     }

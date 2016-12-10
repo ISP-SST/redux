@@ -37,7 +37,7 @@ void HostItem::reset(Host::Ptr h) {
     itemData << to_string(host->info.pid).c_str();
     tmp = to_string(host->status.nThreads) + string("/") + to_string(host->info.nCores);       // + string( "/" )
     itemData << tmp.c_str();
-    itemData << boost::str(boost::format("%3.1f%%") % host->status.loadAvg).c_str();     //to_string( host->status.loadAvg ).c_str();
+    itemData << boost::str(boost::format("%3.1f%%") % host->status.load[0]).c_str();     //to_string( host->status.loadAvg ).c_str();
     time_duration elapsed = (second_clock::local_time() - host->info.startedAt);
     itemData << to_simple_string(elapsed).c_str();//to_iso_extended_string( host->info.startedAt ).c_str(); //tsToString( tsSubtract( ts, ( *rootObject )[i]->startTime ) ).c_str();
     //elapsed = (second_clock::local_time() - host->status.lastSeen);

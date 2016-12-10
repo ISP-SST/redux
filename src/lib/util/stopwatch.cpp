@@ -5,6 +5,12 @@
 using namespace redux::util;
 using namespace std;
 
+StopWatch::StopWatch() {
+    
+    start();
+
+}
+
 
 void StopWatch::analyze(void) {
 
@@ -135,6 +141,14 @@ void StopWatch::stop() {
     getrusage( RUSAGE_SELF, &endR );
     analyze();
     
+}
+
+
+float StopWatch::getLoad( void ) {
+    
+    stop();
+    return (lapsedTot/lapsedT);
+   
 }
 
 

@@ -6,6 +6,7 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
+#include "redux/util/stopwatch.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/translators.hpp"
 #include "redux/image/cachedfile.hpp"
@@ -821,8 +822,11 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             blockSize += wip->workSize();
             //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
             LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
-            host->status.state = Host::ST_ACTIVE;
-        } else wip->previousJob.reset();
+            host->active();
+        } else {
+            wip->previousJob.reset();
+            host->idle();
+        }
         data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
         char* ptr = data.get()+sizeof(uint64_t);
         if( wip->job ) {
@@ -1050,17 +1054,20 @@ void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
 
 
 void Daemon::updateLoadAvg( void ) {
-    //LOG_TRACE << "updateLoadAvg()" << ende;
 
     static double loadAvg[3];
+    static StopWatch sw;
 
     int ret = getloadavg( loadAvg, 3 );
     if( ret != 3 ) {
         LOG_ERR << "updateLoadAvg(): failed to get loadavg." << ende;
-        myInfo.status.loadAvg = 0;
+        myInfo.status.load[1] = 0;
         return;
     }
 
-    myInfo.status.loadAvg = loadAvg[0]; // / myInfo.info.nCores * 100.0;
-    //LOG_TRACE << "updateLoadAvg()  = " << myInfo.status.loadAvg << ende;
+    myInfo.status.load[0] = sw.getLoad();       // cpu usage of this instance
+    myInfo.status.load[1] = loadAvg[0];         // system-wide cpu usage 
+
+    sw.start();         // reset stopwatch so we measure usage of the last 5s only.
+
 }
