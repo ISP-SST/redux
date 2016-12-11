@@ -705,12 +705,11 @@ gradientMethod = gradientMethods[GM_VOGEL];
 //if( false ) {
             alphaPtr = alpha;
             sc.reset();
-            job.progWatch.clear();
+            job.progWatch.set( job.nImages() );
             for( const auto& o: job.objects ) {
                 o->progWatch.clear();
 //        cout << "                                                  Solver: " << __LINE__ << " Obj: " << o->ID << endl;
                 o->imgShifted = 0;
-                job.progWatch.increaseTarget( o->nImages() );
                 o->progWatch.set( o->nImages() );
                 o->progWatch.setHandler( std::bind( &Object::reInitialize, o.get(), std::ref(service)) );
 //                 o->progWatch.setHandler([&](){
