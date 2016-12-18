@@ -500,8 +500,13 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         }
     }
     //service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
-    
-//cout << "MomfbdJob::preProcess(): About to load "  << nTotalImages << " images." << endl;
+    if( nTotalChannels ) {
+        const vector<int16_t>& clip = objects[0]->channels[0]->alignClip;
+        if( clip.size() == 4 ) {
+            roi = Region16(clip[2],clip[0],clip[3],clip[1]);
+        }
+    }
+
     progWatch.setTarget( nTotalImages );
     progWatch.setHandler( std::bind( &MomfbdJob::unloadData, this, std::ref(service)) );
 

@@ -9,6 +9,7 @@
 #include "redux/job.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/progresswatch.hpp"
+#include "redux/util/region.hpp"
 
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
@@ -112,6 +113,7 @@ namespace redux {
             std::vector<std::shared_ptr<Object>> objects;
 
             redux::util::Array<PatchData::Ptr> patches;
+            redux::util::Region16 roi;            // patch locations etc. are specified relative to the reference align-clip, this variable stores that region.
             
             GlobalData::Ptr globalData;
             Solver::Ptr solver;

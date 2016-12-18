@@ -57,7 +57,7 @@ namespace redux {
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&) const;
             uint32_t nImages(void);
-            void adjustCutout(ChannelData&, const redux::util::Region16&) const;
+            void adjustCutout(ChannelData&, const PatchData::Ptr&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
             
             /*************   Processing on slave   ***************/

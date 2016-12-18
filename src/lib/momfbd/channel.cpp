@@ -455,7 +455,6 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
 
             }
             dark = tmp.copy();
-            if( alignClip.size() ) clipImage( dark, alignClip );
             if (nDarkFrames) dark *= 1.0/nDarkFrames;
             ++progWatch;
         });
@@ -466,7 +465,6 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         progWatch.increaseTarget( 1 );
         service.post([this](){
             CachedFile::load<float>( gain, gainFile );
-            if( alignClip.size() ) clipImage( gain, alignClip );
             mask.reset( new uint8_t[imgSize.y*imgSize.x] );
             make_mask( gain.get(), mask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
             ++progWatch;
@@ -478,7 +476,6 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         progWatch.increaseTarget( 1 );
         service.post([this](){
             CachedFile::load<float>( ccdResponse, responseFile );
-            if( alignClip.size() ) clipImage( ccdResponse, alignClip, true );
             ++progWatch;
         });
     }
@@ -487,7 +484,6 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         progWatch.increaseTarget( 1 );
         service.post([this](){
             CachedFile::load<float>( ccdScattering, backgainFile );
-            if( alignClip.size() ) clipImage( ccdScattering, alignClip );
             ++progWatch;
         });
     }
@@ -496,7 +492,6 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         progWatch.increaseTarget( 1 );
         service.post([this](){
             CachedFile::load<float>( psf, psfFile );
-            if( alignClip.size() ) clipImage( psf, alignClip, true );
             ++progWatch;
         });
     }
@@ -505,7 +500,6 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         progWatch.increaseTarget( 1 );
         service.post([this](){
             CachedFile::load<float>( modulationMatrix, mmFile );
-            if( alignClip.size() ) clipImage( modulationMatrix, alignClip );
             ++progWatch;
         });
     }
@@ -516,7 +510,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
             CachedFile::load<int16_t>( xOffset, xOffsetFile );
             if( alignClip.size() == 4 ) {
                 Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
-                if(false) if( clipSize.x != xOffset.dimSize(1) ||
+                if( clipSize.x != xOffset.dimSize(1) ||
                     clipSize.y != xOffset.dimSize(0) ) {
                     LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip." << ende;
                     xOffset.clear();
@@ -534,7 +528,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
             CachedFile::load<int16_t>( yOffset, yOffsetFile );
             if( alignClip.size() == 4 ) {
                 Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
-                if(false) if( clipSize.x != yOffset.dimSize(1) ||
+                if( clipSize.x != yOffset.dimSize(1) ||
                     clipSize.y != yOffset.dimSize(0) ) {
                     LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip." << ende;
                     yOffset.clear();
@@ -578,7 +572,7 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
             for( unsigned int x=0; x<patches.dimSize(1); ++x ) {
                 service.post( [this,&patches,y,x](){
                     auto chData = patches(y,x)->objects[myObject.ID]->channels[ID];
-                    adjustCutout( *chData, patches(y,x)->roi );
+                    adjustCutout( *chData, patches(y,x) );
                     ++myJob.progWatch;
                 } );
             }
@@ -885,7 +879,6 @@ void Channel::loadFile( size_t fileIndex, size_t offset ) {
         string imStr = to_string(fileIndex);
         Image<float> tmpImg;
         CachedFile::load( tmpImg, fn.string() );
-        if( alignClip.size() ) clipImage( tmpImg, alignClip );
         size_t nF = nFrames[fileIndex];
         Image<float> view( images, offset, offset+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
         if( nF > 1 ) {
@@ -1034,7 +1027,22 @@ void Channel::preprocessImage( size_t i ) {
 void Channel::copyImagesToPatch(ChannelData& chData) {
 
     Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
-    chData.images = std::move(block);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
+    Array<float> tmp = block.copy(true);
+    bool flipX = (alignClip.size() == 4) && (alignClip[0] > alignClip[1]);
+    bool flipY = (alignClip.size() == 4) && (alignClip[2] > alignClip[3]);
+    if( flipX || flipY ) {
+        size_t sy = chData.cutout.last.y - chData.cutout.first.y + 1;
+        size_t sx = chData.cutout.last.x - chData.cutout.first.x + 1;
+        cout << "cpImgData " << myObject.ID << ":  flipX = " << flipX << "  flipY = " << flipY << "  sy = " << sy << "  sx = " << sx << endl;
+        std::shared_ptr<float*> arrayPtr = tmp.reshape(nTotalFrames*sy, sx);
+        float** imgPtr = arrayPtr.get();
+        for( size_t i=0; i<nTotalFrames; ++i) {
+            if( flipX ) redux::util::reverseX(imgPtr, sy, sx);
+            if( flipY ) redux::util::reverseY(imgPtr, sy, sx);
+            imgPtr += sy;
+        }
+    }
+    chData.images = std::move(tmp);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
     chData.setLoaded();
     
 }
@@ -1051,50 +1059,88 @@ uint32_t Channel::nImages(void) {
 }
 
 
-void Channel::adjustCutout( ChannelData& chData, const Region16& origCutout ) const {
+void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) const {
 
-    RegionI desiredCutout = origCutout;
-    desiredCutout.grow( myObject.maxLocalShift );
-
-    chData.cutout = desiredCutout;
-    chData.offset = 0;
-    chData.residualOffset = 0;
+    Point16 refPos = patch->position;       // position in clipped reference-channel coordinates
     
-//cout << "Adjusting patch:" << printArray(xOffset.dimensions(),"  xdims") << endl;
+    PointF localPos;                        // position in this channel in non-clipped coordinates
+    uint16_t halfPatch = myObject.patchSize/2;
+    RegionI desiredCutout( myObject.patchSize-1, myObject.patchSize-1 );                    // local cut-out
+    desiredCutout -= PointI( halfPatch, halfPatch );                                        // ...now centered on 0,0
+
+    chData.residualOffset = 0;
+    chData.offset = myObject.maxLocalShift;
+    
+    if( alignMap.size() == 9 ) {
+        refPos += myJob.roi.first;          // position in reference-channel, global coordinates
+        ProjectiveMap map( alignMap );
+        localPos = map*patch->position;
+    } else {                                // old style alignment with clips & offsetfiles
+        localPos = refPos;
+        if( xOffset.valid() ) {
+            float shift = xOffset(refPos.y, refPos.x)/100.0;
+            chData.residualOffset.x = shift;
+            localPos.x += shift;
+        }
+        if( yOffset.valid() ) {
+            float shift = yOffset(refPos.y, refPos.x)/100.0;
+            chData.residualOffset.y = shift;
+            localPos.y += shift;
+        }
+        if( alignClip.size() == 4 ) {
+            if( alignClip[0] > alignClip[1] ) {
+                localPos.x = alignClip[0] - localPos.x - 1;
+            } else {
+                localPos.x += alignClip[0] - 1;
+            }
+            if( alignClip[2] > alignClip[3] ) {
+                localPos.y = alignClip[2] - localPos.y - 1;
+            } else {
+                localPos.y += alignClip[2] - 1;
+            }
+        }
+    }
+    
     if( imgSize == 0 ) {
         LOG_ERR << "No valid imgSize when adjusting cutout, that should not happen..." << ende;
         return;
     }
     
-    RegionI imgBoundary(0,0,imgSize.y-1, imgSize.x-1);
-    chData.cutout.restrict(imgBoundary);
-
-    if( xOffset.valid() ) {
-        ArrayStats stats;
-        stats.getStats( Image<int16_t>(xOffset, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x), ST_VALUES);
-        chData.residualOffset.x = stats.mean/100.0;
-//        cout << "hasXoff: mean = " << chData.residualOffset.x << endl;
-    }
-    if( yOffset.valid() ) {
-        ArrayStats stats;
-        stats.getStats( Image<int16_t>(yOffset, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x), ST_VALUES);
-        chData.residualOffset.y = stats.mean/100.0;
-//        cout << "hasYoff: mean = " << chData.residualOffset.y << endl;
-    }
-
-    chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
-    chData.channelOffset -= imgBoundary.outside( chData.cutout+chData.channelOffset );                          // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
-    chData.cutout += chData.channelOffset;
-    chData.residualOffset -= chData.channelOffset;
-    chData.offset = myObject.maxLocalShift;
-    if( chData.cutout != desiredCutout ) {
-        chData.offset -= (chData.cutout.first - desiredCutout.first - chData.channelOffset);
-    }
-
-  //cout << "adjustCutout: desired=" << desiredCutout << "  cutout=" << chData.cutout
-  //     << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
-  //     << "   res=" << chData.residualOffset << endl;
+    PointI finalPos = localPos;
+    desiredCutout += finalPos;                                                  // ...now centered on localPos, this is the cutout we want
+    RegionI imgBoundary(0,0,imgSize.y-1, imgSize.x-1);                          // restrict to lie inside image
     
+    RegionI tmpCutout = desiredCutout;
+    tmpCutout.restrict(imgBoundary);
+    bool alreadyWarned(false);
+    if( tmpCutout != desiredCutout ) {
+        LOG_WARN << "Patch " << patch->index << " does not lie completely within image in channel " << myObject.ID
+        << ":" << ID << ": region: " << desiredCutout << "  This will likely cause severe artifacts!!!" << ende;
+        alreadyWarned = true;
+        chData.offset -= (tmpCutout.first - desiredCutout.first);
+        finalPos += (tmpCutout.first - desiredCutout.first);
+    }
+    
+    chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
+    chData.channelOffset -= imgBoundary.outside( tmpCutout+chData.channelOffset );                      // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
+    tmpCutout += chData.channelOffset;
+    chData.residualOffset = localPos - finalPos;
+    
+    tmpCutout.grow( myObject.maxLocalShift );                               // add maxLocalshift
+    desiredCutout = tmpCutout;
+    tmpCutout.restrict(imgBoundary);
+    if( tmpCutout != desiredCutout ) {
+        if( !alreadyWarned )
+            LOG_DETAIL << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
+            myObject.ID << ":" << ID << ": region: " << desiredCutout << "  tmpCO = " << tmpCutout << ende;
+        chData.offset -= (tmpCutout.first - desiredCutout.first);
+    }
+    
+    chData.cutout = tmpCutout;
+    
+//   cout << "adjustCutout: loc=" << refPos << "  desired=" << desiredCutout << "  cutout=" << chData.cutout
+//        << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
+//        << "   res=" << chData.residualOffset << "   imgSize=" << imgSize << endl;
 }
 
 
@@ -1105,9 +1151,9 @@ void Channel::adjustCutouts( Array<PatchData::Ptr>& patches ) {
         size_t nPatchesX = patches.dimSize(1);
         for( unsigned int py=0; py<nPatchesY; ++py ) {
             for( unsigned int px=0; px<nPatchesX; ++px ) {
-                PatchData& patch( *patches(py,px) );
-                auto chData = patch.objects[myObject.ID]->channels[ID];
-                adjustCutout( *chData, patch.roi );
+                PatchData::Ptr& patch( patches(py,px) );
+                auto chData = patch->objects[myObject.ID]->channels[ID];
+                adjustCutout( *chData, patch );
             }
         }
     }
@@ -1118,9 +1164,9 @@ void Channel::adjustCutouts( Array<PatchData::Ptr>& patches ) {
 Point16 Channel::getImageSize(void) {
 
     if( imgSize == 0 ) {
-        if( alignClip.size() == 4 ) {   // we have align-clip, but no mapping => reference channel.
-            imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
-        } else {                        //  No align-map or align-clip, get full image size.
+//         if( alignClip.size() == 4 ) {   // we have align-clip, but no mapping => reference channel.
+//             imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
+//         } else {                        //  No align-map or align-clip, get full image size.
             bfs::path fn;
             if( nImages() ) {
                 fn = bfs::path(imageDataDir) / bfs::path(boost::str(boost::format (imageTemplate) % fileNumbers[0]));
@@ -1137,7 +1183,7 @@ Point16 Channel::getImageSize(void) {
             } else if( nDims == 2 ) {
                 imgSize = Point16( tmp.meta->dimSize(0), tmp.meta->dimSize(1) );
             } else LOG_ERR << "Image " << fn << " is not 2D or 3D." << ende;
-        }
+//        }
     }
 
     return imgSize;
