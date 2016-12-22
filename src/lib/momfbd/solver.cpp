@@ -721,23 +721,28 @@ gradientMethod = gradientMethods[GM_VOGEL];
 
 #ifdef RDX_DUMP_PATCHDATA
     dump( "patch_"+(string)data->index );
+    data->dump( "final" );      // will dump images
 #endif
-    
     alphaPtr = alpha;
     for( auto& objData: data->objects ) {
         if(!objData) continue;
-        objData->myObject->getResults(*objData,alphaPtr);
-        alphaPtr += objData->myObject->nObjectImages*nModes;
-        objData->setLoaded( objData->size()>6*sizeof(uint64_t) );
         for( auto& cd: objData->channels ) {
             cd->images.clear();         // don't need input data anymore.
         }
+        objData->myObject->getResults(*objData,alphaPtr);
+        alphaPtr += objData->myObject->nObjectImages*nModes;
+        objData->setLoaded( objData->size()>6*sizeof(uint64_t) );
 #ifdef RDX_DUMP_PATCHDATA
         Ana::write( "patch_"+(string)data->index+"_obj_"+to_string(objData->myObject->ID)+"_result.f0", objData->img );
 #endif
     }
     
     data->finalMetric = thisMetric;
+    
+#ifdef RDX_DUMP_PATCHDATA
+    data->dump( "final" );
+#endif
+    
 
     gsl_multimin_fdfminimizer_free( s );
     gsl_vector_free(beta_init);
