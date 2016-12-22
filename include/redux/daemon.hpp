@@ -40,8 +40,10 @@ namespace redux {
         network::TcpConnection::Ptr getMaster(void);
         void unlockMaster(void);
         
-        void connected(network::TcpConnection::Ptr);
-        void activity( network::TcpConnection::Ptr );
+        void connected( network::TcpConnection::Ptr );
+        void handler( network::TcpConnection::Ptr );
+        void processCommand( network::TcpConnection::Ptr, uint8_t, bool urgent=false);
+        
         void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
         void removeConnection(network::TcpConnection::Ptr);
         void cleanup(void);

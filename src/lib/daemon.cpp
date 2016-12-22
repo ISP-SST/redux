@@ -336,7 +336,7 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
 //        LOG_DEBUG << "connected()  Handshake successful." << ende;
         addConnection( remote_info, conn );
 
-        conn->setCallback( bind( &Daemon::activity, this, std::placeholders::_1 ) );
+        conn->setCallback( bind( &Daemon::handler, this, std::placeholders::_1 ) );
         conn->setErrorCallback( bind( &Daemon::removeConnection, this, std::placeholders::_1 ) );
         *conn << CMD_OK;           // all ok
         conn->idle();
@@ -350,24 +350,30 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
     conn->socket().close();
 }
 
-
-void Daemon::activity( TcpConnection::Ptr conn ) {
-
+void Daemon::handler( TcpConnection::Ptr conn ) {
     
     Command cmd = CMD_ERR;
     try {
         *conn >> cmd;
+        connections[conn]->touch();
     }
     catch( const boost::exception& ) {      // disconnected -> close socket and return.
         removeConnection(conn);
         return;
     }
 
+    processCommand( conn, cmd );
+    
     //LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")" << ende;
+    conn->idle();
+    
+}
+
+
+
+void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent ) {
 
     try {
-        
-        connections[conn]->touch();
 
         switch( cmd ) {
             case CMD_DIE: die(conn); break;
@@ -381,21 +387,19 @@ void Daemon::activity( TcpConnection::Ptr conn ) {
             case CMD_PSTAT: sendPeerList(conn); break;
             case CMD_LOG_CONNECT: addToLog(conn); break;
             case CMD_DISCONNECT: removeConnection(conn); break;
-            default: LOG_DEBUG << "Daemon: Unrecognized command: " << ( int )cmd << "  " << bitString( cmd ) << ende;
+            default: LOG_DEBUG << "processCommand: not implemented: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
                 removeConnection(conn);
                 return;
         }
 
     }
     catch( const exception& e ) {
-        LOG_DEBUG << "activity(): Exception when parsing incoming command: " << e.what() << ende;
+        LOG_DEBUG << "processCommand(): Exception when parsing incoming command: " << e.what() << ende;
         removeConnection(conn);
         return;
     }
 
-    conn->idle();
     logger.flushBuffer();
-    
 
 }
 
