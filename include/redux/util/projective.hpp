@@ -29,12 +29,40 @@ namespace redux {
 
             ProjectivePoints( size_t nPoints=1 );
             ProjectivePoints( double x, double y, size_t nPoints=1 );
-            ProjectivePoints( const PointD&, size_t nPoints=1 );
-            ProjectivePoints( const std::vector<PointD>& );
+            template <typename T> ProjectivePoints( const PointType<T>& pt, size_t nPoints=1 ) : matrix<double>(3, nPoints) {
+                for (size_t i=0; i<nPoints; ++ i) {
+                    (*this)( 0, i ) = pt.x;
+                    (*this)( 1, i ) = pt.y;
+                    (*this)( 2, i ) = 1;
+                }
+            }
+            template <typename T> ProjectivePoints( const std::vector<PointType<T>>& pts ) : matrix<double>(3,1) {
+                size_t nPoints = pts.size();
+                if(nPoints) {
+                    resize( nPoints );
+                    for( size_t i=0; i<nPoints; ++i ) {
+                        (*this)( 0, i ) = pts[i].x;
+                        (*this)( 1, i ) = pts[i].y;
+                        (*this)( 2, i ) = 1;
+                    }
+                }
+            }
             
             void restrict(double minValue=0, double maxValue=1024);
             
-            operator std::vector<PointD>();
+            template <typename T> operator std::vector<PointType<T>>() {
+                std::vector<PointType<T>> ret;
+                size_t nPoints = size2();
+                for( size_t i=0; i<nPoints; ++i ) {
+                    ret.push_back(PointType<T>((*this)( 1, i ),(*this)( 0, i )));
+                }
+                return std::move(ret);
+            }
+
+            template <typename T> operator PointType<T>() {
+                return PointType<T>((*this)( 1, 0 ),(*this)( 0, 0 ));
+            }
+
             
             void resize(size_t);
 
@@ -52,6 +80,10 @@ namespace redux {
         public:
             ProjectiveMap(void);
             ProjectiveMap(const bnu::matrix<double>&);
+            template <typename T> ProjectiveMap( const std::vector<T>& in ) : matrix<double>(bnu::identity_matrix<double>(3)) {
+                size_t n = std::min<size_t>( in.size(), 9 );
+                std::copy( in.begin(), in.begin()+n, data().begin() );
+            }
             virtual ~ProjectiveMap(void);
 
             virtual ProjectiveMap inverse(void);
@@ -64,7 +96,16 @@ namespace redux {
             
             ProjectiveMap operator*(const ProjectiveMap& rhs) const;
             ProjectivePoints operator*(const ProjectivePoints& rhs) const;
-            std::vector<PointD> operator*(const std::vector<PointD>& rhs) const;
+            template <typename T> PointD operator*( const PointType<T>& rhs ) const {
+                ProjectivePoints tmp(rhs);
+                tmp = *this * tmp;
+                return tmp;
+            }
+            template <typename T> std::vector<PointD> operator*( const std::vector<PointType<T>>& rhs ) const {
+                ProjectivePoints tmp(rhs);
+                tmp = *this * tmp;
+                return tmp;
+            }
 
 
         private:

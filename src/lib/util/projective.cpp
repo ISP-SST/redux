@@ -33,30 +33,6 @@ ProjectivePoints::ProjectivePoints(double x, double y, size_t nPoints)
 }
 
 
-ProjectivePoints::ProjectivePoints( const PointD& pt, size_t nPoints )
-    : matrix<double>(3, nPoints) {
-    for (size_t i=0; i<nPoints; ++ i) {
-        (*this)( 0, i ) = pt.x;
-        (*this)( 1, i ) = pt.y;
-        (*this)( 2, i ) = 1;
-    }
-}
-
-
-ProjectivePoints::ProjectivePoints( const std::vector<PointD>& pts )
-    : matrix<double>(3,1) {
-        size_t nPoints = pts.size();
-        if(nPoints) {
-            resize( nPoints );
-            for( size_t i=0; i<nPoints; ++i ) {
-                (*this)( 0, i ) = pts[i].x;
-                (*this)( 1, i ) = pts[i].y;
-                (*this)( 2, i ) = 1;
-            }
-        }
-}
-
-
 void ProjectivePoints::restrict(double minValue, double maxValue) {
     
     size_t nPoints = size2();
@@ -67,18 +43,7 @@ void ProjectivePoints::restrict(double minValue, double maxValue) {
 
 }
 
-
-
-ProjectivePoints::operator std::vector<PointD>() {
-    std::vector<PointD> ret;
-    size_t nPoints = size2();
-    for( size_t i=0; i<nPoints; ++i ) {
-        ret.push_back(PointD((*this)( 1, i ),(*this)( 0, i )));
-    }
-    return std::move(ret);
-}
-
-   
+  
 void ProjectivePoints::resize(size_t nPoints) {
 
     matrix<double>::resize(3, nPoints, true);
@@ -180,17 +145,5 @@ ProjectivePoints ProjectiveMap::operator*(const ProjectivePoints& rhs) const {
     }
     return std::move(ret);
 }
-
-
-
-
-std::vector<PointD> ProjectiveMap::operator*(const std::vector<PointD>& rhs) const {
-    
-    ProjectivePoints tmp(rhs);
-    tmp = *this * tmp;
-    return tmp;
-    
-}
-
 
 

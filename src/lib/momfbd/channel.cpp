@@ -15,6 +15,7 @@
 #include "redux/logging/logger.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/util/projective.hpp"
 
 #include <functional>
 #include <math.h>
@@ -25,7 +26,7 @@
 //#include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
-
+#include <boost/numeric/ublas/io.hpp>
 
 namespace bfs = boost::filesystem;
 using namespace redux::file;
@@ -187,6 +188,13 @@ bool Channel::checkCfg (void) {
     if( !alignClip.empty() && alignClip.size() != 4 ) {
         LOG_WARN << "ALIGN_CLIP does not seem to contain 4 integers. Whole image area will be used." << ende;
         alignClip.clear();
+    }
+    
+    if( alignClip.size() == 4 ) {
+        if( !alignClip[0] || !alignClip[1] || !alignClip[2] || !alignClip[3] ) {
+            LOG_WARN << "ALIGN_CLIP values should be 1-based, i.e. first pixel is (1,1)." << ende;
+            alignClip.clear();
+        }
     }
     
     if( discard.size() > 2 ) {
@@ -1028,12 +1036,19 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
 
     Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
     Array<float> tmp = block.copy(true);
-    bool flipX = (alignClip.size() == 4) && (alignClip[0] > alignClip[1]);
-    bool flipY = (alignClip.size() == 4) && (alignClip[2] > alignClip[3]);
+    
+    bool flipX(false);
+    bool flipY(false);
+    if( alignMap.size() == 9 ) {
+        if( alignMap[0] < 0 ) flipX = true;
+        if( alignMap[0] < 4 ) flipY = true;
+    } else if( alignClip.size() == 4) {
+        if( alignClip[0] > alignClip[1] ) flipX = true;
+        if( alignClip[2] > alignClip[3] ) flipY = true;
+    }
     if( flipX || flipY ) {
         size_t sy = chData.cutout.last.y - chData.cutout.first.y + 1;
         size_t sx = chData.cutout.last.x - chData.cutout.first.x + 1;
-        cout << "cpImgData " << myObject.ID << ":  flipX = " << flipX << "  flipY = " << flipY << "  sy = " << sy << "  sx = " << sx << endl;
         std::shared_ptr<float*> arrayPtr = tmp.reshape(nTotalFrames*sy, sx);
         float** imgPtr = arrayPtr.get();
         for( size_t i=0; i<nTotalFrames; ++i) {
@@ -1042,6 +1057,7 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
             imgPtr += sy;
         }
     }
+    
     chData.images = std::move(tmp);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
     chData.setLoaded();
     
@@ -1072,9 +1088,8 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     chData.offset = myObject.maxLocalShift;
     
     if( alignMap.size() == 9 ) {
-        refPos += myJob.roi.first;          // position in reference-channel, global coordinates
         ProjectiveMap map( alignMap );
-        localPos = map*patch->position;
+        localPos = map*(refPos + myJob.roi.first);  // position in reference-channel, global coordinates
     } else {                                // old style alignment with clips & offsetfiles
         localPos = refPos;
         if( xOffset.valid() ) {
@@ -1123,7 +1138,6 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     
     chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
     chData.channelOffset -= imgBoundary.outside( tmpCutout+chData.channelOffset );                      // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
-    tmpCutout += chData.channelOffset;
     chData.residualOffset = localPos - finalPos;
     
     tmpCutout.grow( myObject.maxLocalShift );                               // add maxLocalshift
@@ -1138,9 +1152,11 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     
     chData.cutout = tmpCutout;
     
-//   cout << "adjustCutout: loc=" << refPos << "  desired=" << desiredCutout << "  cutout=" << chData.cutout
-//        << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
-//        << "   res=" << chData.residualOffset << "   imgSize=" << imgSize << endl;
+    LOG_TRACE << "AdjustCutout ch=" <<myObject.ID << ":" << ID << ": refPos=" << refPos << "  localPos=" << localPos
+         << "  finalPos=" << finalPos<< "  desired=" << desiredCutout << "  cutout=" << chData.cutout
+         << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
+         << "   res=" << chData.residualOffset << ende;
+         
 }
 
 

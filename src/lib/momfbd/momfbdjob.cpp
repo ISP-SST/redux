@@ -503,7 +503,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     if( nTotalChannels ) {
         const vector<int16_t>& clip = objects[0]->channels[0]->alignClip;
         if( clip.size() == 4 ) {
-            roi = Region16(clip[2],clip[0],clip[3],clip[1]);
+            roi = Region16( clip[2]-1, clip[0]-1, clip[3]-1, clip[1]-1 );
         }
     }
 
