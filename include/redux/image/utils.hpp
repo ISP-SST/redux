@@ -12,7 +12,6 @@
 
 #include <atomic>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <thread>
 
@@ -340,7 +339,6 @@ namespace redux {
         
         template <typename T>
         void apodizeInPlace( T** data, size_t nY, size_t nX, size_t blendRegion );
-
         template <typename T>
         void apodizeInPlace( redux::util::Array<T>& array, size_t blendRegion );
 

@@ -57,13 +57,11 @@ namespace redux {
             template <typename T, typename First, typename... Rest>
             struct Dummy {
                 typedef typename Dummy<T, Rest...>::dataType* dataType;
-                typedef typename Dummy<T, Rest...>::ptrType* ptrType;
             };
 
             template <typename T, typename First>
             struct Dummy<T, First> {
                 typedef T dataType;
-                typedef T* ptrType;
             };
 
         }
@@ -79,16 +77,15 @@ namespace redux {
         //@{
         template <class T>
         T* newArray( size_t n1 ) {
-            T* ret = new T[ n1 ];
-            return ret;
+            return new T[ n1 ];
         }
         template <class T, typename... Rest>
-        typename detail::Dummy<T, size_t, size_t, Rest...>::ptrType newArray( size_t n1, size_t n2, Rest ...rest ) {
-            typedef typename detail::Dummy<T, size_t, Rest...>::ptrType ptrType;
+        typename detail::Dummy<T, size_t, size_t, Rest...>::dataType* newArray( size_t n1, size_t n2, Rest ...rest ) {
+            typedef typename detail::Dummy<T, size_t, Rest...>::dataType* ptrType;
             ptrType* ret = new ptrType[ n1 ];               // Create an array of size n1 with pointers.
-            *ret = newArray<T>( n1 * n2, rest... );         // Call newArray() for D = D-1
-            for( size_t i = 1; i < n1; ++i ) {
-                ret[i] = ret[i - 1] + n2;         // Populate the pointer-array with addresses,
+            *ret = newArray<T>( n1*n2, static_cast<uint64_t>(rest)... );         // Call newArray() for D = D-1
+            for( size_t i=1; i<n1; ++i ) {
+                ret[i] = ret[i-1] + n2;         // Populate the pointer-array with addresses,
             }                                     // starting from p[1] with step length n2.
             return ret;
         }
@@ -104,8 +101,8 @@ namespace redux {
         //@{
         template <class T>  T* makePointers( T* data, size_t n1 ) { return data; }
         template <class T, typename... Rest>
-        typename detail::Dummy<T, size_t, size_t, Rest...>::ptrType makePointers( T* data, size_t n1, size_t n2, Rest ...rest ) {
-            typedef typename detail::Dummy<T, size_t, Rest...>::ptrType ptrType;
+        typename detail::Dummy<T, size_t, size_t, Rest...>::dataType* makePointers( T* data, size_t n1, size_t n2, Rest ...rest ) {
+            typedef typename detail::Dummy<T, size_t, Rest...>::dataType* ptrType;
             ptrType* ret = new ptrType[ n1 ];               // Create an array of size n1 with pointers.
             *ret = makePointers<T>(data, n1 * n2, rest... );         // Call newArray() for D = D-1
             for( size_t i = 1; i < n1; ++i ) {
