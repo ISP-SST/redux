@@ -436,17 +436,6 @@ void Object::getResults(ObjectData& od, double* alpha) {
 }
 
 
-void Object::getInit( ObjectData& od, double* alpha ) {
-
-    unique_lock<mutex> lock (mtx);
-    size_t nAlpha = od.alpha.nElements();
-    if( nAlpha > 0 ) {
-        std::copy( od.alpha.get(), od.alpha.get()+nAlpha, alpha );
-    }
-
-}
-
-
 void Object::initPQ (void) {
     P.zero();
   //cout << "imgstack::Object::initPQ(" << ID << ") " << __LINE__ << "  rg = " << reg_gamma << endl;
@@ -587,12 +576,12 @@ bool Object::checkCfg (void) {
         LOG_FATAL << "Each object must have at least 1 channel specified." << ende;
     }
 
-    for (auto& ch : channels) {
-        if (!ch->checkCfg()) return false;
-    }
-
     if (!checkImageScale (telescopeF, arcSecsPerPixel, pixelSize, logChannel)) {
         return false;
+    }
+
+    for (auto& ch : channels) {
+        if (!ch->checkCfg()) return false;
     }
 
     if (outputFileName.empty()) {   // TODO: clean this up

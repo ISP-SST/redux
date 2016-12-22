@@ -80,11 +80,6 @@ namespace {
         }
     }
 
-    /*double def2cf( double pd_defocus, double telescope_r ) { // defocus distance in meters
-        static const double tmp = ( 8.0 * sqrt( 3.0 ) );
-        return -pd_defocus * redux::PI * telescope_r * telescope_r * tmp;
-    }*/
-
 }
 
 const map<FileType, string> redux::momfbd::FileTypeNames = {
@@ -125,7 +120,7 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), borderClip(100), incomplete(0),
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), borderClip(100), incomplete(0), discard(2,0),
         mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel("config") {
 
 }
@@ -203,6 +198,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
 
     alignMap = tree.get<vector<float>>( "ALIGN_MAP", defaults.alignMap );
     alignClip = tree.get<vector<int16_t>>( "ALIGN_CLIP", defaults.alignClip );
+    discard = tree.get<vector<uint16_t>>( "DISCARD", defaults.discard );
     borderClip = tree.get<uint16_t>("BORDER_CLIP", defaults.borderClip);
     incomplete = tree.get<bool>( "INCOMPLETE", defaults.incomplete );
     
@@ -272,6 +268,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     
     if(alignMap != defaults.alignMap) tree.put("ALIGN_MAP", alignMap);
     if(alignClip != defaults.alignClip) tree.put("ALIGN_CLIP", alignClip);
+    if(discard != defaults.discard) tree.put("DISCARD", discard);
     if(borderClip != defaults.borderClip) tree.put("BORDER_CLIP", borderClip);
     if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", (bool)incomplete);
 
@@ -313,6 +310,7 @@ uint64_t ChannelCfg::size(void) const {
     sz += diversityTypes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
     sz += alignMap.size()*sizeof(float) + sizeof(uint64_t);
     sz += alignClip.size()*sizeof(int16_t) + sizeof(uint64_t);
+    sz += discard.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += imageDataDir.length() + 1;
     sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
@@ -335,6 +333,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, diversityTypes);
     count += pack(ptr+count, alignMap);
     count += pack(ptr+count, alignClip);
+    count += pack(ptr+count, discard);
     count += pack(ptr+count, borderClip);
     count += pack(ptr+count, incomplete);
     count += pack(ptr+count, subImagePosX);
@@ -370,6 +369,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, diversityTypes, swap_endian);
     count += unpack(ptr+count, alignMap, swap_endian);
     count += unpack(ptr+count, alignClip, swap_endian);
+    count += unpack(ptr+count, discard, swap_endian);
     count += unpack(ptr+count, borderClip, swap_endian);
     count += unpack(ptr+count, incomplete);
     count += unpack(ptr+count, subImagePosX, swap_endian);
@@ -580,7 +580,7 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
                  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
     telescopeD(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
-    badPixelThreshold(1E-5), FTOL(1E-03), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2),
+    badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2),
     outputFileType(FT_NONE), outputDataType(DT_F32T), sequenceNumber(0),
     observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
 
