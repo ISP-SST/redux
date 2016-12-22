@@ -168,9 +168,6 @@ namespace {
         { NULL }
     };
 
-    const uint8_t alignTo = 4;  // Aligning to 4-bit boundary (IDL structures are aligned to 4-byte boundaries).
-
-
     // Define a structure to contain the datablock + a vector with filenames
     struct MomfdContainer {
         int32_t nNames;
@@ -415,46 +412,6 @@ namespace {
 
     }
 
-
-    size_t getPatchSize ( const FileMomfbd* const info, uint8_t loadMask, const float& version ) {
-        
-        if ( !(loadMask & MOMFBD_PATCH) ) return 0;
-        
-        size_t patchSize  = 4 * sizeof ( IDL_INT );                                 // xl, yl, xh, yl
-        if ( version >= 20110714.0 ) {
-            patchSize += 2 * sizeof ( IDL_INT );                                    // off, offy
-        }
-        patchSize += 3 * info->nChannels * sizeof ( IDL_INT );                      // dx, dy, nim
-        while ( patchSize % alignTo ) patchSize++;                                  // pad if not on boundary (needed if nChannels is odd)
-
-        const FileMomfbd::PatchInfo& tmpPatch = info->patches ( 0 );
-
-        size_t nFloats = 0;
-        if ( loadMask & MOMFBD_IMG ) {
-            nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY;
-        }
-        if ( loadMask & MOMFBD_PSF ) {
-            nFloats += tmpPatch.npsf * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
-        }
-        if ( loadMask & MOMFBD_OBJ ) {
-            nFloats += tmpPatch.nobj * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
-        }
-        if ( loadMask & MOMFBD_RES ) {
-            nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY * tmpPatch.nres;
-        }
-        if ( loadMask & MOMFBD_ALPHA ) {
-            nFloats += tmpPatch.nm * tmpPatch.nalpha;
-        }
-        if ( loadMask & MOMFBD_DIV ) {
-            nFloats += tmpPatch.nphx * tmpPatch.nphy * tmpPatch.ndiv;
-        }
-        patchSize += nFloats * sizeof ( float );
-
-        return patchSize;
-
-    }
-
-
     size_t loadData ( ifstream& file, char* data, uint8_t loadMask, FileMomfbd* info, int verbosity ) {
 
         // zero the list of filenames
@@ -693,8 +650,8 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     vector<IDL_STRUCT_TAG_DEF> tags;
-    size_t patchSize = getPatchSize ( info.get(), loadMask, info->version );
-    createTags ( tags, loadMask, info.get() );
+    size_t patchSize = info->getPatchSize( loadMask, 4 );        // IDL structures are aligned to 4-byte boundaries.
+    createTags( tags, loadMask, info.get() );
 
     IDL_StructDefPtr myStruct = IDL_MakeStruct ( 0, tags.data() );              // Generate the IDL structure defined above
     // Clean up the "dims" array for the tags that has them

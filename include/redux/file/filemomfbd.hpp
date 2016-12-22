@@ -56,6 +56,9 @@ namespace redux {
             FileMomfbd( void );
             FileMomfbd( const std::string& );
             
+            static size_t getPatchSize(const FileMomfbd* const info, uint8_t loadMask, const float& version, size_t alignTo=4);
+            size_t getPatchSize( uint8_t loadMask, size_t alignTo=4 ) const { return getPatchSize( this, loadMask, version, alignTo ); };
+            
             void clear(void);
 
             void read( std::ifstream& );

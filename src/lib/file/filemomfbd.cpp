@@ -356,6 +356,48 @@ FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(N
 }
 
 
+size_t FileMomfbd::getPatchSize( const FileMomfbd* const info, uint8_t loadMask, const float& version, size_t alignTo ) {
+    
+    if ( info->patches.nElements() == 0 ) return 0;                            // no patches
+    
+    size_t patchSize  = 4 * sizeof(short int);                                 // xl, yl, xh, yl
+    if ( version >= 20110714.0 ) {
+        patchSize += 2*sizeof(short int);                                      // off, offy
+    }
+    patchSize += 3*info->nChannels * sizeof( short int );                      // dx, dy, nim
+    while( patchSize % alignTo ) patchSize++;                                  // pad if not on boundary (needed if nChannels is odd)
+
+    if ( !(loadMask & MOMFBD_PATCH) ) return patchSize;
+    
+    const FileMomfbd::PatchInfo& tmpPatch = info->patches(0);
+
+    size_t nFloats = 0;
+    if ( loadMask & MOMFBD_IMG ) {
+        nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY;
+    }
+    if ( loadMask & MOMFBD_PSF ) {
+        nFloats += tmpPatch.npsf * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
+    }
+    if ( loadMask & MOMFBD_OBJ ) {
+        nFloats += tmpPatch.nobj * tmpPatch.nPixelsX * tmpPatch.nPixelsY;
+    }
+    if ( loadMask & MOMFBD_RES ) {
+        nFloats += tmpPatch.nPixelsX * tmpPatch.nPixelsY * tmpPatch.nres;
+    }
+    if ( loadMask & MOMFBD_ALPHA ) {
+        nFloats += tmpPatch.nm * tmpPatch.nalpha;
+    }
+    if ( loadMask & MOMFBD_DIV ) {
+        nFloats += tmpPatch.nphx * tmpPatch.nphy * tmpPatch.ndiv;
+    }
+    patchSize += nFloats * sizeof(float);
+
+    return patchSize;
+
+}
+
+
+
 void FileMomfbd::clear(void) {
     
     version = 0;
@@ -713,4 +755,5 @@ std::shared_ptr<FileMomfbd> redux::file::readMomfbdInfo ( const std::string& fil
     return hdr;
 
 }
+
 
