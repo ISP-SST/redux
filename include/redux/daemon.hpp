@@ -80,11 +80,11 @@ namespace redux {
         } myMaster;
         
         boost::asio::io_service ioService;
+        boost::thread_group pool;
         boost::asio::deadline_timer timer;
         std::unique_ptr<network::TcpServer> server;
         
         Worker worker;
-        std::vector<std::shared_ptr<std::thread> > threads;
         
         friend class network::TcpServer;
         friend class Worker;

@@ -60,6 +60,7 @@ void Worker::stop( void ) {
     running_ = false;
     workLoop.reset();
     ioService.stop();
+    pool.interrupt_all();
     pool.join_all();
 
 }

@@ -96,6 +96,7 @@ void Daemon::serverInit( void ) {
 void Daemon::reset( void ) {
     runMode = RESET;
     ioService.stop();
+    pool.interrupt_all();
 }
 
 
@@ -107,7 +108,8 @@ void Daemon::stop( void ) {
         myInfo.info.peerType &= ~Host::TP_WORKER;
     }
     ioService.stop();
-    worker.stop();
+    pool.interrupt_all();
+
 }
 
 
@@ -138,9 +140,8 @@ bool Daemon::doWork( void ) {
         timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
         // Add some threads for the async work.
-        for( std::size_t i = 0; i < 50; ++i ) {
-            //shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioService ) ) );
-            shared_ptr<thread> t( new thread( [&](){
+        for( int i = 0; i < 50; ++i ) {
+            pool.create_thread( [&](){
                 while( runMode == LOOP ) {
                     try {
                         ioService.run();
@@ -152,31 +153,16 @@ bool Daemon::doWork( void ) {
                         LOG_ERR << "Unhandled exception in thread." << ende;
                     }
                 }
-            }));
-            threads.push_back( t );
+            });
         }
         LOG_DEBUG << "Initializing worker." << ende;
         workerInit();
         worker.init();
         LOG_DEBUG << "Running the asio service." << ende;
-        while( runMode == LOOP ) {
-            try {
-                ioService.run();
-            } catch( job_error& e ) {
-                LOG_ERR << "Job error: " << e.what() << ende;
-            } catch( exception& e ) {
-                LOG_ERR << "Exception in main thread: " << e.what() << ende;
-            } catch( ... ) {
-                LOG_ERR << "Unhandled exception in main thread." << ende;
-            }
-        }
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
-        LOG_DETAIL << "Waiting for all threads to terminate." << ende;
-        for( auto & t : threads ) {
-            t->join();
-        }
+        LOG_TRACE << "Waiting for all threads to terminate." << ende;
+        pool.join_all();
         myInfo.info.peerType = 0;
-        threads.clear();
         worker.stop();
         LOG_DETAIL << "Shutting down Daemon." << ende;
     }
