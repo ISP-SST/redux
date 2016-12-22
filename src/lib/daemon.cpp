@@ -591,11 +591,23 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
 
 
 void Daemon::die( TcpConnection::Ptr& conn ) {
-    LOG_DEBUG << "Received exit command." << ende;
+    
     unique_lock<mutex> lock( peerMutex );
-    connections.clear();
-    conn->socket().close();
-    stop();
+    const Host::HostInfo& hi = connections[conn]->info;
+    lock.unlock();
+
+    //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
+    if( hi.peerType == Host::TP_MASTER ) {
+        LOG_DEBUG << "Received exit command from " << hi.user << "@" << hi.name << ende;
+        *conn << CMD_OK;
+        lock.lock();
+        connections.clear();
+        stop();
+    } else {
+        vector<string> messages;
+        messages.push_back("Not permitted.");
+        *conn << CMD_NOTICE << messages;
+    }
 }
 
 
@@ -668,20 +680,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
     }
 
     // send any messages back
-    uint64_t messagesSize(0);
-    if( messages.size() ) {
-        messagesSize = redux::util::size( messages );
-        size_t totSize = messagesSize+sizeof(uint64_t);
-        shared_ptr<char> tmp( new char[totSize], []( char* p ){ delete[] p; } );
-        char* ptr = tmp.get();
-        ptr += redux::util::pack( ptr, messagesSize );
-        redux::util::pack( ptr, messages );
-        conn->syncWrite(tmp.get(), totSize);
-    } else {
-        conn->syncWrite(messagesSize);
-    }
-
-
+    *conn << messages;
 
 }
 

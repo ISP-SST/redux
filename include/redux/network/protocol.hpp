@@ -8,6 +8,7 @@ namespace redux {
     namespace network {
 
         enum Command : uint8_t { CMD_OK = 0,       // NB: specific-type enums are supported by gcc/clang, but may not behave well with other compilers
+                                 CMD_NOTICE,
                                  CMD_CONNECT,      //   check this !!! /THI
                                  CMD_ADD_JOB,
                                  CMD_MOD_JOB,

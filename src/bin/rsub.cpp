@@ -26,7 +26,7 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "jsub";
+    const string logChannel = "rsub";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
@@ -177,25 +177,16 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
             LOG_ERR << "Failure while sending jobs  (server reply = " << (int)cmd << "   " << bitString(cmd) << ")" << ende;
         }
         
-        ptr = buf.get();
-        received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(uint64_t) ) );
-        if( received == sizeof(uint64_t) ) {
-            unpack(ptr, count, swap_endian);
-            if( count ) {
-                received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, count ) );    // hopefully the buffer allocated for the cfg-data is big enough for any messages.
-                if( received ) {
-                    vector<string> messages;
-                    unpack( ptr, messages, swap_endian );
-                    if( !messages.empty() ) {
-                        string msgText = "Server messages:";
-                        for( auto& msg: messages ) {
-                            msgText += "\n\t" + msg;
-                        }
-                        LOG_WARN << "Error uploading jobs: " << msgText << ende;
-                    }
-                }
+        vector<string> messages;
+        *conn >> messages;
+        if( !messages.empty() ) {
+            string msgText = "Server messages:";
+            for( auto& msg: messages ) {
+                msgText += "\n\t" + msg;
             }
+            LOG_WARN << "Error uploading jobs: " << msgText << ende;
         }
+
     }
     catch( const exception &e ) {
         LOG_ERR << "Error uploading jobs: " << e.what() << ende;
