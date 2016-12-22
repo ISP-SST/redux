@@ -63,6 +63,7 @@ namespace redux {
             void initProcessing( const Solver& );                        //!< Called once per job, to set up storage etc.
             void initPatch(ObjectData&);                                 //!< Called once per patch, normalize, fit plane etc.
             void getResults(ObjectData&, double* alpha);                 //!< Called on patch-completion, gather up what is going back to the master.
+            void getInit(ObjectData&, double* alpha);                    //!< Called on patch-initialization, copy starting values *if any(.
             void initPQ(void);
             void addAllFT(void);
             void addRegGamma(double);
@@ -73,7 +74,7 @@ namespace redux {
             void addAllPQ(void);
             void fitAvgPlane(void);
             void calcMetric(void);
-            inline double metric(void) const { return currentMetric; };
+            inline double metric(void) const { return weight*currentMetric; };
             /*****************************************************/
             
             void dump( std::string tag );
@@ -84,18 +85,19 @@ namespace redux {
             bool checkData(void);
 
             void initCache(void);
+            void reInitialize(boost::asio::io_service&);
             void loadData(boost::asio::io_service&, uint16_t nThreads, redux::util::Array<PatchData::Ptr>&);
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
             void writeResults(const redux::util::Array<PatchData::Ptr>&);
-            void storePatches( WorkInProgress::Ptr, boost::asio::io_service&, uint8_t );
             
             redux::util::Point16 getImageSize(void);
             
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/
             std::mutex mtx;
+            std::atomic<int> imgShifted;
             redux::util::ProgressWatch progWatch;
             redux::util::Array<double>  ftSum;                              //! Sum of the norm of all images' fourier-transforms
             redux::util::Array<double> Q;

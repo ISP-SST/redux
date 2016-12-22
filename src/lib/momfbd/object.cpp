@@ -217,12 +217,13 @@ void Object::initProcessing( const Solver& ws ) {
         if( modes.get() == ret.get() ) {    // rescale local modes
             ret = modes.clone();
             ret.getNorms( pupil );
+    cout << "Object " << ID <<  printArray(ret.norms,"  mode_norms") << endl;
             ret.normalize( mode_scale );
         }
         modes = ret;
 
         //shiftToAlpha = modes.shiftToAlpha;
-        shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize);
+        shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize); ///wavelength);
         
         defocusToAlpha = util::def2cf(myJob.telescopeD/2.0);
         alphaToDefocus = 1.0/defocusToAlpha;
@@ -256,7 +257,7 @@ void Object::initPatch( ObjectData& od ) {
 
 
 void Object::getResults(ObjectData& od, double* alpha) {
-    
+
     unique_lock<mutex> lock (mtx);
     
     FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
@@ -285,17 +286,19 @@ void Object::getResults(ObjectData& od, double* alpha) {
     avgNoiseVariance /= nObjectImages;
     avgShift *= 1.0/nObjectImages;
     
-    LOG_DETAIL << "Average shift for object #" << ID << ":" << avgShift << ende;
+    //LOG_DETAIL << "Average shift for object #" << ID << ":" << avgShift << ende;
 
     avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
-        LOG_DEBUG << boost::format("Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
+        LOG_DEBUG << boost::format("Object %d: Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % ID % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
         ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     
     avgObjFT.getIFT( tmpC.get() );
-
+//static int cnt(0);
+//Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_cresult.f0", tmpC );
+//Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_aoft.f0", avgObjFT );
     od.img.resize( patchSize, patchSize );
     size_t nEl = avgObjFT.nElements();
     double normalization = 1.0 / nEl;
@@ -303,7 +306,9 @@ void Object::getResults(ObjectData& od, double* alpha) {
                 [normalization]( const complex_t& a ) {
                     return std::real(a)*normalization;
                 } );
+//Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_dresult.f0", tmpC );
     
+
     // PSF
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
         uint16_t nPSF = (saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
@@ -374,17 +379,21 @@ void Object::getResults(ObjectData& od, double* alpha) {
             od.res.clear();
         }
     }
-    
-    
+
+//     std::transform( od.img.get(), od.img.get()+nEl, od.img.get(), std::bind2nd<>(std::multiplies<float>(), objMaxMean) );
+//     if( (saveMask & SF_SAVE_COBJ) && nObjectImages ) {
+//         std::transform( od.cobj.get(), od.cobj.get()+nObjectImages*nEl, od.cobj.get(),
+//                         std::bind2nd<>(std::multiplies<float>(), objMaxMean) );
+//     }
+
     // Note: re-adding the plane has to be done *after* calculating the convolved objects and residuals
     if( fittedPlane.sameSize(od.img) ) {
         transpose( fittedPlane.get(), fittedPlane.dimSize(0), fittedPlane.dimSize(1) );                 // to match the transposed subimage.
-        LOG_DETAIL << "Re-adding fitted plane to result." << ende;
+        //LOG_DETAIL << "Re-adding fitted plane to result." << ende;
         od.img += fittedPlane;
     } else if( !fittedPlane.empty() ) {
         LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
     }
-    
     
     // Mode coefficients
     if( saveMask & SF_SAVE_ALPHA ) {
@@ -423,11 +432,24 @@ void Object::getResults(ObjectData& od, double* alpha) {
 
     }
 
+
+}
+
+
+void Object::getInit( ObjectData& od, double* alpha ) {
+
+    unique_lock<mutex> lock (mtx);
+    size_t nAlpha = od.alpha.nElements();
+    if( nAlpha > 0 ) {
+        std::copy( od.alpha.get(), od.alpha.get()+nAlpha, alpha );
+    }
+
 }
 
 
 void Object::initPQ (void) {
     P.zero();
+  //cout << "imgstack::Object::initPQ(" << ID << ") " << __LINE__ << "  rg = " << reg_gamma << endl;
     Q = reg_gamma;
 }
 
@@ -435,6 +457,8 @@ void Object::initPQ (void) {
 void Object::addRegGamma( double rg ) {
     unique_lock<mutex> lock( mtx );
     reg_gamma += 0.10*rg/nObjectImages;
+//    cout << "Object::addRegGamma() obj:" << ID << "  rg=" << rg << "  reg_gamma = " << reg_gamma
+//         << "  nImages = " << nObjectImages << endl;
 }
 
 
@@ -505,8 +529,10 @@ void Object::fitAvgPlane( void ) {
     if( myJob.runFlags & RF_FIT_PLANE ) {
         size_t count(0);
         fittedPlane.zero();
-        for( const shared_ptr<Channel>& c: channels ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+        for( const shared_ptr<Channel> c: channels ) {
+            if( !c ) continue;
+            for( const shared_ptr<SubImage> im: c->getSubImages() ) {
+                if( !im ) continue;
                 if( !im->sameSize(fittedPlane) ) {
                     LOG_ERR << "Size mismatch when fitting average plane for object #" << ID << ende;
                     fittedPlane.clear();
@@ -525,28 +551,30 @@ void Object::fitAvgPlane( void ) {
         fittedPlane /= count;
         vector<double> coeffs(3,0.0);
         fittedPlane = fitPlane( fittedPlane, true, coeffs.data() );          // fit plane to the average image, and subtract average
-        LOG_DEBUG << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
+        LOG_WARN << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
     }
     
 }
 
 
 void Object::calcMetric (void) {
+
+    if( weight == 0.0 ) return;
     
     const double* ftsPtr = ftSum.get();
     const complex_t* pPtr = P.get();
     const double* qPtr = Q.get();
     
     unique_lock<mutex> lock (mtx);
+    currentMetric = 0;
     //size_t N = 4*pupilPixels*pupilPixels;
     //for (size_t ind=0; ind<N; ++ind) {
-    currentMetric = 0;
     for (auto & ind : pupil.otfSupport) {
         currentMetric += (ftsPtr[ind] - norm (pPtr[ind]) / qPtr[ind]);
     }
-
+//cout << "\nnSupp:" << pupil.otfSupport.size() << endl;
     currentMetric /= (patchSize*patchSize);
-
+//cout << "y:" << currentMetric << flush;
 }
 
 
@@ -691,7 +719,7 @@ void Object::initCache (void) {
             } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching pupil
-                LOG << "Using existing pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                LOG_DEBUG << "Using pre-calculated pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet)." << ende;
@@ -713,7 +741,7 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching pupil
-                LOG << "Using existing pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                LOG_DEBUG << "Using pre-calculated Pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!" << ende;
@@ -735,7 +763,7 @@ void Object::initCache (void) {
               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
-                LOG << "Using existing modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet!!)." << ende;
@@ -765,7 +793,7 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
-                LOG << "Using existing modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!" << ende;
@@ -791,12 +819,36 @@ void Object::initCache (void) {
         alphaToPixels = 1.0/pixelsToAlpha;
     }
     
-    LOG << "Tilt-to-pixels conversion: " << alphaToPixels << ende;
+    LOG_TRACE << "Tilt-to-pixels conversion: " << alphaToPixels << ende;
 
     for (auto& ch : channels) {
         ch->initCache();
     }
     
+}
+
+
+void Object::reInitialize( boost::asio::io_service& service ) {
+    progWatch.clear();
+       // cout << "Object::reInitialize: " << __LINE__ << endl;
+    if( imgShifted ) {
+        if(myJob.runFlags&RF_FIT_PLANE) fitAvgPlane();
+        for( const shared_ptr<Channel>& c: channels ) {
+            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                service.post( [&](){
+        //cout << "Object::reInitialize: " << __LINE__ << endl;
+                    im->reInitialize();
+        //cout << "Object::reInitialize: " << __LINE__ << endl;
+                    ++myJob.progWatch;
+                } );
+            }
+        }
+    } else {
+        //cout << "Object::reInitialize: " << __LINE__ << endl;
+        myJob.progWatch.increase( nImages() );
+    }
+ 
+        //cout << "Object::reInitialize: " << __LINE__ << endl;
 }
 
 
@@ -806,8 +858,14 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
     endT = bpx::neg_infin;
     
     progWatch.set( nImages() );
+//cout << "Object::loadData()  nIm:" << nImages() << endl;
     progWatch.setTicker(nullptr);
+//     progWatch.setTicker([&](){
+//         cout << "Object::loadData()  otick: " << progWatch.progressString() << endl;
+//     });
+
     progWatch.setHandler([this,&service,&patches](){        // this will be triggered after all images in this object are loaded/pre-processed
+//cout << "Object::loadData()  progWatch triggered." << endl;
         objMaxMean = std::numeric_limits<double>::lowest();
         for (auto& ch : channels) {
             objMaxMean = std::max(objMaxMean,ch->getMaxMean());
@@ -821,7 +879,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
     });
     
     for( auto& ch: channels ) {
-        ch->loadData( service );
+        ch->loadData( service, patches );
     }
  
 }
@@ -839,7 +897,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
             if( isRelative(fn) ) {
                 fn = bfs::path(myJob.info.outputDir) / fn;
             }
-            Ana::write(fn.string(), patches(y,x)->objects[ID].img);
+            Ana::write(fn.string(), patches(y,x)->objects[ID]->img);
         }
     }
 
@@ -852,7 +910,7 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size());
         for( auto& patch: patches ) {
             Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1);
-            patch->objects[ID].alpha.copy(subalpha);
+            patch->objects[ID]->alpha.copy(subalpha);
        }
        Ana::write(fn.string(), alpha);
     }
@@ -972,7 +1030,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
     size_t modeSize = tmpModes.nElements()*sizeof (float);
     size_t blockSize = modeSize;
-
+//LOG << "Obj " << ID << "  modeSize = " << modeSize << printArray(tmpModes.dimensions(), " modeDims") << ende;
     for (int x = 0; x < info->nPatchesX; ++x) {
         for (int y = 0; y < info->nPatchesY; ++y) {
             PatchData::Ptr thisPatch = patchesData(y,x);
@@ -987,38 +1045,38 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
                 info->patches(x,y).dy = sharedArray<int32_t> (nChannels);
                 for (int i = 0; i < nChannels; ++i) {
                     info->patches(x,y).nim.get()[i] = channels[i]->nImages();
-                    info->patches(x,y).dx.get()[i] = thisPatch->objects[ID].channels[i].channelOffset.x;
-                    info->patches(x,y).dy.get()[i] = thisPatch->objects[ID].channels[i].channelOffset.y;
+                    info->patches(x,y).dx.get()[i] = thisPatch->objects[ID]->channels[i]->channelOffset.x;
+                    info->patches(x,y).dy.get()[i] = thisPatch->objects[ID]->channels[i]->channelOffset.y;
                 }
                 blockSize += imgSize;
                 if ( writeMask&MOMFBD_PSF ) {
-                    if(thisPatch->objects[ID].psf.nDimensions()>1) {
-                        info->patches(x,y).npsf = thisPatch->objects[ID].psf.dimSize(0);
+                    if(thisPatch->objects[ID]->psf.nDimensions()>1) {
+                        info->patches(x,y).npsf = thisPatch->objects[ID]->psf.dimSize(0);
                         blockSize += info->patches(x,y).npsf*imgSize;
                     }
                 }
                 if ( writeMask&MOMFBD_OBJ ) {
-                    if(thisPatch->objects[ID].cobj.nDimensions()>1) {
-                        info->patches(x,y).nobj = thisPatch->objects[ID].cobj.dimSize(0);
+                    if(thisPatch->objects[ID]->cobj.nDimensions()>1) {
+                        info->patches(x,y).nobj = thisPatch->objects[ID]->cobj.dimSize(0);
                         blockSize += info->patches(x,y).nobj*imgSize;
                     }
                 }
                 if ( writeMask&MOMFBD_RES ) {
-                    if(thisPatch->objects[ID].res.nDimensions()>1) {
-                        info->patches(x,y).nres = thisPatch->objects[ID].res.dimSize(0);
+                    if(thisPatch->objects[ID]->res.nDimensions()>1) {
+                        info->patches(x,y).nres = thisPatch->objects[ID]->res.dimSize(0);
                         blockSize += info->patches(x,y).nres*imgSize;
                     }
                 }
                 if ( writeMask&MOMFBD_ALPHA ) {
-                    if(thisPatch->objects[ID].alpha.nDimensions()==2) {
-                        info->patches(x,y).nalpha = thisPatch->objects[ID].alpha.dimSize(0);
-                        info->patches(x,y).nm = thisPatch->objects[ID].alpha.dimSize(1);
+                    if(thisPatch->objects[ID]->alpha.nDimensions()==2) {
+                        info->patches(x,y).nalpha = thisPatch->objects[ID]->alpha.dimSize(0);
+                        info->patches(x,y).nm = thisPatch->objects[ID]->alpha.dimSize(1);
                         blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float);
                     }
                 }
                 if ( writeMask&MOMFBD_DIV ) {
-                    if(thisPatch->objects[ID].div.nDimensions()>1) {
-                        info->patches(x,y).ndiv = thisPatch->objects[ID].div.dimSize(0);
+                    if(thisPatch->objects[ID]->div.nDimensions()>1) {
+                        info->patches(x,y).ndiv = thisPatch->objects[ID]->div.dimSize(0);
                         info->patches(x,y).nphx = info->nPH;
                         info->patches(x,y).nphy = info->nPH;
                         blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float);
@@ -1028,7 +1086,9 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
         }   // y-loop
     }   // x-loop
 
-
+//Ana::write( "patch_"+(string)data->index+"_obj_"+to_string(objData->myObject->ID)+"_result.f0", objData->img );
+//LOG << "Obj " << ID << "  writeMask = " << bitString(writeMask) << ende;
+//Array<float> wrap;
     auto tmp = sharedArray<char> (blockSize);
     memcpy(tmp.get(), tmpModes.get(), modeSize);
     char* tmpPtr = tmp.get();
@@ -1038,45 +1098,51 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
             PatchData::Ptr thisPatch = patchesData(y,x);
             if( thisPatch && ID < thisPatch->objects.size() ) {
                 auto &objData = thisPatch->objects[ID];
-                if( objData.img.nElements() ) {
-                    memcpy(tmpPtr+offset, objData.img.get(), imgSize);
+//LOG << "Obj " << ID << "  patch = " << (string)thisPatch->index << " offset: " << offset << " imgSize: " << imgSize << " patchSize: " << patchSize << ende;
+//Ana::write( "patch_"+(string)thisPatch->index+"_obj_"+to_string(ID)+"_fresult.f0", objData->img );
+//wrap.wrap(objData->img.get(),patchSize,patchSize);
+//Ana::write( "patch_"+(string)thisPatch->index+"_obj_"+to_string(ID)+"_gresult.f0", objData->img );
+                if( objData->img.nElements() ) {
+                    memcpy(tmpPtr+offset, objData->img.get(), imgSize);
                 } else {
                     memset(tmpPtr+offset, 0, imgSize);
                 }
+//wrap.wrap(reinterpret_cast<float*>(tmpPtr+offset),patchSize,patchSize);
+//Ana::write( "patch_"+(string)thisPatch->index+"_obj_"+to_string(ID)+"_hresult.f0", objData->img );
                 info->patches(x,y).imgPos = offset;
                 offset += imgSize;
-                if( objData.psf.nElements() ) {
-                    memcpy(tmpPtr+offset, objData.psf.get(), info->patches(x,y).npsf*imgSize);
+                if( objData->psf.nElements() ) {
+                    memcpy(tmpPtr+offset, objData->psf.get(), info->patches(x,y).npsf*imgSize);
                 } else {
                     memset(tmpPtr+offset, 0, info->patches(x,y).npsf*imgSize);
                 }
                 info->patches(x,y).psfPos = offset;
                 offset += info->patches(x,y).npsf*imgSize;
-                if( objData.cobj.nElements() ) {
-                    memcpy(tmpPtr+offset, objData.cobj.get(), info->patches(x,y).nobj*imgSize);
+                if( objData->cobj.nElements() ) {
+                    memcpy(tmpPtr+offset, objData->cobj.get(), info->patches(x,y).nobj*imgSize);
                 } else {
                     memset(tmpPtr+offset, 0, info->patches(x,y).nobj*imgSize);
                 }
                 info->patches(x,y).objPos = offset;
                 offset += info->patches(x,y).nobj*imgSize;
-                if( objData.res.nElements() ) {
-                    memcpy(tmpPtr+offset, objData.res.get(), info->patches(x,y).nres*imgSize);
+                if( objData->res.nElements() ) {
+                    memcpy(tmpPtr+offset, objData->res.get(), info->patches(x,y).nres*imgSize);
                 } else {
                     memset(tmpPtr+offset, 0, info->patches(x,y).nres*imgSize);
                 }
                 info->patches(x,y).resPos = offset;
                 offset += info->patches(x,y).nres*imgSize;
                 size_t alphaSize = info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float);
-                if( objData.alpha.nElements() ) {
-                    memcpy(tmpPtr+offset, objData.alpha.get(), alphaSize);
+                if( objData->alpha.nElements() ) {
+                    memcpy(tmpPtr+offset, objData->alpha.get(), alphaSize);
                 } else {
                     memset(tmpPtr+offset, 0, alphaSize);
                 }
                 info->patches(x,y).alphaPos = offset;
                 offset += alphaSize;
                 size_t divSize = info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float);
-                if( objData.div.nElements() ) {
-                    memcpy(tmpPtr+offset, objData.div.get(), divSize);
+                if( objData->div.nElements() ) {
+                    memcpy(tmpPtr+offset, objData->div.get(), divSize);
                 } else {
                     memset(tmpPtr+offset, 0, divSize);
                 }
@@ -1086,6 +1152,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
         }
     }
 
+//LOG << "Obj " << ID << "  data = " << hexString(tmp.get()) << ende;
     info->write (fn.string(), reinterpret_cast<char*> (tmp.get()), writeMask);
 
 }
@@ -1094,23 +1161,6 @@ void Object::writeResults (const redux::util::Array<PatchData::Ptr>& patches) {
     if (myJob.outputFileType & FT_ANA) writeAna (patches);
     if (myJob.outputFileType & FT_FITS) writeFits (patches);
     if (myJob.outputFileType & FT_MOMFBD) writeMomfbd (patches);
-}
-
-void Object::storePatches (WorkInProgress::Ptr wip, boost::asio::io_service& service, uint8_t nThreads) {
-
-    bfs::path fn = bfs::path (outputFileName);
-    fn.replace_extension ("momfbd");
-    std::shared_ptr<FileMomfbd> info (new FileMomfbd (fn.string()));
-
-    LOG_DEBUG << "storePatches()" << ende;
-
-    for (auto & part : wip->parts) {
-        auto patch = static_pointer_cast<PatchData> (part);
-        LOG_DEBUG << "storePatches() index: (" << patch->index.x << "," << patch->index.y << ")  offset = "
-                  << info->patches (patch->index.x , patch->index.y).offset << ende;
-        patch->step = MomfbdJob::JSTEP_COMPLETED;
-    }
-
 }
 
 

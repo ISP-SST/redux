@@ -35,7 +35,7 @@ void ChannelData::initPatch(void) {
 
 
 uint64_t ChannelData::size( void ) const {
-    static uint64_t fixed_sz = channelOffset.size() + offset.size() + residualOffset.size();
+    static uint64_t fixed_sz = channelOffset.size() + offset.size() + residualOffset.size() + 1;
     return fixed_sz + images.size();
 }
 
@@ -45,7 +45,12 @@ uint64_t ChannelData::pack( char* ptr ) const {
     uint64_t count = channelOffset.pack(ptr);
     count += offset.pack(ptr+count);
     count += residualOffset.pack(ptr+count);
-    count += images.pack(ptr+count);
+    uint8_t hasImages(0);
+    if( images.size() > sizeof(uint64_t) ) hasImages = 1;
+    count += pack(ptr+count,hasImages);
+    if( hasImages ) {
+        count += images.pack(ptr+count);
+    }
     return count;
 }
 
@@ -55,7 +60,11 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = channelOffset.unpack(ptr, swap_endian);
     count += offset.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
-    count += images.unpack(ptr+count, swap_endian);
+    uint8_t hasImages(0);
+    count += unpack(ptr+count, hasImages, swap_endian);
+    if( hasImages ) {
+        count += images.unpack(ptr+count, swap_endian);
+    }
     if( images.size() > sizeof(uint64_t) ) isLoaded = true;
     else isLoaded = false;
     return count;
@@ -64,12 +73,13 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
 
 void ChannelData::cclear(void) {
     images.clear();
+    isLoaded = false;
 }
 
 
 const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
-    
-    images = rhs.images;
+
+    //images = rhs.images;
     cutout = rhs.cutout;
     channelOffset = rhs.channelOffset;
     offset = rhs.offset;
@@ -82,8 +92,17 @@ const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
 }
 
 
-ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o), channels(o->getChannels().begin(),o->getChannels().end()) {
+void ChannelData::copyResults( const ChannelData& rhs ) {
+    
+    isLoaded = false;
 
+}
+
+
+ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
+    for( auto& c: o->getChannels() ) {
+        channels.push_back( make_shared<Compressed<ChannelData,5>>(c) );
+    }
 }
 
 
@@ -96,16 +115,16 @@ ObjectData::~ObjectData() {
 void ObjectData::setPath(const std::string& path) {
     string mypath = path + "_" + to_string(myObject->id());
     CacheItem::setPath(mypath);
-    for( auto& ch: channels ) {
-        ch.setPath(mypath);
+    for( auto& cd: channels ) {
+        if(cd) cd->setPath(mypath);
     }
 }
 
 
 void ObjectData::initPatch(void) {
     myObject->initPatch(*this);
-    for( auto& ch: channels ) {
-        ch.initPatch();
+    for( auto& cd: channels ) {
+        if(cd) cd->initPatch();
     }
     myObject->fitAvgPlane();
     myObject->initPQ();
@@ -122,7 +141,7 @@ uint64_t ObjectData::size( void ) const {
     sz += div.size();
     for( auto& cd: channels ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual channels)
-        sz += cd.ChannelData::size();
+        if(cd) sz += cd->ChannelData::size();
     }
     return sz;
 }
@@ -138,7 +157,7 @@ uint64_t ObjectData::pack( char* ptr ) const {
     count += div.pack(ptr+count);
     for( auto& cd: channels ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual channels)
-        count += cd.ChannelData::pack( ptr+count );
+        if(cd) count += cd->ChannelData::pack( ptr+count );
     }
     return count;
 }
@@ -154,9 +173,9 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     count += div.unpack(ptr+count,swap_endian);
     if( count > 6*sizeof(uint64_t) ) isLoaded = true;
     else isLoaded = false;
-    for( auto& chan: channels ) {
+    for( auto& cd: channels ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual channels)
-        count += chan.ChannelData::unpack( ptr+count, swap_endian );
+        if(cd) count += cd->ChannelData::unpack( ptr+count, swap_endian );
     }
     return count;
 }
@@ -166,7 +185,7 @@ bool ObjectData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
     loaded |= CacheItem::cacheLoad(removeAfterLoad);
     for( auto& cd: channels ) {
-        loaded |= cd.cacheLoad(removeAfterLoad);
+        if(cd) loaded |= cd->cacheLoad(removeAfterLoad);
     }
     return loaded;      // true if any part was loaded, TODO better control of partial fails.
 }
@@ -175,7 +194,7 @@ bool ObjectData::cacheLoad(bool removeAfterLoad) {
 bool ObjectData::cacheStore(bool clearAfterStore) {
     bool stored(false);
     for( auto& cd: channels ) {
-        stored |= cd.cacheStore(clearAfterStore);
+        if(cd) stored |= cd->cacheStore(clearAfterStore);
     }
     stored |= CacheItem::cacheStore(clearAfterStore);      // true if any part was stored, TODO better control of partial fails.
     return stored;
@@ -183,12 +202,17 @@ bool ObjectData::cacheStore(bool clearAfterStore) {
 
 
 void ObjectData::cclear(void) {
+
     img.clear();
     psf.clear();
     cobj.clear();
     res.clear();
     alpha.clear();
     div.clear();
+    for( auto& cd: channels ) {
+        cd->cclear();
+    }
+    isLoaded = false;
 }
 
 
@@ -217,8 +241,33 @@ const ObjectData& ObjectData::operator=( const ObjectData& rhs ) {
 }
 
 
-PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), objects( j.getObjects().begin(), j.getObjects().end() ), index(yid,xid) {
+void ObjectData::copyResults( const ObjectData& rhs ) {
     
+    if( channels.size() != rhs.channels.size() ) {
+        throw runtime_error("Can not copy ObjectResults if they contain different number of channels.");
+    }
+
+    img = rhs.img;
+    psf = rhs.psf;
+    cobj = rhs.cobj;
+    res = rhs.res;
+    alpha = rhs.alpha;
+    div = rhs.div;
+    
+    isLoaded = (img.nElements() || psf.nElements() || cobj.nElements()
+             || res.nElements() || alpha.nElements() || div.nElements() );
+
+    for( size_t i=0; i<channels.size(); ++i ) {
+        channels[i]->copyResults( *(rhs.channels[i]) );
+    }
+    
+}
+
+
+PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
+    for( auto& o: j.getObjects() ) {
+        objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
+    }
 }
 
 
@@ -230,14 +279,14 @@ void PatchData::setPath(const std::string& path) {
     string mypath = path+"/patch_"+(string)index;
     CacheItem::setPath(mypath);
     for( auto& obj: objects ) {
-        obj.setPath(mypath);
+        if(obj) obj->setPath(mypath);
     }
 }
 
 
 void PatchData::initPatch(void) {
     for( auto& obj: objects ) {
-        obj.initPatch();
+        if(obj) obj->initPatch();
     }
 }
 
@@ -249,7 +298,7 @@ uint64_t PatchData::size( void ) const {
     sz += sizeof(float);
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        sz += obj.ObjectData::size();
+        if(obj) sz += obj->ObjectData::size();
     }
     return sz;
 }
@@ -264,7 +313,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += pack( ptr+count, finalMetric );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        count += obj.ObjectData::pack(ptr+count);
+        if(obj) count += obj->ObjectData::pack(ptr+count);
     }
     return count;
 }
@@ -279,7 +328,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, finalMetric, swap_endian );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        count += obj.ObjectData::unpack( ptr+count, swap_endian );
+        if(obj) count += obj->ObjectData::unpack( ptr+count, swap_endian );
     }
     return count;
 }
@@ -287,14 +336,14 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
 
 void PatchData::cclear(void) {
     for( auto& obj: objects ) {
-        obj.cclear();
+        if(obj) obj->cclear();
     }
 }
 
 bool PatchData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
     for( auto& obj: objects ) {
-        loaded |= obj.cacheLoad(removeAfterLoad);
+        if(obj) loaded |= obj->cacheLoad(removeAfterLoad);
     }
     return loaded;
 }
@@ -302,7 +351,7 @@ bool PatchData::cacheLoad(bool removeAfterLoad) {
 bool PatchData::cacheStore(bool clearAfterStore) {
     bool stored(false);
     for( auto& obj: objects ) {
-        stored |= obj.cacheStore(clearAfterStore);
+        if(obj) stored |= obj->cacheStore(clearAfterStore);
     }
     //stored |= CacheItem::cacheStore(clearAfterStore);
     return stored;
@@ -332,6 +381,21 @@ const PatchData& PatchData::operator=( const PatchData& rhs ) {
     }
     
     return *this;
+    
+}
+
+
+void PatchData::copyResults( const PatchData& rhs ) {
+    
+    if( objects.size() != rhs.objects.size() ) {
+        throw runtime_error("Can not copy PatchData if they contain different number of objects.");
+    }
+
+    finalMetric = rhs.finalMetric;
+
+    for( size_t i=0; i<objects.size(); ++i ) {
+        objects[i]->copyResults( *(rhs.objects[i]) );
+    }
     
 }
 
