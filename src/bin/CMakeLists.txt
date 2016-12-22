@@ -15,6 +15,7 @@ endif()
 REDUX_ADD_EXECUTABLE( rsub rsub.cpp )
 REDUX_ADD_EXECUTABLE( rstat rstat.cpp )
 REDUX_ADD_EXECUTABLE( rdel rdel.cpp )
+REDUX_ADD_EXECUTABLE( rctl rctl.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
