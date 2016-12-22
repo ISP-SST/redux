@@ -822,6 +822,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             blockSize += wip->workSize();
             //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
             LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
+            host->status.statusString = alignLeft(to_string(wip->job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
             host->active();
         } else {
             wip->previousJob.reset();
