@@ -46,12 +46,12 @@ pid_t Cache::pid(void) {
 }
 
 
-CacheItem::CacheItem(void) : itemPath(""), isLoaded(true) {
+CacheItem::CacheItem(void) : itemPath(""), isLoaded(true), cachedSize(0) {
     
 }
 
 
-CacheItem::CacheItem(const string& path) : itemPath(""), fullPath(""), isLoaded(true) {
+CacheItem::CacheItem(const string& path) : itemPath(""), fullPath(""), isLoaded(true), cachedSize(0) {
     setPath(path);
     unique_lock<mutex> lock(itemMutex);
     if ( bfs::exists(fullPath) ) {
@@ -96,6 +96,7 @@ void CacheItem::cacheRemove(void) {
     } catch( ... ) {
         cerr << "CacheItem::cacheRemove() failed for unknown reasons." << endl;
     }
+    
 }
 
 
@@ -110,11 +111,12 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
     bool ret(false);
     try {
         unique_lock<mutex> lock(itemMutex);
-        if(fullPath.empty()) {
+        if( fullPath.empty() ) {
+            //cout << "Not loading b.c. non-existing: " << fullPath << endl;
             return ret;
         }
 
-        if(!isLoaded) {
+        if( !isLoaded ) {
             if ( bfs::exists(fullPath) ) {
                 ifstream in(fullPath.string().c_str(), ofstream::binary|ios_base::ate);
                 if( in.good() ) {
@@ -130,9 +132,9 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                     }
                 }
             }
-        }
+        } //else cout << "Not loading b.c. loaded: " << fullPath << endl;
 
-        if(isLoaded && removeAfterLoad) {
+        if( isLoaded && removeAfterLoad ) {
             bfs::remove(fullPath);
         }
     } catch( exception& e ) {
@@ -140,7 +142,9 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
     } catch( ... ) {
         cerr << "CacheItem::cacheLoad() failed for unknown reasons." << endl;
     }
+    
     return ret;
+    
 }
 
 
@@ -153,7 +157,7 @@ bool CacheItem::cacheStore(bool clearAfterStore){
             return ret;
         }
 
-        if(isLoaded) {
+        if( isLoaded ) {
             bfs::path parent = fullPath.parent_path();
             if( !parent.empty() ) {
                 bfs::create_directories( fullPath.parent_path() );
@@ -168,9 +172,9 @@ bool CacheItem::cacheStore(bool clearAfterStore){
                     ret = true;
                 }
             }
-        }
+        } //else cout << "Not storing b.c. not loaded: " << fullPath << endl;
         
-        if(clearAfterStore) {
+        if(ret && clearAfterStore) {
             cclear();
             isLoaded = false;
         }
@@ -179,7 +183,9 @@ bool CacheItem::cacheStore(bool clearAfterStore){
     } catch( ... ) {
         cerr << "CacheItem::cacheStore() failed for unknown reasons." << endl;
     }
+    
     return ret;
+    
 }
 
 

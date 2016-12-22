@@ -20,29 +20,39 @@ namespace redux {
             void clear(void);
             void reset(void);
             void test(void);
-            inline bool verify(void) const { return (counter_ == target_); }
+            inline bool verify(void) { std::unique_lock<std::mutex> lock(mtx); return completed_; }
             void wait(void);
             
             void set(int target, int start=0);
-            inline void setTarget(int t) { target_ = t; }
-            void increaseTarget(int t=1) { if(t) target_ += t; }
-            void decreaseTarget(int t=1) { if(t) target_ -= t; }
-            inline void setStart(int s) { start_ = s; }
-            inline void tick(void) const { if(onChange) onChange(); }
+            inline void setStart(int s) { std::unique_lock<std::mutex> lock(mtx); start_ = s; }
+            inline void setTarget(int t) { std::unique_lock<std::mutex> lock(mtx); target_ = t; }
             
-            inline void setHandler( std::function<void(void)> cb ) { onCompletion = cb; }
-            inline void setTicker( std::function<void(void)> cb ) { onChange = cb; }
+            void step(int step=1);
+            void stepTarget(int step=1);
+            inline void increase(int count=1) { step(count); };
+            inline void decrease(int count=1) { step(-count); };
+            inline void increaseTarget(int count=1) { stepTarget(count); }
+            inline void decreaseTarget(int count=1) { stepTarget(-count); }
             
-            ProgressWatch& operator--();
-            ProgressWatch& operator++();
+            inline void setHandler( std::function<void(void)> cb ) { std::unique_lock<std::mutex> lock(mtx); onCompletion = cb; }
+            inline void setTicker( std::function<void(void)> cb ) { std::unique_lock<std::mutex> lock(mtx); onChange = cb; }
+            
+            // prefix
+            inline ProgressWatch& operator++() { step(); return *this; }
+            inline ProgressWatch& operator--() { step(-1); return *this; }
+            // postfix
+            //inline ProgressWatch operator++(int) { ProgressWatch tmp = *this; increase(); return tmp; }
+            //inline ProgressWatch operator--(int) { ProgressWatch tmp = *this; decrease(); return tmp; }
             
             float progress(void);
+            std::string dump(void);
             std::string progressString(void);
             
         private:
             int start_;
-            std::atomic<int> counter_;
-            std::atomic<int> target_;
+            int counter_;
+            int target_;
+            bool completed_;
             std::mutex mtx;
             std::condition_variable cv;
             std::function<void(void)> onChange;
