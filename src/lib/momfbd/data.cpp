@@ -3,8 +3,10 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/solver.hpp"
 
+#include "redux/file/fileana.hpp"
 #include "redux/image/utils.hpp"
 
+using namespace redux::file;
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
@@ -96,6 +98,14 @@ void ChannelData::copyResults( const ChannelData& rhs ) {
     
     isLoaded = false;
 
+}
+
+
+void ChannelData::dump( string tag ) {
+
+    tag += "_c"+to_string(myChannel->ID);
+    if( images.nElements() ) Ana::write( tag + "_images.f0", images);
+ 
 }
 
 
@@ -264,6 +274,23 @@ void ObjectData::copyResults( const ObjectData& rhs ) {
 }
 
 
+void ObjectData::dump( string tag ) {
+
+    tag += "_o"+to_string(myObject->ID);
+    for( auto& ch : channels ) {
+        ch->dump(tag);
+    }
+
+    if( img.nElements() ) Ana::write( tag + "_img.f0", img);
+    if( psf.nElements() ) Ana::write( tag + "_psf.f0", psf);
+    if( cobj.nElements() ) Ana::write( tag + "_cobj.f0", cobj);
+    if( res.nElements() ) Ana::write( tag + "_res.f0", res);
+    if( alpha.nElements() ) Ana::write( tag + "_alpha.f0", alpha);
+    if( div.nElements() ) Ana::write( tag + "_div.f0", div);
+ 
+}
+
+
 PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
     for( auto& o: j.getObjects() ) {
         objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
@@ -400,6 +427,18 @@ void PatchData::copyResults( const PatchData& rhs ) {
     }
     
 }
+
+
+void PatchData::dump( string tag ) {
+
+    tag += "_patch" + (string)index;
+    
+    for( auto & object : objects ) {
+        object->dump(tag);
+    }
+     
+}
+
 
 
 ModeSet& GlobalData::get(const ModeInfo& id, const ModeSet& ms) {

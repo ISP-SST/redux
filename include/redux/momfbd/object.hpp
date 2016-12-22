@@ -118,6 +118,7 @@ namespace redux {
             redux::util::Point16 imgSize;
             mutable uint32_t nObjectImages;
             bpx::ptime startT, endT;
+            friend struct ObjectData;
             friend class MomfbdJob;
             friend class Channel;
 

@@ -61,6 +61,7 @@ namespace redux {
             const ChannelData& operator=(const ChannelData&);
 
             void copyResults( const ChannelData& rhs );
+            void dump( std::string );
             
             std::shared_ptr<Channel> myChannel;
             
@@ -89,6 +90,7 @@ namespace redux {
             const ObjectData& operator=(const ObjectData&);
             
             void copyResults( const ObjectData& rhs );
+            void dump( std::string );
             
             std::vector<std::shared_ptr<redux::util::Compressed<ChannelData,5>>> channels;
             
@@ -134,6 +136,7 @@ namespace redux {
             const PatchData& operator=(const PatchData&);
             
             void copyResults( const PatchData& rhs );
+            void dump( std::string );
             
         };
        

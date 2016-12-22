@@ -122,6 +122,7 @@ namespace redux {
             MomfbdJob& myJob;
             logging::Logger& logger;
 
+            friend struct ChannelData;
             friend class Object;
             friend class MomfbdJob;
             friend struct ModeSet;
