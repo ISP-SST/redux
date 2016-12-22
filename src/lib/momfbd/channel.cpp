@@ -195,8 +195,8 @@ bool Channel::checkCfg (void) {
     discard.resize(2,0);
 
     if( diversity.size() == diversityModes.size() ) {
-        for(unsigned int i=0; i<diversity.size(); ++i) {
-            if(diversityModes[i] == 4) {   // focus term, convert from physical length (including mm/cm) to coefficient
+        for( unsigned int i=0; i<diversity.size(); ++i ) {
+            if( diversityModes[i] == 4 && physicalDefocusDistance ) {   // focus term, convert from physical length (including mm/cm) to coefficient
                 diversity[i] = def2cf( diversity[i], myJob.telescopeD / myObject.telescopeF );
             }
         }
@@ -244,7 +244,7 @@ bool Channel::checkData (void) {
         Image<float> tmp;
         CachedFile::load( tmp, fn.string(), true );       // Only read metadata
         uint8_t nDims = tmp.meta->nDims();
-        CachedFile::unload<float>( fn.string() );
+        //CachedFile::unload<float>( fn.string() );
         if( nDims == 3 ) {
             nFrames[0] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
             //imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
@@ -263,7 +263,7 @@ bool Channel::checkData (void) {
             Image<float> tmp;
             CachedFile::load( tmp, fn.string(), true );       // Only read metadata
             uint8_t nDims = tmp.meta->nDims();
-            CachedFile::unload<float>( fn.string() );
+            //CachedFile::unload<float>( fn.string() );
             if( nDims == 3 ) {
                 nFrames[i] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
                 //imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
@@ -546,6 +546,8 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         });
     }
     
+    ++progWatch;
+    
 }
 
 
@@ -569,7 +571,7 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     imageStats.resize( nTotalFrames );
     
     LOG_DEBUG << "      nTotalFrames " << nTotalFrames << printArray(images.dimensions(),"  imgdims") << ende;
-    progWatch.set(0);
+    progWatch.set(1);
     progWatch.setHandler([this,nFiles,&service,&patches](){
         //cout << "Calib loaded.   " << myObject.ID << ":" << ID << endl;
         for( unsigned int y=0; y<patches.dimSize(0); ++y ) {
@@ -587,10 +589,13 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
             service.post( [&,i,nPreviousFrames](){
                 try {
                     loadFile(i,nPreviousFrames);
+                    
+                    if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
+                    
                     size_t nF = nFrames[i];
 
                     for( size_t j=0; j<nF; ++j ) {
-                        preprocessImage(nPreviousFrames+j);
+                        preprocessImage( nPreviousFrames+j );
                         //service.post(std::bind( &Channel::preprocessImage, this, nPreviousFrames+j) );
                     }
                     if( myObject.saveMask & SF_SAVE_FFDATA ) {
@@ -787,7 +792,7 @@ void Channel::initPatch (ChannelData& cd) {
 
 
 void Channel::initPhiFixed(void) {
-    
+
     phi_fixed.resize( myObject.pupilPixels, myObject.pupilPixels );
     phi_fixed.zero();
     double* phiPtr = phi_fixed.get();
@@ -802,10 +807,27 @@ void Channel::initPhiFixed(void) {
         }
         mi2.modeNumber = modeNumber;
         ModeSet& ms = myJob.globalData->get(mi2);
-        
+
+        if( ms.empty() ) {    // generate
+            if( diversityTypes[i] == ZERNIKE ) {
+                ms.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+            } else {
+                ms.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+            }
+            if( ms.nDimensions() != 3 || ms.dimSize(1) != myObject.pupilPixels || ms.dimSize(2) != myObject.pupilPixels ) {    // mismatch
+                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
+            } else {
+                LOG_DEBUG << "Generated Modeset with " << ms.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
+
+//                ms.getNorms( myObject.pupil );
+//cout << "initPhiFixed " << __LINE__ << endl;
+//                ms.normalize( 1.0/myObject.wavelength );
+//cout << "initPhiFixed " << __LINE__ << endl;
+            }
+        }        
         auto it = std::find(ms.modeNumbers.begin(), ms.modeNumbers.end(), modeNumber);
         if( it != ms.modeNumbers.end() ) {
-            double div = diversity[i];
+            double div = diversity[i]/myObject.wavelength;     // minus/sign is just to keep old cfg-files usable.
             const double* modePtr = ms.modePointers[static_cast<size_t>(it-ms.modeNumbers.begin())];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
                 [div](const double& p, const double& m) {
@@ -844,20 +866,22 @@ void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEn
 
 
 void Channel::loadFile( size_t fileIndex, size_t offset ) {
-    
-    bfs::path fn;
-    if( fileNumbers.empty() ) {         // single file
-        if( fileIndex != 0 ) {
-            LOG_ERR << "File-index is " << fileIndex << ", although this should be a single-file channel." << ende;
-            fileIndex = 0;      // FIXME: proper error handling.
-        }
-        fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
-    } else {
-        fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % fileNumbers[fileIndex] ) );
-    }
+    static mutex lmtx;
+    unique_lock<mutex> lock(lmtx);
+    //cout << ("imageDataDir="+imageDataDir+" imageTemplate="+imageTemplate) << flush;
+    bfs::path fn = bfs::path(imageDataDir) / bfs::path( );
+    //cout << "...ok"  << endl;
     
     try {
         
+        if( fileIndex >= fileNumbers.size() ) {
+            string msg = "File-index is out of range. (" + to_string(fileIndex) + "/" + to_string(fileNumbers.size()) + ").";
+            throw logic_error(msg);
+        }
+        if( !fileNumbers.empty() ) {
+            fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % fileNumbers[fileIndex] ) );
+        }
+    
         string imStr = to_string(fileIndex);
         Image<float> tmpImg;
         CachedFile::load( tmpImg, fn.string() );
@@ -877,10 +901,11 @@ void Channel::loadFile( size_t fileIndex, size_t offset ) {
             addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
         }
 
-    } catch ( const std::exception& e ) {
-        LOG_ERR << "Failed to load file " << fn << ". reason: " << e.what() << ende;
+    } catch ( const std::exception& ) {
+        throw;
     } catch ( ... ) {
-        LOG_ERR << "Failed to load file " << fn << " for unknown reason."  << ende;
+        string msg = "Failed to load file " + fn.string() + " for unknown reason.";
+        throw runtime_error(msg);
     }
 
 }

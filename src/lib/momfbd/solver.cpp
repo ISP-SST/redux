@@ -375,7 +375,9 @@ void Solver::run( PatchData::Ptr data ) {
     gsl_vector *beta_init = gsl_vector_alloc( nFreeParameters );
     memset(beta_init->data,0,nFreeParameters*sizeof(double));
     memset(alpha_offset,0,nParameters*sizeof(double));
-
+// for(uint i=0; i<nFreeParameters; ++i ) {
+//  if (i%nModes==2) alpha_offset[i] = -1.68e-06;
+// }
 //     for(uint i=0; i<nFreeParameters; ++i ) {
 //         beta_init->data[i] = 1;
 //         job.globalData->constraints.reverse( beta_init->data, alpha_offset );
@@ -417,50 +419,113 @@ shared_ptr<Object> obj0 = *job.objects.begin();
 cout << "shiftToAlpha: " << obj0->shiftToAlpha << endl;
 
 Array<float> slaskinit;
-readFile("/scratch/tomas/momfbdsol10_5.f0",slaskinit);
+//readFile("/scratch/tomas/momfbdsol10_5.f0",slaskinit);
 
 memset(alpha,0,nParameters*sizeof(double));
+memset(enabledModes,1,nModes*sizeof(uint16_t));
+
 applyAlpha();
 calcPQ();
 gradient(beta_init);
-dump("init0");
-  Array<double> wrap(grad_alpha,nParameters);
-  Ana::write("grad1",wrap);
+cout << printArray(grad_alpha, nModes, "grad0") << endl;
+
+//dump("init0");
+//  Array<double> wrap(grad_alpha,nParameters);
+//  Ana::write("grad1",wrap);
 //cout << printArray( grad_alpha, nParameters, "\ngrad1 " ) << endl;
 //cout << printArray( beta_init->data, nFreeParameters, "\ngrad_beta1 " ) << endl;
 job.globalData->constraints.reverse( beta_init->data, grad_alpha );
 //cout << printArray(grad_alpha, nParameters, "\ngrad2 ") << endl;
-  Ana::write("grad2",wrap);
+//  Ana::write("grad2",wrap);
 double refm = metric();
 cout << "\nMetric0: " << refm << endl;
+
+readFile("/scratch/tomas/sol60r.f0",slaskinit);
+std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
+    [](const double& a, const float&b){
+    return b;
+});
+applyAlpha();
+cout << "\nMetricR: " << (metric()/refm) << endl;
+
+vector<float> testM,testMr,posm;
+for( double pos=-2.0; pos<2; pos += 0.1 ) {
+    std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
+        [pos](const double& a, const float&b){
+        return pos*b;
+        //return 0.5*b;
+        //return -b;
+    });
+    applyAlpha();
+    testMr.push_back(metric()/refm);
+    posm.push_back(pos);
+}
+
+
+
+readFile("/scratch/tomas/sol60m.f0",slaskinit);
+std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
+    [](const double& a, const float&b){
+    return -b;
+});
+applyAlpha();
+cout << "\nMetricM: " << (metric()/refm) << endl;
+
+for( double pos=-2.0; pos<2; pos += 0.1 ) {
+    std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
+        [pos](const double& a, const float&b){
+        return -pos*b;
+        //return 0.5*b;
+        //return -b;
+    });
+    applyAlpha();
+    testM.push_back(metric()/refm);
+
+}
+cout << printArray( testMr, "testMr" ) << endl;
+cout << printArray( testM, "testMm" ) << endl;
+cout << printArray( posm, "posm" ) << endl;
+cout << "plot,posm,testMm" << endl;
+cout << "oplot,posm,testMr" << endl;
+
+
+
+exit(0);
+
+
 
 std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
     [](const double& a, const float&b){
     return -0.5*b;
+    //return 0.5*b;
+    //return -b;
 });
+applyAlpha();
+calcPQ();
+gradient(beta_init);
+cout << printArray(grad_alpha, nModes, "gradh_diff") << endl;
+
+gradientMethod = gradientMethods[GM_VOGEL];
+gradient(beta_init);
+cout << printArray(grad_alpha, nModes, "gradh_vog") << endl;
+
 //alpha[0] = -1.81099e-07;
 //alpha[1] = 6*obj0->shiftToAlpha.x;
 //cout << printArray( alpha, 80, "alpha0" ) << endl;
 applyAlpha();
 dump("init1");
 cout << "\nMetric1: " << (metric()/refm) << endl;
-// alpha[0] = 1.81099e-07;
-// alpha[1] = 2.85138e-07;
-// alpha[2] = 5.03692e-08;
-// alpha[3] = -6.47406e-8;
-//alpha[1] = 6*obj0->shiftToAlpha.x;
-cout << printArray( alpha, 20, "alpha0" ) << endl;
 applyAlpha();
 cout << "\nMetric2: " << (metric()/refm) << endl;
 calcPQ();
 gradient(beta_init);
 dump("init2");
 //cout << printArray( grad_alpha, nParameters, "\ngrad3 " ) << endl;
-  Ana::write("grad3",wrap);
+//  Ana::write("grad3",wrap);
 //cout << printArray( beta_init->data, nFreeParameters, "\ngrad_beta3 " ) << endl;
 job.globalData->constraints.reverse( beta_init->data, grad_alpha );
 //cout << printArray(grad_alpha, nParameters, "\ngrad4 ") << endl;
-  Ana::write("grad4",wrap);
+//  Ana::write("grad4",wrap);
 memset(beta_init->data,0,nFreeParameters*sizeof(double));
 
 double slaskMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
@@ -468,9 +533,6 @@ cout << "Initial metric = " << (std::scientific) << slaskMetric << endl;
 //return;
 exit(0);
 */
-
-    double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
-    LOG << "Initial metric = " << initialMetric << ende;
 
     double previousMetric(0);
     double thisMetric(0);
@@ -486,12 +548,32 @@ exit(0);
     timer.start();
     logger.flushAll();
 
-    memset( alpha_offset, 0, nParameters*sizeof(double) );
+//    memset( alpha_offset, 0, nParameters*sizeof(double) );
+    
+    alphaPtr = alpha_offset;
+    for( auto& objData: data->objects ) {
+        if( !objData ) continue;
+        objData->myObject->getInit( *objData, alphaPtr );
+        alphaPtr += objData->myObject->nObjectImages*nModes;
+    }
+    
+    double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
+    LOG << "Initial metric = " << initialMetric << ende;
+
+//cout << "Solver:  " << __LINE__ << endl;
+//    Array<double> wrapq(alpha_offset, nParameters);
+//    Ana::write( "patch_"+(string)data->index+"_ainit.f0", wrapq );
+//cout << "Solver:  " << __LINE__ << endl;
+/*Array<float> slaskinit;
+readFile("/scratch/tomas/sol60r.f0",slaskinit);
+std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha_offset,
+    [](const double& a, const float&b){
+    return -b;
+});*/
     
     string patchString = alignLeft(to_string(job.info.id) + ":" + to_string(data->id),8);
-
-    gradientMethod = gradientMethods[GM_DIFF];  // always use finite-difference for the first iteration.
-    
+//dump("init");
+gradientMethod = gradientMethods[GM_DIFF];
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
         modeCount = min<uint16_t>(modeCount,nModes);
@@ -504,56 +586,56 @@ exit(0);
         transform(modeNumbers,modeNumbers+nParameters,enabledModes,
                   [&activeModes](const uint16_t& a){ return activeModes.count(a)?a:0; }
                  );
-        
+
         if( modeCount == nModes ) {   // final loop, use proper FTOL and maxIterations
             modeCount = 0;            // we use modeCount=0 to exit the external loop
             tol = 5E-4; //job.FTOL;
             maxIterations = job.maxIterations;
         } else {
             modeCount += job.nModeIncrement;
-            failCount = 0;           // TODO: fix/test fail-reporting before using
+            //failCount = 0;           // TODO: fix/test fail-reporting before using
         }
 
+//memset(enabledModes,1,nModes*sizeof(uint16_t));
 //gradientMethod = gradientMethods[GM_DIFF];
-//cout << "                                                                     Solver: " << __LINE__ << endl;
+//gradientMethod = gradientMethods[GM_VOGEL];
+//cout << printArray(alpha_offset,nParameters,"alpha_offset") << endl;
+//cout << printArray(enabledModes,nModes,"enabledModes") << endl;
+//memset(enabledModes,1,nModes*sizeof(uint16_t));
+//cout  << endl << "                                                                     Solver: " << __LINE__ << endl;
+//cout  << "GradMethods: " << hexString(gradientMethods[GM_DIFF].target<double(SubImage&, uint16_t, double)>()) <<
+//    "  " << hexString(gradientMethods[GM_VOGEL].target<double(SubImage&, uint16_t, double)>()) << endl;
+//cout  << "GradMethod: " << hexString(gradientMethod.target<double(SubImage&, uint16_t, double)>()) << endl;
         // The previous position is saved in in alpha_offset, beta only contains the new step, so start at 0 each iteration
         gsl_multimin_fdfminimizer_set( s, static_cast<gsl_multimin_function_fdf*>(&my_func), beta_init, init_step, init_tol );
-//cout << "                                                                     Solver: " << __LINE__ << endl;
+//cout << printArray(activeModes,"activeModes") << endl;
+//cout << "Iteration: " << totalIterations << printArray(grad_alpha, nModes, "\nstart_agrad") << endl;
+//cout  << endl << "                                                                     Solver: " << __LINE__ << endl;
+//exit(0);
+//gradientMethod = gradientMethods[GM_VOGEL];
         size_t iter = 0;
         int successCount(0);
         bool done(false);
 //GSL_MULTIMIN_FN_EVAL_DF( &my_func, beta_init, s->gradient );        
 #ifdef DEBUG_
-        cout << "Iteration: " << totalIterations << "\nstart_metric = " << s->f
-                       << printArray(alpha_offset, nParameters, "\nalpha_offset")
-                       << printArray(alpha, nParameters, "\nstart_alpha")
-                       << printArray(grad_alpha, nParameters, "\nstart_agrad")
-                       << printArray(s->gradient->data, nFreeParameters, "\nstart_bgrad") << endl;
+//        cout << "Iteration: " << totalIterations << "\nstart_metric = " << s->f
+//                       << printArray(alpha_offset, nParameters, "\nalpha_offset")
+//                       << printArray(alpha, nParameters, "\nstart_alpha")
+//                       << printArray(grad_alpha, nParameters, "\nstart_agrad")
+//                       << printArray(s->gradient->data, nFreeParameters, "\nstart_bgrad") << endl;
         Array<double> gwrapper(grad_alpha, nTotalImages, nModes);
         Ana::write("grad_alpha_"+to_string(totalIterations)+".f0",gwrapper);
         //dump("iter_"+to_string(totalIterations));
         job.globalData->constraints.reverse( s->gradient->data, grad_alpha );
         Ana::write("grad_alphac_"+to_string(totalIterations)+".f0",gwrapper);
-        cout << printArray(grad_alpha, nParameters, "\nreversed_agrad") << endl;
-sleep(1);
-exit(0);
+//        cout << printArray(grad_alpha, nParameters, "\nreversed_agrad") << endl;
+//sleep(1);
+//exit(0);
 #endif
 //cout << "                                                                     Solver: " << __LINE__ << endl;
         do {
             iter++;
             status = gsl_multimin_fdfminimizer_iterate( s );
-            gradientMethod = gradientMethods[GM_VOGEL];
-            if( status == GSL_ENOPROG ) {
-                LOG_TRACE << "iteration: " << iter << "  GSL reports no progress." << ende;
-                failCount++;
-                break;
-            } else if( status ) {
-                LOG_WARN << "GSL error in iteration " << iter << ".  type: " << gsl_strerror(status) << ende;
-            }
-            thisMetric = s->f;
-            if( std::isnan(thisMetric) || std::isinf(thisMetric) ) {
-                failCount++;
-            } 
             if( failCount > maxFails ) {
                 LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")" << ende;
                 status = GSL_FAILURE;
@@ -562,8 +644,32 @@ exit(0);
                 //dump("fail");
                 //exit(0);
             }
-            gradNorm = gsl_blas_dnrm2(s->gradient)/(thisMetric);
-            if (iter>1) {
+gradientMethod = gradientMethods[GM_VOGEL];
+            if( status == GSL_ENOPROG ) {
+                LOG_TRACE << "iteration: " << (totalIterations+iter) << "  GSL reports no progress." << ende;
+                failCount++;
+                break;
+            } else if( status ) {
+                LOG_WARN << "GSL error in iteration " << (totalIterations+iter) << ".  type: " << gsl_strerror(status) << ende;
+            }
+            thisMetric = s->f;
+            if( !isfinite(thisMetric) ) {
+                LOG_WARN << "Error in iteration " << (totalIterations+iter) << ". Metric is not finite." << ende;
+                failCount++;
+                break;
+            } 
+            gradNorm = gsl_blas_dnrm2(s->gradient)/thisMetric;
+            if( !isfinite(gradNorm) ) {
+                LOG_WARN << "Error in iteration " << (totalIterations+iter) << ". Gradient is not finite." << ende;
+//                 LOG_ERR << "Gradient is infinite (or NaN) for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")" << ende;
+//                 status = GSL_FAILURE;
+//                 modeCount = 0;                  // exit outer loop.
+//                 done = true;                    // exit inner loop.
+//                dump("gradfail_"+to_string(failCount));
+                failCount++;
+                break;
+            }
+            if( iter>1 ) {
                 double relativeChange = 2.0 * fabs(thisMetric-previousMetric) / (fabs(thisMetric)+fabs(previousMetric)+job.EPS);
                 if( relativeChange < tol ) {
                     if( ++successCount >= job.targetIterations ) { // exit after targetIterations consecutive marginal improvements.
@@ -586,11 +692,13 @@ exit(0);
         if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
             size_t nActiveModes = activeModes.size();
             if( modeCount ) {
+                if( nActiveModes )  gradNorm /= nActiveModes;
                 LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
                  << "  metric=" << thisMetric << "  rmetric=" << (thisMetric/initialMetric)
-                 << " norm(grad)=" << (gradNorm/nActiveModes) << " using " << nActiveModes << "/" << nModes << " modes." << ende;
+                 << " norm(grad)=" << gradNorm << " using " << nActiveModes << "/" << nModes << " modes." << ende;
             }
         }
+
 //        cout << "                                                                     Solver: " << __LINE__ << endl;
 //dump("itera_"+to_string(totalIterations));
         if( modeCount ) {
@@ -873,7 +981,7 @@ void Solver::gradient( gsl_vector* grad ) {
 
 
 void Solver::clear( void ) {
-    
+
     delete[] modeNumbers;
     delete[] enabledModes;
     delete[] alpha;
@@ -889,6 +997,7 @@ void Solver::clear( void ) {
     alpha = grad_alpha = alpha_offset = tmp_alpha = nullptr;
     regAlphaWeights = nullptr;
     beta = grad_beta = search_dir = tmp_beta = nullptr;
+
 
 }
 

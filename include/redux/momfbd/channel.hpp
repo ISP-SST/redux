@@ -59,7 +59,6 @@ namespace redux {
             uint32_t nImages(void);
             void adjustCutout(ChannelData&, const redux::util::Region16&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
-            void storePatchData(boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>&);          
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
@@ -80,12 +79,12 @@ namespace redux {
             void initCache(void);
             
             void loadCalib(boost::asio::io_service&);
-            void loadData(boost::asio::io_service&);
+            void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void storePatches(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void unloadData(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
-            void loadFile( size_t index );
+            void loadFile( size_t fileIndex, size_t offset );
             void preprocessImage( size_t index );
             void copyImagesToPatch(ChannelData&);          
             
@@ -101,6 +100,7 @@ namespace redux {
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
+            std::shared_ptr<uint8_t> mask;
             bpx::ptime startT, endT;
             std::future<bool> patchWriteFail;
             std::vector<size_t> nFrames;                                    //!< Number of frames in each file

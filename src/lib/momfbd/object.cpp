@@ -217,7 +217,6 @@ void Object::initProcessing( const Solver& ws ) {
         if( modes.get() == ret.get() ) {    // rescale local modes
             ret = modes.clone();
             ret.getNorms( pupil );
-    cout << "Object " << ID <<  printArray(ret.norms,"  mode_norms") << endl;
             ret.normalize( mode_scale );
         }
         modes = ret;
@@ -283,18 +282,22 @@ void Object::getResults(ObjectData& od, double* alpha) {
     avgObjFT.conj();    // This is because we re recycling addPQ in SubImage.restore(),
                         // which actually returns the complex conjugate of the deconvolution.
     
+//Ana::write( "ao1.f0", avgObjFT );  
     avgNoiseVariance /= nObjectImages;
     avgShift *= 1.0/nObjectImages;
     
     //LOG_DETAIL << "Average shift for object #" << ID << ":" << avgShift << ende;
 
     avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
+//Ana::write( "ao2.f0", avgObjFT );  
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
         LOG_DEBUG << boost::format("Object %d: Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % ID % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
         ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
     
+//Ana::write( "ao3.f0", avgObjFT );  
+
     avgObjFT.getIFT( tmpC.get() );
 //static int cnt(0);
 //Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_cresult.f0", tmpC );
@@ -436,6 +439,21 @@ void Object::getResults(ObjectData& od, double* alpha) {
 }
 
 
+void Object::getInit(ObjectData& od, double* alpha) {
+
+    unique_lock<mutex> lock (mtx);
+    // Mode coefficients
+    size_t nAlpha = od.alpha.nElements();
+    if( nAlpha > 0 ) {
+cout << "Object::getInit()  hasAlpha.   " << printArray(od.alpha.dimensions(),"dims") << endl;
+        std::copy( od.alpha.get(), od.alpha.get()+nAlpha, alpha );
+Ana::write("init_"+hexString(this)+".f0",od.alpha);
+    }
+
+
+}
+
+
 void Object::initPQ (void) {
     P.zero();
   //cout << "imgstack::Object::initPQ(" << ID << ") " << __LINE__ << "  rg = " << reg_gamma << endl;
@@ -540,7 +558,7 @@ void Object::fitAvgPlane( void ) {
         fittedPlane /= count;
         vector<double> coeffs(3,0.0);
         fittedPlane = fitPlane( fittedPlane, true, coeffs.data() );          // fit plane to the average image, and subtract average
-        LOG_WARN << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
+        LOG_TRACE << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
     }
     
 }
@@ -847,7 +865,8 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
     endT = bpx::neg_infin;
     
     progWatch.set( nImages() );
-//cout << "Object::loadData()  nIm:" << nImages() << endl;
+
+    loadInit( service, patches );
     progWatch.setTicker(nullptr);
 //     progWatch.setTicker([&](){
 //         cout << "Object::loadData()  otick: " << progWatch.progressString() << endl;
@@ -864,13 +883,110 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
             else endT = std::max(endT,ch->endT);
             ch->storePatches(service, patches);
         }
-        LOG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
+        LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     });
     
     for( auto& ch: channels ) {
         ch->loadData( service, patches );
     }
  
+}
+
+
+void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& patches ) {
+    
+    //if( initFile == "" ) return;
+    
+    bfs::path tmpFile( initFile );
+    if( isRelative(tmpFile) ) {
+        tmpFile = bfs::path(myJob.info.outputDir) / tmpFile;
+    }
+
+    if( !bfs::exists(tmpFile) ) {
+        tmpFile = bfs::path(tmpFile.string() + ".momfbd");
+    }
+
+    if( !bfs::exists(tmpFile) ) return;
+    
+    ifstream file;
+    std::shared_ptr<FileMomfbd> info ( new FileMomfbd() );
+
+    try {
+        file.open( tmpFile.string() );
+        info->read( file );
+        if( !(info->dataMask&MOMFBD_ALPHA) ) {
+            LOG_ERR << "Initilazation file: " << tmpFile <<  " does not contain alphas." << ende;
+            return;
+        }
+        
+        size_t nPatchesX = info->nPatchesX;
+        size_t nPatchesY = info->nPatchesY;
+        size_t patchSize = info->getPatchSize( MOMFBD_ALPHA );
+        size_t offset = info->getPatchSize( 0 );
+        size_t nImgs = (patchSize-offset)/(info->nModes*sizeof(float));
+
+        if( (patches.dimSize(0) != nPatchesY) || (patches.dimSize(1) != nPatchesX) ) {
+            LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of patches." << ende;
+            LOG_ERR << "nPatchesX = " << nPatchesX << " - " << patches.dimSize(1) << ende;
+            LOG_ERR << "nPatchesY = " << nPatchesY << " - " << patches.dimSize(0) << ende;
+            return;
+        }
+        if( info->nModes != myJob.modeNumbers.size() ) {
+            LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of modes." << ende;
+            LOG_ERR << "info->nModes = " << info->nModes << " != " << myJob.modeNumbers.size()  << ende;
+            return;
+        }
+        if( nImgs != nImages() ) {
+            LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of alphas." << ende;
+            LOG_ERR << "nImgs = " << nImgs << " != " << nImages() << ende;
+            return;
+        }
+
+        LOG << "Loading initialization from file: " << tmpFile << ende;
+        unique_ptr<char[]> tmpData( new char[patchSize] );
+        for( size_t y=0; y<nPatchesY; ++y ) {
+            for( size_t x=0; x<nPatchesX; ++x ) {
+                info->patches(y,x).load( file, tmpData.get(), info->swapNeeded, info->version, MOMFBD_ALPHA );
+                auto oData = patches(y,x)->objects[ID];
+                oData->alpha.resize( nImgs, info->nModes );
+                oData->alpha.copyFrom<float>( reinterpret_cast<float*>(tmpData.get()+offset) );
+                oData->cacheStore(true);    // store to disk and clear array
+            }
+        }
+        
+    } catch ( exception& e ) {
+        LOG_ERR << "Failed to read initilazation file: " << tmpFile <<  "\n\t Reason: " << e.what() << ende;
+        return;
+    }
+/*
+    if ( verbosity > 1 ) {
+        cout << "File Version:       \"" << info->versionString << "\"" << endl;
+    }
+
+    uint8_t loadMask = 0;
+
+    if ( kw.img )     loadMask |= MOMFBD_IMG;
+    if ( kw.psf )     loadMask |= MOMFBD_PSF;
+    if ( kw.obj )     loadMask |= MOMFBD_OBJ;
+    if ( kw.res )     loadMask |= MOMFBD_RES;
+    if ( kw.alpha )   loadMask |= MOMFBD_ALPHA;
+    if ( kw.div )     loadMask |= MOMFBD_DIV;
+    if ( kw.modes )   loadMask |= MOMFBD_MODES;
+    if ( kw.names )   loadMask |= MOMFBD_NAMES;
+    if ( kw.all )     loadMask = info->dataMask;
+
+    IDL_KW_FREE;
+
+    if ( !loadMask && !checkData ) {
+        loadMask = info->dataMask;
+    } else {
+        loadMask &= info->dataMask;
+    }
+*/
+    
+    
+    //LOG << "Loading initialization from file: " << tmpFile << ende;
+    //++progWatch;
 }
 
 
@@ -994,6 +1110,7 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
         info->phOffset = 0;
         tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1);
         tmp_slice.assign(mode_wrap);
+        tmp_slice /= wavelength;
         if (myJob.modeNumbers.size()) {
             //ModeInfo id (myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
             info->nModes = myJob.modeNumbers.size();

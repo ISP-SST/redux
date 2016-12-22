@@ -50,33 +50,39 @@ bpo::options_description& Application::parseCmdLine( int argc, char* argv[],  bp
                                                     bpo::positional_options_description *positionalOptions,
                                                     parserFunction custom_parser ) {
     static bpo::options_description all;
-    if( programOptions ) {
-        all.add( *programOptions );
-    }
-
-    fs::path tmpPath = fs::path(string(argv[0])).filename();
-    Application::executableName = tmpPath.string();
-    getOptions( all, Application::executableName );
     
-    bpo::command_line_parser parser( argc, argv );
-    parser.options( all );
-    parser.extra_parser( appCmdParser );
+    try {
+        if( programOptions ) {
+            all.add( *programOptions );
+        }
 
-    if( positionalOptions ){
-        parser.allow_unregistered().positional(*positionalOptions);
+        fs::path tmpPath = fs::path(string(argv[0])).filename();
+        Application::executableName = tmpPath.string();
+        getOptions( all, Application::executableName );
+        
+        bpo::command_line_parser parser( argc, argv );
+        parser.options( all );
+        parser.extra_parser( appCmdParser );
+
+        if( positionalOptions ){
+            parser.allow_unregistered().positional(*positionalOptions);
+        }
+        bpo::store( parser.run(), vm );
+
+        if( custom_parser ) {
+            custom_parser( all, vm );
+        }
+
+        // If e.g. --help was specified, just dump output and exit.
+        checkGeneralOptions( all, vm );
+
+        //vm.notify();
+        //bpo::variables_map::notify(vm);
+    } catch( const exception& e ) {
+        cout << "Failed to parse command-line. Reason: " << e.what() << endl;
+        vm.insert( std::make_pair( "help", bpo::variable_value() ) );
     }
-    bpo::store( parser.run(), vm );
-
-    if( custom_parser ) {
-        custom_parser( all, vm );
-    }
-
-    // If e.g. --help was specified, just dump output and exit.
-    checkGeneralOptions( all, vm );
-
-    //vm.notify();
-    //bpo::variables_map::notify(vm);
-
+    
     return all;
 
 }

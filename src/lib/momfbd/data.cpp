@@ -292,10 +292,12 @@ void PatchData::initPatch(void) {
 
 
 uint64_t PatchData::size( void ) const {
+
     if( !isLoaded && cachedSize ) return cachedSize;
     uint64_t sz = Part::size();
     sz += index.size() + position.size() + roi.size();
     sz += sizeof(float);
+
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         if(obj) sz += obj->ObjectData::size();
@@ -436,11 +438,11 @@ bool GlobalData::verify( void ) const {
 
 uint64_t GlobalData::size( void ) const {
     uint64_t sz = 2*sizeof(uint16_t); // nModes & nPupils
-    for( auto& mode: modes) {
+    for( auto& mode: modes ) {
         sz += mode.first.size();
         sz += mode.second.size();
     }
-    for( auto& pupil: pupils) {
+    for( auto& pupil: pupils ) {
         sz += pupil.first.size();
         sz += pupil.second.size();
     }

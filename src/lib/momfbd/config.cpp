@@ -120,7 +120,7 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), borderClip(100), incomplete(0), discard(2,0),
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), physicalDefocusDistance(false), borderClip(100), incomplete(0), discard(2,0),
         mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel("config") {
 
 }
@@ -149,19 +149,33 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     
     // TODO: collect diversity settings in a struct and write a translator
     string tmpString = tree.get<string>( "DIVERSITY", "" );
+//     cout << "tmpStr1 = " <<tmpString << endl;
+//     //tmpString.erase(remove_if(tmpString.begin(), tmpString.end(), isspace), tmpString.end());
+//     //tmpString.erase(std::remove_if(tmpString.begin(), tmpString.end(), std::isspace), tmpString.end());
+//     tmpString.erase(std::remove (tmpString.begin(), tmpString.end(), ' '), tmpString.end());
+//     //boost::erase_all(tmpString, " ");
+//     cout << "tmpStr2 = " <<tmpString << endl;
     diversity.clear();
     diversityModes.clear();
     diversityTypes.clear();
     if( ! tmpString.empty() ) {
         double tmpD = 1.0;
-        if( tmpString.find( "mm" ) != string::npos ) tmpD = 1.00E-03;
-        else if( tmpString.find( "cm" ) != string::npos ) tmpD = 1.00E-02;
+        if( tmpString.find( "mm" ) != string::npos ) {
+            physicalDefocusDistance = true;
+            tmpD = 1.00E-03;
+        } else if( tmpString.find( "cm" ) != string::npos ) {
+            physicalDefocusDistance = true;
+            tmpD = 1.00E-02;
+        }
         //tmpString.erase( boost::remove_if( tmpString, boost::is_any_of( "cm\" " ) ), tmpString.end() );
         tmpString.erase( remove_if( tmpString.begin(), tmpString.end(),
                                [](const char&a ){ return (a == 'c' || a == 'm' || a == ' ' || a == '"'); } ), tmpString.end() );
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
+    cout << "tmpStr3 = \"" <<tmpString << "\"" << endl;
         tmpTree.put( "tmp", tmpString );
+    cout << "blaha1 " << endl;
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
+    cout << "blaha1 " << printArray(diversity,"DiV") << endl;
         tmpString = tree.get<string>( "DIV_ORDERS", "" );
         if( tmpString.empty() ) {
             if( diversity.size() > 1 ) {
@@ -181,7 +195,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         if( diversity.size() == diversityModes.size() ) {
             for(unsigned int i=0; i<diversity.size(); ++i) {
                 if(diversityModes[i] == 4) {   // focus term, convert from physical length (including mm/cm) to coefficient
-                    diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
+                    diversity[i] = -tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
                 }
             }
         } else {
@@ -189,9 +203,9 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         }
         
         if( diversity.size() ) {
-//             LOG << "Diversity: " << printArray(diversityModes, "modes")
-//                 << "    " << printArray(diversityTypes, "types")
-//                 << "    " << printArray(diversity, "values");
+             cout << "Diversity: " << printArray(diversityModes, "\n\tmodes")
+                 << "    " << printArray(diversityTypes, "\n\ttypes")
+                 << "    " << printArray(diversity, "\n\tvalues") << endl;
         }
         
     }
@@ -301,7 +315,7 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
 
 uint64_t ChannelCfg::size(void) const {
     uint64_t sz = 3*sizeof(double);         // rotationAngle, weight, noiseFudge
-    sz += sizeof(uint16_t)+3;             // borderClip, incomplete, mmRow, mmWidth
+    sz += sizeof(uint16_t)+4;             // borderClip, incomplete, mmRow, mmWidth,physicalDefocusDistance
     sz += sizeof(uint32_t);                 // imageNumberOffset
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
@@ -331,6 +345,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, diversity);
     count += pack(ptr+count, diversityModes);
     count += pack(ptr+count, diversityTypes);
+    count += pack(ptr+count, physicalDefocusDistance);
     count += pack(ptr+count, alignMap);
     count += pack(ptr+count, alignClip);
     count += pack(ptr+count, discard);
@@ -367,6 +382,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, diversity, swap_endian);
     count += unpack(ptr+count, diversityModes, swap_endian);
     count += unpack(ptr+count, diversityTypes, swap_endian);
+    count += unpack(ptr+count, physicalDefocusDistance, swap_endian);
     count += unpack(ptr+count, alignMap, swap_endian);
     count += unpack(ptr+count, alignClip, swap_endian);
     count += unpack(ptr+count, discard, swap_endian);
@@ -453,6 +469,7 @@ void ObjectCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     if( tree.get<bool>( "GET_RESIDUAL", defaults.saveMask&SF_SAVE_RESIDUAL ) ) saveMask |= SF_SAVE_RESIDUAL;
     if( tree.get<bool>( "SAVE_FFDATA", defaults.saveMask&SF_SAVE_FFDATA ) ) saveMask |= SF_SAVE_FFDATA;
     outputFileName = tree.get<string>("OUTPUT_FILE", defaults.outputFileName);
+    initFile = tree.get<string>("INIT_FILE", defaults.initFile);
     modeFile = tree.get<string>("MODE_FILE", defaults.modeFile);
     pupilFile = tree.get<string>("PUPIL", defaults.pupilFile);
     wavelength = tree.get<double>("WAVELENGTH", defaults.wavelength);
@@ -489,6 +506,7 @@ void ObjectCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
     if( diff & SF_SAVE_RESIDUAL ) tree.put( "GET_RESIDUAL", bool( saveMask & SF_SAVE_RESIDUAL ) );
     if( diff & SF_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", bool( saveMask & SF_SAVE_FFDATA ) );
     if(outputFileName != defaults.outputFileName) tree.put("OUTPUT_FILE", outputFileName);
+    if(initFile != defaults.initFile) tree.put("INIT_FILE", initFile);
     if(modeFile != defaults.modeFile) tree.put("MODE_FILE", modeFile);
     if(pupilFile != defaults.pupilFile) tree.put("PUPIL", pupilFile);
     if(wavelength != defaults.wavelength) tree.put("WAVELENGTH", wavelength);
@@ -501,7 +519,7 @@ void ObjectCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
 uint64_t ObjectCfg::size(void) const {
     uint64_t sz = ChannelCfg::size();
     sz += 5*sizeof(uint16_t);
-    sz += outputFileName.length() + 1;
+    sz += outputFileName.length() + initFile.length() + 2;
     sz += modeFile.length() + pupilFile.length() + 2;
     sz += 8*sizeof(double);
     return sz;
@@ -524,6 +542,7 @@ uint64_t ObjectCfg::pack(char* ptr) const {
     count += pack(ptr+count, pupilPixels);
     count += pack(ptr+count, saveMask);
     count += pack(ptr+count, outputFileName);
+    count += pack(ptr+count, initFile);
     count += pack(ptr+count, modeFile);
     count += pack(ptr+count, pupilFile);
     count += pack(ptr+count, wavelength);
@@ -547,6 +566,7 @@ uint64_t ObjectCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, pupilPixels, swap_endian);
     count += unpack(ptr+count, saveMask, swap_endian);
     count += unpack(ptr+count, outputFileName);
+    count += unpack(ptr+count, initFile);
     count += unpack(ptr+count, modeFile);
     count += unpack(ptr+count, pupilFile);
     count += unpack(ptr+count, wavelength, swap_endian);
@@ -709,6 +729,14 @@ void GlobalCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& def) {
     if( tmpString != "" ) {
         boost::split( outputFiles, tmpString, boost::is_any_of( "," ) );
     }
+    
+    if( tree.count("INIT_FILES") ) {
+        tmpString = tree.get<string>( "INIT_FILES", "" );
+        initFiles = defaults.initFiles;
+        if( tmpString != "" ) {
+            boost::split( initFiles, tmpString, boost::is_any_of( "," ) );
+        } else initFiles.resize(1,"OUTPUT");
+    }
 
     if( runFlags & RF_CALIBRATE ) {
         //saveMask |= SF_SAVE_ALPHA; // necessary for calibration runs.
@@ -801,6 +829,7 @@ void GlobalCfg::getProperties(bpt::ptree& tree, const ChannelCfg& def) const {
     if(observationDate != defaults.observationDate) tree.put("DATE_OBS", observationDate);
     if(tmpDataDir != defaults.tmpDataDir) tree.put("PROG_DATA_DIR", tmpDataDir);
     if(outputFiles != defaults.outputFiles) tree.put("OUTPUT_FILES", outputFiles);
+    if(initFiles != defaults.initFiles) tree.put("INIT_FILES", initFiles);
 
     ObjectCfg::getProperties(tree, defaults);
 

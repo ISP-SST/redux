@@ -119,6 +119,7 @@ namespace redux {
             const redux::util::Array<double>& noiseWindow;
             
             redux::util::PointD adjustedTilts;
+            bool shifted;
             bool newPhi;
             bool newOTF;
             std::mutex mtx;

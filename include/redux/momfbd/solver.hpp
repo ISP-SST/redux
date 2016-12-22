@@ -51,6 +51,7 @@ namespace redux {
             
             void run(PatchData::Ptr);
             
+            void shiftSubImages( void );
             void applyAlpha(void);
             void applyBeta( const gsl_vector* beta );
             void applyBeta( const gsl_vector* beta, double scale );

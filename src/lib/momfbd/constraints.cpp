@@ -370,7 +370,7 @@ void Constraints::blockifyGroups( void ) {
         output.clear();
         std::copy(unused2.begin(), unused2.end(), std::back_inserter(output));
         redux::file::Ana::write("unused2",output);
-        //LOG_ERR << "Size mismatch in Constraints::blockifyGroups(). This should *never* happen, so go looking for the bug. :-P";
+        LOG_ERR << "Size mismatch in Constraints::blockifyGroups(). This should *never* happen, so go looking for the bug. :-P";
     }
     
     blockified = true;
@@ -464,29 +464,40 @@ void Constraints::init( void ) {
                 }
                 constraints.push_back( thisConstraint );
 
-                int32_t kOffset = 0;
+                //int32_t kOffset = 0;
+                map<int32_t, Constraint> wfCons;
+                int32_t parameterOffset(0);
                 for( auto& obj : objects ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
                     for( auto& ch : obj->getChannels() ) {
-                        if( kOffset ) { // skip reference channel
-                            int32_t tOffset = 0;
-                            for( size_t count=ch->nImages(); count; --count ) {
-//                                 if( tOffset ) { // skip reference wavefront      TODO: select type with cfg option.
-//                                                                                  TBD:  proper dealing with fixed differences.
-//                                     thisConstraint.reset( new Constraint( modeIndex, 1 ) );                  // \alpha_{11m}
-//                                     thisConstraint->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
-//                                     thisConstraint->addEntry( kOffset + tOffset + modeIndex, 1 );            // \alpha_{tkm}
-//                                     thisConstraint->addEntry( kOffset + modeIndex, -1 );                     // \alpha_{1km}
-//                                     constraints.push_back( thisConstraint );
-//                                 }
-                                //if( tOffset ) { // skip reference wavefront
-                                    thisConstraint.reset( new Constraint( logger, tOffset + modeIndex, 1 ) ); // \alpha_{tkm}
-                                    thisConstraint->addEntry( kOffset + tOffset + modeIndex, -1 );          // \alpha_{t(k-1)m}
-                                    constraints.push_back( thisConstraint );
-                                //}
-                                tOffset += nModes;
+                        for( auto& wf : ch->waveFronts ) {
+                            auto ret = wfCons.insert( make_pair( wf, Constraint( logger, parameterOffset + modeIndex, 1 ) ) );
+                            if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
+                                shared_ptr<Constraint> thisConstraint( new Constraint( logger, ret.first->second ) );
+                                thisConstraint->addEntry( parameterOffset + modeIndex, -1 );
+                                constraints.push_back( thisConstraint );
                             }
+                            parameterOffset += nModes;
                         }
-                        kOffset += ch->nImages() * nModes;
+//                         if( kOffset ) { // skip reference channel
+//                             int32_t tOffset = 0;
+//                             for( size_t count=ch->nImages(); count; --count ) {
+// //                                 if( tOffset ) { // skip reference wavefront      TODO: select type with cfg option.
+// //                                                                                  //TBD:  proper dealing with fixed differences.
+// //                                     thisConstraint.reset( new Constraint( logger, modeIndex, 1 ) );          // \alpha_{11m}
+// //                                     thisConstraint->addEntry( tOffset + modeIndex, -1 );                     // \alpha_{t1m}
+// //                                     thisConstraint->addEntry( kOffset + tOffset + modeIndex, 1 );            // \alpha_{tkm}
+// //                                     thisConstraint->addEntry( kOffset + modeIndex, -1 );                     // \alpha_{1km}
+// //                                     constraints.push_back( thisConstraint );
+// //                                 }
+//                                 //if( tOffset ) { // skip reference wavefront
+//                                    thisConstraint.reset( new Constraint( logger, tOffset + modeIndex, 1 ) ); // \alpha_{tkm}
+//                                     thisConstraint->addEntry( kOffset + tOffset + modeIndex, -1 );          // \alpha_{t(k-1)m}
+//                                     constraints.push_back( thisConstraint );
+//                                 //}
+//                                 tOffset += nModes;
+//                             }
+//                         }
+//                         kOffset += ch->nImages() * nModes;
                     }
                 }
 
@@ -494,8 +505,7 @@ void Constraints::init( void ) {
                 map<int32_t, Constraint> wfCons;
                 for( auto& obj : objects ) {
                     for( auto& ch : obj->getChannels() ) {
-                        //cout << "ModeNumber = " << modeNumber << "   nWF = " << ch->waveFronts.size() << "   nF = " << ch->fileNumbers.size() << endl;
-                        for( auto& wf : ch->fileNumbers ) {
+                        for( auto& wf : ch->waveFronts ) {
                             int32_t parameterOffset = imageCount * nModes;
                             auto ret = wfCons.insert( make_pair( wf, Constraint( logger, parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient

@@ -78,6 +78,7 @@ namespace redux {
             std::vector<double> diversity;
             std::vector<uint16_t> diversityModes;    //!< mode numbers
             std::vector<uint16_t> diversityTypes;    //!< mode types (Zernike/KL)
+            bool physicalDefocusDistance;
             /*****************************/
             
             /******* Data settings *******/
@@ -86,6 +87,7 @@ namespace redux {
             uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
             uint8_t incomplete;                     //!< Some files might not exist, just skip those.
             std::vector<uint16_t> subImagePosX, subImagePosY;
+            std::vector<uint16_t> discard;           //!< Skip this many frames in the beginning/end of datacubes
             /*****************************/
 
             /************ Input **********/
@@ -151,6 +153,7 @@ namespace redux {
             uint16_t pupilPixels;                   //!< (default: 64)
             uint16_t saveMask;                      //!< (default: 0)
             std::string outputFileName;
+            std::string initFile;
             std::string modeFile;
             std::string pupilFile;
             double wavelength;                      //!< (default: 0, has to be specified)
@@ -216,6 +219,7 @@ namespace redux {
             std::string observationDate;
             std::string tmpDataDir;
             std::vector<std::string> outputFiles;
+            std::vector<std::string> initFiles;
             /*****************************/
 
             

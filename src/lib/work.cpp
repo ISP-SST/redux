@@ -158,6 +158,7 @@ uint64_t WorkInProgress::packWork( char* ptr ) const {
 
 
 uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
+
     using redux::util::unpack;
     uint64_t count = this->unpack( ptr, swap_endian );
     bool newJob;
@@ -179,13 +180,7 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
 
 void WorkInProgress::returnResults(void) {
     if( job ) {
-        for( auto& part : parts ) {
-            part->cacheLoad();
-        }
         job->returnResults( shared_from_this() );
-        for( auto& part : parts ) {
-            part->cacheStore(true);
-        }
         resetParts();
     }
 }

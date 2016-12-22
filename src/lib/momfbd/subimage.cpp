@@ -57,7 +57,7 @@ namespace {
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind)
     : imgSize(0), pupilSize(0), nModes(0), oldRG(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
-      window (wind), noiseWindow(nwind) {
+      window (wind), noiseWindow(nwind), shifted(false) {
 
 #ifdef USE_LUT
     static int dummy RDX_UNUSED = initSineLUT(); 
@@ -177,13 +177,17 @@ void SubImage::init (void) {
 
     LOG_DEBUG << str << "  initial shift=" << (string)offsetShift << ende;
     
+    shifted = false;
+    
 }
 
 
 void SubImage::reInitialize(void) {
 
+    //if( !shifted ) return;      // nothing to do
+
     memcpy(tmpFT.get(),imgFT.get(),imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
-    
+
     copy(img);                                                                                  // copy current cut-out to (double) working copy.
 
     stats.getStats( img.get(), imgSize*imgSize, ST_VALUES );     // TODO test if this is necessary or if the stats for the larger area is sufficient
@@ -220,7 +224,18 @@ void SubImage::reInitialize(void) {
    
   
     FourierTransform::reorder(imgFT);                                                           // keep FT in centered form
+//    LOG_DEBUG << "REINIT  " << printArray(imgFT.dimensions(),"  ftDims") << printArray(tmpFT.dimensions(),"  tmpftDims") << ende;
+    
+//     transform(tmpFT.get(), tmpFT.get()+tmpFT.nElements(), imgFT.get(), tmpFT.get(),
+//             [](const complex_t& a, const complex_t& b) { return sqrt(norm(b)-norm(a)); }
+//             );
+// 
+//     
+//     
+//     object.addToFT( tmpFT );
     object.addDiffToFT( imgFT, tmpFT );
+    
+    shifted = false;
     
 }
 
@@ -288,12 +303,20 @@ void SubImage::addToPQ(void) const {
 
 void SubImage::restore( complex_t* obj, double* obj_norm ) const {
 
-    bool no_restore(false);         // TODO: implement NO_RESTORE cfg flag
-    if( !no_restore ) {
-        addPQ( OTF.get(), obj, obj_norm );      // Note: should really return obj = ft*conj(sj) for the deconvolution,
-                                                // and addPQ returns the conjugate.
-    }
+//     bool no_restore(false);         // TODO: implement NO_RESTORE cfg flag
+//     if( !no_restore ) {
+//         addPQ( OTF.get(), obj, obj_norm );      // Note: should really return obj = ft*conj(sj) for the deconvolution,
+//                                                 // and addPQ returns the conjugate.
+//     }
 
+    const complex_t* ftPtr = imgFT.get();
+    const complex_t* otfPtr = OTF.get();
+    for( const size_t& ind: object.pupil.otfSupport ) {
+        obj_norm[ind] += norm(otfPtr[ind]);
+        obj[ind] += conj(ftPtr[ind]) * (otfPtr[ind]);
+    }
+    
+    
 }
 
 
@@ -318,7 +341,7 @@ double SubImage::metricChange(const complex_t* newOTF) const {
 
 
 double SubImage::gradientFiniteDifference( uint16_t modeIndex, double step ) {
-    
+//cout << "g" << flush;
     complex_t* otfPtr = tmpC.get();
     double* phiPtr = tmpPhi.get();
     memcpy(phiPtr, phi.get(), pupilSize2*sizeof(double));
@@ -330,7 +353,7 @@ double SubImage::gradientFiniteDifference( uint16_t modeIndex, double step ) {
 
 
 double SubImage::gradientVogel(uint16_t modeIndex, double ) const {
-
+//cout << "G" << flush;
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
@@ -396,8 +419,8 @@ void SubImage::calcVogelWeight(void) {
 
 
 void SubImage::resetPhi(void) {
-    memset(phi.get(), 0, pupilSize2*sizeof (double));    // FIXME: use phi_fixed
-    //memcpy( phi.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements()*sizeof (double));
+    //memset(phi.get(), 0, pupilSize2*sizeof (double));    // FIXME: use phi_fixed
+    memcpy( phi.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements()*sizeof (double));
 }
 
 #include <iomanip>      // std::setiosflags, std::resetiosflags
@@ -410,7 +433,7 @@ bool SubImage::adjustOffset( double* alpha ) {
     
     int32_t mIndex = object.modes.tiltMode.x;
     if( mIndex >= 0 ) {
-        double shiftToAlpha = object.shiftToAlpha.x;
+        double shiftToAlpha = object.shiftToAlpha.x; // 0.671874;
         double alphaToShift = 1.0/shiftToAlpha;
         newVal.x = oldVal.x = alpha[mIndex];
         int adjust = -lround( oldVal.x*alphaToShift );
@@ -419,7 +442,7 @@ bool SubImage::adjustOffset( double* alpha ) {
             if( adjust ) {
                 offsetShift.x += adjust;
                 alpha[mIndex] += adjust*shiftToAlpha;
-                adjustedTilts.x = offsetShift.x*shiftToAlpha;
+                adjustedTilts.x += adjust*shiftToAlpha;
                 newVal.x = alpha[mIndex];
             }
         }
@@ -427,7 +450,7 @@ bool SubImage::adjustOffset( double* alpha ) {
 
     mIndex = object.modes.tiltMode.y;
     if( mIndex >= 0 ) {
-        double shiftToAlpha = object.shiftToAlpha.y;
+        double shiftToAlpha = object.shiftToAlpha.y; // 0.671874;
         double alphaToShift = 1.0/shiftToAlpha;
         newVal.y = oldVal.y = alpha[mIndex];
         int adjust = -lround( oldVal.y*alphaToShift );
@@ -436,19 +459,19 @@ bool SubImage::adjustOffset( double* alpha ) {
             if(adjust) {
                 offsetShift.y += adjust;
                 alpha[mIndex] += adjust*shiftToAlpha;
-                adjustedTilts.y = offsetShift.y*shiftToAlpha;
+                adjustedTilts.y += adjust*shiftToAlpha;
                 newVal.y = alpha[mIndex];
             }
         }
     }
 
     if( oldOffset != offsetShift ) {
-        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << ende;
+        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << "   tiltMode=" << object.modes.tiltMode << printArray(alpha,2,"  tilts") << ende;
         LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                    << ":  cutout was shifted, from " << oldOffset << " to " << offsetShift
                    << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << "  adj=" << adjustedTilts << ende;
         //newCutout();
-        ret = true;
+        ret = shifted = true;
         //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast") << ende;
     }
     return ret;
@@ -458,14 +481,16 @@ bool SubImage::adjustOffset( double* alpha ) {
 void SubImage::addAlphaOffsets(double* alphas, float* alphaOut) const {
     
     std::copy( alphas, alphas+nModes, alphaOut );
-    
+    //return;
     int32_t mIndex = object.modes.tiltMode.x;
-    if( mIndex >= 0 && offsetShift.x ) {
+    //if( mIndex >= 0 && offsetShift.x ) {
+    if( mIndex >= 0 && fabs(adjustedTilts.x)>0 ) {
         alphaOut[mIndex] -= adjustedTilts.x;
     }
     
     mIndex = object.modes.tiltMode.y;
-    if( mIndex >= 0 && offsetShift.y ) {
+    //if( mIndex >= 0 && offsetShift.y ) {
+    if( mIndex >= 0 && fabs(adjustedTilts.y)>0 ) {
         alphaOut[mIndex] -= adjustedTilts.y;
     }
     
@@ -483,15 +508,14 @@ void SubImage::addToPhi( double* phiPtr, const double* modePtr, double a ) const
 
 
 void SubImage::addToPhi( const double* a, double* phiPtr ) const {
-    
+
 #ifdef DEBUG_
-    LOG_TRACE << "SubImage(" << index << ")::addToPhi(" << hexString(this) << ")   nModes=" << nModes << "  pupilSize2=" << pupilSize2
-    << printArray( a, nModes, "  newAlpha" ) << ende;
+    LOG_TRACE << "SubImage(" << object.ID << ":" << index << ")::addToPhi()" << printArray( a, nModes, "  newAlpha" ) << ende;
 #endif
 
     for( unsigned int i=0; i<nModes; ++i ) {
         if( fabs(a[i]) > ALPHA_CUTOFF ) {
-            double scaledAlpha = a[i]; ///object.wavelength;
+            double scaledAlpha = a[i]; //*object.wavelength;
             const double* modePtr = modes.modePointers[i];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
                 [scaledAlpha](const double& p, const double& m) {
@@ -499,7 +523,7 @@ void SubImage::addToPhi( const double* a, double* phiPtr ) const {
                 });
         }
     }
-    
+
 }
 
 

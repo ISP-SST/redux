@@ -479,7 +479,7 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
             if( wip ) {
                 if( wip->job ) {
                     LOG_NOTICE << "Returning unfinished work to queue: " << wip->print() << ende;
-                    wip->job->failWork( wip );
+                    wip->job->ungetWork( wip );
                 }
                 wip->parts.clear();
                 wip->previousJob.reset();
@@ -750,57 +750,38 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
 }
 
-/*Job::JobPtr Daemon::selectJob( bool localRequest ) {
-    for( auto & job : jobs )
-        if( it->info.step.load() < Job::JSTEP_RUNNING )
-	    return job;
-}*/
 
 bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
 
     wip->job.reset();
+    wip->parts.clear();
+    wip->nParts = 0;
 
     unique_lock<mutex> lock( jobsMutex );
     auto tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     lock.unlock();
-    
-    if( wip->isRemote ) {              // remote worker
-        for( Job::JobPtr& job : tmpJobs ) {
-            if( job && (job->info.step & Job::StepUserMask) &&
-                job->check() && job->getWork( wip, nThreads, false ) ) {
-                wip->job = job;
-                wip->workStarted = boost::posix_time::second_clock::local_time();
-                for( auto& part: wip->parts ) {
-                    part->partStarted = boost::posix_time::second_clock::local_time();
-                }
-                break;
-            }
+    map<size_t,map<uint16_t,uint16_t>> activeCounts;
+    for( Job::JobPtr& job: tmpJobs ) {
+        if( job ) {
+            size_t tid = job->getTypeID();
+            activeCounts[tid][job->info.step]++;
         }
-    } else {                            // local worker
-        uint16_t nActive(0);
-        for( Job::JobPtr& job : tmpJobs ) {
-            if( job && job->active() ) nActive++; // count all user defined steps 
+    }
+
+    for( Job::JobPtr& job: tmpJobs ) {
+        if( job && job->getWork( wip, nThreads, activeCounts[job->getTypeID()] ) ) {
+            wip->job = job;
+            break;
         }
-        static int maxActiveJobs(3);            // FIXME: configurable
-        bool mayStartNewJob = (nActive < maxActiveJobs);
-        for( Job::JobPtr& job : tmpJobs ) {
-            if( job && job->check() && job->getWork( wip, nThreads, mayStartNewJob ) ) {
-                wip->job = job;
-                wip->workStarted = boost::posix_time::second_clock::local_time();
-                for( auto& part: wip->parts ) {
-                    part->partStarted = boost::posix_time::second_clock::local_time();
-                }
-                break;
-            }
-        }
-        myInfo.touch();
     }
     
     if( wip->job ) {
 
         wip->job->info.state.store( Job::JSTATE_ACTIVE );
+        wip->workStarted = boost::posix_time::second_clock::local_time();
         for( auto& part: wip->parts ) {
             part->cacheLoad(false);
+            part->partStarted = wip->workStarted;
         }
         
     }
@@ -842,7 +823,6 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
             host->status.state = Host::ST_ACTIVE;
         } else wip->previousJob.reset();
-
         data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
         char* ptr = data.get()+sizeof(uint64_t);
         if( wip->job ) {

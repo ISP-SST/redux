@@ -111,6 +111,7 @@ namespace redux {
             std::string print(void);
         } info;
         
+        virtual size_t getTypeID(void) { return 0; };
         virtual uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr wip, bool) { wip->parts.clear(); return 0; };
         
         virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree& );
@@ -137,7 +138,7 @@ namespace redux {
         virtual bool active(void) { return false; };
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
         
-        virtual bool getWork(WorkInProgress::Ptr, uint16_t, bool) { return false; };
+        virtual bool getWork(WorkInProgress::Ptr, uint16_t, const std::map<uint16_t,uint16_t>&) { return false; };
         virtual void ungetWork(WorkInProgress::Ptr) { };
         virtual void failWork(WorkInProgress::Ptr) { };
         virtual void returnResults(WorkInProgress::Ptr) { };
