@@ -19,14 +19,14 @@ namespace redux {
     public:
         enum RunMode { LOOP=0, EXIT, RESET };
 
-        struct KillException : public std::exception {
+        struct KillException {
             KillException( void ) {}
             virtual const char *what( void ) const throw() {
                 return "application killed";
             }
         };
 
-        struct ResetException : public std::exception {
+        struct ResetException {
             ResetException( void ) {}
             virtual const char *what( void ) const throw() {
                 return "application reset";

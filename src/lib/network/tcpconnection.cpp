@@ -104,7 +104,7 @@ void TcpConnection::idle( void ) {
 
     unique_lock<mutex> lock(mtx);
     if( !activityCallback ) {
-        throw invalid_argument( "TcpConnection::idle()  Attempting to idle without callback !!" );
+        return;
     }
 
     if( mySocket.is_open() ) {

@@ -41,6 +41,7 @@ namespace {
           " The environment variable RDX_PORT can be used to override the default value." )
         ( "force,f", "Bypass safeguards" )
         ( "kill,k", "Send exit command to Server." )
+        ( "reset,r", bpo::value<int>()->implicit_value(0), "Send reset command to Server." )
         ( "test,t", "For testing out new stuff." )
         ( "cmd,c", bpo::value<string>(), "Send a cmd.")
         ( "urgent,U", bpo::value<string>()->implicit_value("123"), "Send a cmd.")
@@ -126,6 +127,16 @@ void sendCmd( TcpConnection::Ptr conn, Logger& logger, uint8_t cmd ) {
 }
 
 
+void sendCmd( TcpConnection::Ptr conn, Logger& logger, uint8_t cmd, char* data, size_t dataSize ) {
+    LOG_DETAIL << "Sending command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
+    cout << "Sending command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << endl;
+    *conn << cmd;
+    boost::asio::write( conn->socket(), boost::asio::buffer( data, dataSize ) );
+    checkReply( conn, logger, cmd );
+
+}
+
+
 void sendUrgent( TcpConnection::Ptr conn, Logger& logger, uint8_t cmd ) {
     LOG_DETAIL << "Sending urgent command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
     cout << "Sending urgent command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << endl;
@@ -188,6 +199,10 @@ int main( int argc, char *argv[] ) {
                 
                 if( vm.count("cmd") ) sendCmd( conn, logger, cmdFromString(vm["cmd"].as<string>()) );
                 if( vm.count("urgent") ) sendUrgent( conn, logger, cmdFromString(vm["urgent"].as<string>()) );
+                if( vm.count("reset") ) {
+                    uint8_t lvl = static_cast<uint8_t>(vm["reset"].as<int>());
+                    sendCmd( conn, logger, CMD_RESET, reinterpret_cast<char*>(&lvl), 1 );
+                }
                 if( vm.count("kill") ) sendCmd( conn, logger, CMD_DIE );
 
                     

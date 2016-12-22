@@ -27,13 +27,6 @@ using namespace redux;
 using namespace std;
 
 
-namespace {
-
-    typedef boost::asio::time_traits<boost::posix_time::ptime> time_traits_t;
-
-}
-
-
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
     hostTimeout(3600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
@@ -118,12 +111,11 @@ void Daemon::maintenance( void ) {
 #ifdef DEBUG_
     LOG_TRACE << "Maintenance:  nJobs = " << jobs.size() << "  nConn = " << connections.size() << "  nPeerWIP = " << peerWIP.size() << ende;
 #endif
-
     updateLoadAvg();
     cleanup();
     logger.flushAll();
     updateStatus();   // TODO: use a secondary connection for auxiliary communications
-    timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
+    timer.expires_from_now( boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
     
 }
@@ -137,7 +129,7 @@ bool Daemon::doWork( void ) {
         serverInit();
         // start the maintenance loop
         LOG_DEBUG << "Initializing maintenance timer." << ende;
-        timer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 5 ) );
+        timer.expires_from_now( boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
         // Add some threads for the async work.
         for( int i = 0; i < 50; ++i ) {
@@ -157,7 +149,7 @@ bool Daemon::doWork( void ) {
         }
         LOG_DEBUG << "Initializing worker." << ende;
         workerInit();
-        worker.init();
+        worker.start();
         LOG_DEBUG << "Running the asio service." << ende;
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
         LOG_TRACE << "Waiting for all threads to terminate." << ende;
@@ -165,8 +157,10 @@ bool Daemon::doWork( void ) {
         myInfo.info.peerType = 0;
         worker.stop();
         LOG_DETAIL << "Shutting down Daemon." << ende;
-    }
-    catch( const exception& e ) {
+    } catch( const ResetException& e ) {
+        LOG << "Hard reset requested" << ende;
+        throw;
+    } catch( const exception& e ) {
         LOG_FATAL << "Unhandled exception: If something got here, you forgot to catch it !!!\nI will do a hard reset now....\n   reason: " << e.what() << ende;
         throw; // Application::ResetException();
     }
@@ -354,21 +348,22 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
     
     Command cmd = CMD_ERR;
     try {
-        *conn >> cmd;
+        try {
+            *conn >> cmd;
+        } catch( ... ) {      // no data, disconnected or some other unrecoverable error -> close socket and return.
+            removeConnection(conn);
+            return;
+        }
         connections[conn]->touch();
-    }
-    catch( const boost::exception& ) {      // disconnected -> close socket and return.
+        processCommand( conn, cmd );
+        conn->idle();
+    } catch( const std::exception& e ) {      // disconnected -> close socket and return.
+        LOG_ERR << "handler() Failed to process command Reason: " << e.what() << ende;
         removeConnection(conn);
         return;
     }
-
-    processCommand( conn, cmd );
-    
-    //LOG_TRACE << "activity():  received cmd = " << ( int )cmd << "  (" << bitString( cmd ) << ")" << ende;
-    conn->idle();
-    
+     
 }
-
 
 
 void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent ) {
@@ -376,7 +371,8 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
     try {
 
         switch( cmd ) {
-            case CMD_DIE: die(conn); break;
+            case CMD_DIE: die( conn, urgent ); break;
+            case CMD_RESET: reset( conn, urgent ); break;
             case CMD_ADD_JOB: addJobs(conn); break;
             case CMD_DEL_JOB: removeJobs(conn); break;
             case CMD_GET_WORK: sendWork(conn); break;
@@ -394,7 +390,8 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
 
     }
     catch( const exception& e ) {
-        LOG_DEBUG << "processCommand(): Exception when parsing incoming command: " << e.what() << ende;
+        LOG_DEBUG << "processCommand(): Exception when parsing incoming command: " << cmdToString(cmd)
+                  << " (" << (int)cmd << "," << bitString(cmd) << "): " << e.what() << ende;
         removeConnection(conn);
         return;
     }
@@ -444,7 +441,7 @@ void Daemon::addConnection( const Host::HostInfo& remote_info, TcpConnection::Pt
         }
         host = newHost;
 
-        if( host->info.peerType & (Host::TP_WORKER|Host::TP_MASTER) ) {
+        if( host->info.peerType & Host::TP_WORKER ) {
             LOG_DEBUG << "Slave connected: " << host->info.name << ":" << host->info.pid << "  ID=" << host->id << ende;
             peerWIP.emplace( host, std::make_shared<WorkInProgress>() );
         }
@@ -580,7 +577,7 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
 }
 
 
-void Daemon::die( TcpConnection::Ptr& conn ) {
+void Daemon::die( TcpConnection::Ptr& conn, bool urgent ) {
     
     unique_lock<mutex> lock( peerMutex );
     const Host::HostInfo& hi = connections[conn]->info;
@@ -598,6 +595,40 @@ void Daemon::die( TcpConnection::Ptr& conn ) {
         messages.push_back("Not permitted.");
         *conn << CMD_NOTICE << messages;
     }
+}
+
+
+void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
+    
+    unique_lock<mutex> lock( peerMutex );
+    const Host::HostInfo& hi = connections[conn]->info;
+    lock.unlock();
+
+    uint8_t lvl(0);
+    if( !urgent ) {     // non-urgent calls will come with a reset-level appended
+        *conn >> lvl;
+    }
+
+    //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
+    if( hi.peerType == Host::TP_MASTER ) {
+        LOG_DEBUG << "Received reset(" << (int)lvl << ") from " << hi.user << "@" << hi.name << ende;
+        switch(lvl) {
+            case 0: {
+                worker.stop();
+                worker.start();
+            }
+            default: ;
+        }
+        //if( lvl == 5 ) throw ResetException();
+        if( !urgent ) *conn << CMD_OK;
+    } else {
+        if( !urgent ) {
+            vector<string> messages;
+            messages.push_back("Not permitted.");
+            *conn << CMD_NOTICE << messages;
+        }
+    }
+
 }
 
 

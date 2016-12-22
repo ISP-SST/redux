@@ -13,13 +13,8 @@ using namespace redux;
 using namespace std;
 
 
-namespace {
-    typedef boost::asio::time_traits<boost::posix_time::ptime> time_traits_t;
-}
-
-
 Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), running_(false),
-    wip(new WorkInProgress()), daemon( d ), myInfo(Host::myInfo()) {
+    wip(nullptr), daemon( d ), myInfo(Host::myInfo()) {
 
 }
 
@@ -29,15 +24,15 @@ Worker::~Worker( void ) {
 }
 
 
-void Worker::init( void ) {
+void Worker::start( void ) {
 
-    runTimer.expires_at( time_traits_t::now() + boost::posix_time::seconds( 1 ) );
-    runTimer.async_wait(strand.wrap(boost::bind(&Worker::run, this)));
-    workLoop.reset( new boost::asio::io_service::work(ioService) );
     running_ = true;
-    
+    wip.reset( new WorkInProgress() );
+    ioService.reset();
+    workLoop.reset( new boost::asio::io_service::work(ioService) );
+
     for( uint16_t t=0; t < myInfo.status.nThreads; ++t ) {
-        pool.create_thread( [&](){
+        pool.create_thread( [&,t](){
             while( running_ ) {
                 try {
                     ioService.run();
@@ -51,6 +46,10 @@ void Worker::init( void ) {
             }
         });
     }
+    
+    runTimer.expires_from_now( boost::posix_time::seconds( 5 ) );
+    runTimer.async_wait( strand.wrap(std::bind( &Worker::run, this, placeholders::_1 )) );
+    myInfo.touch();
 
 }
 
@@ -62,6 +61,8 @@ void Worker::stop( void ) {
     ioService.stop();
     pool.interrupt_all();
     pool.join_all();
+    runTimer.cancel();
+    wip.reset();
 
 }
 
@@ -126,7 +127,7 @@ bool Worker::getWork( void ) {
         int count(0);
         while( wip->hasResults && count++ < 5 ) {
             LLOG_DEBUG(daemon.logger) << "Failed to return data, trying again in 5 seconds." << ende;
-            runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(5));
+            runTimer.expires_from_now(boost::posix_time::seconds(5));
             runTimer.wait();
             returnWork();
         }
@@ -238,11 +239,16 @@ void Worker::returnWork( void ) {
 }
 
 
-void Worker::run( void ) {
+void Worker::run( const boost::system::error_code& error ) {
 
     static int sleepS(1);
+    if( error == boost::asio::error::operation_aborted ) {
+        sleepS=1;
+        return;
+    }
+    
  //   LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
-    while( getWork() ) {
+    while( running_ && getWork() ) {
         sleepS = 1;
         try {
             while( wip->job && wip->job->run( wip, ioService, myInfo.status.nThreads ) ) ;
@@ -256,11 +262,12 @@ void Worker::run( void ) {
         }
     }
 
-    runTimer.expires_at(time_traits_t::now() + boost::posix_time::seconds(sleepS));
-    runTimer.async_wait( strand.wrap(boost::bind( &Worker::run, this )) );
-    
-    if( sleepS < 4 ) {
-        sleepS <<= 1;
+    if( running_ ) {
+        runTimer.expires_from_now( boost::posix_time::seconds(sleepS) );
+        runTimer.async_wait( strand.wrap(std::bind( &Worker::run, this, placeholders::_1 )) );
+        if( sleepS < 4 ) {
+            sleepS <<= 1;
+        }
     }
 
 }

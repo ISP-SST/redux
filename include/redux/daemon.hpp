@@ -48,7 +48,8 @@ namespace redux {
         void removeConnection(network::TcpConnection::Ptr);
         void cleanup(void);
         void failedWIP( WorkInProgress::Ptr wip );
-        void die( network::TcpConnection::Ptr& );
+        void die( network::TcpConnection::Ptr&, bool urgent=false );
+        void reset( network::TcpConnection::Ptr&, bool urgent=false );
         void addJobs( network::TcpConnection::Ptr& );
         void removeJobs( network::TcpConnection::Ptr& );
         //Job::JobPtr selectJob(bool);

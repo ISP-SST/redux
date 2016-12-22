@@ -66,7 +66,8 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-WorkInProgress::WorkInProgress(void) : isRemote( false ), hasResults(false), nParts(0), nCompleted(0) {
+WorkInProgress::WorkInProgress(void) : job(nullptr), previousJob(job),
+    isRemote(false), hasResults(false), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif

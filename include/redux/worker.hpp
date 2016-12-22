@@ -24,10 +24,9 @@ namespace redux {
         explicit Worker( Daemon& );
         ~Worker( void );
 
-        void init( void );
         void connect( void );
+        void start( void );
         void stop( void );
-
 
     private:
 
@@ -38,7 +37,7 @@ namespace redux {
         void returnJob(void);
         void returnResults(void);
         
-        void run(void);
+        void run( const boost::system::error_code& );
         
         boost::asio::io_service ioService;
 
