@@ -35,7 +35,7 @@ namespace {
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
-    hostTimeout(600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+    hostTimeout(3600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
 
     logger.setFlushPeriod( 100 );   // delay log-flushing until we have set local/remote logging in workerInit
     logger.setContext( myInfo.info.name + ":" +to_string(myInfo.info.pid) + " init" );
