@@ -36,7 +36,7 @@ namespace redux {
         void makeZernike( util::Array<T>& mode, int j, uint32_t nPoints, double radius, double angle=0) {
             mode.resize(nPoints,nPoints);
             T **ptr = redux::util::makePointers(mode.get(),nPoints,nPoints);
-            makeZernike_mvn(ptr,nPoints,radius,angle); // FIXME: temporarily using MvN Z-maker for easier debugging.
+            makeZernike_thi(ptr,nPoints,radius,angle); // FIXME: temporarily using MvN Z-maker for easier debugging.
             redux::util::delPointers(ptr);
         }
 
