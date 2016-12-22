@@ -41,6 +41,9 @@ namespace {
           " The environment variable RDX_PORT can be used to override the default value." )
         ( "force,f", "Bypass safeguards" )
         ( "kill,k", "Send exit command to Server." )
+        ( "test,t", "For testing out new stuff." )
+        ( "cmd,c", bpo::value<string>(), "Send a cmd.")
+        ( "urgent,U", bpo::value<string>()->implicit_value("123"), "Send a cmd.")
         ;
 
         return options;
@@ -69,7 +72,7 @@ namespace {
 }
 
 
-void checkReply( TcpConnection::Ptr conn, Logger& logger ) {
+void checkReply( TcpConnection::Ptr conn, Logger& logger, uint8_t sentCmd ) {
 
 
     uint8_t cmd = CMD_ERR;
@@ -114,17 +117,24 @@ void checkReply( TcpConnection::Ptr conn, Logger& logger ) {
 }
 
 
-void killServer( TcpConnection::Ptr conn, Logger& logger) {
-   
-    uint8_t cmd = CMD_DIE;
-    boost::asio::write( conn->socket(), boost::asio::buffer(&cmd,1) );
-    
-    checkReply( conn, logger );
-   
+void sendCmd( TcpConnection::Ptr conn, Logger& logger, uint8_t cmd ) {
+    LOG_DETAIL << "Sending command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
+    cout << "Sending command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << endl;
+    boost::asio::write( conn->socket(), boost::asio::buffer( &cmd, 1 ) );
+    checkReply( conn, logger, cmd );
+
 }
 
 
-int main (int argc, char *argv[]) {
+void sendUrgent( TcpConnection::Ptr conn, Logger& logger, uint8_t cmd ) {
+    LOG_DETAIL << "Sending urgent command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
+    cout << "Sending urgent command: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << endl;
+    conn->sendUrgent( cmd );
+    //sleep(1);
+}
+
+
+int main( int argc, char *argv[] ) {
     
     bpo::variables_map vm;
     bpo::options_description programOptions = getOptions();
@@ -176,8 +186,11 @@ int main (int argc, char *argv[]) {
                 
                 swap_endian = (me.littleEndian != master.littleEndian);
                 
-                if( vm.count("kill") ) killServer( conn, logger );
-                
+                if( vm.count("cmd") ) sendCmd( conn, logger, cmdFromString(vm["cmd"].as<string>()) );
+                if( vm.count("urgent") ) sendUrgent( conn, logger, cmdFromString(vm["urgent"].as<string>()) );
+                if( vm.count("kill") ) sendCmd( conn, logger, CMD_DIE );
+
+                    
             } else {
                 LOG_ERR << "Failed to connect to reduxd at " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << ende;
             }
@@ -188,7 +201,7 @@ int main (int argc, char *argv[]) {
     catch( const exception &e ) {
         cerr << "Uncaught exception (fatal): " << e.what() << endl;
     }
-
+//sleep(2);
     return EXIT_SUCCESS;
 
 }

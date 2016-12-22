@@ -2,6 +2,7 @@
 #define REDUX_NETWORK_PROTOCOL_HPP
 
 #include <cstdint>
+#include <string>
 
 namespace redux {
 
@@ -33,6 +34,10 @@ namespace redux {
                                  CMD_DIE,
                                  CMD_ERR = 255
                                };
+                               
+        uint8_t cmdFromString( const std::string& str );
+        std::string cmdToString( uint8_t cmd );
+        
     }   // network
 }   // redux
 

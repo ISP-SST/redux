@@ -141,14 +141,28 @@ void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& er
 }
 
 
-TcpConnection& TcpConnection::operator<<( const Command& in ) {
-    syncWrite(&in, sizeof(Command));
+void TcpConnection::sendUrgent( uint8_t c ) {
+    if( mySocket.is_open() ) {
+        mySocket.send( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+    }
+}
+
+ 
+void TcpConnection::receiveUrgent( uint8_t& c ) {
+    if( mySocket.is_open() && mySocket.at_mark() ) {
+        size_t cnt = mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+    }
+}
+
+ 
+TcpConnection& TcpConnection::operator<<( const uint8_t& in ) {
+    syncWrite(&in, sizeof(uint8_t));
     return *this;
 }
 
 
-TcpConnection& TcpConnection::operator>>( Command& out ) {
-    if( ba::read( mySocket, ba::buffer( &out, sizeof( Command ) ) ) < sizeof( Command ) ) {
+TcpConnection& TcpConnection::operator>>( uint8_t& out ) {
+    if( ba::read( mySocket, ba::buffer( &out, sizeof( uint8_t ) ) ) < sizeof( uint8_t ) ) {
         out = CMD_ERR;
         throw std::ios_base::failure( "Failed to receive command." );
     }

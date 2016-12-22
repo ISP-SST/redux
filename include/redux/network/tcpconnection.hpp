@@ -108,10 +108,12 @@ namespace redux {
             void lock(void) { mtx.lock(); };
             void unlock(void) { mtx.unlock(); };
             bool try_lock(void) { return mtx.try_lock(); };
-
-            TcpConnection& operator<<( const Command& );
-            TcpConnection& operator>>( Command& );
             
+            void sendUrgent( uint8_t c );
+            void receiveUrgent( uint8_t& c );
+            
+            TcpConnection& operator<<( const uint8_t& );
+            TcpConnection& operator>>( uint8_t& );
             TcpConnection& operator<<( const std::vector<std::string>& );
             TcpConnection& operator>>( std::vector<std::string>& );
 
