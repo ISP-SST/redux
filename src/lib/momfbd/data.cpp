@@ -494,6 +494,7 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
         }
     }
     count += constraints.unpack(ptr+count,swap_endian);
+    constraints.makeRowsCols();
     return count;
 }
 

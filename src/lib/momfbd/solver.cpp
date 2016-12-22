@@ -27,6 +27,7 @@ using namespace std;
 namespace sp=std::placeholders;
 
 
+thread_local thread::TmpStorage Solver::tmp;
 
 //#define DEBUG_
 //#define RDX_DUMP_PATCHDATA
@@ -142,6 +143,24 @@ void Solver::init( void ) {
         max_wavelength = std::max( max_wavelength, object->wavelength );
     }
 
+    // FIXME: this is a rather kludgy way to allow for resizing the TLS, think of something neater...
+    set<std::thread::id> initDone;
+    progWatch.set( nThreads );
+    for( uint16_t i=0; i<nThreads; ++i ) { 
+        service.post([&](){
+            unique_lock<mutex> lock(mtx);
+            std::thread::id id = std::this_thread::get_id();
+            auto ret = initDone.emplace(id);
+            if( ret.second ) {
+                tmp.resize( patchSize, pupilSize );
+                ++progWatch;
+                lock.unlock();
+                progWatch.wait();
+            }
+        });
+    }
+    tmp.resize( patchSize, pupilSize );
+    progWatch.wait();
 
 }
 
@@ -182,7 +201,8 @@ void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
 double Solver::my_f( const gsl_vector* beta, void* params ) {
 
     applyBeta( beta );
-    return metric();
+    
+    return metric2();
 
 }
 
@@ -190,8 +210,8 @@ double Solver::my_f( const gsl_vector* beta, void* params ) {
 void Solver::my_df( const gsl_vector* beta, void* params, gsl_vector* df ) {
 
     applyBeta( beta );
-    calcPQ();
-    gradient( df );
+    calcPQ2();
+    gradient2( df );
 
 }
 
@@ -199,8 +219,8 @@ void Solver::my_df( const gsl_vector* beta, void* params, gsl_vector* df ) {
 void Solver::my_fdf( const gsl_vector* beta, void* params, double* f, gsl_vector* df ) {
     
     applyBeta( beta );
-    *f = metric();
-    gradient( df );
+    *f = metric2();
+    gradient2( df );
     
 }
 
@@ -274,10 +294,10 @@ double Solver::metricAt( double step ) {
                         for( const auto& ind: o->pupil.pupilInOTF ) {
                             otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+step*phiGradPtr[ind.first]);
                         }
-                        im->tmpOTF.ft(otfPtr);
-                        im->tmpOTF.norm();
-                        im->tmpOTF.getIFT(im->OTF.get());
-                        FourierTransform::reorder( im->OTF.get(), im->OTF.dimSize(0), im->OTF.dimSize(1) );
+                        //im->tmpOTF.ft(otfPtr); FIXME: broke with thread_local
+                        //im->tmpOTF.norm();
+                        //im->tmpOTF.getIFT(im->OTF.get());
+                        //FourierTransform::reorder( im->OTF.get(), im->OTF.dimSize(0), im->OTF.dimSize(1) );
                         --sc;
                     });
                     otfPtr += otfSize2;
@@ -313,8 +333,6 @@ double Solver::metricAt( double step ) {
 
 
 void Solver::run( PatchData::Ptr data ) {
-
-    data->initPatch();
 
     LOG << "Starting patch.  index=" << data->index << "  region=" << data->roi
         << "  nModes=" << nModes << "  nThreads=" << nThreads << ende;
@@ -398,21 +416,8 @@ void Solver::run( PatchData::Ptr data ) {
     memset(s->dx->data,0,nFreeParameters*sizeof(double));
     memset(s->gradient->data,0,nFreeParameters*sizeof(double));
     s->f = 0;
-        
-    sync_counter sc;
-    sc.reset();
-    for( const auto& o: job.objects ) {
-        for( const shared_ptr<Channel>& c: o->channels ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                ++sc;
-                service.post( [&](){
-                    im->init();
-                    --sc;
-                } );
-            }
-        }
-    }
-    sc.wait();
+    
+
 /*
 cout << "nParameters: " << nParameters << "  nFreeParameters: " << nFreeParameters << endl;
 shared_ptr<Object> obj0 = *job.objects.begin();
@@ -550,12 +555,11 @@ exit(0);
 
 //    memset( alpha_offset, 0, nParameters*sizeof(double) );
     
-    alphaPtr = alpha_offset;
-    for( auto& objData: data->objects ) {
-        if( !objData ) continue;
-        objData->myObject->getInit( *objData, alphaPtr );
-        alphaPtr += objData->myObject->nObjectImages*nModes;
-    }
+    
+    loadInit( data, alpha_offset );
+    
+    //initImages( alpha_offset );
+    shiftAndInit( alpha_offset, true );     // force initialization
     
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
     LOG << "Initial metric = " << initialMetric << ende;
@@ -699,55 +703,12 @@ gradientMethod = gradientMethods[GM_VOGEL];
             }
         }
 
-//        cout << "                                                                     Solver: " << __LINE__ << endl;
-//dump("itera_"+to_string(totalIterations));
         if( modeCount ) {
-//if( false ) {
-            alphaPtr = alpha;
-            sc.reset();
-            job.progWatch.set( job.nImages() );
-            for( const auto& o: job.objects ) {
-                o->progWatch.clear();
-//        cout << "                                                  Solver: " << __LINE__ << " Obj: " << o->ID << endl;
-                o->imgShifted = 0;
-                o->progWatch.set( o->nImages() );
-                o->progWatch.setHandler( std::bind( &Object::reInitialize, o.get(), std::ref(service)) );
-//                 o->progWatch.setHandler([&](){
-//                     if( imgShifted ) {
-//                         if(job.runFlags&RF_FIT_PLANE) o->fitAvgPlane();
-//                         for( const shared_ptr<Channel>& c: o->channels ) {
-//                             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-//                                 ++sc;
-//                                 service.post( [&](){
-//                                     im->reInitialize();
-//                                     --sc;
-//                                 } );
-//                             }
-//                         }
-//                     }
-//                     --sc;
-//                 });
-                ++sc;
-                for( const auto& c: o->channels ) {
-                    for( const auto& im: c->getSubImages() ) {
-                        service.post( [&,alphaPtr](){
-                            o->imgShifted.fetch_or(im->adjustOffset(alphaPtr));
-                            ++o->progWatch;
-                        } );
-                        alphaPtr += nModes;
-                    }
-                }
-            }
-//        cout << "                                                                     Solver: " << __LINE__ << endl;
-            job.progWatch.wait();
-//        cout << "                                                                     Solver: " << __LINE__ << endl;
-            //shiftSubImages();
-//}
+            shiftAndInit( alpha );
             memcpy( alpha_offset, alpha, nParameters*sizeof(double) );
         }
-//        cout << "                                                                     Solver: " << __LINE__ << endl;
-//dump("iterb_"+to_string(totalIterations));
     }       // end for-loop
+    
     //dump("final");
     //double finalMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
     //LOG << "Final metric = " << finalMetric << ende;
@@ -789,75 +750,54 @@ gradientMethod = gradientMethods[GM_VOGEL];
 }
 
 
-void Solver::shiftSubImages( void ) {
+void Solver::shiftAndInit( double* a, bool doReset ) {
     
-    double* alphaPtr = alpha;
-    ProgressWatch pw;
-    pw.set( job.objects.size() );
-    for( const shared_ptr<Object>& o: job.objects ) {
-        atomic<int> imgShifted(0);
+    job.progWatch.set( job.nImages() );
+    for( const auto& o: job.objects ) {
+        o->progWatch.clear();
+        o->imgShifted = static_cast<int>( doReset );  // force re-initialization if reset is passed
         o->progWatch.set( o->nImages() );
-        o->progWatch.setTicker(nullptr);
-        o->progWatch.setHandler([&](){
-            if( imgShifted && (job.runFlags&RF_FIT_PLANE) ) {
-                pw.increaseTarget( o->nImages() );
-                o->fitAvgPlane();
-                for( const shared_ptr<Channel>& c: o->channels ) {
-                    for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                        service.post( [&](){
-                            im->reInitialize();
-                            ++pw;
-                        } );
-                    }
-                }
-            }
-            ++pw;
-        });
-        for( const shared_ptr<Channel>& c: o->channels ) {
-            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                service.post( [&,alphaPtr](){
-                    imgShifted.fetch_or(im->adjustOffset(alphaPtr));
+        o->progWatch.setHandler( std::bind( &Object::reInitialize, o.get(), std::ref(service), doReset ) );
+        for( const auto& c: o->channels ) {
+            for( const auto& im: c->getSubImages() ) {
+                service.post( [&,a](){
+                    o->imgShifted.fetch_or(im->adjustOffset(a));
                     ++o->progWatch;
                 } );
-                alphaPtr += nModes;
+                a += nModes;
             }
         }
+
     }
-    pw.wait();
+    job.progWatch.wait();
 
 }
 
 
-void Solver::applyAlpha( void ) {
+void Solver::applyAlpha( double* a ) {
 
-    sync_counter sc;
-    double* alphaPtr = alpha;
+    progWatch.set( nTotalImages );
     for( const auto& o: objects ) {
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
-                ++sc;
-                service.post ([&im, alphaPtr,&sc] {    // use a lambda to ensure these calls are sequential
-                    im->calcPhi( alphaPtr );
+                service.post ([&im,a,this] {    // use a lambda to ensure these calls are sequential
+                    im->calcPhi( a );
                     im->calcPFOTF();
-//cout << "." << flush;
-                    --sc;
+                    ++progWatch;
                 });
-                alphaPtr += nModes;
+                a += nModes;
             }
         }
     }
-    sc.wait();
+    progWatch.wait();
 
 }
 
 
 void Solver::applyBeta( const gsl_vector* beta ) {
 
-//cout << "/" << flush;
     job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset, alpha );
-//cout << "^" << flush;
     applyAlpha();
-//cout << "\\" << flush;
 
 }
 
@@ -877,8 +817,79 @@ void Solver::applyBeta( double scale ) {
     
 }
 
+/*
+            template <typename T> void apply(const T* in, T* out) const {
+                memset(out,0,nFreeParameters*sizeof(T));
+                for( auto& entry: ns_entries ) {
+                    out[entry.first.x] += entry.second * in[entry.first.y];
+                }
+            }
+
+*/
+void Solver::applyConstraints( const double* alpha, double* beta ) {
+
+    progWatch.set( job.globalData->constraints.ns_cols.size() );
+    for( auto& r: job.globalData->constraints.ns_cols ) {
+        service.post( [this,&r,&alpha,&beta]() {
+            double tmp(0);
+            for( auto& e: r.second ) tmp += e.second * alpha[e.first];
+            beta[r.first] += tmp;
+            ++progWatch;
+        });
+    }
+    progWatch.wait();
+
+}
+
+
+void Solver::reverseConstraints( const double* beta, double* a ) {
+
+    progWatch.set( job.globalData->constraints.ns_rows.size() );
+    for( auto& r: job.globalData->constraints.ns_rows ) {
+        service.post([this,&r,&a,&beta]() {
+            double tmp(0);
+            for( auto& e: r.second ) tmp += e.second * beta[e.first];
+            a[r.first] += tmp;
+            ++progWatch;
+        });
+    }
+    progWatch.wait();
+
+}
+
+
+void Solver::loadInit( const PatchData::Ptr pd, double* a ) const {
+    
+    for( auto& objData: pd->objects ) {
+        if( objData ) objData->myObject->getInit( *objData, a );
+        a += objData->myObject->nObjectImages*nModes;
+    }
+    
+}
+
+
+void Solver::initImages( double* a ) {
+
+    progWatch.set( nTotalImages );
+    for( const auto& o: job.objects ) {
+        for( const shared_ptr<Channel>& c: o->channels ) {
+            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                service.post( [&,a](){
+                    im->adjustOffset( a );
+                    im->initialize(true);
+                    ++progWatch;
+                } );
+                a += nModes;
+            }
+        }
+    }
+    progWatch.wait();
+    
+}
+
 
 double Solver::metric(void) {
+
 
     sync_counter sc;
     for( const auto& o : objects ) {
@@ -888,7 +899,6 @@ double Solver::metric(void) {
                 o->initPQ();
                 o->addAllPQ();
                 o->calcMetric();
-//cout << "|" << flush;
                 --sc;
             } );
         //}
@@ -898,7 +908,6 @@ double Solver::metric(void) {
     double sum(0);
     for( const auto& o : objects ) {
         sum += o->metric();
-//cout << "x:" << sum << flush;
     }
     
     if( job.reg_alpha > 0 ) {
@@ -906,6 +915,65 @@ double Solver::metric(void) {
             sum += 0.5*alpha[i]*alpha[i]*regAlphaWeights[i];
         }
     }
+
+    return sum;
+    
+}
+
+namespace {
+    
+    const size_t nMaxImages = 30;
+
+}
+
+
+double Solver::metric2(void) {
+    
+
+    double sum(0);
+    progWatch.set( objects.size() );
+    for( const shared_ptr<Object>& o : objects ) {
+        //if( o->weight > 0 ) {
+            o->initPQ();
+            o->progWatch.set( o->nImages() );
+            o->progWatch.setHandler( [o,&sum,this](){
+                o->calcMetric();
+                lock_guard<mutex> lock(mtx);
+                sum += o->metric();
+                ++progWatch;
+            });
+            for( const shared_ptr<Channel>& c: o->getChannels() ) {
+                size_t nImgs = c->getSubImages().size();
+                size_t begIndex(0);
+                while( begIndex < nImgs ) {
+                    size_t endIndex = begIndex + nMaxImages;
+                    if( endIndex > nImgs ) endIndex = nImgs;
+                    o->progWatch.increaseTarget();
+                    service.post( [o,c,begIndex,endIndex,this] {
+                        const vector< shared_ptr<SubImage> >& imgs = c->getSubImages();
+                        tmp.C.zero();
+                        tmp.D.zero();
+                        for( size_t i=begIndex; i<endIndex; ++i ) {
+                            imgs[i]->addPQ( tmp.C.get(), tmp.D.get() );
+                            ++o->progWatch;
+                        }
+                        o->addToPQ( tmp.C.get(), tmp.D.get() );
+                        ++o->progWatch;
+                    } );
+                    begIndex = endIndex;
+                }
+            }
+        //}
+    }
+
+    if( job.reg_alpha > 0 ) {
+        lock_guard<mutex> lock(mtx);
+        for( size_t i=0; i<nParameters; ++i ) {
+            sum += 0.5*alpha[i]*alpha[i]*regAlphaWeights[i];
+        }
+    }
+    
+    progWatch.wait();
 
     return sum;
     
@@ -921,6 +989,7 @@ void Solver::calcPQ(void) {
             service.post([&o,&sc] {    // use a lambda to ensure these calls are sequential
                     o->initPQ();
                     o->addAllPQ();
+                    o->calcHelpers();
                     --sc;
                 });
         //}
@@ -928,8 +997,48 @@ void Solver::calcPQ(void) {
     sc.wait();
     
 }
- 
- 
+
+
+void Solver::calcPQ2(void) {
+
+    progWatch.set( objects.size() );
+    for( const shared_ptr<Object>& o : objects ) {
+        o->initPQ();
+        o->progWatch.set( o->nImages() );
+        o->progWatch.setHandler( [o,this](){
+            o->calcHelpers();
+            ++progWatch;
+        });
+        for( const shared_ptr<Channel>& c: o->getChannels() ) {
+            size_t nImgs = c->getSubImages().size();
+            size_t begIndex(0);
+            while( begIndex < nImgs ) {
+                size_t endIndex = begIndex + nMaxImages;
+                if( endIndex > nImgs ) endIndex = nImgs;
+                o->progWatch.increaseTarget();
+                service.post( [o,c,begIndex,endIndex,this] {
+                    const vector< shared_ptr<SubImage> >& imgs = c->getSubImages();
+                    tmp.C.zero();
+                    tmp.D.zero();
+                    int cnt(0);
+                    for( size_t i=begIndex; i<endIndex; ++i ) {
+                        cnt++;
+                        imgs[i]->addPQ( tmp.C.get(), tmp.D.get() );
+                        ++o->progWatch;
+                    }
+                    o->addToPQ( tmp.C.get(), tmp.D.get() );
+                    ++o->progWatch;
+                } );
+                begIndex = endIndex;
+            }
+        }
+    }
+
+    progWatch.wait();
+    
+}
+
+
 void Solver::gradient(void) {
 
     if( job.reg_alpha > 0 ) {
@@ -949,7 +1058,7 @@ void Solver::gradient(void) {
                 for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
                     ++sc;
                     service.post ([this, o, im, grad_step, alphaPtr, gAlphaPtr, &sc] {    // use a lambda to ensure these calls are sequential
-                        im->calcVogelWeight();
+                        im->calcVogelWeight( o->PQ.get(), o->PS.get(), o->QS.get() );
                         for ( uint16_t m=0; m<nModes; ++m ) {
                             if( enabledModes[m] ) {
                                 //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
@@ -971,9 +1080,57 @@ void Solver::gradient(void) {
 }
  
  
+void Solver::gradient2(void) {
+
+    if( job.reg_alpha > 0 ) {
+        std::transform( alpha, alpha+nParameters, regAlphaWeights, grad_alpha,
+            std::multiplies<double>() );
+    } else {
+        memset( grad_alpha, 0, nParameters*sizeof(double) );
+    }
+
+    double* alphaPtr = alpha;
+    double* gAlphaPtr = grad_alpha;
+    progWatch.set( nTotalImages );
+    for( const shared_ptr<Object>& o: objects ) {
+        //if( o->weight > 0 ) {
+            double grad_step = job.graddiff_step*o->wavelength;
+            for( const shared_ptr<Channel>& c: o->getChannels() ) {
+                for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                    service.post ([this, o, im, grad_step, alphaPtr, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
+                        im->calcVogelWeight( o->PQ.get(), o->PS.get(), o->QS.get() );
+                        for ( uint16_t m=0; m<nModes; ++m ) {
+                            if( enabledModes[m] ) {
+                                //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
+                                //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethods[GM_DIFF](*im, m, grad_step );
+                                //else gAlphaPtr[m] = o->weight*gradientMethods[GM_VOGEL](*im, m, grad_step );
+                                gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
+                            }
+                        }
+                        ++progWatch;
+                    });
+                    alphaPtr += nModes;
+                    gAlphaPtr += nModes;
+                }
+            }
+        //}
+    }
+    progWatch.wait();
+
+}
+ 
+ 
 void Solver::gradient( gsl_vector* grad ) {
     
     gradient();
+    job.globalData->constraints.apply( grad_alpha, grad->data );
+    
+}
+
+
+void Solver::gradient2( gsl_vector* grad ) {
+    
+    gradient2();
     job.globalData->constraints.apply( grad_alpha, grad->data );
     
 }

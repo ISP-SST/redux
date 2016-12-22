@@ -181,6 +181,9 @@ void Object::cleanup(void) {
     ftSum.clear();
     Q.clear();
     P.clear();
+    PQ.clear();
+    PS.clear();
+    QS.clear();
     fittedPlane.clear();
     pupil.clear();
     modes.clear();
@@ -200,6 +203,9 @@ void Object::initProcessing( const Solver& ws ) {
     if( patchSize && pupilPixels ) {
         P.resize(2*pupilPixels,2*pupilPixels);
         Q.resize(2*pupilPixels,2*pupilPixels);
+        PQ.resize(2*pupilPixels,2*pupilPixels);
+        PS.resize(2*pupilPixels,2*pupilPixels);
+        QS.resize(2*pupilPixels,2*pupilPixels);
         ftSum.resize(patchSize,patchSize);          // full-complex for now
         if( myJob.runFlags & RF_FIT_PLANE ) {
             fittedPlane.resize( patchSize, patchSize );
@@ -274,9 +280,9 @@ void Object::getResults(ObjectData& od, double* alpha) {
         for (auto& im : ch->subImages) {
             im->restore( aoPtr, dPtr );
             avgNoiseVariance += sqr(im->stats.noise);
-            avgShift += im->offsetShift;
-            shifts(imgIndex,0) = im->offsetShift.x;
-            shifts(imgIndex++,1) = im->offsetShift.y;
+            avgShift += im->imageOffset;
+            shifts(imgIndex,0) = im->imageOffset.x;
+            shifts(imgIndex++,1) = im->imageOffset.y;
         }
     }
     avgObjFT.conj();    // This is because we re recycling addPQ in SubImage.restore(),
@@ -441,13 +447,11 @@ void Object::getResults(ObjectData& od, double* alpha) {
 
 void Object::getInit(ObjectData& od, double* alpha) {
 
-    unique_lock<mutex> lock (mtx);
+    lock_guard<mutex> lock (mtx);
     // Mode coefficients
     size_t nAlpha = od.alpha.nElements();
     if( nAlpha > 0 ) {
-cout << "Object::getInit()  hasAlpha.   " << printArray(od.alpha.dimensions(),"dims") << endl;
         std::copy( od.alpha.get(), od.alpha.get()+nAlpha, alpha );
-Ana::write("init_"+hexString(this)+".f0",od.alpha);
     }
 
 
@@ -456,21 +460,18 @@ Ana::write("init_"+hexString(this)+".f0",od.alpha);
 
 void Object::initPQ (void) {
     P.zero();
-  //cout << "imgstack::Object::initPQ(" << ID << ") " << __LINE__ << "  rg = " << reg_gamma << endl;
     Q = reg_gamma;
 }
 
 
 void Object::addRegGamma( double rg ) {
-    unique_lock<mutex> lock( mtx );
+    lock_guard<mutex> lock( mtx );
     reg_gamma += 0.10*rg/nObjectImages;
-//    cout << "Object::addRegGamma() obj:" << ID << "  rg=" << rg << "  reg_gamma = " << reg_gamma
-//         << "  nImages = " << nObjectImages << endl;
 }
 
 
 void Object::addToFT( const redux::image::FourierTransform& ft ) {
-    unique_lock<mutex> lock( mtx );
+    lock_guard<mutex> lock( mtx );
     transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
               [](const double& a, const complex_t& b) { return a+norm(b); }
              );
@@ -480,7 +481,7 @@ void Object::addToFT( const redux::image::FourierTransform& ft ) {
 
 void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft ) {
     
-    unique_lock<mutex> lock( mtx );
+    lock_guard<mutex> lock( mtx );
     const complex_t* ftPtr = ft.get();
     const complex_t* oftPtr = oldft.get();
     double* ftSumPtr = ftSum.get();
@@ -494,7 +495,7 @@ void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& ol
 
 void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<complex_t>& otf, const Array<complex_t>& oldotf) {
 
-    unique_lock<mutex> lock (mtx);
+    lock_guard<mutex> lock (mtx);
     double *qPtr = Q.get();
     complex_t *pPtr = P.get();
     const complex_t *ftPtr = ft.get();
@@ -508,14 +509,14 @@ void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<c
 }
 
 
-void Object::addToPQ(const complex_t* ft, const complex_t* otf) {
+void Object::addToPQ(const complex_t* pp, const double* qq) {
 
-    unique_lock<mutex> lock (mtx);
+    lock_guard<mutex> lock (mtx);
     double *qPtr = Q.get();
     complex_t *pPtr = P.get();
     for( auto& ind: pupil.otfSupport ) {
-        qPtr[ind] += norm(otf[ind]);
-        pPtr[ind] += conj(ft[ind]) * otf[ind];
+        qPtr[ind] += qq[ind];
+        pPtr[ind] += pp[ind];
     }
     
 }
@@ -524,9 +525,25 @@ void Object::addToPQ(const complex_t* ft, const complex_t* otf) {
 void Object::addAllPQ(void) {
     for( auto& ch : channels ) {
         for( auto& im : ch->subImages ) {
-            unique_lock<mutex> lock( mtx );
+            lock_guard<mutex> lock( mtx );
             im->addPQ(P.get(),Q.get());
         }
+    }
+}
+
+
+void Object::calcHelpers(void) {
+    lock_guard<mutex> lock (mtx);
+    const double *qPtr = Q.get();
+    const complex_t *pPtr = P.get();
+    complex_t *pqPtr = PQ.get();
+    double *psPtr = PS.get();
+    double *qsPtr = QS.get();
+
+    for( auto& ind: pupil.otfSupport ) {
+        pqPtr[ind] = pPtr[ind] * qPtr[ind];
+        psPtr[ind] = norm (pPtr[ind]);
+        qsPtr[ind] = qPtr[ind] * qPtr[ind];
     }
 }
 
@@ -559,6 +576,8 @@ void Object::fitAvgPlane( void ) {
         vector<double> coeffs(3,0.0);
         fittedPlane = fitPlane( fittedPlane, true, coeffs.data() );          // fit plane to the average image, and subtract average
         LOG_TRACE << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
+    } else {
+        fittedPlane.clear();
     }
     
 }
@@ -572,7 +591,7 @@ void Object::calcMetric (void) {
     const complex_t* pPtr = P.get();
     const double* qPtr = Q.get();
     
-    unique_lock<mutex> lock (mtx);
+    lock_guard<mutex> lock (mtx);
     currentMetric = 0;
     //size_t N = 4*pupilPixels*pupilPixels;
     //for (size_t ind=0; ind<N; ++ind) {
@@ -718,7 +737,7 @@ void Object::initCache (void) {
     if ( bfs::is_regular_file(pupilFile) ) {
         PupilInfo info( pupilFile, pupilPixels );
         Pupil& ret = myJob.globalData->get(info);
-        unique_lock<mutex> lock(ret.mtx);
+        lock_guard<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( pupilFile, pupilPixels ) ) {
                 LOG << "Loaded Pupil-file " << pupilFile << ende;
@@ -737,7 +756,7 @@ void Object::initCache (void) {
     if( pupil.empty() ) {
         PupilInfo info(pupilPixels, pupilRadiusInPixels);
         Pupil& ret = myJob.globalData->get(info);
-        unique_lock<mutex> lock(ret.mtx);
+        lock_guard<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
             ret.generate( pupilPixels, pupilRadiusInPixels );
             if( ret.nDimensions() != 2 || ret.dimSize(0) != pupilPixels || ret.dimSize(1) != pupilPixels ) {    // mismatch
@@ -759,7 +778,7 @@ void Object::initCache (void) {
     if ( bfs::is_regular_file(modeFile) ) {
         ModeInfo info( modeFile, pupilPixels );
         ModeSet& ret = myJob.globalData->get(info);
-        unique_lock<mutex> lock(ret.mtx);
+        lock_guard<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not loaded yet.
             if( ret.load( modeFile, pupilPixels ) ) {
                 LOG << "Loaded Mode-file " << modeFile << ende;
@@ -784,7 +803,7 @@ void Object::initCache (void) {
             info.firstMode = info.lastMode = 0;
         }
         ModeSet& ret = myJob.globalData->get(info);
-        unique_lock<mutex> lock(ret.mtx);
+        lock_guard<mutex> lock(ret.mtx);
         if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
             if(myJob.modeBasis == ZERNIKE) {
                 ret.generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
@@ -835,27 +854,25 @@ void Object::initCache (void) {
 }
 
 
-void Object::reInitialize( boost::asio::io_service& service ) {
+void Object::reInitialize( boost::asio::io_service& service, bool doReset ) {
+    
     progWatch.clear();
-       // cout << "Object::reInitialize: " << __LINE__ << endl;
     if( imgShifted ) {
-        if(myJob.runFlags&RF_FIT_PLANE) fitAvgPlane();
+        fitAvgPlane();
         for( const shared_ptr<Channel>& c: channels ) {
             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                service.post( [&](){
-        //cout << "Object::reInitialize: " << __LINE__ << endl;
-                    im->reInitialize();
-        //cout << "Object::reInitialize: " << __LINE__ << endl;
+                service.post( [this,im,doReset](){
+                    //im->initialize(true);   // always re-calculate noise statistics
+                    im->initialize( doReset );
                     ++myJob.progWatch;
+
                 } );
             }
         }
     } else {
-        //cout << "Object::reInitialize: " << __LINE__ << endl;
         myJob.progWatch.increase( nImages() );
     }
- 
-        //cout << "Object::reInitialize: " << __LINE__ << endl;
+
 }
 
 
@@ -883,7 +900,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
             else endT = std::max(endT,ch->endT);
             ch->storePatches(service, patches);
         }
-        LOG_DETAIL << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
+        LOG_DEBUG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     });
     
     for( auto& ch: channels ) {
@@ -950,7 +967,6 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
                 auto oData = patches(y,x)->objects[ID];
                 oData->alpha.resize( nImgs, info->nModes );
                 oData->alpha.copyFrom<float>( reinterpret_cast<float*>(tmpData.get()+offset) );
-                oData->cacheStore(true);    // store to disk and clear array
             }
         }
         

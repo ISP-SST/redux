@@ -732,6 +732,25 @@ Array<int16_t> Constraints::getSubMatrix( int32_t groupID ) const {
 }
 
 
+void Constraints::makeRowsCols (void) {
+
+    for( auto& entry: ns_entries ) {
+        ns_rows[entry.first.y].push_back( std::pair<size_t,double>(entry.first.x, entry.second) ); 
+        ns_cols[entry.first.x].push_back( std::pair<size_t,double>(entry.first.y, entry.second) ); 
+    }
+//     int cnt(0);
+// for ( auto& r: ns_cols ) {
+//     if( cnt++ == 5 ) return;
+//     cout << r.first << ":" << endl;
+//     for(auto& e: r.second ) {
+//         cout << "   { " << e.first << " -> " << e.second << " }" << endl;
+//     }
+// }
+//cout << printArray( ns_cols,"cols" ) << endl;
+
+}
+
+
 void Constraints::read( void ) {
 
 }

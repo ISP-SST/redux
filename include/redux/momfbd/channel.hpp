@@ -67,7 +67,7 @@ namespace redux {
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
             void addAllFT(redux::util::Array<double>&);
-            void addAllPQ(void) const;
+            //void addAllPQ(void) const;
             /*****************************************************/
 
             void dump( std::string tag );

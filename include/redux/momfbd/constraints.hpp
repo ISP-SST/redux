@@ -157,6 +157,7 @@ namespace redux {
             redux::util::Array<int16_t> getReducedMatrix (bool blocked=false) const;
             redux::util::Array<double> getReducedNullMatrix (void) const;
             redux::util::Array<int16_t> getSubMatrix (int32_t groupID) const;
+            void makeRowsCols (void);
             void read (void);
             void write (void);
             inline bool verify (void) const { return loaded; }
@@ -177,6 +178,7 @@ namespace redux {
             int32_t nFreeParameters;
             std::unique_ptr<int32_t[]> parameterOrder;
             std::map<redux::util::PointI, double> ns_entries;        //!< (row,col) and value of (non-zero) nullspace-matrix elements
+            std::map<size_t,std::vector<std::pair<size_t,double>>> ns_rows, ns_cols;
 
         };
 

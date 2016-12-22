@@ -6,6 +6,7 @@
 #include "redux/momfbd/subimage.hpp"
 
 #include "redux/util/gsl.hpp"
+#include "redux/util/progresswatch.hpp"
 #include "redux/util/stopwatch.hpp"
 
 #include <memory>
@@ -26,7 +27,47 @@ namespace redux {
         /*! @ingroup momfbd
          *  @{
          */
-         
+        
+        namespace thread {
+        
+            struct TmpStorage {
+                //TmpStorage(){ std::cout << " TmpStorage: " << redux::util::hexString(this) << std::endl; }
+                //~TmpStorage(){ std::cout << "~TmpStorage: " << redux::util::hexString(this) << std::endl; }
+                void resize( uint16_t patchSz, uint16_t pupSz ) {
+                    if( patchSz != patchSize ) {
+                        patchSize = patchSz;
+                        if( patchSize ) {
+                            D.resize( patchSize, patchSize );
+                            FT.resize( patchSize, patchSize );
+                        } else {
+                            D.clear();
+                            FT.clear();
+                        }
+                    }
+                    if( pupSz != pupilSize ) {
+                        pupilSize = pupSz;
+                        size_t otfSize = 2*pupilSize;
+                        if( otfSize ) {
+                            D2.resize( otfSize, otfSize );
+                            C.resize( otfSize, otfSize );
+                            C2.resize( otfSize, otfSize );
+                            OTF.resize( otfSize, otfSize, redux::image::FT_FULLCOMPLEX );
+                        } else {
+                            D2.clear();
+                            C.clear();
+                            C2.clear();
+                            OTF.clear();
+                        }
+                    }
+                }
+                uint16_t patchSize, pupilSize;
+                redux::util::Array<double> D,D2;
+                redux::util::Array<complex_t> C,C2;
+                redux::image::FourierTransform FT,OTF;
+            };
+    
+        }
+
         class MomfbdJob;
         class SubImage;
          /*! Container used during processing. Basically temporary arrays and reorganized references to original data.
@@ -51,17 +92,28 @@ namespace redux {
             
             void run(PatchData::Ptr);
             
-            void shiftSubImages( void );
-            void applyAlpha(void);
+            void shiftAndInit( double* a, bool doReset=false );
+            void applyAlpha( double* a );
+            inline void applyAlpha(void) { applyAlpha( alpha ); } ;
             void applyBeta( const gsl_vector* beta );
             void applyBeta( const gsl_vector* beta, double scale );
             void applyBeta( double scale );
             
+            void applyConstraints( const double* alpha, double* beta );
+            void reverseConstraints( const double* beta, double* alpha );
+
+            void loadInit( const PatchData::Ptr pd, double* a) const;
+            void initImages( double* a );
+            
             double metric(void);
+            double metric2(void);
             double metricAt(double step);       // evaluate metric at alpha + step*grad
             void calcPQ(void);
+            void calcPQ2(void);
             void gradient(void);
+            void gradient2(void);
             void gradient(gsl_vector* out);
+            void gradient2(gsl_vector* out);
           
             void clear(void);
             
@@ -98,6 +150,10 @@ namespace redux {
             grad_t gradientMethod;
 
             redux::util::StopWatch timer;
+            redux::util::ProgressWatch progWatch;
+            
+            static thread_local thread::TmpStorage tmp;
+            std::mutex mtx;
             
         };
 

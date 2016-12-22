@@ -39,21 +39,20 @@ namespace redux {
                      uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);*/
             ~SubImage(void);
             
-            void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointI&, uint16_t, uint16_t, uint16_t);
-            void init(void);
-            void reInitialize(void);
-            void newCutout(void);
+            void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, uint16_t, uint16_t);
+            void getWindowedImg( Array<double>&, redux::util::ArrayStats& s ) const;
+            void initialize( bool doReset=false );
             
             void addFT(redux::util::Array<double>& ftsum) const;
             void addPQ(complex_t* P, double* Q) const { addPQ(OTF.get(),P,Q); };
             void addPQ(const complex_t* otf, complex_t* P, double* Q) const;
-            void addToPQ(void) const;
+            //void addToPQ(void) const;
             void restore(complex_t* avg_obj, double* norm) const;
             
             double metricChange(const complex_t* newOTF) const;
             double gradientFiniteDifference(uint16_t, double);
             double gradientVogel(uint16_t mode, double) const;
-            void calcVogelWeight(void);
+            void calcVogelWeight(complex_t*, double*, double*);
             
             void addToPhi(double* phiPtr, const double* modePtr, double a) const;
             
@@ -96,17 +95,26 @@ namespace redux {
             template <typename T>
             redux::util::Array<T> residual( const redux::util::Array<T>& im ) const {
                 redux::util::Array<T> tmp = convolveImage(im);
+                redux::util::Array<double> img;
+                redux::util::ArrayStats s;
+                getWindowedImg(img,s);
                 tmp -= img;
                 return std::move(tmp);
             }
             template <typename T>
-            redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) { return std::move(cim-img); }
+            redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) {
+                redux::util::Array<double> img;
+                getWindowedImg(img,stats);
+                return std::move(cim-img);
+            }
             
+            std::string idString( void ) const;
             void dump( std::string tag ) const;
 
             uint32_t index;
-            redux::util::PointI offset;                                      //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
-            redux::util::PointI offsetShift;                                 //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
+            redux::util::PointI channelOffset;          //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
+            redux::util::PointF channelResidualOffset;  //<! Remainder after shifting the cutout integer pixels.
+            redux::util::PointI imageOffset;            //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, nModes;
             uint32_t otfSize, pupilSize2, otfSize2;
             double oldRG;
@@ -124,13 +132,11 @@ namespace redux {
             bool newOTF;
             std::mutex mtx;
             
-            redux::util::Array<complex_t> tmpC,tmpC2;   //!< Temporary arrays.                                     size = otfSize
-            redux::util::Array<double> img,tmpImg;      //!< Working copy of the current subimage. (apodized)     size = patchSize
-            redux::util::Array<double> phi,tmpPhi;      //!< Array containing the phase of this OTF               size = pupilsize
-            redux::image::FourierTransform PF;          //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
-            redux::image::FourierTransform OTF,tmpOTF;  //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
-            redux::image::FourierTransform imgFT,tmpFT; //!< Fourier transform of img.                            size = 2*pupilsize
-            redux::util::Array<double> vogel;           //!< used for the Vogel-method of gradient computaion     size = pupilsize
+            redux::util::Array<double> phi;         //!< Array containing the phase of this OTF               size = pupilsize
+            redux::image::FourierTransform PF;      //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
+            redux::image::FourierTransform OTF;     //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
+            redux::image::FourierTransform imgFT;   //!< Fourier transform of img.                            size = 2*pupilsize
+            redux::util::Array<double> vogel;       //!< used for the Vogel-method of gradient computaion     size = pupilsize
             redux::util::ArrayStats stats;
             
 

@@ -757,7 +757,7 @@ void Channel::initPatch (ChannelData& cd) {
     
     uint16_t patchSize = myObject.patchSize;
     for (uint16_t i=0; i < nImages; ++i) {
-        subImages[i]->setPatchInfo( i, cd.offset, cd.channelOffset/*PointI(0,0)*/, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
+        subImages[i]->setPatchInfo( i, cd.channelOffset, cd.residualOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->wrap( cd.images, i, i, cd.offset.y, cd.offset.y+patchSize-1, cd.offset.x, cd.offset.x+patchSize-1 );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), cd.images.dimSize(1)*cd.images.dimSize(2), ST_VALUES|ST_RMS );
     }
@@ -767,7 +767,7 @@ void Channel::initPatch (ChannelData& cd) {
     double* phiPtr = phi_channel.get();
     size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
     
-    int32_t mIndex = myObject.modes.tiltMode.y;     // FIXME: should be x, but subimages are transposed...
+    int32_t mIndex = myObject.modes.tiltMode.x;
     if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
         const double* modePtr = myObject.modes.modePointers[mIndex];
         float res = -cd.residualOffset.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
@@ -777,7 +777,7 @@ void Channel::initPatch (ChannelData& cd) {
             });
     }
     
-    mIndex = myObject.modes.tiltMode.x;     // FIXME: should be y, but subimages are transposed...
+    mIndex = myObject.modes.tiltMode.y;
     if( mIndex >= 0 && fabs(cd.residualOffset.y) > 0 ) {
         const double* modePtr = myObject.modes.modePointers[mIndex];
         float res = -cd.residualOffset.y*myObject.shiftToAlpha.y;   // positive coefficient shifts image downwards
@@ -846,11 +846,11 @@ void Channel::addAllFT (redux::util::Array<double>& ftsum) {
     }
 }
 
-void Channel::addAllPQ(void) const {
-    for (const auto& subimage : subImages) {
-        myObject.addToPQ( subimage->imgFT.get(), subimage->OTF.get() );
-    }
-}
+// void Channel::addAllPQ(void) const {
+//     for (const auto& subimage : subImages) {
+//         myObject.addToPQ( subimage->imgFT.get(), subimage->OTF.get() );
+//     }
+// }
 
 
 void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd ) {
@@ -1091,9 +1091,9 @@ void Channel::adjustCutout( ChannelData& chData, const Region16& origCutout ) co
         chData.offset -= (chData.cutout.first - desiredCutout.first - chData.channelOffset);
     }
 
-//  cout << "adjustCutout: desired=" << desiredCutout << "  cutout=" << chData.cutout
-//       << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
-//       << "   res=" << chData.residualOffset << endl;
+  //cout << "adjustCutout: desired=" << desiredCutout << "  cutout=" << chData.cutout
+  //     << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
+  //     << "   res=" << chData.residualOffset << endl;
     
 }
 

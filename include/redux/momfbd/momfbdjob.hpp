@@ -103,7 +103,7 @@ namespace redux {
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );
             void clearPatches( void );
-            void verifyPatches( boost::asio::io_service& );
+            void verifyPatches( boost::asio::io_service&, uint16_t nThreads );
             void writeOutput( boost::asio::io_service& );
             void postProcess( boost::asio::io_service&, uint16_t nThreads );
             

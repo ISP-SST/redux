@@ -69,9 +69,10 @@ namespace redux {
             void addRegGamma(double);
             void addToFT(const redux::image::FourierTransform&);
             void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft );
-            void addToPQ(const complex_t* ft, const complex_t* otf);
+            void addToPQ(const complex_t* pp, const double* qq);
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
+            void calcHelpers(void);
             void fitAvgPlane(void);
             void calcMetric(void);
             inline double metric(void) const { return weight*currentMetric; };
@@ -85,7 +86,7 @@ namespace redux {
             bool checkData(void);
 
             void initCache(void);
-            void reInitialize(boost::asio::io_service&);
+            void reInitialize(boost::asio::io_service&, bool reset=false);
             void loadData(boost::asio::io_service&, uint16_t nThreads, redux::util::Array<PatchData::Ptr>&);
             void loadInit(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
@@ -101,8 +102,8 @@ namespace redux {
             std::atomic<int> imgShifted;
             redux::util::ProgressWatch progWatch;
             redux::util::Array<double>  ftSum;                              //! Sum of the norm of all images' fourier-transforms
-            redux::util::Array<double> Q;
-            redux::util::Array<complex_t> P;
+            redux::util::Array<double> Q,PS,QS;
+            redux::util::Array<complex_t> P,PQ;
             redux::util::Array<float> fittedPlane;
             redux::image::Pupil pupil;
             ModeSet modes;                                                  //!< modes used in this object
