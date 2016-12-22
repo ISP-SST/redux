@@ -100,7 +100,7 @@ namespace redux {
             redux::image::Image<float> ccdResponse, ccdScattering;
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
-            std::shared_ptr<uint8_t> mask;
+            std::shared_ptr<uint8_t> gainMask;
             bpx::ptime startT, endT;
             std::future<bool> patchWriteFail;
             std::vector<size_t> nFrames;                                    //!< Number of frames in each file

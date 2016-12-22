@@ -465,8 +465,8 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
         progWatch.increaseTarget( 1 );
         service.post([this](){
             CachedFile::load<float>( gain, gainFile );
-            mask.reset( new uint8_t[imgSize.y*imgSize.x] );
-            make_mask( gain.get(), mask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
+            gainMask.reset( new uint8_t[imgSize.y*imgSize.x], []( uint8_t* p ){ delete[] p; } );
+            make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
             ++progWatch;
         });
     }
@@ -979,8 +979,8 @@ void Channel::preprocessImage( size_t i ) {
 
             shared_ptr<double*> array = tmpImg.reshape(sy,sx);
             shared_ptr<uint8_t*> mask2D;
-            if( mask ) {
-                mask2D = reshapeArray( mask.get(), sy, sx );
+            if( gainMask ) {
+                mask2D = reshapeArray( gainMask.get(), sy, sx );
             }
             double** arrayPtr = array.get();
             switch (myJob.fillpixMethod) {
