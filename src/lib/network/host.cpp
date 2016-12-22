@@ -36,6 +36,7 @@ Host::HostInfo::HostInfo( void ) : peerType(0), connectPort(0) {
     nCores = std::thread::hardware_concurrency();
     startedAt = boost::posix_time::second_clock::local_time();
     name = boost::asio::ip::host_name();
+    user = getUname();
     struct utsname nm;
     if( uname( &nm ) < 0 ) {
         os = "-";
@@ -183,7 +184,7 @@ Host& Host::operator=( const Host& rhs ) {
 uint64_t Host::HostInfo::size(void) const {
     uint64_t sz = sizeof(littleEndian) + sizeof(reduxVersion) + sizeof(pid) + sizeof(peerType) + sizeof(nCores);
     sz += sizeof(time_t);   // startedAt is converted and transferred as time_t
-    sz += name.length() + os.length() + arch.length() + 3;
+    sz += name.length() + os.length() + arch.length() + user.size() + 4;
     return sz;
 }
 
@@ -202,6 +203,7 @@ uint64_t Host::HostInfo::pack( char* ptr ) const {
     count += pack(ptr+count,name);
     count += pack(ptr+count,os);
     count += pack(ptr+count,arch);
+    count += pack(ptr+count,user);
     
     return count;
     
@@ -223,6 +225,7 @@ uint64_t Host::HostInfo::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count,name);
     count += unpack(ptr+count,os);
     count += unpack(ptr+count,arch);
+    count += unpack(ptr+count,user);
     
     return count;
     

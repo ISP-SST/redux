@@ -38,7 +38,7 @@ namespace redux {
                 uint16_t nCores;
                 uint16_t connectPort;
                 boost::posix_time::ptime startedAt;
-                std::string name, os, arch, connectName;
+                std::string name, os, arch, connectName, user;
                 HostInfo( void );
                 uint64_t size(void) const;
                 uint64_t pack( char* ) const;
