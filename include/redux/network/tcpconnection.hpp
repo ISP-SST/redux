@@ -102,8 +102,8 @@ namespace redux {
             void setErrorCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); errorCallback = cb; };
             void idle( void );
             void onActivity( Ptr conn, const boost::system::error_code& error );
-            void setSwapEndian(bool se) { swapEndian = se; };
-            bool getSwapEndian(void) { return swapEndian; };
+            void setSwapEndian(bool se) { swapEndian_ = se; };
+            bool getSwapEndian(void) { return swapEndian_; };
             
             void lock(void) { mtx.lock(); };
             void unlock(void) { mtx.unlock(); };
@@ -111,6 +111,9 @@ namespace redux {
 
             TcpConnection& operator<<( const Command& );
             TcpConnection& operator>>( Command& );
+            
+            TcpConnection& operator<<( const std::vector<std::string>& );
+            TcpConnection& operator>>( std::vector<std::string>& );
 
             template <typename T>
             TcpConnection& operator<<( const T& in ) {
@@ -136,7 +139,7 @@ namespace redux {
             callback errorCallback;
             tcp::socket mySocket;
             boost::asio::io_service& myService;
-            bool swapEndian;
+            bool swapEndian_;
             std::mutex mtx;
 
        public:

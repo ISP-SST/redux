@@ -28,7 +28,7 @@ namespace {
 
 
 TcpConnection::TcpConnection( boost::asio::io_service& io_service )
-    : activityCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian(false), strand(io_service) {
+    : activityCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian_(false), strand(io_service) {
 #ifdef DBG_NET_
     LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
 #endif
@@ -62,7 +62,7 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
     //}
 
 
-    unpack( sz, blockSize, swapEndian );
+    unpack( sz, blockSize, swapEndian_ );
     if( blockSize == 0 ) return buf;
 
     buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
@@ -151,6 +151,42 @@ TcpConnection& TcpConnection::operator>>( Command& out ) {
     if( ba::read( mySocket, ba::buffer( &out, sizeof( Command ) ) ) < sizeof( Command ) ) {
         out = CMD_ERR;
         throw std::ios_base::failure( "Failed to receive command." );
+    }
+    return *this;
+}
+
+
+TcpConnection& TcpConnection::operator<<( const std::vector<std::string>& in ) {
+    uint64_t inSize(0);
+    if( in.size() ) {
+        uint64_t messagesSize = redux::util::size( in );
+        size_t totSize = messagesSize+sizeof(uint64_t);
+        shared_ptr<char> tmp( new char[totSize], []( char* p ){ delete[] p; } );
+        char* ptr = tmp.get();
+        ptr += redux::util::pack( ptr, messagesSize );
+        redux::util::pack( ptr, in );
+        syncWrite(tmp.get(), totSize);
+    } else {
+        syncWrite( inSize );
+    }
+    return *this;
+}
+
+
+TcpConnection& TcpConnection::operator>>( std::vector<std::string>& out ) {
+    uint64_t blockSize, received;
+    received = boost::asio::read( mySocket, boost::asio::buffer( &blockSize, sizeof(uint64_t) ) );
+    if( received == sizeof(uint64_t) ) {
+        if( swapEndian_ ) swapEndian( blockSize );
+        if( blockSize ) {
+            shared_ptr<char> buf( new char[blockSize+1], []( char* p ){ delete[] p; } );
+            char* ptr = buf.get();
+            memset( ptr, 0, blockSize+1 );
+            received = boost::asio::read( mySocket, boost::asio::buffer( ptr, blockSize ) );
+            if( received ) {
+                unpack( ptr, out, swapEndian_ );
+            }
+        }
     }
     return *this;
 }
