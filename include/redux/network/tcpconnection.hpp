@@ -110,7 +110,7 @@ namespace redux {
             bool try_lock(void) { return mtx.try_lock(); };
             
             void sendUrgent( uint8_t c );
-            void receiveUrgent( uint8_t& c );
+            size_t receiveUrgent( uint8_t& c );
             
             TcpConnection& operator<<( const uint8_t& );
             TcpConnection& operator>>( uint8_t& );

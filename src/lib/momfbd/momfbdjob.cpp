@@ -470,8 +470,8 @@ void MomfbdJob::unloadData( boost::asio::io_service& service ) {
         LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") flat-fielding completed." << ende;
         info.step.store( JSTEP_COMPLETED );
     } else {
-        LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued." << ende;
-        LOG << "       nPatches = " << patches.nElements() << "   nObjects = " << objects.size() << ende;
+        LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued:"
+            << "  nPatches = " << patches.nElements() << "  nObjects = " << objects.size() << ende;
         //info.step.store( JSTEP_QUEUED );
         //info.progressString = "Q";
         //info.step.store( JSTEP_DONE );
@@ -484,7 +484,7 @@ void MomfbdJob::unloadData( boost::asio::io_service& service ) {
 
 void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
-    LOG_TRACE << "MomfbdJob::preProcess()   nThreads = " << nThreads << ende;
+    LOG_TRACE << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processing..." << ende;
 
     uint32_t nTotalImages(0);
     uint32_t nTotalChannels(0);
@@ -602,7 +602,6 @@ void MomfbdJob::initCache(void) {
     
     auto lock = getLock();
 
-    LOG_DEBUG << "MomfbdJob::initCache()" << ende;
     if( !globalData ) {
         globalData.reset(new GlobalData(*this));
         globalData->constraints.init();
@@ -611,8 +610,6 @@ void MomfbdJob::initCache(void) {
     for( auto& obj: objects ) {
         obj->initCache();
     }
-
-    LOG_TRACE << "MomfbdJob::initCache()  Done." << ende;
     
 }
 

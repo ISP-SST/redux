@@ -124,13 +124,13 @@ double redux::momfbd::util::cf2pix(double arcsecperpix, double telescope_d) {
 
 
 double redux::momfbd::util::pix2cf(double arcsecperpix, double telescope_d) {
-    static const double a = (redux::PI*redux::PI)/648000.0;
+    static const double a = (M_PI*M_PI)/648000.0;
     return a * (arcsecperpix*telescope_d);
 }
 
 
 double redux::momfbd::util::def2cf(double telescope_r) { // defocus distance in meters
-    static const double a = -redux::PI/(8.0*sqrt(3.0));
+    static const double a = -M_PI/(8.0*sqrt(3.0));
     return a * sqr(telescope_r);
 }
 

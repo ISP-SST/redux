@@ -5,6 +5,10 @@ set(TEST_NAME "testsuite" CACHE INTERNAL "Name of test application")
 
 USE_REDUX(redux)
 
+if( REDUX_WITH_FFTW3 )
+    add_definitions(-DREDUX_WITH_FFTW3)
+endif()
+
 # Code for test module
 file(GLOB REDUX_TEST_SRC RELATIVE ${CMAKE_CURRENT_LIST_DIR} "*.cpp")
 file(GLOB REDUX_TEST_HPP RELATIVE ${CMAKE_CURRENT_LIST_DIR} "include/*.hpp")

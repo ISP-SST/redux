@@ -822,29 +822,28 @@ void boundValueTest( void ) {
     BOOST_CHECK_EQUAL( wrappedVal, 1 );
 
 
-    using redux::PI;
     double delta( 0.05 );
     double epsilon = 1E-9;
 
-    BoundValue<double, detail::WRAP> periodicVal( 0, 0, 2 * PI );
-    periodicVal = 3 * PI + delta;
+    BoundValue<double, detail::WRAP> periodicVal( 0, 0, 2 * M_PI );
+    periodicVal = 3 * M_PI + delta;
     BOOST_CHECK_CLOSE( ( double )periodicVal, PI + delta, epsilon );
-    periodicVal = -3 * PI / 2 + delta;
+    periodicVal = -3 * M_PI / 2 + delta;
     BOOST_CHECK_CLOSE( ( double )periodicVal, PI / 2 + delta, epsilon );
 
 
-    BoundValue<double, detail::REFLECT> inclVal( 0, 0, PI ); // e.g. inclination = PI/2+\delta -> PI/2 - \delta
-    inclVal = PI + delta;
+    BoundValue<double, detail::REFLECT> inclVal( 0, 0, M_PI ); // e.g. inclination = PI/2+\delta -> PI/2 - \delta
+    inclVal = M_PI + delta;
     BOOST_CHECK_CLOSE( ( double )inclVal, PI - delta, epsilon );
-    inclVal = 2 * PI + delta;
+    inclVal = 2 * M_PI + delta;
     BOOST_CHECK_CLOSE( ( double )inclVal, delta, epsilon );
-    inclVal = 3 * PI + delta;
+    inclVal = 3 * M_PI + delta;
     BOOST_CHECK_CLOSE( ( double )inclVal, PI - delta, epsilon );
     inclVal = -delta;
     BOOST_CHECK_CLOSE( ( double )inclVal, delta, epsilon );
-    inclVal = -PI - delta;
+    inclVal = -M_PI - delta;
     BOOST_CHECK_CLOSE( ( double )inclVal, PI - delta, epsilon );
-    inclVal = -2 * PI - delta;
+    inclVal = -2 * M_PI - delta;
     BOOST_CHECK_CLOSE( ( double )inclVal, delta, epsilon );
 
 

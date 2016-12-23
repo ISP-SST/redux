@@ -41,7 +41,7 @@ namespace {
     
     bool checkImageScale (double& F, double& A, double& P, const string& logChannel) {
 
-        double rad2asec = 180.0 * 3600.0 / redux::PI;
+        double rad2asec = 180.0 * 3600.0 / M_PI;
         size_t count = F > 0 ? 1 : 0;
         count += A > 0 ? 1 : 0;
         count += P > 0 ? 1 : 0;
@@ -745,7 +745,7 @@ void Object::initCache (void) {
             } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching pupil
-                LOG_DEBUG << "Using pre-calculated pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                //LOG_DEBUG << "Using pre-calculated pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This might happen if a loaded Pupil was rescaled (which is not implemented yet)." << ende;
@@ -767,7 +767,7 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.nPixels && ret.nPixels == pupilPixels ) {    // matching pupil
-                LOG_DEBUG << "Using pre-calculated Pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                //LOG_DEBUG << "Using pre-calculated Pupil:  (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!" << ende;
@@ -789,7 +789,7 @@ void Object::initCache (void) {
               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
-                LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                //LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled (which is not implemented yet!!)." << ende;
@@ -819,7 +819,7 @@ void Object::initCache (void) {
             }
         } else {
             if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ) {    // matching modes
-                LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                //LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0) << " modes. (" << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!" << ende;
@@ -948,9 +948,10 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
             LOG_ERR << "nPatchesY = " << nPatchesY << " - " << patches.dimSize(0) << ende;
             return;
         }
-        if( info->nModes != myJob.modeNumbers.size() ) {
+        int nModeNumbers = static_cast<int>(myJob.modeNumbers.size());
+        if( info->nModes != nModeNumbers ) {
             LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of modes." << ende;
-            LOG_ERR << "info->nModes = " << info->nModes << " != " << myJob.modeNumbers.size()  << ende;
+            LOG_ERR << "info->nModes = " << info->nModes << " != " << nModeNumbers << ende;
             return;
         }
         if( nImgs != nImages() ) {

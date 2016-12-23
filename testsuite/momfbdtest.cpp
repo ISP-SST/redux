@@ -59,8 +59,8 @@ void cfgTest( void ) {
         ccfg.mmWidth = 4;
         ccfg.xOffsetFile = "xOffsetFile.ext";
         ccfg.yOffsetFile = "yOffsetFile.ext";
-        ccfg.imageNumbers = {23,45};
-        ccfg.wfIndex = {2,4,6};
+        ccfg.fileNumbers = {23,45};
+        ccfg.waveFronts = {2,4,6};
         ccfg.darkNumbers = {145,88};
         ccfg.stokesWeights = {0.99,0.11,0.12,0.13};
         // export settings as config file and parse/compare
@@ -251,7 +251,7 @@ void packTest( void ) {
     {   // no image data
         PatchData pd(mjob),pd2(mjob);
         pd.id = 123;
-        pd.index = {1,2};
+        pd.index = Point16(1,2);
         auto buf = sharedArray<char>( pd.size() );
         char* ptr = buf.get();
         uint64_t count = pd.pack( ptr );
@@ -296,7 +296,7 @@ void modeTest(void) {
 
     double lambda = 6.30200e-07; //2; //7.77200e-07; //1000;
     double rc = 19.4376; //80; //87.1075; //29.7;
-    double angle = 0; //45*redux::PI/180.0;
+    double angle = 0; //45*M_PI/180.0;
     int nPixels = 44; //164;
     double cutoff = 0.001;
 
@@ -585,18 +585,18 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
     nPixels = 150;
     double radius = 0.4321*nPixels;
     Array<double> aperture;
-    double area = makePupil_old(aperture,nPixels,radius);
+    double** ap = makePointers(aperture.ptr(), nPixels, nPixels);
+    double area = makePupil(ap,nPixels,radius);
     //redux::file::Ana::write("aperture.f0", aperture);
 
-    double** ap = makePointers(aperture.ptr(), nPixels, nPixels);
-    double area_mvn = makePupil_mvn(ap,nPixels,radius);
+    //double area_mvn = makePupil_mvn(ap,nPixels,radius);
     //redux::file::Ana::write("aperture2.f0", aperture);
     delPointers(ap);
 
     Pupil pup(nPixels,radius);
     //redux::file::Ana::write("aperture3.f0", pup_pair.first);
 
-    cout << "Area = " << area << "  Area_mvn  = " << area_mvn << "  ratio  = " << (area/area_mvn) << "   r^2*PI = " << (radius*radius*redux::PI) << endl;
+    cout << "Area = " << area << "   r^2*PI = " << (radius*radius*M_PI) << endl;
 //     cout << "ap=f0('/home/tomas/build/redux/aperture.f0')\n"
 //          << "ap2=f0('/home/tomas/build/redux/aperture2.f0')\n"
 //          << "ap[" <<(nPixels/2-2) << ":" << (nPixels/2+2) << ","<<(nPixels/2-2) << ":" << (nPixels/2+2) << "]\n"
@@ -740,13 +740,13 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
 //         for( int i=0; i<COLS; ++i) {
 //             for( int j=0; j<ROWS; ++j) {
 //          //       cimg(j,i) = img(j,i) = rand()%10000;
-//                 //img(j,i) = 1+sin(4*redux::PI*i/(COLS-1));
-//     //            cimg(j,i) = img(j,i) = cos(redux::PI*(i+2*j)/24.0)*exp(-(i-COLS/2)*(i-COLS/2)/20000.0);
+//                 //img(j,i) = 1+sin(4*M_PI*i/(COLS-1));
+//     //            cimg(j,i) = img(j,i) = cos(M_PI*(i+2*j)/24.0)*exp(-(i-COLS/2)*(i-COLS/2)/20000.0);
 //                // cimg(j,i) *= iii;
-//     //             img(j,i) = 1+sin(20*redux::PI*i/(COLS-1)); // +
-//     //                        4+4*sin(20*redux::PI*j/(ROWS-1)) +
-//     //                        16+16*cos(14*redux::PI*(i/(COLS-1)+j/(ROWS-1)));
-//     //                        64+64*sin(14*redux::PI*(i/(COLS-1)-j/(ROWS-1)));
+//     //             img(j,i) = 1+sin(20*M_PI*i/(COLS-1)); // +
+//     //                        4+4*sin(20*M_PI*j/(ROWS-1)) +
+//     //                        16+16*cos(14*M_PI*(i/(COLS-1)+j/(ROWS-1)));
+//     //                        64+64*sin(14*M_PI*(i/(COLS-1)-j/(ROWS-1)));
 //
 //                 psf(j,i) = exp(-(i-COLS/2)*(i-COLS/2)/5.0-(j-ROWS/2)*(j-ROWS/2)/100.0);
 //                 if(sqrt((i-COLS/2-XOFF)*(i-COLS/2-XOFF)+(j-ROWS/2-YOFF)*(j-ROWS/2-YOFF)) < 30) cimg(j,i) = img(j,i) = 1;

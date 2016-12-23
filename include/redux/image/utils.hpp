@@ -19,24 +19,15 @@ namespace redux {
 
     namespace image {
         
-        double makePupil_thi( double** pupil, uint32_t nPoints, double radius);
-        double makePupil_mvn( double** pupil, int nPoints, double radius );
-        template <typename T>
-        double makePupil_old( util::Array<T>& pupil, uint32_t nPoints, double radius) {
-            pupil.resize(nPoints,nPoints);
-            T **ptr = redux::util::makePointers(pupil.get(),nPoints,nPoints);
-            double area = makePupil_mvn(ptr,nPoints,radius); // FIXME: temporarily using MvN pupilmaker for easier debugging.
-            redux::util::delPointers(ptr);
-            return area;
-        }
+        double makePupil( double** pupil, uint32_t nPoints, double radius);
 
-        void makeZernike_thi( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
-        void makeZernike_mvn( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
+        void makeZernike( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
+
         template <typename T>
         void makeZernike( util::Array<T>& mode, int j, uint32_t nPoints, double radius, double angle=0) {
             mode.resize(nPoints,nPoints);
             T **ptr = redux::util::makePointers(mode.get(),nPoints,nPoints);
-            makeZernike_thi(ptr,nPoints,radius,angle); // FIXME: temporarily using MvN Z-maker for easier debugging.
+            makeZernike(ptr,nPoints,radius,angle); // FIXME: temporarily using MvN Z-maker for easier debugging.
             redux::util::delPointers(ptr);
         }
 

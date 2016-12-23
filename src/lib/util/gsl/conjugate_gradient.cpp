@@ -79,8 +79,8 @@ static int conjugate_rdx_set (void *vstate, gsl_multimin_function_fdf * fdf,
     state->step = step_size;
     state->tol = tol;
 
-    *f = GSL_MULTIMIN_FN_EVAL_F( fdf, x );
-
+    // *f = GSL_MULTIMIN_FN_EVAL_F( fdf, x );
+    GSL_MULTIMIN_FN_EVAL_F_DF( fdf, x, f, gradient );
     return GSL_SUCCESS;
     
 }

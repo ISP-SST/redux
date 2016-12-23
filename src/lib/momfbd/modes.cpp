@@ -117,7 +117,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double a
         Array<double>::operator=(1.0);
     } else {
         double** modePtr = makePointers(get(), nPoints, nPoints);
-        makeZernike_thi(modePtr,modeNumber,nPoints,r_c,angle);   //FIXME: using MvN's Zernike-generator for comparisons
+        makeZernike(modePtr,modeNumber,nPoints,r_c,angle);   //FIXME: using MvN's Zernike-generator for comparisons
         //makeZernike_mvn(modePtr,modeNumber,nPoints,r_c,angle);
         delPointers(modePtr);
     }
@@ -334,8 +334,8 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         ModeInfo info = base_info;
         if ( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
             info.firstMode = info.lastMode = 0;
-            if ( it == 2 ) tiltMode.x = modeNumbers.size();
-            else tiltMode.y = modeNumbers.size();
+            if ( it == 2 ) tiltMode.y = modeNumbers.size();
+            else tiltMode.x = modeNumbers.size();
         }
         info.modeNumber = it;
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );

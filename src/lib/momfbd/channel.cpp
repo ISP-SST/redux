@@ -41,7 +41,7 @@ using namespace std;
 namespace {
     
     double def2cf( double pd_defocus, double telescope_r ) { // defocus distance in meters
-        static const double tmp = redux::PI/(8.0 * sqrt(3.0));
+        static const double tmp = M_PI/(8.0 * sqrt(3.0));
         return pd_defocus * telescope_r * telescope_r * tmp;
     }
    
@@ -301,8 +301,8 @@ bool Channel::checkData (void) {
         }
         std::swap( waveFronts, tmpV );
     }
-    LOG_DEBUG << "Object #" << myObject.ID << printArray(waveFronts," contains waveFronts") << ende;
-
+    string wfStr = redux::util::uIntsToString( waveFronts );
+    LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << " contains waveFronts: " << wfStr << ende;
     myJob.info.progress[1] += std::max(fileNumbers.size(),1UL)*3;  // load, process, split & store (TODO more accurate progress reporting)
 
     // Dark(s)
@@ -572,7 +572,6 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     images.resize( nTotalFrames, imgSize.y, imgSize.x );
     imageStats.resize( nTotalFrames );
     
-    LOG_DEBUG << "      nTotalFrames " << nTotalFrames << printArray(images.dimensions(),"  imgdims") << ende;
     progWatch.set(1);
     progWatch.setHandler([this,nFiles,&service,&patches](){
         //cout << "Calib loaded.   " << myObject.ID << ":" << ID << endl;
@@ -1121,7 +1120,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         return;
     }
     
-    PointI finalPos = localPos;
+    PointI finalPos = localPos+0.5;
     desiredCutout += finalPos;                                                  // ...now centered on localPos, this is the cutout we want
     RegionI imgBoundary(0,0,imgSize.y-1, imgSize.x-1);                          // restrict to lie inside image
     
@@ -1129,8 +1128,8 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     tmpCutout.restrict(imgBoundary);
     bool alreadyWarned(false);
     if( tmpCutout != desiredCutout ) {
-        LOG_WARN << "Patch " << patch->index << " does not lie completely within image in channel " << myObject.ID
-        << ":" << ID << ": region: " << desiredCutout << "  This will likely cause severe artifacts!!!" << ende;
+        LOG_WARN << "Patch " << patch->index << " does not lie completely within image in channel " << myObject.ID << ":" << ID
+        << ": desired: " << desiredCutout << "  This will likely cause severe artifacts!!!" << ende;
         alreadyWarned = true;
         chData.offset -= (tmpCutout.first - desiredCutout.first);
         finalPos += (tmpCutout.first - desiredCutout.first);
@@ -1146,16 +1145,17 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     if( tmpCutout != desiredCutout ) {
         if( !alreadyWarned )
             LOG_DETAIL << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
-            myObject.ID << ":" << ID << ": region: " << desiredCutout << "  tmpCO = " << tmpCutout << ende;
+            myObject.ID << ":" << ID << ":  desired: " << desiredCutout << "  actual: " << tmpCutout << ende;
         chData.offset -= (tmpCutout.first - desiredCutout.first);
     }
     
     chData.cutout = tmpCutout;
-    
-    LOG_TRACE << "AdjustCutout ch=" <<myObject.ID << ":" << ID << ": refPos=" << refPos << "  localPos=" << localPos
-         << "  finalPos=" << finalPos<< "  desired=" << desiredCutout << "  cutout=" << chData.cutout
-         << "  chOffs=" << chData.channelOffset << "   offs=" << chData.offset
-         << "   res=" << chData.residualOffset << ende;
+    string actStr = "";
+    if( chData.cutout != desiredCutout ) actStr = "  actual="+(string)chData.cutout;
+    LOG_TRACE << "AdjustCutout ch=" <<myObject.ID << ":" << ID << ": patch=" << patch->index << refPos << "  mapped=" << localPos
+              << "  desired=" << desiredCutout << actStr
+              << "  localOffset=" << chData.channelOffset << "   start=" << chData.offset
+              << "   residual=" << chData.residualOffset << ende;
          
 }
 

@@ -19,75 +19,6 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 
-namespace {
-
-    double makePupil(double** pupil, uint16_t nPoints, double radius) {
-
-        double area = 0.0, origin = 0.5;
-        memset (*pupil, 0, nPoints * nPoints * sizeof (double));
-        uint16_t mid = nPoints / 2;                         // N.B: Don't use odd number of points for pupils !!
-                                                            // Pupil should be centered ON pixel (mid,mid), to match the location of the origin for Fourier-transforms.
-
-        if (nPoints % 2) {
-            // TODO: warn or throw if nPoints is odd.
-        }
-
-        const Grid& grid = Grid::get(mid + 1, origin, origin);
-        float** distPtr = grid.distance.get();              // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
-                                                            // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
-        double val;
-        for (unsigned int x = 0; x < mid; ++x) {
-            for (unsigned int y = 0; y <= x; ++y) {                 // We only generate the first octant, then copy.
-                val = 0;
-                if (distPtr[y + 1][x + 1] < radius) {
-                    val = 1;
-                } else if (distPtr[y][x] < radius) {        // partial pixel
-                    if (x == 0 && y == 0) {                 // central pixel = 1 for all practical cases
-                        if (radius < 0.5) val = M_PI*radius*radius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
-                        else val = M_PI*radius*radius + (radius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI*radius*radius);
-                    } else {
-                        // TBD: better approximation of pixel fill-factor ??
-                        val = (radius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
-                    }
-                }
-                if (val > 0) {
-                    pupil[mid + y][mid + x] = val;
-                    area += val;
-                    if (x != y) {
-                        pupil[mid + x][mid + y] = val; // Use symmetry to fill the second octant
-                        area += val;
-                    }
-                }
-            }
-        }
-        for (unsigned int x = 0; x < mid; ++x) {
-            for (unsigned int y = 0; y < mid; ++y) {     // copy 1st quadrant to 2,3,4
-                val = pupil[mid + y][mid + x];
-                if (val > 0) {
-                    if (x) {
-                        pupil[mid + y][mid - x] = val;
-                        area += val;
-                    }
-                    if (y) {
-                        pupil[mid - y][mid + x] = val;
-                        area += val;
-                    }
-                    if (x && y) {
-                        pupil[mid - y][mid - x] = val;
-                        area += val;
-                    }
-                }
-            }
-        }
-
-        return area;
-
-    }
-
-
-}
-
-
 PupilInfo::PupilInfo( string filename, uint16_t pixels )
     : nPixels(pixels), pupilRadius(0), filename(filename) {
 
@@ -245,7 +176,7 @@ void Pupil::generate( uint16_t pixels, double pupilRadius ) {
     radius = pupilRadius;
     resize( nPixels, nPixels );
     auto ptr = reshape( nPixels, nPixels );        // returns a 2D shared_ptr
-    area = makePupil_mvn( ptr.get(), nPixels, radius );
+    area = makePupil( ptr.get(), nPixels, radius );
     
     normalize();
     generateSupport(1E-9);                         // TODO: tweak or make into a config parameter?

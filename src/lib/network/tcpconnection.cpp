@@ -148,10 +148,11 @@ void TcpConnection::sendUrgent( uint8_t c ) {
 }
 
  
-void TcpConnection::receiveUrgent( uint8_t& c ) {
+size_t TcpConnection::receiveUrgent( uint8_t& c ) {
     if( mySocket.is_open() && mySocket.at_mark() ) {
-        size_t cnt = mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+       return mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
     }
+    return 0;
 }
 
  

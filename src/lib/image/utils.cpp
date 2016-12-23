@@ -57,35 +57,6 @@ namespace {
         m = 2 * ( (dl + (n % 2)) / 2) + ! (n % 2) - 1;
     }
 
-    void zernike_mn (int j, int &m, int &n) { // j=1...
-        n = 0;
-        int len = 1;
-        for (int i = 1; len < j; ++i) len += (n = i) + 1;
-        int dl = n + 1 - len + j;
-        m = 2 * ( (dl + (n % 2)) / 2) + ! (n % 2) - 1;
-    }
-
-    double *RC (int m, int n) {
-        int nmm = (n - m) / 2, npm = (n + m) / 2;
-        int nmax = std::max (npm, n);
-        double *f = new double [nmax + 1];
-        f[0] = 1.0;
-        for (int i = 1; i <= nmax; ++i) f[i] = (double) i * f[i - 1];
-        double *res = new double [nmm + 1];
-        for (int s = 0, pm = -1; s <= nmm; ++s)
-            res[s] = (double) ( (pm *= -1) * f[n - s]) / (f[s] * f[npm - s] * f[nmm - s]);
-        delete[] f;
-        return res;
-    }
-
-
-    __inline double mvn_max (double a, double b) {
-        return (a > b) ? a : b;
-    }
-
-    __inline double mvn_min (double a, double b) {
-        return (a > b) ? b : a;
-    }
 
     template <typename T>
     void maskConnected(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int yy, unsigned int xx, unsigned int y_start, unsigned int x_start, T threshold) {
@@ -107,7 +78,7 @@ static __inline T sqr (T x) {
 }
 
 
-double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double radius) {
+double redux::image::makePupil (double** pupil, uint32_t nPoints, double radius) {
 
     double area = 0.0, origin = 0.5;
     memset (*pupil, 0, nPoints * nPoints * sizeof (double));
@@ -129,8 +100,8 @@ double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double rad
                 val = 1;
             } else if (distPtr[y][x] < radius) {    // partial pixel
                 if (x == 0 && y == 0) {     // central pixel = 1 for all practical cases
-                    if (radius < 0.5) val = redux::PI * radius * radius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
-                    else val = redux::PI * radius * radius + (radius - 0.5) / (sqrt (0.5) - 0.5) * (1 - redux::PI * radius * radius);
+                    if (radius < 0.5) val = M_PI * radius * radius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
+                    else val = M_PI * radius * radius + (radius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI * radius * radius);
                 } else {
                     // TBD: better approximation of pixel fill-factor ??
                     val = (radius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
@@ -171,41 +142,7 @@ double redux::image::makePupil_thi (double** pupil, uint32_t nPoints, double rad
 }
 
 
-double redux::image::makePupil_mvn (double** pupil, int nph, double r_c) {
-
-    double area = 0.0;
-    memset (*pupil, 0, nph * nph * sizeof (double));
-    int xo = nph / 2, yo = nph / 2;
-    double dx = 0.5 / r_c, dy = 0.5 / r_c;
-    for (int x = 0; x < nph; ++x) {
-        double xl = fabs ( (double) (x - xo)) / r_c - dx, xh = fabs ( (double) (x - xo)) / r_c + dx;
-        double xhs = sqr (xh);
-        for (int y = 0; y < nph; ++y) {
-            double yl = fabs ( (double) (y - yo)) / r_c - dy, yh = fabs ( (double) (y - yo)) / r_c + dy;
-            double yhs = sqr (yh);
-            double rsl = sqr (xl) + sqr (yl), rsh = xhs + yhs;
-            if (rsl <= 1.0) {  // inside pixel
-                if (rsh < 1.0) {  // full pixel
-                    pupil[y][x] = 1.0;
-                    //pupil[y][x] = sqrt(rsh*r_c*r_c);
-                } else {           // partial pixel
-                    double x2 = sqrt (mvn_max (1.0 - yhs, (double) 0.0));
-                    double y3 = sqrt (mvn_max (1.0 - xhs, (double) 0.0));
-                    double f = (xh > yh) ? (yh - yl) * (mvn_min (xh, mvn_max (xl, x2)) - xl) / (4 * dx * dy) :
-                               (xh - xl) * (mvn_min (yh, mvn_max (yl, y3)) - yl) / (4 * dx * dy);
-                    pupil[y][x] = f;
-                }
-                area += pupil[y][x];
-            }
-        }
-    }
-
-    return area;
-
-}
-
-
-void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle) {
+void redux::image::makeZernike (double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle) {
 
     redux::image::Pupil pupil(nPoints, r_c);
 
@@ -298,99 +235,6 @@ void redux::image::makeZernike_thi (double** modePtr, int modeNumber, uint32_t n
 
     delPointers (pupPtr);
 
-}
-
-
-void redux::image::makeZernike_mvn (double** mode, int j, uint32_t nph, double r_c, double angle) {
-
-    int xo = nph / 2, yo = nph / 2;
-    int nphi = static_cast<int>(nph);
-    if (j == 1) {
-        for (unsigned int x=0; x < nph; ++x) {
-            for (unsigned int y=0; y < nph; ++y) {
-                mode[x][y] = 1.0;
-            }
-        }
-    } else {                                      // j>1
-        int m, n;
-        zernike_mn (j, m, n);
-        double *rc = RC (m, n);
-        double **r = newArray<double> (nph, nph);
-        double **rs = newArray<double> (nph, nph);
-        for (unsigned int x=0; x < nph; ++x) {            // s=0
-            for (unsigned int y=0; y < nph; ++y) {
-                double rr = sqrt ( (double) sqr (x - xo) + (double) sqr (y - yo)) / r_c;
-                rs[x][y] = rr * rr;
-                r[x][y] = pow (rr, n);
-                mode[x][y] = r[x][y] * rc[0];
-            }
-        }
-        rs[xo][yo] = 1.0;                         // avoid division by 0
-        for (int s = 1; s <= (n - m) / 2; ++s) {
-            for (unsigned int x = 0; x < nph; ++x) {
-                for (unsigned int y = 0; y < nph; ++y) {
-                    mode[x][y] += (r[x][y] /= rs[x][y]) * rc[s];
-                }
-            }
-            if (! (n - 2 * s)) mode[xo][yo] += rc[s]; // dividing 0 by 1 will never give 1...
-        }
-        delArray (rs);
-        delArray (r);
-
-        if (m) {                                  // m!=0
-            double sf = sqrt ( (double) (2 * (n + 1)));
-            if (j % 2)                              // odd
-                for (int x = 0; x < nphi; ++x) {
-                    for (int y = 0; y < nphi; ++y) {
-                        mode[x][y] *= sf * sin ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
-                    }
-                }
-            else {                                   // even
-                for (int x = 0; x < nphi; ++x) {
-                    for (int y = 0; y < nphi; ++y) {
-                        mode[x][y] *= sf * cos ( ( (double) m) * (atan2 ( (double) (y - yo), (double) (x - xo)) + angle));
-                    }
-                }
-            }
-        } else {                                   // m==0
-            double sf = sqrt ( (double) (n + 1));
-            for (unsigned int x = 0; x < nph; ++x) {
-                for (unsigned int y = 0; y < nph; ++y) {
-                    mode[x][y] *= sf;
-                }
-            }
-        }
-        delete[] rc;
-    }
-    double sum = 0.0, N = 0.0, dx = 0.5 / r_c, dy = 0.5 / r_c;
-    for (unsigned int x = 0; x < nph; ++x) {
-        double xl = fabs ( ( (double) x - xo)) / r_c - dx, xh = fabs ( ( (double) x - xo)) / r_c + dx;
-        double xhs = sqr (xh);
-        for (unsigned int y = 0; y < nph; ++y) {
-            double yl = fabs ( ( (double) y - yo)) / r_c - dy, yh = fabs ( ( (double) y - yo)) / r_c + dy;
-            double yhs = sqr (yh);
-            double rsl = sqr (xl) + sqr (yl), rsh = xhs + yhs;
-            if (rsl <= 1.0) {   // good pixel
-                if (rsh < 1.0) { // full pixel
-                    sum += sqr (mode[x][y]);
-                    N += 1.0;
-                } else {          // partial pixel
-                    double x2 = sqrt (max (1.0 - yhs, (double) 0.0));
-                    double y3 = sqrt (max (1.0 - xhs, (double) 0.0));
-                    double f = (xh > yh) ? (yh - yl) * (min (xh, max (xl, x2)) - xl) / (4 * dx * dy) :
-                               (xh - xl) * (min (yh, max (yl, y3)) - yl) / (4 * dx * dy);
-                    sum += f * sqr (mode[x][y]);
-                    N += f;
-                }
-            }
-        }
-    }
-    sum /= N;
-    for (unsigned int x = 0; x < nph; ++x) {
-        for (unsigned int y = 0; y < nph; ++y) {
-            mode[x][y] /= sqrt (sum);
-        }
-    }
 }
 
 
