@@ -1028,8 +1028,7 @@ void img_clip ( Array<float>& img ) {
 
     if( firstX < lastX && firstY < lastY ) {
         img.setLimits( firstY, lastY, firstX, lastX );
-        Array<float> tmp( img, firstY, lastY, firstX, lastX );
-        img = tmp.copy();
+        img.trim();
     }
 
 }
