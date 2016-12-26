@@ -1086,7 +1086,13 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     chData.residualOffset = 0;
     chData.offset = myObject.maxLocalShift;
     
+    
+    bool flipX(false);
+    bool flipY(false);
+    
     if( alignMap.size() == 9 ) {
+        if( alignMap[0] < 0 ) flipX = true;
+        if( alignMap[0] < 4 ) flipY = true;
         ProjectiveMap map( alignMap );
         localPos = map*(refPos + myJob.roi.first);  // position in reference-channel, global coordinates
     } else {                                // old style alignment with clips & offsetfiles
@@ -1103,12 +1109,14 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         }
         if( alignClip.size() == 4 ) {
             if( alignClip[0] > alignClip[1] ) {
-                localPos.x = alignClip[0] - localPos.x - 1;
+                flipX = true;
+                localPos.x = alignClip[0] - localPos.x - 1 + myObject.patchSize%2;
             } else {
                 localPos.x += alignClip[0] - 1;
             }
             if( alignClip[2] > alignClip[3] ) {
-                localPos.y = alignClip[2] - localPos.y - 1;
+                flipY = true;
+                localPos.y = alignClip[2] - localPos.y - 1 + myObject.patchSize%2;
             } else {
                 localPos.y += alignClip[2] - 1;
             }
@@ -1119,6 +1127,9 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         LOG_ERR << "No valid imgSize when adjusting cutout, that should not happen..." << ende;
         return;
     }
+    
+    if( flipX ) localPos.x += 1;
+    if( flipY ) localPos.y += 1;
     
     PointI finalPos = localPos+0.5;
     desiredCutout += finalPos;                                                  // ...now centered on localPos, this is the cutout we want
@@ -1131,8 +1142,22 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         LOG_WARN << "Patch " << patch->index << " does not lie completely within image in channel " << myObject.ID << ":" << ID
         << ": desired: " << desiredCutout << "  This will likely cause severe artifacts!!!" << ende;
         alreadyWarned = true;
-        chData.offset -= (tmpCutout.first - desiredCutout.first);
-        finalPos += (tmpCutout.first - desiredCutout.first);
+        if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
+            chData.offset.y -= (tmpCutout.first.y - desiredCutout.first.y);
+            finalPos.y += (tmpCutout.first.y - desiredCutout.first.y);
+        }
+        if( !flipX && (tmpCutout.first.x != desiredCutout.first.x) ) {
+            chData.offset.x -= (tmpCutout.first.x - desiredCutout.first.x);
+            finalPos.x += (tmpCutout.first.x - desiredCutout.first.x);
+        }
+        if( flipY && (tmpCutout.last.y != desiredCutout.last.y) ) {
+            chData.offset.y += (tmpCutout.last.y - desiredCutout.last.y);
+            finalPos.y -= (tmpCutout.last.y - desiredCutout.last.y);
+        }
+        if( flipX && (tmpCutout.last.x != desiredCutout.last.x) ) {
+            chData.offset.x += (tmpCutout.last.x - desiredCutout.last.x);
+            finalPos.x -= (tmpCutout.last.x - desiredCutout.last.x);
+        }
     }
     
     chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
@@ -1146,7 +1171,18 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         if( !alreadyWarned )
             LOG_DETAIL << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
             myObject.ID << ":" << ID << ":  desired: " << desiredCutout << "  actual: " << tmpCutout << ende;
-        chData.offset -= (tmpCutout.first - desiredCutout.first);
+        if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
+            chData.offset.y -= (tmpCutout.first.y - desiredCutout.first.y);
+        }
+        if( !flipX && (tmpCutout.first.x != desiredCutout.first.x) ) {
+            chData.offset.x -= (tmpCutout.first.x - desiredCutout.first.x);
+        }
+        if( flipY && (tmpCutout.last.y != desiredCutout.last.y) ) {
+            chData.offset.y += (tmpCutout.last.y - desiredCutout.last.y);
+        }
+        if( flipX && (tmpCutout.last.x != desiredCutout.last.x) ) {
+            chData.offset.x += (tmpCutout.last.x - desiredCutout.last.x);
+        }
     }
     
     chData.cutout = tmpCutout;
