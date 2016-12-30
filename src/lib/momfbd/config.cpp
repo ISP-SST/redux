@@ -216,6 +216,7 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     borderClip = tree.get<uint16_t>("BORDER_CLIP", defaults.borderClip);
     incomplete = tree.get<bool>( "INCOMPLETE", defaults.incomplete );
     
+    subImagePosXY = tree.get<vector<uint16_t>>( "SIM_XY", defaults.subImagePosXY );
     subImagePosX = tree.get<vector<uint16_t>>( "SIM_X", defaults.subImagePosX );
     subImagePosY = tree.get<vector<uint16_t>>( "SIM_Y", defaults.subImagePosY );
     if( tree.get<bool>( "CAL_X", false ) ) {
@@ -286,9 +287,12 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
     if(borderClip != defaults.borderClip) tree.put("BORDER_CLIP", borderClip);
     if(incomplete != defaults.incomplete) tree.put("INCOMPLETE", (bool)incomplete);
 
-    if(subImagePosX != defaults.subImagePosX) tree.put("SIM_X", subImagePosX);
-    if(subImagePosY != defaults.subImagePosY) tree.put("SIM_Y", subImagePosY);
-
+    if(subImagePosXY != defaults.subImagePosXY) tree.put("SIM_XY", subImagePosXY);
+    if( subImagePosXY.empty() ) {
+        if(subImagePosX != defaults.subImagePosX) tree.put("SIM_X", subImagePosX);
+        if(subImagePosY != defaults.subImagePosY) tree.put("SIM_Y", subImagePosY);
+    }
+    
     if(imageDataDir != defaults.imageDataDir) tree.put("IMAGE_DATA_DIR", imageDataDir);
     if(imageTemplate != defaults.imageTemplate) tree.put("FILENAME_TEMPLATE", imageTemplate);
     if(darkTemplate != defaults.darkTemplate) tree.put("DARK_TEMPLATE", darkTemplate);
@@ -317,6 +321,7 @@ uint64_t ChannelCfg::size(void) const {
     uint64_t sz = 3*sizeof(double);         // rotationAngle, weight, noiseFudge
     sz += sizeof(uint16_t)+4;             // borderClip, incomplete, mmRow, mmWidth,physicalDefocusDistance
     sz += sizeof(uint32_t);                 // imageNumberOffset
+    sz += subImagePosXY.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += subImagePosX.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += subImagePosY.size()*sizeof(uint16_t) + sizeof(uint64_t);
     sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
@@ -351,6 +356,7 @@ uint64_t ChannelCfg::pack(char* ptr) const {
     count += pack(ptr+count, discard);
     count += pack(ptr+count, borderClip);
     count += pack(ptr+count, incomplete);
+    count += pack(ptr+count, subImagePosXY);
     count += pack(ptr+count, subImagePosX);
     count += pack(ptr+count, subImagePosY);
     count += pack(ptr+count, imageDataDir);
@@ -388,6 +394,7 @@ uint64_t ChannelCfg::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, discard, swap_endian);
     count += unpack(ptr+count, borderClip, swap_endian);
     count += unpack(ptr+count, incomplete);
+    count += unpack(ptr+count, subImagePosXY, swap_endian);
     count += unpack(ptr+count, subImagePosX, swap_endian);
     count += unpack(ptr+count, subImagePosY, swap_endian);
     count += unpack(ptr+count, imageDataDir);

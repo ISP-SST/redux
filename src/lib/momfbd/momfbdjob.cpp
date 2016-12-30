@@ -78,6 +78,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
     //LOG_DEBUG << "MomfbdJob::parsePropertyTree()" << ende;
     
     // possibly override cfg-entries with command-line arguments
+    if( vm.count( "simxy" ) ) tree.put( "SIM_XY", vm["simxy"].as<string>() );
     if( vm.count( "simx" ) ) tree.put( "SIM_X", vm["simx"].as<string>() );
     if( vm.count( "simy" ) ) tree.put( "SIM_Y", vm["simy"].as<string>() );
     if( vm.count( "imgn" ) ) tree.put( "IMAGE_NUM", vm["imgn"].as<string>() );
@@ -518,44 +519,56 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     if( !(runFlags&RF_FLATFIELD) ) {    // Skip this if we are only doing flatfielding
         
         uint16_t halfPatchSize = patchSize/2;
-        uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
-        // TODO: do split per channel instead, to allow for different image-scales and/or hardware
-        // NOTE:  subImagePosX/Y are kept 1-based, so ffset by 1 during cut-out.
-        LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
-        if( subImagePosX.empty() ) { // x-coordinate of patch-centre
-            subImagePosX = segment<uint16_t>(halfPatchSize+1,imageSizes.x-halfPatchSize+1,patchSize,totalOverlap);
-            LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
-        }
-        if( subImagePosY.empty() ) { // y-coordinate of patch-centre
-            subImagePosY = segment<uint16_t>(halfPatchSize+1,imageSizes.y-halfPatchSize+1,patchSize,totalOverlap);
-            LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
-        }
-     
-        if( subImagePosX.empty() || subImagePosY.empty() ) {
-            LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue." << ende;
-            info.step.store( JSTEP_ERR );
-            info.state.store( JSTATE_IDLE );
-            return;
-        }
+        bool hasXY(false);
+        if( subImagePosXY.empty() ) {
+            uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
+            // TODO: do split per channel instead, to allow for different image-scales and/or hardware
+            // NOTE:  subImagePosX/Y are kept 1-based, so ffset by 1 during cut-out.
+            LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
+            if( subImagePosX.empty() ) { // x-coordinate of patch-centre
+                subImagePosX = segment<uint16_t>(halfPatchSize+1,imageSizes.x-halfPatchSize+1,patchSize,totalOverlap);
+                LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
+            }
+            if( subImagePosY.empty() ) { // y-coordinate of patch-centre
+                subImagePosY = segment<uint16_t>(halfPatchSize+1,imageSizes.y-halfPatchSize+1,patchSize,totalOverlap);
+                LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
+            }
+        
+            if( subImagePosX.empty() || subImagePosY.empty() ) {
+                LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue." << ende;
+                info.step.store( JSTEP_ERR );
+                info.state.store( JSTATE_IDLE );
+                return;
+            }
 
-        for( uint16_t& pos : subImagePosY ) {
-            uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.y-halfPatchSize+1);       // stay inside borders
-            if( adjustedPos != pos ) {
-                LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
-                pos = adjustedPos;
+            for( uint16_t& pos : subImagePosY ) {
+                uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.y-halfPatchSize+1);       // stay inside borders
+                if( adjustedPos != pos ) {
+                    LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
+                    pos = adjustedPos;
+                }
+            }
+
+            for( uint16_t& pos : subImagePosX ) {
+                uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.x-halfPatchSize+1);       // stay inside borders
+                if( adjustedPos != pos ) {
+                    LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
+                    pos = adjustedPos;
+                }
+            }
+        } else {
+            hasXY = true;
+            subImagePosX.clear();
+            subImagePosY.clear();
+            for ( size_t i=0; i< subImagePosXY.size(); ++i ) {
+                if( i%2 ) subImagePosY.push_back( subImagePosXY[i] );
+                else subImagePosX.push_back( subImagePosXY[i] );
             }
         }
-
-        for( uint16_t& pos : subImagePosX ) {
-            uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.x-halfPatchSize+1);       // stay inside borders
-            if( adjustedPos != pos ) {
-                LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
-                pos = adjustedPos;
-            }
-        }
-       
         unsigned int nPatchesX = subImagePosX.size();
         unsigned int nPatchesY = subImagePosY.size();
+        if ( hasXY ) nPatchesY = 1;         // since the .momfbd format expects a rectangular grid of points, we store
+                                            // the results as a 1 x nPatches array.
         
         progWatch.increaseTarget( nPatchesX*nPatchesY*nTotalChannels );
 
@@ -568,7 +581,11 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
                 PatchData::Ptr patch( new PatchData(*this, y, x ) );
                 patch->setPath(cachePath);
                 patch->step = JSTEP_QUEUED;
-                patch->position = Point16( subImagePosY[y]-1, subImagePosX[x]-1 );   // subImagePosX/Y is 1-based
+                if( hasXY ) {
+                    patch->position = Point16( subImagePosY[x]-1, subImagePosX[x]-1 );   // subImagePosX/Y is 1-based
+                } else {
+                    patch->position = Point16( subImagePosY[y]-1, subImagePosX[x]-1 );   // subImagePosX/Y is 1-based
+                }
                 patch->roi.first = patch->position - halfPatchSize;
                 patch->roi.last = patch->roi.first+ps-1;
                 patch->id = ++count;
@@ -910,6 +927,11 @@ bool MomfbdJob::checkCfg(void) {
     
     if( (runFlags&RF_FLATFIELD) && (runFlags&RF_CALIBRATE) ) {
         LOG_ERR << "Both FLATFIELD and CALIBRATE mode requested" << ende;
+        return false;
+    }
+
+    if( subImagePosXY.size() && (subImagePosXY.size()%2) ) {
+        LOG_ERR << "SIM_XY has to have an even number of entries, since it's  (x,y)-pairs." << ende;
         return false;
     }
 

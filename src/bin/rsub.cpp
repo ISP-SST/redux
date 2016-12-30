@@ -46,6 +46,7 @@ namespace {
         ( "swap,s", "swap mode: write auxiliary data to files instead of keeping it in memory (compatibility flag, always enabled)" )
         ( "config,c", bpo::value< vector<string> >()->multitoken(), "Configuration file(s) to process." )
         ( "name", bpo::value<string>(), "Name to use for the supplied configurations." )
+        ( "simxy", bpo::value<string>(), "(x,y) coordinate[s] of subimages to restore" )
         ( "simx", bpo::value<string>(), "x coordinate[s] of subimages to restore" )
         ( "simy", bpo::value<string>(), "y coordinate[s] of subimages to restore" )
         ( "imgn,n", bpo::value<string>(), "Image numbers" )

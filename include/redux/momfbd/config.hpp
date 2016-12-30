@@ -86,7 +86,7 @@ namespace redux {
             std::vector<int16_t> alignClip;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
             uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
             uint8_t incomplete;                     //!< Some files might not exist, just skip those.
-            std::vector<uint16_t> subImagePosX, subImagePosY;
+            std::vector<uint16_t> subImagePosXY, subImagePosX, subImagePosY;
             std::vector<uint16_t> discard;           //!< Skip this many frames in the beginning/end of datacubes
             /*****************************/
 
