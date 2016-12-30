@@ -2,10 +2,12 @@
 #define REDUX_DLM_IDLUTIL_HPP
 
 #include <functional>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <stdio.h>          // has to be included before idl_export.h, otherwise FILE is undefined.
 #include <string>
+#include <vector>
 
 #include <idl_export.h>
 
@@ -121,6 +123,27 @@ namespace redux {
     void copyToIDL(const T* in, UCHAR* out, size_t nElements, UCHAR IDLtype);
     template <typename T, typename U>
     void subtractFromIDL(const UCHAR* in1, const T* in2, U* out, size_t nElements, UCHAR IDLtype);
+
+    template <typename T>
+    std::vector<T> getAsVector( const IDL_VPTR& v ) {
+        IDL_ENSURE_SIMPLE( v );
+        std::vector<T> ret(1);
+        if ( v->flags & IDL_V_ARR ) {   // array
+            size_t nEl = v->value.arr->n_elts;
+            ret.resize( nEl );
+            copyFromIDL( v->value.arr->data, ret.data(), nEl, v->type );
+        } else {    // scalar
+            switch(v->type) {
+                case IDL_TYP_BYTE: ret[0] = v->value.c; break;
+                case IDL_TYP_INT: ret[0] = v->value.i; break;
+                case IDL_TYP_LONG: ret[0] = v->value.l; break;
+                case IDL_TYP_FLOAT: ret[0] = v->value.f; break;
+                case IDL_TYP_DOUBLE: ret[0] = v->value.d; break;
+                default: std::cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << std::endl;
+            }
+        }
+        return std::move(ret);
+    }
 
     double getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min=nullptr, double* Max=nullptr, bool* hasInf=nullptr );
     
