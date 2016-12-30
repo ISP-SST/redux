@@ -1007,22 +1007,59 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
 }
 
 
-void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
+void Object::writeAna (boost::asio::io_service& service, const redux::util::Array<PatchData::Ptr>& patches) {
 
-    LOG << "BARELY writing output to ANA.   baseName=\"" << outputFileName << "\"" << ende;
+    bfs::path fn = bfs::path(outputFileName + ".f0");
+    if( isRelative(fn) ) {
+        fn = bfs::path(myJob.info.outputDir) / fn;
+    }
+    LOG << "Writing output to file: " << fn << ende;
     
-    LOG_WARN << "Writing to ANA still not properly implemented..." << ende;
+    size_t nPatches = patches.nElements();
+    vector<shared_ptr<float*>> patchPtrs;
+    vector<float**> patchData;
+    vector<int32_t> xpos,ypos;
+    uint16_t maxPosX(0);
+    uint16_t minPosX( std::numeric_limits<uint16_t >::max() );
+    uint16_t maxPosY = maxPosX;
+    uint16_t minPosY = minPosX;
 
     for (unsigned int y = 0; y < patches.dimSize(0); ++y) {
         for (unsigned int x = 0; x < patches.dimSize(1); ++x) {
-            bfs::path fn = bfs::path(outputFileName + "_img_"+to_string(x)+"_"+to_string(y)+".f0");
-            if( isRelative(fn) ) {
-                fn = bfs::path(myJob.info.outputDir) / fn;
-            }
-            Ana::write(fn.string(), patches(y,x)->objects[ID]->img);
+            const Point16& first = patches(y,x)->roi.first;
+            if( first.x > maxPosX ) maxPosX = first.x;
+            if( first.x < minPosX ) minPosX = first.x;
+            if( first.y > maxPosY ) maxPosY = first.y;
+            if( first.y < minPosY ) minPosY = first.y;
+            auto pPtr = patches(y,x)->objects[ID]->img.reshape(patchSize,patchSize);
+            patchPtrs.push_back( pPtr );
+            patchData.push_back( pPtr.get() );
+            xpos.push_back( first.x );
+            ypos.push_back( first.y );
         }
     }
+   
+    size_t imgCols = maxPosX+patchSize;
+    size_t imgRows = maxPosY+patchSize;
+    float** tmpImg = newArray<float>( imgRows, imgCols );
+    int margin = patchSize/8;
+    int blend = (patchSize-2*margin)/3;
+    
+    mozaic( tmpImg, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
 
+    img_trim( tmpImg, imgRows, imgCols, 1E-15 );
+    
+    if( myJob.outputDataType == DT_F32T ) {
+        Array<float> wrap(*tmpImg, imgRows, imgCols);
+        Ana::write( fn.string(), wrap );
+    } else {
+        Array<int16_t> wrap(imgRows, imgCols);
+        wrap.copyFrom<float>( *tmpImg );
+        Ana::write( fn.string(), wrap );
+    }
+
+    delArray( tmpImg );
+    
     if( saveMask & SF_SAVE_ALPHA ) {
         bfs::path fn = bfs::path(outputFileName + ".alpha.f0");
         if( isRelative(fn) ) {
@@ -1037,16 +1074,18 @@ void Object::writeAna (const redux::util::Array<PatchData::Ptr>& patches) {
        Ana::write(fn.string(), alpha);
     }
     
+    ++progWatch;
 }
 
 
-void Object::writeFits (const redux::util::Array<PatchData::Ptr>& patches) {
+void Object::writeFits (boost::asio::io_service& service, const redux::util::Array<PatchData::Ptr>& patches) {
     bfs::path fn = bfs::path(outputFileName + ".fits");
     if( isRelative(fn) ) {
         fn = bfs::path(myJob.info.outputDir) / fn;
     }
     LOG << "NOT writing output to file: " << fn << ende;
     LOG_ERR << "Writing to FITS still not implemented..." << ende;
+    ++progWatch;
 }
 
 
@@ -1277,13 +1316,31 @@ void Object::writeMomfbd (const redux::util::Array<PatchData::Ptr>& patchesData)
 
 //LOG << "Obj " << ID << "  data = " << hexString(tmp.get()) << ende;
     info->write (fn.string(), reinterpret_cast<char*> (tmp.get()), writeMask);
-
+    ++progWatch;
+    
 }
 
-void Object::writeResults (const redux::util::Array<PatchData::Ptr>& patches) {
-    if (myJob.outputFileType & FT_ANA) writeAna (patches);
-    if (myJob.outputFileType & FT_FITS) writeFits (patches);
-    if (myJob.outputFileType & FT_MOMFBD) writeMomfbd (patches);
+void Object::writeResults (boost::asio::io_service& service, const redux::util::Array<PatchData::Ptr>& patches) {
+    
+    progWatch.set( 1 );
+    progWatch.setHandler([this](){
+        ++myJob.progWatch;
+    });
+
+    if (myJob.outputFileType & FT_ANA) {
+        progWatch.increaseTarget(1);
+        service.post( std::bind( &Object::writeAna, this, std::ref(service), std::ref(patches)) );
+    }
+    if (myJob.outputFileType & FT_FITS) {
+        progWatch.increaseTarget(1);
+        service.post( std::bind( &Object::writeFits, this, std::ref(service), std::ref(patches)) );
+    }
+    if (myJob.outputFileType & FT_MOMFBD) {
+        progWatch.increaseTarget(1);
+        service.post( std::bind( &Object::writeMomfbd, this, std::ref(patches)) );
+    }
+    ++progWatch;
+    
 }
 
 

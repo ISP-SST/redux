@@ -788,9 +788,8 @@ static int dummy(0);
     }
     
     for( auto obj : objects ) {
-        service.post( [this,obj](){
-            obj->writeResults( patches );
-            ++progWatch;
+        service.post( [this,obj,&service](){
+            obj->writeResults( service, patches );
         });
     }
         

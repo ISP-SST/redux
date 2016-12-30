@@ -601,7 +601,7 @@ GlobalCfg::GlobalCfg() : runFlags(0), modeBasis(ZERNIKE), klMinMode(2), klMaxMod
     telescopeD(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2),
-    outputFileType(FT_NONE), outputDataType(DT_F32T), sequenceNumber(0),
+    outputFileType(FT_NONE), outputDataType(DT_I16T), sequenceNumber(0),
     observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
 
 

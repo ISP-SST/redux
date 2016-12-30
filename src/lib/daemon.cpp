@@ -152,7 +152,6 @@ bool Daemon::doWork( void ) {
         worker.start();
         LOG_DEBUG << "Running the asio service." << ende;
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
-        LOG_TRACE << "Waiting for all threads to terminate." << ende;
         pool.join_all();
         myInfo.info.peerType = 0;
         worker.stop();

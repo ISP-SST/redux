@@ -310,7 +310,7 @@ string strreplace_info( int lvl ) {
     
     string ret = "RDX_STRREPLACE";
     if( lvl > 0 ) {
-        ret += ((lvl > 1)?"\n":"  ");          // newline if lvl>1
+        ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
         ret += "   Syntax:   result = rdx_strreplace(input,findstring,replacestring,/KEYWORDS)\n";
         if( lvl > 1 ) {
             ret +=  "   Accepted Keywords:\n"
