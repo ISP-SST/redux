@@ -19,6 +19,7 @@ FUNCTION        RDX_MAKE_PUPIL    2       2
 FUNCTION        RDX_MAKE_TEMPLATE 1       1          KEYWORDS
 FUNCTION        RDX_MAKE_WINDOW   1       2          KEYWORDS
 PROCEDURE       RDX_MEMALIGN      1       1
+FUNCTION        RDX_MOZAIC        3       3          KEYWORDS
 FUNCTION        RDX_READDATA      1       1          KEYWORDS
 PROCEDURE       RDX_REORDER       1       1
 FUNCTION        RDX_SEGMENT       0       4          KEYWORDS

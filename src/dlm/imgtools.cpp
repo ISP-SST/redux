@@ -2833,6 +2833,204 @@ IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
 
 }
 
+
+namespace mz {
+    
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_INT blend;
+        IDL_INT clip;
+        IDL_INT help;
+        IDL_INT margin;
+        IDL_INT transpose;
+        IDL_INT verbose;
+    } KW_RESULT;
+
+    IDL_KW_PAR kw_pars[] = {   IDL_KW_FAST_SCAN,       // NOTE:  The keywords MUST be listed in alphabetical order !!
+        { ( char* ) "BLEND",         IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( blend ) },
+        { ( char* ) "CLIP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( clip ) },
+        { ( char* ) "HELP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( help ) },
+        { ( char* ) "MARGIN",        IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
+        { ( char* ) "TRANSPOSE",     IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( transpose ) },
+        { ( char* ) "VERBOSE",       IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( verbose ) },
+        { NULL }
+    };
+        
+    string info( int lvl ) {
+        
+        string ret = "RDX_MOZAIC";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"         ");          // newline if lvl>1
+            ret += "   Syntax:   img = rdx_mozaic(patches, x_pos, y_pos, /KEYWORDS)\n";
+            if( lvl > 1 ) {
+//                 ret +=  "   Combine patches into an image.\n"
+//                         "   patches has to be an array of 2D images and the positions has to have the same number of elements as patches.";
+                ret +=  "   Accepted Keywords:\n"
+                        "      BLEND               Size of smoothing region. (default = PatchSize/8)\n"
+                        "      CLIP                Remove empty border after mozaic.\n"
+                        "      HELP                Display this info.\n"
+                        "      MARGIN              Ignore outermost m pixels in each patch (default = PatchSize/8)\n"
+                        "      TRANSPOSE           Transpose each patch before mozaic, and the resulting image afterwards.\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+            }
+        } else ret += "\n";
+
+        return ret;
+        
+    }
+
+}
+
+
+IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
+
+    mz::KW_RESULT kw;
+    kw.blend = kw.margin = -1;
+    IDL_KWProcessByOffset( argc, argv, argk, mz::kw_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if( kw.help ) {
+        cout << mz::info(2) << endl;
+        return IDL_GettmpInt(0);
+    }
+    
+    IDL_VPTR patches = argv[0];
+    IDL_ENSURE_SIMPLE( patches );
+    IDL_ENSURE_ARRAY( patches );
+    
+    if( patches->value.arr->n_dim < 2 ) {
+        cout << "Patches must be >= 2D." << endl;
+        cout << mz::info(2) << endl;
+        return IDL_GettmpInt(0);
+    }
+    
+    size_t pCols  = patches->value.arr->dim[0];
+    size_t pRows  = patches->value.arr->dim[1];
+    size_t nPatches = 1;
+    if( patches->value.arr->n_dim > 2 ) {
+        nPatches = patches->value.arr->dim[2];
+        for( UCHAR i=3; i<patches->value.arr->n_dim; ++i ) {
+            nPatches *= patches->value.arr->dim[i];
+        }
+    }
+    
+    vector<int32_t> posX = getAsVector<int32_t>( argv[1] );
+    vector<int32_t> posY = getAsVector<int32_t>( argv[2] );
+    size_t nPosX = posX.size();
+    size_t nPosY = posY.size();
+    
+    if( nPosX != nPatches || nPosY != nPatches ) {
+        cout << "Number of positions must match number of patches." << endl;
+        cout << mz::info(2) << endl;
+        return IDL_GettmpInt(0);
+    }
+    
+   
+    int32_t maxPosX(0);
+    int32_t minPosX( std::numeric_limits<int32_t >::max() );
+    for( auto& i: posX ) {
+        if( i > maxPosX ) maxPosX = i;
+        if( i < minPosX ) minPosX = i;
+    }
+    
+    int32_t maxPosY(0);
+    int32_t minPosY( std::numeric_limits<int32_t >::max() );
+    for( auto& i: posY ) {
+        if( i > maxPosY ) maxPosY = i;
+        if( i < minPosY ) minPosY = i;
+    }
+    
+    if( kw.margin < 0 ) {
+        kw.margin = std::max(pCols,pRows)/8; // number of pixels to cut from the edges of each path,
+    }
+    if( kw.blend < 0 ) {
+        kw.blend = (std::min(pCols,pRows)-2*kw.margin)/3;
+    }
+    
+
+    if ( kw.margin > int(pCols/2) || kw.margin > int(pRows/2) ) {
+        cout << "Margin is too big, nothing will be left." << endl;
+        return IDL_GettmpInt(0);
+    }
+    
+    size_t imgCols = maxPosX;
+    size_t imgRows = maxPosY;
+    if( kw.transpose ) {
+        imgCols += pRows;
+        imgRows += pCols;
+    } else {
+        imgCols += pCols;
+        imgRows += pRows;
+    }
+
+    if ( kw.verbose > 0 ) {
+        cout << "Mozaic:  nPatches = " << nPatches << endl;
+        cout << "          imgSize = (" << imgCols << "," << imgRows << ")" << endl;
+        cout << "        patchSize = (" << pCols << "," << pRows << ")" << endl;
+        cout << "             clip = " << ( kw.clip?"YES":"NO" ) << endl;
+        cout << "           margin = " << kw.margin << endl;
+        cout << "            blend = " << kw.blend << endl;
+        cout << "        transpose = " << ( kw.transpose?"YES":"NO" ) << endl;
+    }
+
+    UCHAR dataType = patches->type;
+    IDL_VPTR ret;
+    
+    try {
+        
+        double** tmpImg = redux::util::newArray<double>( imgRows, imgCols );
+    
+        switch( dataType ) {
+            case( IDL_TYP_BYTE ): {
+                auto tmpPatches = reshapeArray( reinterpret_cast<const UCHAR*>(patches->value.arr->data), nPatches, pRows, pCols );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                break;
+            }
+            case( IDL_TYP_INT ): {
+                auto tmpPatches = reshapeArray( reinterpret_cast<const IDL_INT*>(patches->value.arr->data), nPatches, pRows, pCols );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                break;
+            }
+            case( IDL_TYP_LONG ): {
+                auto tmpPatches = reshapeArray( reinterpret_cast<const IDL_LONG*>(patches->value.arr->data), nPatches, pRows, pCols );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                break;
+            }
+            case( IDL_TYP_FLOAT ): {
+                auto tmpPatches = reshapeArray( reinterpret_cast<const float*>(patches->value.arr->data), nPatches, pRows, pCols );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                break;
+            }
+            case( IDL_TYP_DOUBLE ): {
+                auto tmpPatches = reshapeArray( reinterpret_cast<const double*>(patches->value.arr->data), nPatches, pRows, pCols );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                break;
+            }
+            default: ;
+        }
+       
+        if( kw.clip ) {
+            redux::image::img_trim( tmpImg, imgRows, imgCols, 1E-15 );
+        }
+        
+        //if( !kw.transpose ) {
+        //    redux::util::transpose( *tmpImg, imgRows, imgCols );
+        //    std::swap(imgRows, imgCols);
+        //}
+        
+        IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
+        char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
+        copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
+        delArray( tmpImg );
+        
+    } catch( const exception& e ) {
+        cout << "rdx_mozaic: unhandled exception: " << e.what() << endl;
+    }
+    
+    return ret;
+
+}
+
+
 namespace {
     static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_find_shift, (char*)"RDX_FIND_SHIFT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
@@ -2842,5 +3040,6 @@ namespace {
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readdata, (char*)"RDX_READDATA", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readdata_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_images, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_mozaic, (char*)"RDX_MOZAIC", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, mz::info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_files,  (char*)"RDX_SUMFILES",  1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_files_info );
 }
