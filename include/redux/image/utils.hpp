@@ -363,6 +363,56 @@ namespace redux {
         }
         
         template <typename T, typename U>
+        void insertPatch( T** img, size_t imgRows, size_t imgCols, const U** patch, size_t pRows, size_t pCols,
+                                       size_t posY, size_t posX, double** weight=nullptr, double** globalSum=nullptr, bool transpose=false ) {
+           
+            if( transpose ) std::swap( pRows, pCols );
+            if( posY + pRows >= imgRows ) pRows = imgRows-posY;
+            if( posX + pCols >= imgCols ) pCols = imgCols-posX;
+            
+            double* gPtr = nullptr;
+            if( transpose ) {
+                for( size_t r=0; r<pRows; ++r ) {
+                    T* imgRow = img[posY+r] + posX;
+                    if( globalSum ) gPtr = globalSum[posY+r] + posX;
+                    for( size_t c=0; c<pCols; ++c ) {
+                        if( weight ) {
+                            if( globalSum ) {
+                                gPtr[c] += weight[c][r];
+                            } else {
+                                imgRow[c] *= 1.0 - weight[c][r];
+                            }
+                            imgRow[c] += weight[c][r]*static_cast<double>(patch[c][r]);
+                        } else {
+                            imgRow[c] = static_cast<double>(patch[c][r]);
+                        }
+                    }
+                }
+            } else {
+                for( size_t r=0; r<pRows; ++r ) {
+                    T* imgRow = img[posY+r] + posX;
+                    if( globalSum ) gPtr = globalSum[posY+r] + posX;
+                    if( weight ) {
+                        for( size_t c=0; c<pCols; ++c ) {
+                            if( globalSum ) {
+                                gPtr[c] += weight[r][c];
+                            } else {
+                                imgRow[c] *= 1.0 - weight[r][c];
+                            }
+                            imgRow[c] += weight[r][c]*static_cast<double>(patch[r][c]);
+                        }
+                    } else {
+                        for( size_t c=0; c<pCols; ++c ) {
+                            imgRow[c] = static_cast<double>(patch[r][c]);
+                        }
+                    }
+                }
+            }
+
+            
+        }
+
+        template <typename T, typename U>
         template <typename T>
         void normalizeIfMultiFrames( redux::image::Image<T>& img );
         
