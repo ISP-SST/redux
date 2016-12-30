@@ -4,6 +4,7 @@
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/util/progresswatch.hpp"
 #include "redux/types.hpp"
 
 #ifdef REDUX_WITH_OPENCV
@@ -13,7 +14,11 @@
 #include <atomic>
 #include <functional>
 #include <map>
+#include <queue>
 #include <thread>
+
+#include <boost/asio.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace redux {
 
@@ -413,6 +418,87 @@ namespace redux {
         }
 
         template <typename T, typename U>
+        void mozaic( boost::asio::io_service& service, size_t nThreads, T** img, size_t imgRows, size_t imgCols, const U*** patches, size_t nPatches,
+                     size_t pRows, size_t pCols, const int32_t* posY, const int32_t* posX, int32_t blend, int32_t margin, bool transpose=false ) {
+
+            struct patch_info {
+                patch_info() : pPtr(nullptr), pY(0), pX(0) {};
+                patch_info(const U** pPtr_, int32_t pY_, int32_t pX_ ) : pPtr(pPtr_), pY(pY_), pX(pX_) {};
+                const U** pPtr;
+                int32_t pY;
+                int32_t pX;
+            };
+            std::queue<patch_info> q;
+            for( size_t i=0; i<nPatches; ++i ) q.push( patch_info( patches[i], posY[i], posX[i]) );
+
+            size_t nPixels = imgRows*imgCols;
+            double** sum = redux::util::newArray<double>( imgRows, imgCols );
+            memset( *sum, 0, nPixels*sizeof(double) );
+            double** tmpImg = redux::util::newArray<double>( imgRows, imgCols );
+            memset( *tmpImg, 0, nPixels*sizeof(double) );
+            
+            double** weights = redux::util::newArray<double>( pRows, pCols );
+            std::fill( *weights, *weights+pRows*pCols, 1.0 );
+            apodizeInPlace( weights, pRows, pCols, blend, blend, margin, margin );
+            nThreads = std::min<size_t>( nPatches, nThreads );
+            std::mutex mtx;
+            redux::util::ProgressWatch pw;
+            pw.set( nPatches+nThreads );
+            for( size_t i=0; i<nThreads; ++i ) {
+                service.post([&](){
+                    double** tsum = redux::util::newArray<double>( imgRows, imgCols );
+                    memset( *tsum, 0, nPixels*sizeof(double) );
+                    double** timg = redux::util::newArray<double>( imgRows, imgCols );
+                    memset( *timg, 0, nPixels*sizeof(double) );
+                    std::unique_lock<std::mutex> lock(mtx);
+                    while( !q.empty() ) {
+                        patch_info pi = q.front();
+                        q.pop();
+                        lock.unlock();
+                        insertPatch( timg, imgRows, imgCols, pi.pPtr, pRows, pCols, pi.pY, pi.pX, weights, tsum, transpose );
+                        lock.lock();
+                        ++pw;
+                    }
+                    std::transform( *tmpImg, *tmpImg+nPixels, *timg, *tmpImg, std::plus<double>() );
+                    std::transform( *sum, *sum+nPixels, *tsum, *sum, std::plus<double>() );
+                    redux::util::delArray( timg );
+                    redux::util::delArray( tsum );
+                    ++pw;
+                    lock.unlock();
+                });
+            }
+            
+            pw.wait();
+            std::transform( *tmpImg, *tmpImg+nPixels, *sum, *img,
+                            []( const double& a, const double& b ){
+                                if( b > 1E-6 ) return a/b;
+                                else return a;
+                            });
+            
+            redux::util::delArray( weights );
+            redux::util::delArray( tmpImg );
+            redux::util::delArray( sum );
+            
+         }
+
+        template <typename T, typename U>
+        void mozaic( T** img, size_t imgRows, size_t imgCols, const U*** patches, size_t nPatches, size_t pRows, size_t pCols,
+                     const int32_t* posY, const int32_t* posX, int32_t blend, int32_t margin, bool transpose=false ) {
+
+            size_t nThreads = std::min<size_t>( nPatches, std::thread::hardware_concurrency() );
+            boost::asio::io_service service;
+            boost::thread_group pool;
+            {
+                boost::asio::io_service::work workLoop(service);
+                for( size_t t = 0; t < nThreads; ++t ) {
+                    pool.create_thread( boost::bind(&boost::asio::io_service::run, &service) );
+                }
+                mozaic( service, nThreads, img, imgRows, imgCols, patches, nPatches, pRows, pCols, posY, posX, blend, margin, transpose );
+            }
+            pool.join_all();
+            
+        }
+
         template <typename T>
         void normalizeIfMultiFrames( redux::image::Image<T>& img );
         
