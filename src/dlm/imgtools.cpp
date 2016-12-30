@@ -1259,63 +1259,79 @@ IDL_VPTR rdx_make_mask( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
-typedef struct {
-    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
-    IDL_INT help;
-    IDL_INT verbose;
-} MAKE_WIN_KW;
+
+namespace apz {
+                
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_INT blend;
+        IDL_INT help;
+        IDL_INT margin;
+        IDL_INT verbose;
+    } KW_RESULT;
 
 
-// NOTE:  The keywords MUST be listed in alphabetical order !!
-static IDL_KW_PAR make_win_kw_pars[] = {
-    IDL_KW_FAST_SCAN,
-    { (char*) "HELP",           IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MAKE_WIN_KW,help) },
-    { (char*) "VERBOSE",        IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MAKE_WIN_KW,verbose) },
-    { NULL }
-};
+    // NOTE:  The keywords MUST be listed in alphabetical order !!
+    IDL_KW_PAR kw_pars[] = {
+        IDL_KW_FAST_SCAN,
+        { (char*) "BLEND",          IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF(blend) },
+        { (char*) "HELP",           IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF(help) },
+        { (char*) "MARGIN",         IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF(margin) },
+        { (char*) "VERBOSE",        IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF(verbose) },
+        { NULL }
+    };
 
 
-string make_win_info( int lvl ) {
-    string ret = "RDX_MAKE_WINDOW";
-    if( lvl > 0 ) {
-        ret += ((lvl > 1)?"\n":"      ");          // newline if lvl>1
-        ret += "   Syntax:   win = rdx_make_window(img_size, blend_region, /KEYWORDS)\n";
-        if( lvl > 1 ) {
-            ret +=  "   Accepted Keywords:\n"
-                    "      HELP                Display this info.\n"
-                    "      VERBOSE             Verbosity, default is 0 (only error output).\n";
-        }
-    } else ret += "\n";
-    return ret;
+    string make_win_info( int lvl ) {
+        string ret = "RDX_MAKE_WINDOW";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+            ret += "   Syntax:   win = rdx_make_window( size, /KEYWORDS )\n";
+            ret += ((lvl > 1)?"":"                   ");
+            ret += "             win = rdx_make_window( columnns, rows, /KEYWORDS )\n";
+            if( lvl > 1 ) {
+                ret +=  "   Accepted Keywords:\n"
+                        "      HELP                Display this info.\n"
+                        "      BLEND               Size of smoothing area. (default=12.5% of image width/height).\n"
+                        "      MARGIN              Border size. (default = 0, i.e. smoothing all the way to the edge).\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+            }
+        } else ret += "\n";
+        return ret;
+    }
+
+
 }
 
 
 IDL_VPTR rdx_make_win( int argc, IDL_VPTR* argv, char* argk ) {
     
-    MAKE_WIN_KW kw;
-    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, make_win_kw_pars, (IDL_VPTR*)0, 255, &kw );
+    apz::KW_RESULT kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, (IDL_VPTR*)0, 255, &kw );
 
-    if( kw.help ) {
-        cout << make_win_info(2) << endl;
+    if( kw.help || nPlainArgs < 1 ) {
+        cout << apz::make_win_info(2) << endl;
         return IDL_GettmpInt(0);
     }
     
-    if( nPlainArgs < 2 ) {
-        cout << "rdx_make_window: needs 2 arguments: nPixels & blend_region (in pixels). " << endl;
-        return IDL_GettmpInt (0);
+    IDL_LONG nCols = IDL_LongScalar(argv[0]);
+    IDL_LONG nRows = nCols;
+    if( nPlainArgs > 1 ) {
+        nRows = IDL_LongScalar(argv[1]);
+    }
+
+    if( kw.blend == 0 ) {
+        kw.blend = (nRows + nCols) / 16;
     }
     
-    IDL_LONG nPixels = IDL_LongScalar(argv[0]);
-    IDL_LONG nBlend = IDL_LongScalar(argv[1]);
     IDL_VPTR tmp;
- 
-    Array<float> win(nPixels, nPixels);
-    win = 1.0;
-    redux::image::apodizeInPlace( win, nBlend );
-        
-    IDL_MEMINT dims[] = { nPixels, nPixels };
+    IDL_MEMINT dims[] = { nCols, nRows };
     float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_NOP, &tmp );
-    win.copyTo<float>(tmpData);
+    
+    std::fill( tmpData, tmpData+nCols*nRows, 1.0 );
+    
+    shared_ptr<float*> tmpArr = reshapeArray( tmpData, nRows, nCols );
+    apodizeInPlace( tmpArr.get(), nRows, nCols, kw.blend, kw.blend, kw.margin, kw.margin );
     
     return tmp;
 
@@ -1475,7 +1491,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                 yCalibSize = kw.gain->value.arr->dim[0];
                 maskData.reset( new uint8_t[xCalibSize*yCalibSize] );
                 mask2D = reshapeArray( maskData.get(), yCalibSize, xCalibSize );
-                redux::image::make_mask( gainPtr, maskData.get(), yCalibSize, xCalibSize, 0, 5, true, true ); // filter away larger features than ~5 pixels and invert
+                make_mask( gainPtr, maskData.get(), yCalibSize, xCalibSize, 0, 5, true, true ); // filter away larger features than ~5 pixels and invert
             } else cout << "gain must be a 2D image." << endl;
         }
         if( kw.bs_gain && kw.bs_psf ) {
@@ -1650,7 +1666,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                         copyToRaw( myDataPtr, myTmpPtr, nPixels, dataType );
                     }
                     if( bsOtfPtr ) {
-                        redux::image::descatter( myTmpPtr, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
+                        descatter( myTmpPtr, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
                     }
                     
                     if ( mask2D ) {
@@ -1816,7 +1832,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
             applyDarkAndGain( summedData, summedData, darkData.get(), gainData.get(), nPixels );
             
             if( bsOtfPtr ) {
-                redux::image::descatter( summedData, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, kw.nthreads, 50, 1E-8 );
+                descatter( summedData, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, kw.nthreads, 50, 1E-8 );
             }
             
             if ( mask2D ) {
@@ -2052,7 +2068,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
     
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
     kw.padding = max<IDL_INT>(0, min<IDL_INT>(kw.padding, 4096));   // prevent insane padding
-    
+
     try {
         
         IDL_VPTR ret;
@@ -2092,7 +2108,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 yCalibSize = kw.gain->value.arr->dim[0];
                 maskData.reset( new uint8_t[xCalibSize*yCalibSize] );
                 mask2D = reshapeArray( maskData.get(), yCalibSize, xCalibSize );
-                redux::image::make_mask( gainPtr, maskData.get(), yCalibSize, xCalibSize, 0, 5, true, true ); // filter away larger features than ~5 pixels and invert
+                make_mask( gainPtr, maskData.get(), yCalibSize, xCalibSize, 0, 5, true, true ); // filter away larger features than ~5 pixels and invert
             } else cout << "gain must be a 2D image." << endl;
         }
         if( kw.bs_gain && kw.bs_psf ) {
@@ -2159,6 +2175,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 }
             }
         }
+
         size_t nFiles = existingFiles.size();
         //kw.nthreads = static_cast<UCHAR>( min<size_t>(kw.nthreads, nFiles) );
 
@@ -2341,7 +2358,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                             copyToRaw( framePtr, threadTmp, nPixels, dataType );
                         }
                         if( bsOtfPtr ) {
-                            redux::image::descatter( threadTmp, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
+                            descatter( threadTmp, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, 1, 50, 1E-8 );
                         }
                         
                         if ( mask2D ) {
@@ -2636,7 +2653,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             applyDarkAndGain( summedData, summedData, darkData.get(), gainData.get(), nPixels );
             
             if( bsOtfPtr ) {
-                redux::image::descatter( summedData, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, kw.nthreads, 50, 1E-8 );
+                descatter( summedData, ySize, xSize, bsGainPtr, bsOtfPtr, ySizePadded, xSizePadded, kw.nthreads, 50, 1E-8 );
             }
             
             if ( mask2D ) {
@@ -2823,7 +2840,7 @@ namespace {
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)load_files, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, load_files_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_mask,  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readdata, (char*)"RDX_READDATA", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readdata_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_win_info ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_images, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_files,  (char*)"RDX_SUMFILES",  1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_files_info );
 }
