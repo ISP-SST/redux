@@ -97,13 +97,13 @@ void Solver::init( void ) {
     
     window.resize( patchSize, patchSize );
     window = 1.0;
-    redux::image::windowInPlace( window, patchSize / 8);
+    redux::image::apodizeInPlace( window, patchSize / 8);
 
     int md = std::min<int>( 256, patchSize );                       // new size (maximum=256)
     md -= ( md % 2 );
     noiseWindow.resize(md,md);
     noiseWindow = 1.0;
-    redux::image::windowInPlace( noiseWindow, md / 16);     // FIXME: old code specifies md/16, but applies it after "window", so it is actually the product...
+    redux::image::apodizeInPlace( noiseWindow, md / 16);     // FIXME: old code specifies md/16, but applies it after "window", so it is actually the product...
     
     tmpPhi.resize( nTotalImages, pupilSize, pupilSize );
     tmpPhiGrad.resize( nTotalImages, pupilSize, pupilSize );
