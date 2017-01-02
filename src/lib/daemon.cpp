@@ -768,11 +768,20 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
     if( blockSize ) {
 
+        unique_lock<mutex> plock( peerMutex );
+        const Host::HostInfo& hi = connections[conn]->info;
+        plock.unlock();
+    
+        //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
         string jobString = string( buf.get() );
         if( iequals( jobString, "all" ) ) {
             unique_lock<mutex> lock( jobsMutex );
             if( jobs.size() ) LOG << "Clearing joblist." << ende;
-            jobs.clear();
+            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
+                    if( !job ) return true;
+                    if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
+                    return true;
+                }), jobs.end() );
             return;
         }
 
@@ -783,8 +792,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             std::set<size_t> jobSet( jobList.begin(), jobList.end() );
             unique_lock<mutex> lock( jobsMutex );
             jobList.clear(); 
-            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&jobSet, &jobList](const Job::JobPtr& job) {
+            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
                     if( !job ) return true;
+                    if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
                     if( jobSet.count( job->info.id ) ) {
                         jobList.push_back(job->info.id);
                         return true;
@@ -805,8 +815,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             unique_lock<mutex> lock( jobsMutex );
             jobList.clear(); 
             vector<size_t> deletedList;
-            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&jobSet, &deletedList](const Job::JobPtr& job) {
+            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
                     if( !job ) return true;
+                    if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
                     if( jobSet.count( job->info.name ) ) {
                         deletedList.push_back(job->info.id);
                         return true;
