@@ -95,6 +95,7 @@ void Daemon::reset( void ) {
 
 void Daemon::stop( void ) {
     runMode = EXIT;
+    logger.flushAll();
     if( myMaster.conn && myMaster.conn->socket().is_open() ) {
         *myMaster.conn << CMD_DISCONNECT;
         myMaster.conn->socket().close();
@@ -188,7 +189,11 @@ void Daemon::workerInit( void ) {
         logger.addNetwork( logConn, 0, Logger::getDefaultMask(), remoteLogFlushPeriod );
         logger.setContext( myInfo.info.name+":"+to_string(myInfo.info.pid) );
         logger.setFlushPeriod( remoteLogFlushPeriod );
-        LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
+        if( myMaster.conn && myMaster.conn->socket().is_open() ) {
+            LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
+            myMaster.conn->setUrgentCallback( bind( &Daemon::urgentHandler, this, std::placeholders::_1 ) );
+            myMaster.conn->uIdle();
+        }
         
     }
     
@@ -243,7 +248,6 @@ void Daemon::connect( network::Host::HostInfo& host, network::TcpConnection::Ptr
                 conn->socket().close();
                 //myInfo.info.peerType &= ~Host::TP_WORKER;
             }
-
         }
 
     } catch ( const std::exception& e ) {
@@ -343,6 +347,7 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
     conn->socket().close();
 }
 
+
 void Daemon::handler( TcpConnection::Ptr conn ) {
     
     Command cmd = CMD_ERR;
@@ -365,11 +370,32 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
 }
 
 
+void Daemon::urgentHandler( TcpConnection::Ptr conn ) {
+    
+    uint8_t cmd = conn->getUrgentData();
+    try {
+        processCommand( conn, cmd, true );
+        if( cmd == CMD_DIE ) {
+            conn->setUrgentCallback( nullptr );
+            conn->close();
+            return;
+        }
+        conn->uIdle();
+    } catch( const std::exception& e ) {
+        LOG_ERR << "urgentHandler() Failed to process command Reason: " << e.what() << ende;
+    } catch( ... ) {
+        LOG_ERR << "urgentHandler() Unrecognized exception." << ende;
+    }
+
+}
+
+
 void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent ) {
 
     try {
 
         switch( cmd ) {
+            case CMD_EXIT: softExit(); break;
             case CMD_DIE: die( conn, urgent ); break;
             case CMD_RESET: reset( conn, urgent ); break;
             case CMD_ADD_JOB: addJobs(conn); break;
@@ -382,6 +408,8 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
             case CMD_PSTAT: sendPeerList(conn); break;
             case CMD_LOG_CONNECT: addToLog(conn); break;
             case CMD_DISCONNECT: removeConnection(conn); break;
+            case CMD_DEL_SLV: ;
+            case CMD_SLV_RES: resetSlaves(conn, cmd); break;
             default: LOG_DEBUG << "processCommand: not implemented: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
                 removeConnection(conn);
                 return;
@@ -464,7 +492,7 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
             WorkInProgress::Ptr& wip = wipit->second;
             LOG_NOTICE << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
             if( wip ) {
-                if( wip->job ) {
+                if( wip->job && !wip->parts.empty() ) {
                     LOG_NOTICE << "Returning unfinished work to queue: " << wip->print() << ende;
                     wip->job->ungetWork( wip );
                 }
@@ -576,12 +604,26 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
 }
 
 
+void Daemon::die(void) {
+
+    LOG_DEBUG << "Received exit command from master." << ende;
+    worker.stop();
+    stop();
+    
+}
+
+
 void Daemon::die( TcpConnection::Ptr& conn, bool urgent ) {
+    
+    if( urgent ) {
+        die();
+        return;
+    }
     
     unique_lock<mutex> lock( peerMutex );
     const Host::HostInfo& hi = connections[conn]->info;
     lock.unlock();
-
+    
     //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
     if( hi.peerType == Host::TP_MASTER ) {
         LOG_DEBUG << "Received exit command from " << hi.user << "@" << hi.name << ende;
@@ -594,19 +636,35 @@ void Daemon::die( TcpConnection::Ptr& conn, bool urgent ) {
         messages.push_back("Not permitted.");
         *conn << CMD_NOTICE << messages;
     }
+
+}
+
+
+void Daemon::softExit( void ) {
+    
+    if( myInfo.info.peerType == Host::TP_MASTER ) {
+        LOG_ERR<< "Daemon::softExit, not implemented for master yet." << ende;
+    } else {
+        worker.exitWhenDone();
+    }
 }
 
 
 void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
+    
+    if( urgent ) {  // received on a slave, just do it without replying
+        worker.stop();
+        worker.start();
+        reset();
+        return;
+    }
     
     unique_lock<mutex> lock( peerMutex );
     const Host::HostInfo& hi = connections[conn]->info;
     lock.unlock();
 
     uint8_t lvl(0);
-    if( !urgent ) {     // non-urgent calls will come with a reset-level appended
-        *conn >> lvl;
-    }
+    *conn >> lvl;
 
     //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
     if( hi.peerType == Host::TP_MASTER ) {
@@ -619,13 +677,11 @@ void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
             default: ;
         }
         //if( lvl == 5 ) throw ResetException();
-        if( !urgent ) *conn << CMD_OK;
+        *conn << CMD_OK;
     } else {
-        if( !urgent ) {
-            vector<string> messages;
-            messages.push_back("Not permitted.");
-            *conn << CMD_NOTICE << messages;
-        }
+        vector<string> messages;
+        messages.push_back("Not permitted.");
+        *conn << CMD_NOTICE << messages;
     }
 
 }
@@ -771,6 +827,99 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 }
 
 
+void Daemon::resetSlaves( TcpConnection::Ptr& conn, uint8_t cmd ) {
+
+    uint8_t hardExit(0);
+    if( cmd == CMD_DEL_SLV ) {
+        *conn >> hardExit;
+    }
+    size_t blockSize;
+    shared_ptr<char> buf = conn->receiveBlock( blockSize );
+    
+    if( cmd == CMD_SLV_RES ) cmd = CMD_RESET;
+    else if( hardExit ) cmd = CMD_DIE;
+    else cmd = CMD_EXIT;
+
+    string msgStr = "Killing";
+    if( cmd == CMD_RESET ) msgStr = "Restarting";
+    
+    if( blockSize ) {
+
+        string slvString = string( buf.get() );
+       if( iequals( slvString, "all" ) ) {
+            unique_lock<mutex> lock( peerMutex );
+            if( peerWIP.size() ) {
+                LOG << msgStr << " " << peerWIP.size() << " slaves." << ende;
+                for( auto &pw: peerWIP ) {
+                    Host::Ptr host = pw.first;
+                    for( auto& hconn: connections ) {
+                        if( (*hconn.second) == (*host) ) {
+                            hconn.first->sendUrgent( cmd );
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        try {   // remove by ID
+            bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
+            tmpTree.put( "slaves", slvString );
+            vector<uint64_t> slaveList = tmpTree.get<vector<uint64_t>>( "slaves", vector<uint64_t>() );
+            std::set<uint64_t> slaveSet( slaveList.begin(), slaveList.end() );
+            unique_lock<mutex> lock( peerMutex );
+            slaveList.clear(); 
+            for( auto &pw: peerWIP ) {
+                Host::Ptr host = pw.first;
+                if( slaveSet.count( host->id ) ) {
+                    LOG << msgStr << " slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
+                    slaveList.push_back(host->id);
+                    for( auto& hconn: connections ) {
+                        if( (*hconn.second) == (*host) ) {
+                            hconn.first->sendUrgent( cmd );
+                        }
+                    }
+                }
+            }
+            if( !slaveList.empty() ) LOG << msgStr << " " << printArray(slaveList,"slaves") << ende;
+            return;
+        }
+        catch( const boost::bad_lexical_cast& e ) {
+            // ignore: it just means the specified list of jobs count not be cast into unsigned integers (could also be "all" or list of names)
+        }
+
+        try {   // remove by name
+            vector<string> slaveList;
+            boost::split( slaveList, slvString, boost::is_any_of( "," ) );
+            std::set<string> slaveSet( slaveList.begin(), slaveList.end() );
+            unique_lock<mutex> lock( peerMutex );
+            vector<uint64_t> slaveIdList;
+            for( auto &pw: peerWIP ) {
+                Host::Ptr host = pw.first;
+                if( slaveSet.count( host->info.name ) ) {
+                    LOG << msgStr << " slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
+                    slaveIdList.push_back(host->id);
+                    for( auto& hconn: connections ) {
+                        if( (*hconn.second) == (*host) ) {
+                            hconn.first->sendUrgent( cmd );
+                        }
+                    }
+                }
+            }
+            if( !slaveIdList.empty() ) LOG << msgStr << " " << printArray(slaveIdList,"slaves") << ende;
+            return;
+        }
+        catch( const std::exception& e ) {
+            LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
+            throw e;
+        }
+
+
+    }
+
+}
+
+
 bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
 
     wip->job.reset();
@@ -891,8 +1040,6 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
             
             if( wipit->second->job ) {
                 shared_ptr<WorkInProgress> tmpwip( std::make_shared<WorkInProgress>(*wipit->second) );
-//cout << "tmpwip=" << hexString(tmpwip.get()) << "  wipit=" << hexString(wipit->second.get())
-//<< " nP=" << tmpwip->parts.size() << "  p0=" << hexString(tmpwip->parts[0].get()) << endl;
                 bool endian = conn->getSwapEndian();
                 wipit->first->status.state = Host::ST_IDLE;
                 wipit->second->resetParts();

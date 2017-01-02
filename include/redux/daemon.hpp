@@ -42,16 +42,20 @@ namespace redux {
         
         void connected( network::TcpConnection::Ptr );
         void handler( network::TcpConnection::Ptr );
+        void urgentHandler( network::TcpConnection::Ptr );
         void processCommand( network::TcpConnection::Ptr, uint8_t, bool urgent=false);
         
         void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
         void removeConnection(network::TcpConnection::Ptr);
         void cleanup(void);
         void failedWIP( WorkInProgress::Ptr wip );
+        void die(void);
         void die( network::TcpConnection::Ptr&, bool urgent=false );
+        void softExit(void);
         void reset( network::TcpConnection::Ptr&, bool urgent=false );
         void addJobs( network::TcpConnection::Ptr& );
         void removeJobs( network::TcpConnection::Ptr& );
+        void resetSlaves( network::TcpConnection::Ptr&, uint8_t );
         //Job::JobPtr selectJob(bool);
         bool getWork( WorkInProgress::Ptr&, uint8_t nThreads = 1);
         void sendWork( network::TcpConnection::Ptr& );

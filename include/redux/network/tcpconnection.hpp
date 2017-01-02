@@ -97,11 +97,15 @@ namespace redux {
             operator bool() const { return mySocket.is_open(); };
 
             void connect( std::string host, std::string service );
+            void close( void );
             callback getCallback( void ) { std::unique_lock<std::mutex> lock(mtx); return activityCallback; };
             void setCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); activityCallback = cb; };
+            void setUrgentCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); urgentCallback = cb; };
             void setErrorCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); errorCallback = cb; };
+            void uIdle( void );
+            void urgentHandler( const boost::system::error_code& error, size_t transferred );
             void idle( void );
-            void onActivity( Ptr conn, const boost::system::error_code& error );
+            void onActivity( const boost::system::error_code& error );
             void setSwapEndian(bool se) { swapEndian_ = se; };
             bool getSwapEndian(void) { return swapEndian_; };
             
@@ -110,10 +114,12 @@ namespace redux {
             bool try_lock(void) { return mtx.try_lock(); };
             
             void sendUrgent( uint8_t c );
-            size_t receiveUrgent( uint8_t& c );
+            void receiveUrgent( uint8_t& c );
+            uint8_t getUrgentData(void) { return urgentData; };
             
             TcpConnection& operator<<( const uint8_t& );
             TcpConnection& operator>>( uint8_t& );
+            
             TcpConnection& operator<<( const std::vector<std::string>& );
             TcpConnection& operator>>( std::vector<std::string>& );
 
@@ -138,10 +144,12 @@ namespace redux {
             TcpConnection( const TcpConnection& ) = delete;
 
             callback activityCallback;
+            callback urgentCallback;
             callback errorCallback;
             tcp::socket mySocket;
             boost::asio::io_service& myService;
             bool swapEndian_;
+            uint8_t urgentData;
             std::mutex mtx;
 
        public:

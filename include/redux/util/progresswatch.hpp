@@ -2,11 +2,11 @@
 #define REDUX_UTIL_PROGRESSWATCH_HPP
 
 #include <atomic>
-#include <condition_variable>
 #include <functional>
-#include <mutex>
 #include <string>
 
+#include <boost/thread.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 namespace redux {
 
@@ -20,12 +20,12 @@ namespace redux {
             void clear(void);
             void reset(void);
             void test(void);
-            inline bool verify(void) { std::unique_lock<std::mutex> lock(mtx); return completed_; }
+            inline bool verify(void) { boost::lock_guard<boost::mutex> lock(mtx); return completed_; }
             void wait(void);
             
             void set(int target, int start=0);
-            inline void setStart(int s) { std::unique_lock<std::mutex> lock(mtx); start_ = s; }
-            inline void setTarget(int t) { std::unique_lock<std::mutex> lock(mtx); target_ = t; }
+            inline void setStart(int s) { boost::lock_guard<boost::mutex> lock(mtx); start_ = s; }
+            inline void setTarget(int t) { boost::lock_guard<boost::mutex> lock(mtx); target_ = t; }
             
             void step(int step=1);
             void stepTarget(int step=1);
@@ -34,8 +34,8 @@ namespace redux {
             inline void increaseTarget(int count=1) { stepTarget(count); }
             inline void decreaseTarget(int count=1) { stepTarget(-count); }
             
-            inline void setHandler( std::function<void(void)> cb ) { std::unique_lock<std::mutex> lock(mtx); onCompletion = cb; }
-            inline void setTicker( std::function<void(void)> cb ) { std::unique_lock<std::mutex> lock(mtx); onChange = cb; }
+            inline void setHandler( std::function<void(void)> cb ) { boost::lock_guard<boost::mutex> lock(mtx); onCompletion = cb; }
+            inline void setTicker( std::function<void(void)> cb ) { boost::lock_guard<boost::mutex> lock(mtx); onChange = cb; }
             
             // prefix
             inline ProgressWatch& operator++() { step(); return *this; }
@@ -53,8 +53,8 @@ namespace redux {
             int counter_;
             int target_;
             bool completed_;
-            std::mutex mtx;
-            std::condition_variable cv;
+            boost::mutex mtx;
+            boost::condition_variable cv;
             std::function<void(void)> onChange;
             std::function<void(void)> onCompletion;
             

@@ -12,7 +12,6 @@ using namespace redux::util;
 using namespace redux::network;
 using namespace std;
 
-
 #ifdef DEBUG_
 //#define DBG_NET_
 #endif
@@ -28,7 +27,7 @@ namespace {
 
 
 TcpConnection::TcpConnection( boost::asio::io_service& io_service )
-    : activityCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian_(false), strand(io_service) {
+    : activityCallback( nullptr ), urgentCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian_(false), strand(io_service) {
 #ifdef DBG_NET_
     LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
 #endif
@@ -100,6 +99,73 @@ void TcpConnection::connect( string host, string service ) {
     //LOG_ERR << "Connection failed";
 }
 
+
+void TcpConnection::close( void ) {
+
+    unique_lock<mutex> lock(mtx);
+    activityCallback = nullptr;
+    urgentCallback = nullptr;
+    errorCallback = nullptr;
+    mySocket.close();
+    
+}
+
+
+void TcpConnection::uIdle( void ) {
+
+    unique_lock<mutex> lock(mtx);
+    if( !urgentCallback ) {
+        return;
+    }
+
+    if( mySocket.is_open() ) {
+        lock.unlock();
+                
+        mySocket.async_receive( boost::asio::buffer( &urgentData, 1 ), ba::socket_base::message_out_of_band,
+                                  boost::bind( &TcpConnection::urgentHandler, this,
+                                               ba::placeholders::error, ba::placeholders::bytes_transferred) );
+//         mySocket.async_read_some( ba::null_buffers(),
+//                                   boost::bind( &TcpConnection::urgentHandler, this, ba::placeholders::error, ba::placeholders::bytes_transferred) );
+
+    }
+
+}
+
+
+void TcpConnection::urgentHandler( const boost::system::error_code& error, size_t transferred ) {
+    
+    try {
+        unique_lock<mutex> lock(mtx);
+        if( mySocket.is_open() && !mySocket.at_mark() ) {
+            lock.unlock();
+            uIdle();
+            return;
+        }
+    } catch(...) {
+        return;
+    }
+    
+    if( !error ) {
+        if( urgentCallback ) {
+            //LOG_DEBUG << "Activity on connection \"" << connptr->socket().remote_endpoint().address().to_string() << "\"";
+            if( mySocket.is_open() ) {
+                std::thread( urgentCallback, shared_from_this() ).detach();
+            }
+        }
+    } else {
+        if( ( error == ba::error::eof ) || ( error == ba::error::connection_reset ) ) {
+            mySocket.close();
+        } else {
+            if( errorCallback ) {
+                std::thread( errorCallback, shared_from_this() ).detach();
+            } else {
+                //throw std::ios_base::failure( "TcpConnection::urgentHandler: error: " + error.message() );
+            }
+        }
+    }
+
+}
+
 void TcpConnection::idle( void ) {
 
     unique_lock<mutex> lock(mtx);
@@ -110,20 +176,20 @@ void TcpConnection::idle( void ) {
     if( mySocket.is_open() ) {
         lock.unlock();
         mySocket.async_read_some( ba::null_buffers(),
-                                  boost::bind( &TcpConnection::onActivity, this, shared_from_this(), ba::placeholders::error) );
+                                  boost::bind( &TcpConnection::onActivity, this, ba::placeholders::error) );
 
     }
     
 }
 
-void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& error ) {
+void TcpConnection::onActivity( const boost::system::error_code& error ) {
 
     unique_lock<mutex> lock(mtx);
     if( !error ) {
         if( activityCallback ) {
             //LOG_DEBUG << "Activity on connection \"" << connptr->socket().remote_endpoint().address().to_string() << "\"";
             if( mySocket.is_open() ) {
-                std::thread(activityCallback,connptr).detach();
+                std::thread( activityCallback, shared_from_this() ).detach();
             }
         }
     } else {
@@ -131,7 +197,7 @@ void TcpConnection::onActivity( Ptr connptr, const boost::system::error_code& er
             mySocket.close();
         } else {
             if( errorCallback ) {
-                std::thread(errorCallback,connptr).detach();
+                std::thread( errorCallback, shared_from_this() ).detach();
             } else {
                 throw std::ios_base::failure( "TcpConnection::onActivity: error: " + error.message() );
             }
@@ -148,11 +214,10 @@ void TcpConnection::sendUrgent( uint8_t c ) {
 }
 
  
-size_t TcpConnection::receiveUrgent( uint8_t& c ) {
+void TcpConnection::receiveUrgent( uint8_t& c ) {
     if( mySocket.is_open() && mySocket.at_mark() ) {
-       return mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+        size_t cnt = mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
     }
-    return 0;
 }
 
  

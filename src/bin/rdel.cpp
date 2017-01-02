@@ -28,7 +28,7 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "jdel";
+    const string logChannel = "rdel";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
@@ -37,9 +37,13 @@ namespace {
         options.add_options()
         ( "master,m", bpo::value<string>()->default_value( "localhost" ), "Hostname/IP of the master" )
         ( "port,p", bpo::value<string>()->default_value( "30000" ), "Port to use, either when connecting to the master." )
-        ( "jobs,j", bpo::value< vector<string> >()->composing(), "Job(s) to delete, as job-ID(s) or job-name(s)."
-        "All additional arguments on the command-line will be interpreted as jobs to delete."
+        ( "force,f", "Bypass safeguards" )
+        ( "ids,i", bpo::value< vector<string> >()->composing(), "ID(s) to delete/reset, as ID(s) or name(s)."
+        "All additional arguments on the command-line will be interpreted as IDs/names to delete."
         "Comma (or space) separated list of IDs/names is accepted. IDs may also be specified as ranges (e.g 4-17)." )
+        ( "kill,k", "Hard-kill slaves (default is to exit after patch is completed)." )
+        ( "restart,r", "Restart slaves instead of exiting." )
+        ( "slaves,s", "Interpret IDs as slaves, instead of jobs." )
         ;
 
         return options;
@@ -72,7 +76,7 @@ int main( int argc, char *argv[] ) {
     bpo::options_description programOptions = getOptions();
 
     bpo::positional_options_description pod;
-    pod.add("jobs", -1);
+    pod.add("ids", -1);
     
     bpo::options_description& allOptions = Application::parseCmdLine( argc, argv, vm, &programOptions, &pod );
 
@@ -88,12 +92,12 @@ int main( int argc, char *argv[] ) {
 //     }
 // 
     try {
-        string jobString;        
-        if( vm.count( "jobs" ) ) {
-            jobString = boost::algorithm::join(vm["jobs"].as<vector<string>>(), ",");
+        string idString;        
+        if( vm.count( "ids" ) ) {
+            idString = boost::algorithm::join(vm["ids"].as<vector<string>>(), ",");
         }
         
-        if( jobString.empty() ) {
+        if( idString.empty() ) {
             return EXIT_SUCCESS;
         }
         
@@ -112,6 +116,7 @@ int main( int argc, char *argv[] ) {
                 // implement
             }
             if( cmd == CMD_CFG ) {  // handshake requested
+                if( vm.count("force") ) me.peerType = Host::TP_MASTER;
                 *conn << me;
                 *conn >> master;
                 boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
@@ -121,14 +126,27 @@ int main( int argc, char *argv[] ) {
                 return EXIT_FAILURE;
             }
 
-            size_t stringSize = jobString.length()+1;
-            size_t totalSize = stringSize + sizeof( size_t ) + 1;
+            size_t stringSize = idString.length()+1;
+            size_t totalSize = stringSize + sizeof( size_t ) + 2;
             auto buf = sharedArray<char>( totalSize );
             char* ptr = buf.get();
-            uint64_t count = pack(ptr,CMD_DEL_JOB);
+            
+            if( vm.count( "slaves" ) ) {
+                    cout << "slaves" << endl;
+                if( vm.count( "restart" ) ) {
+                    cout << "restart" << endl;
+                    cmd = CMD_SLV_RES;
+                } else cmd = CMD_DEL_SLV;
+            } else cmd = CMD_DEL_JOB;
+            uint64_t count = pack(ptr,cmd);
+            if( cmd == CMD_DEL_SLV  ) {
+                uint8_t hardExit(0);
+                if( vm.count( "kill" ) ) hardExit = 1;
+                count += pack( ptr+count, hardExit );
+            }
             count += pack(ptr+count,stringSize);
-            count += pack(ptr+count,jobString);
-            boost::asio::write(conn->socket(),boost::asio::buffer(buf.get(),totalSize));
+            count += pack(ptr+count,idString);
+            boost::asio::write( conn->socket(), boost::asio::buffer(buf.get(), count));
         }
     }
     catch( const exception &e ) {

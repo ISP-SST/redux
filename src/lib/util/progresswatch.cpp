@@ -17,7 +17,7 @@ ProgressWatch::ProgressWatch(int target, int start) : start_(start), counter_(st
 void ProgressWatch::clear(void) {
     
 //    cout << __LINE__ << "  " << dump() << endl;
-    unique_lock<mutex> lock(mtx);
+    boost::lock_guard<boost::mutex> lock(mtx);
     onChange = nullptr;
     onCompletion = nullptr;
     counter_ = start_ = target_ = 0;
@@ -38,7 +38,7 @@ void ProgressWatch::test(void) {
     
 
     //cout << __LINE__ << "  " << dump() << endl;
-    unique_lock<mutex> lock(mtx);
+    boost::unique_lock<boost::mutex> lock(mtx);
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
     if(counter_ > target_) {
         lock.unlock();
@@ -63,7 +63,7 @@ void ProgressWatch::wait(void) {
     
 
 //    cout << __LINE__ << "  " << dump() << endl;
-    unique_lock<mutex> lock(mtx);
+    boost::unique_lock<boost::mutex> lock(mtx);
 //    cout  << "ProgressWatch::wait()  " << __LINE__ << " completed = " << completed_ << endl;
     while( !completed_ ) {
 //    cout  << "ProgressWatch::wait()  " << __LINE__ << " completed = " << completed_ << endl;
@@ -75,7 +75,7 @@ void ProgressWatch::wait(void) {
 
 
 // void ProgressWatch::wait_for(void) {
-//     unique_lock<mutex> lock(mtx);
+//     boost::unique_lock<boost::mutex> lock(mtx);
 //     while ( counter_ != target_ ) {
 //         cv.wait(lock);
 //     }
@@ -90,19 +90,17 @@ void ProgressWatch::wait(void) {
 
 void ProgressWatch::set(int end, int start) {
     
-    unique_lock<mutex> lock(mtx);
+    boost::lock_guard<boost::mutex> lock(mtx);
     target_ = end;
     counter_ = start_ = start;
     completed_ = false;
-    lock.unlock();
-//cout << __LINE__ << "  " << dump() << "  SET " << end << "," << start << endl;
     
 }
 
 
 void ProgressWatch::step(int step) {
 
-    unique_lock<mutex> lock(mtx);
+    boost::unique_lock<boost::mutex> lock(mtx);
     counter_ += step;
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
     if(counter_ > target_) {
@@ -132,24 +130,22 @@ void ProgressWatch::step(int step) {
 
 void ProgressWatch::stepTarget(int step) {
 
-    unique_lock<mutex> lock(mtx);
+    boost::lock_guard<boost::mutex> lock(mtx);
     target_ += step;
-    lock.unlock();
-//cout << __LINE__ << "  " << dump() << "  stepTarget " << step << endl;
 
 }
 
 
 float ProgressWatch::progress(void) {
 
-    unique_lock<mutex> lock(mtx);
+    boost::lock_guard<boost::mutex> lock(mtx);
     return (counter_ - start_)*100.0/(target_ - start_);
    
 }
 
 
 string ProgressWatch::dump(void) {
-    unique_lock<mutex> lock(mtx);
+    boost::lock_guard<boost::mutex> lock(mtx);
     return hexString(this) + " " + to_string(start_) + "/" + to_string(counter_) + "/" + to_string(target_);
 }
 

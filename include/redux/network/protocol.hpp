@@ -32,6 +32,7 @@ namespace redux {
                                  CMD_PUT_LOG,
                                  CMD_RESET,
                                  CMD_DIE,
+                                 CMD_EXIT,
                                  CMD_ERR = 255
                                };
                                

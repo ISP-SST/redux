@@ -13,7 +13,7 @@ using namespace redux;
 using namespace std;
 
 
-Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), running_(false),
+Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), running_(false), exitWhenDone_(false),
     wip(nullptr), daemon( d ), myInfo(Host::myInfo()) {
 
 }
@@ -38,6 +38,9 @@ void Worker::start( void ) {
                     ioService.run();
                 } catch( job_error& e ) {
                     LLOG_ERR(daemon.logger) << "Job error: " << e.what() << ende;
+                } catch( const boost::thread_interrupted& ) {
+                    LLOG_DEBUG(daemon.logger) << "Worker: Thread interrupted."  << ende;
+                    return;
                 } catch( exception& e ) {
                     LLOG_ERR(daemon.logger) << "Exception in thread: " << e.what() << ende;
                 } catch( ... ) {
@@ -150,26 +153,28 @@ bool Worker::getWork( void ) {
             wip->job->logger.flushAll();
         }
     
-        if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-           if( wip->job && (!previousJob || *(wip->job) != *(previousJob)) ) {
-                wip->job->logger.setLevel( wip->job->info.verbosity );
-                if( wip->isRemote ) {
-                    if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
-                        wip->job->logger.addLogger( daemon.logger );
+        if( running_ ) {
+            if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
+            if( wip->job && (!previousJob || *(wip->job) != *(previousJob)) ) {
+                    wip->job->logger.setLevel( wip->job->info.verbosity );
+                    if( wip->isRemote ) {
+                        if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
+                            wip->job->logger.addLogger( daemon.logger );
+                        }
+                        TcpConnection::Ptr logConn;
+                        daemon.connect( daemon.myMaster.host->info, logConn );
+                        wip->job->logger.addNetwork( logConn, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
                     }
-                    TcpConnection::Ptr logConn;
-                    daemon.connect( daemon.myMaster.host->info, logConn );
-                    wip->job->logger.addNetwork( logConn, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
+                    wip->job->init();
+                    wip->previousJob = wip->job;
                 }
-                wip->job->init();
-                wip->previousJob = wip->job;
+                for( auto& part: wip->parts ) {
+                    part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
+                }
+                myInfo.active();
+                myInfo.status.statusString = "...";
+                return true;
             }
-            for( auto& part: wip->parts ) {
-                part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
-            }
-            myInfo.active();
-            myInfo.status.statusString = "...";
-            return true;
         }
     } catch (const std::exception& e) {
         LLOG_TRACE(daemon.logger) << "Failed to get new work: reson: " << e.what() << ende;
@@ -248,11 +253,15 @@ void Worker::run( const boost::system::error_code& error ) {
     }
     
  //   LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
-    while( running_ && getWork() ) {
+    while( getWork() ) {
         sleepS = 1;
         try {
             while( wip->job && wip->job->run( wip, ioService, myInfo.status.nThreads ) ) ;
             if( wip->job ) wip->job->logger.flushAll(); 
+        }
+        catch( const boost::thread_interrupted& ) {
+            LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;
+            return;
         }
         catch( const exception& e ) {
             LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;
@@ -268,6 +277,9 @@ void Worker::run( const boost::system::error_code& error ) {
         if( sleepS < 4 ) {
             sleepS <<= 1;
         }
+    } else if( exitWhenDone_ ) {
+        stop();
+        daemon.stop();
     }
 
 }

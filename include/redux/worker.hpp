@@ -27,6 +27,7 @@ namespace redux {
         void connect( void );
         void start( void );
         void stop( void );
+        void exitWhenDone( void ) { running_ = false; exitWhenDone_ = true; };
 
     private:
 
@@ -46,6 +47,7 @@ namespace redux {
         boost::asio::strand strand;
         boost::asio::deadline_timer runTimer;
         bool running_;
+        bool exitWhenDone_;
         
         WorkInProgress::Ptr wip;
 
