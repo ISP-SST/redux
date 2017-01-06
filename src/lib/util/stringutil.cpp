@@ -185,11 +185,12 @@ string redux::util::alignRight(const string& s, size_t n, unsigned char c) {
 
 string redux::util::getUname(__uid_t id) {
     if(!id) id = geteuid();
-    struct passwd* pwd = getpwuid(id);
-
     string tmp;
-    if(pwd) {
-        tmp = pwd->pw_name;
+    struct passwd pwent;
+    struct passwd *pwentp;
+    char buf[1024];
+    if( !getpwuid_r( id, &pwent, buf, 1024, &pwentp ) ) {
+        tmp = pwent.pw_name;
     }
     else {
         tmp = std::to_string((int)id);
@@ -202,19 +203,24 @@ string expandTilde(string in) {
     if(in.empty() || in[0] != '~') return in;
     string tmp;
     size_t cut;
+    struct passwd pwent;
+    struct passwd *pwentp;
+    char buf[1024];
     if(in.length() == 1 || in[1] == '/') {
         cut = 1;
         tmp = getenv("HOME");
         if(tmp.empty()) {
-            struct passwd* pwd = getpwuid(geteuid());
-            if(pwd) tmp = pwd->pw_dir;
+            if( !getpwuid_r( geteuid(), &pwent, buf, 1024, &pwentp ) ) {
+                tmp = pwent.pw_dir;
+            }
         }
     }
     else {
         cut = in.find_first_of('/');
         string user = in.substr(1, cut - 1);
-        struct passwd* pwd = getpwnam(user.c_str());
-        if(pwd) tmp = pwd->pw_dir;
+        if( !getpwnam_r(user.c_str(), &pwent, buf, 1024, &pwentp) ) {
+            tmp = pwent.pw_dir;
+        }
     }
     if(tmp.empty()) return in;
     else return tmp + in.substr(cut);
