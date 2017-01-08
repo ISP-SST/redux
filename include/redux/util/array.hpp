@@ -1091,7 +1091,7 @@ namespace redux {
             void resetLimits( void ) {
                 nElements_ = 1;
                 for( size_t i = 1; i < nDims_; ++i ) {
-                    currentSizes[i] = dimStrides[i-1];
+                    currentSizes[i] = dimStrides[i-1]/dimStrides[i];
                     dimFirst[i] = 0;
                     dimLast[i] = currentSizes[i]-1;
                     nElements_ *= currentSizes[i];
