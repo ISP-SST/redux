@@ -780,6 +780,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
         unique_lock<mutex> plock( peerMutex );
         const Host::HostInfo& hi = connections[conn]->info;
         plock.unlock();
+        
+        vector<Job::JobPtr> removedJobs;
+        bool done(false);
     
         //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
         string jobString = string( buf.get() );
@@ -788,59 +791,85 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             if( jobs.size() ) LOG << "Clearing joblist." << ende;
             jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
                     if( !job ) return true;
+                    if( !job->mayBeDeleted() ) return false;
                     if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
+                    removedJobs.push_back( job );
                     return true;
                 }), jobs.end() );
-            return;
+            done = true;
         }
 
-        try {   // remove by ID
-            bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
-            tmpTree.put( "jobs", jobString );
-            vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
-            std::set<size_t> jobSet( jobList.begin(), jobList.end() );
-            unique_lock<mutex> lock( jobsMutex );
-            jobList.clear(); 
-            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
-                    if( !job ) return true;
-                    if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
-                    if( jobSet.count( job->info.id ) ) {
-                        jobList.push_back(job->info.id);
-                        return true;
+        if( !done ) {
+            try {   // remove by ID
+                bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
+                tmpTree.put( "jobs", jobString );
+                vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
+                std::set<size_t> jobSet( jobList.begin(), jobList.end() );
+                unique_lock<mutex> lock( jobsMutex );
+                jobList.clear();
+                jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
+                        if( !job ) return true;
+                        if( !job->mayBeDeleted() ) return false;
+                        if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
+                        if( jobSet.count( job->info.id ) ) {
+                            jobList.push_back(job->info.id);
+                            removedJobs.push_back( job );
+                            return true;
+                        }
+                        return false;
+                    }), jobs.end() );
+                if( !jobList.empty() ) LOG << "Removed " << printArray(jobList,"jobs") << ende;
+                done = true;
+            }
+            catch( const boost::bad_lexical_cast& e ) {
+                // ignore: it just means the specified list of jobs count not be cast into unsigned integers (could also be "all" or list of names)
+            }
+        }
+        
+        if( !done ) {
+            try {   // remove by name
+                vector<string> jobList;
+                boost::split( jobList, jobString, boost::is_any_of( "," ) );
+                std::set<string> jobSet( jobList.begin(), jobList.end() );
+                unique_lock<mutex> lock( jobsMutex );
+                vector<size_t> deletedList;
+                jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
+                        if( !job ) return true;
+                        if( !job->mayBeDeleted() ) return false;
+                        if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
+                        if( jobSet.count( job->info.name ) ) {
+                            deletedList.push_back(job->info.id);
+                            removedJobs.push_back( job );
+                            return true;
+                        }
+                        return false;
+                    }) , jobs.end() );
+                if( !deletedList.empty() ) LOG << "Removed " << printArray( deletedList, "jobs" ) << ende;
+                done = true;
+            }
+            catch( const std::exception& e ) {
+                LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
+                throw e;
+            }
+        }
+
+        if( removedJobs.size() ) {
+            for( auto &j: removedJobs ) {
+                if( !j ) continue;
+                plock.lock();
+                for( auto &pw: peerWIP ) {
+                    if( !pw.second || !pw.second->job ) continue;
+                    if( j != pw.second->job ) continue;
+                    Host::Ptr host = pw.first;
+                    for( auto& hconn: connections ) {
+                        if( (*hconn.second) == (*host) ) {
+                            hconn.first->sendUrgent( CMD_RESET );
+                        }
                     }
-                    return false;
-                }), jobs.end() );
-            if( !jobList.empty() ) LOG << "Removed " << printArray(jobList,"jobs") << ende;
-            return;
+                }
+                plock.unlock();
+            }
         }
-        catch( const boost::bad_lexical_cast& e ) {
-            // ignore: it just means the specified list of jobs count not be cast into unsigned integers (could also be "all" or list of names)
-        }
-
-        try {   // remove by name
-            vector<string> jobList;
-            boost::split( jobList, jobString, boost::is_any_of( "," ) );
-            std::set<string> jobSet( jobList.begin(), jobList.end() );
-            unique_lock<mutex> lock( jobsMutex );
-            jobList.clear(); 
-            vector<size_t> deletedList;
-            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
-                    if( !job ) return true;
-                    if( hi.user != job->info.user && hi.peerType != Host::TP_MASTER ) return false;
-                    if( jobSet.count( job->info.name ) ) {
-                        deletedList.push_back(job->info.id);
-                        return true;
-                    }
-                    return false;
-                }), jobs.end() );
-            if( !jobList.empty() ) LOG << "Removed " << printArray(jobList,"jobs") << ende;
-            return;
-        }
-        catch( const std::exception& e ) {
-            LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
-            throw e;
-        }
-
 
     }
 
