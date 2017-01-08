@@ -291,7 +291,7 @@ void ObjectData::dump( string tag ) {
 }
 
 
-PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid) {
+PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
     for( auto& o: j.getObjects() ) {
         objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
     }

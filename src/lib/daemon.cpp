@@ -149,8 +149,9 @@ bool Daemon::doWork( void ) {
             });
         }
         LOG_DEBUG << "Initializing worker." << ende;
-        workerInit();
-        worker.start();
+        if( workerInit() ) {
+            worker.start();
+        }
         LOG_DEBUG << "Running the asio service." << ende;
         // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
         pool.join_all();
@@ -170,7 +171,7 @@ bool Daemon::doWork( void ) {
 }
 
 
-void Daemon::workerInit( void ) {
+bool Daemon::workerInit( void ) {
     
     string master = params["master"].as<string>();
     
@@ -181,24 +182,33 @@ void Daemon::workerInit( void ) {
         myMaster.host.reset( new Host() );
         myMaster.host->info.connectName = master;
         myMaster.host->info.connectPort = params["port"].as<uint16_t>();
-       
+        
         connect( myMaster.host->info, myMaster.conn );
+        if( !myMaster.conn->socket().is_open() ) {
+            logger.addStream( cerr, Logger::getDefaultMask() );
+            LOG_ERR << "Failed to connect to master at " << myMaster.host->info.connectName << ":"
+                    << myMaster.host->info.connectPort << ende;
+            stop();
+            return false;
+        }
+        myMaster.conn->setUrgentCallback( bind( &Daemon::urgentHandler, this, std::placeholders::_1 ) );
+        myMaster.conn->uIdle();
+        
         TcpConnection::Ptr logConn;
+
         connect( myMaster.host->info, logConn );
+
         int remoteLogFlushPeriod = 5;       // TODO make this a config setting.
         logger.addNetwork( logConn, 0, Logger::getDefaultMask(), remoteLogFlushPeriod );
         logger.setContext( myInfo.info.name+":"+to_string(myInfo.info.pid) );
         logger.setFlushPeriod( remoteLogFlushPeriod );
-        if( myMaster.conn && myMaster.conn->socket().is_open() ) {
-            LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
-            myMaster.conn->setUrgentCallback( bind( &Daemon::urgentHandler, this, std::placeholders::_1 ) );
-            myMaster.conn->uIdle();
-        }
+
+        LOG_DETAIL << "Running slave with " << myInfo.status.nThreads << " threads." << ende;
         
     }
     
     myInfo.info.peerType = Host::TP_WORKER;
-
+    return true;
 }
 
 
@@ -643,8 +653,9 @@ void Daemon::die( TcpConnection::Ptr& conn, bool urgent ) {
 void Daemon::softExit( void ) {
     
     if( myInfo.info.peerType == Host::TP_MASTER ) {
-        LOG_ERR<< "Daemon::softExit, not implemented for master yet." << ende;
+        LOG_ERR << "Daemon::softExit, not implemented for master yet." << ende;
     } else {
+        LOG_DETAIL << "Slave will exit after the current job is completed." << ende;
         worker.exitWhenDone();
     }
 }
@@ -653,8 +664,6 @@ void Daemon::softExit( void ) {
 void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
     
     if( urgent ) {  // received on a slave, just do it without replying
-        worker.stop();
-        worker.start();
         reset();
         return;
     }
@@ -938,7 +947,7 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
     wip->nParts = 0;
 
     unique_lock<mutex> lock( jobsMutex );
-    auto tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
+    vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     lock.unlock();
     map<size_t,map<uint16_t,uint16_t>> activeCounts;
     for( Job::JobPtr& job: tmpJobs ) {

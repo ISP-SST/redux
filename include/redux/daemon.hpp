@@ -34,7 +34,7 @@ namespace redux {
         void maintenance( void );
         bool doWork(void);
         
-        void workerInit( void );
+        bool workerInit( void );
         void connect( network::Host::HostInfo& host, network::TcpConnection::Ptr& conn );
         void updateStatus(void);
         network::TcpConnection::Ptr getMaster(void);

@@ -388,8 +388,15 @@ void MomfbdJob::cleanup(void) {
 }
 
 
+bool MomfbdJob::mayBeDeleted(void) {
+    uint16_t jobStep = info.step.load();
+    return ( jobStep != JSTEP_PREPROCESS && jobStep != JSTEP_POSTPROCESS );     // these are asynchronous steps and job can't be safely deleted until it finishes
+}
+
+
 bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, uint16_t maxThreads ) {
     
+
     uint16_t jobStep = info.step.load();
     uint16_t patchStep = 0;
     uint16_t nThreads = std::min( maxThreads, info.maxThreads );
@@ -406,9 +413,11 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, 
         if( patchStep == JSTEP_POSTPROCESS ) {      // patch-wise post-processing, do we need any for momfbd?  the filtering etc. is done on the slaves.
         } else {                                    // main processing
             if( !globalData ) {
+
                 LOG_ERR << "MomfbdJob::run()  Generating globalData, this should have been received from the master!!" << ende;
                 globalData.reset( new GlobalData(*this) );
             }
+
             if( !solver ) {
                 LOG_TRACE << "Initializing new Solver for job #" << info.id << ende;
                 solver.reset( new Solver(*this, service, nThreads) );            // Initialize, allocations, etc.
@@ -461,9 +470,9 @@ void MomfbdJob::setLogChannel(std::string channel) {
 
 void MomfbdJob::unloadData( boost::asio::io_service& service ) {
 
-    for( auto& obj : objects ) {
-        for( auto& ch : obj->channels ) {
-            service.post( bind(&Channel::unloadData, ch.get()) );
+    for( shared_ptr<Object>& obj : objects ) {
+        for( shared_ptr<Channel>& ch : obj->channels ) {
+            ch->unloadData();
         }
     }
 
@@ -480,6 +489,7 @@ void MomfbdJob::unloadData( boost::asio::io_service& service ) {
     }
     info.state.store( JSTATE_IDLE );
     nActivePre--;
+    
 }
 
 

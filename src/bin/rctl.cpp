@@ -207,7 +207,7 @@ int main( int argc, char *argv[] ) {
 
                     
             } else {
-                LOG_ERR << "Failed to connect to reduxd at " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << ende;
+                LOG_ERR << "Connection failed: " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << ende;
             }
             
         }

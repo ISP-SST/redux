@@ -59,6 +59,7 @@ namespace redux {
             PointType<T>& operator+=(const T& rhs) { x += rhs; y += rhs; return *this; }
             PointType<T>& operator-=(const T& rhs) { x -= rhs; y -= rhs; return *this; }
             PointType<T>& operator*=(const T& rhs) { x *= rhs; y *= rhs; return *this; }
+            PointType<T>& operator/=(const T& rhs) { x /= rhs; y /= rhs; return *this; }
             PointType<T> operator+(const T& rhs) const { PointType<T> tmp(*this); tmp += rhs; return std::move(tmp); }
             PointType<T> operator-(const T& rhs) const { PointType<T> tmp(*this); tmp -= rhs; return std::move(tmp); }
             PointType<T> operator*(const T& rhs) const { PointType<T> tmp(*this); tmp *= rhs; return std::move(tmp); }

@@ -132,9 +132,7 @@ int main( int argc, char *argv[] ) {
             char* ptr = buf.get();
             
             if( vm.count( "slaves" ) ) {
-                    cout << "slaves" << endl;
                 if( vm.count( "restart" ) ) {
-                    cout << "restart" << endl;
                     cmd = CMD_SLV_RES;
                 } else cmd = CMD_DEL_SLV;
             } else cmd = CMD_DEL_JOB;
@@ -147,6 +145,8 @@ int main( int argc, char *argv[] ) {
             count += pack(ptr+count,stringSize);
             count += pack(ptr+count,idString);
             boost::asio::write( conn->socket(), boost::asio::buffer(buf.get(), count));
+        } else {
+            cout << "Connection failed: " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << endl;
         }
     }
     catch( const exception &e ) {

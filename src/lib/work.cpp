@@ -26,7 +26,7 @@ namespace {
 #endif
     
 }
-Part::Part() : id( 0 ), step( 0 ), nRetries( 0 ), partType(0) {
+Part::Part() : id( 0 ), partStarted(boost::posix_time::not_a_date_time), step( 0 ), nRetries( 0 ), partType(0) {
 #ifdef DBG_PART_
     LOG_DEBUG << "Constructing Part: (" << hexString(this) << ") new instance count = " << (partCounter.fetch_add(1)+1);
 #endif
@@ -67,7 +67,7 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 
 
 WorkInProgress::WorkInProgress(void) : job(nullptr), previousJob(job),
-    isRemote(false), hasResults(false), nParts(0), nCompleted(0) {
+    workStarted(boost::posix_time::not_a_date_time), isRemote(false), hasResults(false), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif

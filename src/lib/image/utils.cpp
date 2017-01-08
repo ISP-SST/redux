@@ -293,9 +293,9 @@ redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, b
 
     T* retPtr = ret.ptr();
     for (int i = 0; i < ySize; ++i) {
-        double y = static_cast<double>(i-yHalf);
+        double y = static_cast<double>(i-yHalf+0.5);
         for (int j = 0; j < xSize; ++j) {
-            double x = static_cast<double>(j-xHalf);
+            double x = static_cast<double>(j-xHalf+0.5);
             int offset = i * xSize + j;
             retPtr[offset] = a*x + b*y + c;
         }

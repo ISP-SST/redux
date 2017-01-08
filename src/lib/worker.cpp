@@ -13,7 +13,7 @@ using namespace redux;
 using namespace std;
 
 
-Worker::Worker( Daemon& d ) : strand(d.ioService), runTimer( d.ioService ), running_(false), exitWhenDone_(false),
+Worker::Worker( Daemon& d ) : strand(ioService), runTimer( ioService ), running_(false), exitWhenDone_(false),
     wip(nullptr), daemon( d ), myInfo(Host::myInfo()) {
 
 }
@@ -31,7 +31,7 @@ void Worker::start( void ) {
     ioService.reset();
     workLoop.reset( new boost::asio::io_service::work(ioService) );
 
-    for( uint16_t t=0; t < myInfo.status.nThreads; ++t ) {
+    for( uint16_t t=0; t < myInfo.status.nThreads+1; ++t ) {
         pool.create_thread( [&,t](){
             while( running_ ) {
                 try {
@@ -62,9 +62,9 @@ void Worker::stop( void ) {
     running_ = false;
     workLoop.reset();
     ioService.stop();
+    runTimer.cancel();
     pool.interrupt_all();
     pool.join_all();
-    runTimer.cancel();
     wip.reset();
 
 }
@@ -155,7 +155,7 @@ bool Worker::getWork( void ) {
     
         if( running_ ) {
             if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-            if( wip->job && (!previousJob || *(wip->job) != *(previousJob)) ) {
+                if( wip->job && (!previousJob || *(wip->job) != *(previousJob)) ) {
                     wip->job->logger.setLevel( wip->job->info.verbosity );
                     if( wip->isRemote ) {
                         if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
@@ -251,7 +251,6 @@ void Worker::run( const boost::system::error_code& error ) {
         sleepS=1;
         return;
     }
-    
  //   LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
     while( getWork() ) {
         sleepS = 1;
@@ -278,7 +277,9 @@ void Worker::run( const boost::system::error_code& error ) {
             sleepS <<= 1;
         }
     } else if( exitWhenDone_ ) {
-        stop();
+        running_ = false;
+        workLoop.reset();
+        ioService.stop();
         daemon.stop();
     }
 

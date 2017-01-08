@@ -359,6 +359,8 @@ int main (int argc, char *argv[]) {
                 }
 
             }
+        } else {
+            cout << "Connection failed: " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << endl;
         }
 
     }

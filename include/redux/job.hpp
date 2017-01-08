@@ -161,11 +161,13 @@ namespace redux {
             return std::move( std::unique_lock<std::mutex>(jobMutex) );
         }
         
+        virtual bool mayBeDeleted(void) { return true; }
+        
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);
     
     protected:
-        
+       
         std::mutex jobMutex;
         std::string cachePath;
         std::string jobLogChannel;

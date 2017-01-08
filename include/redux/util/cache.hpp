@@ -203,9 +203,6 @@ namespace redux {
         protected:
             bfs::path itemPath;
             bfs::path fullPath;
-            int timeout;
-            int lastAccessed;
-            int options;
             std::mutex itemMutex;
             bool isLoaded;
             uint64_t cachedSize;

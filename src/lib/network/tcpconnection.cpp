@@ -86,17 +86,26 @@ void TcpConnection::connect( string host, string service ) {
     
     if( host == "" ) host = "localhost";
 
-    ba::ip::tcp::resolver::query query( host, service );
-    ba::ip::tcp::resolver resolver( myService );
-    ba::ip::tcp::resolver::iterator destination = resolver.resolve( query );
-    ba::ip::tcp::resolver::iterator end ;
-    ba::ip::tcp::endpoint endpoint;
+    try {
+        ba::ip::tcp::resolver::query query( host, service );
+        ba::ip::tcp::resolver resolver( myService );
+        ba::ip::tcp::resolver::iterator destination = resolver.resolve( query );
+        ba::ip::tcp::resolver::iterator end ;
+        ba::ip::tcp::endpoint endpoint;
 
-    while( destination != end ) {       // TODO: try connect to each destination and return on success...
-        mySocket.connect( *destination++ );
-        if( mySocket.is_open() ) return;
+        while( destination != end ) {
+            try {
+                mySocket.connect( *destination++ );
+            } catch ( const boost::system::system_error& ) {
+                mySocket.close();
+            }
+            if( mySocket.is_open() ) return;
+        }
+    } catch ( ... ) {
+        // TODO 
     }
-    //LOG_ERR << "Connection failed";
+    mySocket.close();
+
 }
 
 
@@ -216,7 +225,7 @@ void TcpConnection::sendUrgent( uint8_t c ) {
  
 void TcpConnection::receiveUrgent( uint8_t& c ) {
     if( mySocket.is_open() && mySocket.at_mark() ) {
-        size_t cnt = mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+        mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
     }
 }
 

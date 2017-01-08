@@ -662,6 +662,15 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
 
 void Channel::unloadData(void) {               // unload what was accessed through the cache, this should be called when all objects are done pre-processing.
     
+    dark.clear();
+    gain.clear();
+    ccdResponse.clear();
+    ccdScattering.clear();
+    psf.clear();
+    modulationMatrix.clear();
+    xOffset.clear();
+    yOffset.clear();
+
     if (!darkTemplate.empty()) {
         size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
         if (nWild == 0 || darkNumbers.empty()) {
@@ -691,15 +700,6 @@ void Channel::unloadData(void) {               // unload what was accessed throu
             CachedFile::unload<float>( fn.string() );
         }
     }
-
-    dark.clear();
-    gain.clear();
-    ccdResponse.clear();
-    ccdScattering.clear();
-    psf.clear();
-    modulationMatrix.clear();
-    xOffset.clear();
-    yOffset.clear();
 
 }
 
@@ -1257,10 +1257,64 @@ void Channel::dump (std::string tag) {
     
     Ana::write (tag + "_phi_fixed.f0", phi_fixed);
     Ana::write (tag + "_phi_channel.f0", phi_channel);
-    int cnt(0);
-    for( auto& im: subImages ) {
-        im->dump(tag+"_im"+to_string(cnt++));
-    }
+    
+    uint16_t patchSize = myObject.patchSize;
+    size_t blockSize = patchSize*patchSize;
+    Array<float> tmpF( subImages.size(), patchSize, patchSize );
+    Array<double> tmpD( patchSize, patchSize );
+    Array<complex_t> tmpC( subImages.size(), patchSize, patchSize );
+    FourierTransform tmpFT( patchSize, patchSize );
+    Array<float> statArr( subImages.size(), 4 );
+    Array<int16_t> shiftArr( subImages.size(), 2 );
+    ArrayStats s;
 
+    if( subImages.size() && subImages[0] ) {
+        Array<float> wrap(reinterpret_cast<Array<float>&>(*subImages[0]));
+        wrap.resetLimits();     // all subimages share a datablock, reset the limits to the "full" data and write.
+        Ana::write( tag + "_data.f0", wrap );
+    }
+    
+    float* tmpPtr = tmpF.get();
+    for( shared_ptr<SubImage>& im: subImages ) {
+        im->copyTo<float>(tmpPtr);
+        tmpPtr += blockSize;
+    }
+    Ana::write( tag + "_img.f0", tmpF );
+    
+    tmpPtr = tmpF.get();
+    complex_t* ftPtr = tmpC.get();
+    int idx(0);
+    for( shared_ptr<SubImage>& im: subImages ) {
+        im->getWindowedImg( tmpD, s, true );
+        tmpFT.reset( tmpD.get(), patchSize, patchSize, FT_FULLCOMPLEX );
+        FourierTransform::reorder(tmpFT);
+        tmpD.copyTo<float>(tmpPtr);
+        tmpFT.copyTo<complex_t>(ftPtr);
+        const vector<int64_t>& first = im->first();
+        shiftArr(idx,0) = first[1];
+        shiftArr(idx,1) = first[2];
+        statArr(idx,0) = s.min;
+        statArr(idx,1) = s.max;
+        statArr(idx,2) = s.mean;
+        statArr(idx++,3) = s.stddev;
+        tmpPtr += blockSize;
+        ftPtr += blockSize;
+    }
+    Ana::write( tag + "_wimg.f0", tmpF );
+    Ana::write( tag + "_ft.f0", tmpC );
+    Ana::write( tag + "_stat.f0", statArr );
+    Ana::write( tag + "_shift.f0", shiftArr );
+    tmpC.resize();      // free some memory
+    
+    tmpPtr = tmpF.get();
+    for( shared_ptr<SubImage>& im: subImages ) {
+        im->getPSF( tmpD.get() );
+        tmpD.copyTo<float>(tmpPtr);
+        tmpPtr += blockSize;
+    }
+    Ana::write( tag + "_psf.f0", tmpF );
+    tmpF.resize();      // free some memory
+
+    
 }
 

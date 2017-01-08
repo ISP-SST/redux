@@ -78,11 +78,9 @@ int main( int argc, char *argv[] ) {
                 return res;
             }
             catch( Application::KillException ) {
-                cerr << "Application terminated by kill request." << endl;
                 break;
             }
             catch( Application::ResetException ) {
-                cout << "Application restarting." << endl;
                 continue;
             }
         }

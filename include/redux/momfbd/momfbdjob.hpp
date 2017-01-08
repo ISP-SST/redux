@@ -86,6 +86,8 @@ namespace redux {
             
             void setLogChannel(std::string channel);
             
+            bool mayBeDeleted(void);
+            
             bool active(void);
             bool check(void);
             bool checkCfg(void);

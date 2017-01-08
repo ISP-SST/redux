@@ -533,7 +533,12 @@ void Object::addAllPQ(void) {
 
 
 void Object::calcHelpers(void) {
+    
     lock_guard<mutex> lock (mtx);
+    PQ.zero();
+    PS.zero();
+    QS.zero();
+    
     const double *qPtr = Q.get();
     const complex_t *pPtr = P.get();
     complex_t *pqPtr = PQ.get();
@@ -545,6 +550,7 @@ void Object::calcHelpers(void) {
         psPtr[ind] = norm (pPtr[ind]);
         qsPtr[ind] = qPtr[ind] * qPtr[ind];
     }
+    
 }
 
 

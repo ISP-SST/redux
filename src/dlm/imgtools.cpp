@@ -471,16 +471,6 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         if( selectedKP1.size() > size_t(kw.nrefpoints) ) selectedKP1.resize(kw.nrefpoints);
         if( selectedKP2.size() > size_t(2*kw.nrefpoints) ) selectedKP2.resize(2*kw.nrefpoints);
 
-#ifdef DEBUG_
-        if( kw.show > 1 ) {
-            drawKeypoints(imgByte1, selectedKP1, result, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-            imshow( "Good Matches & Object detection 1", result );
-            drawKeypoints(imgByte2, selectedKP2, result, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-            imshow( "Good Matches & Object detection 2", result );
-            waitKey(0); 
-        }
-#endif
-
         std::vector<Mat> initializations;
         if( kw.h_init ) {
             if( kw.h_init->type == IDL_TYP_UNDEF ) {
@@ -604,15 +594,6 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             if( size_t(kw.max_points) < matches.size() ) matches.resize( kw.max_points );
         }
         
-        
-#ifdef DEBUG_
-            if( kw.show > 1 ) {
-                drawKeypoints(imgByte1, keypoints1, result, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-                imshow( "Good Matches & Object detection 1", result );
-                waitKey(0); 
-            }
-#endif
-
         if( matches.size() > 3 ) {
             
             if( kw.verbose > 1 ) {

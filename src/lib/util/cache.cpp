@@ -46,7 +46,7 @@ pid_t Cache::pid(void) {
 }
 
 
-CacheItem::CacheItem(void) : itemPath(""), isLoaded(true), cachedSize(0) {
+CacheItem::CacheItem(void) : itemPath(""), fullPath(""), isLoaded(true), cachedSize(0) {
     
 }
 
@@ -60,8 +60,7 @@ CacheItem::CacheItem(const string& path) : itemPath(""), fullPath(""), isLoaded(
 }
 
 
-CacheItem::CacheItem(const CacheItem& rhs) : itemPath(rhs.itemPath), fullPath(rhs.fullPath), timeout(rhs.timeout), lastAccessed(rhs.lastAccessed),
-     options(rhs.options), isLoaded(rhs.isLoaded) {
+CacheItem::CacheItem(const CacheItem& rhs) : itemPath(rhs.itemPath), fullPath(rhs.fullPath), isLoaded(rhs.isLoaded), cachedSize(rhs.cachedSize) {
          
 }
 
@@ -102,7 +101,7 @@ void CacheItem::cacheRemove(void) {
 
 void CacheItem::cacheTouch(void) {
     unique_lock<mutex> lock(itemMutex);
-    lastAccessed = 0;
+//     lastAccessed = 0;
 }
 
 
@@ -122,6 +121,7 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                 if( in.good() ) {
                     size_t sz = in.tellg();
                     unique_ptr<char[]> buf( new char[sz] );
+                    memset( buf.get(), 0, sz);
                     in.seekg(0, ios_base::beg);
                     in.clear();
                     in.read(buf.get(), sz);
@@ -164,11 +164,11 @@ bool CacheItem::cacheStore(bool clearAfterStore){
             }
             cachedSize = csize();
             unique_ptr<char[]> buf( new char[cachedSize] );
-            size_t psz = cpack(buf.get());
+            size_t psz = cpack( buf.get() );
             if( psz <= cachedSize ) {
-                ofstream out(fullPath.string().c_str(), ofstream::binary);
+                ofstream out( fullPath.string().c_str(), ofstream::binary );
                 if( out.good() ) {
-                    out.write( buf.get(), cachedSize );
+                    out.write( buf.get(), psz );
                     ret = true;
                 }
             }

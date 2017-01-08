@@ -241,6 +241,8 @@ int main( int argc, char *argv[] ) {
                 if( hasFlags != 1 ) cout << endl;
                 if( vm.count( "slaves" ) || !hasFlags ) printPeerList( conn, maxSlaves, sorting );
             }
+        } else {
+            cout << "Connection failed: " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << endl;
         }
     }
     catch( const exception &e ) {
