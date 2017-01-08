@@ -1285,7 +1285,7 @@ void Channel::dump (std::string tag) {
     complex_t* ftPtr = tmpC.get();
     int idx(0);
     for( shared_ptr<SubImage>& im: subImages ) {
-        im->getWindowedImg( tmpD, s, true );
+        im->getWindowedImg( tmpD, s );
         tmpFT.reset( tmpD.get(), patchSize, patchSize, FT_FULLCOMPLEX );
         FourierTransform::reorder(tmpFT);
         tmpD.copyTo<float>(tmpPtr);
