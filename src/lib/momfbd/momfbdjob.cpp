@@ -216,7 +216,7 @@ uint16_t MomfbdJob::checkParts( void ) {
         counts[patch->step]++;
     }
     lock.unlock();
-cout << "mask = " << bitString(mask) << printArray(counts,"\ncounts") << endl; 
+
     if( mask & JSTEP_ERR ) {
         info.step.store( JSTEP_ERR );
         info.state.store( JSTATE_ERR );
@@ -919,12 +919,12 @@ bool MomfbdJob::check(void) {
     switch (step) {
         case JSTEP_NONE:        ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;
         case JSTEP_SUBMIT:      ret = checkData();  if(ret) info.step = JSTEP_CHECKED; break;
+        case JSTEP_RUNNING:     ret = true; checkParts(); break;    // this check should find orphan parts etc.
 //         case JSTEP_PREPROCESS:  return checkPre();
 //         case JSTEP_WRITING:     return checkWriting();
 //         case JSTEP_CHECKED: ;                  // no checks at these steps, just fall through and return true
 //         case JSTEP_POSTPROCESS: ;
 //         case JSTEP_QUEUED: ;
-//         case JSTEP_RUNNING: ;
 //         case JSTEP_COMPLETED: ret = true; break;
 //         case JSTEP_ERR: ret = false; break;
         default: LOG_ERR << "check(): No check defined for step = " << (int)info.step << ende;

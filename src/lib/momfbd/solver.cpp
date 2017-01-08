@@ -1165,20 +1165,26 @@ void Solver::clear( void ) {
 
 void Solver::dump( string tag ) {
 
-    for( auto & object : objects ) {
-        object->dump(tag);
+    progWatch.set( objects.size()+1 );
+    for( auto & o : objects ) {
+        service.post( [this,tag, &o](){
+            o->dump(tag);
+            ++progWatch;
+        });
     }
+    service.post( [this,tag](){
+        Ana::write (tag + "_window.f0", window);
+        Ana::write (tag + "_noisewindow.f0", noiseWindow);
 
-    Ana::write (tag + "_window.f0", window);
-    Ana::write (tag + "_noisewindow.f0", noiseWindow);
-
-    Array<double> wrapper(alpha, nTotalImages, nModes);
-    Ana::write(tag + "_alpha.f0",wrapper);
-    wrapper.wrap(alpha_offset, nTotalImages, nModes);
-    Ana::write(tag + "_alpha_offset.f0",wrapper);
-    wrapper.wrap(grad_alpha, nTotalImages, nModes);
-    Ana::write(tag + "_grad_alpha.f0",wrapper);
-     
+        Array<double> wrapper(alpha, nTotalImages, nModes);
+        Ana::write(tag + "_alpha.f0",wrapper);
+        wrapper.wrap(alpha_offset, nTotalImages, nModes);
+        Ana::write(tag + "_alpha_offset.f0",wrapper);
+        wrapper.wrap(grad_alpha, nTotalImages, nModes);
+        Ana::write(tag + "_grad_alpha.f0",wrapper);
+        ++progWatch;
+    });
+    progWatch.wait();
 }
 
 

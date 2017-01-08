@@ -1029,6 +1029,12 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         Host::Ptr host = wipit->first;
         lock.unlock();
 
+        if( wip->job && wip->parts.size() ) {   // parts should have been cleared when results returned.
+            wip->job->ungetWork( wip );
+            //wip->job->failWork( wip );
+            wip->resetParts();
+        }
+        
         uint64_t blockSize = 0;
         wip->isRemote = true;
         if( getWork( wip, host->status.nThreads ) ) {

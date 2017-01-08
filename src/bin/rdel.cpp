@@ -87,10 +87,6 @@ int main( int argc, char *argv[] ) {
     vm.notify();
 #endif
 
-//     if( !vm.count( "jobs" ) && !vm.count( "all" ) ) {
-//         return EXIT_SUCCESS;
-//     }
-// 
     try {
         string idString;        
         if( vm.count( "ids" ) ) {
@@ -103,7 +99,6 @@ int main( int argc, char *argv[] ) {
         
         boost::asio::io_service ioservice;
         auto conn = TcpConnection::newPtr( ioservice );
-        
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {

@@ -191,12 +191,6 @@ int main( int argc, char *argv[] ) {
     vm.notify();
 #endif
 
-    
-    if( vm.count( "help" ) ) {
-        cout << allOptions << endl;
-        return EXIT_SUCCESS;
-    }
-
     bool loop = vm.count( "time" );
     int sorting = by_name;
     try {
