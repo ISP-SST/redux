@@ -5,7 +5,8 @@
 
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
+#include <iostream>
+using namespace std;
 using namespace redux::logging;
 using namespace redux::util;
 using namespace boost::posix_time;
@@ -21,8 +22,9 @@ uint64_t LogEntry::pack( char* ptr ) const {
     using redux::util::pack;
     *ptr = mask;
     uint64_t count = 1;     // mask
-    count += pack( ptr+count, redux::util::to_time_t( entryTime ) );
-    int32_t micros = entryTime.time_of_day().total_microseconds();
+    time_t timestamp = redux::util::to_time_t( entryTime );
+    count += pack( ptr+count, timestamp );
+    int32_t micros = entryTime.time_of_day().fractional_seconds();
     count += pack( ptr+count, micros );
     count += pack( ptr+count, message );
     return count;
