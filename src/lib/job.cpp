@@ -369,16 +369,20 @@ void Job::startLog( bool overwrite ) {
         bfs::path outDir( info.outputDir );
         if( !outDir.empty() && !bfs::exists(outDir) ) {
             if( !bfs::create_directories(outDir) ) {
-                cerr << "failed to create directory for output: " << outDir << endl;
-                return;
+                throw job_error( info.name + ": Failed to create directory for output: " + outDir.string() );
             }
         }
         logFilePath = bfs::path(info.outputDir) / logFilePath;
     }
 
     logger.setLevel( info.verbosity );
-    logger.addFile( logFilePath.string(), 0, overwrite );
     logger.setContext( "job "+to_string(info.id) );
+    try {
+        logger.addFile( logFilePath.string(), 0, overwrite );
+    } catch( exception& e ) {
+        throw job_error( info.name + ": " + string(e.what()) );
+    }
+    
 
 }
 
