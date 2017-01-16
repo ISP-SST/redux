@@ -152,12 +152,14 @@ bool Pupil::load( const string& filename, uint16_t pixels ) {
     
     if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
-        if( nDimensions() != 2 || dimSize(0) != pixels || dimSize(1) != pixels ) {    // mismatch
+        if( nDimensions() != 2 ) {    // not a 2D image
             clear();
         } else {
-            *this *= 1.1;
-            *this -= 0.05;
-            // TODO rescale file to right size
+            if( dimSize(0) != pixels || dimSize(1) != pixels ) {    // size mismatch
+                Array<double> tmp = Array<double>::copy(true);
+                resize( pixels, pixels );
+                redux::image::resize( tmp.get(), tmp.dimSize(0), tmp.dimSize(1), get(), pixels, pixels );
+            }
             nPixels = pixels;
             radius = 0;
             normalize();

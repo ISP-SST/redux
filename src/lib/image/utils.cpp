@@ -573,3 +573,25 @@ template void redux::image::inpaint( float*, uint8_t*, float*, size_t, size_t, d
 template void redux::image::inpaint( double*, uint8_t*, double*, size_t, size_t, double, int );
 
 
+template <typename T, typename U>
+void redux::image::resize( T* in, size_t inSizeY, size_t inSizeX, U* out, size_t outSizeY, size_t outSizeX ) {
+#ifdef REDUX_WITH_OPENCV
+    cv::Mat src( inSizeY, inSizeX, cv::cvType<T>(), in );
+    cv::Mat dst( outSizeY, outSizeX, cv::cvType<T>(), out );
+    if( (inSizeY > outSizeY) && (inSizeX > outSizeX) ) {
+        resize( src, dst, dst.size(), 0, 0, cv::INTER_AREA );
+    } else if( (inSizeY < outSizeY) && (inSizeX < outSizeX) ) {
+        resize( src, dst, dst.size(), 0, 0, cv::INTER_CUBIC );
+    } else {
+        resize( src, dst, dst.size(), 0, 0, cv::INTER_CUBIC );
+    }
+#else
+    std::cerr << "redux::image::resize is not yet implemented for non-OpenCV builds." << std::endl;
+#endif            
+}
+template void redux::image::resize( int16_t* in, size_t, size_t, int16_t* out, size_t, size_t );
+template void redux::image::resize( int32_t* in, size_t, size_t, int32_t* out, size_t, size_t );
+template void redux::image::resize( float* in, size_t, size_t, float* out, size_t, size_t );
+template void redux::image::resize( double* in, size_t, size_t, double* out, size_t, size_t );
+
+

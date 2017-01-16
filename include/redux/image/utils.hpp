@@ -549,7 +549,11 @@ namespace redux {
         
         template <typename T, typename U>
         void inpaint( T* img, U* mask, T* out, size_t ySize, size_t xSize, double radius, int flags=0 );
+        
+        template <typename T, typename U>
+        void resize( T* in, size_t inSizeY, size_t inSizeX, U* out, size_t outSizeY, size_t outSizeX );
 
+        
     }   // image
 
 }   // redux
