@@ -2227,9 +2227,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     ++progWatch;
                 });
             }
+            progWatch.wait();
         }
-        progWatch.wait();
-
         
         size_t maxFileSize = *std::max_element( nFrames.begin(), nFrames.end() ) * frameSize;
         atomic<size_t> nSummed(0);
