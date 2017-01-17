@@ -95,7 +95,7 @@ namespace redux {
             template <typename T>
             redux::util::Array<T> residual( const redux::util::Array<T>& im ) const {
                 redux::util::Array<T> tmp = convolveImage(im);
-                redux::util::Array<double> img;
+                redux::util::Array<double> img(imgSize,imgSize);
                 redux::util::ArrayStats s;
                 getWindowedImg(img,s);
                 tmp -= img;
@@ -103,7 +103,7 @@ namespace redux {
             }
             template <typename T>
             redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) {
-                redux::util::Array<double> img;
+                redux::util::Array<double> img(imgSize,imgSize);
                 getWindowedImg(img,stats);
                 return std::move(cim-img);
             }

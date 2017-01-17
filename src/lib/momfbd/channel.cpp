@@ -745,9 +745,11 @@ void Channel::initPatch (ChannelData& cd) {
         throw logic_error(msg);
     }
 
+    size_t blockSizeY = cd.images.dimSize(1);
+    size_t blockSizeX = cd.images.dimSize(2);
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         float* dataPtr = cd.images.get();
-        size_t imgPixels = cd.images.dimSize(1)*cd.images.dimSize(2);
+        size_t imgPixels = blockSizeY*blockSizeX;
         for( uint16_t i=0; i<nImages; ++i ) {
             double scale = myObject.objMaxMean/imageStats[i]->mean;
             //double scale = 1.0/imageStats[i]->mean;
@@ -757,10 +759,21 @@ void Channel::initPatch (ChannelData& cd) {
     }
     
     uint16_t patchSize = myObject.patchSize;
+    
+    PointF localShift; 
+    int firstY = max( cd.offset.y, 0 );
+    int lastY = min<int>( firstY+patchSize-1, blockSizeY-1);
+    firstY = max( lastY-patchSize+1, 0 );   // this should actually never go out-of-bounds unless patchSize > blockSize
+    localShift.y = firstY-cd.offset.y;
+    int firstX = max( cd.offset.x, 0 );
+    int lastX = min<int>( firstX+patchSize-1, blockSizeX-1);
+    firstX = max( lastX-patchSize+1, 0 );
+    localShift.x = firstX-cd.offset.x;
+
     for (uint16_t i=0; i < nImages; ++i) {
         subImages[i]->setPatchInfo( i, cd.channelOffset, cd.residualOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
-        subImages[i]->wrap( cd.images, i, i, cd.offset.y, cd.offset.y+patchSize-1, cd.offset.x, cd.offset.x+patchSize-1 );
-        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), cd.images.dimSize(1)*cd.images.dimSize(2), ST_VALUES|ST_RMS );
+        subImages[i]->wrap( cd.images, i, i, firstY, lastY, firstX, lastX );
+        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockSizeY*blockSizeX, ST_VALUES|ST_RMS );
     }
 
     phi_fixed.copy( phi_channel );
@@ -768,10 +781,12 @@ void Channel::initPatch (ChannelData& cd) {
     double* phiPtr = phi_channel.get();
     size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
     
+    PointF totalshift = localShift + cd.residualOffset;
+    
     int32_t mIndex = myObject.modes.tiltMode.x;
-    if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
+    if( mIndex >= 0 && fabs(totalshift.x) > 0 ) {
         const double* modePtr = myObject.modes.modePointers[mIndex];
-        float res = -cd.residualOffset.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
+        float res = -totalshift.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [res](const double& p, const double& m) {
                 return p + res*m;
@@ -779,9 +794,9 @@ void Channel::initPatch (ChannelData& cd) {
     }
     
     mIndex = myObject.modes.tiltMode.y;
-    if( mIndex >= 0 && fabs(cd.residualOffset.y) > 0 ) {
+    if( mIndex >= 0 && fabs(totalshift.y) > 0 ) {
         const double* modePtr = myObject.modes.modePointers[mIndex];
-        float res = -cd.residualOffset.y*myObject.shiftToAlpha.y;   // positive coefficient shifts image downwards
+        float res = -totalshift.y*myObject.shiftToAlpha.y;   // positive coefficient shifts image downwards
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [res](const double& p, const double& m) {
                 return p + res*m;

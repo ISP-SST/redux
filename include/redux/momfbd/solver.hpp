@@ -31,8 +31,7 @@ namespace redux {
         namespace thread {
         
             struct TmpStorage {
-                //TmpStorage(){ std::cout << " TmpStorage: " << redux::util::hexString(this) << std::endl; }
-                //~TmpStorage(){ std::cout << "~TmpStorage: " << redux::util::hexString(this) << std::endl; }
+                TmpStorage() : patchSize(0), pupilSize(0) {}
                 void resize( uint16_t patchSz, uint16_t pupSz ) {
                     if( patchSz != patchSize ) {
                         patchSize = patchSz;

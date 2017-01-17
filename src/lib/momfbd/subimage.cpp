@@ -101,13 +101,19 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointF& resOf
 
 void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s ) const {
     
-    size_t nEl = img.nElements();
-    if( nEl != imgSize*imgSize ) {
-        img.resize(imgSize,imgSize);
-        nEl = imgSize*imgSize;
+    if( img.dimSize(0) < imgSize || img.dimSize(1) < imgSize  ) {
+        string msg = "SubImage::getWindowedImg: Output container is smaller than image! " +
+               printArray( dimensions(), "\n\timgdims" ) +
+               printArray( img.dimensions(), "\n\toutdims" );
+        throw std::logic_error(msg);
     }
-    copy( img );                    // copy current cut-out to (double) working copy.
+
+    for( size_t y=0; y<imgSize; ++y ) {
+        const float* rowPtr = ptr(0,y,0);
+        std::copy( rowPtr, rowPtr+imgSize, img.ptr(y,0) );
+    }
     
+    size_t nEl = img.nElements();
     s.getStats( img.get(), nEl, ST_VALUES );
     double avg = s.mean;
     double* imgPtr = img.get();
