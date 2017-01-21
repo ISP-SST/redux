@@ -1113,14 +1113,12 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     } else {                                // old style alignment with clips & offsetfiles
         localPos = refPos;
         if( xOffset.valid() ) {
-            float shift = xOffset(refPos.y, refPos.x)/100.0;
-            chData.residualOffset.x = shift;
-            localPos.x += shift;
+            chData.residualOffset.x = xOffset(refPos.y, refPos.x)/100.0;
+            localPos.x += chData.residualOffset.x;
         }
         if( yOffset.valid() ) {
-            float shift = yOffset(refPos.y, refPos.x)/100.0;
-            chData.residualOffset.y = shift;
-            localPos.y += shift;
+            chData.residualOffset.y = yOffset(refPos.y, refPos.x)/100.0;
+            localPos.y += chData.residualOffset.y;
         }
         if( alignClip.size() == 4 ) {
             if( alignClip[0] > alignClip[1] ) {
@@ -1178,6 +1176,10 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
     chData.channelOffset -= imgBoundary.outside( tmpCutout+chData.channelOffset );                      // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
     chData.residualOffset = localPos - finalPos;
+    
+    // TODO cleanup all this arithmetic, it's not really clear like this...
+    if( flipX ) chData.residualOffset.x = -chData.residualOffset.x;
+    if( flipY ) chData.residualOffset.y = -chData.residualOffset.y;
     
     tmpCutout.grow( myObject.maxLocalShift );                               // add maxLocalshift
     desiredCutout = tmpCutout;
