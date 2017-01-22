@@ -53,7 +53,7 @@ namespace redux {
                 auto it = m.second.find(cf);
                 if( it != m.second.end() ) {
                     std::unique_lock<std::mutex> lock( it->second.imgMutex ); // sync-point: prevent deletion while loading
-                    if( it->second.getData().unique() ) {
+                    if( it->second.getData().use_count() < 2 ) {
                         lock.unlock();
                         m.second.erase(it);
                     }
