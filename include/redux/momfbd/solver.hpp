@@ -91,28 +91,33 @@ namespace redux {
             
             void run(PatchData::Ptr);
             
-            void shiftAndInit( double* a, bool doReset=false );
-            void applyAlpha( double* a );
-            inline void applyAlpha(void) { applyAlpha( alpha ); } ;
+            template <typename T>
+            void shiftAndInit( const T* a, bool doReset=false );
+            void shiftAndInit( bool doReset=false ){ shiftAndInit( alpha.get(), doReset ); }
+            
+            void alignWavefronts( void );
+            void zeroAlphas( void );
+            
+            template <typename T> void applyAlpha( T* a );
+            inline void applyAlpha(void) { applyAlpha( alpha.get() ); } ;
             void applyBeta( const gsl_vector* beta );
             void applyBeta( const gsl_vector* beta, double scale );
             void applyBeta( double scale );
             
-            void applyConstraints( const double* alpha, double* beta );
-            void reverseConstraints( const double* beta, double* alpha );
+            void applyConstraints( const double* a, double* b );
+            void reverseConstraints( const double* b, double* a );
+            
+            void zeroAvgTilt( double* a, int m );
+            void zeroAvgTilts( double* a, int m1, int m2 );
 
             void loadInit( const PatchData::Ptr pd, double* a) const;
             void initImages( double* a );
             
             double metric(void);
-            double metric2(void);
             double metricAt(double step);       // evaluate metric at alpha + step*grad
             void calcPQ(void);
-            void calcPQ2(void);
             void gradient(void);
-            void gradient2(void);
             void gradient(gsl_vector* out);
-            void gradient2(gsl_vector* out);
           
             void clear(void);
             
@@ -136,15 +141,16 @@ namespace redux {
             uint32_t nFreeParameters;
             uint32_t nTotalImages;
             
-            uint16_t *modeNumbers;
-            uint16_t *enabledModes;
+            std::shared_ptr<bool> enabledModes;
+            std::shared_ptr<double> alpha, alpha_offset, grad_alpha;
 
-            double *alpha, *alpha_offset, *grad_alpha, *tmp_alpha;
+            double *tmp_alpha;
             double *beta, *grad_beta, *search_dir, *tmp_beta;
             double grad_beta_norm;
             double *regAlphaWeights;
             
             double max_wavelength;
+            size_t nTotalPixels;
             
             grad_t gradientMethod;
 

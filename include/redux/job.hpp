@@ -94,7 +94,6 @@ namespace redux {
             uint16_t maxThreads;
             std::atomic<uint16_t> step;
             std::atomic<uint8_t> state;
-            std::atomic<uint32_t> progress[2];
             std::string typeString, name, user, host;
             std::string logFile;
             std::string outputDir;                  //!< Where the output goes (defaults to current directory of rsub)

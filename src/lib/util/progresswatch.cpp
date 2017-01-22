@@ -139,7 +139,7 @@ void ProgressWatch::stepTarget(int step) {
 float ProgressWatch::progress(void) {
 
     boost::lock_guard<boost::mutex> lock(mtx);
-    return (counter_ - start_)*100.0/(target_ - start_);
+    return static_cast<float>(counter_ - start_)/(target_ - start_);
    
 }
 
@@ -153,6 +153,6 @@ string ProgressWatch::dump(void) {
 string ProgressWatch::progressString(void) {
 
     //return to_string(counter_) +"/" + to_string(target_);
-    return boost::str( boost::format("%03.1f%%") % progress() );
+    return boost::str( boost::format("%03.1f%%") % (100.0*progress()) );
     
 }

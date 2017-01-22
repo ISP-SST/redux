@@ -40,7 +40,7 @@ namespace redux {
             ~SubImage(void);
             
             void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, uint16_t, uint16_t);
-            void getWindowedImg( Array<double>&, redux::util::ArrayStats& s ) const;
+            void getWindowedImg( Array<double>&, redux::util::ArrayStats& s, bool rescaled ) const;
             void initialize( bool doReset=false );
             
             void addFT(redux::util::Array<double>& ftsum) const;
@@ -50,13 +50,19 @@ namespace redux {
             void restore(complex_t* avg_obj, double* norm) const;
             
             double metricChange(const complex_t* newOTF) const;
-            double gradientFiniteDifference(uint16_t, double);
-            double gradientVogel(uint16_t mode, double) const;
-            void calcVogelWeight(complex_t*, double*, double*);
+            double gradientFiniteDifference(uint16_t);
+            void gradientFiniteDifference2( double* agrad, const bool* enabledModes );
+            double gradientVogel(uint16_t mode);
+            void gradientVogel2( double* agrad, const bool* enabledModes );
+            void calcVogelWeight( complex_t*, double*, double* );
+            void calcVogelWeight( void );
             
             void addToPhi(double* phiPtr, const double* modePtr, double a) const;
             
-            bool adjustOffset(double* alpha);
+
+            template <typename T>
+            bool adjustShifts( const T* alpha );
+            void alignAgainst( const Ptr& refIm );
 
             void addPhases(const double* a) { addPhases(phi.get(), a); };
             void addPhases(double* phiPtr, const double* a) const;
@@ -66,18 +72,18 @@ namespace redux {
             void addAlphas(const double* a);
             void setAlphas(const double* a);
             void setAlphas(const std::vector<uint16_t>& modes, const double* a);
-
-            void addAlphaOffsets(double* alphas, float* alphaOut) const;    // copy with offset correction (results)
+            
+            void resetShifts( void );
             
             void resetPhi(void);
-            inline void addToPhi(const double* a) { addToPhi( a, phi.get() ); }
-            void addToPhi(const double* a, double* phiPtr) const;
-            inline void calcPhi(const double* a) { calcPhi( a, phi.get() ); }
-            void calcPhi(const double* a, double* phiPtr) const;
+            template <typename T> void addToPhi(const T* a, double* phiPtr) const;
+            template <typename T> void addToPhi(const T* a) { addToPhi( a, phi.get() ); }
+            template <typename T> void calcPhi( const T* a, double* phiPtr ) const;
+            template <typename T> void calcPhi( const T* a ) { calcPhi( a, phi.get() ); }
 
             void calcOTF(complex_t* otf, const double* phiOffset, double scale);
-            void calcOTF(complex_t* otf, const double* phi);
-            void calcOTF(void);
+            void calcOTF(complex_t* otf, const double* phi) const;
+            void calcOTF(void) { calcOTF( OTF.get(), phi.get() ); }
             void calcPFOTF(void);
             
             void addPSF( double* psf ) const;
@@ -94,17 +100,17 @@ namespace redux {
             
             template <typename T>
             redux::util::Array<T> residual( const redux::util::Array<T>& im ) const {
-                redux::util::Array<T> tmp = convolveImage(im);
+                redux::util::Array<T> cim = convolveImage(im);
                 redux::util::Array<double> img(imgSize,imgSize);
                 redux::util::ArrayStats s;
-                getWindowedImg(img,s);
-                tmp -= img;
-                return std::move(tmp);
+                getWindowedImg(img,s,true);
+                cim -= img;
+                return std::move(cim);
             }
             template <typename T>
-            redux::util::Array<T> convolvedResidual(const redux::util::Array<T>& cim) {
+            redux::util::Array<T> convolvedResidual( const redux::util::Array<T>& cim ) {
                 redux::util::Array<double> img(imgSize,imgSize);
-                getWindowedImg(img,stats);
+                getWindowedImg(img,stats,true);
                 return std::move(cim-img);
             }
             
@@ -112,12 +118,13 @@ namespace redux {
             void dump( std::string tag ) const;
 
             uint32_t index;
-            redux::util::PointI channelOffset;          //<! Location of the current/original cutout, this typically starts at (maxLocalShift,maxLocalShift)
+            redux::util::PointI initialOffset;          //<! Starting location of the patch in the datablock, this is typically (maxLocalShift, maxLocalShift)
             redux::util::PointF channelResidualOffset;  //<! Remainder after shifting the cutout integer pixels.
-            redux::util::PointI imageOffset;            //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
+            redux::util::PointI imageShift;            //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, nModes;
             uint32_t otfSize, pupilSize2, otfSize2;
             double oldRG;
+            double grad_step;
             
             Object& object;
             const Channel& channel;
@@ -132,6 +139,7 @@ namespace redux {
             bool newOTF;
             std::mutex mtx;
             
+            std::vector<double> localAlpha;
             redux::util::Array<double> phi;         //!< Array containing the phase of this OTF               size = pupilsize
             redux::image::FourierTransform PF;      //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
             redux::image::FourierTransform OTF;     //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
@@ -143,7 +151,7 @@ namespace redux {
         };
         
         
-        typedef std::function<double(SubImage&, uint16_t, double)> grad_t;
+        typedef std::function<double(SubImage&, uint16_t)> grad_t;
 
 
         /*! @} */

@@ -158,7 +158,7 @@ Job::Info::Info(const Info& rhs) {
 
 uint64_t Job::Info::size(void) const {
     
-    static uint64_t fixed_sz = 4*sizeof(uint32_t)       // id, timeout, maxProcessingTime, progress[]
+    static uint64_t fixed_sz = 2*sizeof(uint32_t)       // id, timeout, maxProcessingTime
                              + 2*sizeof(uint16_t)       // maxThreads, step
                              + 4                        // priority, verbosity, maxPartRetries, state
                              + 3*sizeof(time_t)         // submitTime, startedTime, completedTime
@@ -184,8 +184,6 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, maxPartRetries);
     count += pack(ptr+count, step.load());
     count += pack(ptr+count, state.load());
-    count += pack(ptr+count, progress[0].load());
-    count += pack(ptr+count, progress[1].load());
     count += pack(ptr+count, name);
     count += pack(ptr+count, user);
     count += pack(ptr+count, host);
@@ -214,11 +212,6 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     uint8_t tmp8(0);
     count += unpack(ptr+count, tmp8);
     state.store(tmp8);
-    uint32_t tmp32(0);
-    count += unpack(ptr+count, tmp32);
-    progress[0].store(tmp32);
-    count += unpack(ptr+count, tmp32);
-    progress[1].store(tmp32);
     count += unpack(ptr+count, name);
     count += unpack(ptr+count, user);
     count += unpack(ptr+count, host);

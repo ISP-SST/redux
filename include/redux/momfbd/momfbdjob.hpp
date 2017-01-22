@@ -49,6 +49,7 @@ namespace redux {
                     JSTEP_RUNNING,
                     JSTEP_DONE,
                     JSTEP_VERIFY,
+                    JSTEP_VERIFIED,
                     JSTEP_POSTPROCESS,
                     JSTEP_WRITING
                  // JSTEP_SUBMIT = 0x100,              Defined in job.hpp
@@ -102,12 +103,13 @@ namespace redux {
         private:
 
             uint16_t checkParts( void );
-            void unloadData( boost::asio::io_service& );
+            void unloadCalib( boost::asio::io_service& );
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );
             void clearPatches( void );
-            void verifyPatches( boost::asio::io_service&, uint16_t nThreads );
+            void verifyPatches( void );
             void writeOutput( boost::asio::io_service& );
+            void loadPatchResults( boost::asio::io_service&, uint16_t nThreads );
             void postProcess( boost::asio::io_service&, uint16_t nThreads );
             
             void updateProgressString(void);

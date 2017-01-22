@@ -303,7 +303,6 @@ bool Channel::checkData (void) {
     }
     string wfStr = redux::util::uIntsToString( waveFronts );
     LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << " contains waveFronts: " << wfStr << ende;
-    myJob.info.progress[1] += std::max(fileNumbers.size(),1UL)*3;  // load, process, split & store (TODO more accurate progress reporting)
 
     // Dark(s)
     if (!darkTemplate.empty()) {
@@ -615,8 +614,7 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
 }
 
 
-void Channel::unloadData(void) {               // unload what was accessed through the cache, this should be called when all objects are done pre-processing.
-    
+void Channel::unloadCalib(void) {               // unload what was accessed through the cache, this should be called when all objects are done pre-processing.
 
     dark.clear();
     gain.clear();
@@ -668,7 +666,7 @@ void Channel::getFileNames(std::vector<std::string>& files) const {
 }
 
 
-void Channel::initProcessing( const Solver& solver ) {
+void Channel::initProcessing( Solver& solver ) {
     
     initPhiFixed();
 
@@ -706,17 +704,17 @@ void Channel::initPatch (ChannelData& cd) {
     uint16_t patchSize = myObject.patchSize;
     
     PointF localShift; 
-    int firstY = max( cd.offset.y, 0 );
+    int firstY = max( cd.patchStart.y, 0 );
     int lastY = min<int>( firstY+patchSize-1, blockSizeY-1);
     firstY = max( lastY-patchSize+1, 0 );   // this should actually never go out-of-bounds unless patchSize > blockSize
-    localShift.y = firstY-cd.offset.y;
-    int firstX = max( cd.offset.x, 0 );
+    localShift.y = firstY-cd.patchStart.y;
+    int firstX = max( cd.patchStart.x, 0 );
     int lastX = min<int>( firstX+patchSize-1, blockSizeX-1);
     firstX = max( lastX-patchSize+1, 0 );
-    localShift.x = firstX-cd.offset.x;
+    localShift.x = firstX-cd.patchStart.x;
 
     for (uint16_t i=0; i < nImages; ++i) {
-        subImages[i]->setPatchInfo( i, cd.channelOffset, cd.residualOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
+        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->wrap( cd.images, i, i, firstY, lastY, firstX, lastX );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockSizeY*blockSizeX, ST_VALUES|ST_RMS );
     }
@@ -974,12 +972,13 @@ void Channel::preprocessImage( size_t i ) {
         view.assign(tmpImg);                            // copy back to image
         imageStats[i].reset( new ArrayStats() );
         imageStats[i]->getStats( borderClip, tmpImg );    // get stats for corrected data
-        myJob.info.progress[0]++;
     
     } catch ( const std::exception& e ) {
-        LOG_ERR << "Failed to preprocess image #" << i << ". reason: " << e.what() << ende;
+        LOG_ERR << boost::format("Failed to preprocess image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(images.dimensions(),"dims")
+                << ".  reason: " << e.what() << ende;
     } catch ( ... ) {
-        LOG_ERR << "Failed to preprocess image #" << i << " for unknown reason."  << ende;
+        LOG_ERR << boost::format("Failed to preprocess image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(images.dimensions(),"dims")
+                << " for unknown reason."  << ende;
     }
 
     ++myJob.progWatch;          // this will trigger unloading the calibration data after all objects/images are done.
@@ -1041,7 +1040,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     desiredCutout -= PointI( halfPatch, halfPatch );                                        // ...now centered on 0,0
 
     chData.residualOffset = 0;
-    chData.offset = myObject.maxLocalShift;
+    chData.patchStart = myObject.maxLocalShift;
     
     
     bool flipX(false);
@@ -1098,19 +1097,19 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         << ": desired: " << desiredCutout << "  This will likely cause severe artifacts!!!" << ende;
         alreadyWarned = true;
         if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
-            chData.offset.y -= (tmpCutout.first.y - desiredCutout.first.y);
+            chData.patchStart.y -= (tmpCutout.first.y - desiredCutout.first.y);
             finalPos.y += (tmpCutout.first.y - desiredCutout.first.y);
         }
         if( !flipX && (tmpCutout.first.x != desiredCutout.first.x) ) {
-            chData.offset.x -= (tmpCutout.first.x - desiredCutout.first.x);
+            chData.patchStart.x -= (tmpCutout.first.x - desiredCutout.first.x);
             finalPos.x += (tmpCutout.first.x - desiredCutout.first.x);
         }
         if( flipY && (tmpCutout.last.y != desiredCutout.last.y) ) {
-            chData.offset.y += (tmpCutout.last.y - desiredCutout.last.y);
+            chData.patchStart.y += (tmpCutout.last.y - desiredCutout.last.y);
             finalPos.y -= (tmpCutout.last.y - desiredCutout.last.y);
         }
         if( flipX && (tmpCutout.last.x != desiredCutout.last.x) ) {
-            chData.offset.x += (tmpCutout.last.x - desiredCutout.last.x);
+            chData.patchStart.x += (tmpCutout.last.x - desiredCutout.last.x);
             finalPos.x -= (tmpCutout.last.x - desiredCutout.last.x);
         }
     }
@@ -1127,20 +1126,21 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     desiredCutout = tmpCutout;
     tmpCutout.restrict(imgBoundary);
     if( tmpCutout != desiredCutout ) {
-        if( !alreadyWarned )
+        if( !alreadyWarned ) {
             LOG_DEBUG << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
             myObject.ID << ":" << ID << ":  desired: " << desiredCutout << "  actual: " << tmpCutout << ende;
+        }
         if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
-            chData.offset.y -= (tmpCutout.first.y - desiredCutout.first.y);
+            chData.patchStart.y -= (tmpCutout.first.y - desiredCutout.first.y);
         }
         if( !flipX && (tmpCutout.first.x != desiredCutout.first.x) ) {
-            chData.offset.x -= (tmpCutout.first.x - desiredCutout.first.x);
+            chData.patchStart.x -= (tmpCutout.first.x - desiredCutout.first.x);
         }
         if( flipY && (tmpCutout.last.y != desiredCutout.last.y) ) {
-            chData.offset.y += (tmpCutout.last.y - desiredCutout.last.y);
+            chData.patchStart.y += (tmpCutout.last.y - desiredCutout.last.y);
         }
         if( flipX && (tmpCutout.last.x != desiredCutout.last.x) ) {
-            chData.offset.x += (tmpCutout.last.x - desiredCutout.last.x);
+            chData.patchStart.x += (tmpCutout.last.x - desiredCutout.last.x);
         }
     }
     
@@ -1149,7 +1149,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     if( chData.cutout != desiredCutout ) actStr = "  actual="+(string)chData.cutout;
     LOG_TRACE << "AdjustCutout ch=" <<myObject.ID << ":" << ID << ": patch=" << patch->index << refPos << "  mapped=" << localPos
               << "  desired=" << desiredCutout << actStr
-              << "  localOffset=" << chData.channelOffset << "   start=" << chData.offset
+              << "  localOffset=" << chData.channelOffset << "   start=" << chData.patchStart
               << "   residual=" << chData.residualOffset << ende;
          
 }
@@ -1212,7 +1212,7 @@ void Channel::logAndThrow( string msg ) {
 
 void Channel::dump (std::string tag) {
     
-    tag += "_c"+to_string(ID);
+    tag += ":"+to_string(ID);
     
     Ana::write (tag + "_phi_fixed.f0", phi_fixed);
     Ana::write (tag + "_phi_channel.f0", phi_channel);
@@ -1238,13 +1238,13 @@ void Channel::dump (std::string tag) {
         im->copyTo<float>(tmpPtr);
         tmpPtr += blockSize;
     }
-    Ana::write( tag + "_img.f0", tmpF );
+    Ana::write( tag + "_imgs.f0", tmpF );
     
     tmpPtr = tmpF.get();
     complex_t* ftPtr = tmpC.get();
     int idx(0);
     for( shared_ptr<SubImage>& im: subImages ) {
-        im->getWindowedImg( tmpD, s );
+        im->getWindowedImg( tmpD, s, true );
         tmpFT.reset( tmpD.get(), patchSize, patchSize, FT_FULLCOMPLEX );
         FourierTransform::reorder(tmpFT);
         tmpD.copyTo<float>(tmpPtr);
@@ -1259,8 +1259,8 @@ void Channel::dump (std::string tag) {
         tmpPtr += blockSize;
         ftPtr += blockSize;
     }
-    Ana::write( tag + "_wimg.f0", tmpF );
-    Ana::write( tag + "_ft.f0", tmpC );
+    Ana::write( tag + "_wimgs.f0", tmpF );
+    Ana::write( tag + "_fts.f0", tmpC );
     Ana::write( tag + "_stat.f0", statArr );
     Ana::write( tag + "_shift.f0", shiftArr );
     tmpC.resize();      // free some memory
@@ -1271,7 +1271,7 @@ void Channel::dump (std::string tag) {
         tmpD.copyTo<float>(tmpPtr);
         tmpPtr += blockSize;
     }
-    Ana::write( tag + "_psf.f0", tmpF );
+    Ana::write( tag + "_psfs.f0", tmpF );
     tmpF.resize();      // free some memory
 
     

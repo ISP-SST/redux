@@ -37,7 +37,7 @@ void ChannelData::initPatch(void) {
 
 
 uint64_t ChannelData::size( void ) const {
-    static uint64_t fixed_sz = channelOffset.size() + offset.size() + residualOffset.size() + 1;
+    static uint64_t fixed_sz = channelOffset.size() + patchStart.size() + residualOffset.size() + 1;
     return fixed_sz + images.size();
 }
 
@@ -45,7 +45,7 @@ uint64_t ChannelData::size( void ) const {
 uint64_t ChannelData::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = channelOffset.pack(ptr);
-    count += offset.pack(ptr+count);
+    count += patchStart.pack(ptr+count);
     count += residualOffset.pack(ptr+count);
     uint8_t hasImages(0);
     if( images.size() > sizeof(uint64_t) ) hasImages = 1;
@@ -60,7 +60,7 @@ uint64_t ChannelData::pack( char* ptr ) const {
 uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = channelOffset.unpack(ptr, swap_endian);
-    count += offset.unpack(ptr+count, swap_endian);
+    count += patchStart.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
     uint8_t hasImages(0);
     count += unpack(ptr+count, hasImages, swap_endian);
@@ -84,7 +84,7 @@ const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
     //images = rhs.images;
     cutout = rhs.cutout;
     channelOffset = rhs.channelOffset;
-    offset = rhs.offset;
+    patchStart = rhs.patchStart;
     residualOffset = rhs.residualOffset;
 
     isLoaded = images.nElements();
@@ -132,7 +132,7 @@ void ObjectData::setPath(const std::string& path) {
 
 
 void ObjectData::initPatch(void) {
-    myObject->initPatch(*this);
+    myObject->initPatch();
     for( auto& cd: channels ) {
         if(cd) cd->initPatch();
     }

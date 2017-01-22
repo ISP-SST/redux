@@ -37,7 +37,7 @@ MomfbdJob::MomfbdJob( void ) {
 
 
 MomfbdJob::~MomfbdJob( void ) {
-    
+
     cleanup();
     
 }
@@ -254,8 +254,6 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
                 updateProgressString();
             });
             info.step = step = JSTEP_RUNNING;
-            info.progress[0] = 0;
-            info.progress[1] = patches.nElements();
             updateProgressString();
         }
 
@@ -292,7 +290,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
             info.step = JSTEP_QUEUED;
         }
         
-        if( (step == JSTEP_POSTPROCESS) && checkPost() ) {
+        if( (step == JSTEP_VERIFIED) && checkPost() ) {
             ret = true;
         }
         
@@ -311,7 +309,6 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
                 if( nPrepQueued < maxActive[JSTEP_QUEUED] ) {
                     startLog();
                     info.step = JSTEP_PREPROCESS;
-                    info.progress[0] = 0;
                     info.startedTime = boost::posix_time::second_clock::local_time();
                     ret = true;
                 }
@@ -360,12 +357,11 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
         patch->step = JSTEP_POSTPROCESS;
         patch->cacheStore(true);
         ++progWatch;
-        info.progress[0]++;
     }
 
     info.maxProcessingTime = max<uint32_t>( info.maxProcessingTime, elapsed.total_seconds() );
     if( info.maxProcessingTime ) {
-        uint32_t newTimeout = info.maxProcessingTime * (20 - info.progress[0]*15.0/info.progress[1]);    // TBD: start with large margin, then shrink to ~5*maxProcessingTime ?
+        uint32_t newTimeout = info.maxProcessingTime * (20.0 - 15.0*progWatch.progress());    // TBD: start with large margin, then shrink to ~5*maxProcessingTime ?
         LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds." << ende;
         info.timeout = newTimeout;    // TBD: fixed timeout or 10 * maxProcTime ?
     }
@@ -376,6 +372,8 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
 void MomfbdJob::cleanup(void) {
     
     progWatch.clear();
+    solver.reset();
+
     for( auto &o: objects ) {
         o->cleanup();
     }
@@ -383,7 +381,6 @@ void MomfbdJob::cleanup(void) {
     objects.clear();
     patches.clear();
     globalData.reset();
-    solver.reset();
     
 }
 
@@ -418,33 +415,32 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, 
                 globalData.reset( new GlobalData(*this) );
             }
 
-            if( !solver ) {
-                LOG_TRACE << "Initializing new Solver for job #" << info.id << ende;
-                solver.reset( new Solver(*this, service, nThreads) );            // Initialize, allocations, etc.
-                solver->init();
-            }
+            if( !solver ) solver.reset( new Solver(*this, service, nThreads) );
             for( auto& part : wip->parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 logger.setContext( "job "+to_string(info.id)+":"+to_string(part->id) );
                 // Run main processing
                 auto data = static_pointer_cast<PatchData>(part);
                 data->initPatch();
                 solver->run( data );
+                
                 //solver->run_new(static_pointer_cast<PatchData>(part));
                 wip->hasResults = true;
             }
         }
     } else if( jobStep == JSTEP_DONE ) {
+        info.step.store( JSTEP_VERIFY );
         progWatch.set(0,0);
         progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
-        verifyPatches( service, nThreads );                          // check for failed patches
-    } else if( jobStep == JSTEP_POSTPROCESS ) {
-        progWatch.set(0,0);
+        if( !solver ) solver.reset( new Solver(*this, service, nThreads) );            // Initialize, allocations, etc.
+        service.post( std::bind( &MomfbdJob::verifyPatches, this) );                   // check for failed patches
+    } else if( jobStep == JSTEP_VERIFIED ) {
+        info.step.store( JSTEP_POSTPROCESS );
+        progWatch.set( patches.nElements() );
+        progWatch.setHandler( std::bind( &MomfbdJob::postProcess, this, std::ref(service), nThreads) );
         progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
-//         progWatch.setTicker([this](){
-//             auto lock = getLock();
-//             info.progressString = "(W:" + progWatch.progressString() + ")";
-//         });
-        postProcess(service, nThreads);                          // postprocess on master, collect results, save...
+        if( !solver ) solver.reset( new Solver(*this, service, nThreads) );
+        service.post( std::bind( &MomfbdJob::loadPatchResults, this, std::ref(service), nThreads) );
+
     } else {
         LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load() << ende;
         info.step.store( JSTEP_ERR );
@@ -468,11 +464,11 @@ void MomfbdJob::setLogChannel(std::string channel) {
 }
 
 
-void MomfbdJob::unloadData( boost::asio::io_service& service ) {
+void MomfbdJob::unloadCalib( boost::asio::io_service& service ) {
 
     for( shared_ptr<Object>& obj : objects ) {
         for( shared_ptr<Channel>& ch : obj->channels ) {
-            ch->unloadData();
+            ch->unloadCalib();
         }
     }
 
@@ -519,7 +515,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     }
 
     progWatch.setTarget( nTotalImages );
-    progWatch.setHandler( std::bind( &MomfbdJob::unloadData, this, std::ref(service)) );
+    progWatch.setHandler( std::bind( &MomfbdJob::unloadCalib, this, std::ref(service)) );
 
 //    progWatch.setTicker([this](){
 //        cout << "Tick: "  << progWatch.progressString() << endl;
@@ -650,150 +646,100 @@ void MomfbdJob::clearPatches(void) {
 }
 
  
-void MomfbdJob::verifyPatches( boost::asio::io_service& service, uint16_t nThreads ) {
+void MomfbdJob::verifyPatches( void ) {
 
-    //LOG << "Verifying patches for job #" << info.id << ende;
-info.step = JSTEP_POSTPROCESS;
+info.step = JSTEP_VERIFIED;
 return;
-    if( !solver ) {
-        //LOG_TRACE << "Initializing new Solver for job #" << info.id << ende;
-        solver.reset( new Solver(*this, service, nThreads) );            // Initialize, allocations, etc.
-        solver->init();
-    }
 
-    unsigned int nPatchesX = patches.dimSize(1);
-    unsigned int nPatchesY = patches.dimSize(0);
+    int nPatchesX = patches.dimSize(1);
+    int nPatchesY = patches.dimSize(0);
+    int nFailedPatches(0);
 
-    cout << "verifyPatches  " << __LINE__ << "  nPatchesX=" << nPatchesX << "  nPatchesY=" << nPatchesY << endl;
-    //progWatch.increaseTarget( nPatchesX*nPatchesY );
-
-    for( unsigned int y=0; y<nPatchesY; ++y ) {
-        for( unsigned int x=0; x<nPatchesX; ++x ) {
+    size_t nModes = modeNumbers.size();
+    size_t nAlpha = nModes*nImages();
+    
+    unique_ptr<double[]> bestFit( new double[ nAlpha ] );
+    double* bPtr = bestFit.get();
+    unique_ptr<double[]> tmp( new double[ nAlpha ] );
+    double* tmpPtr = tmp.get();
+    unique_ptr<double[]> tmp2( new double[ nAlpha ] );
+    double* tmp2Ptr = tmp2.get();
+static int bla(1);    
+    for( int y=0; y<nPatchesY; ++y ) {
+        for( int x=0; x<nPatchesX; ++x ) {
     cout << "verifyPatches  " << __LINE__ << "  x=" << x << "  y=" << y << endl;
             PatchData::Ptr patch = patches(y,x);
+patch->dump( "ver"+to_string(bla) );
             patch->cacheLoad();
             patch->initPatch();
-            solver->loadInit( patch, solver->alpha );
-            //memset( solver->alpha, 0, solver->nParameters*sizeof(double) );
-            cout << __LINE__ << printArray(solver->alpha, 7,"  alpha1") << endl;
-            solver->shiftAndInit( solver->alpha, true );
-            cout << __LINE__ << printArray(solver->alpha, 7,"  alpha2") << endl;
-            solver->applyAlpha( solver->alpha );
-            double mm = solver->metric2();
-            //solver->dump( "vp_"+(string)patch->index );
-            //LOG << "Patch " << patch->index << "   metric = " << patch->finalMetric << ende;
-            cout << "Patch " << patch->index << "   metric = " << patch->finalMetric << "  mm= " << mm << endl;
-//                 for( auto& obj: objects ) {
-//                     for (auto& ch: obj->channels) {
-//                         service.post( [this,patch,obj,ch](){
-//                             auto chData = patch->objects[obj->ID]->channels[ch->ID];
-//                             //ch->adjustCutout( *chData, patch->roi );
-//                             //++progWatch;
-//                         } );
-//                         
-//                     }
-//                 }
-//            patches(y,x) = std::move(patch);
+            patch->loadAlpha( solver->alpha.get() );
+cout << printArray( solver->alpha.get(), 20, "alphaA" ) << endl;
+
+            solver->shiftAndInit( true );
+            solver->applyAlpha();
+            double origMetric = solver->metric();
+            
+            memset( bPtr, 0, nAlpha*sizeof(double) );
+            solver->shiftAndInit( bPtr, true );
+            solver->applyAlpha( bPtr );
+            double bestMetric = solver->metric();
+            /*int lastY = min(nPatchesY-1,y+1);
+            int lastX = min(nPatchesX-1,x+1);
+            for( int yy=max(0,y-1); yy<=lastY; ++yy ) {
+                for( int xx=max(0,x-1); xx<=lastX; ++xx ) {
+                    patches( yy, xx )->loadAlpha( tmpPtr );
+                    for( unsigned int m=0; m<nModes; ++m ) {
+                        memcpy( tmp2Ptr, bPtr, nAlpha*sizeof(double) );
+                        for( unsigned int a=m; a<nAlpha; a+=nModes ) {
+                            tmp2Ptr[a] = tmpPtr[a];
+                        }
+                        solver->shiftAndInit( tmp2Ptr, true );
+                        solver->applyAlpha( tmp2Ptr );
+                        double thisMetric = solver->metric();
+                        if( thisMetric < bestMetric ){
+cout << __LINE__ << "  Patch"<< patch->index << " mode: " << m << "  improved by (" << yy << "," << xx << ")" << endl;
+                            memcpy( bPtr, tmp2Ptr, nAlpha*sizeof(double) );
+                            bestMetric = thisMetric;
+                        }
+                    }
+                }
+            }*/
+            
+            if( bla /*bestMetric < origMetric*/ ) {
+cout << __LINE__ << "  Patch"<< patch->index << " metric improved: " << origMetric<< " -> " << bestMetric << endl;
+cout << printArray( solver->alpha.get(), 20, "alphaB" ) << endl;
+                patch->storeAlpha( solver->alpha.get() );
+                patch->step = JSTEP_QUEUED;
+                ++nFailedPatches;
+                bla = 0;
+            }
+
         }   // end nPatchesX
     }   // end nPatchesY
     
-
-    
-/*    progWatch.clear();
-    progWatch.set( objects.size() + (saveMask&SF_SAVE_METRIC) );
-
-    progWatch.setHandler( std::bind( &MomfbdJob::clearPatches, this) );
-    if( saveMask&SF_SAVE_METRIC ) {
-        service.post( [this](){
-            bfs::path fn = bfs::path(info.outputDir) / bfs::path(info.name+"_metrics.f0");
-            Array<float> metrics( patches.dimensions() );
-            for( auto& patch: patches ) {
-                metrics( patch->index.y, patch->index.x ) = patch->finalMetric; 
-            }
-            LOG << "Writing metrics to file: " << fn << ende;
-            Ana::write( fn.string(), metrics );
-            ++progWatch;
+    if( nFailedPatches > 0 ) {
+        LOG << "verifyPatches: " << nFailedPatches << " patches failed, returning them to queue with new initial values." << ende;
+        progWatch.set( patches.nElements() );
+        progWatch.setHandler([this](){
+            info.step = JSTEP_DONE;
+            updateProgressString();
         });
-
+        progWatch.step( patches.nElements()-nFailedPatches );
+        info.step = JSTEP_RUNNING;
+    } else {                                // All ok, proceed to post-processing step.
+        LOG_DETAIL << "verifyPatches: all ok." << ende;
+        info.step = JSTEP_POSTPROCESS;
     }
     
-    for( auto obj : objects ) {
-        service.post( [this,obj](){
-            obj->writeResults( patches );
-            ++progWatch;
-        });
-    }
+    updateProgressString();
     
-    
-            for( auto& part : wip->parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
-                logger.setContext( "job "+to_string(info.id)+":"+to_string(part->id) );
-                // Run main processing
-                auto data = static_pointer_cast<PatchData>(part);
-                data->initPatch();
-                solver->run( data );
-                //solver->run_new(static_pointer_cast<PatchData>(part));
-                wip->hasResults = true;
-            }
-
-    
-    
-    
-    
-    
-*/
-
-    info.step = JSTEP_POSTPROCESS;
-        
 }
 
 
 void MomfbdJob::writeOutput( boost::asio::io_service& service ) {
     
-    
     auto jlock = getLock();
-    
-    unsigned int nPatchesX = patches.dimSize(1);
-    unsigned int nPatchesY = patches.dimSize(0);
-    int nFailedPatches(0);
-    //progWatch.increaseTarget( nPatchesX*nPatchesY );
-static int dummy(0);
-    for( unsigned int y=0; y<nPatchesY; ++y ) {
-        for( unsigned int x=0; x<nPatchesX; ++x ) {
-            PatchData::Ptr patch = patches(y,x);
-            patch->cacheLoad();
-            if( dummy && y == 0 && x == 0 ) {
-                patch->step = JSTEP_QUEUED;
-                ++nFailedPatches;
-                dummy = 0;
-            }
-//                 for( auto& obj: objects ) {
-//                     for (auto& ch: obj->channels) {
-//                         service.post( [this,patch,obj,ch](){
-//                             auto chData = patch->objects[obj->ID]->channels[ch->ID];
-//                             //ch->adjustCutout( *chData, patch->roi );
-//                             //++progWatch;
-//                         } );
-//                         
-//                     }
-//                 }
-        }
-    }   // end nPatchesY
-
-    if( nFailedPatches > 0 ) {
-        LOG << "writeOutput: " << nFailedPatches << " patches failed, returning them to queue." << ende;
-        progWatch.set( patches.nElements() );
-//         progWatch.setTicker([this](){
-//             info.progressString = "(" + progWatch.progressString() + ")";
-//         });
-        progWatch.setHandler([this](){
-            info.step = JSTEP_POSTPROCESS;
-        });
-        progWatch.step( patches.nElements()-nFailedPatches );
-        info.step = JSTEP_RUNNING;
-        updateProgressString();
-        return;
-    }
-    
+    info.step = JSTEP_WRITING;
 
     progWatch.clear();
     progWatch.set( objects.size() );
@@ -823,11 +769,22 @@ static int dummy(0);
 }
 
 
+void MomfbdJob::loadPatchResults( boost::asio::io_service& service, uint16_t nThreads ) {
+
+    for( auto& patch: patches ) {
+        service.post( [this,patch](){
+            patch->cacheLoad(false); //true);        // load and erase cache-file.
+            ++progWatch;
+        });
+    }
+    
+}
+
+
 void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
     LOG_DEBUG << "MomfbdJob::postProcess()" << ende;
-    info.progress[0] = 0;
-    info.progress[1] = objects.size();
+ 
 
     progWatch.set( patches.nElements() );
     progWatch.setHandler( std::bind( &MomfbdJob::writeOutput, this, std::ref(service)) );
@@ -863,8 +820,6 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads
 // 
 //     });
 
-    info.step = JSTEP_WRITING;
-
     for( auto& patch: patches ) {
         service.post( [this,patch](){
             patch->cacheLoad(false); //true);        // load and erase cache-file.
@@ -889,6 +844,7 @@ void MomfbdJob::updateProgressString(void) {
     //return;
     switch( info.step ) {
         case JSTEP_PREPROCESS:  info.progressString = "P"; break; //"(P:" + progWatch.progressString() + ")"; break;
+        case JSTEP_VERIFY:      info.progressString = "V"; break;
         case JSTEP_POSTPROCESS: ;
         case JSTEP_WRITING:     info.progressString = "(W:"; break;// + progWatch.progressString() + ")"; break;
         case JSTEP_QUEUED:      info.progressString = "Q"; break;
@@ -920,6 +876,7 @@ bool MomfbdJob::check(void) {
         case JSTEP_NONE:        ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;
         case JSTEP_SUBMIT:      ret = checkData();  if(ret) info.step = JSTEP_CHECKED; break;
         case JSTEP_RUNNING:     ret = true; checkParts(); break;    // this check should find orphan parts etc.
+        case JSTEP_VERIFY:      return false;
 //         case JSTEP_PREPROCESS:  return checkPre();
 //         case JSTEP_WRITING:     return checkWriting();
 //         case JSTEP_CHECKED: ;                  // no checks at these steps, just fall through and return true
@@ -957,8 +914,7 @@ bool MomfbdJob::checkCfg(void) {
 
 bool MomfbdJob::checkData(void) {
     
-    info.progress[1] = 0;
-    for( auto& obj: objects ) {
+    for( shared_ptr<Object>& obj: objects ) {
         if( !obj->checkData() ) return false;
     }
     

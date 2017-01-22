@@ -78,7 +78,9 @@ Object::Object (MomfbdJob& j, uint16_t id) : ObjectCfg(j), myJob(j), logger(j.lo
 
 
 Object::~Object() {
+
     cleanup();
+
 }
 
 
@@ -173,10 +175,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian) {
 
 
 void Object::cleanup(void) {
-    
-    for( auto &c: channels ) {
-        c->cleanup();
-    }
+
     channels.clear();
     ftSum.clear();
     Q.clear();
@@ -187,7 +186,7 @@ void Object::cleanup(void) {
     fittedPlane.clear();
     pupil.clear();
     modes.clear();
-    
+
 }
 
 
@@ -198,7 +197,7 @@ uint32_t Object::nImages(void) const {
 }
 
 
-void Object::initProcessing( const Solver& ws ) {
+void Object::initProcessing( Solver& ws ) {
 
     if( patchSize && pupilPixels ) {
         P.resize(2*pupilPixels,2*pupilPixels);
@@ -254,7 +253,7 @@ void Object::initProcessing( const Solver& ws ) {
 }
 
 
-void Object::initPatch( ObjectData& od ) {
+void Object::initPatch( void ) {
     unique_lock<mutex> lock (mtx);
     reg_gamma = 0;
     ftSum.zero();
@@ -280,9 +279,9 @@ void Object::getResults(ObjectData& od, double* alpha) {
         for (auto& im : ch->subImages) {
             im->restore( aoPtr, dPtr );
             avgNoiseVariance += sqr(im->stats.noise);
-            avgShift += im->imageOffset;
-            shifts(imgIndex,0) = im->imageOffset.x;
-            shifts(imgIndex++,1) = im->imageOffset.y;
+            avgShift += im->imageShift;
+            shifts(imgIndex,0) = im->imageShift.x;
+            shifts(imgIndex++,1) = im->imageShift.y;
         }
     }
     avgObjFT.conj();    // This is because we re recycling addPQ in SubImage.restore(),
@@ -407,18 +406,8 @@ void Object::getResults(ObjectData& od, double* alpha) {
     // Mode coefficients
     if( saveMask & SF_SAVE_ALPHA ) {
         if( nObjectImages  ) {
-            size_t nModes = myJob.modeNumbers.size();
-            od.alpha.resize(nObjectImages, myJob.modeNumbers.size());
-            od.alpha.zero();
-            double* alphaPtr = alpha;
-            float* alphaOutPtr = od.alpha.get();
-            for( auto& ch: channels ) {
-                for ( auto& si: ch->subImages ) {
-                    si->addAlphaOffsets(alphaPtr, alphaOutPtr);
-                    alphaPtr += nModes;
-                    alphaOutPtr += nModes;
-                }
-            }
+            od.alpha.resize( nObjectImages, myJob.modeNumbers.size() );
+            od.alpha.copyFrom<double>(alpha);
         } else {
             od.alpha.clear();
         }
@@ -604,9 +593,9 @@ void Object::calcMetric (void) {
     for (auto & ind : pupil.otfSupport) {
         currentMetric += (ftsPtr[ind] - norm (pPtr[ind]) / qPtr[ind]);
     }
-//cout << "\nnSupp:" << pupil.otfSupport.size() << endl;
+
     currentMetric /= (patchSize*patchSize);
-//cout << "y:" << currentMetric << flush;
+
 }
 
 
@@ -702,7 +691,7 @@ bool Object::checkData (void) {
         }
     }
 
-    for (auto& ch : channels) {
+    for( shared_ptr<Channel>& ch: channels) {
         if (!ch->checkData()) return false;
     }
     
@@ -865,6 +854,7 @@ void Object::reInitialize( boost::asio::io_service& service, bool doReset ) {
     progWatch.clear();
     if( imgShifted ) {
         fitAvgPlane();
+        if( doReset ) initPatch();
         for( const shared_ptr<Channel>& c: channels ) {
             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
                 service.post( [this,im,doReset](){
@@ -892,11 +882,10 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
     loadInit( service, patches );
     progWatch.setTicker(nullptr);
 //     progWatch.setTicker([&](){
-//         cout << "Object::loadData()  otick: " << progWatch.progressString() << endl;
+//         LOG_WARN << "Object" << to_string(ID) << ")::loadData()  otick: " << progWatch.dump() << ende;
 //     });
 
     progWatch.setHandler([this,&service,&patches](){        // this will be triggered after all images in this object are loaded/pre-processed
-//cout << "Object::loadData()  progWatch triggered." << endl;
         objMaxMean = std::numeric_limits<double>::lowest();
         for (auto& ch : channels) {
             objMaxMean = std::max(objMaxMean,ch->getMaxMean());
@@ -908,7 +897,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
         LOG_DEBUG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     });
     
-    for( auto& ch: channels ) {
+    for( shared_ptr<Channel>& ch: channels ) {
         ch->loadData( service, patches );
     }
  
@@ -1365,7 +1354,8 @@ Point16 Object::getImageSize (void) {
 
 
 void Object::dump (std::string tag) {
-    tag += "_o"+to_string(ID);
+    
+    tag += "_"+to_string(ID);
 
     Ana::write (tag + "_ftsum.f0", ftSum);
     Ana::write (tag + "_q.f0", Q);

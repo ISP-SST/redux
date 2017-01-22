@@ -45,9 +45,9 @@ namespace redux {
             
             /********* Input *********/
             redux::util::Array<float> images;                           //!< Image stack for this channel.
-            redux::util::RegionI cutout;                                //!< Coordinates of the cutout region.
+            redux::util::RegionI cutout;                                //!< Coordinates of the cutout region. (size is usually patchSize+2*maxLocalShift, but might be constrained by edges)
             redux::util::PointI channelOffset;                          //!< The displacement of this channel relative to the reference channel.
-            redux::util::PointI offset;                                 //!< Local offset, i.e. where in the "block" we cut out the subimage for processing.
+            redux::util::PointI patchStart;                             //!< Local offset, i.e. where in the cutout we cut out the subimage for processing.
             redux::util::PointF residualOffset;                         //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
             /*************************/
             
@@ -135,6 +135,12 @@ namespace redux {
             bool operator==(const PatchData&);
             const PatchData& operator=(const PatchData&);
             
+            template <typename T>
+            void loadAlpha( T* a ) const {
+            }
+            template <typename T>
+            void storeAlpha( T* a ) {
+            }
             void copyResults( const PatchData& rhs );
             void dump( std::string );
             

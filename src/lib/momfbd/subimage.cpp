@@ -55,7 +55,7 @@ namespace {
 }
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind)
-    : imgSize(0), pupilSize(0), nModes(0), oldRG(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
+    : imgSize(0), pupilSize(0), nModes(0), oldRG(0), grad_step(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
       window (wind), noiseWindow(nwind), shifted(false) {
 
 #ifdef USE_LUT
@@ -68,12 +68,12 @@ SubImage::~SubImage (void) {
 }
 
 
-void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointF& resOffs, uint16_t patchSize, uint16_t pupSz, uint16_t nM ) {
+void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOffs, uint16_t patchSize, uint16_t pupSz, uint16_t nM ) {
 
     index = i;
-    channelOffset = offs;
+    initialOffset = pos;
     channelResidualOffset = resOffs;
-    imageOffset = 0;
+    imageShift = 0;
     adjustedTilts = 0;
     
     if( patchSize != imgSize ) {
@@ -95,11 +95,13 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& offs, const PointF& resOf
     }
     
     nModes = nM;
-    
+    localAlpha.assign( nM, 0.0 );
+    grad_step = object.myJob.graddiff_step * object.wavelength;
+
 }
 
 
-void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s ) const {
+void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s, bool rescaled ) const {
     
     if( img.dimSize(0) < imgSize || img.dimSize(1) < imgSize  ) {
         string msg = "SubImage::getWindowedImg: Output container is smaller than image! " +
@@ -116,19 +118,35 @@ void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s ) const {
     size_t nEl = img.nElements();
     s.getStats( img.get(), nEl, ST_VALUES );
     double avg = s.mean;
+    double newAvg(0);
     double* imgPtr = img.get();
     const double* winPtr = window.get();
     if( object.fittedPlane.nElements() == nEl ) {
         const float* planePtr = object.fittedPlane.get();
         for( size_t i=0; i<nEl; ++i) {
             // Note: mean(plane) = 0, so subtracting it will not affect the mean value.
-            imgPtr[i] = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
+//            imgPtr[i] = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
+            double tmp = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
+            newAvg += tmp;
+            imgPtr[i] = tmp;
         }
     } else {
         transform(imgPtr, imgPtr+nEl, window.get(), imgPtr,
-                [avg](const double& a, const double& b) { return (a-avg)*b+avg; }
-                );
+                [avg,&newAvg](const double& a, const double& b) {
+//                    return (a-avg)*b+avg;
+                    double tmp = (a-avg)*b+avg;
+                    newAvg += tmp;
+                    return tmp;
+                    
+                });
     }
+    newAvg /= nEl;
+    if( rescaled ) {
+        avg = object.objMaxMean;
+    } /*else {
+        avg = 1.0/newAvg;
+        s.mean = newAvg;
+    }*/
     s.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
     
     transpose( img.get(), imgSize, imgSize );                      // to match MvN
@@ -144,7 +162,7 @@ void SubImage::initialize( bool doReset ) {
         memcpy( Solver::tmp.FT.get(), imgFT.get(), imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
     }
     
-    getWindowedImg( Solver::tmp.D, stats );
+    getWindowedImg( Solver::tmp.D, stats, false );
     double* imgPtr = Solver::tmp.D.get();
     
     size_t noiseSize = noiseWindow.dimSize(0);
@@ -173,7 +191,7 @@ void SubImage::initialize( bool doReset ) {
         stats.noise *= channel.noiseFudge;
         double rg = stats.noise/stats.stddev;
         msg += " noise=" + to_string (stats.noise) + " rg=" + to_string(rg);
-        msg += "  initial shift=" + (string)imageOffset;
+        msg += "  initial shift=" + (string)imageShift;
         LOG_TRACE << msg << ende;
         object.addRegGamma( rg );
     }
@@ -245,7 +263,7 @@ void SubImage::restore( complex_t* obj, double* obj_norm ) const {
 }
 
 
-double SubImage::metricChange(const complex_t* newOTF) const {
+double SubImage::metricChange( const complex_t* newOTF ) const {
 
     const complex_t* oldOTF = OTF.get();
     const complex_t* p = object.P.get();
@@ -265,35 +283,75 @@ double SubImage::metricChange(const complex_t* newOTF) const {
 }
 
 
-double SubImage::gradientFiniteDifference( uint16_t modeIndex, double step ) {
+double SubImage::gradientFiniteDifference( uint16_t modeIndex ) {
 
+    if( object.weight == 0 ) return 0;
+        
     complex_t* otfPtr = Solver::tmp.C.get();
     double* phiPtr = Solver::tmp.D.get();
     memcpy( phiPtr, phi.get(), pupilSize2*sizeof(double) );
-    addToPhi( phiPtr, modes.modePointers[modeIndex], step );
+    addToPhi( phiPtr, modes.modePointers[modeIndex], grad_step );
     calcOTF( otfPtr, phiPtr );
-    return metricChange( otfPtr )/step;
+    return metricChange( otfPtr )/grad_step*object.weight;
     
 }
 
 
-double SubImage::gradientVogel(uint16_t modeIndex, double ) const {
-//cout << "G" << flush;
+void SubImage::gradientFiniteDifference2( double* agrad, const bool* enabledModes ) {
+
+    if( object.weight == 0 ) return;
+    
+    complex_t* otfPtr = Solver::tmp.C.get();
+    double* phiPtr = Solver::tmp.D.get();
+    for( uint16_t m=0; m<nModes; ++m ) {
+        if( enabledModes[m] ) {
+            memcpy( phiPtr, phi.get(), pupilSize2*sizeof(double) );
+            addToPhi( phiPtr, modes.modePointers[m], grad_step );
+            calcOTF( otfPtr, phiPtr );
+            agrad[m] += metricChange( otfPtr )/grad_step*object.weight;
+        }
+    }
+}
+
+
+double SubImage::gradientVogel(uint16_t modeIndex ) {
+
+    if( object.weight == 0 ) return 0;
+    
     double ret = 0;
     const double* modePtr = modes.modePointers[modeIndex];
     const double* vogPtr = vogel.get();
     double scale = -2.0 * object.pupil.area / otfSize2;
-    for (auto & ind : object.pupil.pupilSupport) {
+    for( auto & ind : object.pupil.pupilSupport ) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }
     
-    return ret;
+    return ret*object.weight;
     
 }
 
 
+void SubImage::gradientVogel2( double* agrad, const bool* enabledModes ) {
+
+    if( object.weight == 0 ) return;
+    
+    const double* vogPtr = vogel.get();
+    double scale = -2.0 * object.pupil.area / otfSize2 * object.weight;
+    for( uint16_t m=0; m<nModes; ++m ) {
+        if( enabledModes[m] ) {
+            const double* modePtr = modes.modePointers[m];
+            double tmp(0);
+            for( auto & ind : object.pupil.pupilSupport ) {
+                tmp += vogPtr[ind] * modePtr[ind];
+            }
+            agrad[m] += tmp*scale;
+        }
+    }
+}
+
+
 void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
-//cout << "imID: " << index << " - " << threadStorage.print() << endl;
+
 #ifdef DEBUG_
     LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size() << ende;
 #endif
@@ -338,16 +396,55 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
 }
 
 
+void SubImage::calcVogelWeight( void ) {
+    calcVogelWeight( object.PQ.get(), object.PS.get(), object.QS.get() );
+}
+
+
 void SubImage::resetPhi(void) {
     //memset(phi.get(), 0, pupilSize2*sizeof (double));    // FIXME: use phi_fixed
     memcpy( phi.get(), channel.phi_fixed.get(), channel.phi_fixed.nElements()*sizeof (double));
 }
 
-#include <iomanip>      // std::setiosflags, std::resetiosflags
 
-bool SubImage::adjustOffset( double* alpha ) {
+void SubImage::alignAgainst( const Ptr& refIm ) {
 
-    PointI oldOffset = imageOffset;
+    if( !refIm ) {
+        return;
+    }
+    const complex_t* ftPtr = imgFT.get();
+    const complex_t* refPtr = refIm->imgFT.get();
+    complex_t* tmpPtr = Solver::tmp.FT.get();
+    std::transform( ftPtr, ftPtr+imgFT.nElements(), refPtr, tmpPtr,
+        []( const complex_t& a, const complex_t& b ){
+            return b*std::conj(a);
+    });
+    FourierTransform::reorder( Solver::tmp.FT );
+    Solver::tmp.FT.getIFT( Solver::tmp.D.get() );
+    FourierTransform::reorder( Solver::tmp.D.get(), imgSize, imgSize );
+    
+    auto arr = reshapeArray( Solver::tmp.D.get(), imgSize, imgSize );
+    double** arrPtr = arr.get();
+    int mid = imgSize/2;
+    imageShift = 0;
+    double maxVal = arrPtr[mid][mid];
+    for( int x=-19; x<20; ++x ) {
+        for( int y=-19; y<20; ++y ) {
+            if( arrPtr[mid+y][mid+x] > maxVal ) {
+                maxVal = arrPtr[mid+y][mid+x];
+                imageShift.x = x;
+                imageShift.y = y;
+            }
+        }
+    }
+    
+}
+
+            
+template <typename T>
+bool SubImage::adjustShifts( const T* alpha ) {
+
+    PointI oldShift = imageShift;
     PointD oldVal(0,0),newVal(0,0);
     bool ret(false);
     
@@ -355,13 +452,12 @@ bool SubImage::adjustOffset( double* alpha ) {
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.y;
         double alphaToShift = 1.0/shiftToAlpha;
-        newVal.x = oldVal.x = alpha[mIndex]; // + channelResidualOffset.x;
+        newVal.x = oldVal.x = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.x;
         int adjust = -lround( oldVal.x*alphaToShift );
         if( adjust && (adjust = shift(1/*FIXME 2*/,adjust)) ) {    // will return the "actual" shift. (the cube-edge might restrict it)
-            imageOffset.x += adjust;
-            alpha[mIndex] += adjust*shiftToAlpha;
-            adjustedTilts.x += adjust*shiftToAlpha;
-            newVal.x = alpha[mIndex];
+            imageShift.x += adjust;
+            localAlpha[mIndex] += adjust*shiftToAlpha;
+            newVal.x += adjust*shiftToAlpha;
         }
     }
 
@@ -369,92 +465,91 @@ bool SubImage::adjustOffset( double* alpha ) {
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.x;
         double alphaToShift = 1.0/shiftToAlpha;
-        newVal.y = oldVal.y = alpha[mIndex]; // + channelResidualOffset.y;
+        newVal.y = oldVal.y = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.y;
         int adjust = -lround( oldVal.y*alphaToShift );
         if( adjust && (adjust = shift(2/*FIXME 1*/,adjust)) ) {        // will return the "actual" shift. (the cube-edge might restrict it)
-            imageOffset.y += adjust;
-            alpha[mIndex] += adjust*shiftToAlpha;
-            adjustedTilts.y += adjust*shiftToAlpha;
-            newVal.y = alpha[mIndex];
+            imageShift.y += adjust;
+            localAlpha[mIndex] += adjust*shiftToAlpha;
+            newVal.y += adjust*shiftToAlpha;
         }
     }
 
-    if( oldOffset != imageOffset ) {
+    if( oldShift != imageShift ) {
         //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << "   tiltMode=" << object.modes.tiltMode << printArray(alpha,2,"  tilts") << ende;
         LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
-                   << ":  cutout was shifted, from " << oldOffset << " to " << imageOffset
-                   << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << "  adj=" << adjustedTilts << ende;
+                  << ":  cutout was shifted, from " << oldShift << " to " << imageShift
+                  << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << ende;
         //newCutout();
         ret = shifted = true;
         //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast") << ende;
+//LOG << printArray(localAlpha,"newLocalAlpha") << ende;
     }
     return ret;
 }
+template bool SubImage::adjustShifts( const double* );
+template bool SubImage::adjustShifts( const float* );
 
 
-void SubImage::addAlphaOffsets(double* alphas, float* alphaOut) const {
+void SubImage::resetShifts( void ) {
     
-    std::copy( alphas, alphas+nModes, alphaOut );
-    //return;
-    PointD oldVals,newVals;
+    shift( 2/*FIXME 1*/, -imageShift.y );
+    shift( 1/*FIXME 2*/, -imageShift.x );
+    imageShift = 0;
     int32_t mIndex = object.modes.tiltMode.x;
-    //if( mIndex >= 0 && offsetShift.x ) {
-    if( mIndex >= 0 && fabs(adjustedTilts.x)>0 ) {
-        oldVals.x = alphaOut[mIndex];
-        alphaOut[mIndex] -= adjustedTilts.x;
-        newVals.x = alphaOut[mIndex];
+    if( mIndex >= 0 ) {
+        localAlpha[mIndex] = 0;
     }
     
     mIndex = object.modes.tiltMode.y;
-    //if( mIndex >= 0 && offsetShift.y ) {
-    if( mIndex >= 0 && fabs(adjustedTilts.y)>0 ) {
-        oldVals.y = alphaOut[mIndex];
-        alphaOut[mIndex] -= adjustedTilts.y;
-        newVals.y = alphaOut[mIndex];
+    if( mIndex >= 0 ) {
+        localAlpha[mIndex] = 0;
     }
     
-    //    LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
-    //               << ":  addAlphaOffsets:   offsetShift = " << offsetShift << "  oldV = " << oldVals <<  "  newV = " << newVals << "  adj = " << adjustedTilts << ende;
 }
 
 
-void SubImage::addToPhi( double* phiPtr, const double* modePtr, double a ) const {
+void SubImage::addToPhi( double* phiPtr, const double* modePtr, double w ) const {
 
     transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
-              [a](const double& p, const double& m) {
-                  return p + a*m;
+              [w](const double& p, const double& m) {
+                  return p + w*m;
               });
 
 }
 
-
-void SubImage::addToPhi( const double* a, double* phiPtr ) const {
+template <typename T>
+void SubImage::addToPhi( const T* a, double* phiPtr ) const {
 
 #ifdef DEBUG_
     LOG_TRACE << "SubImage(" << object.ID << ":" << index << ")::addToPhi()" << printArray( a, nModes, "  newAlpha" ) << ende;
 #endif
 
     for( unsigned int i=0; i<nModes; ++i ) {
-        if( fabs(a[i]) > ALPHA_CUTOFF ) {
-            double scaledAlpha = a[i]; //*object.wavelength;
+        double alpha = a[i] + localAlpha[i];
+        if( fabs(alpha) > ALPHA_CUTOFF ) {
             const double* modePtr = modes.modePointers[i];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
-                [scaledAlpha](const double& p, const double& m) {
-                    return p + scaledAlpha*m;
+                [alpha](const double& p, const double& m) {
+                    return p + alpha*m;
                 });
         }
     }
 
 }
+template void SubImage::addToPhi( const double* a, double* phiPtr ) const;
+template void SubImage::addToPhi( const float* a, double* phiPtr ) const;
 
 
-void SubImage::calcPhi( const double* a, double* phiPtr ) const {
+template <typename T>
+void SubImage::calcPhi( const T* a, double* phiPtr ) const {
 
     memcpy( phiPtr, channel.phi_channel.get(), pupilSize2*sizeof(double) );
     //memset( phiPtr, 0, pupilSize2*sizeof(double) );    // FIXME: use phi_fixed
     addToPhi( a, phiPtr );
 
 }
+template void SubImage::calcPhi( const double* a, double* phiPtr ) const;
+template void SubImage::calcPhi( const float* a, double* phiPtr ) const;
 
 
 void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale) {
@@ -480,15 +575,15 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale)
 }
 
 
-void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
+void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
 
-    memset (otfPtr, 0, otfSize2*sizeof (complex_t));
+    memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
 
     const double* pupilPtr = object.pupil.get();
     double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
     //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
 
-    for (auto & ind : object.pupil.pupilInOTF) {
+    for( auto& ind : object.pupil.pupilInOTF ) {
 #ifdef USE_LUT
         otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
 #else
@@ -500,44 +595,6 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiPtr) {
     Solver::tmp.OTF.norm();
     Solver::tmp.OTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
-    //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
-
-    newPhi = false;
-    newOTF = true;
-
-}
-
-
-void SubImage::calcOTF(void) {
-    
-    //if( !newPhi ) return;
-   //     LOG_TRACE << "SubImage::calcOTF(" << hexString(this) << ")" << ende;
-    
-    complex_t* otfPtr = OTF.get();
-    const double* phiPtr = phi.get();
-
-    memset(otfPtr, 0, otfSize2*sizeof (complex_t));
-    
-    const double* pupilPtr = object.pupil.get();
-    double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-    //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
-    
-    for (auto & ind : object.pupil.pupilInOTF) {
-#ifdef USE_LUT
-        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
-#else
-        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
-#endif
-    }
-
-    Solver::tmp.OTF.ft(otfPtr);
-    Solver::tmp.OTF.norm();
-    Solver::tmp.OTF.getIFT(otfPtr);
-    FourierTransform::reorder(otfPtr, otfSize, otfSize);
-    //FourierTransform::autocorrelate(otfPtr, otfSize, otfSize);
-
-    newPhi = false;
-    newOTF = true;
 
 }
 
@@ -552,8 +609,8 @@ void SubImage::calcPFOTF(void) {
     complex_t* otfPtr = OTF.get();
     const double* phiPtr = phi.get();
 
-    memset (pfPtr, 0, pupilSize2*sizeof (complex_t));
-    memset (otfPtr, 0, otfSize2*sizeof (complex_t));
+    memset( pfPtr, 0, pupilSize2*sizeof(complex_t) );
+    memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
     
     const double* pupilPtr = object.pupil.get();
     double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
@@ -568,10 +625,10 @@ void SubImage::calcPFOTF(void) {
         otfPtr[ind.second] = normalization*pfPtr[ind.first];
     }
 
-    Solver::tmp.OTF.ft(otfPtr);
+    Solver::tmp.OTF.ft( otfPtr );
     Solver::tmp.OTF.norm();
-    Solver::tmp.OTF.getIFT(otfPtr);
-    FourierTransform::reorder(otfPtr, otfSize, otfSize);
+    Solver::tmp.OTF.getIFT( otfPtr );
+    FourierTransform::reorder( otfPtr, otfSize, otfSize );
     
 }
 
@@ -622,11 +679,12 @@ string SubImage::idString( void ) const {
 
 void SubImage::dump( std::string tag ) const {
 
+    tag += "_" + idString();
  //   cout << "    dumping image:  this=" << hexString(this) << " with tag=" << tag << endl;
  //   cout << "                  phiPtr=" << hexString(phi.get()) << endl;
     Array<double> img( imgSize, imgSize );
     ArrayStats s;
-    getWindowedImg(img,s);
+    getWindowedImg(img,s,true);
     Ana::write (tag + "_rimg.f0", *this);
     Ana::write (tag + "_img.f0", img);
     Ana::write (tag + "_phi.f0", phi);
@@ -636,6 +694,7 @@ void SubImage::dump( std::string tag ) const {
     Ana::write (tag + "_imgFT.f0", imgFT);
     Ana::write (tag + "_window.f0", window);
     Ana::write (tag + "_vogel.f0", vogel);
+    Ana::write (tag + "_alpha.f0", localAlpha);
     
 
 

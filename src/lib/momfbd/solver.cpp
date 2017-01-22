@@ -35,33 +35,8 @@ thread_local thread::TmpStorage Solver::tmp;
 namespace {
 
     grad_t gradientMethods[] = { nullptr,
-        std::bind(&SubImage::gradientFiniteDifference, sp::_1, sp::_2, sp::_3),
-        std::bind(&SubImage::gradientVogel, sp::_1, sp::_2, sp::_3)
-    };
-
-    struct sync_counter {
-        sync_counter() : counter(0) {}
-        atomic<int> counter;
-        mutex mtx;
-        condition_variable cv;
-        void reset(void) {
-            unique_lock<mutex> lck(mtx);
-            counter = 0;
-        }
-        void wait(void) {
-            unique_lock<mutex> lck(mtx);
-            while( counter > 0 ) cv.wait(lck);
-        }
-        sync_counter& operator--() {
-            unique_lock<mutex> lck(mtx);
-            if( --counter <= 0 ) cv.notify_all();
-            return *this;
-        }
-        sync_counter& operator++() {
-            unique_lock<mutex> lck(mtx);
-            counter++;
-            return *this;
-        }
+        std::bind(&SubImage::gradientFiniteDifference, sp::_1, sp::_2),
+        std::bind(&SubImage::gradientVogel, sp::_1, sp::_2)
     };
     
     
@@ -70,9 +45,10 @@ namespace {
 
 Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), myInfo( network::Host::myInfo() ),
     logger(j.logger), objects( j.getObjects() ), service(s), nThreads(t), nFreeParameters(0), nTotalImages(0),
-    modeNumbers(nullptr), enabledModes(nullptr),alpha(nullptr), alpha_offset(nullptr), grad_alpha(nullptr),
-    tmp_alpha(nullptr), beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr),
+    beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr),
     regAlphaWeights(nullptr) {
+
+    init();
 
 }
 
@@ -85,6 +61,8 @@ Solver::~Solver() {
 
 
 void Solver::init( void ) {
+    
+    LOG_TRACE << "Initializing Solver." << ende;
 
     clear();
 
@@ -109,13 +87,12 @@ void Solver::init( void ) {
     tmpPhiGrad.resize( nTotalImages, pupilSize, pupilSize );
     tmpOTF.resize( nTotalImages, 2*pupilSize, 2*pupilSize );
 
-    enabledModes = new uint16_t[nParameters];
-    modeNumbers = new uint16_t[nParameters];
-    
-    alpha = new double[nParameters];
-    grad_alpha = new double[nParameters];
-    alpha_offset = new double[nParameters];
-    tmp_alpha = new double[nParameters];
+    enabledModes.reset( new bool[nModes], [](bool* p){ delete[] p; } );
+
+    alpha.reset( new double[nParameters], [](double* p){ delete[] p; } );
+    alpha_offset.reset( new double[nParameters], [](double* p){ delete[] p; } );
+    grad_alpha.reset( new double[nParameters], [](double* p){ delete[] p; } );
+
     regAlphaWeights = new double[nParameters];
     
     beta = new double[nFreeParameters];
@@ -123,18 +100,13 @@ void Solver::init( void ) {
     search_dir = new double[nFreeParameters];
     tmp_beta = new double[nFreeParameters];
 
-    uint16_t* mPtr = modeNumbers;
-    for( size_t n=nTotalImages; n; n-- ) {
-        memcpy( mPtr, job.modeNumbers.data(), nModes*sizeof(uint16_t));
-        mPtr += nModes;
-    }
-
     max_wavelength = 0;
+    nTotalPixels = nTotalImages*patchSize*patchSize;
     double* raPtr = regAlphaWeights;
     for( auto & object : objects ) {
         object->initProcessing( *this );
         double scale = job.reg_alpha/object->wavelength;
-        scale *= nTotalImages*patchSize*patchSize;      // FIXME the other term in the metric should be normalized instead
+        scale *= nTotalPixels;      // FIXME the other term in the metric should be normalized instead
         for( size_t i=0; i<object->nImages(); ++i ) {
             transform(object->modes.atm_rms.begin(), object->modes.atm_rms.end(), raPtr,
                [scale](const float& a) { if(a==0) return 0.0; return scale/(a*a); } );
@@ -202,7 +174,7 @@ double Solver::my_f( const gsl_vector* beta, void* params ) {
 
     applyBeta( beta );
     
-    return metric2();
+    return metric();
 
 }
 
@@ -210,8 +182,8 @@ double Solver::my_f( const gsl_vector* beta, void* params ) {
 void Solver::my_df( const gsl_vector* beta, void* params, gsl_vector* df ) {
 
     applyBeta( beta );
-    calcPQ2();
-    gradient2( df );
+    calcPQ();
+    gradient( df );
 
 }
 
@@ -219,31 +191,31 @@ void Solver::my_df( const gsl_vector* beta, void* params, gsl_vector* df ) {
 void Solver::my_fdf( const gsl_vector* beta, void* params, double* f, gsl_vector* df ) {
     
     applyBeta( beta );
-    *f = metric2();
-    gradient2( df );
+    *f = metric();
+    gradient( df );
     
 }
 
 
 void Solver::my_precalc( const gsl_vector* beta, const gsl_vector* beta_grad ) {
     
-    sync_counter sc;
-    ++sc; service.post( [this, &sc] { tmpPhiGrad.zero(); --sc; } );
-    ++sc; service.post ([this, beta, &sc] { job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset, alpha ); --sc; });
-    ++sc; service.post ([this, beta_grad, &sc] { job.globalData->constraints.reverse( beta_grad->data, grad_alpha ); --sc; });
-    sc.wait();
+    progWatch.set(3);
+    service.post( [this] { tmpPhiGrad.zero(); ++progWatch; } );
+    service.post ([this, beta] { job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset.get(), alpha.get() ); ++progWatch; });
+    service.post ([this, beta_grad] { job.globalData->constraints.reverse( beta_grad->data, grad_alpha.get() ); ++progWatch; });
+    progWatch.wait();
 
     size_t nElements = pupilSize*pupilSize;
-    double* alphaPtr = alpha;
+    double* alphaPtr = alpha.get();
     double* phiPtr = tmpPhi.get();
+    progWatch.set( 2*nTotalImages );
     for( const auto& o: objects ) {
         //if( o->weight > 0 ) {
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im: c->getSubImages() ) {
-                    ++sc;
-                    service.post ([&im, alphaPtr, phiPtr, &sc] {    // use a lambda to ensure these calls are sequential
+                    service.post ([this,&im, alphaPtr, phiPtr] {    // use a lambda to ensure these calls are sequential
                         im->calcPhi( alphaPtr, phiPtr );
-                        --sc;
+                        ++progWatch;
                     });
                     alphaPtr += nModes;
                     phiPtr += nElements;
@@ -252,16 +224,15 @@ void Solver::my_precalc( const gsl_vector* beta, const gsl_vector* beta_grad ) {
         //}
     }
     
-    alphaPtr = grad_alpha;
+    alphaPtr = grad_alpha.get();
     phiPtr = tmpPhiGrad.get();
     for( const auto& o: objects ) {
         //if( o->weight > 0 ) {
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im: c->getSubImages() ) {
-                    ++sc;
-                    service.post ([&im, alphaPtr, phiPtr, &sc] {    // use a lambda to ensure these calls are sequential
+                    service.post ([this,&im, alphaPtr, phiPtr] {    // use a lambda to ensure these calls are sequential
                         im->addToPhi( alphaPtr, phiPtr );
-                        --sc;
+                        ++progWatch;
                     });
                     alphaPtr += nModes;
                     phiPtr += nElements;
@@ -269,27 +240,25 @@ void Solver::my_precalc( const gsl_vector* beta, const gsl_vector* beta_grad ) {
             }
         //}
     }
-    sc.wait();
-
+    progWatch.wait();
+    
 }
 
 
 double Solver::metricAt( double step ) {
-    
-    sync_counter sc;
     
     size_t pupilSize2 = pupilSize*pupilSize;
     size_t otfSize2 = 4*pupilSize2;
     complex_t* otfPtr = tmpOTF.get();
     double* phiPtr = tmpPhi.get();
     double* phiGradPtr = tmpPhiGrad.get();
+    progWatch.set( nTotalImages );
     for( const auto& o: objects ) {
         //if( o->weight > 0 ) {
             double normalization = sqrt(1.0 / (o->pupil.area*otfSize2));
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im: c->getSubImages() ) {
-                    ++sc;
-                    service.post( [&im, &o, normalization, step, otfPtr, phiPtr, phiGradPtr, &sc] {
+                    service.post( [this, &im, &o, normalization, step, otfPtr, phiPtr, phiGradPtr] {
                         const double* pupilPtr = o->pupil.get();
                         for( const auto& ind: o->pupil.pupilInOTF ) {
                             otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+step*phiGradPtr[ind.first]);
@@ -298,7 +267,7 @@ double Solver::metricAt( double step ) {
                         //im->tmpOTF.norm();
                         //im->tmpOTF.getIFT(im->OTF.get());
                         //FourierTransform::reorder( im->OTF.get(), im->OTF.dimSize(0), im->OTF.dimSize(1) );
-                        --sc;
+                        ++progWatch;
                     });
                     otfPtr += otfSize2;
                     phiPtr += pupilSize2;
@@ -307,32 +276,16 @@ double Solver::metricAt( double step ) {
             }
         //}
     }
-    sc.wait();
+    progWatch.wait();
 
-    for( const auto& o : objects ) {
-        //if( o->weight > 0 ) {
-            ++sc;
-            service.post( [o,&sc] {
-                o->initPQ();
-                o->addAllPQ();
-                o->calcMetric();
-                --sc;
-            } );
-        //}
-    }
-    sc.wait();
-    
-    double sum(0);
-    for( const auto& o : objects ) {
-        sum += o->metric();
-    }
-
-    return sum;
+    return metric();
     
 }
 
 
 void Solver::run( PatchData::Ptr data ) {
+    
+    zeroAlphas();
 
     LOG << "Starting patch.  index=" << data->index << "  region=" << data->roi
         << "  nModes=" << nModes << "  nThreads=" << nThreads << ende;
@@ -385,164 +338,24 @@ void Solver::run( PatchData::Ptr data ) {
     }
 
     gradientMethod = gradientMethods[job.gradientMethod];
-    gradientMethod = gradientMethods[GM_VOGEL];   // FIXME: old code just uses the cfg-setting the first iteration, then switches to Vogel.
     gradientMethod = gradientMethods[GM_DIFF];   // FIXME: old code just uses the cfg-setting the first iteration, then switches to Vogel.
     
     gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc( minimizerType, nFreeParameters );
 
     gsl_vector *beta_init = gsl_vector_alloc( nFreeParameters );
-    memset(beta_init->data,0,nFreeParameters*sizeof(double));
-    memset(alpha_offset,0,nParameters*sizeof(double));
-// for(uint i=0; i<nFreeParameters; ++i ) {
-//  if (i%nModes==2) alpha_offset[i] = -1.68e-06;
-// }
-//     for(uint i=0; i<nFreeParameters; ++i ) {
-//         beta_init->data[i] = 1;
-//         job.globalData->constraints.reverse( beta_init->data, alpha_offset );
-//         cout << i << printArray(alpha_offset, nParameters,"  alpha") << endl;
-//         memset(beta_init->data,0,nFreeParameters*sizeof(double));
-//         memset(alpha_offset,0,nParameters*sizeof(double));
-//     }
-//     
-//     for(uint i=0; i<nParameters; ++i ) {
-//         alpha_offset[i] = 1;
-//         job.globalData->constraints.apply( alpha_offset, beta_init->data );
-//         cout << i << printArray(beta_init->data, nFreeParameters,"  beta") << endl;
-//         memset(beta_init->data,0,nFreeParameters*sizeof(double));
-//         memset(alpha_offset,0,nParameters*sizeof(double));
-//     }
-
+    memset( beta_init->data, 0, nFreeParameters*sizeof(double) );
+    memset( alpha_offset.get(), 0, nParameters*sizeof(double) );
     memset(s->x->data,0,nFreeParameters*sizeof(double));
     memset(s->dx->data,0,nFreeParameters*sizeof(double));
     memset(s->gradient->data,0,nFreeParameters*sizeof(double));
+    memset( enabledModes.get(), 0, nModes );
     s->f = 0;
     
-
-/*
-cout << "nParameters: " << nParameters << "  nFreeParameters: " << nFreeParameters << endl;
-shared_ptr<Object> obj0 = *job.objects.begin();
-cout << "shiftToAlpha: " << obj0->shiftToAlpha << endl;
-
-Array<float> slaskinit;
-//readFile("/scratch/tomas/momfbdsol10_5.f0",slaskinit);
-
-memset(alpha,0,nParameters*sizeof(double));
-memset(enabledModes,1,nModes*sizeof(uint16_t));
-
-applyAlpha();
-calcPQ();
-gradient(beta_init);
-cout << printArray(grad_alpha, nModes, "grad0") << endl;
-
-//dump("init0");
-//  Array<double> wrap(grad_alpha,nParameters);
-//  Ana::write("grad1",wrap);
-//cout << printArray( grad_alpha, nParameters, "\ngrad1 " ) << endl;
-//cout << printArray( beta_init->data, nFreeParameters, "\ngrad_beta1 " ) << endl;
-job.globalData->constraints.reverse( beta_init->data, grad_alpha );
-//cout << printArray(grad_alpha, nParameters, "\ngrad2 ") << endl;
-//  Ana::write("grad2",wrap);
-double refm = metric();
-cout << "\nMetric0: " << refm << endl;
-
-readFile("/scratch/tomas/sol60r.f0",slaskinit);
-std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
-    [](const double& a, const float&b){
-    return b;
-});
-applyAlpha();
-cout << "\nMetricR: " << (metric()/refm) << endl;
-
-vector<float> testM,testMr,posm;
-for( double pos=-2.0; pos<2; pos += 0.1 ) {
-    std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
-        [pos](const double& a, const float&b){
-        return pos*b;
-        //return 0.5*b;
-        //return -b;
-    });
-    applyAlpha();
-    testMr.push_back(metric()/refm);
-    posm.push_back(pos);
-}
-
-
-
-readFile("/scratch/tomas/sol60m.f0",slaskinit);
-std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
-    [](const double& a, const float&b){
-    return -b;
-});
-applyAlpha();
-cout << "\nMetricM: " << (metric()/refm) << endl;
-
-for( double pos=-2.0; pos<2; pos += 0.1 ) {
-    std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
-        [pos](const double& a, const float&b){
-        return -pos*b;
-        //return 0.5*b;
-        //return -b;
-    });
-    applyAlpha();
-    testM.push_back(metric()/refm);
-
-}
-cout << printArray( testMr, "testMr" ) << endl;
-cout << printArray( testM, "testMm" ) << endl;
-cout << printArray( posm, "posm" ) << endl;
-cout << "plot,posm,testMm" << endl;
-cout << "oplot,posm,testMr" << endl;
-
-
-
-exit(0);
-
-
-
-std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha,
-    [](const double& a, const float&b){
-    return -0.5*b;
-    //return 0.5*b;
-    //return -b;
-});
-applyAlpha();
-calcPQ();
-gradient(beta_init);
-cout << printArray(grad_alpha, nModes, "gradh_diff") << endl;
-
-gradientMethod = gradientMethods[GM_VOGEL];
-gradient(beta_init);
-cout << printArray(grad_alpha, nModes, "gradh_vog") << endl;
-
-//alpha[0] = -1.81099e-07;
-//alpha[1] = 6*obj0->shiftToAlpha.x;
-//cout << printArray( alpha, 80, "alpha0" ) << endl;
-applyAlpha();
-dump("init1");
-cout << "\nMetric1: " << (metric()/refm) << endl;
-applyAlpha();
-cout << "\nMetric2: " << (metric()/refm) << endl;
-calcPQ();
-gradient(beta_init);
-dump("init2");
-//cout << printArray( grad_alpha, nParameters, "\ngrad3 " ) << endl;
-//  Ana::write("grad3",wrap);
-//cout << printArray( beta_init->data, nFreeParameters, "\ngrad_beta3 " ) << endl;
-job.globalData->constraints.reverse( beta_init->data, grad_alpha );
-//cout << printArray(grad_alpha, nParameters, "\ngrad4 ") << endl;
-//  Ana::write("grad4",wrap);
-memset(beta_init->data,0,nFreeParameters*sizeof(double));
-
-double slaskMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
-cout << "Initial metric = " << (std::scientific) << slaskMetric << endl;
-//return;
-exit(0);
-*/
 
     double previousMetric(0);
     double thisMetric(0);
     double gradNorm(0);
-    double* alphaPtr;
+    double* alphaPtr = alpha.get();
     double tol = 1.0E-1;
     size_t failCount(0);
     size_t totalIterations(0);
@@ -552,44 +365,28 @@ exit(0);
 
     timer.start();
     logger.flushAll();
-
-//    memset( alpha_offset, 0, nParameters*sizeof(double) );
     
-    
-    loadInit( data, alpha_offset );
-    
-    //initImages( alpha_offset );
-    shiftAndInit( alpha_offset, true );     // force initialization
+    loadInit( data, alpha_offset.get() );
+    shiftAndInit( alpha_offset.get(), true );     // force initialization
     
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
-    LOG << "Initial metric = " << initialMetric << ende;
+    LOG << "Patch" << (string)data->index << ":  Initial metric = " << initialMetric << ende;
 
-//cout << "Solver:  " << __LINE__ << endl;
-//    Array<double> wrapq(alpha_offset, nParameters);
-//    Ana::write( "patch_"+(string)data->index+"_ainit.f0", wrapq );
-//cout << "Solver:  " << __LINE__ << endl;
-/*Array<float> slaskinit;
-readFile("/scratch/tomas/sol60r.f0",slaskinit);
-std::transform(alpha,alpha+nParameters,slaskinit.get(),alpha_offset,
-    [](const double& a, const float&b){
-    return -b;
-});*/
+    double gradScale = 1.0/(nTotalPixels*nTotalPixels);
     
     string patchString = alignLeft(to_string(job.info.id) + ":" + to_string(data->id),8);
-//dump("init");
-gradientMethod = gradientMethods[GM_DIFF];
+
+
     for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
         
         modeCount = min<uint16_t>(modeCount,nModes);
         std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
         
         string progressString = boost::str( boost::format(" (%03.1f%%)") %
-        ((modeCount-min(job.nInitialModes,nModes))*100.0/nModes));
+                                ((modeCount-min(job.nInitialModes,nModes))*100.0/nModes));
         myInfo.status.statusString = patchString + progressString;
         
-        transform(modeNumbers,modeNumbers+nParameters,enabledModes,
-                  [&activeModes](const uint16_t& a){ return activeModes.count(a)?a:0; }
-                 );
+        std::fill( enabledModes.get(), enabledModes.get()+modeCount, true );
 
         if( modeCount == nModes ) {   // final loop, use proper FTOL and maxIterations
             modeCount = 0;            // we use modeCount=0 to exit the external loop
@@ -600,43 +397,27 @@ gradientMethod = gradientMethods[GM_DIFF];
             //failCount = 0;           // TODO: fix/test fail-reporting before using
         }
 
-//memset(enabledModes,1,nModes*sizeof(uint16_t));
-//gradientMethod = gradientMethods[GM_DIFF];
-//gradientMethod = gradientMethods[GM_VOGEL];
-//cout << printArray(alpha_offset,nParameters,"alpha_offset") << endl;
-//cout << printArray(enabledModes,nModes,"enabledModes") << endl;
-//memset(enabledModes,1,nModes*sizeof(uint16_t));
-//cout  << endl << "                                                                     Solver: " << __LINE__ << endl;
-//cout  << "GradMethods: " << hexString(gradientMethods[GM_DIFF].target<double(SubImage&, uint16_t, double)>()) <<
-//    "  " << hexString(gradientMethods[GM_VOGEL].target<double(SubImage&, uint16_t, double)>()) << endl;
-//cout  << "GradMethod: " << hexString(gradientMethod.target<double(SubImage&, uint16_t, double)>()) << endl;
         // The previous position is saved in in alpha_offset, beta only contains the new step, so start at 0 each iteration
         gsl_multimin_fdfminimizer_set( s, static_cast<gsl_multimin_function_fdf*>(&my_func), beta_init, init_step, init_tol );
-//cout << printArray(activeModes,"activeModes") << endl;
-//cout << "Iteration: " << totalIterations << printArray(grad_alpha, nModes, "\nstart_agrad") << endl;
-//cout  << endl << "                                                                     Solver: " << __LINE__ << endl;
-//exit(0);
-//gradientMethod = gradientMethods[GM_VOGEL];
+
         size_t iter = 0;
         int successCount(0);
         bool done(false);
-//GSL_MULTIMIN_FN_EVAL_DF( &my_func, beta_init, s->gradient );        
-#ifdef DEBUG_
-//        cout << "Iteration: " << totalIterations << "\nstart_metric = " << s->f
-//                       << printArray(alpha_offset, nParameters, "\nalpha_offset")
-//                       << printArray(alpha, nParameters, "\nstart_alpha")
-//                       << printArray(grad_alpha, nParameters, "\nstart_agrad")
-//                       << printArray(s->gradient->data, nFreeParameters, "\nstart_bgrad") << endl;
-        Array<double> gwrapper(grad_alpha, nTotalImages, nModes);
+      
+#ifdef MASSIVE_DEBUG_
+       cout << "Iteration: " << totalIterations << "\nstart_metric = " << s->f
+            << printArray(alpha_offset.get(), nParameters, "\nalpha_offset")
+            << printArray(alpha.get(), nParameters, "\nstart_alpha")
+            << printArray(grad_alpha.get(), nParameters, "\nstart_agrad")
+            << printArray(s->gradient->data, nFreeParameters, "\nstart_bgrad") << endl;
+        Array<double> gwrapper(grad_alpha.get(), nTotalImages, nModes);
         Ana::write("grad_alpha_"+to_string(totalIterations)+".f0",gwrapper);
-        //dump("iter_"+to_string(totalIterations));
+        dump("iter_"+to_string(totalIterations));
         job.globalData->constraints.reverse( s->gradient->data, grad_alpha );
         Ana::write("grad_alphac_"+to_string(totalIterations)+".f0",gwrapper);
-//        cout << printArray(grad_alpha, nParameters, "\nreversed_agrad") << endl;
-//sleep(1);
-//exit(0);
+        cout << printArray(grad_alpha.get(), nParameters, "\nreversed_agrad") << endl;
 #endif
-//cout << "                                                                     Solver: " << __LINE__ << endl;
+
         do {
             iter++;
             status = gsl_multimin_fdfminimizer_iterate( s );
@@ -645,10 +426,10 @@ gradientMethod = gradientMethods[GM_DIFF];
                 status = GSL_FAILURE;
                 modeCount = 0;                  // exit outer loop.
                 done = true;                    // exit inner loop.
-                //dump("fail");
-                //exit(0);
             }
-gradientMethod = gradientMethods[GM_VOGEL];
+            
+            gradientMethod = gradientMethods[GM_VOGEL];   // FIXME: old code just uses the cfg-setting the first iteration, then switches to Vogel.
+            
             if( status == GSL_ENOPROG ) {
                 LOG_TRACE << "iteration: " << (totalIterations+iter) << "  GSL reports no progress." << ende;
                 failCount++;
@@ -665,11 +446,6 @@ gradientMethod = gradientMethods[GM_VOGEL];
             gradNorm = gsl_blas_dnrm2(s->gradient)/thisMetric;
             if( !isfinite(gradNorm) ) {
                 LOG_WARN << "Error in iteration " << (totalIterations+iter) << ". Gradient is not finite." << ende;
-//                 LOG_ERR << "Gradient is infinite (or NaN) for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")" << ende;
-//                 status = GSL_FAILURE;
-//                 modeCount = 0;                  // exit outer loop.
-//                 done = true;                    // exit inner loop.
-//                dump("gradfail_"+to_string(failCount));
                 failCount++;
                 break;
             }
@@ -697,33 +473,28 @@ gradientMethod = gradientMethods[GM_VOGEL];
             size_t nActiveModes = activeModes.size();
             if( modeCount ) {
                 if( nActiveModes )  gradNorm /= nActiveModes;
-                LOG_DETAIL << "After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
+                LOG_DETAIL << "Patch" << (string)data->index << ":  After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
                  << "  metric=" << thisMetric << "  rmetric=" << (thisMetric/initialMetric)
                  << " norm(grad)=" << gradNorm << " using " << nActiveModes << "/" << nModes << " modes." << ende;
             }
         }
 
         if( modeCount ) {
-            shiftAndInit( alpha );
-            memcpy( alpha_offset, alpha, nParameters*sizeof(double) );
+            shiftAndInit();
+            memcpy( alpha_offset.get(), alpha.get(), nParameters*sizeof(double) );          // store current solution
         }
     }       // end for-loop
     
-    //dump("final");
-    //double finalMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
-    //LOG << "Final metric = " << finalMetric << ende;
-  
-//cout << "                                                                     Solver: " << __LINE__ << endl;
-    LOG << "After " << totalIterations << " iterations:  metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
+    LOG << "Patch" << (string)data->index << ":  After " << totalIterations << " iterations:  metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
     LOG << timer.print() << ende;
     myInfo.status.statusString = patchString + " completed";
     
 
 #ifdef RDX_DUMP_PATCHDATA
     dump( "patch_"+(string)data->index );
-    data->dump( "final" );      // will dump images
 #endif
-    alphaPtr = alpha;
+    
+    alphaPtr = alpha.get();
     for( auto& objData: data->objects ) {
         if(!objData) continue;
         for( auto& cd: objData->channels ) {
@@ -751,13 +522,13 @@ gradientMethod = gradientMethods[GM_VOGEL];
         // TODO throw e.g. "part_fail" or just flag it ??
     }
 
-//cout << "                                                                     Solver: " << __LINE__ << endl;
 }
 
 
-void Solver::shiftAndInit( double* a, bool doReset ) {
+template <typename T>
+void Solver::shiftAndInit( const T* a, bool doReset ) {
     
-    job.progWatch.set( job.nImages() );
+    job.progWatch.set( nTotalImages );
     for( const auto& o: job.objects ) {
         o->progWatch.clear();
         o->imgShifted = static_cast<int>( doReset );  // force re-initialization if reset is passed
@@ -766,7 +537,7 @@ void Solver::shiftAndInit( double* a, bool doReset ) {
         for( const auto& c: o->channels ) {
             for( const auto& im: c->getSubImages() ) {
                 service.post( [&,a](){
-                    o->imgShifted.fetch_or(im->adjustOffset(a));
+                    o->imgShifted.fetch_or(im->adjustShifts(a));
                     ++o->progWatch;
                 } );
                 a += nModes;
@@ -777,9 +548,41 @@ void Solver::shiftAndInit( double* a, bool doReset ) {
     job.progWatch.wait();
 
 }
+template void Solver::shiftAndInit( const double*, bool );
+template void Solver::shiftAndInit( const float*, bool );
 
 
-void Solver::applyAlpha( double* a ) {
+void Solver::alignWavefronts( void ) {
+
+    progWatch.set( nTotalImages );
+    for( const auto& o: objects ) {
+        for( const auto& c: o->getChannels() ) {
+            shared_ptr<SubImage> refIm;
+            for( const auto& im: c->getSubImages() ) {
+                service.post ([&im,refIm,this] {    // use a lambda to ensure these calls are sequential
+                    im->alignAgainst( refIm );
+                    ++progWatch;
+                });
+                refIm = im;
+            }
+        }
+    }
+    progWatch.wait();
+
+}
+
+
+void Solver::zeroAlphas( void ) {
+    
+    memset( alpha.get(), 0, nParameters*sizeof(double) );
+    memset( grad_alpha.get(), 0, nParameters*sizeof(double) );
+    memset( alpha_offset.get(), 0, nParameters*sizeof(double) );
+
+}
+
+
+template <typename T> 
+void Solver::applyAlpha( T* a ) {
 
     progWatch.set( nTotalImages );
     for( const auto& o: objects ) {
@@ -797,11 +600,13 @@ void Solver::applyAlpha( double* a ) {
     progWatch.wait();
 
 }
+template void Solver::applyAlpha( double* a );
+template void Solver::applyAlpha( float* a );
 
 
 void Solver::applyBeta( const gsl_vector* beta ) {
 
-    job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset, alpha );
+    job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset.get(), alpha.get() );
     applyAlpha();
 
 }
@@ -809,7 +614,7 @@ void Solver::applyBeta( const gsl_vector* beta ) {
 
 void Solver::applyBeta( const gsl_vector* beta, double scale ) {
 
-    job.globalData->constraints.reverse( beta->data, alpha, scale );
+    job.globalData->constraints.reverse( beta->data, alpha.get(), scale );
     applyAlpha();
 
 }
@@ -817,28 +622,20 @@ void Solver::applyBeta( const gsl_vector* beta, double scale ) {
 
 void Solver::applyBeta( double scale ) {
 
-    job.globalData->constraints.reverse( beta, alpha, scale );
+    job.globalData->constraints.reverse( beta, alpha.get(), scale );
     applyAlpha();
     
 }
 
-/*
-            template <typename T> void apply(const T* in, T* out) const {
-                memset(out,0,nFreeParameters*sizeof(T));
-                for( auto& entry: ns_entries ) {
-                    out[entry.first.x] += entry.second * in[entry.first.y];
-                }
-            }
 
-*/
-void Solver::applyConstraints( const double* alpha, double* beta ) {
+void Solver::applyConstraints( const double* a, double* b ) {
 
     progWatch.set( job.globalData->constraints.ns_cols.size() );
     for( auto& r: job.globalData->constraints.ns_cols ) {
-        service.post( [this,&r,&alpha,&beta]() {
+        service.post( [this,&r,&a,&b]() {
             double tmp(0);
-            for( auto& e: r.second ) tmp += e.second * alpha[e.first];
-            beta[r.first] += tmp;
+            for( auto& e: r.second ) tmp += e.second * a[e.first];
+            b[r.first] += tmp;
             ++progWatch;
         });
     }
@@ -847,19 +644,27 @@ void Solver::applyConstraints( const double* alpha, double* beta ) {
 }
 
 
-void Solver::reverseConstraints( const double* beta, double* a ) {
+void Solver::reverseConstraints( const double* b, double* a ) {
 
     progWatch.set( job.globalData->constraints.ns_rows.size() );
     for( auto& r: job.globalData->constraints.ns_rows ) {
-        service.post([this,&r,&a,&beta]() {
+        service.post([this,&r,&a,&b]() {
             double tmp(0);
-            for( auto& e: r.second ) tmp += e.second * beta[e.first];
+            for( auto& e: r.second ) tmp += e.second * b[e.first];
             a[r.first] += tmp;
             ++progWatch;
         });
     }
     progWatch.wait();
 
+}
+
+
+void Solver::zeroAvgTilt( double* a, int m ) {
+}
+
+
+void Solver::zeroAvgTilts( double* a, int m1, int m2 ) {
 }
 
 
@@ -880,7 +685,7 @@ void Solver::initImages( double* a ) {
         for( const shared_ptr<Channel>& c: o->channels ) {
             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
                 service.post( [&,a](){
-                    im->adjustOffset( a );
+                    im->adjustShifts( a );
                     im->initialize(true);
                     ++progWatch;
                 } );
@@ -893,38 +698,6 @@ void Solver::initImages( double* a ) {
 }
 
 
-double Solver::metric(void) {
-
-
-    sync_counter sc;
-    for( const auto& o : objects ) {
-        //if( o->weight > 0 ) {
-            ++sc;
-            service.post( [o,&sc] {
-                o->initPQ();
-                o->addAllPQ();
-                o->calcMetric();
-                --sc;
-            } );
-        //}
-    }
-    sc.wait();
-    
-    double sum(0);
-    for( const auto& o : objects ) {
-        sum += o->metric();
-    }
-    
-    if( job.reg_alpha > 0 ) {
-        for( size_t i=0; i<nParameters; ++i ) {
-            sum += 0.5*alpha[i]*alpha[i]*regAlphaWeights[i];
-        }
-    }
-
-    return sum;
-    
-}
-
 namespace {
     
     const size_t nMaxImages = 30;
@@ -932,7 +705,7 @@ namespace {
 }
 
 
-double Solver::metric2(void) {
+double Solver::metric(void) {
     
 
     double sum(0);
@@ -973,38 +746,20 @@ double Solver::metric2(void) {
 
     if( job.reg_alpha > 0 ) {
         lock_guard<mutex> lock(mtx);
+        double* alphaPtr = alpha.get();
         for( size_t i=0; i<nParameters; ++i ) {
-            sum += 0.5*alpha[i]*alpha[i]*regAlphaWeights[i];
+            sum += 0.5*alphaPtr[i]*alphaPtr[i]*regAlphaWeights[i];
         }
     }
     
     progWatch.wait();
 
-    return sum;
+    return sum; ///nTotalPixels;
     
 }
 
 
 void Solver::calcPQ(void) {
-
-    sync_counter sc;
-    for( const auto& o: objects ) {
-        //if( o->weight > 0 ) {
-            ++sc;
-            service.post([&o,&sc] {    // use a lambda to ensure these calls are sequential
-                    o->initPQ();
-                    o->addAllPQ();
-                    o->calcHelpers();
-                    --sc;
-                });
-        //}
-    }
-    sc.wait();
-    
-}
-
-
-void Solver::calcPQ2(void) {
 
     progWatch.set( objects.size() );
     for( const shared_ptr<Object>& o : objects ) {
@@ -1046,70 +801,26 @@ void Solver::calcPQ2(void) {
 
 void Solver::gradient(void) {
 
+    double* alphaPtr = alpha.get();
+    double* gAlphaPtr = grad_alpha.get();
     if( job.reg_alpha > 0 ) {
-        std::transform( alpha, alpha+nParameters, regAlphaWeights, grad_alpha,
+        std::transform( alphaPtr, alphaPtr+nParameters, regAlphaWeights, gAlphaPtr,
             std::multiplies<double>() );
     } else {
-        memset( grad_alpha, 0, nParameters*sizeof(double) );
+        memset( gAlphaPtr, 0, nParameters*sizeof(double) );
     }
 
-    double* alphaPtr = alpha;
-    double* gAlphaPtr = grad_alpha;
-    sync_counter sc;
+    bool* eM = enabledModes.get();
+    progWatch.set(nTotalImages );
     for( const shared_ptr<Object>& o: objects ) {
         //if( o->weight > 0 ) {
-            double grad_step = job.graddiff_step*o->wavelength;
             for( const shared_ptr<Channel>& c: o->getChannels() ) {
                 for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                    ++sc;
-                    service.post ([this, o, im, grad_step, alphaPtr, gAlphaPtr, &sc] {    // use a lambda to ensure these calls are sequential
+                    service.post ([this, eM, o, im, alphaPtr, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
                         im->calcVogelWeight( o->PQ.get(), o->PS.get(), o->QS.get() );
                         for ( uint16_t m=0; m<nModes; ++m ) {
-                            if( enabledModes[m] ) {
-                                //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
-                                //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethods[GM_DIFF](*im, m, grad_step );
-                                //else gAlphaPtr[m] = o->weight*gradientMethods[GM_VOGEL](*im, m, grad_step );
-                                gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
-                            }
-                        }
-                        --sc;
-                    });
-                    alphaPtr += nModes;
-                    gAlphaPtr += nModes;
-                }
-            }
-        //}
-    }
-    sc.wait();
-
-}
- 
- 
-void Solver::gradient2(void) {
-
-    if( job.reg_alpha > 0 ) {
-        std::transform( alpha, alpha+nParameters, regAlphaWeights, grad_alpha,
-            std::multiplies<double>() );
-    } else {
-        memset( grad_alpha, 0, nParameters*sizeof(double) );
-    }
-
-    double* alphaPtr = alpha;
-    double* gAlphaPtr = grad_alpha;
-    progWatch.set( nTotalImages );
-    for( const shared_ptr<Object>& o: objects ) {
-        //if( o->weight > 0 ) {
-            double grad_step = job.graddiff_step*o->wavelength;
-            for( const shared_ptr<Channel>& c: o->getChannels() ) {
-                for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                    service.post ([this, o, im, grad_step, alphaPtr, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
-                        im->calcVogelWeight( o->PQ.get(), o->PS.get(), o->QS.get() );
-                        for ( uint16_t m=0; m<nModes; ++m ) {
-                            if( enabledModes[m] ) {
-                                //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
-                                //if( fabs(alphaPtr[m]) < 1E-16 ) gAlphaPtr[m] = o->weight*gradientMethods[GM_DIFF](*im, m, grad_step );
-                                //else gAlphaPtr[m] = o->weight*gradientMethods[GM_VOGEL](*im, m, grad_step );
-                                gAlphaPtr[m] = o->weight*gradientMethod(*im, m, grad_step );
+                            if( eM[m] ) {
+                                gAlphaPtr[m] = o->weight*gradientMethod(*im, m );
                             }
                         }
                         ++progWatch;
@@ -1128,37 +839,27 @@ void Solver::gradient2(void) {
 void Solver::gradient( gsl_vector* grad ) {
     
     gradient();
-    job.globalData->constraints.apply( grad_alpha, grad->data );
-    
-}
-
-
-void Solver::gradient2( gsl_vector* grad ) {
-    
-    gradient2();
-    job.globalData->constraints.apply( grad_alpha, grad->data );
+    job.globalData->constraints.apply( grad_alpha.get(), grad->data );
     
 }
 
 
 void Solver::clear( void ) {
 
-    delete[] modeNumbers;
-    delete[] enabledModes;
-    delete[] alpha;
-    delete[] grad_alpha;
-    delete[] alpha_offset;
-    delete[] tmp_alpha;
+    enabledModes.reset();
+    alpha.reset();
+    grad_alpha.reset();
+    alpha_offset.reset();
+
     delete[] regAlphaWeights;
     delete[] beta;
     delete[] grad_beta;
     delete[] search_dir;
     delete[] tmp_beta;
-    modeNumbers = enabledModes = nullptr;
-    alpha = grad_alpha = alpha_offset = tmp_alpha = nullptr;
+
+    alpha = grad_alpha = alpha_offset = nullptr;
     regAlphaWeights = nullptr;
     beta = grad_beta = search_dir = tmp_beta = nullptr;
-
 
 }
 
@@ -1176,11 +877,11 @@ void Solver::dump( string tag ) {
         Ana::write (tag + "_window.f0", window);
         Ana::write (tag + "_noisewindow.f0", noiseWindow);
 
-        Array<double> wrapper(alpha, nTotalImages, nModes);
+        Array<double> wrapper(alpha.get(), nTotalImages, nModes);
         Ana::write(tag + "_alpha.f0",wrapper);
-        wrapper.wrap(alpha_offset, nTotalImages, nModes);
+        wrapper.wrap(alpha_offset.get(), nTotalImages, nModes);
         Ana::write(tag + "_alpha_offset.f0",wrapper);
-        wrapper.wrap(grad_alpha, nTotalImages, nModes);
+        wrapper.wrap(grad_alpha.get(), nTotalImages, nModes);
         Ana::write(tag + "_grad_alpha.f0",wrapper);
         ++progWatch;
     });

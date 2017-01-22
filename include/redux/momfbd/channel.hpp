@@ -62,7 +62,7 @@ namespace redux {
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
-            void initProcessing( const Solver& );
+            void initProcessing( Solver& );
             void initPatch(ChannelData&);
             const std::vector<std::shared_ptr<SubImage>>& getSubImages(void) const { return subImages; };
             void initPhiFixed(void);
@@ -81,7 +81,7 @@ namespace redux {
             void loadCalib(boost::asio::io_service&);
             void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void storePatches(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
-            void unloadData(void);
+            void unloadCalib(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
             void loadFile( size_t fileIndex, size_t offset );
