@@ -437,125 +437,87 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
     // TODO: cache files and just fetch shared_ptr
 
     if( !darkTemplate.empty() ) {        // needs to be read synchronously because of adding/normalization
-        progWatch.increaseTarget( std::max<int>(darkNumbers.size(),1) );
-        service.post( [this](){
-            Image<float> tmp;
-            size_t nDarkFrames(0);
-            size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
-            if (nWild == 0 || darkNumbers.empty()) {
-                CachedFile::load( tmp, darkTemplate );
-                nDarkFrames = tmp.meta->getNumberOfFrames();
-            } else {
-                Image<float> tmp2;
-                for (size_t di = 0; di < darkNumbers.size(); ++di) {
-                    bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
-                    if (!di) {
-                        CachedFile::load( tmp, fn.string() );
-                        nDarkFrames = tmp.meta->getNumberOfFrames();
-                    } else {
-                        CachedFile::load( tmp2, fn.string() );
-                        tmp += tmp2;
-                        nDarkFrames += tmp2.meta->getNumberOfFrames();
-                    }
+        Image<float> tmp;
+        size_t nDarkFrames(0);
+        size_t nWild = std::count (darkTemplate.begin(), darkTemplate.end(), '%');
+        if (nWild == 0 || darkNumbers.empty()) {
+            CachedFile::load( tmp, darkTemplate );
+            nDarkFrames = tmp.meta->getNumberOfFrames();
+        } else {
+            Image<float> tmp2;
+            for (size_t di = 0; di < darkNumbers.size(); ++di) {
+                bfs::path fn = bfs::path (boost::str (boost::format (darkTemplate) % darkNumbers[di]));
+                if (!di) {
+                    CachedFile::load( tmp, fn.string() );
+                    nDarkFrames = tmp.meta->getNumberOfFrames();
+                } else {
+                    CachedFile::load( tmp2, fn.string() );
+                    tmp += tmp2;
+                    nDarkFrames += tmp2.meta->getNumberOfFrames();
                 }
-                
-                //   NOTE: no normalization here, modify metadata instead. TODO: += operator for meta to add frames??
-
             }
-            dark = tmp.copy();
-            if (nDarkFrames) dark *= 1.0/nDarkFrames;
-            ++progWatch;
-        });
+            
+            //   NOTE: no normalization here, modify metadata instead. TODO: += operator for meta to add frames??
+
+        }
+        dark = tmp.copy();
+        if (nDarkFrames) dark *= 1.0/nDarkFrames;
     }
 
 
     if( !gainFile.empty() ) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<float>( gain, gainFile );
-            gainMask.reset( new uint8_t[imgSize.y*imgSize.x], []( uint8_t* p ){ delete[] p; } );
-            make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
-            ++progWatch;
-        });
+        CachedFile::load<float>( gain, gainFile );
+        gainMask.reset( new uint8_t[imgSize.y*imgSize.x], []( uint8_t* p ){ delete[] p; } );
+        make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
     }
 
 
     if( !responseFile.empty() ) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<float>( ccdResponse, responseFile );
-            ++progWatch;
-        });
+        CachedFile::load<float>( ccdResponse, responseFile );
     }
 
     if (!backgainFile.empty()) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<float>( ccdScattering, backgainFile );
-            ++progWatch;
-        });
+        CachedFile::load<float>( ccdScattering, backgainFile );
     }
 
     if( !psfFile.empty() ) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<float>( psf, psfFile );
-            ++progWatch;
-        });
+        CachedFile::load<float>( psf, psfFile );
     }
 
     if( !mmFile.empty() ) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<float>( modulationMatrix, mmFile );
-            ++progWatch;
-        });
+        CachedFile::load<float>( modulationMatrix, mmFile );
     }
 
     if( !xOffsetFile.empty() ) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<int16_t>( xOffset, xOffsetFile );
-            if( alignClip.size() == 4 ) {
-                Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
-                if( clipSize.x != xOffset.dimSize(1) ||
-                    clipSize.y != xOffset.dimSize(0) ) {
-                    LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip." << ende;
-                    xOffset.clear();
-                }
-                //cout << "Loaded offset file: " << xOffsetFile << printArray(xOffset.dimensions(),"  dims") << endl;
-                //clipImage( xOffset, alignClip );
+        CachedFile::load<int16_t>( xOffset, xOffsetFile );
+        if( alignClip.size() == 4 ) {
+            Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
+            if( clipSize.x != xOffset.dimSize(1) ||
+                clipSize.y != xOffset.dimSize(0) ) {
+                LOG_ERR << "Size of offset file: " << xOffsetFile << " does not match the align_clip." << ende;
+                xOffset.clear();
             }
-            ++progWatch;
-        });
+        }
     }
 
     if( !yOffsetFile.empty() ) {
-        progWatch.increaseTarget( 1 );
-        service.post([this](){
-            CachedFile::load<int16_t>( yOffset, yOffsetFile );
-            if( alignClip.size() == 4 ) {
-                Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
-                if( clipSize.x != yOffset.dimSize(1) ||
-                    clipSize.y != yOffset.dimSize(0) ) {
-                    LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip." << ende;
-                    yOffset.clear();
-                }
-                //cout << "Loaded offset file: " << yOffsetFile << printArray(yOffset.dimensions(),"  dims") << endl;
-                //clipImage( yOffset, alignClip );
+        CachedFile::load<int16_t>( yOffset, yOffsetFile );
+        if( alignClip.size() == 4 ) {
+            Point clipSize( abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1 );
+            if( clipSize.x != yOffset.dimSize(1) ||
+                clipSize.y != yOffset.dimSize(0) ) {
+                LOG_ERR << "Size of offset file: " << yOffsetFile << " does not match the align_clip." << ende;
+                yOffset.clear();
             }
-            ++progWatch;
-        });
+        }
     }
-    
-    ++progWatch;
+
     
 }
 
 
 void Channel::loadData( boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>& patches ) {
 
-   //LOG_TRACE << "Channel::loadData()" << ende;
     size_t nFiles = std::max<size_t>( 1, fileNumbers.size() );       // If no numbers, load template as single file
 
     startT = bpx::pos_infin;
@@ -565,74 +527,66 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
         throw logic_error("No input images for channel " + to_string(myObject.ID) + ":" + to_string(ID));
     }
     
-    //myJob.progWatch.increaseTarget(nTotalFrames);
-    //myObject.progWatch.increaseTarget(nTotalFrames);
-    
     // Prepare needed storage
     images.resize( nTotalFrames, imgSize.y, imgSize.x );
     imageStats.resize( nTotalFrames );
     
-    progWatch.set(1);
-    progWatch.setHandler([this,nFiles,&service,&patches](){
-        //cout << "Calib loaded.   " << myObject.ID << ":" << ID << endl;
-        for( unsigned int y=0; y<patches.dimSize(0); ++y ) {
-            for( unsigned int x=0; x<patches.dimSize(1); ++x ) {
-                service.post( [this,&patches,y,x](){
-                    auto chData = patches(y,x)->objects[myObject.ID]->channels[ID];
-                    adjustCutout( *chData, patches(y,x) );
-                    ++myJob.progWatch;
-                } );
-            }
-        }
-        size_t nPreviousFrames(0);
-        for( size_t i=0; i<nFiles; ++i ) {
-
-            service.post( [&,i,nPreviousFrames](){
-                try {
-                    loadFile(i,nPreviousFrames);
-                    
-                    if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
-                    
-                    size_t nF = nFrames[i];
-
-                    for( size_t j=0; j<nF; ++j ) {
-                        preprocessImage( nPreviousFrames+j );
-                        //service.post(std::bind( &Channel::preprocessImage, this, nPreviousFrames+j) );
-                    }
-                    if( myObject.saveMask & SF_SAVE_FFDATA ) {
-                        myJob.progWatch.increaseTarget(1);
-                        progWatch.increaseTarget(1);
-                        service.post( [&,i,nF,nPreviousFrames](){
-                            bfs::path fn;
-                            try {
-                                fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
-                                bfs::path ext = fn.extension();
-                                if(ext.string().empty() || ext.string().length() > 5 ) {     // we assume the filename does not have a proper extenstion, add a temporary dummy
-                                    fn = bfs::path( fn.string() + ".ext" );
-                                }
-                                fn.replace_extension(".cor.f0");
-                                LOG_DEBUG << boost::format ("Saving dark/flat corrected file %s.") % fn.string() << ende;
-                                LOG_DEBUG << "Saving dark/flat corrected file " << printArray(images.dimensions(),"  imgdims") << ende;
-                                Image<float> view( images, nPreviousFrames, nPreviousFrames+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
-                                redux::file::Ana::write( fn.string(), view.copy() );   // TODO: other formats
-                            } catch ( const std::exception& e ) {
-                                LOG_ERR << "Failed to save corrected file: " << fn << "  reason: " << e.what() << ende;
-                            }
-                            ++progWatch;
-                            ++myJob.progWatch;
-                        });
-                    } 
-                } catch ( const std::exception& e ) {
-                    LOG_ERR << "Failed to load/preprocess file. reason: " << e.what() << ende;
-                } catch ( ... ) {
-                    LOG_ERR << "Failed to load/preprocess file for unknown reason." << ende;
-                }
-            });
-            nPreviousFrames += nFrames[i];
-        }
-        
-    });
+    if( myObject.saveMask & SF_SAVE_FFDATA ) {
+        myObject.progWatch.increaseTarget( nFiles );    // add saving of calibrated datafiles.
+    }
+    
     loadCalib(service);
+    
+    progWatch.set(patches.dimSize(0)*patches.dimSize(1)+nFiles);
+    progWatch.setHandler( std::bind( &Channel::storePatches, this, std::ref(service), std::ref(patches)) );
+    for( unsigned int y=0; y<patches.dimSize(0); ++y ) {
+        for( unsigned int x=0; x<patches.dimSize(1); ++x ) {
+            service.post( [this,&patches,y,x](){
+                auto chData = patches(y,x)->objects[myObject.ID]->channels[ID];
+                adjustCutout( *chData, patches(y,x) );
+                ++progWatch;
+            } );
+        }
+    }
+    
+    size_t nPreviousFrames(0);
+    for( size_t i=0; i<nFiles; ++i ) {
+        service.post( [&,i,nPreviousFrames](){
+            try {
+                loadFile(i,nPreviousFrames);
+                if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
+                size_t nF = nFrames[i];
+                for( size_t j=0; j<nF; ++j ) {
+                    preprocessImage( nPreviousFrames+j );
+                    //service.post(std::bind( &Channel::preprocessImage, this, nPreviousFrames+j) );
+                }
+                if( myObject.saveMask & SF_SAVE_FFDATA ) {
+                    bfs::path fn;
+                    try {
+                        fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
+                        bfs::path ext = fn.extension();
+                        if(ext.string().empty() || ext.string().length() > 5 ) {     // we assume the filename does not have a proper extenstion, add a temporary dummy
+                            fn = bfs::path( fn.string() + ".ext" );
+                        }
+                        fn.replace_extension(".cor.f0");
+                        LOG_DEBUG << boost::format ("Saving dark/flat corrected file %s.") % fn.string() << ende;
+                        LOG_DEBUG << "Saving dark/flat corrected file " << printArray(images.dimensions(),"  imgdims") << ende;
+                        Image<float> view( images, nPreviousFrames, nPreviousFrames+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
+                        redux::file::Ana::write( fn.string(), view.copy() );   // TODO: other formats
+                    } catch ( const std::exception& e ) {
+                        LOG_ERR << "Failed to save corrected file: " << fn << "  reason: " << e.what() << ende;
+                    }
+                    ++myObject.progWatch;
+                }
+            } catch ( const std::exception& e ) {
+                LOG_ERR << "Failed to load/preprocess file. reason: " << e.what() << ende;
+            } catch ( ... ) {
+                LOG_ERR << "Failed to load/preprocess file for unknown reason." << ende;
+            }
+            ++progWatch;
+        });
+        nPreviousFrames += nFrames[i];
+    }
 
 }
 
@@ -653,6 +607,7 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
                 copyImagesToPatch(*chData);
                 chData->cacheStore(true);    // store to disk and clear array
                 ++progWatch;
+                ++myJob.progWatch;
             });
         }
     }
@@ -662,6 +617,7 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
 
 void Channel::unloadData(void) {               // unload what was accessed through the cache, this should be called when all objects are done pre-processing.
     
+
     dark.clear();
     gain.clear();
     ccdResponse.clear();
@@ -689,17 +645,6 @@ void Channel::unloadData(void) {               // unload what was accessed throu
     if( !mmFile.empty() ) CachedFile::unload<float>(mmFile);
     if( !xOffsetFile.empty() ) CachedFile::unload<int16_t>(xOffsetFile);
     if( !yOffsetFile.empty() ) CachedFile::unload<int16_t>(yOffsetFile);
-
-    if( fileNumbers.empty() ) {         // single file
-        bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
-        CachedFile::unload<float>( fn.string() );
-    } else {
-        size_t nFiles = std::max<size_t>( 1, fileNumbers.size() );       // If no numbers, load template as single file
-        for( size_t i=0; i<nFiles; ++i ) {
-            bfs::path fn = bfs::path( imageDataDir ) / bfs::path( boost::str( boost::format( imageTemplate ) % fileNumbers[i] ) );
-            CachedFile::unload<float>( fn.string() );
-        }
-    }
 
 }
 
@@ -884,9 +829,8 @@ void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEn
 void Channel::loadFile( size_t fileIndex, size_t offset ) {
     static mutex lmtx;
     unique_lock<mutex> lock(lmtx);
-    //cout << ("imageDataDir="+imageDataDir+" imageTemplate="+imageTemplate) << flush;
     bfs::path fn = bfs::path(imageDataDir) / bfs::path( );
-    //cout << "...ok"  << endl;
+    Image<float> tmpImg;
     
     try {
         
@@ -899,8 +843,7 @@ void Channel::loadFile( size_t fileIndex, size_t offset ) {
         }
     
         string imStr = to_string(fileIndex);
-        Image<float> tmpImg;
-        CachedFile::load( tmpImg, fn.string() );
+        redux::file::readFile( fn.string(), tmpImg, false );
         size_t nF = nFrames[fileIndex];
         Image<float> view( images, offset, offset+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
         if( nF > 1 ) {
@@ -910,18 +853,17 @@ void Channel::loadFile( size_t fileIndex, size_t offset ) {
         } else {
             view.assign( reinterpret_cast<redux::util::Array<float>&>(tmpImg) );           
         }
-        LOG << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[fileIndex] % myObject.ID % ID % imStr << ende;
-        myJob.info.progress[0]++;
         if( tmpImg.meta ) {
             addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
         }
-
+        LOG << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[fileIndex] % myObject.ID % ID % imStr << ende;
     } catch ( const std::exception& ) {
         throw;
     } catch ( ... ) {
         string msg = "Failed to load file " + fn.string() + " for unknown reason.";
         throw runtime_error(msg);
     }
+    
 
 }
 
@@ -934,7 +876,7 @@ void Channel::preprocessImage( size_t i ) {
         Array<double> tmpImg( imgSize.y, imgSize.x );       // local temporary with double-precision
         tmpImg = view.copy<double>();
         
-        LOG_TRACE << boost::format ("Preprocessing image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(tmpImg.dimensions(),"dims") << ende;
+        LOG_DEBUG << boost::format ("Preprocessing image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(tmpImg.dimensions(),"dims") << ende;
         
     //         bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % i));
     //         fn = bfs::path(fn.leaf().string() + ".inp");
@@ -1034,15 +976,15 @@ void Channel::preprocessImage( size_t i ) {
         imageStats[i]->getStats( borderClip, tmpImg );    // get stats for corrected data
         myJob.info.progress[0]++;
     
-        ++myJob.progWatch;          // this will trigger calculating max_mean and storing patches in Object::loadData()
-        ++myObject.progWatch;       // this will trigger unloading the calibration data after all objects/images are done.
-        
     } catch ( const std::exception& e ) {
         LOG_ERR << "Failed to preprocess image #" << i << ". reason: " << e.what() << ende;
     } catch ( ... ) {
         LOG_ERR << "Failed to preprocess image #" << i << " for unknown reason."  << ende;
     }
 
+    ++myJob.progWatch;          // this will trigger unloading the calibration data after all objects/images are done.
+    ++myObject.progWatch;       // this will trigger calculating max_mean and storing patch-data to disk
+        
 }
 
 
@@ -1186,7 +1128,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     tmpCutout.restrict(imgBoundary);
     if( tmpCutout != desiredCutout ) {
         if( !alreadyWarned )
-            LOG_DETAIL << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
+            LOG_DEBUG << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
             myObject.ID << ":" << ID << ":  desired: " << desiredCutout << "  actual: " << tmpCutout << ende;
         if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
             chData.offset.y -= (tmpCutout.first.y - desiredCutout.first.y);

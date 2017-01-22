@@ -904,7 +904,6 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
             else startT = std::min(startT,ch->startT);
             if(endT.is_special()) endT = ch->endT;
             else endT = std::max(endT,ch->endT);
-            ch->storePatches(service, patches);
         }
         LOG_DEBUG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     });
