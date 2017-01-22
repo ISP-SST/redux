@@ -243,7 +243,8 @@ namespace redux {
             Array( const Array<T>& rhs, const std::vector<U>& indices ) : Array<T>(rhs) {
                 size_t nIndices = indices.size();
                 if( nIndices&1 || (nIndices > 2*nDims_) )  {  // odd number of indices, or too many indices
-                    throw std::logic_error("Array: Copy (sub-)constructor: Too many indices or odd number of indices.");
+                    throw std::logic_error( "Array: Copy (sub-)constructor: Too many indices or odd number of indices. " +
+                                            printArray(indices,"") + printArray(rhs.dimensions(),"  rhsDims"));
                 }
 
                 if ( nIndices ) {
@@ -470,7 +471,7 @@ namespace redux {
             }
 
             template <typename U>
-            void copyTo( void* data ) {
+            void copyTo( void* data ) const {
                 U* dptr = reinterpret_cast<U*>( data );
                 if( dense_ ) {
                     std::copy( get()+begin_, get()+end_, dptr );
