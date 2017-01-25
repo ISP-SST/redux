@@ -147,15 +147,13 @@ bool Worker::getWork( void ) {
     try {
         
         wip->isRemote = wip->hasResults = false;
-        shared_ptr<Job> previousJob = wip->job;     // keep a temporary pointer while getting next job.
-        wip->previousJob = wip->job;
         if( wip->job ) {
             wip->job->logger.flushAll();
         }
     
         if( running_ ) {
             if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-                if( wip->job && (!previousJob || *(wip->job) != *(previousJob)) ) {
+                if( wip->previousJob.expired() ) {                                  // initialize if it is a new job.
                     wip->job->logger.setLevel( wip->job->info.verbosity );
                     if( wip->isRemote ) {
                         if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line

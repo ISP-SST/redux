@@ -973,9 +973,8 @@ void Daemon::resetSlaves( TcpConnection::Ptr& conn, uint8_t cmd ) {
 
 bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
 
-    wip->job.reset();
-    wip->parts.clear();
-    wip->nParts = 0;
+    bool gotJob(false);
+    bool newJob(false);
 
     unique_lock<mutex> lock( jobsMutex );
     vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
@@ -990,23 +989,23 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
 
     for( Job::JobPtr& job: tmpJobs ) {
         if( job && job->getWork( wip, nThreads, activeCounts[job->getTypeID()] ) ) {
+            newJob = (job.get() != wip->job.get());
             wip->job = job;
+            gotJob = true;
             break;
         }
     }
     
-    if( wip->job ) {
-
+    if( newJob ) {
         wip->job->info.state.store( Job::JSTATE_ACTIVE );
         wip->workStarted = boost::posix_time::second_clock::local_time();
         for( auto& part: wip->parts ) {
             part->cacheLoad(false);
             part->partStarted = wip->workStarted;
         }
-        
     }
     
-    return bool(wip->job);
+    return gotJob;
 }
 
 
@@ -1039,6 +1038,10 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         
         uint64_t blockSize = 0;
         wip->isRemote = true;
+        wip->job.reset();
+        wip->parts.clear();
+        wip->nParts = 0;
+
         if( getWork( wip, host->status.nThreads ) ) {
             auto jlock = wip->job->getLock();
             for( auto& part: wip->parts ) {
