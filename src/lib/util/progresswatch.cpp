@@ -40,7 +40,7 @@ void ProgressWatch::test(void) {
     //cout << __LINE__ << "  " << dump() << endl;
     boost::unique_lock<boost::mutex> lock(mtx);
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
-    if(counter_ > target_) {
+    if( (start_ != target_) && (counter_ > target_) ) {
         lock.unlock();
         cout << __LINE__ << "  " << dump() << "  OVERFLOW !!!" << endl;
     }
@@ -103,7 +103,7 @@ void ProgressWatch::step(int step) {
     boost::unique_lock<boost::mutex> lock(mtx);
     counter_ += step;
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
-    if(counter_ > target_) {
+    if( (start_ != target_) && (counter_ > target_) ) {
         lock.unlock();
         cout << __LINE__ << "  " << dump() << "  OVERFLOW !!!" << endl;
     }
