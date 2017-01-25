@@ -426,6 +426,7 @@ void Solver::run( PatchData::Ptr data ) {
                 status = GSL_FAILURE;
                 modeCount = 0;                  // exit outer loop.
                 done = true;                    // exit inner loop.
+                break;
             }
             
             gradientMethod = gradientMethods[GM_VOGEL];   // FIXME: old code just uses the cfg-setting the first iteration, then switches to Vogel.
@@ -443,10 +444,16 @@ void Solver::run( PatchData::Ptr data ) {
                 failCount++;
                 break;
             } 
-            gradNorm = gsl_blas_dnrm2(s->gradient)/thisMetric;
+            gradNorm = gsl_blas_dnrm2(s->gradient)*gradScale;
             if( !isfinite(gradNorm) ) {
                 LOG_WARN << "Error in iteration " << (totalIterations+iter) << ". Gradient is not finite." << ende;
                 failCount++;
+                break;
+            }
+            if( gradNorm < job.FTOL ) {
+                LOG_DETAIL << "Norm(grad) is below threshold." << ende;
+                modeCount = 0;                  // exit outer loop.
+                done = true;                    // exit inner loop.
                 break;
             }
             if( iter>1 ) {
@@ -463,9 +470,7 @@ void Solver::run( PatchData::Ptr data ) {
 
             previousMetric = thisMetric;
 
-            status = gsl_multimin_test_gradient( s->gradient, 1e-9 );
-
-        } while( status == GSL_CONTINUE && (!done || iter < job.minIterations) && iter < maxIterations );
+        } while( (!done || iter < job.minIterations) && iter < maxIterations );
 
         GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
         totalIterations += iter;
