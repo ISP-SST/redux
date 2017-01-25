@@ -532,11 +532,15 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
             // NOTE:  subImagePosX/Y are kept 1-based, so ffset by 1 during cut-out.
             LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
             if( subImagePosX.empty() ) { // x-coordinate of patch-centre
-                subImagePosX = segment<uint16_t>(halfPatchSize+1,imageSizes.x-halfPatchSize+1,patchSize,totalOverlap);
+                uint16_t first = roi.first.x + halfPatchSize+1;
+                uint16_t last = roi.last.x - halfPatchSize+1;
+                subImagePosX = segment<uint16_t>( first, last, patchSize, totalOverlap );
                 LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
             }
             if( subImagePosY.empty() ) { // y-coordinate of patch-centre
-                subImagePosY = segment<uint16_t>(halfPatchSize+1,imageSizes.y-halfPatchSize+1,patchSize,totalOverlap);
+                uint16_t first = roi.first.y + halfPatchSize+1;
+                uint16_t last = roi.last.y - halfPatchSize+1;
+                subImagePosY = segment<uint16_t>( first, last, patchSize, totalOverlap );
                 LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
             }
         
