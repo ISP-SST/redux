@@ -10,6 +10,7 @@
 #include "redux/util/stringutil.hpp"
 #include "redux/translators.hpp"
 #include "redux/image/cachedfile.hpp"
+#include "redux/revision.hpp"
 
 #include <functional>
 
@@ -129,6 +130,7 @@ bool Daemon::doWork( void ) {
         // start the server
         serverInit();
         // start the maintenance loop
+        LOG << "Version: " << reduxCommitMessage << ende;
         LOG_DEBUG << "Initializing maintenance timer." << ende;
         timer.expires_from_now( boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
