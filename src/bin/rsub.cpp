@@ -291,9 +291,9 @@ int main (int argc, char *argv[]) {
             globalName = vm["name"].as<string>();
         }
 
-        boost::filesystem::path outputDir = boost::filesystem::current_path();
+        bfs::path outputDir = bfs::current_path();
         if( vm.count ("output-dir") ) {
-            boost::filesystem::path tmpPath = vm["output-dir"].as<string>();
+            bfs::path tmpPath = vm["output-dir"].as<string>();
             if( isRelative( tmpPath ) && !outputDir.empty() ) {
                 outputDir = outputDir / tmpPath;
             }
@@ -301,7 +301,11 @@ int main (int argc, char *argv[]) {
 
         stringstream filteredCfg;
         for( auto it: files ) {
-            string bn = boost::filesystem::basename(it);
+            if( ! bfs::is_regular_file( it ) ) {
+                LOG_WARN << "No such file: " << it << ende;
+                continue;
+            }
+            string bn = bfs::basename(it);
             string jobName = globalName.empty() ? bn : globalName;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
             string tmpS = filterOldCfg(it, jobName, logFile, outputDir.string()) + "\n";
