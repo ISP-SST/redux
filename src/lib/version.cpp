@@ -20,6 +20,6 @@ string redux::getVersionString ( int v ) {
 string redux::getLongVersionString ( void ) {
     
     string ret = to_string(reduxVersionMajor) + "." + to_string(reduxVersionMinor) + "." + to_string(reduxVersionPatch);
-    ret += " (commit: " + to_string(reduxVersionCommit) + " - " + string(reduxCommitMessage) + ")";
+    ret += " (" + string(reduxCommitMessage) + ")";
     return ret;
 }
