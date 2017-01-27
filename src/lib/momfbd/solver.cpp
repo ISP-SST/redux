@@ -393,7 +393,7 @@ void Solver::run( PatchData::Ptr data ) {
 
         if( modeCount == nModes ) {   // final loop, use proper FTOL and maxIterations
             modeCount = 0;            // we use modeCount=0 to exit the external loop
-            tol = 5E-4; //job.FTOL;
+            tol = job.FTOL;
             maxIterations = job.maxIterations;
         } else {
             modeCount += job.nModeIncrement;
