@@ -221,7 +221,7 @@ uint16_t MomfbdJob::checkParts( void ) {
         info.step.store( JSTEP_ERR );
         info.state.store( JSTATE_ERR );
         progWatch.clear();
-        info.progressString = "blaha";
+        info.progressString = "error";
     } else if( countBits( mask ) == 1 ) {  // if all parts have the same "step", set the whole job to that step.
         uint16_t tmp = mask;
         if( !info.step.compare_exchange_strong( tmp, tmp ) ) {  // TODO make this neater

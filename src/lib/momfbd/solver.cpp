@@ -494,8 +494,8 @@ void Solver::run( PatchData::Ptr data ) {
         }
     }       // end for-loop
     
-    LOG << "Patch" << (string)data->index << ":  After " << totalIterations << " iterations:  metric=" << thisMetric << "  (relative=" << (thisMetric/initialMetric) << ")" << ende;
-    LOG << timer.print() << ende;
+    LOG << "Patch" << (string)data->index << ":  After " << totalIterations << " iterations:  metric=" << thisMetric
+        << "  (relative=" << (thisMetric/initialMetric) << ")  " << timer.print() << ende;
     myInfo.status.statusString = patchString + " completed";
     
 

@@ -35,6 +35,7 @@ namespace redux {
                 auto m = redux::util::Cache::get().getMap< CachedFile, redux::image::Image<T> >();
                 auto it = m.second.find(cf);
                 if( it != m.second.end() && ((it->second.nElements() > 0) || (it->second.meta && metaOnly)) ) {  // exists and loaded
+                    std::unique_lock<std::mutex> lock( it->second.imgMutex ); // sync-point to prevent other threads from getting this item before it is finished loading
                     img = it->second;
                     m.first.unlock();
                 } else {    // not already loaded, load the file.

@@ -302,7 +302,7 @@ bool Channel::checkData (void) {
         std::swap( waveFronts, tmpV );
     }
     string wfStr = redux::util::uIntsToString( waveFronts );
-    LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << " contains waveFronts: " << wfStr << ende;
+    LOG << "Channel " << myObject.ID << ":" << ID << " waveFronts: " << wfStr << ende;
 
     // Dark(s)
     if (!darkTemplate.empty()) {

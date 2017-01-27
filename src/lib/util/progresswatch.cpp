@@ -15,13 +15,13 @@ ProgressWatch::ProgressWatch(int target, int start) : start_(start), counter_(st
 
 
 void ProgressWatch::clear(void) {
-    
-//    cout << __LINE__ << "  " << dump() << endl;
+   
     boost::lock_guard<boost::mutex> lock(mtx);
     onChange = nullptr;
     onCompletion = nullptr;
     counter_ = start_ = target_ = 0;
     completed_ = false;
+    
 }
 
 
@@ -36,8 +36,6 @@ void ProgressWatch::reset(void) {
 
 void ProgressWatch::test(void) {
     
-
-    //cout << __LINE__ << "  " << dump() << endl;
     boost::unique_lock<boost::mutex> lock(mtx);
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
     if( (start_ != target_) && (counter_ > target_) ) {
@@ -61,15 +59,10 @@ void ProgressWatch::test(void) {
 
 void ProgressWatch::wait(void) {
     
-
-//    cout << __LINE__ << "  " << dump() << endl;
     boost::unique_lock<boost::mutex> lock(mtx);
-//    cout  << "ProgressWatch::wait()  " << __LINE__ << " completed = " << completed_ << endl;
     while( !completed_ ) {
-//    cout  << "ProgressWatch::wait()  " << __LINE__ << " completed = " << completed_ << endl;
         cv.wait(lock);
     }
-//    cout  << "ProgressWatch::wait()  DONE" << __LINE__ << endl;
 
 }
 
@@ -114,15 +107,13 @@ void ProgressWatch::step(int step) {
         counter_ = start_;
     }
     lock.unlock();
-    //cout << __LINE__ << "  " << dump() << endl;
 
     if( ticker ) ticker();
     if( notify ) {
         cv.notify_all();
         if( completer ) {
-//    cout << __LINE__ << "  " << dump() << "   Calling completer." << endl;
             completer();
-        } //else cout << __LINE__ << "  " << dump() << "  NO CB !!" << endl;
+        }
     }
 
 }

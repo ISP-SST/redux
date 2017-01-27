@@ -149,12 +149,6 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
     
     // TODO: collect diversity settings in a struct and write a translator
     string tmpString = tree.get<string>( "DIVERSITY", "" );
-//     cout << "tmpStr1 = " <<tmpString << endl;
-//     //tmpString.erase(remove_if(tmpString.begin(), tmpString.end(), isspace), tmpString.end());
-//     //tmpString.erase(std::remove_if(tmpString.begin(), tmpString.end(), std::isspace), tmpString.end());
-//     tmpString.erase(std::remove (tmpString.begin(), tmpString.end(), ' '), tmpString.end());
-//     //boost::erase_all(tmpString, " ");
-//     cout << "tmpStr2 = " <<tmpString << endl;
     diversity.clear();
     diversityModes.clear();
     diversityTypes.clear();
@@ -167,15 +161,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
             physicalDefocusDistance = true;
             tmpD = 1.00E-02;
         }
-        //tmpString.erase( boost::remove_if( tmpString, boost::is_any_of( "cm\" " ) ), tmpString.end() );
+        // we extracted the suffix/units avove, so now we can delete the letters and extract the numbers.
         tmpString.erase( remove_if( tmpString.begin(), tmpString.end(),
                                [](const char&a ){ return (a == 'c' || a == 'm' || a == ' ' || a == '"'); } ), tmpString.end() );
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
-    cout << "tmpStr3 = \"" <<tmpString << "\"" << endl;
         tmpTree.put( "tmp", tmpString );
-    cout << "blaha1 " << endl;
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
-    cout << "blaha1 " << printArray(diversity,"DiV") << endl;
+
         tmpString = tree.get<string>( "DIV_ORDERS", "" );
         if( tmpString.empty() ) {
             if( diversity.size() > 1 ) {
@@ -195,18 +187,13 @@ void ChannelCfg::parseProperties(bpt::ptree& tree, const ChannelCfg& defaults) {
         if( diversity.size() == diversityModes.size() ) {
             for(unsigned int i=0; i<diversity.size(); ++i) {
                 if(diversityModes[i] == 4) {   // focus term, convert from physical length (including mm/cm) to coefficient
-                    diversity[i] = -tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
+                    diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
                 }
             }
         } else {
             //LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!";
         }
-        
-        if( diversity.size() ) {
-             cout << "Diversity: " << printArray(diversityModes, "\n\tmodes")
-                 << "    " << printArray(diversityTypes, "\n\ttypes")
-                 << "    " << printArray(diversity, "\n\tvalues") << endl;
-        }
+
         
     }
 
@@ -280,6 +267,8 @@ void ChannelCfg::getProperties(bpt::ptree& tree, const ChannelCfg& defaults) con
 
     if(noiseFudge != defaults.noiseFudge) tree.put("NF", noiseFudge);
     if(weight != defaults.weight) tree.put("WEIGHT", weight);
+    
+    if(diversity != defaults.diversity) tree.put("DIVERSITY", diversity);
     
     if(alignMap != defaults.alignMap) tree.put("ALIGN_MAP", alignMap);
     if(alignClip != defaults.alignClip) tree.put("ALIGN_CLIP", alignClip);
