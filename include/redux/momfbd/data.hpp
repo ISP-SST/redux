@@ -116,6 +116,7 @@ namespace redux {
             redux::util::Point16 position;                   //! Patch position (centre coordinates in the reference channel)
             redux::util::Region16 roi;                       //! Region/position of this patch in the full image
             float finalMetric;
+            std::vector<float> metrics;
             PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
             PatchData( const PatchData& ) = delete;
             ~PatchData();

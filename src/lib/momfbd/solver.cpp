@@ -369,7 +369,10 @@ void Solver::run( PatchData::Ptr data ) {
     loadInit( data, alpha_offset.get() );
     shiftAndInit( alpha_offset.get(), true );     // force initialization
     
+    data->metrics.clear();
+    data->metrics.reserve(10000);     // should be more than enough
     double initialMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, beta_init );
+    data->metrics.push_back(initialMetric);
     LOG << "Patch" << (string)data->index << ":  Initial metric = " << initialMetric << ende;
 
     double gradScale = 1.0/(nTotalPixels*nTotalPixels);
@@ -443,7 +446,8 @@ void Solver::run( PatchData::Ptr data ) {
                 LOG_WARN << "Error in iteration " << (totalIterations+iter) << ". Metric is not finite." << ende;
                 failCount++;
                 break;
-            } 
+            }
+            data->metrics.push_back(thisMetric);
             gradNorm = gsl_blas_dnrm2(s->gradient)*gradScale;
             if( !isfinite(gradNorm) ) {
                 LOG_WARN << "Error in iteration " << (totalIterations+iter) << ". Gradient is not finite." << ende;

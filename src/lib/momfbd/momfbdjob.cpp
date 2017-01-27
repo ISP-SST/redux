@@ -753,12 +753,26 @@ void MomfbdJob::writeOutput( boost::asio::io_service& service ) {
         progWatch.increaseTarget();
         service.post( [this](){
             bfs::path fn = bfs::path(info.outputDir) / bfs::path(info.name+"_metrics.f0");
-            Array<float> metrics( patches.dimensions() );
+            vector<size_t> dims = patches.dimensions();
+            Array<float> metrics( dims );
+            size_t maxIterations(0);
             for( auto& patch: patches ) {
-                metrics( patch->index.y, patch->index.x ) = patch->finalMetric; 
+                metrics( patch->index.y, patch->index.x ) = patch->finalMetric;
+                maxIterations = max( maxIterations, patch->metrics.size() );
             }
-            LOG << "Writing metrics to file: " << fn << ende;
+            LOG << "Writing final metrics to file: " << fn << ende;
             Ana::write( fn.string(), metrics );
+            if( maxIterations ) {
+                fn = bfs::path(info.outputDir) / bfs::path(info.name+"_metric_progress.f0");
+                dims.push_back(maxIterations);
+                metrics.resize(dims);
+                metrics.zero();
+                for( auto& patch: patches ) {
+                    copy( patch->metrics.begin(), patch->metrics.end(), metrics.ptr( patch->index.y, patch->index.x, 0 ) );
+                }
+                LOG << "Writing metric progression to file: " << fn << ende;
+                Ana::write( fn.string(), metrics );
+            }
             ++progWatch;
         });
 

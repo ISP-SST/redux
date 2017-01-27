@@ -324,6 +324,7 @@ uint64_t PatchData::size( void ) const {
     uint64_t sz = Part::size();
     sz += index.size() + position.size() + roi.size();
     sz += sizeof(float);
+    sz += metrics.size()*sizeof(float) + sizeof(uint64_t);
 
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
@@ -340,6 +341,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += position.pack(ptr+count);
     count += roi.pack(ptr+count);
     count += pack( ptr+count, finalMetric );
+    count += pack( ptr+count, metrics );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         if(obj) count += obj->ObjectData::pack(ptr+count);
@@ -355,6 +357,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += position.unpack(ptr+count, swap_endian);
     count += roi.unpack(ptr+count, swap_endian);
     count += unpack( ptr+count, finalMetric, swap_endian );
+    count += unpack( ptr+count, metrics, swap_endian );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         if(obj) count += obj->ObjectData::unpack( ptr+count, swap_endian );
@@ -404,6 +407,7 @@ const PatchData& PatchData::operator=( const PatchData& rhs ) {
     index = rhs.index;
     roi = rhs.roi;
     finalMetric = rhs.finalMetric;
+    metrics = rhs.metrics;
 
     for( size_t i=0; i<objects.size(); ++i ) {
         objects[i] = rhs.objects[i];
@@ -421,6 +425,7 @@ void PatchData::copyResults( const PatchData& rhs ) {
     }
 
     finalMetric = rhs.finalMetric;
+    metrics = rhs.metrics;
 
     for( size_t i=0; i<objects.size(); ++i ) {
         objects[i]->copyResults( *(rhs.objects[i]) );
