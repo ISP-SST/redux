@@ -764,7 +764,7 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
     std::shared_ptr<FileMomfbd> info ( infoPtr );
 
     IDL_StructDefPtr structDef = momfbdStruct->value.s.sdef;
-
+    
     IDL_VPTR tagPtr;
     IDL_INT* intPtr;
     IDL_STRING* stringPtr;
@@ -781,64 +781,119 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
         if ( tagPtr->type == IDL_TYP_STRING ) {
             stringPtr = ( IDL_STRING* ) ( momfbdStruct->value.arr->data + tagOffset );
             if ( contains ( "VERSION",tag,true ) ) {
-                infoPtr->versionString = stringPtr->s;
+                if( stringPtr->slen ) {
+                    infoPtr->versionString = stringPtr->s;
+                } else {
+                    cout << "Variable VERSION has to be defined in the MOMFBD struct !!!" <<  endl;
+                    return;
+                }
                 infoPtr->version = atof ( stringPtr->s );
             } else if ( contains ( "DATE",tag,true ) ) {
-                infoPtr->dateString = stringPtr->s;
+                if( stringPtr->slen ) {
+                    infoPtr->dateString = stringPtr->s;
+                } else {
+                    if( verbosity>1 ) cout << "Warning: Variable DATE is not defined." <<  endl;
+                    infoPtr->dateString = "";
+                }
             } else if ( contains ( "TIME",tag,true ) ) {
-                infoPtr->timeString = stringPtr->s;
+                if( stringPtr->slen ) {
+                    infoPtr->timeString = stringPtr->s;
+                } else {
+                    if( verbosity>1 ) cout << "Warning: Variable TIME is not defined." <<  endl;
+                    infoPtr->timeString = "";
+                }
             } else if ( ( writeMask & MOMFBD_NAMES ) && contains ( "NAME",tag,true ) ) {
-                if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==1 ) {
-                    for ( int n = 0; n < tagPtr->value.arr->dim[0]; ++n ) {
-                        infoPtr->fileNames.push_back ( string ( stringPtr[n].s ) );
+                if ( tagPtr->flags & IDL_V_ARR ) {
+                    if ( tagPtr->value.arr->n_dim ==1 ) {
+                        for ( int n = 0; n < tagPtr->value.arr->dim[0]; ++n ) {
+                            if( stringPtr[n].slen ) {
+                                infoPtr->fileNames.push_back ( string ( stringPtr[n].s ) );
+                            }
+                        }
+                        infoPtr->nFileNames = infoPtr->fileNames.size();
+                        infoPtr->dataMask |= MOMFBD_NAMES;
+                    } else {
+                        if( verbosity ) cout << "Variable NAME has " << (int)tagPtr->value.arr->n_dim << " dimensions, expected 1." << endl;
                     }
-                    infoPtr->nFileNames = infoPtr->fileNames.size();
-                    infoPtr->dataMask |= MOMFBD_NAMES;
+                } else {
+                    if( verbosity ) cout << "Variable NAME is not an array." << endl;
                 }
             }
         } else if ( tagPtr->type == IDL_TYP_INT ) {
             intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + tagOffset );
             if ( ( writeMask ) && contains ( "CLIP",tag,true ) ) { // dimensions: (nChannels,2,2)
-                if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3 ) {
-                    int32_t nChannels = infoPtr->nChannels = tagPtr->value.arr->dim[0];
-                    infoPtr->clipStartX = sharedArray<int16_t>(nChannels);
-                    infoPtr->clipEndX = sharedArray<int16_t>(nChannels);
-                    infoPtr->clipStartY = sharedArray<int16_t>(nChannels);
-                    infoPtr->clipEndY = sharedArray<int16_t>(nChannels);
+                if ( tagPtr->flags & IDL_V_ARR  ) {
+                    if ( tagPtr->value.arr->n_dim==3 ) {
+                        int32_t nChannels = infoPtr->nChannels = tagPtr->value.arr->dim[0];
+                        infoPtr->clipStartX = sharedArray<int16_t>(nChannels);
+                        infoPtr->clipEndX = sharedArray<int16_t>(nChannels);
+                        infoPtr->clipStartY = sharedArray<int16_t>(nChannels);
+                        infoPtr->clipEndY = sharedArray<int16_t>(nChannels);
 
-                    // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                    for ( int i = 0; i < nChannels; ++i ) {
-                        infoPtr->clipStartY.get() [ i ] = intPtr[ i + 0 * nChannels ];
-                        infoPtr->clipStartX.get() [ i ] = intPtr[ i + 1 * nChannels ];
-                        infoPtr->clipEndY.get() [ i ] = intPtr[ i + 2 * nChannels ];
-                        infoPtr->clipEndX.get() [ i ] = intPtr[ i + 3 * nChannels ];
+                        // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+                        for ( int i = 0; i < nChannels; ++i ) {
+                            infoPtr->clipStartY.get() [ i ] = intPtr[ i + 0 * nChannels ];
+                            infoPtr->clipStartX.get() [ i ] = intPtr[ i + 1 * nChannels ];
+                            infoPtr->clipEndY.get() [ i ] = intPtr[ i + 2 * nChannels ];
+                            infoPtr->clipEndX.get() [ i ] = intPtr[ i + 3 * nChannels ];
+                        }
+                    } else {
+                        if( verbosity ) cout << "Variable CLIP has " << (int)tagPtr->value.arr->n_dim << " dimensions, expected 3." << endl;
                     }
+                } else {
+                    if( verbosity ) cout << "Variable CLIP is not an array." << endl;
                 }
             }
         } else if ( tagPtr->type == IDL_TYP_FLOAT ) { // pupil, mode, pix2cf, cf2pix
             if ( writeMask & MOMFBD_MODES ) {
                 if ( contains ( "PUPIL",tag,true ) ) { // dimensions: (nPH,nPH)
-                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2 ) {
-                        infoPtr->nPH = tagPtr->value.arr->dim[0];
-                        infoPtr->phOffset = tagOffset;
+                    if ( tagPtr->flags & IDL_V_ARR ) {
+                        if ( tagPtr->value.arr->n_dim==2 ) {
+                            infoPtr->nPH = tagPtr->value.arr->dim[0];
+                            infoPtr->phOffset = tagOffset;
+                        } else {
+                            if( verbosity ) cout << "Variable PUPIL has " << (int)tagPtr->value.arr->n_dim << " dimensions, expected 2." << endl;
+                        }
+                    } else {
+                        if( verbosity ) cout << "Variable PUPIL is not an array." << endl;
                     }
                 } else if ( contains ( "MODE",tag,true ) ) { // dimensions: (nPH,nPH, nModes)
-                    if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==3 ) {
-                        infoPtr->nModes = tagPtr->value.arr->dim[2];
-                        infoPtr->modesOffset = tagOffset;
+                    if ( tagPtr->flags & IDL_V_ARR ) {
+                        if ( tagPtr->value.arr->n_dim==3 ) {
+                            infoPtr->nModes = tagPtr->value.arr->dim[2];
+                            infoPtr->modesOffset = tagOffset;
+                        } else {
+                            if( verbosity ) cout << "Variable MODE has " << (int)tagPtr->value.arr->n_dim << " dimensions, expected 3." << endl;
+                        }
+                    } else {
+                        if( verbosity ) cout << "Variable MODE is not an array." << endl;
                     }
                 } else if ( contains ( "PIX2CF",tag,true ) ) { // scalar
-                    infoPtr->pix2cf = * ( ( float* ) ( momfbdStruct->value.arr->data + tagOffset ) );
+                    if( !(tagPtr->flags & IDL_V_NOT_SCALAR) ) {
+                        infoPtr->pix2cf = * ( ( float* ) ( momfbdStruct->value.arr->data + tagOffset ) );
+                    } else {
+                        if( verbosity ) cout << "Variable PIX2CF is not a scalar." << endl;
+                    }
                 } else if ( contains ( "CF2PIX",tag,true ) ) { // scalar
-                    infoPtr->cf2pix = * ( ( float* ) ( momfbdStruct->value.arr->data + tagOffset ) );
+                    if( !(tagPtr->flags & IDL_V_NOT_SCALAR) ) {
+                        infoPtr->cf2pix = * ( ( float* ) ( momfbdStruct->value.arr->data + tagOffset ) );
+                    } else {
+                        if( verbosity ) cout << "Variable CF2PIX is not a scalar." << endl;
+                    }
                 }
                 if ( infoPtr->nPH && infoPtr->nModes ) infoPtr->dataMask |= MOMFBD_MODES;
             }
         } else if ( tagPtr->type == IDL_TYP_STRUCT ) { // patches
             if ( ( writeMask & MOMFBD_PATCH ) && contains ( "PATCH",tag,true ) ) {
-                if ( tagPtr->flags & IDL_V_ARR && tagPtr->value.arr->n_dim==2 ) {
+                if ( tagPtr->flags & IDL_V_ARR  ) {
+                    int nDims = tagPtr->value.arr->n_dim;
+                    if( nDims>2 || nDims<1 ) {
+                        cout << "Patch array must be 1D or 2D!" <<  endl;
+                        return;
+                    }
                     infoPtr->nPatchesY = tagPtr->value.arr->dim[0];     // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-                    infoPtr->nPatchesX = tagPtr->value.arr->dim[1];
+                    if( nDims>1 ) infoPtr->nPatchesX = tagPtr->value.arr->dim[1];
+                    else infoPtr->nPatchesX = 1;
                     int64_t offset = 0;
                     infoPtr->patches.resize ( infoPtr->nPatchesX,infoPtr->nPatchesY );
                     for ( int x = 0; x < infoPtr->nPatchesX; ++x ) {
@@ -877,6 +932,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             IDL_VPTR tmpPtr;
                             subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DY", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr ); // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
                             if ( subOffset >= 0 ) {
+                                if( tmpPtr->value.arr->n_dim != 1 ) {
+                                    cout << "Patch variable DY has to be 1D." << endl;
+                                    return;
+                                }
                                 int32_t nChannels = tmpPtr->value.arr->dim[0];
                                 intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
                                 if ( nChannels > 0 ) {
@@ -892,6 +951,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             }
                             subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DX", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                             if ( subOffset >= 0 ) {
+                                if( tmpPtr->value.arr->n_dim != 1 ) {
+                                    cout << "Patch variable DX has to be 1D." << endl;
+                                    return;
+                                }
                                 int32_t nChannels = tmpPtr->value.arr->dim[0];
                                 intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
                                 if ( nChannels > 0 ) {
@@ -908,6 +971,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
                             subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "NIMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                             if ( subOffset >= 0 ) {
+                                if( tmpPtr->value.arr->n_dim != 1 ) {
+                                    cout << "Patch variable NIMG has to be 1D." << endl;
+                                    return;
+                                }
                                 int32_t nChannels = tmpPtr->value.arr->dim[0];
                                 intPtr = ( IDL_INT* ) ( momfbdStruct->value.arr->data + patch->offset + subOffset );
                                 if ( nChannels > 0 ) {
@@ -924,7 +991,11 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
                             if ( writeMask & MOMFBD_IMG ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "IMG", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
-                                if ( subOffset >= 0 && tmpPtr->value.arr->n_dim==2 ) {
+                                if ( subOffset >= 0  ) {
+                                    if( tmpPtr->value.arr->n_dim != 2 ) {
+                                        cout << "Patch variable IMG has to be 2D." << endl;
+                                        return;
+                                    }
                                     int32_t nPixelsX = tmpPtr->value.arr->dim[0];
                                     int32_t nPixelsY = tmpPtr->value.arr->dim[1];
                                     if ( !infoPtr->nPoints && ( nPixelsX == nPixelsY ) ) infoPtr->nPoints = nPixelsX;
@@ -939,6 +1010,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             if ( writeMask & MOMFBD_PSF ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "PSF", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                                 if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nPSF(=nFiles) )
+                                    if( tmpPtr->value.arr->n_dim != 3 ) {
+                                        cout << "Patch variable PSF has to be 3D." << endl;
+                                        return;
+                                    }
                                     patch->psfPos = patch->offset + subOffset;
                                     patch->npsf = tmpPtr->value.arr->dim[2];
                                     infoPtr->dataMask |= MOMFBD_PSF;
@@ -948,6 +1023,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             if ( writeMask & MOMFBD_OBJ ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "OBJ", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                                 if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nOBJ(=nFiles) )
+                                    if( tmpPtr->value.arr->n_dim != 3 ) {
+                                        cout << "Patch variable OBJ has to be 3D." << endl;
+                                        return;
+                                    }
                                     patch->objPos = patch->offset + subOffset;
                                     patch->nobj = tmpPtr->value.arr->dim[2];
                                     infoPtr->dataMask |= MOMFBD_OBJ;
@@ -957,6 +1036,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             if ( writeMask & MOMFBD_RES ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "RES", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                                 if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nRES(=nFiles) )
+                                    if( tmpPtr->value.arr->n_dim != 3 ) {
+                                        cout << "Patch variable RES has to be 3D." << endl;
+                                        return;
+                                    }
                                     patch->resPos = patch->offset + subOffset;
                                     patch->nres = tmpPtr->value.arr->dim[2];
                                     infoPtr->dataMask |= MOMFBD_RES;
@@ -966,6 +1049,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             if ( writeMask & MOMFBD_ALPHA ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "ALPHA", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                                 if ( subOffset >= 0 ) {   // dimensions: (nModes,nALPHA(=nFiles) )
+                                if( tmpPtr->value.arr->n_dim != 2 ) {
+                                    cout << "Patch variable ALPHA has to be 2D." << endl;
+                                    return;
+                                }
                                     patch->alphaPos = patch->offset + subOffset;
                                     patch->nm = tmpPtr->value.arr->dim[0];
                                     patch->nalpha = tmpPtr->value.arr->dim[1];
@@ -976,6 +1063,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                             if ( writeMask & MOMFBD_DIV ) {
                                 subOffset = IDL_StructTagInfoByName ( subStruct, ( char* ) "DIV", IDL_MSG_INFO|IDL_MSG_ATTR_NOPRINT, &tmpPtr );
                                 if ( subOffset >= 0 ) {   // dimensions: (xPixels,yPixels,nDIV(=nFiles) )
+                                if( tmpPtr->value.arr->n_dim != 3 ) {
+                                    cout << "Patch variable DIV has to be 3D." << endl;
+                                    return;
+                                }
                                     patch->diversityPos = patch->offset + subOffset;
                                     patch->nphx = tmpPtr->value.arr->dim[0];
                                     patch->nphy = tmpPtr->value.arr->dim[1];
@@ -989,7 +1080,10 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                         }   // patches x-loop
                     }       // patches y-loop
 
-                }           // if nDims == 2
+                } else {
+                    if( verbosity ) cout << "Variable PATCH is not an array." << endl;
+                    infoPtr->dataMask &= ~MOMFBD_PATCH;
+                }
             }               // PATCH
 
         }                   // struct
