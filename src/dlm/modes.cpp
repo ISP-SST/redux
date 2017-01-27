@@ -171,19 +171,21 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     }
 
     ModeInfo mi(kw.firstZernike, kw.lastZernike, 0, nPixels, radius, kw.angle, kw.cutoff);
-    ModeSet& modes = Cache::get<ModeInfo,ModeSet>(mi);
+    ModeSet& modesRef = Cache::get<ModeInfo,ModeSet>(mi);
 
-    if( modes.empty() ) {
+    if( modesRef.empty() ) {
         if( kw.firstZernike && kw.lastZernike ) {
-            modes.generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff );
+            modesRef.generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff );
         } else {    // first=last=0  =>  Zernike
             kw.firstZernike = kw.lastZernike = 0;   // in case only one was 0.
-            modes.generate( nPixels, radius, kw.angle, modeNumbers );
+            modesRef.generate( nPixels, radius, kw.angle, modeNumbers );
         }
     }
-
+    
+    ModeSet modes = modesRef.clone();
     if( kw.normalize ) {
         modes.getNorms( pupil );
+        modes.normalize( 1.0 );
         cout << "rdx_make_modes: Normalizing not properly implemented at the moment." << endl;
         // TODO: do the actual normalization of the local copy of the modes below
     }
@@ -196,7 +198,6 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         IDL_VarCopy( tmpVar, kw.variance );
     }
     
-
     if( kw.pupil ) {
 
         IDL_VPTR tmpPup; // = IDL_Gettmp();
