@@ -1288,7 +1288,7 @@ namespace apz {
 IDL_VPTR rdx_make_win( int argc, IDL_VPTR* argv, char* argk ) {
     
     apz::KW_RESULT kw;
-    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, (IDL_VPTR*)0, 255, &kw );
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, apz::kw_pars, (IDL_VPTR*)0, 255, &kw );
 
     if( kw.help || nPlainArgs < 1 ) {
         cout << apz::make_win_info(2) << endl;
