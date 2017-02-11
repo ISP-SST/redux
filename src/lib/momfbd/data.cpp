@@ -15,7 +15,7 @@ using namespace std;
 
 
 ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
-
+    if( !c ) throw logic_error("Cannot construct ChannelData from a null ChannelPtr.");
 }
 
 
@@ -110,9 +110,11 @@ void ChannelData::dump( string tag ) {
 
 
 ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
+    if( !o ) throw logic_error("Cannot construct ObjectData from a null ObjectPtr.");
     for( auto& c: o->getChannels() ) {
         channels.push_back( make_shared<Compressed<ChannelData,5>>(c) );
     }
+
 }
 
 
@@ -292,8 +294,9 @@ void ObjectData::dump( string tag ) {
 
 
 PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
-    for( auto& o: j.getObjects() ) {
-        objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
+    vector<shared_ptr<Object>> objs = myJob.getObjects();
+    for( auto& o: objs ) {
+        if(o) objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
     }
 }
 
