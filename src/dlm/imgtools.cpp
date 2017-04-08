@@ -60,9 +60,10 @@ namespace {
         IDL_INT niter;
         IDL_INT nrefpoints;
         IDL_INT show;
-        float threshold;
         IDL_INT verbose;
         IDL_VPTR h_init;
+        IDL_VPTR status;
+        IDL_VPTR threshold;
         IDL_VPTR points;
     } KW_RESULT;
 
@@ -86,7 +87,8 @@ namespace {
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
         { (char*) "SHOW",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (show) },
-        { (char*) "THRESHOLD",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (threshold) },
+        { (char*) "STATUS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (status) },
+        { (char*) "THRESHOLD",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (threshold) },
         { (char*) "VERBOSE",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (verbose) },
         { NULL }
     };
@@ -320,6 +322,12 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     kw.threshold = 0;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
+    if( kw.status ) {
+        IDL_ALLTYPES tmp;
+        tmp.i = 0;
+        IDL_StoreScalar( kw.status, IDL_TYP_INT, &tmp );
+    }
+    
     IDL_VPTR ret;
     IDL_MakeTempArray (IDL_TYP_FLOAT, 2, dims3x3, IDL_ARR_INI_ZERO, &ret);
     Mat retMat = arrayToMat (ret);
@@ -339,6 +347,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
     Mat imgIn1 = getImgAsGrayFloat( img1_in, kw.verbose );
     Mat imgIn2 = getImgAsGrayFloat( img2_in, kw.verbose );
+    
     cv::Size imgSize1 = imgIn1.size();
     cv::Size imgSize2 = imgIn2.size();
     int maxSize = max( imgIn1.size().height, imgIn1.size().width );
@@ -347,14 +356,10 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     
     cv::Size imgSize(maxSize, maxSize);   // The smallest square that fits both images
 
-    Mat imgFloat1(imgSize, imgIn1.type(), Scalar(0));
-    Mat imgFloat2(imgSize, imgIn2.type(), Scalar(0));
-    imgIn1.copyTo(imgFloat1(cv::Rect_<int>(0, 0, imgIn1.size().width, imgIn1.size().height)));
-    imgIn2.copyTo(imgFloat2(cv::Rect_<int>(0, 0, imgIn2.size().width, imgIn2.size().height)));
-
+    std::vector<float> thresholds;
+    
     cv::SimpleBlobDetector::Params params;
-    params.minThreshold = 30;
-    params.thresholdStep = 10;
+    params.thresholdStep = 5;
     params.maxThreshold = 255;
     params.minDistBetweenBlobs = 20;
     params.filterByColor = false;
@@ -364,64 +369,91 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     params.minArea = 10;
     params.maxArea = 150;
     
-    kw.threshold = std::min( std::max(kw.threshold, 0.0f), 1.0f );      // restrict threshold to [0,1]
 
     try {
 
-        Mat imgByte1( imgSize, CV_8UC1 );
-        Mat imgByte2( imgSize, CV_8UC1 );
+        Mat imgByte( imgSize, CV_8UC1 );
+        Mat imgByte1( imgSize1, CV_8UC1 );
+        Mat imgByte2( imgSize2, CV_8UC1 );
+        Mat tmp1( imgSize1, CV_8UC1 );
+        Mat tmp2( imgSize2, CV_8UC1 );
         Mat H, H_init;
 
 #ifdef DEBUG_
         Mat result( imgSize, CV_8UC3 );
 #endif
 
-        if (kw.verbose > 1) {
-            cout << "Applying threshold " << kw.threshold << " to input images." << endl;
+        imgIn1.convertTo( imgByte1, CV_8UC1, 255 );
+        imgIn2.convertTo( imgByte2, CV_8UC1, 255 );
+        
+        kw.margin = std::max<IDL_INT>( kw.margin, 0 );
+        int m2 = 2*kw.margin;
+        Rect ROI1( kw.margin, kw.margin, imgSize1.width-m2, imgSize1.height-m2 );
+        Rect ROI2( kw.margin, kw.margin, imgSize2.width-m2, imgSize2.height-m2 );
+        if( kw.margin > 0 ) {
+            if( m2 >= imgSize1.width || m2 >= imgSize1.height ||
+                m2 >= imgSize2.width || m2 >= imgSize2.height ) {
+                cerr << "img_align: margin is too large." << endl;
+                return ret;
+            }
+            if ( kw.verbose > 1 ) cout << "img_align: applying margin: " << kw.margin << endl;
+            Mat mask1( imgByte1.size(), CV_8UC1, Scalar::all(1) );
+            mask1(ROI1).setTo( Scalar::all(0) );
+            imgByte1.setTo( Scalar::all(0), mask1 );
+            Mat mask2( imgByte2.size(), CV_8UC1, Scalar::all(1) );
+            mask2(ROI2).setTo( Scalar::all(0) );
+            imgByte2.setTo( Scalar::all(0), mask2 );
         }
-        params.minThreshold = kw.threshold*255;
-
-        imgFloat1.convertTo( imgByte1, CV_8UC1, 255 );
-        imgFloat2.convertTo( imgByte2, CV_8UC1, 255 );
-
-        SimpleBlobDetector detector (params);
+        
+        if( kw.threshold ) {
+            thresholds = getAsVector<float>(kw.threshold);
+            if( thresholds.size() ) {
+                thresholds.resize( 2, thresholds[0] );  // if only 1 value, it will be copied
+                thresholds[0] = std::min( std::max(thresholds[0], 0.0f), 1.0f );
+                thresholds[1] = std::min( std::max(thresholds[1], 0.0f), 1.0f );
+                if ( kw.verbose > 1 ) cout << "img_align: applying " << printArray(thresholds,"threshold") << endl;
+                threshold( imgByte1, imgByte1, thresholds[0]*255, 0, THRESH_TOZERO );
+                threshold( imgByte1, imgByte1, thresholds[1]*255, 0, THRESH_TOZERO );
+            }
+        }
+        
+        double otsu1 = threshold( imgByte1, tmp1, 0, 0, THRESH_TOZERO|THRESH_OTSU );
+        double otsu2 = threshold( imgByte2, tmp2, 0, 0, THRESH_TOZERO|THRESH_OTSU );
+        
         vector<KeyPoint> keypoints1, keypoints2;
         
+        params.minThreshold = otsu1/4;
+        SimpleBlobDetector detector1(params);
+        detector1.detect( imgByte1, keypoints1 );
+        
+        params.minThreshold = otsu2/4;
+        SimpleBlobDetector detector2(params);
+        detector2.detect( imgByte2, keypoints2 );
+        
+        imgIn1.convertTo( imgByte1, CV_8UC1, 255 );
+        imgIn2.convertTo( imgByte2, CV_8UC1, 255 );
+        
+        copyMakeBorder( imgByte1, imgByte, 0, maxSize-imgSize1.height, 0, maxSize-imgSize1.width, BORDER_CONSTANT, Scalar::all(0) );
+        imgByte.copyTo(imgByte1);
+        copyMakeBorder( imgByte2, imgByte, 0, maxSize-imgSize2.height, 0, maxSize-imgSize2.width, BORDER_CONSTANT, Scalar::all(0) );
+        imgByte.copyTo(imgByte2);
+    
         Point2f mid1(imgIn1.cols/2, imgIn1.rows/2);
         Point2f mid2(imgIn2.cols/2, imgIn2.rows/2);
 
-        detector.detect( imgByte1, keypoints1 );
-        detector.detect( imgByte2, keypoints2 );
-        Point2f imgEnd1(imgIn1.cols-kw.margin, imgIn1.rows-kw.margin);
-        keypoints1.erase( std::remove_if(keypoints1.begin(), keypoints1.end(),
-                                         [&](const KeyPoint& kp) {
-                                             if ( std::isfinite( norm(kp.pt) ) ) {
-                                                 if( (kp.pt.x > kw.margin) && (kp.pt.y > kw.margin) &&
-                                                     (kp.pt.x < imgEnd1.x) && (kp.pt.y < imgEnd1.y)
-                                                 ) return false;
-                                             }
-                                             return true;
-                                        }),
-                          keypoints1.end());
-        
-        Point2f imgEnd2(imgIn2.cols-kw.margin, imgIn2.rows-kw.margin);
-        keypoints2.erase( std::remove_if(keypoints2.begin(), keypoints2.end(),
-                                         [&kw,&imgEnd2](const KeyPoint& kp) {
-                                             if ( std::isfinite( norm(kp.pt) ) ) {
-                                                 if( (kp.pt.x > kw.margin) && (kp.pt.y > kw.margin) &&
-                                                     (kp.pt.x < imgEnd2.x) && (kp.pt.y < imgEnd2.y)
-                                                 ) return false;
-                                             }
-                                             return true;
-                                        }),
-                          keypoints2.end());
-
-        if ( kw.verbose > 1 || keypoints1.size() < 3 || keypoints2.size() < 3 ) {
+        if ( kw.verbose > 1 ) {
             cout << "Detected " << keypoints1.size() << " keypoints in image 1 and " << keypoints2.size() << " keypoints in image 2" << endl;
         }
         
         if( keypoints1.size() < 3 || keypoints2.size() < 3 ) {
-            cout << "Not enough points for fitting." << endl;
+            if( kw.status ) {
+                IDL_ALLTYPES tmp;
+                tmp.i = -1;
+                IDL_StoreScalar( kw.status, IDL_TYP_INT, &tmp );
+            } else {
+                cout << "Not enough points for fitting, try to adjust threshold (" <<
+                    printArray(thresholds,"current") << ")." << endl;
+            }
             return ret;
         }
         
@@ -468,9 +500,21 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         
         vector<KeyPoint> selectedKP1( keypoints1.begin(), keypoints1.end() );
         vector<KeyPoint> selectedKP2( keypoints2.begin(), keypoints2.end() );
+        if( selectedKP1.size() > size_t(3*kw.nrefpoints) ) selectedKP1.resize(3*kw.nrefpoints);
+        if( selectedKP2.size() > size_t(3*kw.nrefpoints) ) selectedKP2.resize(3*kw.nrefpoints);
+        
+        // sort w.r.t. distance from center
+        std::sort (selectedKP1.begin(), selectedKP1.end(),
+            [&] (const KeyPoint& a, const KeyPoint& b) {
+                return (cv::norm(a.pt - mid1) < cv::norm(b.pt - mid1));
+        });
+        std::sort (selectedKP2.begin(), selectedKP2.end(),
+            [&] (const KeyPoint& a, const KeyPoint& b) {
+                return (cv::norm(a.pt - mid2) < cv::norm(b.pt - mid2));
+        });
         if( selectedKP1.size() > size_t(kw.nrefpoints) ) selectedKP1.resize(kw.nrefpoints);
-        if( selectedKP2.size() > size_t(2*kw.nrefpoints) ) selectedKP2.resize(2*kw.nrefpoints);
-
+        if( selectedKP2.size() > size_t(kw.nrefpoints+2) ) selectedKP2.resize(kw.nrefpoints+2);
+        
         std::vector<Mat> initializations;
         if( kw.h_init ) {
             if( kw.h_init->type == IDL_TYP_UNDEF ) {
@@ -500,22 +544,16 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         
         // Create mask with the strongest 50% of the pinholes.
         // This will introduce asymmetry so that the crosscorrelation gives a clearer unique maximum
-        Mat ccMask( imgSize, CV_8UC1, Scalar(0) );
+        imgByte.setTo( Scalar::all(0) );
         for( size_t i=0; i<keypoints2.size()/2; ++i ) {
             KeyPoint& kp = keypoints2[i];
-            circle( ccMask, kp.pt, 2*kp.size, Scalar(255), -1 );
-        }
-        
-        if ( kw.verbose > 2 ) {
-            Array<uint8_t> slask( ccMask.data, ccMask.rows, ccMask.cols );
-            Ana::write("cc_mask.f0",slask);
+            circle( imgByte, kp.pt, 4*kp.size, Scalar(255), -1 );
         }
         
         std::map<double, Mat> results;
         TermCriteria term_crit = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, kw.niter, kw.eps);
         auto fit_func = std::bind( findTransformECC, std::ref(imgByte1), std::ref(imgByte2), std::placeholders::_1,
-            MOTION_HOMOGRAPHY, term_crit, ccMask //noArray()
-        );
+            MOTION_HOMOGRAPHY, term_crit, imgByte );
         
         boost::asio::io_service service;
         boost::thread_group pool;
@@ -540,9 +578,14 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         pool.join_all();
         
         if( results.empty() ) {
-            cout << "Failed to match detected pinholes, try to increase nref (current: "
-                 << kw.nrefpoints << ")  or adjust threshold (current: "
-                 << kw.threshold << ")." << endl;
+            if( kw.status ) {
+                IDL_ALLTYPES tmp;
+                tmp.i = -2;
+                IDL_StoreScalar( kw.status, IDL_TYP_INT, &tmp );
+            } else {
+                cout << "Failed to match detected pinholes, try to increase nref (current: "
+                    << kw.nrefpoints << ")." << endl;
+            }
             return ret;
         }
         H = results.rbegin()->second;
@@ -656,7 +699,6 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
     kw.help = 0;
     kw.nrefpoints = 4;
     kw.verbose = 0;
-    kw.threshold = 0.05;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     if (nPlainArgs != 2) {
@@ -671,16 +713,32 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
     IDL_ENSURE_SIMPLE (H_in);
     IDL_ENSURE_ARRAY (H_in);
 
-    const Mat img = arrayToMat (img_in);
-    const Mat H = arrayToMat (H_in);
+    const Mat img = arrayToMat(img_in);
+    const Mat H = arrayToMat(H_in);
+    
+    Size2f inSize = img.size();
 
+    vector<Point2f> corners({{0,0}, {inSize.width,0}, {0,inSize.height}, {inSize.width,inSize.height}});
+    vector<Point2f>  mappedCorners;
+    perspectiveTransform( corners, mappedCorners, H );
+    int maxX = mappedCorners[0].x;
+    int minX = mappedCorners[0].x;
+    int maxY = mappedCorners[0].y;
+    int minY = mappedCorners[0].y;
+    for( auto& c: mappedCorners ) {
+        maxX = max<int>(maxX, c.x+0.5);
+        minX = min<int>(minX, c.x+0.5);
+        maxY = max<int>(maxY, c.y+0.5);
+        minY = min<int>(minY, c.y+0.5);
+    }
 
     IDL_VPTR out;
-    IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim,  img_in->value.arr->dim, IDL_ARR_INI_NOP, &out);
+    IDL_ARRAY_DIM outDims = { maxX-minX+1, maxY-minY+1, 0, 0, 0, 0, 0, 0 };
+    IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_NOP, &out);
 
-    Mat outImg = arrayToMat (out);
-    img.copyTo (outImg);
+    Mat outImg = arrayToMat(out);
     Size dsize = outImg.size();
+
     int flags = INTER_CUBIC;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
     int borderMode = BORDER_CONSTANT;
     const Scalar borderValue = Scalar();
@@ -717,7 +775,6 @@ IDL_VPTR redux::img_remap (int argc, IDL_VPTR* argv, char* argk) {
     kw.help = 0;
     kw.nrefpoints = 4;
     kw.verbose = 0;
-    kw.threshold = 0.05;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     if (nPlainArgs != 3) {

@@ -126,20 +126,22 @@ namespace redux {
 
     template <typename T>
     std::vector<T> getAsVector( const IDL_VPTR& v ) {
-        IDL_ENSURE_SIMPLE( v );
-        std::vector<T> ret(1);
-        if ( v->flags & IDL_V_ARR ) {   // array
-            size_t nEl = v->value.arr->n_elts;
-            ret.resize( nEl );
-            copyFromIDL( v->value.arr->data, ret.data(), nEl, v->type );
-        } else {    // scalar
-            switch(v->type) {
-                case IDL_TYP_BYTE: ret[0] = v->value.c; break;
-                case IDL_TYP_INT: ret[0] = v->value.i; break;
-                case IDL_TYP_LONG: ret[0] = v->value.l; break;
-                case IDL_TYP_FLOAT: ret[0] = v->value.f; break;
-                case IDL_TYP_DOUBLE: ret[0] = v->value.d; break;
-                default: std::cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << std::endl;
+        std::vector<T> ret;
+        if( v->type != IDL_TYP_UNDEF ) {
+            if ( v->flags & IDL_V_ARR ) {   // array
+                size_t nEl = v->value.arr->n_elts;
+                ret.resize( nEl );
+                copyFromIDL( v->value.arr->data, ret.data(), nEl, v->type );
+            } else {    // scalar
+                ret.resize( 1 );
+                switch(v->type) {
+                    case IDL_TYP_BYTE: ret[0] = v->value.c; break;
+                    case IDL_TYP_INT: ret[0] = v->value.i; break;
+                    case IDL_TYP_LONG: ret[0] = v->value.l; break;
+                    case IDL_TYP_FLOAT: ret[0] = v->value.f; break;
+                    case IDL_TYP_DOUBLE: ret[0] = v->value.d; break;
+                    default: std::cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << std::endl;
+                }
             }
         }
         return std::move(ret);
