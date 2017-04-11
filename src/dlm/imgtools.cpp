@@ -420,6 +420,8 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         double otsu1 = threshold( imgByte1, tmp1, 0, 0, THRESH_TOZERO|THRESH_OTSU );
         double otsu2 = threshold( imgByte2, tmp2, 0, 0, THRESH_TOZERO|THRESH_OTSU );
         
+        if ( kw.verbose > 1 ) cout << "img_align: Detection cutoffs: [" << otsu1 << "," << otsu2 << "]" << endl;
+        
         vector<KeyPoint> keypoints1, keypoints2;
         
         params.minThreshold = otsu1/4;
