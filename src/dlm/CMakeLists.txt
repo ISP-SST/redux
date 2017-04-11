@@ -91,6 +91,8 @@ if (DEFINED IDL_FOUND)
          "${REDUX_LIB_BASE}/util/progresswatch.cpp"
          "${REDUX_LIB_BASE}/util/stopwatch.cpp"
          "${REDUX_LIB_BASE}/util/stringutil.cpp"
+         "${REDUX_LIB_BASE}/util/astro_comp.cpp"
+         "${REDUX_LIB_BASE}/util/solar_system_geo.cpp"
          "${REDUX_LIB_BASE}/version.cpp"
          "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )
@@ -106,7 +108,7 @@ if (DEFINED IDL_FOUND)
         set( REDUX_RDX_DEPS ${REDUX_RDX_DEPS} cvutil.cpp ${REDUX_UTIL_OPENCV_CPP} )
     endif()
     
-    add_library(rdx SHARED rdx.cpp ${REDUX_RDX_DEPS} )
+    add_library(rdx SHARED rdx.cpp convertlog.cpp ${REDUX_RDX_DEPS} )
     set(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${REDUX_CURRENT_LIBRARIES})

@@ -6,6 +6,8 @@ BUILD_DATE ${LIBREDUX_COMMIT_TIME}
 PROCEDURE       RDX               0       1
 PROCEDURE       RDX_CLEAR_CACHE   0       0
 PROCEDURE       RDX_CLEAR_MODES   0       0
+PROCEDURE       RDX_CONVERTLOG    0       2          KEYWORDS
+FUNCTION        RDX_CONVERTLOG    0       1          KEYWORDS
 FUNCTION        RDX_CONVOLVE      2       2          KEYWORDS
 FUNCTION        RDX_DESCATTER     3       3          KEYWORDS
 FUNCTION        RDX_FILETYPE      0       1
