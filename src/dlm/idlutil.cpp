@@ -18,7 +18,8 @@ using namespace std;
 
 int IdlContainer::registerRoutine( IDL_SYSFUN_DEF2 def, int is_function, info_func info, void_func cleanup ) {
 
-    auto result = get().routines.emplace( def.name, RoutineInfo(def, info) );
+    string name = def.name + to_string(is_function);
+    auto result = get().routines.emplace( name, RoutineInfo(def, info) );
     if( result.second ) {
         result.first->second.is_function = is_function;
         result.first->second.cleanup = cleanup;
