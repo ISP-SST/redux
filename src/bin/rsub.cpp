@@ -314,7 +314,12 @@ int main (int argc, char *argv[]) {
 
         bpt::read_info (filteredCfg , momfbd);
         bool check = (vm.count ("no-check") == 0 && !vm.count ("print"));
-        vector<Job::JobPtr> jobs = Job::parseTree (vm, momfbd, check);
+        vector<Job::JobPtr> jobs;
+        try {
+            jobs = Job::parseTree (vm, momfbd, check);
+        } catch ( const exception& e ) {
+            LOG_ERR << "Error while parsing cfg file(s):\n" << e.what() << ende;
+        }
         
         if( jobs.empty() ) {
             LOG_WARN << "No jobs to upload." << ende;
