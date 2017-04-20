@@ -323,11 +323,6 @@ void Fits::read( const std::string& filename ) {
         throwStatusError( filename, status_ );
     }
     
-    if ( nHDU > 1 ) {
-        cout << "filefits: " << __LINE__ << "   status  " << status_ << "   nHDU  " << nHDU << endl; 
-        //throw logic_error( "Fits::read() only 1 HDU supported for now.  file:" + filename );
-    }
-
     if( fits_get_hdu_type( fitsPtr_, &hduType, &status_ ) ) {
         throwStatusError( filename, status_ );
     }
@@ -893,6 +888,11 @@ void Fits::read( std::shared_ptr<redux::file::Fits>& hdr, char* data ) {
     bool pg_data(false);
     char card[81];
     memset(card,0,81);
+    
+    if( fits_movabs_hdu( hdr->fitsPtr_, 1, nullptr,  &status) ) {
+        throwStatusError( "Fits::read(hdr,data) moving to primary HDU.", status );
+    }
+    
     if( fits_read_keyword( hdr->fitsPtr_, "SOLARNET", card, nullptr, &status ) ) {
         if( status != KEY_NO_EXIST ) {
             throwStatusError( "Fits::read(hdr,data) SOLARNET", status );
