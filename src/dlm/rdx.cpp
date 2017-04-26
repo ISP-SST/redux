@@ -134,7 +134,7 @@ double *bezier2 (int n, T *xin, U *yin, int np, double *xp) {
     //
     double aa0 = (y[1] - y[0]) / (x[1] - x[0]);
     double bb0 = y[0] - aa0 * x[0];
-    double aa1 = (y[n - 1] - y[n - 2]) / (x[n - 1] - y[n - 2]);
+    double aa1 = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
     double bb1 = y[n - 1] - aa1 * x[n - 1];
 
     for (int k = 0; k < np; k++) {
@@ -206,7 +206,7 @@ double *bezier3 (int n, T *xin, U *yin, int np, double *xp) {
     //
     double aa0 = (y[1] - y[0]) / (x[1] - x[0]);
     double bb0 = y[0] - aa0 * x[0];
-    double aa1 = (y[n - 1] - y[n - 2]) / (x[n - 1] - y[n - 2]);
+    double aa1 = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
     double bb1 = y[n - 1] - aa1 * x[n - 1];
 
     for (int k = 0; k < np; k++) {
