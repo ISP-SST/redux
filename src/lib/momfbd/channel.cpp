@@ -996,7 +996,7 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
     bool flipY(false);
     if( alignMap.size() == 9 ) {
         if( alignMap[0] < 0 ) flipX = true;
-        if( alignMap[0] < 4 ) flipY = true;
+        if( alignMap[4] < 0 ) flipY = true;
     } else if( alignClip.size() == 4) {
         if( alignClip[0] > alignClip[1] ) flipX = true;
         if( alignClip[2] > alignClip[3] ) flipY = true;
