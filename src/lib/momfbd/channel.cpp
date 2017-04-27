@@ -1048,7 +1048,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     
     if( alignMap.size() == 9 ) {
         if( alignMap[0] < 0 ) flipX = true;
-        if( alignMap[0] < 4 ) flipY = true;
+        if( alignMap[4] < 0 ) flipY = true;
         ProjectiveMap map( alignMap );
         localPos = map*(refPos + myJob.roi.first);  // position in reference-channel, global coordinates
     } else {                                // old style alignment with clips & offsetfiles
