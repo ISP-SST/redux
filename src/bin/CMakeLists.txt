@@ -12,10 +12,10 @@ if( Boost_VERSION VERSION_LESS "1.41" )
 endif()
 
 
-REDUX_ADD_EXECUTABLE( rsub rsub.cpp )
-REDUX_ADD_EXECUTABLE( rstat rstat.cpp )
-REDUX_ADD_EXECUTABLE( rdel rdel.cpp )
-REDUX_ADD_EXECUTABLE( rctl rctl.cpp )
+REDUX_ADD_EXECUTABLE( rdx_sub rsub.cpp )
+REDUX_ADD_EXECUTABLE( rdx_stat rstat.cpp )
+REDUX_ADD_EXECUTABLE( rdx_del rdel.cpp )
+REDUX_ADD_EXECUTABLE( rdx_ctl rctl.cpp )
 
 REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
@@ -32,5 +32,5 @@ if (NOT QT4_FOUND)
 endif()
 
 set(CMAKE_AUTOMOC ON)
-REDUX_ADD_EXECUTABLE( redux-gui redux-gui.cpp )
+REDUX_ADD_EXECUTABLE( rdx_gui redux-gui.cpp )
 
