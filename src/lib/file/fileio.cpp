@@ -54,12 +54,14 @@ Format redux::file::readFmt( const string& filename ) {
             switch( magic ) {
                 case Ana::MAGIC_ANA: ;
                 case Ana::MAGIC_ANAR: return FMT_ANA;
-                case FileMomfbd::MAGIC_MOMFBD: return FMT_MOMFBD;
+                case FileMomfbd::MAGIC_MOMFBD8: ;	// Fall through
+                case FileMomfbd::MAGIC_MOMFBD10: ;	// Fall through
+                case FileMomfbd::MAGIC_MOMFBD11: return FMT_MOMFBD;
 #ifdef REDUX_WITH_FITS
                 case Fits::MAGIC_FITS: return FMT_FITS;
 #endif
                 //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-                default: cout << "readFmt needs to be implemented for this file-type: \"" << filename << "\""  << endl; return FMT_NONE; 
+                default: std::ios_base::failure("readFmt needs to be implemented for this file-type: \"" +filename+"\""); 
             }
         } else throw std::ios_base::failure("Failed to read file: "+filename);
     } else throw std::ios_base::failure("Failed to open file: "+filename);

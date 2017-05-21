@@ -26,7 +26,9 @@ namespace redux {
         struct FileMomfbd : public redux::file::FileMeta {
 
             enum Magic {
-                MAGIC_MOMFBD = 0x00000b00     // FIXME: this assumes version-string is always 10 chars long
+                MAGIC_MOMFBD8 = 0x00000900,     	// version-string is 8 chars long (no decimals)
+                MAGIC_MOMFBD10 = 0x00000b00,     	// version-string is 10 chars long (1 decimal)
+                MAGIC_MOMFBD11 = 0x00000c00     	// version-string is 11 chars long (2 decimals)
                 //,MAGIC_MOMFBD_BE = 0x00000001    // file written on a big-endian system (first 5 bytes = 0x0b00000001)
             };
             typedef std::shared_ptr<FileMomfbd> Ptr;
