@@ -90,7 +90,7 @@ namespace redux {
 
         };
 
-        /*! @class Counter Counter.h "redux/Counter.h"
+       /*! @class Counter counter.hpp "redux/counter.hpp"
         *  @brief Counter-class to be used for triggering, waiting for certain values and similar.
         *  @details   Providing a "wait()" function and a callback-facility to allow triggering when a specified target-value is reached.
         *  @author    Tomas Hillberg (hillberg@astro.su.se)

@@ -2,8 +2,7 @@
  * @page coding_conventions REDUX Coding Conventions
  *
  * This page describes the genereal coding conventions that should be 
- * followed while developing REDUX modules or projects based on the
- * REDUX platform.
+ * followed while developing modules or functions for inclusion in REDUX.
  *
  * @section CC_TOC Table of contents
  * \ref CC_1 \n 

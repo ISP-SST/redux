@@ -10,9 +10,14 @@ namespace fs = boost::filesystem;
 namespace redux {
 
     namespace util {
+        
+       /*!  @ingroup util
+        *  @{
+        */
 
-        /*! @enum Color
-        *  @brief Constants for use with String::color() to generate colored strings (using console escape characters)
+
+       /*! @enum EntryType
+        *  @brief Identifiers for filesystem entries.s
         */
         enum EntryType { ET_UNDEF=0, ET_DIRECTORY=1, ET_FILE=2, ET_SYMLINK=4 };
 
@@ -42,6 +47,7 @@ namespace redux {
         }; // end RecursePath
 
 
+       /*! @} */
 
     } // end namespace util
 

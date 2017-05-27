@@ -141,7 +141,7 @@ namespace redux {
             /********* Hardware **********/
             double telescopeF;                       //!< Telescope focal length  (or Ratio?)
             double arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
-            double pixelSize;                        //!< Physical size of pixels (default: 10\mu)
+            double pixelSize;                        //!< Physical size of pixels (default: 10\f$\mu\f$)
             double alphaToPixels,pixelsToAlpha;      //!< Conversion factors for the tilt-modes. Derived from arcSecsPerPixel & telescopeD.
             double alphaToDefocus,defocusToAlpha;    //!< Conversion factors for the focus-mode. Derived from telescopeD. (defocus in meters)
             /*****************************/
