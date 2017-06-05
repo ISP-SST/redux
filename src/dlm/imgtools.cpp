@@ -2558,34 +2558,35 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                             allOk = false;
                         }
                     }
-                    if( allOk ) continue;
-                    progWatch.increaseTarget(1);
-                    ioService.post([&,i,frameCount](){
-                        shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
-                        shared_ptr<redux::file::FileMeta> threadMeta;
-                        try {
-                            readFile( existingFiles[0], threadBuffer.get(), threadMeta );
-                            size_t bufferOffset(0);
-                            for( size_t j=0; j<nFrames[i]; ++j ) {
-                                if( checkedPtr[frameCount+j] == 0 ) {     // subtract discarded images
-                                    progWatch.increaseTarget(1);
-                                    ioService.post( std::bind(sumFunc, frameCount+j, threadBuffer, bufferOffset) );
-                                    --nSummed;
-                                    if( shifts ) {
-                                        shifts[frameCount+j][0] = 0;
-                                        shifts[frameCount+j][1] = 0;
+                    if( !allOk ) {
+                        progWatch.increaseTarget(1);
+                        ioService.post([&,i,frameCount](){
+                            shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
+                            shared_ptr<redux::file::FileMeta> threadMeta;
+                            try {
+                                readFile( existingFiles[0], threadBuffer.get(), threadMeta );
+                                size_t bufferOffset(0);
+                                for( size_t j=0; j<nFrames[i]; ++j ) {
+                                    if( checkedPtr[frameCount+j] == 0 ) {     // subtract discarded images
+                                        progWatch.increaseTarget(1);
+                                        ioService.post( std::bind(sumFunc, frameCount+j, threadBuffer, bufferOffset) );
+                                        --nSummed;
+                                        if( shifts ) {
+                                            shifts[frameCount+j][0] = 0;
+                                            shifts[frameCount+j][1] = 0;
+                                        }
+                                        if( !time_beg.empty() ) {
+                                            time_beg[frameCount+j] = time_end[frameCount+j] = bpx::ptime();
+                                        }
                                     }
-                                    if( !time_beg.empty() ) {
-                                        time_beg[frameCount+j] = time_end[frameCount+j] = bpx::ptime();
-                                    }
+                                    bufferOffset += frameSize;
                                 }
-                                bufferOffset += frameSize;
+                            } catch( const exception& e ) {
+                                cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
                             }
-                        } catch( const exception& e ) {
-                            cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
-                        }
-                        ++progWatch;
-                    });
+                            ++progWatch;
+                        });
+                    }
                     frameCount += nFrames[i];
                 }
 
