@@ -16,7 +16,7 @@ endif()
 
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing -O4")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing -O3 -pg -DDEBUG_ -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing -O4 -march=native")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing -O3 -march=native -pg -DDEBUG_ -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -std=c99 -w -O3")
