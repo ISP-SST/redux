@@ -425,12 +425,23 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         vector<KeyPoint> keypoints1, keypoints2;
         
         params.minThreshold = otsu1/4;
-        SimpleBlobDetector detector1(params);
-        detector1.detect( imgByte1, keypoints1 );
+
+        Ptr<SimpleBlobDetector> detector;
+        
+#if CV_MAJOR_VERSION >= 3
+        detector = SimpleBlobDetector::create(params);
+#else
+        detector = Ptr<SimpleBlobDetector>( new SimpleBlobDetector(params) );
+#endif
+        detector->detect( imgByte1, keypoints1 );
         
         params.minThreshold = otsu2/4;
-        SimpleBlobDetector detector2(params);
-        detector2.detect( imgByte2, keypoints2 );
+#if CV_MAJOR_VERSION >= 3
+        detector = SimpleBlobDetector::create(params);
+#else
+        detector = Ptr<SimpleBlobDetector>( new SimpleBlobDetector(params) );
+#endif
+        detector->detect( imgByte2, keypoints2 );
         
         imgIn1.convertTo( imgByte1, CV_8UC1, 255 );
         imgIn2.convertTo( imgByte2, CV_8UC1, 255 );
