@@ -261,7 +261,7 @@ namespace {
             offset = tmp&7;
             *ptr |= 13;
             *(ptr+1) |= 13;
-            //*p.p32 |= 13;
+            // *p.p32 |= 13;
             tmp = offset+split+1;       // we are setting the unary "1"-bit together with the entropy bits, hence +1
             ptr += tmp>>3;
             offset = tmp&7;

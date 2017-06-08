@@ -317,7 +317,7 @@ string redux::util::tvToString( const timeval& a, bool millis ) {
 
 
     char tmp[15];
-    strftime( tmp, 14, "%H:%M:%S\0", gmtime( &a.tv_sec ) );
+    strftime( tmp, 14, "%H:%M:%S", gmtime( &a.tv_sec ) );
     string ret( tmp );
 
     if ( millis ) {
@@ -334,7 +334,7 @@ string redux::util::tsToString( const timespec& a, bool millis ) {
 
 
     char tmp[15];
-    strftime( tmp, 14, "%H:%M:%S\0", gmtime( &a.tv_sec ) );
+    strftime( tmp, 14, "%H:%M:%S", gmtime( &a.tv_sec ) );
     string ret( tmp );
 
     if ( millis ) {
