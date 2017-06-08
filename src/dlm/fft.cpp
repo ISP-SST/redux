@@ -141,8 +141,8 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
         FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( ySize, xSize, FourierTransform::Plan::R2C, 1 );
 
         size_t tmpSize = (kw.nthreads+1)*(ftSize+fftAlign);
-        std::shared_ptr<fftw_complex> tmpComplex( (fftw_complex*)fftw_malloc(tmpSize*sizeof(fftw_complex)), fftw_free );
-        fftw_complex* psfFT = tmpComplex.get();
+        std::shared_ptr<double> tmpComplex( (double*)fftw_malloc(tmpSize*sizeof(fftw_complex)), fftw_free );
+        fftw_complex* psfFT = reinterpret_cast<fftw_complex*>(tmpComplex.get());
         fftw_complex* ptrC = psfFT + ftSize + fftAlign;
 
         shared_ptr<double> psf( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free );
@@ -377,8 +377,8 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         FourierTransform::reorder( psfPtr, paddedY, paddedX );
         
         FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( paddedY, paddedX, FourierTransform::Plan::R2C, kw.nthreads );
-        std::shared_ptr<fftw_complex> otf( (fftw_complex*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
-        fftw_complex* otfPtr = otf.get();
+        std::shared_ptr<double> otf( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
+        fftw_complex* otfPtr = reinterpret_cast<fftw_complex*>(otf.get());
         plan->forward( psfPtr, otfPtr );
        
         string statusString;

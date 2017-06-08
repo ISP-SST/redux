@@ -1509,7 +1509,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         shared_ptr<double> darkData, gainData, bsGainData;
         shared_ptr<uint8_t> maskData;
         shared_ptr<uint8_t*> mask2D;
-        shared_ptr<fftw_complex> bsOtfData;
+        shared_ptr<double> bsOtfData;
         double *darkPtr = nullptr;
         double *gainPtr = nullptr;
         double *bsGainPtr = nullptr;
@@ -1589,8 +1589,8 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                     
                     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( ySizePadded, xSizePadded, FourierTransform::Plan::R2C, 1 );
                     //bsOtfData.reset( fftw_alloc_complex( ySizePadded*(xSizePadded/2+1) ), fftw_free );
-                    bsOtfData.reset( (fftw_complex*)fftw_malloc(ySizePadded*(xSizePadded/2+1)*sizeof(fftw_complex)), fftw_free );
-                    bsOtfPtr = bsOtfData.get();
+                    bsOtfData.reset( (double*)fftw_malloc(ySizePadded*(xSizePadded/2+1)*sizeof(fftw_complex)), fftw_free );
+                    bsOtfPtr = reinterpret_cast<fftw_complex*>(bsOtfData.get());
                     plan->forward( bsPsfData.get(), bsOtfPtr );
                     
                 } else cout << "backscatter_gain/psf must be a 2D images." << endl;
@@ -2126,7 +2126,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         shared_ptr<double> darkData, gainData, bsGainData;
         shared_ptr<uint8_t> maskData;
         shared_ptr<uint8_t*> mask2D;
-        shared_ptr<fftw_complex> bsOtfData;
+        shared_ptr<double> bsOtfData;
         double *darkPtr = nullptr;
         double *gainPtr = nullptr;
         double *bsGainPtr = nullptr;
@@ -2203,8 +2203,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     FourierTransform::reorder( psfPtr, ySizePadded, xSizePadded );
                     
                     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( ySizePadded, xSizePadded, FourierTransform::Plan::R2C, 1 );
-                    bsOtfData.reset( fftw_alloc_complex( ySizePadded*(xSizePadded/2+1) ), fftw_free );
-                    bsOtfPtr = bsOtfData.get();
+                    bsOtfData.reset( (double*)fftw_malloc( ySizePadded*(xSizePadded/2+1)*sizeof(fftw_complex) ), fftw_free );
+                    bsOtfPtr = reinterpret_cast<fftw_complex*>(bsOtfData.get());
                     plan->forward( bsPsfData.get(), bsOtfPtr );
                     
                 } else cout << "backscatter_gain/psf must be a 2D images." << endl;

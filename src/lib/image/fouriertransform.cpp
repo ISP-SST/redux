@@ -61,32 +61,44 @@ void FourierTransform::Plan::init (void) {
   
     if (id.tp == R2C) {
         if (id.sizes.size() == 2) {
-            auto in = sharedArray<double> (id.sizes[0], id.sizes[1]);
-            auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1] / 2 + 1);
-            forward_plan = fftw_plan_dft_r2c_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_MEASURE);   // FFTW_MEASURE|FFTW_UNALIGNED
-            backward_plan = fftw_plan_dft_c2r_2d (id.sizes[0], id.sizes[1], *out.get(), *in.get(), FFTW_MEASURE);
+            size_t nPix = id.sizes[0]*id.sizes[1];
+            size_t ftSize = id.sizes[0]*(id.sizes[1] / 2 + 1);
+            std::shared_ptr<double> data( (double*)fftw_malloc(nPix*sizeof(double)), fftw_free );
+            std::shared_ptr<double> ft( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
+            fftw_complex* ftPtr = reinterpret_cast<fftw_complex*>(ft.get());
+            forward_plan = fftw_plan_dft_r2c_2d (id.sizes[0], id.sizes[1], data.get(), ftPtr, FFTW_MEASURE);   // FFTW_MEASURE|FFTW_UNALIGNED
+            backward_plan = fftw_plan_dft_c2r_2d (id.sizes[0], id.sizes[1], ftPtr, data.get(), FFTW_MEASURE);
         } else
             if (id.sizes.size() == 1) {
-                auto in = sharedArray<double> (id.sizes[0]);
-                auto out = sharedArray<fftw_complex> (id.sizes[0] / 2 + 1);
-                forward_plan = fftw_plan_dft_r2c_1d (id.sizes[0], in.get(), out.get(), FFTW_MEASURE);
-                backward_plan = fftw_plan_dft_c2r_1d (id.sizes[0] / 2 + 1, out.get(), in.get(), FFTW_MEASURE);
+                size_t nPix = id.sizes[0];
+                size_t ftSize = id.sizes[0] / 2 + 1;
+                std::shared_ptr<double> data( (double*)fftw_malloc(nPix*sizeof(double)), fftw_free );
+                std::shared_ptr<double> ft( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
+                fftw_complex* ftPtr = reinterpret_cast<fftw_complex*>(ft.get());
+                forward_plan = fftw_plan_dft_r2c_1d( nPix, data.get(), ftPtr, FFTW_MEASURE);
+                backward_plan = fftw_plan_dft_c2r_1d( ftSize, ftPtr, data.get(), FFTW_MEASURE);
             } else {
                 throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
             }
     } else {
         if (id.tp == C2C) {
             if (id.sizes.size() == 2) {
-                auto in = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
-                auto out = sharedArray<fftw_complex> (id.sizes[0], id.sizes[1]);
-                forward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_FORWARD, FFTW_MEASURE);
-                backward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], *in.get(), *out.get(), FFTW_BACKWARD, FFTW_MEASURE);
+                size_t nPix = id.sizes[0]*id.sizes[1];
+                std::shared_ptr<double> data( (double*)fftw_malloc(nPix*sizeof(fftw_complex)), fftw_free );
+                std::shared_ptr<double> ft( (double*)fftw_malloc(nPix*sizeof(fftw_complex)), fftw_free );
+                fftw_complex* dataPtr = reinterpret_cast<fftw_complex*>(data.get());
+                fftw_complex* ftPtr = reinterpret_cast<fftw_complex*>(ft.get());
+                forward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], dataPtr, ftPtr, FFTW_FORWARD, FFTW_MEASURE);
+                backward_plan = fftw_plan_dft_2d (id.sizes[0], id.sizes[1], dataPtr, ftPtr, FFTW_BACKWARD, FFTW_MEASURE);
             } else {
                 if (id.sizes.size() == 1) {
-                    auto in = sharedArray<fftw_complex> (id.sizes[0]);
-                    auto out = sharedArray<fftw_complex> (id.sizes[0]);
-                    forward_plan = fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_FORWARD, FFTW_MEASURE);
-                    backward_plan =  fftw_plan_dft_1d (id.sizes[0], in.get(), out.get(), FFTW_BACKWARD, FFTW_MEASURE);
+                    size_t nPix = id.sizes[0];
+                    std::shared_ptr<double> data( (double*)fftw_malloc(nPix*sizeof(fftw_complex)), fftw_free );
+                    std::shared_ptr<double> ft( (double*)fftw_malloc(nPix*sizeof(fftw_complex)), fftw_free );
+                    fftw_complex* dataPtr = reinterpret_cast<fftw_complex*>(data.get());
+                    fftw_complex* ftPtr = reinterpret_cast<fftw_complex*>(ft.get());
+                    forward_plan = fftw_plan_dft_1d( nPix, dataPtr, ftPtr, FFTW_FORWARD, FFTW_MEASURE);
+                    backward_plan =  fftw_plan_dft_1d( nPix, dataPtr, ftPtr, FFTW_BACKWARD, FFTW_MEASURE);
                 } else {
                     throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
                 }

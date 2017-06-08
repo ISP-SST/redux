@@ -24,8 +24,8 @@ void redux::image::descatter( double* img, size_t imgY, size_t imgX, double* gai
     
     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( paddedY, paddedX, FourierTransform::Plan::R2C, nthreads );
     
-    std::shared_ptr<fftw_complex> ft( (fftw_complex*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
-    fftw_complex* ftPtr = ft.get();        
+    std::shared_ptr<double> ft( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
+    fftw_complex* ftPtr = reinterpret_cast<fftw_complex*>(ft.get());
     std::shared_ptr<double> tmp( (double*)fftw_malloc(nPaddedPixels*sizeof(double)), fftw_free );
     double* tmpPtr = tmp.get();
     std::shared_ptr<double> tmpC( (double*)fftw_malloc(nPaddedPixels*sizeof(double)), fftw_free );
@@ -76,13 +76,14 @@ void redux::image::descatter( double* img, size_t imgY, size_t imgX, double* gai
 }
 
 
-void redux::image::descatter( double* img, size_t szY, size_t szX, double* gain, double* psf, size_t paddedY, size_t paddedX, int nthreads, int niter, float epsilon ) {
+void redux::image::descatter( double* img, size_t nRows, size_t nCols, double* gain, double* psf, size_t paddedY, size_t paddedX, int nthreads, int niter, float epsilon ) {
 
-    size_t ftSize = szY*(szX/2+1);
-    FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( szY, szX, FourierTransform::Plan::R2C, 1 );
-    std::shared_ptr<fftw_complex> otf( (fftw_complex*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
-    plan->forward( psf, otf.get() );
-    descatter( img, szY, szX, gain, otf.get(), paddedY, paddedX, nthreads, niter, epsilon );
+    size_t ftSize = nRows*(nCols/2+1);
+    FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( nRows, nCols, FourierTransform::Plan::R2C, 1 );
+    std::shared_ptr<double> otf( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
+    fftw_complex* otfPtr = reinterpret_cast<fftw_complex*>(otf.get());
+    plan->forward( psf, otfPtr );
+    descatter( img, nRows, nCols, gain, otfPtr, paddedY, paddedX, nthreads, niter, epsilon );
 
 }
 
