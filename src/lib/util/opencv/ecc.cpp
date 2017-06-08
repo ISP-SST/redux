@@ -513,7 +513,7 @@ double cv::findTransformECC(InputArray templateImage,
         last_rho = rho;
         rho = correlation/(imgNorm*tmpNorm);
         if (cvIsNaN(rho)) {
-            throw cv::Exception(CV_StsNoConv, "NaN encountered.", CV_Func, __FILE__, __LINE__);
+            throw cv::Exception(CV_StsNoConv, "NaN encountered.", __func__, __FILE__, __LINE__);
         }
 
         // project images into jacobian
@@ -528,7 +528,7 @@ double cv::findTransformECC(InputArray templateImage,
         if (lambda_d <= 0.0)
         {
             rho = -1;
-            throw cv::Exception(CV_StsNoConv, "The algorithm stopped before its convergence.  Images may be uncorrelated or non-overlapped", CV_Func, __FILE__, __LINE__);
+            throw cv::Exception(CV_StsNoConv, "The algorithm stopped before its convergence.  Images may be uncorrelated or non-overlapped", __func__, __FILE__, __LINE__);
         }
         const double lambda = (lambda_n/lambda_d);
 
