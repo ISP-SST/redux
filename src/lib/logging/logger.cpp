@@ -42,11 +42,27 @@ pair<string, string> Logger::customParser( const string& s ) { // custom parser 
 }
 
 
+string Logger::environmentMap( const string &envName ) {
+
+    static map<string, string> vmap;
+    if( vmap.empty() ) {
+        vmap["RDX_LOGFILE"] = "log-file";
+        vmap["RDX_VERBOSITY"] = "verbosity";
+    }
+    map<string, string>::const_iterator ci = vmap.find( envName );
+    if( ci == vmap.end() ) {
+        return "";
+    } else {
+        return ci->second;
+    }
+}
+
 bpo::options_description Logger::getOptions( const string& application_name ) {
 
     bpo::options_description logging( "Logging Options" );
     logging.add_options()
-    ( "verbosity", bpo::value< int >(), "Specify verbosity level" )
+    ( "verbosity", bpo::value< int >(), "Specify verbosity level (0-8, 0 means no output)."
+      " The environment variable RDX_VERBOSITY will be used as default if it exists." )
     ( "verbose,v", bpo::value<vector<string>>()->implicit_value( vector<string>( 1, "1" ), "" )
       ->composing(), "More output. (ignored if --verbosity is specified)" )
     ( "quiet,q", bpo::value<vector<string>>()->implicit_value( vector<string>( 1, "-1" ), "" )
@@ -54,10 +70,10 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
 
     ( "log-file,L", bpo::value< vector<string> >()->implicit_value( vector<string>( 1, "" ), "" )
       ->composing(),
-      "Print logevents to file. If no log-file name is"
-      " specified the log will be written to ./<name>.log,"
-      " where <name> is the name given to this application instance." )
-    ( "log-stdout,d", "Debug mode. Will write output from all channels to stdout. --log-file can not be used together with this option." )
+      "Print output to file."
+      " The environment variable RDX_LOGFILE will be used as default if it exists." )
+    ( "log-stdout,d", "Debug mode. Will write output from all channels to stdout."
+      " --log-file can not be used together with this option." )
     ;
 
     return logging;

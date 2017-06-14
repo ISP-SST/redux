@@ -23,13 +23,11 @@ namespace {
         bpo::options_description options( "REDUXd Options" );
         options.add_options()
         ( "cache-dir,C", po::value<string>()->default_value( "" ), "path where to store auxiliary data."
-          " The environment variable RDX_CACHEDIR will be used instead of the default if this option"
-          " is not specified." )
+          " The environment variable RDX_CACHEDIR will be used as default if it is defined." )
         ( "master,m", po::value<string>()->default_value( "" ), "name or ip of master."
           " If left blank, this instance will start as a master." )
         ( "port,p", bpo::value<uint16_t>()->default_value( 30000 ), "Port to listen on, or connect to."
-          " The environment variable RDX_PORT will be used instead of the default if this option"
-          " is not specified." )
+          " The environment variable RDX_PORT will be used as default if it is defined." )
         ( "threads,t", po::value<uint16_t>()->default_value( 0 ), "max number of threads to use.")
         ;
 
@@ -42,7 +40,6 @@ namespace {
         static map<string, string> vmap;
         if( vmap.empty() ) {
             vmap["RDX_CACHEDIR"] = "cache-dir";
-            vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
             vmap["RDX_PORT"] = "port";            // This means the environment variable RDX_PORT will override the
                                                   // default value of 30000 specified above.
         }

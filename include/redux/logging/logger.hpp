@@ -62,6 +62,7 @@ namespace redux {
             static inline uint8_t getDefaultMask(void) { return defaultLevelMask; }
             
             static std::pair<std::string, std::string> customParser( const std::string& s );
+            static std::string environmentMap( const std::string& );
             static bpo::options_description getOptions( const std::string& application_name );
 
         private:

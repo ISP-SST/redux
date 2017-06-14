@@ -24,13 +24,13 @@ void Application::getOptions( bpo::options_description& options, const string& n
     ( "version,V", "Print version information and quit." )
     ( "copyright", "Print copyright information and quit." )
     ( "help,h", "Show command line options and quit." )
-    ( "tutorial", "Print full tutorial and quit." )
-    ( "sample", "Produce a sample config script on standard output, that uses" " various application features." )
+//    ( "tutorial", "Print full tutorial and quit." )
+//    ( "sample", "Produce a sample config script on standard output, that uses" " various application features." )
     ;
 
     bpo::options_description config( "Configuration" );
     config.add_options()
-    ( "settings", "Configuration file to load settings from." )
+//    ( "settings", "Configuration file to load settings from." )
     ( "appname", bpo::value<string>()->default_value( name ),
       "Name used to identify this application." )
     ( "unique,u", "Prevent any other application-based process with this flag from"
@@ -76,6 +76,8 @@ bpo::options_description& Application::parseCmdLine( int argc, char* argv[],  bp
         // If e.g. --help was specified, just dump output and exit.
         checkGeneralOptions( all, vm );
 
+        bpo::store( bpo::parse_environment( all, Logger::environmentMap ), vm );
+        
         //vm.notify();
         //bpo::variables_map::notify(vm);
     } catch( const exception& e ) {
