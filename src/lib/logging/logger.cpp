@@ -46,7 +46,7 @@ string Logger::environmentMap( const string &envName ) {
 
     static map<string, string> vmap;
     if( vmap.empty() ) {
-        vmap["RDX_LOGFILE"] = "log-file";
+//        vmap["RDX_LOGFILE"] = "log-file";
         vmap["RDX_VERBOSITY"] = "verbosity";
     }
     map<string, string>::const_iterator ci = vmap.find( envName );
@@ -71,7 +71,7 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
     ( "log-file,L", bpo::value< vector<string> >()->implicit_value( vector<string>( 1, "" ), "" )
       ->composing(),
       "Print output to file."
-      " The environment variable RDX_LOGFILE will be used as default if it exists." )
+      /*" The environment variable RDX_LOGFILE will be used as default if it exists."*/ )
     ( "log-stdout,d", "Debug mode. Will write output from all channels to stdout."
       " --log-file can not be used together with this option." )
     ;
