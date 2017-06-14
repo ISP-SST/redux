@@ -73,9 +73,14 @@ int main( int argc, char *argv[] ) {
     try {
         while( true ) {
             try {
+                if( vm.count( "log-stdout" ) == 0 ) {
+                    if( daemon( 1, 0 ) ) {
+                        throw runtime_error( string("Failed to background process: ") + strerror( errno ) );
+                    }
+
+                }
                 Daemon daemon( vm );
-                int res = daemon.run();
-                return res;
+                return daemon.run();
             }
             catch( Application::KillException ) {
                 break;
