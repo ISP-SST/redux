@@ -1,6 +1,7 @@
 #ifndef REDUX_MOMFBD_CONFIG_HPP
 #define REDUX_MOMFBD_CONFIG_HPP
 
+#include <redux/logging/logger.hpp>
 #include <redux/util/stringutil.hpp>
 
 #include <map>
@@ -58,7 +59,7 @@ namespace redux {
             
             operator std::string() const;           //!< cast to string (for easy printing of configuration)
 
-            virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() );
+            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ChannelCfg() );
             virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
             
             void setLogChannel(std::string channel) { logChannel = channel; };
@@ -134,7 +135,7 @@ namespace redux {
             ObjectCfg();
             virtual ~ObjectCfg();
             
-            virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() );
+            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ObjectCfg() );
             virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() ) const;
 
             uint64_t size(void) const;
@@ -176,7 +177,7 @@ namespace redux {
             GlobalCfg();
             ~GlobalCfg();
 
-            virtual void parseProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() );
+            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=GlobalCfg() );
             virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() ) const;
 
             uint64_t size(void) const;

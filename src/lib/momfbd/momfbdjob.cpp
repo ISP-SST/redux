@@ -72,10 +72,9 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool 
 }
 
 
-void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
+void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& logger ) {
 
-    Job::parsePropertyTree( vm, tree );
-    //LOG_DEBUG << "MomfbdJob::parsePropertyTree()" << ende;
+    Job::parsePropertyTree( vm, tree, logger );
     
     // possibly override cfg-entries with command-line arguments
     if( vm.count( "simxy" ) ) tree.put( "SIM_XY", vm["simxy"].as<string>() );
@@ -87,12 +86,12 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
     if( vm.count( "force" ) ) tree.put( "OVERWRITE", true );
     if( vm.count( "swap" ) ) tree.put( "SWAP", true );
 
-    GlobalCfg::parseProperties(tree);
+    GlobalCfg::parseProperties(tree, logger);
     uint16_t nObj(0);
     for( auto & property : tree ) {
         if( iequals( property.first, "OBJECT" ) ) {
             Object* tmpObj = new Object( *this, nObj );
-            tmpObj->parsePropertyTree( property.second );
+            tmpObj->parsePropertyTree( property.second, logger );
             if( nObj < outputFiles.size() ) {
                 tmpObj->outputFileName = outputFiles[nObj];
             }
@@ -126,8 +125,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
     if( outputFiles.size() > objects.size() ) {
         LOG_WARN << outputFiles.size() << " output file names specified but only " << objects.size() << " objects found." << ende;
     }
-    //LOG_DEBUG << "MomfbdJob::parsePropertyTree() done." << ende;
-
+    
 }
 
 

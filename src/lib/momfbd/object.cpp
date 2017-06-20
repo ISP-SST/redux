@@ -84,20 +84,18 @@ Object::~Object( ){
 }
 
 
-void Object::parsePropertyTree( bpt::ptree& tree ){
+void Object::parsePropertyTree( bpt::ptree& tree, redux::logging::Logger& logger ){
 
-    ObjectCfg::parseProperties(tree, myJob );
+    ObjectCfg::parseProperties(tree, logger, myJob );
 
     uint16_t nCh(0 );
     for( auto & property : tree ){
         if( iequals( property.first, "CHANNEL" ) ){
             Channel* tmpCh = new Channel( *this, myJob, nCh++ );
-            tmpCh->parsePropertyTree( property.second );
+            tmpCh->parsePropertyTree( property.second, logger );
             channels.push_back( shared_ptr<Channel>( tmpCh ) );
         }
     }
-
-    //LOG_DEBUG << "Object::parseProperties( )done." << ende;
 
 }
 
@@ -110,7 +108,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ){
         ch->getPropertyTree( node );
     }
 
-    ObjectCfg::getProperties(node,myJob );
+    ObjectCfg::getProperties(node, myJob);
 
     tree.push_back( bpt::ptree::value_type( "object", node ) );
 

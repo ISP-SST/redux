@@ -66,9 +66,9 @@ DebugJob::~DebugJob( void ) {
 }
 
 
-void DebugJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree ) {
+void DebugJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& logger ) {
     
-    Job::parsePropertyTree( vm, tree );
+    Job::parsePropertyTree( vm, tree, logger );
     
     maxIterations = tree.get<uint32_t>( "MAX_ITERATIONS", 1000 );
     patchSize = tree.get<uint32_t>( "PATCH_SIZE", 200 );

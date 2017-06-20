@@ -316,7 +316,7 @@ int main (int argc, char *argv[]) {
         bool check = (vm.count ("no-check") == 0 && !vm.count ("print"));
         vector<Job::JobPtr> jobs;
         try {
-            jobs = Job::parseTree (vm, momfbd, check);
+            jobs = Job::parseTree (vm, momfbd, logger, check);
         } catch ( const exception& e ) {
             LOG_ERR << "Error while parsing cfg file(s):\n" << e.what() << ende;
         }

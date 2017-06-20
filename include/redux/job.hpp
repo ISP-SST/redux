@@ -82,7 +82,7 @@ namespace redux {
 
         static MapT& getMap(void) { static MapT m; return m; };
         static size_t registerJob( const std::string&, JobCreator f );
-        static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, bool check=false );
+        static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger&, bool check=false );
         static JobPtr newJob( const std::string& );
         
         static std::string stateString(uint8_t);
@@ -113,7 +113,7 @@ namespace redux {
         virtual size_t getTypeID(void) { return 0; };
         virtual uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr wip, bool) { wip->parts.clear(); return 0; };
         
-        virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree& );
+        virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree&, redux::logging::Logger&);
         /*! @brief Returns a boost::property_tree containing the settings for this job.
          *  @details If a ptree pointer is provided, the tree will also be appended to it,
          *  inside a named block

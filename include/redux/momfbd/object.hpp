@@ -40,7 +40,7 @@ namespace redux {
             Object( MomfbdJob&, uint16_t id=0 );
             ~Object();
 
-            void parsePropertyTree( bpt::ptree& );
+            void parsePropertyTree( bpt::ptree&, redux::logging::Logger& );
             bpt::ptree getPropertyTree( bpt::ptree& );
 
             uint16_t id(void) const { return ID; };

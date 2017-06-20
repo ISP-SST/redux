@@ -61,9 +61,9 @@ Channel::~Channel() {
 }
 
 
-void Channel::parsePropertyTree (bpt::ptree& tree) {
+void Channel::parsePropertyTree (bpt::ptree& tree, redux::logging::Logger& logger) {
 
-    ChannelCfg::parseProperties (tree, myObject);       // parse using our parent-object as default-values.
+    ChannelCfg::parseProperties( tree, logger, myObject );       // parse using our parent-object as default-values.
 
 }
 

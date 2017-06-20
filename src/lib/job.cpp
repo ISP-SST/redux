@@ -58,7 +58,8 @@ size_t Job::registerJob( const string& name, JobCreator f ) {
 }
 
 
-vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, bool check) {
+vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& logger, bool check) {
+
     vector<JobPtr> tmp;
     std::unique_lock<mutex> lock(globalJobMutex);
     for(auto & property : tree) {
@@ -66,13 +67,13 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, boo
         auto it2 = getMap().find(boost::to_upper_copy(name));       // check if the current tag matches a registered (Job-derived) class.
         if(it2 != getMap().end()) {
             Job* tmpJob = it2->second.second();
-            tmpJob->parsePropertyTree(vm, property.second);
+            tmpJob->parsePropertyTree(vm, property.second, logger);
             if(!check || tmpJob->check()) {
                 tmp.push_back(shared_ptr<Job>(tmpJob));
-            } else cerr << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << endl;
+            } else LOG_ERR << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << ende;
         } else {
 #ifdef DEBUG_
-            cerr << "No job-type with tag \"" << name << "\" registered." << endl;
+            LOG_ERR << "No job-type with tag \"" << name << "\" registered." << ende;
 #endif
         }
     }
@@ -247,7 +248,7 @@ std::string Job::Info::print(void) {
 }
 
 
-void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree) {
+void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& logger) {
     
     Info defaults = globalDefaults;
 

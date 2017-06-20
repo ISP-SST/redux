@@ -18,6 +18,7 @@ namespace bpt = boost::property_tree;
 namespace bfs = boost::filesystem;
 
 using namespace redux::momfbd;
+using namespace redux::logging;
 using namespace redux::util;
 using namespace std;
 using boost::algorithm::iequals;
@@ -164,7 +165,7 @@ ChannelCfg::operator std::string() const {
 }
 
 
-void ChannelCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& defaults ) {
+void ChannelCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& defaults ) {
     
     rotationAngle = getValue( tree, "ANGLE", defaults.rotationAngle );
 
@@ -195,7 +196,7 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& defaults )
         tmpString = getValue<string>( tree, "DIV_ORDERS", "" );
         if( tmpString.empty() ) {
             if( diversity.size() > 1 ) {
-                //LOG_ERR << "Multiple diversity coefficients specified, but no orders provided!";
+                LOG_ERR << "Multiple diversity coefficients specified, but no orders provided!" << ende;
             } else if( diversity.size() == 1 ) {  // A single diversity value is interpreted as ( de)focus.
                 diversityModes.resize( 1, 4 );
                 diversityTypes.resize( 1, ZERNIKE );
@@ -215,7 +216,7 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& defaults )
                 }
             }
         } else {
-            //LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!";
+            LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!" << ende;
         }
 
         
@@ -232,14 +233,13 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& defaults )
     subImagePosY = getValue( tree, "SIM_Y", defaults.subImagePosY );
     if( getValue<bool>( tree, "CAL_X", false ) ) {
         if( getValue<bool>( tree, "CAL_Y", false ) ) {
-            //if( subImagePosX.size() || subImagePosY.size() ) LOG << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y";
+            if( subImagePosX.size() || subImagePosY.size() ) LOG_WARN << "Note: SIM_X/SIM_Y replaced by CAL_X/CAL_Y" << ende;
             subImagePosX = getValue( tree, "CAL_X", defaults.subImagePosX );
             subImagePosY = getValue( tree, "CAL_Y", defaults.subImagePosY );
             if( subImagePosX.empty() || ( subImagePosX.size() != subImagePosY.size() ) ) {
-                //LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!";
+                LOG_ERR << "CAL_X and CAL_Y must have the same number of elements!" << ende;
             }
-        }
-        //else LOG_ERR << "CAL_Y must be provided if CAL_X is!";
+        } else LOG_ERR << "CAL_Y must be provided if CAL_X is!" << ende;
     }
 
     
@@ -265,15 +265,15 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& defaults )
     stokesWeights = getValue( tree, "VECTOR", defaults.stokesWeights );
     if( mmFile.length() > 0 ) {
         if( !mmRow ) {
-            //LOG_FATAL << "a modulation matrix was provided but no row specified ( MMROW).";
+            LOG_ERR << "a modulation matrix was provided but no row specified (MMROW)." << ende;
         }
         if( !mmWidth ) {
-            //LOG_FATAL << "modulation matrix dimensions cannot be autodetected ( yet): you must provide the matrix width ( MMWIDTH)!";
+            LOG_ERR << "modulation matrix dimensions cannot be autodetected (yet): you must provide the matrix width (MMWIDTH)!" << ende;
         }
         if( stokesWeights.size() == 0 ) {
-            //LOG_ERR << "modulation matrix specified but no VECTOR input given!";
+            LOG_ERR << "modulation matrix specified but no VECTOR input given!" << ende;
         } else if( stokesWeights.size() != mmWidth ) {
-            //LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << ( int)mmWidth;
+            LOG_ERR << "VECTOR input has " << stokesWeights.size() << " elements, but MMWIDTH=" << (int)mmWidth << ende;
         }
     }
     else {  // TODO: don't modify cfg values!! ...make the main code use weight 1 as default instead.
@@ -465,7 +465,7 @@ ObjectCfg::~ObjectCfg() {
 }
 
 
-void ObjectCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
+void ObjectCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& def ) {
     
     const ObjectCfg& defaults = reinterpret_cast<const ObjectCfg&>( def );
 
@@ -495,10 +495,10 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
     wavelength = getValue( tree, "WAVELENGTH", defaults.wavelength );
 
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
-        //LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested";
+        LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested" << ende;
     }
 
-    ChannelCfg::parseProperties( tree, defaults );
+    ChannelCfg::parseProperties( tree, logger, defaults );
 
 }
 
@@ -633,7 +633,7 @@ GlobalCfg::~GlobalCfg() {
 }
 
 
-void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
+void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& def ) {
     
     const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>( def );
 
@@ -668,8 +668,9 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
             if( iequals(tmpString, "Zernike") || iequals(tmpString, "Z") ) {
                 modeBasis = ZERNIKE;
             } else {
-                //LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \"" << basisTags[globalDefaults.modeBasis] << "\"";
-                //modeBasis = defaults.modeBasis;
+                LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \""
+                        << basisTags[globalDefaults.modeBasis] << "\"" << ende;
+                modeBasis = defaults.modeBasis;
             }
     }
 
@@ -695,7 +696,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
         } else {
             string msg = "Unrecognized FPMETHOD value \"" + tmpString + "\"\n  Valid entries are: ";
             for( const auto& entry: fillpixMap ) msg += "\"" + entry.first + "\" ";
-            //LOG_ERR << msg;
+            LOG_ERR << msg << ende;
         }
     }
     gradientMethod = defaults.gradientMethod;
@@ -707,7 +708,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
         } else {
             string msg = "Unrecognized GRADIENT value \"" + tmpString + "\"\n  Valid entries are: ";
             for( const auto& entry: gradientMap ) msg += "\"" + entry.first + "\" ";
-            //LOG_ERR << msg;
+            LOG_ERR << msg << ende;
         }
     }
     getstepMethod = defaults.getstepMethod;
@@ -719,7 +720,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
         } else {
             string msg = "Unrecognized GETSTEP value \"" + tmpString + "\"\n  Valid entries are: ";
             for( const auto& entry: getstepMap ) msg += "\"" + entry.first + "\" ";
-            //LOG_ERR << msg;
+            LOG_ERR << msg << ende;
         }
     }
     badPixelThreshold = getValue( tree, "BADPIXEL", defaults.badPixelThreshold );
@@ -735,11 +736,12 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
         throw logic_error( msg );
     }
 
+    outputDataType = defaults.outputDataType;
     tmpString = getValue<string>( tree, "DATA_TYPE", dtTags[defaults.outputDataType] );
     if( iequals( tmpString, "FLOAT") ) outputDataType = DT_F32T;
     else if( iequals( tmpString, "SHORT") ) outputDataType = DT_I16T;
     else {
-        //LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default ( " +dtTags[defaults.outputDataType]+ ")";
+        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default ( " +dtTags[outputDataType]+ ")" << ende;
     }
 
     sequenceNumber = getValue( tree, "SEQUENCE_NUM", defaults.sequenceNumber );
@@ -766,7 +768,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
         outputFileType |= FT_ANA;
     }
     
-    ObjectCfg::parseProperties( tree, defaults );
+    ObjectCfg::parseProperties( tree, logger, defaults );
 
 }
 

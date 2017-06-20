@@ -68,7 +68,7 @@ namespace redux {
             size_t getTypeID(void);
             uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr, bool);
             
-            void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree );
+            void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& );
             bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
 
             uint64_t size( void ) const;
