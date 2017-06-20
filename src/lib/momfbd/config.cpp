@@ -35,7 +35,8 @@ namespace {
     const string ftExt[] = {"","f0","fits","","momfbd"};
     const string dtTags[] = {"byte","short","int","int64","float","double"};
 
-    int getFromMap( const string& str, const map<string, int>& m ) {
+    template <typename T>
+    int getFromMap( const string& str, const map<string, int, T>& m ) {
         auto res = m.find( str );
 
         if( res != m.end() ) {
@@ -97,33 +98,42 @@ namespace {
 }
 
 const map<FileType, string> redux::momfbd::FileTypeNames = {
-    {FT_ANA, ftTags[FT_ANA]},
-    {FT_FITS, ftTags[FT_FITS]},
-    {FT_MOMFBD, ftTags[FT_MOMFBD]}
+    { FT_ANA, ftTags[FT_ANA] },
+    { FT_FITS, ftTags[FT_FITS] },
+    { FT_MOMFBD, ftTags[FT_MOMFBD] }
 };
 
 const map<FileType, string> redux::momfbd::FileTypeExtensions = {
-    {FT_ANA, ftExt[FT_ANA]},
-    {FT_FITS, ftExt[FT_FITS]},
-    {FT_MOMFBD, ftExt[FT_MOMFBD]}
+    { FT_ANA, ftExt[FT_ANA] },
+    { FT_FITS, ftExt[FT_FITS] },
+    { FT_MOMFBD, ftExt[FT_MOMFBD] }
 };
 
-const map<string, int> redux::momfbd::fillpixMap = {
-    {fpmTags[FPM_MEDIAN], FPM_MEDIAN},
-    {fpmTags[FPM_INVDISTWEIGHT], FPM_INVDISTWEIGHT},
-    {fpmTags[FPM_HORINT], FPM_HORINT}
+const map<string, int, cicomp> redux::momfbd::fillpixMap = {
+    { fpmTags[FPM_MEDIAN], FPM_MEDIAN },
+    { fpmTags[FPM_INVDISTWEIGHT], FPM_INVDISTWEIGHT },
+    { fpmTags[FPM_HORINT], FPM_HORINT }
 };
 
-const map<string, int> redux::momfbd::gradientMap = {
-    {gmTags[GM_DIFF], GM_DIFF},
-    {gmTags[GM_VOGEL], GM_VOGEL}
+const map<string, int, cicomp> redux::momfbd::gradientMap = {
+    { gmTags[GM_DIFF], GM_DIFF },
+    { gmTags[GM_VOGEL], GM_VOGEL },
+    { "diff", GM_DIFF },            // alternative spellings
+    { "vogel", GM_VOGEL}
 };
 
-const map<string, int> redux::momfbd::getstepMap = {
-    {gsmTags[GSM_SDSC], GSM_SDSC},
-    {gsmTags[GSM_CNJG], GSM_CNJG},
-    {gsmTags[GSM_BFGS], GSM_BFGS},
-    {gsmTags[GSM_BFGS_inv], GSM_BFGS_inv}
+const map<string, int, cicomp> redux::momfbd::getstepMap = {
+    { gsmTags[GSM_SDSC], GSM_SDSC },
+    { gsmTags[GSM_CNJG], GSM_CNJG },
+    { gsmTags[GSM_BFGS], GSM_BFGS },
+    { gsmTags[GSM_BFGS_inv], GSM_BFGS_inv },
+    { "steepest", GSM_SDSC },       // alternative spellings
+    { "steepest_descent", GSM_SDSC },
+    { "conjugate", GSM_CNJG },
+    { "conjugate_gradient", GSM_CNJG },
+    { "bfgs", GSM_BFGS },
+    { "bfgsinv", GSM_BFGS_inv },
+    { "bfgs_inv", GSM_BFGS_inv }
 };
 
 
@@ -134,8 +144,8 @@ const map<string, int> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle( 0), noiseFudge( 1), weight( 1), physicalDefocusDistance( false), borderClip( 100), incomplete( 0), discard( 2,0),
-        mmRow( 0), mmWidth( 0), imageNumberOffset( 0), logChannel( "config" ) {
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), physicalDefocusDistance(false), borderClip(100), incomplete(0),
+        discard(2,0), mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel( "config" ) {
 
 }
 
@@ -652,10 +662,10 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, const ChannelCfg& def ) {
     string tmpString = getValue<string>( tree, "BASIS", "" );
     modeBasis = defaults.modeBasis;
     if( tmpString.length() ) {
-        if( iequals( tmpString, "Karhunen-Loeve") ) {
+        if( iequals(tmpString, "Karhunen-Loeve") || iequals(tmpString, "KL") ) {
             modeBasis = KARHUNEN_LOEVE;
         } else
-            if( iequals( tmpString, "Zernike") ) {
+            if( iequals(tmpString, "Zernike") || iequals(tmpString, "Z") ) {
                 modeBasis = ZERNIKE;
             } else {
                 //LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \"" << basisTags[globalDefaults.modeBasis] << "\"";

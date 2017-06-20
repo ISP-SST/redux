@@ -1,6 +1,8 @@
 #ifndef REDUX_MOMFBD_CONFIG_HPP
 #define REDUX_MOMFBD_CONFIG_HPP
 
+#include <redux/util/stringutil.hpp>
+
 #include <map>
 #include <ostream>
 #include <string>
@@ -32,12 +34,16 @@ namespace redux {
                          RF_FLATFIELD=16, RF_GLOBAL_NOISE=32, RF_NEW_CONSTRAINTS=64, RF_NO_CLIP=128,
                          RF_NO_CONSTRAINTS=256, RF_NO_FILTER=512, RF_FORCE_WRITE=1024, RF_SWAP=2048 };
 
+        struct cicomp {  // case-insensitive comparator for the maps below.
+            bool operator() ( const std::string& a,const std::string& b ) const { return redux::util::nocaseLess(a,b); }
+        };
+
         enum FillpixMethod { FPM_MEDIAN=1, FPM_INVDISTWEIGHT, FPM_HORINT };
-        extern const std::map<std::string, int> fillpixMap;
+        extern const std::map<std::string, int, cicomp> fillpixMap;
         enum GradientMethod { GM_DIFF=1, GM_VOGEL };
-        extern const std::map<std::string, int> gradientMap;
+        extern const std::map<std::string, int, cicomp> gradientMap;
         enum GetstepMethod { GSM_SDSC=1, GSM_CNJG, GSM_BFGS, GSM_BFGS_inv };
-        extern const std::map<std::string, int> getstepMap;
+        extern const std::map<std::string, int, cicomp> getstepMap;
         
         
         
