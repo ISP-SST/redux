@@ -87,28 +87,39 @@ namespace redux {
         typedef typename std::vector<T> external_type;
 
         void parseSegment(external_type& out, const internal_type& elem) {
-            size_t n = std::count(elem.begin(), elem.end(), '-');
-            n += std::count(elem.begin(), elem.end(), ':');
-            if(n == 0) {
+            size_t n1 = std::count(elem.begin(), elem.end(), '-');
+            size_t n2 = std::count(elem.begin(), elem.end(), ':');
+            if( (n1+n2) == 0 ) {
                 out.push_back(boost::lexical_cast<T>(elem));
                 return;
-            }
-            else if(n == 2) {
-                n = elem.find_first_of(":-");
-                size_t nn = elem.find_first_of(":-", n + 1);
+            } else if( (n1+n2) == 1 ) {
+                size_t n = elem.find_first_of(":-");
                 T first = boost::lexical_cast<T>(elem.substr(0, n));
-                T step = boost::lexical_cast<T>(elem.substr(n + 1, nn - n - 1));
+                T last = boost::lexical_cast<T>(elem.substr(n + 1));
+                bool rev(false);
+                if( first > last ) {
+                    std::swap(first,last);
+                    rev = true;
+                }
+                while(first <= last) out.push_back(first++);
+                if( rev ) std::reverse( out.begin(), out.end() );
+            } else if( n2 == 2 ) {
+                size_t n = elem.find_first_of(":");
+                size_t nn = elem.find_first_of(":", n + 1);
+                T first = boost::lexical_cast<T>(elem.substr(0, n));
+                int step = boost::lexical_cast<T>(elem.substr(n + 1, nn - n - 1));
                 T last = boost::lexical_cast<T>(elem.substr(nn + 1));
+                bool rev(false);
+                if( first > last ) {
+                    std::swap(first,last);
+                    if( step < 0 ) step = abs(step);
+                    rev = true;
+                }
                 while(first <= last) {
                     out.push_back(first);
                     first += step;
                 }
-            }
-            else if(n == 1) {
-                n = elem.find_first_of(":-");
-                T first = boost::lexical_cast<T>(elem.substr(0, n));
-                T last = boost::lexical_cast<T>(elem.substr(n + 1));
-                while(first <= last) out.push_back(first++);
+                if( rev ) std::reverse( out.begin(), out.end() );
             }
         }
 
@@ -123,7 +134,9 @@ namespace redux {
                 boost::split(tokens, str, boost::is_any_of(", "));
                 if(std::numeric_limits<T>::is_integer && !std::numeric_limits<T>::is_signed) {    // only expand '-' & ':' for unsigned integers
                     for(auto & token : tokens) {
-                        parseSegment(result, token);
+                        external_type res;
+                        parseSegment( res, token );
+                        result.insert( result.end(), res.begin(), res.end() );
                     }
                 }
                 else {
