@@ -164,7 +164,9 @@ float StopWatch::getSeconds( void ) {
 string StopWatch::print(void) {
     
     stop();
-
+    float usage = (100*lapsedTot/lapsedT);
+    if( suffixT == "ms" && suffixTot == "s") usage *= 1000;
+    else if( suffixT == "s" && suffixTot == "ms") usage /= 1000;
     std::stringstream ss;
     ss.setf( std::ios::fixed, std:: ios::floatfield );
     ss.precision(3);
@@ -173,7 +175,7 @@ string StopWatch::print(void) {
     ss << lapsedRS << suffixRS << " system = ";
     ss << lapsedTot << suffixTot << " CPU (";
     ss.precision(2);
-    ss << (100*lapsedTot/lapsedT) << "%)";
+    ss << usage << "%)";
    
     return ss.str();
     
