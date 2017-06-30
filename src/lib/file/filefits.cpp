@@ -444,7 +444,7 @@ vector<string> Fits::getText( bool raw ) {
         hduText += "END" + string(77, ' ') ;
         ret.push_back(hduText);
         for( size_t i=0; i<extHDUs.size(); ++i ) {
-            if( (i != (primaryHDU.dHDU-2)) && extHDUs[i] ) {
+            if( ((int)i != (primaryHDU.dHDU-2)) && extHDUs[i] ) {
                 hduText.clear();
                 for( auto& k: extHDUs[i]->cards ) {
                     hduText += k;

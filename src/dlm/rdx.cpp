@@ -591,14 +591,14 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
     
     if( argc < 1 ) {
         cout << filetype_info(2) << endl;
-        return IDL_StrToSTRING( (char*)"fla" );
+        return IDL_StrToSTRING( (char*)"" );
     }
     
     IDL_VPTR filenames = argv[0];
     IDL_ENSURE_SIMPLE( filenames );
     
     if( filenames->type != IDL_TYP_STRING ) {
-        return IDL_StrToSTRING( (char*)"fly" );
+        return IDL_StrToSTRING( (char*)"" );
     }
 
     if ( !(filenames->flags & IDL_V_ARR) ) {

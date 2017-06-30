@@ -13,16 +13,16 @@ using namespace redux::util;
 using namespace std;
 
 
-void redux::image::descatter( double* img, size_t imgY, size_t imgX, double* gain, fftw_complex* otf, size_t paddedY, size_t paddedX, int nthreads, int niter, float epsilon ) {
+void redux::image::descatter( double* img, size_t nRows, size_t nCols, double* gain, fftw_complex* otf, size_t nPaddedRows, size_t nPaddedCols, int nthreads, int maxIterations, float epsilon ) {
     
-    size_t posX = (paddedX-imgX)/2;
-    size_t posY = (paddedY-imgY)/2;
+    size_t posX = (nPaddedCols-nCols)/2;
+    size_t posY = (nPaddedRows-nRows)/2;
     
-    size_t ftSize = paddedY*(paddedX/2+1);
-    size_t nPixels = imgY*imgX;
-    size_t nPaddedPixels = paddedY*paddedX;
+    size_t ftSize = nPaddedRows*(nPaddedCols/2+1);
+    size_t nPixels = nRows*nCols;
+    size_t nPaddedPixels = nPaddedRows*nPaddedCols;
     
-    FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( paddedY, paddedX, FourierTransform::Plan::R2C, nthreads );
+    FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( nPaddedRows, nPaddedCols, FourierTransform::Plan::R2C, nthreads );
     
     std::shared_ptr<double> ft( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
     fftw_complex* ftPtr = reinterpret_cast<fftw_complex*>(ft.get());
@@ -31,10 +31,10 @@ void redux::image::descatter( double* img, size_t imgY, size_t imgX, double* gai
     std::shared_ptr<double> tmpC( (double*)fftw_malloc(nPaddedPixels*sizeof(double)), fftw_free );
     double* tmpPtrC = tmpC.get();
     
-    if( (paddedX==imgX) && (paddedY==imgY) ) {
+    if( (nPaddedCols==nCols) && (nPaddedRows==nRows) ) {
         memcpy( tmpPtr, img, nPixels*sizeof(double) );
     } else {
-        copyInto( img, imgY, imgX, tmpPtr, paddedY, paddedX, posY, posX );
+        copyInto( img, nRows, nCols, tmpPtr, nPaddedRows, nPaddedCols, posY, posX );
     }
         
     double chiSq;
@@ -53,47 +53,47 @@ void redux::image::descatter( double* img, size_t imgY, size_t imgX, double* gai
 
         // Compute ChiSq
         chiSq = 0.0;
-        double* tmpRowC = tmpPtrC + posY*paddedX + posX;
-        double* tmpRow = tmpPtr + posY*paddedX + posX;
+        double* tmpRowC = tmpPtrC + posY*nPaddedCols + posX;
+        double* tmpRow = tmpPtr + posY*nPaddedCols + posX;
         double* imgRow = img;
-        for( size_t y = 0; y < imgY; ++y ) {
-            for( size_t x = 0; x < imgX; ++x ) {
+        for( size_t y = 0; y < nRows; ++y ) {
+            for( size_t x = 0; x < nCols; ++x ) {
                 double newValue = imgRow[x] - tmpRowC[x];
                 chiSq += norm(tmpRow[x] - newValue);   // norm() works for complex numbers too.
                 tmpRow[x] = newValue;
             }
-            tmpRowC += paddedX;
-            tmpRow  += paddedX;
-            imgRow  += imgX;
+            tmpRowC += nPaddedCols;
+            tmpRow  += nPaddedCols;
+            imgRow  += nCols;
         }
         
         //cout << "cdescatter:  iteration #" << i << "  ChiSq = " << chiSq << "  ChiSq/ nPixels = " << (chiSq / nPixels) << endl;
 
-    } while ( (chiSq > limit) && (++i < niter) );
+    } while ( (chiSq > limit) && (++i < maxIterations) );
         
-    copyPart( tmpPtr, paddedY, paddedX, img, imgY, imgX, posY, posX );
+    copyPart( tmpPtr, nPaddedRows, nPaddedCols, img, nRows, nCols, posY, posX );
  
 }
 
 
-void redux::image::descatter( double* img, size_t nRows, size_t nCols, double* gain, double* psf, size_t paddedY, size_t paddedX, int nthreads, int niter, float epsilon ) {
+void redux::image::descatter( double* img, size_t nRows, size_t nCols, double* gain, double* psf, size_t nPaddedRows, size_t nPaddedCols, int nthreads, int maxIterations, float epsilon ) {
 
     size_t ftSize = nRows*(nCols/2+1);
     FourierTransform::Plan::Ptr plan = FourierTransform::Plan::get( nRows, nCols, FourierTransform::Plan::R2C, 1 );
     std::shared_ptr<double> otf( (double*)fftw_malloc(ftSize*sizeof(fftw_complex)), fftw_free );
     fftw_complex* otfPtr = reinterpret_cast<fftw_complex*>(otf.get());
     plan->forward( psf, otfPtr );
-    descatter( img, nRows, nCols, gain, otfPtr, paddedY, paddedX, nthreads, niter, epsilon );
+    descatter( img, nRows, nCols, gain, otfPtr, nPaddedRows, nPaddedCols, nthreads, maxIterations, epsilon );
 
 }
 
 
 template <typename T, typename U>
-void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Array<U>& psf_in, int maxIterations, double minImprovement, double epsilon) {
+void redux::image::descatter (Array<T>& data, const Array<U>& gain, const Array<U>& psf_in, int maxIterations, double minImprovement, double epsilon) {
 
     vector<size_t> dims = data.dimensions (true);
 
-    if (dims.size() != 2 || dims != ccdgain.dimensions() || dims != psf_in.dimensions()) {
+    if (dims.size() != 2 || dims != gain.dimensions() || dims != psf_in.dimensions()) {
         cout << "descatter(): dimensions of gain/psf does not match image." << endl;
         return;
     }
@@ -114,12 +114,12 @@ void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Arr
         psf_center *= 1.0 / sum;
     }
 
-    Array<double> gain;
-    ccdgain.copy(gain);
+    Array<double> dgain;
+    gain.copy(dgain);
 
     redux::image::FourierTransform otf (psf, FT_REORDER | FT_NORMALIZE);
 
-    Array<double>::const_iterator itg = gain.begin();
+    Array<double>::const_iterator itg = dgain.begin();
     for (auto & value : img_center) {
         double g = *itg++;
         value /= (1.0 + g * g);
@@ -133,9 +133,9 @@ void redux::image::descatter (Array<T>& data, const Array<U>& ccdgain, const Arr
     int i = 0;
     do {
         img.copy (tmp);
-        tmp_center *= gain;
+        tmp_center *= dgain;
         otf.convolveInPlace (tmp);
-        tmp_center *= gain;
+        tmp_center *= dgain;
         delta = metric;
         metric = 0.0;
         typename Array<T>::const_iterator in_it = data.begin();
