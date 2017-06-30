@@ -11,11 +11,13 @@
 #include <string>
 #include <vector>
 
+#ifndef Q_MOC_RUN
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/thread/thread.hpp>
+#endif
 
 namespace bpo = boost::program_options;
 namespace bpt = boost::property_tree;

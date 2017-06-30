@@ -22,7 +22,7 @@ namespace {
 
         bpo::options_description options( "REDUXd Options" );
         options.add_options()
-        ( "master,m", po::value<string>()->default_value( "" ), "name or ip of master." )
+        ( "master,m", bpo::value<string>()->default_value( "" ), "name or ip of master." )
         ( "port,p", bpo::value<uint16_t>()->default_value( 30000 ), "Port to listen on."
           " The environment variable RDX_PORT will be used instead of the default if this option"
           " is not specified." )
@@ -80,7 +80,7 @@ int main( int argc, char *argv[] ) {
 
     }
     catch( const exception &e ) {
-        LOG_ERR << "Uncaught exception (fatal): " << e.what();
+        cerr << "Uncaught exception (fatal): " << e.what() << endl;
     }
 
     return EXIT_SUCCESS;

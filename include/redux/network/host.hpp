@@ -9,7 +9,9 @@
 #include <set>
 #include <string>
 
+#ifndef Q_MOC_RUN
 #include <boost/date_time/posix_time/ptime.hpp>
+#endif
 
 namespace redux {
 

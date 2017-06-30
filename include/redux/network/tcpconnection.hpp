@@ -9,9 +9,11 @@
 #include <mutex>
 #include <typeinfo>
 
+#ifndef Q_MOC_RUN
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/bind/protect.hpp>
+#endif
 
 using boost::asio::ip::tcp;
 
