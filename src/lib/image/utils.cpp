@@ -565,10 +565,10 @@ void redux::image::inpaint( T* img, U* mask, T* out, size_t ySize, size_t xSize,
     cv::Mat imgMat( ySize, xSize, cv::cvType<T>(), img );
     cv::Mat maskMat( ySize, xSize, cv::cvType<U>(), mask );
     cv::Mat outMat( ySize, xSize, cv::cvType<T>(), out );
-    std::cerr << "make_mask is not yet implemented for OpenCV builds." << std::endl;
+    std::cerr << "inpaint is not yet implemented for OpenCV builds." << std::endl;
     //cv::inpaint( imgMat, maskMat, outMat, radius, flags );
 #else
-    std::cerr << "make_mask is not yet implemented for non-OpenCV builds." << std::endl;
+    std::cerr << "inpaint is not yet implemented for non-OpenCV builds." << std::endl;
 #endif            
 }
 template void redux::image::inpaint( float*, uint8_t*, float*, size_t, size_t, double, int );

@@ -301,11 +301,9 @@ namespace {
 
 
 IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
+	
+	static_assert( REDUX_WITH_OPENCV == 1, "redux has to be compiled with OpenCV support");
 
-#ifndef REDUX_WITH_OPENCV
-    cerr << "img_align: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
-    return IDL_GettmpInt(0);
-#else
     KW_RESULT kw;
     kw.by_size = 0;
     kw.eps = 1E-3;
@@ -695,8 +693,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     }
 
     return ret;
-    
-#endif
+
     
 }
 
