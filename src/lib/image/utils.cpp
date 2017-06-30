@@ -540,7 +540,9 @@ template void redux::image::apodizeInPlace(complex_t**, size_t, size_t, size_t, 
 template <typename T>
 void redux::image::normalizeIfMultiFrames (redux::image::Image<T>& img) {
     if (img.meta) {
-        std::string hdr = img.meta->getText();
+        vector<string> hdrTexts = img.meta->getText();
+        string hdr;
+        if( !hdrTexts.empty() ) hdr = hdrTexts.front();
         boost::regex re ("(\\d+)[ .]+SUM[= ]+");
         boost::smatch match;
         if (boost::regex_search (hdr, match, re)) {

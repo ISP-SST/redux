@@ -49,21 +49,17 @@ namespace redux {
 
             void write( std::ofstream& );
 
-            std::string getText( void ) {
-                std::string ret;
-                for( auto& k: primaryHDU.cards ) {
-                    ret += k;
-                }
-                return ret;
-            }
+            std::vector<std::string> getText( bool );
             
             template <typename T>
             std::string makeCard( std::string key, T value, std::string comment="" );
-            void insertCard( std::string card, size_t location=std::string::npos );
-            void insertCardAfter( std::string card, std::string after );
-            void insertCardBefore( std::string card, std::string before );
+            void insertCard( std::vector<std::string>& hdr, std::string card, size_t location=std::string::npos );
+            void insertCardAfter( std::vector<std::string>& hdr, std::string card, std::string after );
+            void insertCardBefore( std::vector<std::string>& hdr, std::string card, std::string before );
+            bool updateCard( std::vector<std::string>& hdr, size_t location, std::string card );
+            bool updateCard( std::vector<std::string>& hdr, std::string key, std::string card );
             template <typename T>
-            T getValue(std::string key);
+            T getValue( const std::vector<std::string>& hdr, std::string key);
             template <typename T>
             std::vector<T> getTableArray( std::string key );
             
@@ -96,7 +92,9 @@ namespace redux {
             };
             
             struct image_hdu : public hdu {
+                image_hdu() : dHDU(0) {}
                 void dummy(void){};
+                int dHDU;       // index to hdu containing data, e.g. compressed tile image.
             };
             
             struct ascii_hdu : public hdu {

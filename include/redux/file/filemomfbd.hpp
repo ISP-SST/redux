@@ -71,7 +71,7 @@ namespace redux {
             
             size_t load ( std::ifstream& file, char* data, uint8_t loadMask, int verbosity=0, uint8_t alignTo=4 );
             
-            std::string getText( void ) { return ""; }
+            std::vector<std::string> getText( bool ) { return std::vector<std::string>(1,""); }
             int getFormat(void) { return FMT_MOMFBD; };
 
             float version, pix2cf, cf2pix;

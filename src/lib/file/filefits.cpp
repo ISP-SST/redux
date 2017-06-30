@@ -4,6 +4,7 @@
 
 #include "redux/util/arraystats.hpp"
 #include "redux/util/endian.hpp"
+#include "redux/util/ricecompress.hpp"
 #include "redux/types.hpp"
 
 #include <fstream>
@@ -111,7 +112,7 @@ namespace {
     string trimStringValue( string str ) {
         size_t first = str.find_first_of("'");
         if( first != string::npos ) {
-            int len = std::max((int)str.find_last_of("'")-(int)first-1,0);
+            int len = max((int)str.find_last_of("'")-(int)first-1,0);
             str = str.substr(first+1,len);
         }
         boost::replace_all( str, "''",  "'" );
@@ -125,7 +126,7 @@ Fits::Fits( void ) : fitsPtr_(nullptr), status_(0)  {
 }
 
 
-Fits::Fits( const std::string& filename ) : fitsPtr_(nullptr), status_(0) {
+Fits::Fits( const string& filename ) : fitsPtr_(nullptr), status_(0) {
     
     read( filename );
     
@@ -151,15 +152,7 @@ void Fits::close(void) {
 
 
 namespace {
-    /*
-                int bitpix;
-                int nDims;
-                int dataType;               // data type as defined in cfitsio
-                size_t elementSize;         // element size (in bytes) = abs(bitpix/8)
-                size_t nElements;
-                std::vector<int> dims;
-                std::vector<std::string> cards;
-*/
+
     void readRawHDU( const string& fn, size_t offset, Fits::ascii_hdu& hdu ) {
         
         // fixed values for an ASCII table.
@@ -250,7 +243,7 @@ namespace {
             throwStatusError( fn, status );
         }
 
-        if ( hdu.nDims == 0 || hdu.nDims > 999 ) {
+        if ( hdu.nDims > 999 ) {
             throw logic_error( "Fits::read() NAXIS="+to_string(hdu.nDims)+".  file:" + fn );
         }
         
@@ -266,6 +259,13 @@ namespace {
                 hdu.nElements *= hdu.dims[i];
             }
         }
+
+    }
+    
+    void readImageHDU( fitsfile* ff, Fits::image_hdu& hdu, const string& fn ){
+        
+        readPrimaryHDU( ff, dynamic_cast<Fits::hdu&>(hdu), fn );
+
     }
     
     void readAsciiHDU( fitsfile* ff, Fits::ascii_hdu& hdu, const string& fn ){
@@ -301,7 +301,7 @@ namespace {
 }
 
 
-void Fits::read( const std::string& filename ) {
+void Fits::read( const string& filename ) {
     
     int nHDU, hduType;
     char data[ FLEN_VALUE ];
@@ -335,59 +335,66 @@ void Fits::read( const std::string& filename ) {
     readAllCards( fitsPtr_, primaryHDU, filename );
     
     int hdutype(ANY_HDU);
-    for( int ii=2; ; ++ii ) {
+    for( int ii=2; ii<=nHDU; ++ii ) {
         status_ = 0;
-        if( fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_) ) {
-            if( status_ == END_OF_FILE ) {
-                status_ = 0;              // reached EOF, return
-                break;
-            } else if( status_ == BAD_BITPIX ) {  // this is most likely one of the non-conforming early chromis ascii-tables
+        fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_ );
+        if( status_ == END_OF_FILE ) {
+            status_ = 0;              // reached EOF, return
+            break;
+        } else if( status_ == BAD_BITPIX ) {  // this is most likely one of the non-conforming early chromis ascii-tables
+            status_ = 0;
+            auto hdu = make_shared<ascii_hdu>();
+            size_t offset = fitsPtr_->Fptr->headstart[ii-1];
+            if( offset > 0 ) {
+                close();
+                readRawHDU( filename, offset, *hdu );
+                extHDUs.push_back( hdu );
+                if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
+                    throwStatusError( filename, status_ );
+                }
+                fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_);
                 status_ = 0;
-                auto hdu = make_shared<ascii_hdu>();
-                size_t offset = fitsPtr_->Fptr->headstart[ii-1];
-                if( offset > 0 ) {
-                    close();
-                    readRawHDU( filename, offset, *hdu );
-                    extHDUs.push_back( hdu );
-                    if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
-                        throwStatusError( filename, status_ );
-                    }
-                    fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_);
-                    status_ = 0;
+            }
+            break;
+        } else if( status_ ){
+            throwStatusError( filename, status_ );      // got an unexpected error   
+        }
+
+        switch( hdutype ) {
+            case IMAGE_HDU: {
+                //cout << __FILE__ << ":" << __LINE__ << "  Extension is IMAGE_HDU" << endl;
+                auto hdu = make_shared<Fits::image_hdu>();
+                readImageHDU( fitsPtr_, *hdu, filename );
+                readAllCards( fitsPtr_, *hdu, filename );
+                if( fitsPtr_->Fptr->compressimg ) {
+                    primaryHDU.dHDU = ii;
+                    primaryHDU.bitpix = fitsPtr_->Fptr->zbitpix;
+                    primaryHDU.nDims = fitsPtr_->Fptr->zndim;
+                    primaryHDU.dims.assign( fitsPtr_->Fptr->znaxis, fitsPtr_->Fptr->znaxis+MAX_COMPRESS_DIM );
+                    //cout << __FILE__ << ":" << __LINE__ << printArray(primaryHDU.dims," PRIMARY dims") << endl;
                 }
+                extHDUs.push_back( hdu );
                 break;
-            } else if( status_ ){
-                cout << "filefits: " << __LINE__ << "   status no EOF.  " << status_ << endl; 
-                throwStatusError( filename, status_ );      // got an unexpected error   
             }
-            switch( hdutype ) {
-                case IMAGE_HDU: {
-                    cout << "filefits: " << __LINE__ << "   Extension is IMAGE_HDU" << endl;
-                    auto hdu = make_shared<Fits::image_hdu>();
-                    readPrimaryHDU( fitsPtr_, *hdu, filename );
-                    readAllCards( fitsPtr_, *hdu, filename );
-                    extHDUs.push_back( hdu );
-                    break;
-                }
-                case ASCII_TBL: {
-                    cout << "filefits: " << __LINE__ << "   Extension is ASCII_TBL" << endl;
-                    auto hdu = make_shared<Fits::ascii_hdu>();
-                    readAsciiHDU( fitsPtr_, *hdu, filename );
-                    readAllCards( fitsPtr_, *hdu, filename );
-                    extHDUs.push_back( hdu );
-                    break;
-                }
-                case BINARY_TBL: {
-                    cout << "filefits: " << __LINE__ << "   Extension is BINARY_TBL" << endl;
-                    auto hdu = make_shared<Fits::binary_hdu>();
-                    readBinaryHDU( fitsPtr_, *hdu, filename);
-                    readAllCards( fitsPtr_, *hdu, filename );
-                    extHDUs.push_back( hdu );
-                    break;
-                }
-                default:
-                    cout << "filefits: " << __LINE__ << "   Extension is weird..." << endl;
+            case ASCII_TBL: {
+                //cout << __FILE__ << ":" << __LINE__ << "   Extension is ASCII_TBL" << endl;
+                auto hdu = make_shared<Fits::ascii_hdu>();
+                readAsciiHDU( fitsPtr_, *hdu, filename );
+                readAllCards( fitsPtr_, *hdu, filename );
+                extHDUs.push_back( hdu );
+                break;
             }
+            case BINARY_TBL: {
+                //cout << __FILE__ << ":" << __LINE__ << "   Extension is BINARY_TBL" << endl;
+                auto hdu = make_shared<Fits::binary_hdu>();
+                readBinaryHDU( fitsPtr_, *hdu, filename);
+                readAllCards( fitsPtr_, *hdu, filename );
+                extHDUs.push_back( hdu );
+                break;
+            }
+            default:
+                cout << __FILE__ << ":" << __LINE__ << "   Extension is not recognized..." << endl;
+
         }
     }
 
@@ -402,6 +409,68 @@ void Fits::read( const std::string& filename ) {
 
 void Fits::write( ofstream& file ) {
 
+}
+
+
+vector<string> Fits::getText( bool raw ) {
+    vector<string> ret;
+    string hduText;
+    if( !raw && primaryHDU.dHDU && extHDUs[primaryHDU.dHDU-2]) {
+        for( string k: extHDUs[primaryHDU.dHDU-2]->cards ) {
+            string kk = k;
+            string key = k.substr(0,8);
+            if( boost::iequals( key, "ZBITPIX ") ) {
+                key = "BITPIX  ";
+                k.replace(0,8,key);
+                updateCard( primaryHDU.cards, key, k );
+            } else if( boost::iequals( key, "ZNAXIS  ") ) {
+                key = "NAXIS   ";
+                k.replace(0,8,key);
+                updateCard( primaryHDU.cards, key, k );
+            } else if( boost::iequals( key.substr(0,6), "ZNAXIS") ) {
+                key = "NAXIS" + k.substr(6,1) + "  ";
+                int ind = atoi(k.substr(6,1).c_str());
+                k.replace(0,8,key);
+                if( !updateCard( primaryHDU.cards, key, k ) ) {
+                    string key2 = "NAXIS";
+                    if( ind>1 ) key2 += to_string(ind-1) + "  ";
+                    insertCardAfter( primaryHDU.cards, k, key2);
+                }
+            }
+        }
+        for( auto& k: primaryHDU.cards ) {
+            hduText += k;
+        }
+        hduText += "END" + string(77, ' ') ;
+        ret.push_back(hduText);
+        for( size_t i=0; i<extHDUs.size(); ++i ) {
+            if( (i != (primaryHDU.dHDU-2)) && extHDUs[i] ) {
+                hduText.clear();
+                for( auto& k: extHDUs[i]->cards ) {
+                    hduText += k;
+                }
+                hduText += "END" + string(77, ' ') ;
+                ret.push_back(hduText);
+            }
+        }
+    } else {
+        for( auto& k: primaryHDU.cards ) {
+            hduText += k;
+        }
+        hduText += "END" + string(77, ' ') ;
+        ret.push_back(hduText);
+        for( size_t i=0; i<extHDUs.size(); ++i ) {
+            if( extHDUs[i] ) {
+                hduText.clear();
+                for( auto& k: extHDUs[i]->cards ) {
+                    hduText += k;
+                }
+                hduText += "END" + string(77, ' ') ;
+                ret.push_back(hduText);
+            }
+        }
+    }
+    return ret;
 }
 
 
@@ -458,57 +527,83 @@ namespace redux {
 }
 
 
-void Fits::insertCard( std::string card, size_t location ) {
+void Fits::insertCard( vector<string>& hdr, string card, size_t location ) {
     
-    if( location < primaryHDU.cards.size() ) {
-        primaryHDU.cards.insert( primaryHDU.cards.begin()+location, card );
+    if( location < hdr.size() ) {
+        hdr.insert( hdr.begin()+location, card );
     } else {
-        primaryHDU.cards.push_back(card);
+        hdr.push_back(card);
     }
     
 }
 
 
-void Fits::insertCardAfter( std::string card, std::string after ) {
+void Fits::insertCardAfter( vector<string>& hdr, string card, string after ) {
     after.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
     size_t location = string::npos;
-    for( size_t i=0; i<primaryHDU.cards.size(); ++i ) {
-        if( boost::iequals( primaryHDU.cards[i].substr(0,8), after) ) {
+    for( size_t i=0; i<hdr.size(); ++i ) {
+        if( boost::iequals( hdr[i].substr(0,8), after) ) {
             location = i+1;
             break;
         }
     }
-    insertCard(card,location);
+    insertCard( hdr, card, location );
 }
 
 
-void Fits::insertCardBefore( std::string card, std::string before ) {
+void Fits::insertCardBefore( vector<string>& hdr, string card, string before ) {
     before.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
     size_t location = string::npos;
-    for( size_t i=0; i<primaryHDU.cards.size(); ++i ) {
-        if( boost::iequals( primaryHDU.cards[i].substr(0,8), before) ) {
+    for( size_t i=0; i<hdr.size(); ++i ) {
+        if( boost::iequals( hdr[i].substr(0,8), before) ) {
             location = i;
             break;
         }
     }
-    insertCard(card,location);
+    insertCard( hdr, card, location );
     
 }
 
 
+bool Fits::updateCard( vector<string>& hdr, size_t location, string card ) {
+    
+    if( location < hdr.size() ) {
+        hdr[location] = card;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+
+bool Fits::updateCard( vector<string>& hdr, string key, string card ) {
+    
+    key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    size_t location = string::npos;
+    for( size_t i=0; i<hdr.size(); ++i ) {
+        if( boost::iequals( hdr[i].substr(0,8), key) ) {
+            location = i;
+            break;
+        }
+    }
+    return updateCard( hdr, location, card );
+
+}
+
+
 template <typename T>
-T Fits::getValue( string key ) {
+T Fits::getValue( const vector<string>& hdr, string key ) {
     
     key.resize(8,' ');       // pad with spaces, or truncate, to 8 characters
 
-    for( string k: primaryHDU.cards ) {
+    for( string k: hdr ) {
         if( boost::iequals( k.substr(0,key.length()), key) ) {
             size_t commentStart = k.find('/');
             k = trimStringValue( k.substr( 10, commentStart-10 ) );
             try {
                 return boost::lexical_cast<T>(k);
             } catch( const boost::bad_lexical_cast& ) {
-                // catch and ignore, return default contructed T
+                // catch and ignore, return default constructed T
             }
         }
     }
@@ -519,11 +614,11 @@ T Fits::getValue( string key ) {
 namespace redux {
     namespace file {
         template <>
-        string Fits::getValue( string key ) {
+        string Fits::getValue( const vector<string>& hdr, string key ) {
             
             key.resize(8,' ');       // pad with spaces, or truncate, to 8 characters
             
-            for( string k: primaryHDU.cards ) {
+            for( string k: hdr ) {
                 if( boost::iequals( k.substr(0,8), key) ) {
                     size_t commentStart = k.find('/');
                     return trimStringValue( k.substr( 10, commentStart-10 ) );
@@ -533,10 +628,10 @@ namespace redux {
         }
         
         template <>
-        bpx::ptime Fits::getValue( string key ) {
+        bpx::ptime Fits::getValue( const vector<string>& hdr, string key ) {
             using namespace bpx;
             key.resize(8,' ');
-            for( string k: primaryHDU.cards ) {
+            for( string k: hdr ) {
                 if( boost::iequals( k.substr(0,8), key) ) {
                     size_t commentStart = k.find('/');
                     k = trimStringValue( k.substr( 10, commentStart-10 ) );
@@ -544,7 +639,7 @@ namespace redux {
                         boost::replace_first(k,"T"," ");
                         return bpx::time_from_string(k);
                     } catch( const boost::bad_lexical_cast& ) {
-                        // catch and ignore, return default contructed T
+                        // catch and ignore, return default constructed T
                     }
                     //return bpx::from_iso_string(k);
                 }
@@ -565,7 +660,7 @@ vector<T> Fits::getTableArray( string key ) {
             size_t commentStart = k.find('/');
     cout << "filefits: " << __LINE__ << "   s=\"" << k << "\"" << endl; 
             k = k.substr( 10, commentStart-10 );
-            k.erase(std::remove(k.begin(), k.end(), ' '), k.end());
+            k.erase(remove(k.begin(), k.end(), ' '), k.end());
     cout << "filefits: " << __LINE__ << "   s=\"" << k << "\"" << endl; 
             return boost::lexical_cast<T>(k);
         }
@@ -659,7 +754,7 @@ size_t Fits::getNumberOfFrames(void) {
 bpx::ptime Fits::getStartTime(void) {
 
     using bpx::ptime;
-    ptime startT = getValue<ptime>("DATE-BEG");
+    ptime startT = getValue<ptime>( primaryHDU.cards, "DATE-BEG" );
     if( startT.is_special() ) {
         auto times = getTableArray<ptime>("DATE-BEG");
         for( const ptime& t: times ) {
@@ -669,7 +764,7 @@ bpx::ptime Fits::getStartTime(void) {
         }
         if( !startT.is_special() ) {
             string card = makeCard("DATE-BEG", startT, "First in table." );
-            insertCardAfter( card, "DATE" );
+            insertCardAfter( primaryHDU.cards, card, "DATE" );
         }
     }
 
@@ -681,7 +776,7 @@ bpx::ptime Fits::getStartTime(void) {
 bpx::ptime Fits::getEndTime(void) {
     
     using bpx::ptime;
-    ptime endT = getValue<ptime>("DATE-END");
+    ptime endT = getValue<ptime>( primaryHDU.cards, "DATE-END" );
     if( endT.is_special() ) {
         auto times = getTableArray<ptime>("DATE-BEG");
         for( const ptime& t: times ) {
@@ -693,7 +788,7 @@ bpx::ptime Fits::getEndTime(void) {
             endT += getExposureTime();
             //  "Last in table + NAXIS3*CADENCE + XPOSURE."  ???
             string card = makeCard( "DATE-END", endT, "Last in table + XPOSURE." );
-            insertCardAfter( card, "DATE" );
+            insertCardAfter( primaryHDU.cards, card, "DATE" );
         }
     }
     return endT;
@@ -704,7 +799,7 @@ bpx::ptime Fits::getEndTime(void) {
 bpx::ptime Fits::getAverageTime(void) {
 
     using namespace bpx;
-    ptime avgT = getValue<ptime>("DATE-AVG");
+    ptime avgT = getValue<ptime>( primaryHDU.cards, "DATE-AVG" );
     if( avgT.is_special() ) {
         auto times = getTableArray<ptime>("DATE-BEG");
         time_duration sum;
@@ -721,7 +816,7 @@ bpx::ptime Fits::getAverageTime(void) {
             avgT += sum + getExposureTime()/2;
             //  "Last in table + NAXIS3*CADENCE + XPOSURE."  ???
             string card = makeCard( "DATE-AVG", avgT, "Average time from table." );
-            insertCardAfter( card, "DATE" );
+            insertCardAfter( primaryHDU.cards, card, "DATE" );
         }
     }
     return avgT;
@@ -742,9 +837,9 @@ bpx::ptime Fits::getAverageTime(void) {
 
 bpx::time_duration Fits::getExposureTime(void) {
     
-    float exposureTime = getValue<float>("XPOSURE");
+    float exposureTime = getValue<float>( primaryHDU.cards, "XPOSURE" );
     if( exposureTime == 0.0 ) {     // also look for old non-SolarNet keyword
-        exposureTime = getValue<float>("EXPTIME");
+        exposureTime = getValue<float>( primaryHDU.cards, "EXPTIME" );
     }
     return bpx::microseconds( exposureTime*1E6 );
 
@@ -787,7 +882,7 @@ vector<bpx::ptime> Fits::getStartTimes(void){
 // 
 // 
 // vector<bpx::ptime> getExposureTimes(void){
-//     return std::vector<bpx::ptime>();   // TODO Implement when we gat per-frame exposure times
+//     return vector<bpx::ptime>();   // TODO Implement when we get per-frame exposure times
 // }
 
 
@@ -809,7 +904,7 @@ size_t Fits::dimSize(size_t i) {
 
 uint8_t Fits::elementSize(void) { 
     
-    return std::abs(primaryHDU.bitpix/8);
+    return abs(primaryHDU.bitpix/8);
     
 }
 
@@ -877,13 +972,44 @@ double Fits::getMinMaxMean( const char* data, double* Min, double* Max ){
 }
 
 
-void Fits::read( std::shared_ptr<redux::file::Fits>& hdr, char* data ) {
+void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
 
     if( !hdr.get() ) {
         return;
     }
+    
     int anynull(0), status(0);
     int ret(0);
+    
+    if( hdr->primaryHDU.dHDU ) {
+        if( fits_movabs_hdu( hdr->fitsPtr_, hdr->primaryHDU.dHDU, nullptr, &status) ) {
+            throwStatusError( "Fits::read(hdr,data) moving to cHDU.", status );
+        }
+
+        if( hdr->primaryHDU.dataType == TSHORT ) {      // only support int16_t at the moment
+            char* dataPtr = data;
+            FITSfile* fptr = hdr->fitsPtr_->Fptr;
+            size_t imgSize = fptr->maxtilelen;
+            size_t blockSize = fptr->rice_blocksize;
+            vector<thread> threads;
+            for( LONGLONG i=1; i<=fptr->numrows; ++i ) {
+                LONGLONG rSize, rOffset;
+                if( fits_read_descriptll( hdr->fitsPtr_, fptr->cn_compressed, i, &rSize, &rOffset, &status ) ) {
+                    throwStatusError( "Fits::read(hdr,data) getting row info.", status );
+                }
+                shared_ptr<uint8_t> tmp( new uint8_t[rSize], []( uint8_t*& p ) { delete[] p; } );
+                if( fits_read_col( hdr->fitsPtr_, TBYTE, fptr->cn_compressed, i, 1, rSize, NULL, tmp.get(), NULL, &status ) ) {
+                    throwStatusError( "Fits::read(hdr,data) reading row.", status );
+                }
+                threads.push_back( thread([ tmp, dataPtr, rSize, &imgSize, &blockSize ](){
+                    rice_decomp16( tmp.get(), rSize, reinterpret_cast<int16_t*>(dataPtr), imgSize, blockSize );
+                }));
+               dataPtr += imgSize * 2;
+            }
+            for( auto &t: threads ) t.join();
+        }
+        return;
+    }
     
     bool pg_data(false);
     char card[81];
@@ -948,7 +1074,7 @@ void Fits::read( std::shared_ptr<redux::file::Fits>& hdr, char* data ) {
 }
 
 
-void Fits::write( const std::string& filename, const char* data, const std::shared_ptr<redux::file::Fits> hdr, bool compress, int slice ) {
+void Fits::write( const string& filename, const char* data, const shared_ptr<redux::file::Fits> hdr, bool compress, int slice ) {
 
     // TODO
     
@@ -956,7 +1082,7 @@ void Fits::write( const std::string& filename, const char* data, const std::shar
 
 
 template <typename T>
-void Fits::read( const string& filename, redux::util::Array<T>& data, std::shared_ptr<redux::file::Fits>& hdr ) {
+void Fits::read( const string& filename, redux::util::Array<T>& data, shared_ptr<redux::file::Fits>& hdr ) {
 
     if( !hdr.get() ) {
         hdr.reset( new Fits() );
@@ -966,7 +1092,7 @@ void Fits::read( const string& filename, redux::util::Array<T>& data, std::share
     int nDims = hdr->primaryHDU.nDims;
     int nArrayDims = data.nDimensions();
     bool forceResize = ( nArrayDims < nDims );
-    std::vector<size_t> dimSizes( hdr->primaryHDU.dims.rbegin(), hdr->primaryHDU.dims.rend() );
+    vector<size_t> dimSizes( hdr->primaryHDU.dims.rbegin(), hdr->primaryHDU.dims.rend() );
     if( (int)dimSizes.size() != nDims ) {
         string msg = "Fits::read() dimension mismatch:  nDims=" +to_string(nDims);
         msg += printArray(dimSizes, "\ndimSizes" );
@@ -985,7 +1111,7 @@ void Fits::read( const string& filename, redux::util::Array<T>& data, std::share
 
     size_t dataSize = hdr->primaryHDU.nElements * hdr->primaryHDU.elementSize;
     if( dataSize ) {
-        auto tmp = std::shared_ptr<char>( new char[dataSize], []( char * p ) { delete[] p; } );
+        auto tmp = shared_ptr<char>( new char[dataSize], []( char * p ) { delete[] p; } );
         read( hdr, tmp.get() );
         switch( hdr->primaryHDU.dataType ) {
             case( TBYTE ):   data.template copyFrom<uint8_t>( tmp.get() ); break;
@@ -1001,18 +1127,18 @@ void Fits::read( const string& filename, redux::util::Array<T>& data, std::share
         }
     }
 }
-template void Fits::read( const string& filename, redux::util::Array<uint8_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
-template void Fits::read( const string& filename, redux::util::Array<int16_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
-template void Fits::read( const string& filename, redux::util::Array<int32_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
-template void Fits::read( const string& filename, redux::util::Array<int64_t>& data, std::shared_ptr<redux::file::Fits>& hdr );
-template void Fits::read( const string& filename, redux::util::Array<float  >& data, std::shared_ptr<redux::file::Fits>& hdr );
-template void Fits::read( const string& filename, redux::util::Array<double >& data, std::shared_ptr<redux::file::Fits>& hdr );
-template void Fits::read( const string& filename, redux::util::Array<complex_t >& data, std::shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<uint8_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<int16_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<int32_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<int64_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<float  >& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<double >& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<complex_t >& data, shared_ptr<redux::file::Fits>& hdr );
 
 
 template <typename T>
 void Fits::read( const string& filename, redux::image::Image<T>& image, bool metaOnly ) {
-    std::shared_ptr<Fits> hdr = static_pointer_cast<Fits>( image.meta );
+    shared_ptr<Fits> hdr = static_pointer_cast<Fits>( image.meta );
     if( !hdr ) {
         hdr.reset( new Fits() );
         image.meta = hdr;
@@ -1034,7 +1160,7 @@ template void Fits::read( const string & filename, redux::image::Image<complex_t
 
 
 template <typename T>
-void Fits::write( const string & filename, const redux::util::Array<T>& data, std::shared_ptr<redux::file::Fits> hdr, int sliceSize ) {
+void Fits::write( const string & filename, const redux::util::Array<T>& data, shared_ptr<redux::file::Fits> hdr, int sliceSize ) {
 
     // TODO
     
@@ -1044,13 +1170,13 @@ void Fits::write( const string & filename, const redux::util::Array<T>& data, st
     
 
 }
-template void Fits::write( const string&, const redux::util::Array<uint8_t>&, std::shared_ptr<redux::file::Fits>, int );
-template void Fits::write( const string&, const redux::util::Array<int16_t>&, std::shared_ptr<redux::file::Fits>, int );
-template void Fits::write( const string&, const redux::util::Array<int32_t>&, std::shared_ptr<redux::file::Fits>, int );
-template void Fits::write( const string&, const redux::util::Array<int64_t>&, std::shared_ptr<redux::file::Fits>, int );
-template void Fits::write( const string&, const redux::util::Array<float  >&, std::shared_ptr<redux::file::Fits>, int );
-template void Fits::write( const string&, const redux::util::Array<double >&, std::shared_ptr<redux::file::Fits>, int );
-template void Fits::write( const string&, const redux::util::Array<complex_t >&, std::shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<uint8_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<int16_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<int32_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<int64_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<float  >&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<double >&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<complex_t >&, shared_ptr<redux::file::Fits>, int );
 
 
 template <typename T>

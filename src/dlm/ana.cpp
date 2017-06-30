@@ -74,7 +74,8 @@ IDL_VPTR redux::fzhead( int argc, IDL_VPTR* argv ) {
     string hdrText;
     try {
         Ana header( name );
-        hdrText = header.getText();
+        vector<string> hdrTexts = header.getText();
+        if( !hdrTexts.empty() ) hdrText = hdrTexts.front();
     } catch (exception& e) {
         cout << "Failed to read ANA Header: " << e.what() << endl;
     }
@@ -243,7 +244,9 @@ void redux::fzread( int argc, IDL_VPTR* argv, char* argk ) {
         // IDL type-ID = ANA type-ID + 1
         argv[0] = IDL_ImportNamedArray( var_name, nDims, dim, header->m_Header.datyp + 1, ( UCHAR* )data, redux::util::castAndDelete<char>, NULL );
 
-        string hdrText = header->getText();
+        vector<string> hdrTexts = header->getText();
+        string hdrText;
+        if( !hdrTexts.empty() ) hdrText = hdrTexts.front();
         size_t textSize = hdrText.length();
         if( textSize && argc>2 ) {
             IDL_VPTR hdrVar    = argv[2];

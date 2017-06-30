@@ -76,7 +76,7 @@ if (DEFINED IDL_FOUND)
     endif()
 
         
-    set( REDUX_RDX_DEPS idlutil.cpp imgtools.cpp modes.cpp string.cpp
+    set( REDUX_RDX_DEPS filetools.cpp idlutil.cpp imgtools.cpp modes.cpp string.cpp
          ${REDUX_ANA_DEPS} ${REDUX_MOMFBD_DEPS}
          "${REDUX_LIB_BASE}/file/fileio.cpp"
          "${REDUX_LIB_BASE}/image/descatter.cpp"
@@ -89,6 +89,7 @@ if (DEFINED IDL_FOUND)
          "${REDUX_LIB_BASE}/util/arraystats.cpp"
          "${REDUX_LIB_BASE}/util/cache.cpp"
          "${REDUX_LIB_BASE}/util/progresswatch.cpp"
+         "${REDUX_LIB_BASE}/util/ricecompress.cpp"
          "${REDUX_LIB_BASE}/util/stopwatch.cpp"
          "${REDUX_LIB_BASE}/util/stringutil.cpp"
          "${REDUX_LIB_BASE}/util/astro_comp.cpp"

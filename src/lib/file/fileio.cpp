@@ -175,10 +175,11 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
         }
 #ifdef REDUX_WITH_FITS
         case FMT_FITS: {
+            shared_ptr<Fits> hdr;
             if( !meta ) {
-                meta.reset( new Fits() );
-            }
-            shared_ptr<Fits> hdr = static_pointer_cast<Fits>(meta);
+                hdr.reset( new Fits() );
+                meta = static_pointer_cast<FileMeta>(hdr);
+            } else hdr = static_pointer_cast<Fits>(meta);
             if( hdr ) {
                 hdr->read( filename );
                 Fits::read( hdr, data );

@@ -44,8 +44,8 @@ namespace redux {
 
             void write( std::ofstream& );
 
-            std::string getText( void ) {
-                return m_Header.txt + m_ExtendedHeader;
+            std::vector<std::string> getText( bool raw RDX_UNUSED=false ) {
+                return std::vector<std::string>(1,m_Header.txt + m_ExtendedHeader);
             }
             
             size_t getNumberOfFrames(void);

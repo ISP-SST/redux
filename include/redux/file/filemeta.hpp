@@ -25,7 +25,7 @@ namespace redux {
             FileMeta ( void ) {}
             virtual ~FileMeta ( void ) = default;
             
-            virtual std::string getText( void ) { return ""; }
+            virtual std::vector<std::string> getText( bool raw=false ) { return std::vector<std::string>(1,""); }
             virtual size_t getNumberOfFrames(void) { return 1; }
             virtual bpx::ptime getStartTime(void) { return bpx::ptime(); };
             virtual bpx::ptime getEndTime(void) { return bpx::ptime(); };
