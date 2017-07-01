@@ -1064,7 +1064,11 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
             reinterpret_cast<int64_t*>( data ), &anynull, &status); break;
         case( TULONG ): ret = fits_read_img( hdr->fitsPtr_, TULONG, 1, hdr->nElements(), 0,
             reinterpret_cast<uint64_t*>( data ), &anynull, &status); break;
-        default: ;
+        case( TFLOAT ): ret = fits_read_img( hdr->fitsPtr_, TFLOAT, 1, hdr->nElements(), 0,
+            reinterpret_cast<float*>( data ), &anynull, &status); break;
+        case( TDOUBLE ): ret = fits_read_img( hdr->fitsPtr_, TDOUBLE, 1, hdr->nElements(), 0,
+            reinterpret_cast<double*>( data ), &anynull, &status); break;
+		default: throw logic_error("Fits::read: Data-type not supported: " + to_string(hdr->primaryHDU.dataType) );
     }
     
     if ( ret ) {
