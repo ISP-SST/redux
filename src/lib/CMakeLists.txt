@@ -145,7 +145,7 @@ endif()
 
 # Installation (distribution) settings
 install(DIRECTORY ${REDUX_DIR}/include/redux
-        DESTINATION ${REDUX_INSTALL_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/include/
         FILES_MATCHING PATTERN "*.hpp"
 )
 

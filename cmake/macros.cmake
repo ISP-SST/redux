@@ -59,7 +59,7 @@ macro(ADD_TRANSLATION TARGETNAME ROOTDIR TSFILES)
             ARGS ${TSFILE} -qm ${QM_FILE}
             DEPENDS ${TSFILE}
         )
-        install(FILES ${QM_FILE} DESTINATION ${REDUX_INSTALL_DIR}/translations OPTIONAL)
+        install(FILES ${QM_FILE} DESTINATION ${CMAKE_INSTALL_PREFIX}/translations OPTIONAL)
     endforeach()
         
     string(REPLACE ";" " " TSFILESARG "${${TSFILES}}")
@@ -132,9 +132,9 @@ macro(INSTALL_DEPS TGT)
     string(REPLACE "$(Configuration)" "$${}{CMAKE_INSTALL_CONFIG_NAME}" TARGET_LOCATION ${TARGET_LOCATION})
     # Ordinary install of the binary
     install(TARGETS ${TGT}
-        RUNTIME DESTINATION ${REDUX_INSTALL_DIR}/bin
-        LIBRARY DESTINATION ${REDUX_INSTALL_DIR}/lib
-        ARCHIVE DESTINATION ${REDUX_INSTALL_DIR}/lib
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
         OPTIONAL
     )
     # Generate an install script which will check dependencies at install-time and copy those as well.
@@ -245,7 +245,7 @@ macro(REDUX_ADD_LIBRARY target)
     MAKE_CPPCHECK(${target} ${src})
     # TODO: Eventually the install-dir should really be user configurable.
     set_target_properties(${target} PROPERTIES DEBUG_POSTFIX "-d")
-    install(TARGETS ${target} DESTINATION ${REDUX_INSTALL_DIR}/lib)
+    install(TARGETS ${target} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 endmacro()
 
 

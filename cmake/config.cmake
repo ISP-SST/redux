@@ -93,7 +93,8 @@ else()
 endif()
 
 include_directories(${REDUX_DIR}/include)
-set(REDUX_INSTALL_DIR "${CMAKE_SOURCE_DIR}/dist" CACHE PATH "Installation path.")
+
+message(STATUS "Redux will be installed into: \"${CMAKE_INSTALL_PREFIX}\"")
 
 # Setup a variable to indicate endian:ness of current system.
 include(TestBigEndian)
