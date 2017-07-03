@@ -44,15 +44,20 @@ namespace redux {
 
             void write( std::ofstream& );
 
-            std::vector<std::string> getText( bool raw RDX_UNUSED=false ) {
-                return std::vector<std::string>(1,m_Header.txt + m_ExtendedHeader);
+            std::vector<std::string> getText( bool raw=false ) {
+                std::string hdr = m_Header.txt + m_ExtendedHeader;
+                if( raw ) return std::vector<std::string>( 1, hdr );
+                return makeFitsHeader(hdr);
             }
+            
+            std::vector<std::string> makeFitsHeader( const std::string& );
             
             size_t getNumberOfFrames(void);
             bpx::ptime getStartTime(void);
             bpx::ptime getEndTime(void);
             bpx::ptime getAverageTime(void);
             bpx::time_duration getExposureTime(void);
+            std::vector<bpx::ptime> getStartTimes(void);
             
             size_t dataSize(void);
             size_t dimSize(size_t);

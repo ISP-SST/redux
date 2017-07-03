@@ -224,6 +224,13 @@ void Ana::write( ofstream& file ) {
 
 }
 
+
+vector<string> redux::file::Ana::makeFitsHeader( const std::string& hdr ) {
+    // TODO implement this
+    return vector<string>(1,hdr);
+}
+
+
 // TBD: These "parsers" should probably be in the sst namespace with other telescope/hardware specific functions...
 size_t redux::file::Ana::getNumberOfFrames(void) {
     
@@ -290,6 +297,20 @@ bpx::time_duration redux::file::Ana::getExposureTime(void) {
 
 }
 
+vector<bpx::ptime> redux::file::Ana::getStartTimes(void) {
+    size_t nFrames = getNumberOfFrames();
+    if( nFrames == 0 ) return vector<bpx::ptime>();
+    bpx::ptime startT = getStartTime();
+    vector<bpx::ptime> ret( nFrames, startT );
+    if( nFrames == 1 ) return ret;
+    bpx::ptime endT = getEndTime();
+    bpx::time_duration expTime = (endT-startT);
+    for( size_t i=1; i<nFrames; ++i ) {
+        ret[i] += expTime;
+        expTime += expTime;
+    }
+    return ret;
+}
 
 size_t redux::file::Ana::dataSize(void) { 
 

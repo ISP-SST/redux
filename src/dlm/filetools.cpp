@@ -442,24 +442,31 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
             bool raw = (kw.raw != 0);
             vector<string> hdrTexts = myMeta->getText( raw );
             int nTexts = hdrTexts.size();
-            if( kw.all == 0 ) nTexts = 1;
             if( nTexts ) {
-                size_t charCount(0);
-                for( int i=0; i<nTexts; ++i ) charCount += hdrTexts[i].size();
-                if( charCount%80 ) {
-                    throw logic_error("Header text-size is not a multiple of 80.");
-                }
-                IDL_MEMINT nKeys = charCount/80;
-                IDL_MEMINT dims[] = { nKeys };
-                IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &tmpHdr );
-                IDL_STRING* strPtr = reinterpret_cast<IDL_STRING*>(tmpHdr->value.arr->data);
-                size_t cnt(0);
-                for( int i=0; i<nTexts; ++i ) {
-                    string hdr = hdrTexts[i];
-                    while( !hdr.empty() ) {
-                        string tmp = hdr.substr( 0, 80 );
-                        hdr.erase( 0, 80 );
-                        IDL_StrStore( &(strPtr[cnt++]), (char*)tmp.c_str() );
+                if( kw.all == 0 ) nTexts = 1;
+                if( raw ) {
+                    string tmp;
+                    for( auto& t: hdrTexts ) tmp += t;
+                    tmpHdr = IDL_StrToSTRING( (char*)tmp.c_str() );
+                } else {
+                    size_t charCount(0);
+                    for( int i=0; i<nTexts; ++i ) charCount += hdrTexts[i].size();
+                    IDL_MEMINT nKeys = charCount/80;
+                    if( charCount%80 ) {
+                        nKeys++;
+                        //throw logic_error("Header text-size is not a multiple of 80.");
+                    }
+                    IDL_MEMINT dims[] = { nKeys };
+                    IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &tmpHdr );
+                    IDL_STRING* strPtr = reinterpret_cast<IDL_STRING*>(tmpHdr->value.arr->data);
+                    size_t cnt(0);
+                    for( int i=0; i<nTexts; ++i ) {
+                        string hdr = hdrTexts[i];
+                        while( !hdr.empty() ) {
+                            string tmp = hdr.substr( 0, 80 );
+                            hdr.erase( 0, 80 );
+                            IDL_StrStore( &(strPtr[cnt++]), (char*)tmp.c_str() );
+                        }
                     }
                 }
             } else tmpHdr = IDL_StrToSTRING((char*)"");
