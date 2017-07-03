@@ -1,6 +1,6 @@
 #include "redux/util/ricecompress.hpp"
 
-#include "redux/util/stringutil.hpp"
+#include "redux/util/datautil.hpp"
 
 #include <string.h>             // memset
 #include <memory>               // unique_ptr
@@ -127,6 +127,7 @@ namespace {
         uint8_t u8[8];
     };
 
+    int preprocess_block( const int16_t* block, size_t blockSize, uint32_t* diff, int16_t refValue ) RDX_UNUSED;
 
     __attribute__ ((target ("default")))
     int preprocess_block( const int16_t* __restrict__ block, size_t blockSize, uint32_t* __restrict__ diff, int16_t refValue ) {

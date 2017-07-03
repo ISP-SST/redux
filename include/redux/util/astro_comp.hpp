@@ -1,6 +1,7 @@
 #ifndef REDUX_UTIL_ASTRO_COMP_HPP
 #define REDUX_UTIL_ASTRO_COMP_HPP
 
+#include <redux/util/datautil.hpp>
 
 #include <math.h>
 
@@ -25,8 +26,8 @@ namespace redux {
     
     namespace util {
         
-        static double DtoR = ( M_PI / 180.0 );
-        static double RtoD = ( 180.0 / M_PI );
+        static double DtoR RDX_UNUSED = ( M_PI / 180.0 );
+        static double RtoD RDX_UNUSED = ( 180.0 / M_PI );
 
         /**
          * structure for storing observatory particulars

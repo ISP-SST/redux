@@ -29,14 +29,17 @@ static const int system_is_big_endian = 1;
 const uint8_t Fits::typeSizes[] = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
 
 namespace {
-    template <typename T> Fits::TypeIndex getDatyp( void ) { return Fits::FITS_NOTYPE; }
+    
+    /* not used at the moment, so commented out to avoid compiler warnings about it
+    template <typename T> Fits::TypeIndex getDatyp( void )  { return Fits::FITS_NOTYPE; }
     template <> Fits::TypeIndex getDatyp<uint8_t>( void ) { return Fits::FITS_BYTE; }
     template <> Fits::TypeIndex getDatyp<int16_t>( void ) { return Fits::FITS_WORD; }
     template <> Fits::TypeIndex getDatyp<int32_t>( void ) { return Fits::FITS_INT; }
     template <> Fits::TypeIndex getDatyp<float  >( void ) { return Fits::FITS_FLOAT; }
     template <> Fits::TypeIndex getDatyp<double >( void ) { return Fits::FITS_DOUBLE; }
     template <> Fits::TypeIndex getDatyp<int64_t>( void ) { return Fits::FITS_LONG; }
-    template <> Fits::TypeIndex getDatyp<complex_t>( void ) { return Fits::FITS_COMPLEX; }
+    template <> Fits::TypeIndex getDatyp<complex_t>( void )  { return Fits::FITS_COMPLEX; }
+    */
     
     size_t getElementSize( int dataType ) {
         switch( dataType ) {
@@ -110,6 +113,7 @@ namespace {
     }
     
     string trimStringValue( string str ) {
+        boost::trim( str );
         size_t first = str.find_first_of("'");
         if( first != string::npos ) {
             int len = max((int)str.find_last_of("'")-(int)first-1,0);

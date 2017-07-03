@@ -1120,7 +1120,7 @@ namespace redux {
                     n = -dimFirst[dim];
                 }
                 
-                if(abs(n+dimLast[dim]) >= dimSizes[dim]) {
+                if((size_t)abs(n+dimLast[dim]) >= dimSizes[dim]) {
                     n = dimSizes[dim]-dimLast[dim]-1;
                 }
               

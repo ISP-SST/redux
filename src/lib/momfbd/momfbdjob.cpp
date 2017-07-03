@@ -663,9 +663,9 @@ return;
     unique_ptr<double[]> bestFit( new double[ nAlpha ] );
     double* bPtr = bestFit.get();
     unique_ptr<double[]> tmp( new double[ nAlpha ] );
-    double* tmpPtr = tmp.get();
+    //double* tmpPtr = tmp.get();
     unique_ptr<double[]> tmp2( new double[ nAlpha ] );
-    double* tmp2Ptr = tmp2.get();
+    //double* tmp2Ptr = tmp2.get();
 static int bla(1);    
     for( int y=0; y<nPatchesY; ++y ) {
         for( int x=0; x<nPatchesX; ++x ) {
