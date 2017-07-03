@@ -69,7 +69,8 @@ namespace redux {
             bpx::ptime getAverageTime(void);
             bpx::time_duration getExposureTime(void);
             std::vector<bpx::ptime> getStartTimes(void);
-            
+            std::vector<size_t> getFrameNumbers(void);
+           
             size_t dataSize(void);
             size_t dimSize(size_t);
             uint8_t elementSize(void);

@@ -1245,6 +1245,8 @@ namespace {
         IDL_INT filter;
         float fp_thres;
         float limit;
+        IDL_VPTR framenumbers;
+        IDL_VPTR discarded;
         IDL_VPTR summed;
         IDL_VPTR nsummed;
         IDL_VPTR dark;
@@ -1264,8 +1266,10 @@ namespace {
         { (char*) "BACKSCATTER_PSF",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,bs_psf) },
         { (char*) "CHECK",            IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,check) },
         { (char*) "DARK",             IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,dark) },
+        { (char*) "DISCARDED",        IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,discarded) },
         { (char*) "FILLPIX_THRESHOLD",IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,fp_thres) },
         { (char*) "FILTER",           IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,filter) },
+        { (char*) "FRAMENUMBERS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,framenumbers) },
         { (char*) "GAIN",             IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,gain) },
         { (char*) "HELP",             IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,help) },
         { (char*) "LIMIT",            IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(SI_KW,limit) },
@@ -1275,8 +1279,8 @@ namespace {
         { (char*) "PADDING",          IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(SI_KW,padding) },
         { (char*) "PINHOLE_ALIGN",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,pinh_align) },
         { (char*) "SUMMED",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,summed) },
-        { (char*) "TIME_AVERAGE",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_avg) },
-        { (char*) "TIME_BEGIN",       IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_beg) },
+        { (char*) "TIME_AVG",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_avg) },
+        { (char*) "TIME_BEG",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_beg) },
         { (char*) "TIME_END",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_end) },
         { (char*) "VERBOSE",          IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,verbose) },
         { (char*) "XYC",              IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,xyc) },
@@ -1758,7 +1762,9 @@ string sum_files_info( int lvl ) {
                     "      BACKSCATTER_PSF     Image containing the scattering PSF. (for descattering).\n"
                     "      CHECK               Discard images which are statistically deviant.\n"
                     "      DARK                Dark field.\n"
+                    "      DISCARDED           (output) Framenumbers of the discarded frames.\n"
                     "      FILTER              Size of median-filter to be applied to means before checking. (3)\n"
+                    "      FRAMENUMBERS        (output) Framenumbers of the summed frames.\n"
                     "      GAIN                Gain table (inverted flat-field).\n"
                     "      LIMIT               Allowed deviation from the median. (0.0175)\n"
                     "      LUN                 IDL file unit (id) where discarded files will be logged.\n"
@@ -1767,9 +1773,9 @@ string sum_files_info( int lvl ) {
                     "      PADDING             Padding size for the descattering procedure. (256)\n"
                     "      PINHOLE_ALIGN       Do sub-pixel alignment before summing.\n"
                     "      SUMMED              (output) Raw sum.\n"
-                    "      TIME_BEGIN          (output) Begin-time from file-headers.\n"
+                    "      TIME_BEG            (output) Begin-time from file-headers.\n"
                     "      TIME_END            (output) End-time from file-headers.\n"
-                    "      TIME_AVERAGE        (output) Average timestamp from file-headers.\n"
+                    "      TIME_AVE            (output) Average timestamp from file-headers.\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                     "      XYC                 (output) Coordinates of align-feature and image-shifts.\n";
         }
@@ -1935,7 +1941,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             return IDL_GettmpInt(0);
         }
         size_t nDims = meta->nDims();
-        IDL_MEMINT xSize, ySize;
+        IDL_MEMINT xSize(0);
+        IDL_MEMINT ySize(0);
         size_t nTotalFrames( nFiles );
         vector<size_t> nFrames( nFiles, 1 );
         if( nDims == 2 ) {
@@ -1983,7 +1990,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 ioService.post([&](){
                     auto tmpMeta = redux::file::getMeta( fn );
                     if( meta ) {
-                        size_t frames = meta->dimSize(0);
+                        size_t frames = tmpMeta->dimSize(0);
                         unique_lock<mutex> lock(mtx);
                         nFrames.push_back( frames );
                         nTotalFrames += frames;
@@ -1998,6 +2005,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         atomic<size_t> nSummed(0);
         atomic<size_t> frameIndex(0);
         
+        vector<int32_t> frameNumbers( nTotalFrames );
         vector<bpx::ptime> time_beg;
         vector<bpx::ptime> time_end;
         if( kw.time_beg || kw.time_end || kw.time_avg ) {
@@ -2197,8 +2205,18 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 try {
                     readFile( existingFiles[i], threadBuffer.get(), threadMeta );
                     if( threadMeta && !time_beg.empty() ) {
-                        vector<bpx::ptime> startTimes = meta->getStartTimes();
-                        bpx::time_duration expTime = meta->getExposureTime();
+                        vector<bpx::ptime> startTimes = threadMeta->getStartTimes();
+                        bpx::time_duration expTime = threadMeta->getExposureTime();
+                        vector<size_t> fn = threadMeta->getFrameNumbers();
+                        if( fn.size() == nFrames[i] ) {
+                            if( fn.front() ) {
+                                std::copy( fn.begin(), fn.end(), frameNumbers.begin()+frameCount );
+                            } else {
+                                std::transform( fn.begin(), fn.end(), frameNumbers.begin()+frameCount,
+                                    [frameCount](const size_t& a){ return a+frameCount; }
+                                );
+                            }
+                        }
                         if( startTimes.size() == nFrames[i] ) {
                             std::copy( startTimes.begin(), startTimes.end(), time_beg.begin()+frameCount);
                             std::transform( startTimes.begin(), startTimes.end(), time_end.begin()+frameCount,
@@ -2276,6 +2294,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                         progWatch.increaseTarget(1);
                                         ioService.post( std::bind(sumFunc, frameCount+j, threadBuffer, bufferOffset) );
                                         --nSummed;
+                                        frameNumbers[frameCount+j] *= -1;
                                         if( shifts ) {
                                             shifts[frameCount+j][0] = 0;
                                             shifts[frameCount+j][1] = 0;
@@ -2310,7 +2329,6 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         ioService.stop();
         pool.join_all();
 
-        
         if( kw.pinh_align ) {
             Mat cvImg( ySize, xSize, CV_64FC1, summedData );
             Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
@@ -2335,10 +2353,40 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         if( kw.summed ) {
-            IDL_VPTR tmpSummed;
-            double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &tmpSummed );
+            IDL_VPTR tmp;
+            double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &tmp );
             memcpy( tmpData, summedData, nPixels*sizeof(double));
-            IDL_VarCopy( tmpSummed, kw.summed );
+            IDL_VarCopy( tmp, kw.summed );
+        }
+        
+        vector<int32_t> discarded;
+        if( nDiscarded && (kw.discarded || kw.framenumbers) ) {
+            for( auto it=frameNumbers.begin(); it < frameNumbers.end(); ) {
+                if( *it < 0 ) {
+                    discarded.push_back(-*it);
+                    frameNumbers.erase(it++);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
+        if( nDiscarded && kw.discarded ) {
+            IDL_VPTR tmp;
+            IDL_MEMINT nD = discarded.size();
+            IDL_MEMINT dims[] = { nD }; 
+            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmp );
+            memcpy( tmpData, discarded.data(), nD*sizeof(int32_t));
+            IDL_VarCopy( tmp, kw.discarded );
+        }
+        
+        if( kw.framenumbers ) {
+            IDL_VPTR tmp;
+            IDL_MEMINT nFN = frameNumbers.size();
+            IDL_MEMINT dims[] = { nFN }; 
+            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmp );
+            memcpy( tmpData, frameNumbers.data(), nFN*sizeof(int32_t));
+            IDL_VarCopy( tmp, kw.framenumbers );
         }
         
         if( nDiscarded <= nSummed ) nSummed -= nDiscarded;

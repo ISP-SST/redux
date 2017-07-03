@@ -33,6 +33,7 @@ namespace redux {
             virtual bpx::time_duration getExposureTime(void) { return bpx::time_duration(); };
             
             virtual std::vector<bpx::ptime> getStartTimes(void) { return std::vector<bpx::ptime>(); };
+            virtual std::vector<size_t> getFrameNumbers(void) { return std::vector<size_t>(1,0); };
             
             virtual size_t dataSize(void) { return 0; };
             virtual size_t dimSize(size_t) { return 0; };

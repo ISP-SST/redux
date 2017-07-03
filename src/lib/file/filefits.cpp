@@ -8,6 +8,7 @@
 #include "redux/types.hpp"
 
 #include <fstream>
+#include <numeric>
 
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
@@ -914,6 +915,15 @@ vector<bpx::ptime> Fits::getStartTimes(void){
     
 }
 
+std::vector<size_t> Fits::getFrameNumbers(void) {
+    
+    size_t firstFrame = getValue<float>( primaryHDU.cards, "FRAMENUM" );
+    size_t nFrames = getNumberOfFrames();
+    std::vector<size_t> ret(nFrames);
+    std::iota( ret.begin(), ret.end(), firstFrame );
+    return ret;
+    
+}
 
 // vector<bpx::ptime> Fits::getEndTimes(void){
 //     
