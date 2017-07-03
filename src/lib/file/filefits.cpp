@@ -275,6 +275,64 @@ namespace {
     void readAsciiHDU( fitsfile* ff, Fits::ascii_hdu& hdu, const string& fn ){
         
         readPrimaryHDU( ff, dynamic_cast<Fits::hdu&>(hdu), fn );
+        
+        // fixed values for an ASCII table.
+        if( hdu.bitpix != 8 ) {
+            throw ios_base::failure("Fits ASCII-table has wrong BITPIX value " + to_string(hdu.bitpix) + " (should be 8)." );
+        }
+        if( hdu.nDims != 2 ) {
+            throw ios_base::failure("Fits ASCII-table has wrong NAXIS value " + to_string(hdu.nDims) + " (should be 2)." );
+        }
+
+        hdu.dataType = TBYTE;
+        hdu.elementSize = 1;
+        
+        char card[FLEN_CARD];
+        memset( card, 0, FLEN_CARD );
+        hdu.cards.clear();
+
+        int tmpInt;
+        int status(0);
+        if( fits_read_key( ff, TINT, "TFIELDS", &tmpInt, NULL, &status ) ) {
+            throwStatusError( fn, status );
+        }
+        hdu.nColumns = tmpInt;
+        hdu.table_info.clear();
+        
+        for( uint16_t i=1; i<=hdu.nColumns; ++i ) {
+            Fits::ascii_hdu::table_info_t ti;
+            string key = "TTYPE" + to_string(i);
+            if( fits_read_key( ff,  TSTRING, key.c_str(), card, nullptr, &status ) ) {
+                throwStatusError( fn+key, status );
+            }
+            ti.columnName = card;
+            key = "TBCOL" + to_string(i);
+            if( fits_read_key( ff, TINT, key.c_str(), &tmpInt, NULL, &status ) ) {
+                throwStatusError( fn, status );
+            }
+            ti.columnStart = tmpInt;
+            key = "TFORM" + to_string(i);
+            if( fits_read_key( ff,  TSTRING, key.c_str(), card, nullptr, &status ) ) {
+                throwStatusError( fn+key, status );
+            }
+            ti.columnFormat = card;
+            key = "TUNIT" + to_string(i);
+            if( fits_read_key( ff,  TSTRING, key.c_str(), card, nullptr, &status ) ) {
+                throwStatusError( fn+key, status );
+            }
+            ti.columnUnit = card;
+            hdu.table_info.push_back(ti);
+        }
+
+        if( hdu.nElements == 0 ) return;
+
+        hdu.data.resize( hdu.dims[1], hdu.dims[0] );
+        hdu.data.zero();
+        unsigned char* dataPtr = reinterpret_cast<unsigned char*>(hdu.data.get());
+
+        if( ffgtbb( ff, 1, 1, hdu.nElements, dataPtr, &status ) ) {
+            throwStatusError( "Fits ASCII-table read: ", status );
+        }
 
     }
     
