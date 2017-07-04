@@ -1775,7 +1775,7 @@ string sum_files_info( int lvl ) {
                     "      SUMMED              (output) Raw sum.\n"
                     "      TIME_BEG            (output) Begin-time from file-headers.\n"
                     "      TIME_END            (output) End-time from file-headers.\n"
-                    "      TIME_AVE            (output) Average timestamp from file-headers.\n"
+                    "      TIME_AVG            (output) Average timestamp from file-headers.\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                     "      XYC                 (output) Coordinates of align-feature and image-shifts.\n";
         }
