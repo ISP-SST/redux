@@ -347,16 +347,20 @@ typedef struct {
     IDL_INT help;
     IDL_VPTR status;
     IDL_INT raw;
+    IDL_VPTR date_beg;
+    IDL_VPTR framenumbers;
     // IDL_STRING split_chars;
 } KW_READHEAD;
 
 // NOTE:  The keywords MUST be listed in alphabetical order !!
 static IDL_KW_PAR kw_readhead_pars[] = {
     IDL_KW_FAST_SCAN,
-    { (char*) "ALL",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,all) },
-    { (char*) "HELP",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,help) },
-    { (char*) "RAW",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,raw) },
-    { (char*) "STATUS", IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,status) },
+    { (char*) "ALL",            IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,all) },
+    { (char*) "DATE_BEG",       IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,date_beg) },
+    { (char*) "FRAMENUMBERS",   IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,framenumbers) },
+    { (char*) "HELP",           IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,help) },
+    { (char*) "RAW",            IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,raw) },
+    { (char*) "STATUS",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_READHEAD,status) },
     { NULL }
 };
 
@@ -372,7 +376,10 @@ string readhead_info( int lvl ) {
             ret +=  "   Accepted Keywords:\n"
                     "      HELP                Display this info.\n"
                     "      ALL                 Return all metadata.\n"
-                    "      RAW                 Return metadata exactly as it is in the file, without manipulation.\n";
+                    "      FRAMENUMBERS        (output) Get the framenumbers.\n"
+                    "      DATE_BEG            (output) Get the start-times.\n"
+                    "      RAW                 Return metadata exactly as it is in the file, without manipulation.\n"
+                    "      STATUS              (output) Status flag.\n";
         }
     } else ret += "\n";
     return ret;
@@ -471,6 +478,32 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
                 }
             } else tmpHdr = IDL_StrToSTRING((char*)"");
             IDL_VarCopy( tmpHdr, ret );
+            
+            if( kw.framenumbers ) {
+                vector<size_t> frameNumbers = myMeta->getFrameNumbers();
+                IDL_VPTR tmp;
+                IDL_MEMINT nFN = frameNumbers.size();
+                IDL_MEMINT dims[] = { nFN }; 
+                int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmp );
+                std::copy( frameNumbers.begin(), frameNumbers.end(), tmpData );
+                IDL_VarCopy( tmp, kw.framenumbers );
+            }
+            
+            if( kw.date_beg ) {
+                vector<boost::posix_time::ptime> date_beg = myMeta->getStartTimes();
+                IDL_VPTR tmp;
+                IDL_MEMINT nDB = date_beg.size();
+                IDL_MEMINT dims[] = { nDB };
+                IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &tmp );
+                IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( tmp->value.arr->data );
+                for( int j=0; j<nDB; ++j ) {
+                    string tStr = bpx::to_iso_extended_string( date_beg[j] );
+                    IDL_StrStore( strptr++, const_cast<char*>(tStr.c_str()) );
+                }
+                IDL_VarCopy( tmp, kw.date_beg );
+            }
+
+
         } catch (const exception& e ) {
             cout << "rdx_readhead: unhandled exception: " << e.what() << endl;
             return IDL_GettmpInt(0);
