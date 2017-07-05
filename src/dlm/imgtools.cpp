@@ -1773,8 +1773,8 @@ string sum_files_info( int lvl ) {
                     "      PADDING             Padding size for the descattering procedure. (256)\n"
                     "      PINHOLE_ALIGN       Do sub-pixel alignment before summing.\n"
                     "      SUMMED              (output) Raw sum.\n"
-                    "      TIME_BEG            (output) Begin-time from file-headers.\n"
-                    "      TIME_END            (output) End-time from file-headers.\n"
+                    "      TIME_BEG            (output) Begin-time (for the first frame).\n"
+                    "      TIME_END            (output) End-time (for the last frame).\n"
                     "      TIME_AVG            (output) Average timestamp from file-headers.\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                     "      XYC                 (output) Coordinates of align-feature and image-shifts.\n";
@@ -2204,24 +2204,28 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 shared_ptr<redux::file::FileMeta> threadMeta;
                 try {
                     readFile( existingFiles[i], threadBuffer.get(), threadMeta );
-                    if( threadMeta && !time_beg.empty() ) {
-                        vector<bpx::ptime> startTimes = threadMeta->getStartTimes();
-                        bpx::time_duration expTime = threadMeta->getExposureTime();
-                        vector<size_t> fn = threadMeta->getFrameNumbers();
-                        if( fn.size() == nFrames[i] ) {
-                            if( fn.front() ) {
-                                std::copy( fn.begin(), fn.end(), frameNumbers.begin()+frameCount );
-                            } else {
-                                std::transform( fn.begin(), fn.end(), frameNumbers.begin()+frameCount,
-                                    [frameCount](const size_t& a){ return a+frameCount; }
+                    if( threadMeta ) {
+                        if( !time_beg.empty() ) {
+                            vector<bpx::ptime> startTimes = threadMeta->getStartTimes();
+                            bpx::time_duration expTime = threadMeta->getExposureTime();
+                            if( startTimes.size() == nFrames[i] ) {
+                                std::copy( startTimes.begin(), startTimes.end(), time_beg.begin()+frameCount);
+                                std::transform( startTimes.begin(), startTimes.end(), time_end.begin()+frameCount,
+                                    [expTime](const bpx::ptime& pt){ return pt+expTime; }
                                 );
                             }
                         }
-                        if( startTimes.size() == nFrames[i] ) {
-                            std::copy( startTimes.begin(), startTimes.end(), time_beg.begin()+frameCount);
-                            std::transform( startTimes.begin(), startTimes.end(), time_end.begin()+frameCount,
-                                [expTime](const bpx::ptime& pt){ return pt+expTime; }
-                            );
+                        if( kw.framenumbers ) {
+                          vector<size_t> fn = threadMeta->getFrameNumbers();
+                          if( fn.size() == nFrames[i] ) {
+                              if( fn.front() ) {
+                                  std::copy( fn.begin(), fn.end(), frameNumbers.begin()+frameCount );
+                              } else {
+                                  std::transform( fn.begin(), fn.end(), frameNumbers.begin()+frameCount,
+                                      [frameCount](const size_t& a){ return a+frameCount; }
+                                  );
+                              }
+                          }
                         }
                     }
                     size_t bufferOffset(0);
@@ -2358,15 +2362,16 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             memcpy( tmpData, summedData, nPixels*sizeof(double));
             IDL_VarCopy( tmp, kw.summed );
         }
-        
+
         vector<int32_t> discarded;
         if( nDiscarded && (kw.discarded || kw.framenumbers) ) {
-            for( auto it=frameNumbers.begin(); it < frameNumbers.end(); ) {
-                if( *it < 0 ) {
-                    discarded.push_back(-*it);
-                    frameNumbers.erase(it++);
+            for( size_t i=0; i<frameNumbers.size(); ) {
+                int32_t val = frameNumbers[i];
+                if( val < 0 ) {
+                    discarded.push_back(-val);
+                    frameNumbers.erase( frameNumbers.begin()+i );
                 } else {
-                    ++it;
+                    i++;
                 }
             }
         }
