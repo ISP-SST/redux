@@ -4,6 +4,7 @@
 #include <redux/file/filefits.hpp>
 #include <redux/util/stringutil.hpp>
 
+#include <atomic>
 
 #include <boost/asio.hpp>
 #include <boost/thread/thread.hpp>

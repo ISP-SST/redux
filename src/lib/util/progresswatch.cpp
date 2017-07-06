@@ -16,7 +16,7 @@ ProgressWatch::ProgressWatch(int target, int start) : start_(start), counter_(st
 
 void ProgressWatch::clear(void) {
    
-    boost::lock_guard<boost::mutex> lock(mtx);
+    lock_guard<mutex> lock(mtx);
     onChange = nullptr;
     onCompletion = nullptr;
     counter_ = start_ = target_ = 0;
@@ -36,7 +36,7 @@ void ProgressWatch::reset(void) {
 
 void ProgressWatch::test(void) {
     
-    boost::unique_lock<boost::mutex> lock(mtx);
+    unique_lock<mutex> lock(mtx);
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
     if( (start_ != target_) && (counter_ > target_) ) {
         lock.unlock();
@@ -59,7 +59,7 @@ void ProgressWatch::test(void) {
 
 void ProgressWatch::wait(void) {
     
-    boost::unique_lock<boost::mutex> lock(mtx);
+    unique_lock<mutex> lock(mtx);
     while( !completed_ ) {
         cv.wait(lock);
     }
@@ -68,7 +68,7 @@ void ProgressWatch::wait(void) {
 
 
 // void ProgressWatch::wait_for(void) {
-//     boost::unique_lock<boost::mutex> lock(mtx);
+//     unique_lock<mutex> lock(mtx);
 //     while ( counter_ != target_ ) {
 //         cv.wait(lock);
 //     }
@@ -83,7 +83,7 @@ void ProgressWatch::wait(void) {
 
 void ProgressWatch::set(int end, int start) {
     
-    boost::lock_guard<boost::mutex> lock(mtx);
+    lock_guard<mutex> lock(mtx);
     target_ = end;
     counter_ = start_ = start;
     completed_ = false;
@@ -93,7 +93,7 @@ void ProgressWatch::set(int end, int start) {
 
 void ProgressWatch::step(int step) {
 
-    boost::unique_lock<boost::mutex> lock(mtx);
+    unique_lock<mutex> lock(mtx);
     counter_ += step;
     bool notify = completed_ = ((start_ != target_) && (counter_ == target_));
     if( (start_ != target_) && (counter_ > target_) ) {
@@ -121,7 +121,7 @@ void ProgressWatch::step(int step) {
 
 void ProgressWatch::stepTarget(int step) {
 
-    boost::lock_guard<boost::mutex> lock(mtx);
+    lock_guard<mutex> lock(mtx);
     target_ += step;
 
 }
@@ -129,14 +129,14 @@ void ProgressWatch::stepTarget(int step) {
 
 float ProgressWatch::progress(void) {
 
-    boost::lock_guard<boost::mutex> lock(mtx);
+    lock_guard<mutex> lock(mtx);
     return static_cast<float>(counter_ - start_)/(target_ - start_);
    
 }
 
 
 string ProgressWatch::dump(void) {
-    boost::lock_guard<boost::mutex> lock(mtx);
+    lock_guard<mutex> lock(mtx);
     return hexString(this) + " " + to_string(start_) + "/" + to_string(counter_) + "/" + to_string(target_);
 }
 

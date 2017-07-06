@@ -1884,12 +1884,12 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     size_t ySizePadded = bsYsize + 2*kw.padding;
                     size_t dataSize = xSizePadded*ySizePadded;
 
-                    bsGainData.reset( fftw_alloc_real(dataSize), fftw_free );
+                    bsGainData.reset( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free );
                     bsGainPtr = bsGainData.get();
                     memset( bsGainPtr, 0, dataSize*sizeof(double) );
                     copyInto( kw.bs_gain, bsGainPtr, ySizePadded, xSizePadded, kw.padding, kw.padding );
                     
-                    shared_ptr<double> bsPsfData( fftw_alloc_real(dataSize), fftw_free );
+                    shared_ptr<double> bsPsfData( (double*)fftw_malloc(dataSize*sizeof(double)), fftw_free );
                     double* psfPtr = bsPsfData.get();
                     memset( psfPtr, 0, dataSize*sizeof(double) );
                     copyInto( kw.bs_psf, psfPtr, ySizePadded, xSizePadded, kw.padding, kw.padding );
