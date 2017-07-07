@@ -2327,16 +2327,34 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             }
         }
         
-        
         done = true;
         workLoop.reset();
         ioService.stop();
         pool.join_all();
 
+        vector<int32_t> discarded;
+        if( kw.discarded || kw.framenumbers ) {
+            for( size_t i=0; i<frameNumbers.size(); ) {
+                int32_t val = frameNumbers[i];
+                if( val < 0 ) {
+                    discarded.push_back(-val);
+                    frameNumbers.erase( frameNumbers.begin()+i );
+                } else {
+                    i++;
+                }
+            }
+        }
+        
+        nDiscarded = discarded.size();
+        nSummed = frameNumbers.size();
+        if( nSummed+nDiscarded != nTotalFrames ) {
+            cout << "  FrameCount mismatch: " << nSummed << "+" << nDiscarded << " != " << nTotalFrames << endl;
+        }
+        
         if( kw.pinh_align ) {
             Mat cvImg( ySize, xSize, CV_64FC1, summedData );
             Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
-            for( size_t n=1; n<nSummed; ++n ) {
+            for( size_t n=1; n<nTotalFrames; ++n ) {
                 warp_matrix.at<float>(0,2) -= shifts[n][0];
                 warp_matrix.at<float>(1,2) -= shifts[n][1];
             }
@@ -2363,19 +2381,6 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             IDL_VarCopy( tmp, kw.summed );
         }
 
-        vector<int32_t> discarded;
-        if( nDiscarded && (kw.discarded || kw.framenumbers) ) {
-            for( size_t i=0; i<frameNumbers.size(); ) {
-                int32_t val = frameNumbers[i];
-                if( val < 0 ) {
-                    discarded.push_back(-val);
-                    frameNumbers.erase( frameNumbers.begin()+i );
-                } else {
-                    i++;
-                }
-            }
-        }
-
         if( nDiscarded && kw.discarded ) {
             IDL_VPTR tmp;
             IDL_MEMINT nD = discarded.size();
@@ -2393,8 +2398,6 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             memcpy( tmpData, frameNumbers.data(), nFN*sizeof(int32_t));
             IDL_VarCopy( tmp, kw.framenumbers );
         }
-        
-        if( nDiscarded <= nSummed ) nSummed -= nDiscarded;
 
         if( kw.nsummed ) {
             IDL_VPTR tmpNS = IDL_GettmpLong( nSummed );
@@ -2409,15 +2412,22 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             IDL_VarCopy( tmp, kw.xyc );
         }
         
-        if( kw.time_beg ) {
+        if( !time_beg.empty() ) {
+            time_beg.erase( std::remove_if( time_beg.begin(), time_beg.end(),
+                                       [](const bpx::ptime& a){ return a.is_special(); } ), time_beg.end() );
+            time_end.erase( std::remove_if( time_end.begin(), time_end.end(),
+                                       [](const bpx::ptime& a){ return a.is_special(); } ), time_end.end() );
             std::sort( time_beg.begin(), time_beg.end() );
+            std::sort( time_end.begin(), time_end.end() );
+        }
+        
+        if( kw.time_beg ) {
             string tStr = bpx::to_simple_string(time_beg.begin()->time_of_day());
             IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
             IDL_VarCopy( tmpTimeString, kw.time_beg );
         }
 
         if( kw.time_end ) {
-            std::sort( time_end.begin(), time_end.end() );
             string tStr = bpx::to_simple_string(time_end.rbegin()->time_of_day());
             IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
             IDL_VarCopy( tmpTimeString, kw.time_end );
@@ -2428,10 +2438,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             time_beg.insert( time_beg.end(), time_end.begin(), time_end.end() );
             size_t tCount(0);
             for( bpx::ptime& t: time_beg ) {
-                if( !t.is_special() ) {
-                    avgTime += t.time_of_day();
-                    tCount++;
-                }
+                avgTime += t.time_of_day();
+                tCount++;
             }
             if( tCount ) {
                 avgTime /= tCount;
