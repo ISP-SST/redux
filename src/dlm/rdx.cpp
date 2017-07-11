@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <iostream>
 #include <typeinfo>
+#include <zlib.h>
 
 using namespace redux::file;
 using namespace redux::util;
@@ -665,6 +666,350 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+string clear_cache_info( int lvl ) {
+    
+    string ret = "RDX_CACHECLEAR";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   rdx_cacheclear\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+
+void clear_cache(int argc, IDL_VPTR argv[], char* argk) {
+    Cache::cleanup();
+}
+
+
+string cacheinfo_info( int lvl ) {
+    
+    string ret = "RDX_CACHEINFO";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   rdx_cacheinfo\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+
+void cacheinfo( int argc, IDL_VPTR argv[], char* argk ) {
+    auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
+    cout << "rdx_cache contains " << map.second.size() << " entries.";
+    uint64_t sz(0);
+    for( auto& p: map.second ) {
+        sz += getVarSize(p.second.get());
+    }
+    cout << "  Total size: " << sz << " bytes." << endl;
+}
+
+
+string cache_info( int lvl ) {
+    
+    string ret = "RDX_CACHE";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   rdx_cache\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+    
+void cache( int argc, IDL_VPTR* argv, char* argk ) {
+
+    if( argc < 2 ) {
+        cout << cache_info(2) << endl;
+        return;
+    }
+    
+    IDL_VPTR tag = argv[0];
+    IDL_VPTR val = argv[1];
+    IDL_ENSURE_SCALAR( tag );
+    IDL_ENSURE_STRING( tag );
+    bool temporary( val->flags & IDL_V_TEMP );
+    
+    string tagS = IDL_VarGetString( tag );
+    IDL_VPTR tmp = new IDL_VARIABLE;
+    *tmp = {0};
+    
+    IDL_VarCopy( val, tmp );
+    if( temporary ) val = IDL_GettmpInt(-1);        // to prevent auto-cleanup & segfault
+    auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
+    map.second[tagS].reset( tmp, [tagS]( IDL_VPTR& p ){
+        IDL_VPTR b = IDL_Gettmp();
+        memcpy( b, p, sizeof(IDL_VARIABLE) );
+        IDL_Deltmp(b);
+        delete p;
+    });
+  
+
+}
+
+
+string cacheget_info( int lvl ) {
+    
+    string ret = "RDX_CACHEGET";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   value = rdx_cacheget(key)\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+    
+IDL_VPTR cacheget( int argc, IDL_VPTR* argv, char* argk ) {
+
+    if( argc < 1 ) {
+        cout << cacheget_info(2) << endl;
+        return IDL_GettmpInt(-1);
+    }
+
+    IDL_VPTR tag = argv[0];
+    IDL_ENSURE_SCALAR( tag );
+    IDL_ENSURE_STRING( tag );
+    string tagS = IDL_VarGetString( tag );
+
+    auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
+    auto it = map.second.find( tagS );
+    IDL_VPTR tmp = IDL_GettmpInt(-1);
+    if( it != map.second.end() ) {
+        IDL_VarCopy( it->second.get(), tmp );
+    } else cout << "cacheget: " << tagS << " not found." << endl;
+    return tmp;
+}
+
+
+string cachedel_info( int lvl ) {
+    
+    string ret = "RDX_CACHEDEL";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   rdx_cachedel,key\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+    
+void cachedel( int argc, IDL_VPTR* argv, char* argk ) {
+
+    if( argc < 1 ) {
+        cout << cachedel_info(2) << endl;
+        return;
+    }
+
+    IDL_VPTR tags = argv[0];
+    IDL_ENSURE_SIMPLE( tags );
+    IDL_ENSURE_STRING( tags );
+    
+    auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
+    size_t count(0);
+    if ( !(tags->flags & IDL_V_ARR) ) {
+        string tmp = IDL_VarGetString( tags );
+        count += map.second.erase( tmp );
+    } else {
+        IDL_ARRAY* strarr = tags->value.arr;
+        IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(strarr->data);
+        for( int i=0; i<strarr->n_elts; ++i ) {
+            string tmp(strptr[i].s);
+            count += map.second.erase( tmp );
+        }
+    }
+    if( count == 0 ) {
+        //cout << "rdx_cachedel: not found." << endl;
+    }
+}
+
+
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_INT help;
+    IDL_INT clear;
+} KW_STORE;
+
+// NOTE:  The keywords MUST be listed in alphabetical order !!
+static IDL_KW_PAR kw_store_pars[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "CLEAR",        IDL_TYP_INT,   1,   IDL_KW_ZERO,   0,   (char*)IDL_KW_OFFSETOF2(KW_STORE,clear) },
+    { (char*) "HELP",         IDL_TYP_INT,   1,   IDL_KW_ZERO,   0,   (char*)IDL_KW_OFFSETOF2(KW_STORE,help) },
+    { NULL }
+};
+
+
+string cachestore_info( int lvl ) {
+    
+    string ret = "RDX_CACHESTORE";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   rdx_cachestore,filename\n";
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      CLEAR               Clear cache.\n"
+                    "      HELP                Show this helptext.\n";
+        }
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+    
+void cachestore( int argc, IDL_VPTR* argv, char* argk ) {
+
+    KW_STORE kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_store_pars, (IDL_VPTR*)0, 255, &kw );
+    
+    if( nPlainArgs < 1 || kw.help ) {
+        cout << cachestore_info(2) << endl;
+        return;
+    }
+
+    IDL_VPTR filename = argv[0];
+    IDL_ENSURE_SIMPLE( filename );
+    IDL_ENSURE_STRING( filename );
+    IDL_ENSURE_SCALAR( filename )
+    
+    string fn( IDL_VarGetString( filename ) );
+
+    try {
+        
+        ofstream file( fn, ofstream::binary );
+        
+        auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
+        size_t dataSize(0);
+        for( auto& p: map.second ) {
+            size_t thisSize = p.first.length()+1;
+            thisSize += getVarSize( p.second.get() );
+            dataSize += thisSize;
+        }
+        //cout << "dataSize = " << dataSize;
+        unique_ptr<Bytef[]> tmpData( new Bytef[dataSize] );
+        char* tmpPtr = reinterpret_cast<char*>(tmpData.get());
+        uint64_t packCount(0);
+        for( auto& p: map.second ) {
+            packCount += pack( tmpPtr+packCount, p.first );
+            packCount += packVar( tmpPtr+packCount, p.second.get() );
+        }
+        //cout << "  packCount = " << packCount;
+
+        if( kw.clear ) {
+            map.second.clear();
+        }
+        
+        uint64_t compressedSz;
+        uLongf tmpSz = compressBound(packCount);
+        compressedSz = packCount;
+        unique_ptr<Bytef[]> buf( new Bytef[ tmpSz + sizeof(packCount)] );
+        int ret = compress( buf.get()+ sizeof(packCount), &tmpSz, tmpData.get(), packCount );
+        switch(ret){
+            case(Z_OK): compressedSz = tmpSz; break;
+            case(Z_MEM_ERROR): cout << "compressing data: out of memory." << endl; break;
+            case(Z_BUF_ERROR): cout << "compressing data: buffer not large enough" << endl; break;
+            default: cout << "compressing data: unknown reason. ret=" << ret << endl; break;
+        }
+        redux::util::pack( reinterpret_cast<char*>(buf.get()), packCount );
+        //cout << "  compressedSz = " << compressedSz << endl;
+        
+        file.write( reinterpret_cast<char*>(buf.get()), compressedSz+sizeof(packCount) );
+    
+    } catch( exception& e ){
+        cerr << "Failed to write \"" << fn << "\"  reason:" << e.what() << endl;
+    }
+    
+}
+
+
+string cacheload_info( int lvl ) {
+    
+    string ret = "RDX_CACHELOAD";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret += "   Syntax:   rdx_cacheload,filename\n";
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
+    
+void cacheload( int argc, IDL_VPTR* argv, char* argk ) {
+
+    KW_STORE kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_store_pars, (IDL_VPTR*)0, 255, &kw );
+    
+    if( nPlainArgs < 1 || kw.help ) {
+        cout << cacheload_info(2) << endl;
+        return;
+    }
+
+    IDL_VPTR filename = argv[0];
+    IDL_ENSURE_SIMPLE( filename );
+    IDL_ENSURE_STRING( filename );
+    IDL_ENSURE_SCALAR( filename )
+    
+    string fn( IDL_VarGetString( filename ) );
+
+    try {
+        
+        ifstream file( fn, ofstream::binary );
+        file.seekg( 0, std::ios::end );
+        size_t dataSize = file.tellg();
+        file.seekg( 0, std::ios::beg );
+        unique_ptr<Bytef[]> tmpData( new Bytef[dataSize] );
+        char* tmpPtr = reinterpret_cast<char*>( tmpData.get() );
+        file.read( tmpPtr, dataSize );
+        
+        auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
+        if( kw.clear ) {
+            map.second.clear();
+        }
+        uint64_t uncompressedSz;
+        redux::util::unpack( tmpPtr, uncompressedSz );
+        unique_ptr<Bytef[]> buf( new Bytef[ uncompressedSz ] );
+        int ret = uncompress( buf.get(), &uncompressedSz, tmpData.get()+sizeof(uncompressedSz), dataSize );
+        
+        switch(ret){
+            case(Z_OK): break;
+            case(Z_DATA_ERROR): cout << "decompressing data: corrupt buffer." << endl; break;
+            case(Z_MEM_ERROR): cout << "decompressing data: out of memory." << endl; break;
+            case(Z_BUF_ERROR): cout << "decompressing data: buffer not large enough." << endl; break;
+            default: cout << "decompressing data: unknown reason. ret=" << ret << endl; break;
+        }
+        
+        tmpPtr = reinterpret_cast<char*>( buf.get() );
+        uint64_t unpackCount(0);
+        
+        while( unpackCount < uncompressedSz ) {
+            IDL_VPTR tmpVar = new IDL_VARIABLE;
+            *tmpVar = {0};
+            string tmpS;
+            unpackCount += unpack( tmpPtr+unpackCount, tmpS );
+            unpackCount += unpackVar( tmpPtr+unpackCount, tmpVar );
+            map.second[tmpS].reset( tmpVar, []( IDL_VPTR& p ){
+                IDL_VPTR b = IDL_Gettmp();
+                memcpy( b, p, sizeof(IDL_VARIABLE) );
+                IDL_Deltmp(b);
+                delete p;
+            });
+        }
+        //cout << "unpackCount = " << unpackCount << endl;
+
+    } catch( exception& e ){
+        cerr << "Failed to read \"" << fn << "\"  reason:" << e.what() << endl;
+    }
+
+}
+
+
 extern "C" {
 
     int IDL_Load (void) {
@@ -677,7 +1022,14 @@ extern "C" {
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_segment, (char*)"RDX_SEGMENT", 0, 4, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, segment_info );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_hasopencv, (char*)"RDX_HASOPENCV", 0, 0, 0, 0 }, 1, hasopencv_info );
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_filetype, (char*)"RDX_FILETYPE", 0, 1, 0, 0 }, 1, filetype_info );
-        
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_cache, (char*)"RDX_CACHECLEAR", 0, 0, 0, 0 }, 0 , clear_cache_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheinfo, (char*)"RDX_CACHEINFO", 0, 0, 0, 0 }, 0 , cacheinfo_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cache, (char*)"RDX_CACHE", 2, 2, 0, 0 }, 0 , cache_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheget, (char*)"RDX_CACHEGET", 1, 1, 0, 0 }, 1 , cacheget_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cachedel, (char*)"RDX_CACHEDEL", 1, 1, 0, 0 }, 0 , cachedel_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cachestore, (char*)"RDX_CACHESTORE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cachestore_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheload, (char*)"RDX_CACHELOAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cacheload_info);
+    
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) cbezier3}, (char*) "RDX_CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },

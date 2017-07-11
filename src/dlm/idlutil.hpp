@@ -150,6 +150,9 @@ namespace redux {
     double getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min=nullptr, double* Max=nullptr, bool* hasInf=nullptr );
     
     void structinfo( int argc, IDL_VPTR argv[], char* argk );
+    size_t getVarSize( IDL_VPTR );
+    uint64_t packVar( char* ptr, IDL_VPTR );
+    uint64_t unpackVar( const char* ptr, IDL_VPTR& );
     
 }
 

@@ -4,6 +4,10 @@ USE_EXTERNAL( boost fftw3 fits gsl idl opencv threads )
 
 if (DEFINED IDL_FOUND)
 
+    if( IDL_RDX )
+        message( STATUS "Unable to find an IDL installation, using header from IDL 7.1." )
+    endif()
+
     if( NOT IS_DIRECTORY "${IDL_DLM_DIR}" AND IS_DIRECTORY "$ENV{IDL_DLM_DIR}" )
         set( IDL_DLM_DIR "$ENV{IDL_DLM_DIR}/" )
     endif()
@@ -37,6 +41,7 @@ if (DEFINED IDL_FOUND)
     endif()
     
     add_definitions(-DBOOST_ALL_DYN_LINK)
+    add_definitions(-DRDX_IDL_HDR_VER=${IDL_VERSION})
 
     set(CMAKE_DEBUG_POSTFIX "")   # no debug-suffix for dlm libraries
     

@@ -243,29 +243,10 @@ void clear_modecache(int argc, IDL_VPTR argv[], char* argk) {
 }
 
 
-string clear_cache_info( int lvl ) {
-    
-    string ret = "RDX_CLEAR_CACHE";
-    if( lvl > 0 ) {
-        ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
-        ret += "   Syntax:   rdx_clear_cache\n";
-    } else ret += "\n";
-
-    return ret;
-    
-}
-
-
-void clear_cache(int argc, IDL_VPTR argv[], char* argk) {
-    Cache::cleanup();
-}
-
-
 namespace {
     static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_pupil, (char*)"RDX_MAKE_PUPIL", 2, 2, 0, 0 }, 1, make_pupil_info, clear_pupils ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_modes, (char*)"RDX_MAKE_MODES", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_modes_info, clear_modes ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_modecache, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_cache, (char*)"RDX_CLEAR_CACHE", 0, 0, 0, 0 }, 0 , clear_cache_info);
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_modecache, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info);
 }
 

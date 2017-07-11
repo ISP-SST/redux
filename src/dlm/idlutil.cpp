@@ -66,7 +66,8 @@ void IdlContainer::reset( void ) {
    
 }
 
-
+#define xstringize(s) stringize(s)
+#define stringize(s) #s
 void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
     
     int verb(0);
@@ -104,9 +105,11 @@ void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
     cout << "\nRedux DLM";
     
     if( verb > 2 ) {
-        cout << "\n   Version:  " << getLongVersionString() << endl;
+        cout << endl;
+        cout << "   Version:  " << getLongVersionString() << endl;
         cout << "   Commited: " << reduxCommitTime << endl;
-        cout << "   Compiled: " << reduxBuildTime << endl;
+        cout << "   Compiled: " << reduxBuildTime;
+        cout << " (using idl_exports " << xstringize(RDX_IDL_HDR_VER) << ")" << endl;
     } else {
         cout << " - " << getVersionString() << endl;
     }
@@ -683,6 +686,376 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
 
     printStruct( data, -1, indent, kw.max_length );
     
+}
+
+
+size_t getStructDefSize( IDL_StructDefPtr structDef, vector<pair<IDL_MEMINT,size_t>>& strOffsets ) {
+    
+    size_t sz(1);    // \0
+    if( structDef->id ) {
+        sz += structDef->id->len;
+    }
+    sz += sizeof(int);    // nTags
+    for( int i = 0; i < structDef->ntags; ++i ) {
+        sz += 1;    // \0
+        if( structDef->tags[i].id ) {
+            sz += structDef->tags[i].id->len;
+        }
+        sz += sizeof(IDL_MEMINT);   // offset
+        sz += 2*sizeof( UCHAR );    // all IDL variables a type id & flags
+        IDL_VPTR v = &(structDef->tags[i].var);
+        size_t count(1);
+        sz += sizeof( UCHAR );      // n_dim
+        if( v->flags & IDL_V_ARR ) { // it's an array, also store n_dim + dim[]
+            sz += v->value.arr->n_dim * sizeof(IDL_MEMINT);
+            count = v->value.arr->n_elts;
+        }
+        if( v->type == IDL_TYP_STRING ) {
+            strOffsets.push_back( make_pair( structDef->tags[i].offset, count ) );
+        } else if( v->flags & IDL_V_STRUCT ) {
+            IDL_StructDefPtr tagStructDef = v->value.s.sdef;
+            vector<pair<IDL_MEMINT,size_t>> myStrOffsets;
+            size_t tagSize = getStructDefSize( tagStructDef, myStrOffsets );
+            sz += tagSize;
+            for( auto& it: myStrOffsets ) it.first += structDef->tags[i].offset;
+            strOffsets.insert( strOffsets.end(), myStrOffsets.begin(), myStrOffsets.end() );
+        }
+    }
+    return sz;
+}
+
+
+uint64_t packStructDef( char* ptr, IDL_StructDefPtr structDef, vector<pair<IDL_MEMINT,size_t>>& strOffsets) {
+    
+    uint64_t count(0);    // \0
+    if( structDef->id ) {
+        string tmp( structDef->id->name );
+        count += pack( ptr+count, tmp );
+    } else count += pack( ptr+count, UCHAR(0) );
+
+    count += pack( ptr+count, structDef->ntags );
+    for( int i=0; i < structDef->ntags; ++i ) {
+
+        if( structDef->tags[i].id ) {
+            string tmp( structDef->tags[i].id->name );
+            count += pack( ptr+count, tmp );
+        } else count += pack( ptr+count, UCHAR(0) );
+        count += pack( ptr+count, structDef->tags[i].offset );
+        IDL_VPTR v = &(structDef->tags[i].var);
+        count += pack( ptr+count, v->type );
+        count += pack( ptr+count, v->flags );
+
+        size_t count2(1);
+
+        if( v->flags & IDL_V_ARR ) { // it's an array, also store n_dim + dim[]
+            count += pack( ptr+count, v->value.arr->n_dim );
+            memcpy( ptr+count, v->value.arr->dim, v->value.arr->n_dim*sizeof(IDL_MEMINT) );
+            count += v->value.arr->n_dim * sizeof(IDL_MEMINT);
+            count2 = v->value.arr->n_elts;
+
+        } else count += pack( ptr+count, UCHAR(0) );    // scalar
+        
+        if( v->type == IDL_TYP_STRING ) {
+            strOffsets.push_back( make_pair( structDef->tags[i].offset, count2 ) );
+        } else if( v->flags & IDL_V_STRUCT ) {
+            IDL_StructDefPtr tagStructDef = v->value.s.sdef;
+            vector<pair<IDL_MEMINT,size_t>> myStrOffsets;
+            count += packStructDef( ptr+count, tagStructDef, myStrOffsets );
+            for( auto& it: myStrOffsets ) it.first += structDef->tags[i].offset;
+            strOffsets.insert( strOffsets.end(), myStrOffsets.begin(), myStrOffsets.end() );
+        }
+    }
+
+    return count;
+    
+}
+
+
+uint64_t unpackStructDef( const char* ptr, IDL_StructDefPtr& structDef ) {
+    
+    string structName;
+    uint64_t count(0);
+    count += unpack( ptr+count, structName );
+
+    int nTags;
+    count += unpack( ptr+count, nTags );
+    vector<IDL_STRUCT_TAG_DEF> tags;
+    
+    IDL_STRUCT_TAG_DEF tmp;
+    for( int i=0; i < nTags; ++i ) {
+        string tagName;
+        count += unpack( ptr+count, tagName );
+        tmp.name = const_cast<char*> ( tagName.c_str() );
+        IDL_MEMINT tagOffset;
+        UCHAR tagType;
+        count += unpack( ptr+count, tagOffset );
+        count += unpack( ptr+count, tagType );
+        count += unpack( ptr+count, tmp.flags );
+        
+        UCHAR nTagDims;
+        IDL_MEMINT* tagDims = new IDL_MEMINT[IDL_MAX_ARRAY_DIM];
+        void* tagTypePtr = reinterpret_cast<void*>(tagType);
+        count += unpack( ptr+count, nTagDims );
+        tmp.dims = nullptr;
+        if( nTagDims ) {
+            memcpy( tagDims+1, ptr+count, nTagDims*sizeof(IDL_MEMINT) );
+            count += nTagDims * sizeof(IDL_MEMINT);
+            tagDims[0] = nTagDims;
+            tmp.dims = tagDims;
+        }
+        if( tagType == IDL_TYP_STRUCT ) {
+            IDL_StructDefPtr tagStructDef;
+            count += unpackStructDef( ptr+count, tagStructDef );
+            tagTypePtr = (void*)tagStructDef;
+        }
+        tmp.type = tagTypePtr;
+        tags.push_back(tmp);
+    }
+    memset( &tmp, 0, sizeof(tmp) );
+    tags.push_back(tmp);
+    char* namePtr = nullptr;
+    if( !structName.empty() ) namePtr = const_cast<char*> ( structName.c_str() );
+    structDef = IDL_MakeStruct ( namePtr, tags.data() );
+    for( auto& t: tags ) {
+        if( t.dims ) {
+            delete[] t.dims;
+            t.dims = nullptr;
+        }
+    }
+    return count;
+}
+
+
+size_t redux::getVarSize( IDL_VPTR v ) {
+    
+    size_t sz = 2*sizeof( UCHAR ); // all IDL variables a type id & flags
+    UCHAR dataType = v->type;
+    
+    if( dataType == IDL_TYP_OBJREF ) {    // if it is an object-reference, fetch the heap-pointer and call again.
+        IDL_HEAP_VPTR heapPtr = IDL_HeapVarHashFind( v->value.hvid );
+        cout << "This is an objref" << endl;
+        return getVarSize( &(heapPtr->var) );
+    }
+
+    if( dataType == IDL_TYP_STRUCT ) {
+        
+        if( !v->value.s.arr ) {
+            cout << "weird, all structs should have the arr..." << endl;
+        }
+        
+        // data block
+        sz += sizeof( IDL_MEMINT );         // arr_len
+        sz += v->value.s.arr->arr_len;
+        sz += sizeof( UCHAR );              // n_dim
+        sz += (v->value.s.arr->n_dim+1) * sizeof(IDL_MEMINT);    // dim + elt_len
+
+        // struct def
+        IDL_StructDefPtr structDef = v->value.s.sdef;
+        vector< pair<IDL_MEMINT, size_t> > strOffsets;
+        size_t structDefSz = getStructDefSize( structDef, strOffsets );
+        sz += structDefSz;
+        size_t sSize(0);
+        size_t sCount = v->value.s.arr->n_elts;
+        sz += sizeof(size_t);   // nStrings
+        for( size_t c=0; c<sCount; ++c ) {
+            for( auto& it: strOffsets ) {
+                size_t offset = c*v->value.s.arr->elt_len + it.first;
+                IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( v->value.s.arr->data+offset );
+                for( size_t i=0; i<it.second; ++i ) {
+                    sSize += strptr[i].slen+1;
+                }
+                sz += it.second*sizeof(size_t);    // offsets
+            }
+        }
+
+        sz += sSize;
+        return sz;
+    }
+    
+    int count = 1;
+    if( v->flags & IDL_V_STRUCT ) {
+        // structs should be dealt with above
+    } else if( v->flags & IDL_V_ARR ) { // it's an array, also store n_dim + dim[]
+        sz += sizeof( UCHAR );      // n_dim
+        sz += v->value.arr->n_dim * sizeof(IDL_MEMINT);
+        if( dataType == IDL_TYP_STRING ) {
+            IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( v->value.arr->data );
+            for( int i=0; i<v->value.arr->n_elts; ++i ) {
+                sz += strptr[i].slen+1;
+            }
+            count = 0;  // don't add arraySz*elSz below
+        } else {
+            count = v->value.arr->n_elts;
+        }
+    } else if( dataType == IDL_TYP_STRING ) {
+        sz += v->value.str.slen+1;
+        return sz;
+    }
+
+    sz += count * IDL_TypeSizeFunc(dataType);
+
+    return sz;
+    
+}
+
+
+uint64_t redux::packVar( char* ptr, IDL_VPTR v ) {
+    
+    using redux::util::pack;
+    
+    uint64_t count = pack( ptr, v->type );
+    count += pack( ptr+count, v->flags );
+    
+    if( v->type == IDL_TYP_STRUCT ) {
+        
+        // data block
+        count += pack( ptr+count, v->value.s.arr->arr_len );
+        memcpy( ptr+count, v->value.s.arr->data, v->value.s.arr->arr_len );
+        count += v->value.s.arr->arr_len;
+        count += pack( ptr+count, v->value.s.arr->n_dim );
+        memcpy( ptr+count, v->value.s.arr->dim, v->value.s.arr->n_dim*sizeof(IDL_MEMINT) );
+        count += v->value.s.arr->n_dim*sizeof(IDL_MEMINT);
+        count += pack( ptr+count, v->value.s.arr->elt_len );
+        
+        // struct def
+        IDL_StructDefPtr structDef = v->value.s.sdef;
+        vector< pair<IDL_MEMINT, size_t> > strOffsets;
+        count += packStructDef( ptr+count, structDef, strOffsets );
+        size_t nStrings(0);
+        for( auto& it: strOffsets ) nStrings += it.second;
+        nStrings *= v->value.s.arr->n_elts;
+        count += pack( ptr+count, nStrings );
+        for( int c=0; c<v->value.s.arr->n_elts; ++c ) {
+            for( auto& it: strOffsets ) {
+                size_t offset = c*v->value.s.arr->elt_len + it.first;
+                IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( v->value.s.arr->data+offset );
+                for( size_t i=0; i<it.second; ++i ) {
+                    string tmp( strptr[i].s );
+                    count += pack( ptr+count, offset );
+                    count += pack( ptr+count, tmp );
+                }
+            }
+        }
+        
+        return count;
+    }
+    
+    if( v->flags & IDL_V_STRUCT ) {
+        // structs should be dealt with above
+    } else if( v->flags & IDL_V_ARR ) { // it's an array, also store n_dim + dim[]
+        count += pack( ptr+count, v->value.arr->n_dim );
+        for( UCHAR i=0; i<v->value.arr->n_dim; ++i ) {
+            count += pack( ptr+count, v->value.arr->dim[i] );
+        }
+        if( v->type == IDL_TYP_STRING ) {
+            IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( v->value.arr->data );
+            for( int i=0; i<v->value.arr->n_elts; ++i ) {
+                count += pack( ptr+count, string( strptr[i].s ) );
+            }
+        } else {
+            memcpy( ptr+count, v->value.arr->data, v->value.arr->arr_len );
+            count += v->value.arr->arr_len;
+        }
+        return count;
+    }
+    
+    // scalar values
+    if( v->type == IDL_TYP_STRING ) {
+        string tmp( v->value.str.s );
+        count += pack( ptr+count, tmp );
+    } else {
+        memcpy( ptr+count, &(v->value), IDL_TypeSizeFunc( v->type ) );
+        count += IDL_TypeSizeFunc( v->type );
+    }
+    return count;
+}
+
+
+uint64_t redux::unpackVar( const char* ptr, IDL_VPTR& v ) {
+    
+    using redux::util::unpack;
+    
+    UCHAR dataType, flags;
+    uint64_t count = unpack( ptr, dataType );
+    count += unpack( ptr+count, flags );
+
+    if( dataType == IDL_TYP_STRUCT ) {
+        
+        // data block
+        IDL_MEMINT blockSize;
+        count += unpack( ptr+count, blockSize );
+        unique_ptr<UCHAR[]> tmpData( new UCHAR[blockSize] );
+        memcpy( tmpData.get(), ptr+count, blockSize );
+        count += blockSize;
+        UCHAR nDims;
+        count += unpack( ptr+count, nDims );
+        IDL_ARRAY_DIM dims;
+        memcpy( dims, ptr+count, nDims*sizeof(IDL_MEMINT) );
+        count += nDims*sizeof(IDL_MEMINT);
+        IDL_MEMINT elt_len;
+        count += unpack( ptr+count, elt_len );
+        
+        // struct def
+        IDL_StructDefPtr structDef = v->value.s.sdef;
+        count += unpackStructDef( ptr+count, structDef );
+        
+        size_t nStrings;
+        count += unpack( ptr+count, nStrings );
+        for( size_t i=0; i<nStrings; ++i) {
+            size_t offset;
+            string tmp;
+            count += unpack( ptr+count, offset );
+            count += unpack( ptr+count, tmp );
+            IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( tmpData.get()+offset );
+            IDL_StrStore( strptr, const_cast<char*>(tmp.c_str()) );
+        }
+        IDL_VPTR tmp = IDL_ImportArray( nDims, dims, IDL_TYP_STRUCT, tmpData.release(), 0, structDef );
+        *v = {0};
+        IDL_VarCopy( tmp, v );
+
+        return count;
+    }
+    
+    if( flags & IDL_V_STRUCT ) {
+        // structs should be dealt with above
+    } else if( flags & IDL_V_ARR ) { // it's an array, also store n_dim + dim[]
+        UCHAR nDim;
+        IDL_ARRAY_DIM dims;
+        count += unpack( ptr+count, nDim );
+        for( UCHAR i=0; i<nDim; ++i ) {
+            count += unpack( ptr+count, dims[i] );
+        }
+        if( !nDim ) return count;
+        IDL_VPTR tmpV;
+        IDL_MakeTempArray( dataType, nDim, dims, IDL_ARR_INI_NOP, &tmpV );
+        if( dataType == IDL_TYP_STRING ) {
+             IDL_STRING* resptr = reinterpret_cast<IDL_STRING*>( tmpV->value.arr->data );
+             for( int i=0; i<tmpV->value.arr->n_elts; ++i ) {
+                string tmp;
+                count += unpack( ptr+count, tmp );
+                IDL_StrStore(resptr+i,const_cast<char*>(tmp.c_str()));
+            }
+        } else {
+            memcpy( tmpV->value.arr->data, ptr+count, tmpV->value.arr->arr_len );
+            count += tmpV->value.arr->arr_len;
+        }
+        IDL_VarCopy( tmpV, v );
+        return count;
+    }
+    
+    // scalar values
+    if( dataType == IDL_TYP_STRING ) {
+        string tmp;
+        count += unpack( ptr+count, tmp );
+        IDL_VPTR tmpV = IDL_StrToSTRING( const_cast<char*>(tmp.c_str()) );
+        IDL_VarCopy( tmpV, v );
+    } else {
+        v->type = dataType;
+        v->flags = 0;   // should always be 0 here
+        memcpy( &(v->value), ptr+count, IDL_TypeSizeFunc(dataType) );
+        count += IDL_TypeSizeFunc( dataType );
+    }
+    return count;
 }
 
 
