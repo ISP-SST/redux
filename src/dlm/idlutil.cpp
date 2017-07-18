@@ -55,7 +55,8 @@ int IdlContainer::load( void ) {
     
     string dlmVer = xstringize(RDX_IDL_HDR_VER);
     string idlVer = string(IDL_SysvVersion.release.s);
-    if( strncmp( idlVer.c_str(), dlmVer.c_str(), idlVer.length() ) ) {
+    size_t nChars = min( dlmVer.length(), idlVer.length() );
+    if( strncmp( idlVer.c_str(), dlmVer.c_str(), nChars ) ) {
         cout << colorString("Warning",YELLOW) << ": The redux DLM was not compiled using the same IDL-header (idl_export.h) as the current session." << endl;
         cout << "IDL Version: " << IDL_SysvVersion.release.s << endl;
         cout << "Header Version: " << dlmVer << endl;
