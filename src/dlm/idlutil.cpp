@@ -47,10 +47,20 @@ void IdlContainer::exit( void ) {
 }
 
 
+#define xstringize(s) stringize(s)
+#define stringize(s) #s
 int IdlContainer::load( void ) {
     
     int ret(1);
-
+    
+    string dlmVer = xstringize(RDX_IDL_HDR_VER);
+    string idlVer = string(IDL_SysvVersion.release.s);
+    if( strncmp( idlVer.c_str(), dlmVer.c_str(), idlVer.length() ) ) {
+        cout << colorString("Warning",YELLOW) << ": The redux DLM was not compiled using the same IDL-header (idl_export.h) as the current session." << endl;
+        cout << "IDL Version: " << IDL_SysvVersion.release.s << endl;
+        cout << "Header Version: " << dlmVer << endl;
+        cout << "This might lead to undefined behaviour if there is a mismatch in the data/functions used, YOU HAVE BEEN WARNED!" << endl;
+    }
     for( auto& r: get().routines ) {
         ret &= IDL_SysRtnAdd( &r.second.def, r.second.is_function, 1);
     }
@@ -66,8 +76,7 @@ void IdlContainer::reset( void ) {
    
 }
 
-#define xstringize(s) stringize(s)
-#define stringize(s) #s
+
 void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
     
     int verb(0);
