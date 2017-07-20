@@ -3,9 +3,15 @@
 #
 
 set( EXT_NAME "IDL" )
+#set( EXT_DEBUG "1" )
 #set( EXT_COMPONENTS idl )
 
-set( EXT_HINT "/usr/local/harris/idl/external/include/"
+if( NOT IS_DIRECTORY "${IDL_DIR}" AND IS_DIRECTORY "$ENV{IDL_DIR}" )
+    set( IDL_DIR "$ENV{IDL_DIR}/external/include/" )
+endif()
+
+set( EXT_HINT ${IDL_DIR} "${IDL_DIR}/external/" "${IDL_DIR}/external/include/"
+              "/usr/local/harris/idl/external/include/"
               "/opt/harris/idl/external/include/"
               "/usr/local/rsi/idl/external/include/"
               "/opt/rsi/external/include/"
@@ -17,6 +23,7 @@ set( EXT_HEADER_FILE "idl_export.h" )
 set( EXT_VERSION_FILE "idl_export.h" )
 set( EXT_MAJOR_REGEXP "VERSION_MAJOR" )
 set( EXT_MINOR_REGEXP "VERSION_MINOR" )
+set( EXT_PATCH_REGEXP "NotUsed" )
 
 
 # Attempt to locate libs/headers automagically
