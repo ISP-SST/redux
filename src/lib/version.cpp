@@ -17,9 +17,10 @@ string redux::getVersionString ( int v ) {
     return to_string((v>>16)&0xFF) + "." + to_string((v>>8)&0xFF) + "." + to_string(v&0xFF);
 }
 
-string redux::getLongVersionString ( void ) {
+string redux::getLongVersionString ( bool includeMessage ) {
     
-    string ret = to_string(reduxVersionMajor) + "." + to_string(reduxVersionMinor) + "." + to_string(reduxVersionPatch);
-    ret += " (" + string(reduxCommitMessage) + ")";
+    string ret = to_string(reduxVersionMajor) + "." + to_string(reduxVersionMinor)
+         + "." + to_string(reduxVersionPatch)+ "-" + to_string(reduxVersionCommit);
+    if( includeMessage ) ret += " (" + string(reduxCommitMessage) + ")";
     return ret;
 }

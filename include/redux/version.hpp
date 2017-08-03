@@ -42,7 +42,7 @@ namespace redux {
 
 
     /*!
-     *   @fn         extern std::string getLongVersionString ( void )
+     *   @fn         extern std::string getLongVersionString ( bool )
      *   @brief      Returns a string with version info and commit message.
      *   @details    E.g. If the build was made 7 commits after the last version-tag, the
      *               result would be something like: "1.2.3 (commit: 7 - Added implementation of getLongVersionString)"
@@ -50,7 +50,7 @@ namespace redux {
      *   @author    Tomas Hillberg (hillberg@astro.su.se)
      *   @date      2013
      */
-    extern std::string getLongVersionString( void );
+    extern std::string getLongVersionString( bool includeMessage=true );
 
     /*! @} */
 

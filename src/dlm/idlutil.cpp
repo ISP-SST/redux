@@ -77,13 +77,62 @@ void IdlContainer::reset( void ) {
    
 }
 
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_INT help;
+    IDL_VPTR version;
+} KW_INFO;
+
+static IDL_KW_PAR kw_info[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "HELP",      IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*)IDL_KW_OFFSETOF2(KW_INFO,help) },
+    { (char*) "VERSION",   IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2(KW_INFO,version) },
+    { NULL }
+};
+
+string info_help( int lvl ) {
+    
+    string ret = "RDX";
+    if( lvl > 0 ) {
+        
+        ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
+        ret += "   Syntax:   rdx, 1/2, /KEYWORDS\n";
+        ret += "             rdx, str, /KEYWORDS\n";
+    
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      HELP                Display this info.\n"
+                    "      VERSION             Return the DLM version as a string.\n";
+        }
+    
+    } else ret += "\n";
+
+    return ret;
+    
+}
+
 
 void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
+    
+    KW_INFO kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_info, (IDL_VPTR*)0, 255, &kw );
+
+    if( kw.help ) {
+        cout << info_help(2) << endl;
+        return;
+    }
+
+    if( kw.version ) {
+        string ver = getLongVersionString(false);
+        IDL_VPTR tmp = IDL_StrToSTRING( (char*)ver.c_str() );
+        IDL_VarCopy( tmp, kw.version );
+        return;
+    }
     
     int verb(0);
     string out;
     
-    if( argc ) {
+    if( nPlainArgs ) {
         
         IDL_VPTR arg = argv[0];
         IDL_ENSURE_SIMPLE( arg );
