@@ -29,6 +29,7 @@ namespace {
         ( "port,p", bpo::value<uint16_t>()->default_value( 30000 ), "Port to listen on, or connect to."
           " The environment variable RDX_PORT will be used as default if it is defined." )
         ( "threads,t", po::value<uint16_t>()->default_value( 0 ), "max number of threads to use.")
+        ( "foreground,F", "Do not detach/background process.")
         ;
 
         return options;
@@ -70,7 +71,7 @@ int main( int argc, char *argv[] ) {
     try {
         while( true ) {
             try {
-                if( vm.count( "log-stdout" ) == 0 ) {
+                if( (vm.count( "log-stdout" ) == 0) && (vm.count( "foreground" ) == 0) ) {
                     if( daemon( 1, 0 ) ) {
                         throw runtime_error( string("Failed to background process: ") + strerror( errno ) );
                     }
