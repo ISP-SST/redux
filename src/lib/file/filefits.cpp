@@ -398,7 +398,7 @@ void Fits::read( const string& filename ) {
     readAllCards( fitsPtr_, primaryHDU, filename );
     
     int hdutype(ANY_HDU);
-    for( int ii=2; ii<=nHDU; ++ii ) {
+    for( int ii=2; ; ++ii ) {
         status_ = 0;
         fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_ );
         if( status_ == END_OF_FILE ) {
