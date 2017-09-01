@@ -530,7 +530,8 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     images.resize( nTotalFrames, imgSize.y, imgSize.x );
     imageStats.resize( nTotalFrames );
     
-    if( myObject.saveMask & SF_SAVE_FFDATA ) {
+    bool saveFFData = (myObject.saveMask&SF_SAVE_FFDATA) || (myJob.runFlags&RF_FLATFIELD);
+    if( saveFFData ) {
         myObject.progWatch.increaseTarget( nFiles );    // add saving of calibrated datafiles.
     }
     
@@ -550,7 +551,7 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     
     size_t nPreviousFrames(0);
     for( size_t i=0; i<nFiles; ++i ) {
-        service.post( [&,i,nPreviousFrames](){
+        service.post( [&,i,nPreviousFrames,saveFFData](){
             try {
                 loadFile(i,nPreviousFrames);
                 if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
@@ -559,7 +560,7 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
                     preprocessImage( nPreviousFrames+j );
                     //service.post(std::bind( &Channel::preprocessImage, this, nPreviousFrames+j) );
                 }
-                if( myObject.saveMask & SF_SAVE_FFDATA ) {
+                if( saveFFData ) {
                     bfs::path fn;
                     try {
                         fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
