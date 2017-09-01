@@ -425,7 +425,6 @@ void Fits::read( const string& filename ) {
 
         switch( hdutype ) {
             case IMAGE_HDU: {
-                //cout << __FILE__ << ":" << __LINE__ << "  Extension is IMAGE_HDU" << endl;
                 auto hdu = make_shared<Fits::image_hdu>();
                 readImageHDU( fitsPtr_, *hdu, filename );
                 readAllCards( fitsPtr_, *hdu, filename );
@@ -433,14 +432,16 @@ void Fits::read( const string& filename ) {
                     primaryHDU.dHDU = ii;
                     primaryHDU.bitpix = fitsPtr_->Fptr->zbitpix;
                     primaryHDU.nDims = fitsPtr_->Fptr->zndim;
-                    primaryHDU.dims.assign( fitsPtr_->Fptr->znaxis, fitsPtr_->Fptr->znaxis+MAX_COMPRESS_DIM );
-                    //cout << __FILE__ << ":" << __LINE__ << printArray(primaryHDU.dims," PRIMARY dims") << endl;
+                    primaryHDU.dims.assign( fitsPtr_->Fptr->znaxis, fitsPtr_->Fptr->znaxis+fitsPtr_->Fptr->zndim );
+                    primaryHDU.nElements = 1;
+                    for( auto d: primaryHDU.dims ) {
+                        primaryHDU.nElements *=d;
+                    }
                 }
                 extHDUs.push_back( hdu );
                 break;
             }
             case ASCII_TBL: {
-                //cout << __FILE__ << ":" << __LINE__ << "   Extension is ASCII_TBL" << endl;
                 auto hdu = make_shared<Fits::ascii_hdu>();
                 readAsciiHDU( fitsPtr_, *hdu, filename );
                 readAllCards( fitsPtr_, *hdu, filename );
@@ -448,7 +449,6 @@ void Fits::read( const string& filename ) {
                 break;
             }
             case BINARY_TBL: {
-                //cout << __FILE__ << ":" << __LINE__ << "   Extension is BINARY_TBL" << endl;
                 auto hdu = make_shared<Fits::binary_hdu>();
                 readBinaryHDU( fitsPtr_, *hdu, filename);
                 readAllCards( fitsPtr_, *hdu, filename );
@@ -731,10 +731,8 @@ vector<T> Fits::getTableArray( string key ) {
     for( auto& ext: extHDUs ) {
         shared_ptr<ascii_hdu> ptr = dynamic_pointer_cast<ascii_hdu>(ext);
         if( ptr ) {
-            cout << "filefits: " << __LINE__ << "   getValue from ascii table." << endl; 
             for( const ascii_hdu::table_info_t& ti: ptr->table_info ) {
                 if( boost::iequals( ti.columnName.substr(0,8), key) ) {
-            cout << "filefits: " << __LINE__ << "   table-entry found: " << ti.columnName << endl; 
                 }
             }
     //             if( boost::iequals( k.substr(0,8), key) ) {

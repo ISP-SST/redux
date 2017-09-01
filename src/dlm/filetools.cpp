@@ -492,6 +492,7 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
             
             if( kw.date_beg ) {
                 vector<boost::posix_time::ptime> date_beg = myMeta->getStartTimes();
+                if( date_beg.empty() ) date_beg.push_back( myMeta->getStartTime() );
                 IDL_VPTR tmp;
                 IDL_MEMINT nDB = date_beg.size();
                 IDL_MEMINT dims[] = { nDB };
