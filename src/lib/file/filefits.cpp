@@ -915,7 +915,19 @@ vector<bpx::ptime> Fits::getStartTimes(void){
 
 std::vector<size_t> Fits::getFrameNumbers(void) {
     
-    size_t firstFrame = getValue<float>( primaryHDU.cards, "FRAMENUM" );
+    string fnstr = getValue<string>( primaryHDU.cards, "FRAMENUM" );
+    size_t found = fnstr.find_first_of("-,");   // check if it is a range.
+    if( found != string::npos ) {
+        return redux::util::stringToUInts<size_t>(fnstr);
+    }
+    // else treat it as an integer.
+    size_t firstFrame = 0;
+    try {
+        firstFrame = boost::lexical_cast<size_t>(fnstr);
+    } catch( const boost::bad_lexical_cast& ) {
+        // catch and ignore, use 0 as default.
+    }
+
     size_t nFrames = getNumberOfFrames();
     std::vector<size_t> ret(nFrames);
     std::iota( ret.begin(), ret.end(), firstFrame );
