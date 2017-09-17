@@ -7,7 +7,7 @@ PROCEDURE       RDX               0       1          KEYWORDS
 PROCEDURE       RDX_CACHE         2       2
 PROCEDURE       RDX_CACHECLEAR    0       0
 PROCEDURE       RDX_CACHEDEL      1       1
-FUNCTION        RDX_CACHEGET      1       1
+FUNCTION        RDX_CACHEGET      1       1          KEYWORDS
 PROCEDURE       RDX_CACHEINFO     0       0
 PROCEDURE       RDX_CACHESTORE    1       1          KEYWORDS
 PROCEDURE       RDX_CACHELOAD     1       1          KEYWORDS

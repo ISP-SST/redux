@@ -752,12 +752,32 @@ void cache( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+typedef struct {
+    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+    IDL_VPTR count;
+    IDL_INT help;
+} KW_CGET;
+
+// NOTE:  The keywords MUST be listed in alphabetical order !!
+static IDL_KW_PAR kw_cget_pars[] = {
+    IDL_KW_FAST_SCAN,
+    { (char*) "COUNT",    IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2(KW_CGET, count) },
+    { (char*) "HELP",     IDL_TYP_INT,   1,            IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2(KW_CGET, help) },
+    { NULL }
+};
+    
+
 string cacheget_info( int lvl ) {
     
     string ret = "RDX_CACHEGET";
     if( lvl > 0 ) {
         ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
-        ret += "   Syntax:   value = rdx_cacheget(key)\n";
+        ret += "   Syntax:   value = rdx_cacheget(key, /KEYWORDS)\n";
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      COUNT              Set to 1 if the key existed, else 0.\n";
+        }
+    
     } else ret += "\n";
 
     return ret;
@@ -767,11 +787,10 @@ string cacheget_info( int lvl ) {
     
 IDL_VPTR cacheget( int argc, IDL_VPTR* argv, char* argk ) {
 
-    if( argc < 1 ) {
-        cout << cacheget_info(2) << endl;
-        return IDL_GettmpInt(-1);
-    }
+    KW_CGET kw;
+    int nPlainArgs RDX_UNUSED = IDL_KWProcessByOffset( argc, argv, argk, kw_cget_pars, (IDL_VPTR*)0, 255, &kw );
 
+    
     IDL_VPTR tag = argv[0];
     IDL_ENSURE_SCALAR( tag );
     IDL_ENSURE_STRING( tag );
@@ -780,10 +799,21 @@ IDL_VPTR cacheget( int argc, IDL_VPTR* argv, char* argk ) {
     auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
     auto it = map.second.find( tagS );
     IDL_VPTR tmp = IDL_GettmpInt(-1);
-    if( it != map.second.end() ) {
+    int found = (it != map.second.end());
+    if( found ) {
         IDL_VarCopy( it->second.get(), tmp );
-    } else cout << "cacheget: " << tagS << " not found." << endl;
+    } else if( !kw.count ) {  // only warn if keyword found was not passed
+      string out = tagS + " not found.";
+      IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, out.c_str() );
+    }
+    
+    if( kw.count ) {
+        IDL_VPTR foundV = IDL_GettmpInt( found );
+        IDL_VarCopy( foundV, kw.count );
+    }
+    
     return tmp;
+    
 }
 
 
@@ -1025,7 +1055,7 @@ extern "C" {
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_cache, (char*)"RDX_CACHECLEAR", 0, 0, 0, 0 }, 0 , clear_cache_info);
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheinfo, (char*)"RDX_CACHEINFO", 0, 0, 0, 0 }, 0 , cacheinfo_info);
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cache, (char*)"RDX_CACHE", 2, 2, 0, 0 }, 0 , cache_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheget, (char*)"RDX_CACHEGET", 1, 1, 0, 0 }, 1 , cacheget_info);
+        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheget, (char*)"RDX_CACHEGET", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 , cacheget_info);
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cachedel, (char*)"RDX_CACHEDEL", 1, 1, 0, 0 }, 0 , cachedel_info);
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cachestore, (char*)"RDX_CACHESTORE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cachestore_info);
         IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheload, (char*)"RDX_CACHELOAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cacheload_info);
