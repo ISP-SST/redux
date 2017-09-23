@@ -89,10 +89,11 @@ namespace redux {
             void reInitialize(boost::asio::io_service&, bool reset=false);
             void loadData(boost::asio::io_service&, uint16_t nThreads, redux::util::Array<PatchData::Ptr>&);
             void loadInit(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
-            void writeAna(boost::asio::io_service&, const redux::util::Array<PatchData::Ptr>&);
-            void writeFits(boost::asio::io_service&, const redux::util::Array<PatchData::Ptr>&);
+            void writeAna(const redux::util::Array<PatchData::Ptr>&);
+            void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
             void writeResults(boost::asio::io_service&, const redux::util::Array<PatchData::Ptr>&);
+            void writeResults(redux::util::Array<PatchData::Ptr>&);
             
             redux::util::Point16 getImageSize(void);
             

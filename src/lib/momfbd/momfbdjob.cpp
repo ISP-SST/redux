@@ -433,12 +433,13 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, 
         service.post( std::bind( &MomfbdJob::verifyPatches, this) );                   // check for failed patches
     } else if( jobStep == JSTEP_VERIFIED ) {
         info.step.store( JSTEP_POSTPROCESS );
-        progWatch.set( patches.nElements() );
-        progWatch.setHandler( std::bind( &MomfbdJob::postProcess, this, std::ref(service), nThreads) );
-        progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
-        if( !solver ) solver.reset( new Solver(*this, service, nThreads) );
-        service.post( std::bind( &MomfbdJob::loadPatchResults, this, std::ref(service), nThreads) );
-
+//         progWatch.set( patches.nElements() );
+//         progWatch.setHandler( std::bind( &MomfbdJob::postProcess, this, std::ref(service), nThreads) );
+//         progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
+//         if( !solver ) solver.reset( new Solver(*this, service, nThreads) );
+//         service.post( std::bind( &MomfbdJob::loadPatchResults, this, std::ref(service), nThreads) );
+// 
+        writeOutput(service);
     } else {
         LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load() << ende;
         info.step.store( JSTEP_ERR );
@@ -742,14 +743,17 @@ void MomfbdJob::writeOutput( boost::asio::io_service& service ) {
     
     auto jlock = getLock();
     info.step = JSTEP_WRITING;
-
+    
     progWatch.clear();
     progWatch.set( objects.size() );
-
+    progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
     progWatch.setHandler( std::bind( &MomfbdJob::clearPatches, this) );
+    
+    updateProgressString();
+    
     if( saveMask&SF_SAVE_METRIC ) {
-        progWatch.increaseTarget();
-        service.post( [this](){
+        //progWatch.increaseTarget();
+        //service.post( [this](){
             bfs::path fn = bfs::path(info.outputDir) / bfs::path(info.name+"_metrics.f0");
             vector<size_t> dims = patches.dimensions();
             Array<float> metrics( dims );
@@ -771,17 +775,20 @@ void MomfbdJob::writeOutput( boost::asio::io_service& service ) {
                 LOG << "Writing metric progression to file: " << fn << ende;
                 Ana::write( fn.string(), metrics );
             }
-            ++progWatch;
-        });
+        //    ++progWatch;
+        //});
 
     }
     
     for( auto obj : objects ) {
+//         service.post( [this,obj,&service](){
+//             obj->writeResults( service, patches );
+//         });
         service.post( [this,obj,&service](){
-            obj->writeResults( service, patches );
+            obj->writeResults( patches );
         });
     }
-        
+
 }
 
 
@@ -859,10 +866,10 @@ void MomfbdJob::updateProgressString(void) {
     //info.progressString = progWatch.dump();
     //return;
     switch( info.step ) {
-        case JSTEP_PREPROCESS:  info.progressString = "P"; break; //"(P:" + progWatch.progressString() + ")"; break;
+        case JSTEP_PREPROCESS:  info.progressString = "Preprocessing"; break; //"(P:" + progWatch.progressString() + ")"; break;
         case JSTEP_VERIFY:      info.progressString = "V"; break;
         case JSTEP_POSTPROCESS: ;
-        case JSTEP_WRITING:     info.progressString = "(W:"; break;// + progWatch.progressString() + ")"; break;
+        case JSTEP_WRITING:     info.progressString = "Writing"; break; // + progWatch.progressString() + ")"; break;
         case JSTEP_QUEUED:      info.progressString = "Q"; break;
         case JSTEP_RUNNING:     info.progressString = "(" + progWatch.progressString() + ")"; break;
         case JSTEP_COMPLETED:   info.progressString = "(completed)"; break;

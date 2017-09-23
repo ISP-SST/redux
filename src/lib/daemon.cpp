@@ -1003,7 +1003,6 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
         wip->job->info.state.store( Job::JSTATE_ACTIVE );
         wip->workStarted = boost::posix_time::second_clock::local_time();
         for( auto& part: wip->parts ) {
-            part->cacheLoad(false);
             part->partStarted = wip->workStarted;
         }
     }
@@ -1014,8 +1013,12 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
 
 void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
-     shared_ptr<char> data;
-     uint64_t count(0); 
+    shared_ptr<char> data;
+    uint64_t count(0); 
+    static int maxRequests(10);
+    bool tooManyRequests(false);
+    WorkInProgress::Ptr wip;
+    Host::Ptr host;
      
     {
         unique_lock<mutex> lock( peerMutex );
@@ -1028,9 +1031,10 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             }
             wipit = rit.first;
         }
-        
-        WorkInProgress::Ptr wip = wipit->second;
-        Host::Ptr host = wipit->first;
+        wip = wipit->second;
+        host = wipit->first;
+        tooManyRequests = (maxRequests <= 0);
+        maxRequests -= !tooManyRequests;
         lock.unlock();
 
         if( wip->job && wip->parts.size() ) {   // parts should have been cleared when results returned.
@@ -1045,37 +1049,40 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         wip->parts.clear();
         wip->nParts = 0;
 
-        if( getWork( wip, host->status.nThreads ) ) {
-            auto jlock = wip->job->getLock();
-            for( auto& part: wip->parts ) {
-                part->cacheLoad();
+        if( !tooManyRequests ) {
+            if ( getWork( wip, host->status.nThreads ) ) {
+              //auto jlock = wip->job->getLock();
+              for( auto& part: wip->parts ) {
+                  part->cacheLoad();
+              }
+              blockSize += wip->workSize();
+              //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
+              host->status.statusString = alignLeft(to_string(wip->job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
+              host->active();
+              data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
+              char* ptr = data.get()+sizeof(uint64_t);
+              count += wip->packWork( ptr+count );
+              for( auto& part: wip->parts ) {
+                  part->cacheClear();
+              }
+              wip->previousJob = wip->job;
             }
-            blockSize += wip->workSize();
-            //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
-            LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
-            host->status.statusString = alignLeft(to_string(wip->job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
-            host->active();
-        } else {
-            wip->previousJob.reset();
-            host->idle();
-        }
-        data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
-        char* ptr = data.get()+sizeof(uint64_t);
-        if( wip->job ) {
-            auto jlock = wip->job->getLock();
-            count += wip->packWork( ptr+count );
-            for( auto& part: wip->parts ) {
-                part->cacheClear();
-            }
-            wip->previousJob = wip->job;
         }
     }
     
     if( count ) {
         pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)
+        LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
         conn->syncWrite( data.get(), count+sizeof(uint64_t) );
     } else {
         conn->syncWrite(count);
+        wip->previousJob.reset();
+        host->idle();
+    }
+    
+    if( !tooManyRequests ) {
+        unique_lock<mutex> lock( peerMutex );
+        maxRequests += 1;
     }
     
 }

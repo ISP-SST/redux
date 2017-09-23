@@ -991,7 +991,6 @@ void Channel::preprocessImage( size_t i ) {
 void Channel::copyImagesToPatch(ChannelData& chData) {
 
     Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
-    Array<float> tmp = block.copy(true);
     
     bool flipX(false);
     bool flipY(false);
@@ -1005,6 +1004,7 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
     if( flipX || flipY ) {
         size_t sy = chData.cutout.last.y - chData.cutout.first.y + 1;
         size_t sx = chData.cutout.last.x - chData.cutout.first.x + 1;
+        Array<float> tmp = block.copy(true);
         std::shared_ptr<float*> arrayPtr = tmp.reshape(nTotalFrames*sy, sx);
         float** imgPtr = arrayPtr.get();
         for( size_t i=0; i<nTotalFrames; ++i) {
@@ -1012,9 +1012,11 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
             if( flipY ) redux::util::reverseY(imgPtr, sy, sx);
             imgPtr += sy;
         }
+        chData.images = std::move(tmp);
+    } else {
+        chData.images = std::move(block);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
     }
     
-    chData.images = std::move(tmp);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
     chData.setLoaded();
     
 }

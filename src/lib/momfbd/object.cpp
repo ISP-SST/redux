@@ -999,7 +999,7 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
 }
 
 
-void Object::writeAna( boost::asio::io_service& service, const redux::util::Array<PatchData::Ptr>& patches ){
+void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
 
     bfs::path fn = bfs::path(outputFileName + ".f0" );
     if( isRelative(fn ) ){
@@ -1070,10 +1070,10 @@ void Object::writeAna( boost::asio::io_service& service, const redux::util::Arra
 }
 
 
-void Object::writeFits( boost::asio::io_service& service, const redux::util::Array<PatchData::Ptr>& patches ){
-    bfs::path fn = bfs::path(outputFileName + ".fits" );
-    if( isRelative(fn ) ){
-        fn = bfs::path(myJob.info.outputDir )/ fn;
+void Object::writeFits( const redux::util::Array<PatchData::Ptr>& patches ) {
+    bfs::path fn = bfs::path( outputFileName + ".fits" );
+    if( isRelative( fn ) ) {
+        fn = bfs::path( myJob.info.outputDir ) / fn;
     }
     LOG << "NOT writing output to file: " << fn << ende;
     LOG_ERR << "Writing to FITS still not implemented..." << ende;
@@ -1319,13 +1319,13 @@ void Object::writeResults( boost::asio::io_service& service, const redux::util::
         ++myJob.progWatch;
     } );
 
-    if( myJob.outputFileType & FT_ANA ){
-        progWatch.increaseTarget(1 );
-        service.post( std::bind( &Object::writeAna, this, std::ref(service), std::ref(patches) ) );
+    if( myJob.outputFileType & FT_ANA ) {
+        progWatch.increaseTarget( 1 );
+        service.post( std::bind( &Object::writeAna, this, std::ref( patches) ) );
     }
-    if( myJob.outputFileType & FT_FITS ){
-        progWatch.increaseTarget(1 );
-        service.post( std::bind( &Object::writeFits, this, std::ref(service), std::ref(patches) ) );
+    if( myJob.outputFileType & FT_FITS ) {
+        progWatch.increaseTarget( 1 );
+        service.post( std::bind( &Object::writeFits, this, std::ref( patches) ) );
     }
     if( myJob.outputFileType & FT_MOMFBD ){
         progWatch.increaseTarget(1 );
@@ -1333,6 +1333,31 @@ void Object::writeResults( boost::asio::io_service& service, const redux::util::
     }
     ++progWatch;
     
+}
+
+void Object::writeResults( redux::util::Array<PatchData::Ptr>& patches ) {
+    
+    for( auto& patch: patches ) {
+        //patch->CacheItem::cacheLoad(false);
+        patch->objects[ID]->CacheItem::cacheLoad(false);
+    }
+    
+    if( myJob.outputFileType & FT_ANA ) {
+        writeAna(patches);
+    }
+    if( myJob.outputFileType & FT_FITS ) {
+        writeFits(patches);
+    }
+    if( myJob.outputFileType & FT_MOMFBD ) {
+        writeMomfbd(patches);
+    }
+
+    for( auto& patch: patches ) {
+        patch->objects[ID]->CacheItem::cacheRemove();
+        patch->objects[ID]->CacheItem::cacheClear();
+    }
+    
+    ++myJob.progWatch;
 }
 
 
