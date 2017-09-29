@@ -244,33 +244,34 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
     }
 
     if( wip->isRemote ) {
-        auto lock = getLock();
-        if ( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
-            progWatch.set(patches.nElements());
-            progWatch.setHandler([this](){
-                info.step = JSTEP_DONE;
+        auto lock = getLock( true );
+        if( lock.owns_lock() ) {
+            if( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
+                progWatch.set(patches.nElements());
+                progWatch.setHandler([this](){
+                    info.step = JSTEP_DONE;
+                    updateProgressString();
+                });
+                info.step = step = JSTEP_RUNNING;
                 updateProgressString();
-            });
-            info.step = step = JSTEP_RUNNING;
-            updateProgressString();
-        }
+            }
 
-        if ( step == JSTEP_RUNNING ) {                      // running
-             for( auto & patch : patches ) {
-                if( patch && (patch->step == JSTEP_QUEUED) ) {
-                    //LOG_DETAIL << "Starting patch: #" << patch->id << "   step=" << (int)patch->step << "  ptr = " << hexString(patch.get()) << ende;
-                    patch->step = JSTEP_RUNNING;
-                    wip->parts.push_back( patch );
-                    auto pJob = wip->previousJob.lock();
-                    if( pJob.get() != this ) {     // First time for this slave -> include global data
-                        wip->parts.push_back( globalData );
+            if( step == JSTEP_RUNNING ) {                      // running
+                 for( auto & patch : patches ) {
+                    if( patch && (patch->step == JSTEP_QUEUED) ) {
+                        //LOG_DETAIL << "Starting patch: #" << patch->id << "   step=" << (int)patch->step << "  ptr = " << hexString(patch.get()) << ende;
+                        patch->step = JSTEP_RUNNING;
+                        wip->parts.push_back( patch );
+                        auto pJob = wip->previousJob.lock();
+                        if( pJob.get() != this ) {     // First time for this slave -> include global data
+                            wip->parts.push_back( globalData );
+                        }
+                        ret = true;
+                        break;// only 1 part at a time for MomfbdJob
                     }
-                    ret = true;
-                    break;// only 1 part at a time for MomfbdJob
                 }
             }
         }
-
         wip->nParts = wip->parts.size();
         return ret;
         
@@ -343,27 +344,34 @@ void MomfbdJob::failWork( WorkInProgress::Ptr wip ) {
 
 void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
     
-    auto lock = getLock();
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-
     boost::posix_time::time_duration elapsed = (now - wip->workStarted);
-
-    for( auto& part : wip->parts ) {
-        auto tmpPatch = static_pointer_cast<PatchData>( part );
-        PatchData::Ptr patch = patches( tmpPatch->index.y, tmpPatch->index.x );
-        patch->copyResults(*tmpPatch);         // copies the returned results without overwriting other variables.
-        patch->step = JSTEP_POSTPROCESS;
-        patch->cacheStore(true);
+    vector<PatchData::Ptr> pV;
+    
+    {
+        auto lock = getLock();
+        for( auto& part : wip->parts ) {
+            auto tmpPatch = static_pointer_cast<PatchData>( part );
+            PatchData::Ptr patch = patches( tmpPatch->index.y, tmpPatch->index.x );
+            patch->copyResults(*tmpPatch);         // copies the returned results without overwriting other variables.
+            patch->step = JSTEP_POSTPROCESS;
+            pV.push_back(patch);
+        }
+        
+        info.maxProcessingTime = max<uint32_t>( info.maxProcessingTime, elapsed.total_seconds() );
+        if( info.maxProcessingTime ) {
+            uint32_t newTimeout = info.maxProcessingTime * (20.0 - 15.0*progWatch.progress());    // TBD: start with large margin, then shrink to ~5*maxProcessingTime ?
+            LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds." << ende;
+            info.timeout = newTimeout;    // TBD: fixed timeout or 10 * maxProcTime ?
+        }
+    }
+    
+    for( auto p : pV ) {
+        p->cacheStore(true);
+        auto lock = getLock();
         ++progWatch;
     }
 
-    info.maxProcessingTime = max<uint32_t>( info.maxProcessingTime, elapsed.total_seconds() );
-    if( info.maxProcessingTime ) {
-        uint32_t newTimeout = info.maxProcessingTime * (20.0 - 15.0*progWatch.progress());    // TBD: start with large margin, then shrink to ~5*maxProcessingTime ?
-        LOG_TRACE << "returnResults(): Adjusting job-timeout from " << info.timeout << " to " << newTimeout << " seconds." << ende;
-        info.timeout = newTimeout;    // TBD: fixed timeout or 10 * maxProcTime ?
-    }
-    
 }
 
 
