@@ -751,7 +751,6 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
     vector<string> messages;
     bool swap_endian = conn->getSwapEndian();
     try {
-        vector<shared_ptr<Job>> newjobs;
         while( count < blockSize ) {
             string tmpS = string( ptr+count );
             Job::JobPtr job = Job::newJob( tmpS );
@@ -776,15 +775,15 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     ids.push_back( job->info.id );
                     ids[0]++;
                     jobCounter++;
-                    newjobs.push_back( job );
                     job->stopLog();
+                    lock_guard<mutex> lock( jobsMutex );
+                    jobs.push_back( job );
                 } catch( const job_error& e ) {
                     messages.push_back( e.what() );
                 }
             } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
         }
-        unique_lock<mutex> lock( jobsMutex );
-        jobs.insert( jobs.end(), newjobs.begin(), newjobs.end() );
+        lock_guard<mutex> lock( jobsMutex );
         std::sort( jobs.begin(), jobs.end(), [](const Job::JobPtr& a, const Job::JobPtr& b) {
             if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
             if(a->info.step != b->info.step) return (a->info.step > b->info.step);
