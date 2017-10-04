@@ -43,4 +43,10 @@ if( NOT DEFINED IDL_FOUND )     # no system installation found, use the header i
     endif()
 endif()
 
+if( DEFINED IDL_FOUND )
+    message("Using IDL header file found in: ${IDL_DIR} (ver: ${IDL_VERSION})")
+    message(" To use a different IDL version, set the IDL_DIR variable in your environment before running cmake.")
+endif()
+
+
 appendPaths()

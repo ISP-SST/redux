@@ -188,9 +188,10 @@ void Object::cleanup(void ){
 }
 
 
-uint32_t Object::nImages(void )const {
-    if(nObjectImages )return nObjectImages;
-    for( const auto& ch : channels )nObjectImages += ch->nImages( );
+uint32_t Object::nImages( bool reCalc ) {
+    if( reCalc ) nObjectImages = 0;
+    if( nObjectImages ) return nObjectImages;
+    for( const auto& ch : channels ) nObjectImages += ch->nImages( );
     return nObjectImages;
 }
 
@@ -604,6 +605,7 @@ bool Object::checkCfg( void ){
     }
     if( channels.empty() ){
         LOG_FATAL << "Each object must have at least 1 channel specified." << ende;
+        return false;
     }
 
     if( !checkImageScale( telescopeF, arcSecsPerPixel, pixelSize, logChannel) ){

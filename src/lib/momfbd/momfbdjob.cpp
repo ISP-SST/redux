@@ -587,9 +587,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     uint32_t nTotalImages(0);
     uint32_t nTotalChannels(0);
     Point16 imageSizes;
-    for( auto& obj : objects ) {
+    for( shared_ptr<Object>& obj : objects ) {
         Point16 tmp = obj->getImageSize();
-        nTotalImages += obj->nImages();
+        nTotalImages += obj->nImages( true );
         nTotalChannels += obj->channels.size();
         if(imageSizes == 0) {
             imageSizes = tmp;

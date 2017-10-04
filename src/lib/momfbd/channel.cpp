@@ -603,11 +603,18 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
     for(unsigned int py=0; py<nPatchesY; ++py) {
         for(unsigned int px=0; px<nPatchesX; ++px) {
             service.post( [this,&patches,py,px](){
-                auto chData = patches(py,px)->objects[myObject.ID]->channels[ID];
-                copyImagesToPatch(*chData);
-                chData->cacheStore(true);    // store to disk and clear array
-                ++progWatch;
-                ++myJob.progWatch;
+                if( myJob.isOK() ) {
+                    auto chData = patches(py,px)->objects[myObject.ID]->channels[ID];
+                    try {
+                        copyImagesToPatch(*chData);
+                        chData->cacheStore(true);    // store to disk and clear array
+                    } catch( std::exception& e ) {
+                        myJob.setFailed();
+                        LOG_ERR << "Failed to copy/store patch(" << py << "," << px << "): " << e.what() << ende;
+                    } 
+                    ++progWatch;
+                    ++myJob.progWatch;
+                }
             });
         }
     }
@@ -985,6 +992,7 @@ void Channel::preprocessImage( size_t i ) {
     ++myJob.progWatch;          // this will trigger unloading the calibration data after all objects/images are done.
     ++myObject.progWatch;       // this will trigger calculating max_mean and storing patch-data to disk
         
+
 }
 
 

@@ -67,7 +67,8 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, red
         auto it2 = getMap().find(boost::to_upper_copy(name));       // check if the current tag matches a registered (Job-derived) class.
         if(it2 != getMap().end()) {
             Job* tmpJob = it2->second.second();
-            tmpJob->parsePropertyTree(vm, property.second, logger);
+            tmpJob->parsePropertyTree( vm, property.second, logger );
+            tmpJob->getLogger().addLogger( logger );
             if(!check || tmpJob->check()) {
                 tmp.push_back(shared_ptr<Job>(tmpJob));
             } else LOG_ERR << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << ende;
@@ -342,6 +343,21 @@ uint64_t Job::unpack(const char* ptr, bool swap_endian) {
     return info.unpack(ptr, swap_endian);
 }
 
+
+void Job::setFailed(void) {
+    
+    unique_lock<mutex>(jobMutex);
+    info.state |= JSTATE_ERR;
+    
+}
+
+
+bool Job::isOK(void) {
+    
+    unique_lock<mutex>(jobMutex);
+    return !(info.state&JSTATE_ERR);
+    
+}
 
 string Job::cfg(void) {
 

@@ -144,6 +144,9 @@ namespace redux {
         virtual void failWork(WorkInProgress::Ptr) { };
         virtual void returnResults(WorkInProgress::Ptr) { };
 
+        void setFailed(void);
+        bool isOK(void);
+        
         virtual void init(void) {};
         virtual void cleanup(void) {};
         virtual bool run(WorkInProgress::Ptr, boost::asio::io_service&, uint16_t) = 0;

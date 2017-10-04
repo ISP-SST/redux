@@ -49,7 +49,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             
             void cleanup(void);
-            uint32_t nImages(void) const;
+            uint32_t nImages(bool reCalc=false);
             
             const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };
             const MomfbdJob& getJob(void) const { return myJob; };
