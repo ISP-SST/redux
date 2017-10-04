@@ -6,8 +6,8 @@ set( EXT_NAME "IDL" )
 #set( EXT_DEBUG "1" )
 #set( EXT_COMPONENTS idl )
 
-if( NOT IS_DIRECTORY "${IDL_DIR}" AND IS_DIRECTORY "$ENV{IDL_DIR}" )
-    set( IDL_DIR "$ENV{IDL_DIR}/external/include/" )
+if( IS_DIRECTORY "$ENV{IDL_DIR}" )   # always use the environment IDL directory if it exists.
+    set( IDL_DIR "$ENV{IDL_DIR}" )
 endif()
 
 set( EXT_HINT ${IDL_DIR} "${IDL_DIR}/external/" "${IDL_DIR}/external/include/"
