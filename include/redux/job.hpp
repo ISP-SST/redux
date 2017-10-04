@@ -164,6 +164,10 @@ namespace redux {
         
         virtual bool mayBeDeleted(void) { return true; }
         
+        virtual size_t memUsage(void) { return 0; }       //!< Approximate current memory usage of this job
+        virtual size_t diskUsage(void) { return 0; }      //!< Approximate current disk usage of this job
+        virtual size_t procUsage(void) { return 0; }      //!< Approximate memory usage for processing 1 part
+        
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);
     

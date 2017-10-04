@@ -32,6 +32,8 @@ namespace redux {
         
         void serverInit( void );
         void maintenance( void );
+        void checkSwapSpace( void );
+        void checkCurrentUsage( void );
         bool doWork(void);
         
         bool workerInit( void );

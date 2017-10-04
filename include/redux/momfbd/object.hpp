@@ -95,6 +95,11 @@ namespace redux {
             void writeResults(boost::asio::io_service&, const redux::util::Array<PatchData::Ptr>&);
             void writeResults(redux::util::Array<PatchData::Ptr>&);
             
+            size_t estimateOutputSizeANA(void);
+            size_t estimateOutputSizeFITS(void);
+            size_t estimateOutputSizeMOMFBD(void);
+            size_t estimateOutputSize(void);
+            
             redux::util::Point16 getImageSize(void);
             
             /*************   Processing on slave   ***************/

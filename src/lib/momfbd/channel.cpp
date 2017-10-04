@@ -1025,6 +1025,8 @@ void Channel::copyImagesToPatch(ChannelData& chData) {
 uint32_t Channel::nImages(void) {
     
     if( nTotalFrames == 0 ) {
+        // just to allow a rough estimate of needed diskspace before the preprocessing starts.
+        if( nFrames.empty() ) return fileNumbers.size();
         nTotalFrames = std::accumulate( nFrames.begin(), nFrames.end(), 0 );
     }
     
@@ -1182,11 +1184,13 @@ Point16 Channel::getImageSize(void) {
 //             imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
 //         } else {                        //  No align-map or align-clip, get full image size.
             bfs::path fn;
-            if( nImages() ) {
+            LOG_ERR << "Image0 " << printArray(fileNumbers,"nums") << "  nImgs= " << nImages() << ende;
+            if( !fileNumbers.empty() ) {
                 fn = bfs::path(imageDataDir) / bfs::path(boost::str(boost::format (imageTemplate) % fileNumbers[0]));
             } else {
                 fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
             }
+            LOG_ERR << "Image1 " << fn << ende;
             Image<float> tmp;
             CachedFile::load( tmp, fn.string(), true );       // Image will be cached, so this is not a "wasted" load.
 
@@ -1199,6 +1203,7 @@ Point16 Channel::getImageSize(void) {
             } else LOG_ERR << "Image " << fn << " is not 2D or 3D." << ende;
 //        }
     }
+LOG << "Image1 imgSize: " << imgSize << ende;
 
     return imgSize;
  

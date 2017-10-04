@@ -116,12 +116,46 @@ void Daemon::maintenance( void ) {
     LOG_TRACE << "Maintenance:  nJobs = " << jobs.size() << "  nConn = " << connections.size() << "  nPeerWIP = " << peerWIP.size() << ende;
 #endif
     updateLoadAvg();
+    checkSwapSpace();
     cleanup();
+    checkCurrentUsage();
     logger.flushAll();
     updateStatus();   // TODO: use a secondary connection for auxiliary communications
     timer.expires_from_now( boost::posix_time::seconds( 5 ) );
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
     
+}
+
+
+void Daemon::checkSwapSpace( void ) {
+    bfs::path cachePath( Cache::get().path() );
+    boost::system::error_code ec;
+    bfs::space_info si = bfs::space(cachePath,ec);
+    if( ec ) {
+        LOG_ERR << "checkSwapSpace failed for path" << cachePath<< ": " << ec.message() << ende;
+    } else {
+        double diskFree = static_cast<double>(si.available)/si.capacity;
+        double diskFreeGB = static_cast<double>(si.available)/(1<<30);
+        if( diskFree < 0.05 || diskFreeGB < 100 ) {
+            LOG_WARN << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
+                     << "%) free space on the cache drive (" << cachePath << ")."
+                     << "\n\tYour jobs will fail if you run out of space!!" << ende;
+        }
+    }
+}
+
+
+void Daemon::checkCurrentUsage( void ) {
+    unique_lock<mutex> lock( jobsMutex );
+    for( auto& job : jobs ) {
+        if( !job ) continue;
+        size_t memUsage = job->memUsage();
+        size_t diskUsage = job->diskUsage();
+        LOG << "Job " << job->info.id << " (" << job->info.name << ")  memUsage = " << memUsage
+            << "  diskUsage = " << diskUsage << ende;
+        //LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
+
+    }
 }
 
 
@@ -1110,7 +1144,7 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
             LOG_ERR << "This slave is not listed in peerWIP: " << host->info.name << ":" << host->info.pid << ende;
         } else {
             
-            if( wipit->second->job ) {
+            if( wipit->second && wipit->second->job ) {
                 shared_ptr<WorkInProgress> tmpwip( std::make_shared<WorkInProgress>(*wipit->second) );
                 bool endian = conn->getSwapEndian();
                 wipit->first->status.state = Host::ST_IDLE;

@@ -5,6 +5,7 @@
 #include "redux/logging/logger.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/util/bitoperations.hpp"
+#include "redux/util/fileutil.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <thread>
@@ -397,6 +398,29 @@ bool MomfbdJob::mayBeDeleted(void) {
 }
 
 
+
+size_t MomfbdJob::memUsage(void) {
+  
+  return 1;
+  
+}
+
+
+size_t MomfbdJob::diskUsage(void) {
+  if( cachePath.empty() ) return 0;
+  bfs::path cp = bfs::path(Cache::get().path()) / bfs::path(cachePath);
+  return getDirSize( cp.string() );
+  
+}
+
+
+size_t MomfbdJob::procUsage(void) {
+  
+  return 3;
+  
+}
+        
+
 bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, uint16_t maxThreads ) {
     
 
@@ -471,6 +495,66 @@ void MomfbdJob::setLogChannel(std::string channel) {
 }
 
 
+void MomfbdJob::generatePatchPositions(void) {
+    
+    const vector<int16_t>& clip = objects[0]->channels[0]->alignClip;
+    if( clip.size() == 4 ) {
+        roi = Region16( clip[2]-1, clip[0]-1, clip[3]-1, clip[1]-1 );
+    }
+    Point16 imageSizes = objects[0]->getImageSize();
+    uint16_t halfPatchSize = patchSize/2;
+    if( subImagePosXY.empty() ) {
+        uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
+        // TODO: do split per channel instead, to allow for different image-scales and/or hardware
+        // NOTE:  subImagePosX/Y are kept 1-based, so offset by 1 during cut-out.
+        LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
+        if( subImagePosX.empty() ) { // x-coordinate of patch-centre
+            uint16_t first = roi.first.x + halfPatchSize+1;
+            uint16_t last = roi.last.x - halfPatchSize+1;
+            subImagePosX = segment<uint16_t>( first, last, patchSize, totalOverlap );
+            LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
+        }
+        if( subImagePosY.empty() ) { // y-coordinate of patch-centre
+            uint16_t first = roi.first.y + halfPatchSize+1;
+            uint16_t last = roi.last.y - halfPatchSize+1;
+            subImagePosY = segment<uint16_t>( first, last, patchSize, totalOverlap );
+            LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
+        }
+    
+        if( subImagePosX.empty() || subImagePosY.empty() ) {
+            LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue." << ende;
+            info.step.store( JSTEP_ERR );
+            info.state.store( JSTATE_IDLE );
+            return;
+        }
+
+        for( uint16_t& pos : subImagePosY ) {
+            uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.y-halfPatchSize+1);       // stay inside borders
+            if( adjustedPos != pos ) {
+                LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
+                pos = adjustedPos;
+            }
+        }
+
+        for( uint16_t& pos : subImagePosX ) {
+            uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.x-halfPatchSize+1);       // stay inside borders
+            if( adjustedPos != pos ) {
+                LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
+                pos = adjustedPos;
+            }
+        }
+    } else {
+        subImagePosX.clear();
+        subImagePosY.clear();
+        for ( size_t i=0; i< subImagePosXY.size(); ++i ) {
+            if( i%2 ) subImagePosY.push_back( subImagePosXY[i] );
+            else subImagePosX.push_back( subImagePosXY[i] );
+        }
+    }
+
+}
+
+
 void MomfbdJob::unloadCalib( boost::asio::io_service& service ) {
 
     for( shared_ptr<Object>& obj : objects ) {
@@ -514,12 +598,6 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         }
     }
     //service.post( std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
-    if( nTotalChannels ) {
-        const vector<int16_t>& clip = objects[0]->channels[0]->alignClip;
-        if( clip.size() == 4 ) {
-            roi = Region16( clip[2]-1, clip[0]-1, clip[3]-1, clip[1]-1 );
-        }
-    }
 
     progWatch.setTarget( nTotalImages );
     progWatch.setHandler( std::bind( &MomfbdJob::unloadCalib, this, std::ref(service)) );
@@ -532,56 +610,8 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     if( !(runFlags&RF_FLATFIELD) ) {    // Skip this if we are only doing flatfielding
         
         uint16_t halfPatchSize = patchSize/2;
-        bool hasXY(false);
-        if( subImagePosXY.empty() ) {
-            uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
-            // TODO: do split per channel instead, to allow for different image-scales and/or hardware
-            // NOTE:  subImagePosX/Y are kept 1-based, so ffset by 1 during cut-out.
-            LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
-            if( subImagePosX.empty() ) { // x-coordinate of patch-centre
-                uint16_t first = roi.first.x + halfPatchSize+1;
-                uint16_t last = roi.last.x - halfPatchSize+1;
-                subImagePosX = segment<uint16_t>( first, last, patchSize, totalOverlap );
-                LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
-            }
-            if( subImagePosY.empty() ) { // y-coordinate of patch-centre
-                uint16_t first = roi.first.y + halfPatchSize+1;
-                uint16_t last = roi.last.y - halfPatchSize+1;
-                subImagePosY = segment<uint16_t>( first, last, patchSize, totalOverlap );
-                LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
-            }
-        
-            if( subImagePosX.empty() || subImagePosY.empty() ) {
-                LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue." << ende;
-                info.step.store( JSTEP_ERR );
-                info.state.store( JSTATE_IDLE );
-                return;
-            }
+        bool hasXY = !subImagePosXY.empty();
 
-            for( uint16_t& pos : subImagePosY ) {
-                uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.y-halfPatchSize+1);       // stay inside borders
-                if( adjustedPos != pos ) {
-                    LOG_WARN << "MomfbdJob::preProcess() y-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
-                    pos = adjustedPos;
-                }
-            }
-
-            for( uint16_t& pos : subImagePosX ) {
-                uint16_t adjustedPos = std::min<uint16_t>(std::max<uint16_t>(halfPatchSize+1,pos),imageSizes.x-halfPatchSize+1);       // stay inside borders
-                if( adjustedPos != pos ) {
-                    LOG_WARN << "MomfbdJob::preProcess() x-position of patch is too close to the border, adjusting: " << pos << " -> " << adjustedPos << ende;
-                    pos = adjustedPos;
-                }
-            }
-        } else {
-            hasXY = true;
-            subImagePosX.clear();
-            subImagePosY.clear();
-            for ( size_t i=0; i< subImagePosXY.size(); ++i ) {
-                if( i%2 ) subImagePosY.push_back( subImagePosXY[i] );
-                else subImagePosX.push_back( subImagePosXY[i] );
-            }
-        }
         unsigned int nPatchesX = subImagePosX.size();
         unsigned int nPatchesY = subImagePosY.size();
         if ( hasXY ) nPatchesY = 1;         // since the .momfbd format expects a rectangular grid of points, we store
@@ -904,8 +934,18 @@ bool MomfbdJob::check(void) {
     bool ret(false);
     uint16_t step = info.step;
     switch (step) {
-        case JSTEP_NONE:        ret = checkCfg(); if(ret) info.step = JSTEP_SUBMIT; break;
-        case JSTEP_SUBMIT:      ret = checkData();  if(ret) info.step = JSTEP_CHECKED; break;
+        case JSTEP_NONE: {
+LOG << "check(): " << __LINE__ << ende;
+            ret = checkCfg();// && checkCacheUsage();
+            if(ret) info.step = JSTEP_SUBMIT;
+            break;
+        }
+        case JSTEP_SUBMIT: {
+LOG << "check(): " << __LINE__ << ende;
+            ret = checkData() && checkCacheUsage();
+            if(ret) info.step = JSTEP_CHECKED;
+            break;
+        }
         case JSTEP_RUNNING:     ret = true; checkParts(); break;    // this check should find orphan parts etc.
         case JSTEP_VERIFY:      return false;
 //         case JSTEP_PREPROCESS:  return checkPre();
@@ -921,6 +961,55 @@ bool MomfbdJob::check(void) {
 }
 
 
+bool MomfbdJob::checkCacheUsage(void) {
+LOG_ERR << "MomfbdJob::checkCacheUsage() " << __LINE__ << ende;    
+    if( runFlags&RF_FLATFIELD ) {    // No cache usage if we are only doing flatfielding
+        return true;
+    }
+    
+    size_t estimatedNeededCache(0);
+    size_t nPatches = subImagePosXY.size();
+    if( !nPatches ) {
+        nPatches = subImagePosX.size()*subImagePosY.size();
+    }
+    for( shared_ptr<Object>& o: objects ) {
+        size_t tmp = o->patchSize + 2*o->maxLocalShift;
+        estimatedNeededCache += tmp*tmp*o->nImages();
+    }
+LOG_ERR << "MomfbdJob::checkCacheUsage() " << __LINE__ << ende;    
+    estimatedNeededCache *= nPatches;
+    
+    bfs::path cachePath( Cache::get().path() );
+    boost::system::error_code ec;
+    bfs::space_info si = bfs::space(cachePath,ec);
+    if( ec ) {
+        LOG_WARN << "Failed to check available space for path" << cachePath << ": " << ec.message()
+                 << "\n\tProceeding anyway!" << ende;
+    } else {
+        double diskFree = static_cast<double>(si.available)/si.capacity;
+        double diskFreeGB = static_cast<double>(si.available)/(1<<30);
+        double neededGB = static_cast<double>(estimatedNeededCache)/(1<<30);
+        if( si.available < estimatedNeededCache ) {
+            LOG_ERR << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
+                     << "%) free space on the cache drive (" << cachePath << ")."
+                     << " This job needs ~" << (int)neededGB << "Gb free!!." << ende;
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+
+bool MomfbdJob::checkOutputUsage(void) {
+    size_t estimatedOutputSize(0);
+    for( shared_ptr<Object>& o: objects ) {
+        estimatedOutputSize += o->estimateOutputSize();
+    }
+    return true;
+}
+
+
 bool MomfbdJob::checkCfg(void) {
     
     if( (runFlags&RF_FLATFIELD) && (runFlags&RF_CALIBRATE) ) {
@@ -932,11 +1021,51 @@ bool MomfbdJob::checkCfg(void) {
         LOG_ERR << "SIM_XY has to have an even number of entries, since it's  (x,y)-pairs." << ende;
         return false;
     }
-
-    if( objects.empty() ) return false;     // need at least 1 object
     
-    for( auto& obj: objects ) {
-        if( !obj->checkCfg() ) return false;
+    generatePatchPositions();
+
+    if( subImagePosXY.empty() && (subImagePosX.empty() || subImagePosY.empty()) ) {
+        LOG_ERR << "Patch X and/or Y positions are not specified (and autogeneration failed)." << ende;
+        return false;
+    }
+    
+    if( objects.empty() ) {
+        LOG_ERR << "The configuration file contains no objects." << ende;
+        return false;
+    }
+    
+    for( size_t i=0; i<objects.size(); ++i ) {
+        if( objects[i] ) {
+            if( objects[i]->channels.empty() ) {
+                LOG_ERR << "Object " << i << " has no channel specified." << ende;
+                return false;
+            }
+            if( !objects[i]->nImages() ) {
+                LOG_ERR << "Object " << i << " has no images." << ende;
+                return false;
+            }
+            if( !objects[i]->checkCfg() ) return false;
+        } else {
+            LOG_ERR << "Object #" << i << " is invalid." << ende;
+            return false;
+        }
+    }
+
+    boost::system::error_code ec;
+    bfs::path outDir( info.outputDir );
+    bfs::space_info si = bfs::space(outDir,ec);
+    if( ec ) {
+        LOG_WARN << "Failed to check available space for path" << outDir << ": " << ec.message()
+                 << "\n\tProceeding anyway!" << ende;
+    } else {
+        double diskFree = static_cast<double>(si.available)/si.capacity;
+        double diskFreeGB = static_cast<double>(si.available)/(1<<30);
+        if( diskFree < 0.05 || diskFreeGB < 100 ) {
+            LOG_WARN << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
+                     << "%) free space for the output data (" << outDir << ")."
+                     << "\n\tYour jobs will fail if you run out of space!!" << ende;
+            return false;
+        }
     }
 
     return true;
@@ -958,7 +1087,6 @@ bool MomfbdJob::checkPre(void) {
     if( !globalData || !globalData->verify() ) return false;
 
     for( auto& obj: objects ) {
-
         if( !obj->progWatch.verify() ) {
             return false;
         }

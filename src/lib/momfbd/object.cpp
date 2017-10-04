@@ -1361,6 +1361,57 @@ void Object::writeResults( redux::util::Array<PatchData::Ptr>& patches ) {
 }
 
 
+size_t Object::estimateOutputSizeANA( void) {
+    size_t sz( 0);
+    
+//     uint16_t maxPosX( 0);
+//     uint16_t minPosX( std::numeric_limits<uint16_t >::max() );
+//     uint16_t maxPosY = maxPosX;
+//     uint16_t minPosY = minPosX;
+// 
+//     for( unsigned int y = 0; y < patches.dimSize( 0 ); ++y ) {
+//         for( unsigned int x = 0; x < patches.dimSize( 1 ); ++x ) {
+//             const Point16& first = patches( y, x) ->roi.first;
+//             if( first.x > maxPosX ) maxPosX = first.x;
+//             if( first.x < minPosX ) minPosX = first.x;
+//             if( first.y > maxPosY ) maxPosY = first.y;
+//             if( first.y < minPosY ) minPosY = first.y;
+//             auto pPtr = patches( y, x) ->objects[ID]->img.reshape( patchSize, patchSize );
+//             patchPtrs.push_back( pPtr );
+//             patchData.push_back( pPtr.get() );
+//             xpos.push_back( first.x );
+//             ypos.push_back( first.y );
+//         }
+//     }
+//    
+//     size_t imgCols = maxPosX+patchSize;
+//     size_t imgRows = maxPosY+patchSize;
+    return sz;
+}
+
+size_t Object::estimateOutputSizeFITS( void) {
+    return 0;
+}
+size_t Object::estimateOutputSizeMOMFBD( void) {
+    return 0;
+}
+
+size_t Object::estimateOutputSize( void) {
+    size_t sz( 0);
+    if( myJob.outputFileType & FT_ANA ) {
+        sz += estimateOutputSizeANA();
+    }
+    if( myJob.outputFileType & FT_FITS ) {
+        sz += estimateOutputSizeFITS();
+    }
+    if( myJob.outputFileType & FT_MOMFBD ) {
+        sz += estimateOutputSizeMOMFBD();
+    }
+    return sz;
+}
+
+
+
 Point16 Object::getImageSize( void ){
     if( imgSize == 0 ){
         for( auto& ch : channels ){

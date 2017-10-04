@@ -89,8 +89,14 @@ namespace redux {
             
             bool mayBeDeleted(void);
             
+            size_t memUsage(void);       //!< Approximate current memory usage of this job
+            size_t diskUsage(void);      //!< Approximate current disk usage of this job
+            size_t procUsage(void);      //!< Approximate memory usage for processing 1 part
+        
             bool active(void);
             bool check(void);
+            bool checkCacheUsage(void);
+            bool checkOutputUsage(void);
             bool checkCfg(void);
             bool checkData(void);
             bool checkPre(void);
@@ -103,6 +109,7 @@ namespace redux {
         private:
 
             uint16_t checkParts( void );
+            void generatePatchPositions(void);
             void unloadCalib( boost::asio::io_service& );
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );
