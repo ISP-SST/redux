@@ -1,13 +1,14 @@
 #include "redux/util/cache.hpp"
 
+#include <redux/file/fileio.hpp>
 
 #include <iostream>
 #include <memory>
 
 
+using namespace redux::file;
 using namespace redux::util;
 using namespace std;
-
 
 void Cache::cleanup(void) {
     for( auto& func: get().cleanup_funcs ) {
@@ -77,9 +78,9 @@ void CacheItem::cacheClear(void) {
         cclear();
         isLoaded = false;
     } catch( exception& e ) {
-        cerr << "CacheItem::cacheClear() failed: " << e.what() << endl;
-    } catch( ... ) {
-        cerr << "CacheItem::cacheClear() failed for unknown reasons." << endl;
+        if( errorHandling == EH_PRINT ) {
+            cerr << "CacheItem::cacheClear() failed: " << e.what() << endl;
+        } else throw;
     }
     
 }
@@ -91,9 +92,9 @@ void CacheItem::cacheRemove(void) {
     try {
         bfs::remove(fullPath);
     } catch( exception& e ) {
-        cerr << "CacheItem::cacheRemove() failed: " << e.what() << endl;
-    } catch( ... ) {
-        cerr << "CacheItem::cacheRemove() failed for unknown reasons." << endl;
+        if( errorHandling == EH_PRINT ) {
+            cerr << "CacheItem::cacheRemove() failed: " << e.what() << endl;
+        } else throw;
     }
     
 }
@@ -111,7 +112,6 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
     try {
         unique_lock<mutex> lock(itemMutex);
         if( fullPath.empty() ) {
-            //cout << "Not loading b.c. non-existing: " << fullPath << endl;
             return ret;
         }
 
@@ -132,15 +132,14 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                     }
                 }
             }
-        } //else cout << "Not loading b.c. loaded: " << fullPath << endl;
-
+        }
         if( isLoaded && removeAfterLoad ) {
             bfs::remove(fullPath);
         }
     } catch( exception& e ) {
-        cerr << "CacheItem::cacheLoad() failed: " << e.what() << endl;
-    } catch( ... ) {
-        cerr << "CacheItem::cacheLoad() failed for unknown reasons." << endl;
+        if( errorHandling == EH_PRINT ) {
+            cerr << "CacheItem::cacheLoad() failed: " << e.what() << endl;
+        } else throw;
     }
     
     return ret;
@@ -172,16 +171,15 @@ bool CacheItem::cacheStore(bool clearAfterStore){
                     ret = true;
                 }
             }
-        } //else cout << "Not storing b.c. not loaded: " << fullPath << endl;
-        
+        }
         if(ret && clearAfterStore) {
             cclear();
             isLoaded = false;
         }
     } catch( exception& e ) {
-        cerr << "CacheItem::cacheStore() failed: " << e.what() << endl;
-    } catch( ... ) {
-        cerr << "CacheItem::cacheStore() failed for unknown reasons." << endl;
+        if( errorHandling == EH_PRINT ) {
+            cerr << "CacheItem::cacheStore() failed: " << e.what() << endl;
+        } else throw;
     }
     
     return ret;

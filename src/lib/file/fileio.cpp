@@ -14,6 +14,8 @@ using namespace redux::file;
 using namespace redux::util;
 using namespace std;
 
+ErrorHandling redux::file::errorHandling = EH_PRINT;
+
 namespace {
 
     mutex fileMutex;
@@ -98,7 +100,7 @@ void redux::file::getOrRead( const string& fn, shared_ptr<T>& data ) {
 
     //static auto& cache = getFileCache<T>();
 
-    cout << "redux::file::getOrRead(" << fn << ")     "  << endl;
+    cout << "getOrRead(" << fn << ")     "  << endl;
 
    // future<shared_ptr<T>> async( getFile<T>, fn, 100 );
 
@@ -120,7 +122,7 @@ void redux::file::getOrRead( const string& fn, shared_ptr<T>& data ) {
 template <typename T>
 void redux::file::getOrRead2( const string& fn, shared_ptr<redux::image::Image<T>>& im ) {
 //void redux::file::getOrRead(const string& fn, redux::image::Image<T>::Ptr& im) {
-    cout << "redux::file::getOrRead2(" << fn << ")" << endl;
+    cout << "getOrRead2(" << fn << ")" << endl;
 }
 
 template void redux::file::getOrRead( const string&, typename redux::image::Image<int16_t>::Ptr& );
@@ -151,7 +153,11 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
         }
 #endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-        default: cout << "file::getMeta(arr) needs to be implemented for this file-type: " << fmt << "   \"" << fn << "\""  << endl;
+        default: {
+            string msg = "getMeta(arr) needs to be implemented for this file-type: " + to_string(fmt)
+                       + "   \"" + fn + "\"";
+            throw runtime_error(msg);
+        }
     }
     
     return move(meta);
@@ -161,34 +167,49 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
 
 void redux::file::readFile( const string& filename, char* data, shared_ptr<FileMeta>& meta ) {
 
-    Format fmt = readFmt(filename);
-    switch(fmt) {
-        case FMT_ANA: {
-            if( !meta ) {
-                meta.reset( new Ana() );
+    try {
+        Format fmt = readFmt(filename);
+        switch(fmt) {
+            case FMT_ANA: {
+                if( !meta ) {
+                    meta.reset( new Ana() );
+                }
+                shared_ptr<Ana> hdr = static_pointer_cast<Ana>(meta);
+                if( hdr ) {
+                    Ana::read( filename, data, hdr );
+                } else {
+                    string msg = "readFile(string,char*,shared_ptr<FileMeta>&) failed to cast meta-pointer into Ana type.";
+                    throw runtime_error(msg);
+                }
+                break;
             }
-            shared_ptr<Ana> hdr = static_pointer_cast<Ana>(meta);
-            if( hdr ) {
-                Ana::read( filename, data, hdr );
-            } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Ana type." << endl;
-            break;
-        }
 #ifdef REDUX_WITH_FITS
-        case FMT_FITS: {
-            shared_ptr<Fits> hdr;
-            if( !meta ) {
-                hdr.reset( new Fits() );
-                meta = static_pointer_cast<FileMeta>(hdr);
-            } else hdr = static_pointer_cast<Fits>(meta);
-            if( hdr ) {
-                hdr->read( filename );
-                Fits::read( hdr, data );
-            } else cout << "file::readFile(string,char*,meta) failed to cast meta-pointer into Fits type." << endl;
-            break;
-        }
+            case FMT_FITS: {
+                if( !meta ) {
+                    meta.reset( new Fits() );
+                }
+                shared_ptr<Fits> hdr = static_pointer_cast<Fits>(meta);
+                if( hdr ) {
+                    hdr->read( filename );
+                    Fits::read( hdr, data );
+                } else {
+                    string msg = "readFile(string,char*,shared_ptr<FileMeta>&) failed to cast meta-pointer into Fits type.";
+                    throw runtime_error(msg);
+                }
+                break;
+            }
 #endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-        default: cout << "file::readFile(string,char*,meta) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\"" << endl;
+            default: {
+                string msg = "readFile(string,char*,shared_ptr<FileMeta>&) needs to be implemented for this file-type: " + to_string(fmt)
+                           + "   \"" + filename + "\"";
+                throw runtime_error(msg);
+            }
+        }
+    } catch ( std::exception& e ) {
+        if( errorHandling == EH_PRINT ) {
+            cerr << "FileIO Error: " << e.what() << endl;
+        } else throw;
     }
 
 
@@ -196,24 +217,34 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
 
 template <typename T>
 void redux::file::readFile( const string& filename, redux::util::Array<T>& data ) {
-    Format fmt = readFmt(filename);
-    switch(fmt) {
-        case FMT_ANA: {
-            shared_ptr<Ana> hdr(new Ana());
-            Ana::read(filename,data,hdr);
-            break;
-        }
+    
+    try {
+        Format fmt = readFmt(filename);
+        switch(fmt) {
+            case FMT_ANA: {
+                shared_ptr<Ana> hdr(new Ana());
+                Ana::read(filename,data,hdr);
+                break;
+            }
 #ifdef REDUX_WITH_FITS
-        case FMT_FITS: {
-            shared_ptr<Fits> hdr(new Fits());
-            Fits::read(filename,data,hdr);
-            break;
-        }
+            case FMT_FITS: {
+                shared_ptr<Fits> hdr(new Fits());
+                Fits::read(filename,data,hdr);
+                break;
+            }
 #endif
-        //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-        default: cout << "file::read(arr) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
+            //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
+            default: {
+                string msg = "readFile(str,Array<T>) needs to be implemented for this file-type: " + to_string(fmt)
+                           + "   \"" + filename + "\"";
+                throw runtime_error(msg);
+            }
+        }
+    } catch ( std::exception& e ) {
+        if( errorHandling == EH_PRINT ) {
+            cerr << "FileIO Error: " << e.what() << endl;
+        } else throw;
     }
-
 
 }
 template void redux::file::readFile( const string& filename, redux::util::Array<uint8_t>& data );
@@ -226,16 +257,26 @@ template void redux::file::readFile( const string& filename, redux::util::Array<
 
 template <typename T>
 void redux::file::readFile( const string& filename, redux::image::Image<T>& image, bool metaOnly ) {
-    Format fmt = readFmt(filename);
-    switch(fmt) {
-        case FMT_ANA: Ana::read(filename, image, metaOnly); break;
+    
+    try {
+        Format fmt = readFmt(filename);
+        switch(fmt) {
+            case FMT_ANA: Ana::read(filename, image, metaOnly); break;
 #ifdef REDUX_WITH_FITS
-        case FMT_FITS: Fits::read(filename, image, metaOnly); break;
+            case FMT_FITS: Fits::read(filename, image, metaOnly); break;
 #endif
-        //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-        default: cout << "file::read(img) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
+            //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
+            default: {
+                string msg = "readFile(string,Image<T>,bool) needs to be implemented for this file-type: " + to_string(fmt)
+                           + "   \"" + filename + "\"";
+                throw runtime_error(msg);
+            }
+        }
+    } catch ( std::exception& e ) {
+        if( errorHandling == EH_PRINT ) {
+            cerr << "FileIO Error: " << e.what() << endl;
+        } else throw;
     }
-
 
 }
 template void redux::file::readFile( const string& filename, redux::image::Image<uint8_t>& data, bool );
@@ -248,14 +289,25 @@ template void redux::file::readFile( const string& filename, redux::image::Image
 
 template <typename T>
 void redux::file::writeFile( const string& filename, redux::util::Array<T>& data ) {
-    Format fmt = guessFmt(filename);
-    switch(fmt) {
-        case FMT_ANA: Ana::write(filename, data); break;
+    
+    try {
+        Format fmt = guessFmt(filename);
+        switch(fmt) {
+            case FMT_ANA: Ana::write(filename, data); break;
 #ifdef REDUX_WITH_FITS
-        case FMT_FITS: Fits::write(filename, data); break;
+            case FMT_FITS: Fits::write(filename, data); break;
 #endif
-        //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-        default: cout << "file::write(arr) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
+            //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
+            default: {
+                string msg = "writeFile(string,Array<T>) needs to be implemented for this file-type: " + to_string(fmt)
+                           + "   \"" + filename + "\"";
+                throw runtime_error(msg);
+            }
+        }
+    } catch ( std::exception& e ) {
+        if( errorHandling == EH_PRINT ) {
+            cerr << "FileIO Error: " << e.what() << endl;
+        } else throw;
     }
 
 
@@ -270,14 +322,25 @@ template void redux::file::writeFile( const string& filename, redux::util::Array
 
 template <typename T>
 void redux::file::writeFile( const string& filename, redux::image::Image<T>& image ) {
-    Format fmt = guessFmt(filename);
-    switch(fmt) {
-        case FMT_ANA: Ana::write(filename, image); break;
+    
+    try {
+        Format fmt = guessFmt(filename);
+        switch(fmt) {
+            case FMT_ANA: Ana::write(filename, image); break;
 #ifdef REDUX_WITH_FITS
-        case FMT_FITS: Fits::write(filename, image); break;
+            case FMT_FITS: Fits::write(filename, image); break;
 #endif
-        //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-        default: cout << "file::write(img) needs to be implemented for this file-type: " << fmt << "   \"" << filename << "\""  << endl;
+            //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
+            default: {
+                string msg = "writeFile(string,Image<T>) needs to be implemented for this file-type: " + to_string(fmt)
+                           + "   \"" + filename + "\"";
+                throw runtime_error(msg);
+            }
+        }
+    } catch ( std::exception& e ) {
+        if( errorHandling == EH_PRINT ) {
+            cerr << "FileIO Error: " << e.what() << endl;
+        } else throw;
     }
 
 
@@ -328,6 +391,8 @@ void redux::file::loadFiles( const vector<string>& filenames, char* out, size_t 
     
     atomic<size_t> imgIndex(0);
 
+    mutex mtx;
+    list<string> msgs;
     vector<thread> threads;
     for( uint8_t i=0; i<nThreads; ++i ) {
         threads.push_back( std::thread(
@@ -336,17 +401,31 @@ void redux::file::loadFiles( const vector<string>& filenames, char* out, size_t 
                 shared_ptr<FileMeta> myMeta;
                 while( (myIndex=imgIndex.fetch_add(1)) < nImages ) {
                     char* myPtr = out + myIndex*frameSize;
+                    string fn;
+                    {
+                        lock_guard<mutex> lock(mtx);
+                        fn = filenames[myIndex];
+                    }
                     try {
-                        readFile( filenames[myIndex], myPtr, myMeta );
+                        readFile( fn, myPtr, myMeta );
                         postLoad( myPtr, myIndex, myMeta );
                     } catch (const exception& e ) {
-                        printProgress( "\nloadFiles: " + string(e.what()) + " at file #" + to_string(myIndex) + "\n", -1);  // print via mutex
+                        string msg = "file #" + to_string(myIndex) + "\"" + fn + "\": " + e.what();  
                         memset( myPtr, 0, frameSize );  // zero image and continue.
+                        lock_guard<mutex> lock(mtx);
+                        msgs.push_back( msg );
                     }
                 }
             }));
     }
     for (auto& th : threads) th.join();
+    if( msgs.size() ) {
+        string msg = "FileIO Error: loadFiles(vector<string>,char*,size_t,uint8_t,callback_t)";
+        for( auto& m: msgs ) msg += "\n\t  " + m;
+        if( errorHandling == EH_PRINT ) {
+            cerr << msg << endl;
+        } else throw runtime_error( msg );
+    }
 }
 
 

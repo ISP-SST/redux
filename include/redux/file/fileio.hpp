@@ -57,8 +57,10 @@ namespace redux {
                        postLoadCallback postLoad = postLoadCallback() );
         void sumFiles( const std::vector<std::string>& fn, double* out, size_t frameSize, uint8_t nThreads=std::thread::hardware_concurrency(),
                        preSumCallback preSum = preSumCallback() );
-
-
+        
+        enum ErrorHandling { EH_PRINT=1, EH_THROW };
+        extern ErrorHandling errorHandling;         //<! Specify if routines should throw or print errors. Default is EH_PRINT;
+        inline void setErrorHandling( ErrorHandling eh ) { errorHandling = eh; }
 
 
 //std::shared_ptr<Image>
