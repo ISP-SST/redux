@@ -407,6 +407,11 @@ void SubImage::resetPhi(void) {
 }
 
 
+void SubImage::zeroPhi(void) {
+    memset( phi.get(), 0, pupilSize2*sizeof(double) );
+}
+
+
 void SubImage::alignAgainst( const Ptr& refIm ) {
 
     if( !refIm ) {
@@ -557,13 +562,11 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale)
     const double* phiPtr = phi.get();
     const double* pupilPtr = object.pupil.get();
     
-    double normalization = sqrt(1.0 / object.pupil.area);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-
     for (auto & ind : object.pupil.pupilInOTF) {
 #ifdef USE_LUT
-        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
+        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
 #else
-        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
+        otfPtr[ind.second] = polar(pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
 #endif
     }
 
@@ -580,14 +583,12 @@ void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
     memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
 
     const double* pupilPtr = object.pupil.get();
-    double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-    //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
 
     for( auto& ind : object.pupil.pupilInOTF ) {
 #ifdef USE_LUT
-        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
+        otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]);
 #else
-        otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]);
+        otfPtr[ind.second] = polar(pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]);
 #endif
     }
     
@@ -613,16 +614,14 @@ void SubImage::calcPFOTF(void) {
     memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
     
     const double* pupilPtr = object.pupil.get();
-    double normalization = sqrt(1.0 / object.pupil.area / otfSize2);   // normalize OTF by pupil-area (sqrt since the autocorrelation squares the OTF)
-    //double normalization = 1.0; // / object.pupil.area;   // normalize OTF by pupil-area
-
+    
     for( const auto& ind: object.pupil.pupilInOTF ) {
 #ifdef USE_LUT
         pfPtr[ind.first] = getPolar( pupilPtr[ind.first], phiPtr[ind.first]);
 #else
         pfPtr[ind.first] = polar(pupilPtr[ind.first], phiPtr[ind.first]);
 #endif
-        otfPtr[ind.second] = normalization*pfPtr[ind.first];
+        otfPtr[ind.second] = channel.otfNormalization*pfPtr[ind.first];
     }
 
     Solver::tmp.OTF.ft( otfPtr );

@@ -754,7 +754,18 @@ void Channel::initPatch (ChannelData& cd) {
             });
     }
 
-    
+    otfNormalization = 1;       // measure the normalization (because calculating it as sqrt(1.0 / object.pupil.area / otfSize2) is a bit inaccurate)
+    if( !subImages.empty() && subImages[0] ) {
+        subImages[0]->zeroPhi();
+        subImages[0]->calcPFOTF();
+        complex_t* otfPtr = subImages[0]->OTF.get();
+        double otfMax(0);
+        pupilSize2 *= 4;    // OTF-size is 2 x pupilSize
+        for( size_t i(0); i<pupilSize2; ++i ){
+            otfMax = max(otfMax,abs(otfPtr[i]));
+        }
+        otfNormalization = 1.0/sqrt(otfMax);
+    }
 }
 
 

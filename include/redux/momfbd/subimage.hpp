@@ -76,6 +76,7 @@ namespace redux {
             void resetShifts( void );
             
             void resetPhi(void);
+            void zeroPhi(void);
             template <typename T> void addToPhi(const T* a, double* phiPtr) const;
             template <typename T> void addToPhi(const T* a) { addToPhi( a, phi.get() ); }
             template <typename T> void calcPhi( const T* a, double* phiPtr ) const;

@@ -113,6 +113,7 @@ namespace redux {
             std::vector<std::shared_ptr<SubImage>> subImages;
             redux::util::Array<double> phi_fixed;                           //!< The fixed aberrations for this channel (i.e. phase diversity)
             redux::util::Array<double> phi_channel;                         //!< The fixed part + tilt-corrections for this channel
+            double otfNormalization;
             /*****************************************************/
             
             uint16_t ID;
