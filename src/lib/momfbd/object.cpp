@@ -1097,8 +1097,8 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     // Extract date/time from the git commit.
     int day, month, year, hour;
     char buffer [15];
-    sscanf( reduxCommitTime, "%4d-%2d-%2d %2d", &year, &month, &day, &hour );
-    sprintf( buffer, "%4d%02d%02d.%01d", year, month, day, hour );
+    sscanf (reduxCommitTime, "%4d-%2d-%2d %2d", &year, &month, &day, &hour);
+    snprintf( buffer, 15, "%4d%02d%02d.%01d", year, month, day, hour );
     info->versionString = buffer;
     info->version = atof( info->versionString.c_str( ) );
 
@@ -1186,7 +1186,6 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
 
     size_t modeSize = tmpModes.nElements()*sizeof( float );
     size_t blockSize = modeSize;
-//LOG << "Obj " << ID << "  modeSize = " << modeSize << printArray(tmpModes.dimensions(), " modeDims" )<< ende;
     for( int x = 0; x < info->nPatchesX; ++x ){
         for( int y = 0; y < info->nPatchesY; ++y ){
             PatchData::Ptr thisPatch = patchesData(y,x );
@@ -1242,9 +1241,6 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         }   // y-loop
     }   // x-loop
 
-//Ana::write( "patch_"+(string)data->index+"_obj_"+to_string(objData->myObject->ID)+"_result.f0", objData->img );
-//LOG << "Obj " << ID << "  writeMask = " << bitString(writeMask )<< ende;
-//Array<float> wrap;
     auto tmp = sharedArray<char>( blockSize );
     memcpy(tmp.get(), tmpModes.get(), modeSize );
     char* tmpPtr = tmp.get( );
@@ -1254,17 +1250,11 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
             PatchData::Ptr thisPatch = patchesData(y,x );
             if( thisPatch && ID < thisPatch->objects.size( ) ){
                 auto &objData = thisPatch->objects[ID];
-//LOG << "Obj " << ID << "  patch = " <<( string)thisPatch->index << " offset: " << offset << " imgSize: " << imgSize << " patchSize: " << patchSize << ende;
-//Ana::write( "patch_"+(string)thisPatch->index+"_obj_"+to_string(ID)+"_fresult.f0", objData->img );
-//wrap.wrap(objData->img.get(),patchSize,patchSize );
-//Ana::write( "patch_"+(string)thisPatch->index+"_obj_"+to_string(ID)+"_gresult.f0", objData->img );
                 if( objData->img.nElements( ) ){
                     memcpy(tmpPtr+offset, objData->img.get(), imgSize );
                 } else {
                     memset(tmpPtr+offset, 0, imgSize );
                 }
-//wrap.wrap(reinterpret_cast<float*>(tmpPtr+offset),patchSize,patchSize );
-//Ana::write( "patch_"+(string)thisPatch->index+"_obj_"+to_string(ID)+"_hresult.f0", objData->img );
                 info->patches(x,y).imgPos = offset;
                 offset += imgSize;
                 if( objData->psf.nElements( ) ){
@@ -1304,11 +1294,10 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                 }
                 info->patches(x,y).diversityPos = offset;
                 offset += divSize;
-            } else LOG_ERR << "NullPatch or index out-of-bounds:  id=" << ID << ende;
+            }
         }
     }
 
-//LOG << "Obj " << ID << "  data = " << hexString(tmp.get() )<< ende;
     info->write( fn.string(), reinterpret_cast<char*>( tmp.get()), writeMask );
     ++progWatch;
     

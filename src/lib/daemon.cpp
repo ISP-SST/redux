@@ -118,7 +118,7 @@ void Daemon::maintenance( void ) {
     updateLoadAvg();
     checkSwapSpace();
     cleanup();
-    checkCurrentUsage();
+    //checkCurrentUsage();
     logger.flushAll();
     updateStatus();   // TODO: use a secondary connection for auxiliary communications
     timer.expires_from_now( boost::posix_time::seconds( 5 ) );
@@ -129,17 +129,19 @@ void Daemon::maintenance( void ) {
 
 void Daemon::checkSwapSpace( void ) {
     bfs::path cachePath( Cache::get().path() );
-    boost::system::error_code ec;
-    bfs::space_info si = bfs::space(cachePath,ec);
-    if( ec ) {
-        LOG_ERR << "checkSwapSpace failed for path" << cachePath<< ": " << ec.message() << ende;
-    } else {
-        double diskFree = static_cast<double>(si.available)/si.capacity;
-        double diskFreeGB = static_cast<double>(si.available)/(1<<30);
-        if( diskFree < 0.05 || diskFreeGB < 100 ) {
-            LOG_WARN << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
-                     << "%) free space on the cache drive (" << cachePath << ")."
-                     << "\n\tYour jobs will fail if you run out of space!!" << ende;
+    if( !cachePath.empty() && bfs::exists(cachePath) ) {
+        boost::system::error_code ec;
+        bfs::space_info si = bfs::space(cachePath,ec);
+        if( ec ) {
+            LOG_ERR << "checkSwapSpace failed for path" << cachePath<< ": " << ec.message() << ende;
+        } else {
+            double diskFree = static_cast<double>(si.available)/si.capacity;
+            double diskFreeGB = static_cast<double>(si.available)/(1<<30);
+            if( diskFree < 0.05 || diskFreeGB < 100 ) {
+                LOG_WARN << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
+                         << "%) free space on the cache drive (" << cachePath << ")."
+                         << "\n\tYour jobs will fail if you run out of space!!" << ende;
+            }
         }
     }
 }
@@ -151,8 +153,8 @@ void Daemon::checkCurrentUsage( void ) {
         if( !job ) continue;
         size_t memUsage = job->memUsage();
         size_t diskUsage = job->diskUsage();
-        LOG << "Job " << job->info.id << " (" << job->info.name << ")  memUsage = " << memUsage
-            << "  diskUsage = " << diskUsage << ende;
+        LOG << "Job " << job->info.id << " (" << job->info.name << "), memUsage = " << static_cast<double>(memUsage)/(1<<30)
+            << " Gb, diskUsage = " << static_cast<double>(diskUsage)/(1<<30) << " Gb" << ende;
         //LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
 
     }

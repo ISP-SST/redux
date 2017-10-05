@@ -656,7 +656,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         
     }       // end RF_FLATFIELD
 
-    for( auto& obj : objects ) {
+    for( shared_ptr<Object>& obj : objects ) {
         obj->loadData( service, nThreads, patches );
     }
     
@@ -834,7 +834,7 @@ void MomfbdJob::loadPatchResults( boost::asio::io_service& service, uint16_t nTh
 
     for( auto& patch: patches ) {
         service.post( [this,patch](){
-            patch->cacheLoad(false); //true);        // load and erase cache-file.
+            patch->cacheLoad(false);
             ++progWatch;
         });
     }
@@ -1053,6 +1053,15 @@ bool MomfbdJob::checkCfg(void) {
 
     boost::system::error_code ec;
     bfs::path outDir( info.outputDir );
+    
+    if( !outDir.empty() && !bfs::exists(outDir) ){
+        if( !bfs::create_directories(outDir,ec) ){
+            LOG_FATAL << boost::format( "output directory %s not writable: %s" ) % outDir % ec.message() << ende;
+            return false;
+        } else LOG_TRACE << boost::format( "created output directory %s" ) % outDir << ende;
+    }
+
+    
     bfs::space_info si = bfs::space(outDir,ec);
     if( ec ) {
         LOG_WARN << "Failed to check available space for path" << outDir << ": " << ec.message()
