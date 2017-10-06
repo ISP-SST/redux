@@ -33,14 +33,15 @@ void Worker::start( void ) {
 
     for( uint16_t t=0; t < myInfo.status.nThreads+1; ++t ) {
         pool.create_thread( [&,t](){
-            while( running_ ) {
+            while( true ) {
                 try {
+                    boost::this_thread::interruption_point();
                     ioService.run();
                 } catch( job_error& e ) {
                     LLOG_ERR(daemon.logger) << "Job error: " << e.what() << ende;
                 } catch( const boost::thread_interrupted& ) {
-                    LLOG_DEBUG(daemon.logger) << "Worker: Thread interrupted."  << ende;
-                    return;
+                    LLOG_TRACE(daemon.logger) << "Worker: Thread interrupted." << ende;
+                    break;
                 } catch( exception& e ) {
                     LLOG_ERR(daemon.logger) << "Exception in thread: " << e.what() << ende;
                 } catch( ... ) {
@@ -60,10 +61,10 @@ void Worker::start( void ) {
 void Worker::stop( void ) {
 
     running_ = false;
+    pool.interrupt_all();
     workLoop.reset();
     ioService.stop();
     runTimer.cancel();
-    pool.interrupt_all();
     pool.join_all();
     wip.reset();
 
@@ -151,6 +152,7 @@ bool Worker::getWork( void ) {
             wip->job->logger.flushAll();
         }
     
+        boost::this_thread::interruption_point();
         if( running_ ) {
             if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
                 if( wip->previousJob.expired() ) {                                  // initialize if it is a new job.
@@ -186,6 +188,7 @@ bool Worker::getWork( void ) {
     wip->parts.clear();
     
     myInfo.idle();
+    boost::this_thread::interruption_point();
     return false;
 
 }
@@ -258,7 +261,7 @@ void Worker::run( const boost::system::error_code& error ) {
         }
         catch( const boost::thread_interrupted& ) {
             LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;
-            return;
+            throw;
         }
         catch( const exception& e ) {
             LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;
@@ -269,13 +272,13 @@ void Worker::run( const boost::system::error_code& error ) {
     }
 
     if( running_ ) {
+        boost::this_thread::interruption_point();
         runTimer.expires_from_now( boost::posix_time::seconds(sleepS) );
         runTimer.async_wait( strand.wrap(std::bind( &Worker::run, this, placeholders::_1 )) );
         if( sleepS < 4 ) {
             sleepS <<= 1;
         }
     } else if( exitWhenDone_ ) {
-        running_ = false;
         workLoop.reset();
         ioService.stop();
         daemon.stop();

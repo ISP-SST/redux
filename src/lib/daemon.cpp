@@ -106,7 +106,6 @@ void Daemon::stop( void ) {
     }
     ioService.stop();
     pool.interrupt_all();
-
 }
 
 
@@ -137,7 +136,7 @@ void Daemon::checkSwapSpace( void ) {
         } else {
             double diskFree = static_cast<double>(si.available)/si.capacity;
             double diskFreeGB = static_cast<double>(si.available)/(1<<30);
-            if( diskFree < 0.05 || diskFreeGB < 100 ) {
+            if(false)if( diskFree < 0.05 || diskFreeGB < 100 ) {
                 LOG_WARN << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
                          << "%) free space on the cache drive (" << cachePath << ")."
                          << "\n\tYour jobs will fail if you run out of space!!" << ende;
@@ -1131,9 +1130,7 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     Command reply = CMD_ERR;            // return err unless everything seems fine.
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    if( blockSize == 0 ) {
-        LOG_ERR << "Received empty result." << ende;
-    } else {
+    if( blockSize ) {
         unique_lock<mutex> lock( peerMutex );
         Host::Ptr host = connections[conn];
         if( !host ) {

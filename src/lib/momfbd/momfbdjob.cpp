@@ -935,13 +935,11 @@ bool MomfbdJob::check(void) {
     uint16_t step = info.step;
     switch (step) {
         case JSTEP_NONE: {
-LOG << "check(): " << __LINE__ << ende;
             ret = checkCfg();// && checkCacheUsage();
             if(ret) info.step = JSTEP_SUBMIT;
             break;
         }
         case JSTEP_SUBMIT: {
-LOG << "check(): " << __LINE__ << ende;
             ret = checkData() && checkCacheUsage();
             if(ret) info.step = JSTEP_CHECKED;
             break;
@@ -1069,7 +1067,7 @@ bool MomfbdJob::checkCfg(void) {
     } else {
         double diskFree = static_cast<double>(si.available)/si.capacity;
         double diskFreeGB = static_cast<double>(si.available)/(1<<30);
-        if( diskFree < 0.05 || diskFreeGB < 100 ) {
+        if (false) if( diskFree < 0.05 || diskFreeGB < 100 ) {
             LOG_WARN << "Only " << (int)diskFreeGB << "Gb (" << (int)(diskFree*100)
                      << "%) free space for the output data (" << outDir << ")."
                      << "\n\tYour jobs will fail if you run out of space!!" << ende;

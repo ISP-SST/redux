@@ -423,6 +423,7 @@ void Solver::run( PatchData::Ptr data ) {
 
         do {
             iter++;
+            boost::this_thread::interruption_point();
             status = gsl_multimin_fdfminimizer_iterate( s );
             if( failCount > maxFails ) {
                 LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")" << ende;

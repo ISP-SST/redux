@@ -50,16 +50,15 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
     received = 0;
 
     char sz[sizeof(uint64_t)];
-    //boost::system::error_code ec;
+    boost::system::error_code ec;
     uint64_t count;
-    //try {
-        count = boost::asio::read( socket(), boost::asio::buffer(sz, sizeof(uint64_t)) ); //, ec );
-    //} catch( const exception& ) {
+    try {
+        count = boost::asio::read( socket(), boost::asio::buffer(sz, sizeof(uint64_t)), ec );
+    } catch( const exception& ) {
         //LOG_ERR << "TcpConnection::receiveBlock(" << hexString(this) << ")  failed to receive blockSize.  error: " + ec.message();
         //cerr << "TcpConnection::receiveBlock(" << hexString(this) << ")  Failed to receive blockSize.  error: " + ec.message() << endl;
-    //    return buf;
-    //}
-
+        return buf;
+    }
 
     unpack( sz, blockSize, swapEndian_ );
     if( blockSize == 0 ) return buf;
@@ -69,14 +68,23 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
     int64_t remain = blockSize;
     while( remain > 0 ) {
         try {
-            count = boost::asio::read( socket(), boost::asio::buffer(buf.get()+received,remain), boost::asio::transfer_at_least(1) );
+            count = boost::asio::read( socket(), boost::asio::buffer(buf.get()+received,remain), boost::asio::transfer_at_least(1), ec );
+            if( count == 0 ) {
+                if( ec == boost::asio::error::eof || !mySocket.is_open() ) break;
+            }
             received += count;
             remain -= count;
         }
         catch( const exception& ) {
-            // ignore and continue.  TODO: make it safer
+            // ignore and continue. Connection errors are dealt with above.
         }
     }
+    
+    if( remain ) {  // connection severed before completion, clear partial transfer.
+        buf.reset();
+        received = 0;
+    }
+    
     return buf;
 
 }

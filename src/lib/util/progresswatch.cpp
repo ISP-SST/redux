@@ -2,8 +2,10 @@
 
 #include "redux/util/stringutil.hpp"
 
+#include <chrono>
 
 #include <boost/format.hpp>
+#include <boost/thread.hpp>
 
 using namespace redux::util;
 using namespace std;
@@ -61,7 +63,9 @@ void ProgressWatch::wait(void) {
     
     unique_lock<mutex> lock(mtx);
     while( !completed_ ) {
-        cv.wait(lock);
+        boost::this_thread::interruption_point();
+        auto now = std::chrono::system_clock::now();
+        cv.wait_until( lock, now + chrono::duration<int>(1) );
     }
 
 }
