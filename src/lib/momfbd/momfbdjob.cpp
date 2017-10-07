@@ -960,7 +960,7 @@ bool MomfbdJob::check(void) {
 
 
 bool MomfbdJob::checkCacheUsage(void) {
-LOG_ERR << "MomfbdJob::checkCacheUsage() " << __LINE__ << ende;    
+ 
     if( runFlags&RF_FLATFIELD ) {    // No cache usage if we are only doing flatfielding
         return true;
     }
@@ -974,7 +974,7 @@ LOG_ERR << "MomfbdJob::checkCacheUsage() " << __LINE__ << ende;
         size_t tmp = o->patchSize + 2*o->maxLocalShift;
         estimatedNeededCache += tmp*tmp*o->nImages();
     }
-LOG_ERR << "MomfbdJob::checkCacheUsage() " << __LINE__ << ende;    
+   
     estimatedNeededCache *= nPatches;
     
     bfs::path cachePath( Cache::get().path() );
