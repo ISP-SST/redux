@@ -1,5 +1,6 @@
 #include "redux/momfbd/data.hpp"
 
+#include "redux/logging/logger.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/solver.hpp"
 
@@ -7,6 +8,7 @@
 #include "redux/image/utils.hpp"
 
 using namespace redux::file;
+using namespace redux::logging;
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::util;
@@ -20,7 +22,11 @@ ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
 
 
 ChannelData::~ChannelData() {
-    cacheRemove();        // remove cache file
+    try {
+        cacheRemove();        // remove cache file
+    } catch( exception& e ) {
+        LLOG(myChannel->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
+    }
     cclear();
 }
 
@@ -119,7 +125,11 @@ ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
 
 
 ObjectData::~ObjectData() {
-    cacheRemove();        // remove cache file
+    try {
+        cacheRemove();        // remove cache file
+    } catch( exception& e ) {
+        LLOG(myObject->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
+    }
     cclear();
 }
 
