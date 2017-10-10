@@ -26,7 +26,7 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "rsub";
+    const string logChannel = "rdx_sub";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
@@ -35,20 +35,19 @@ namespace {
         options.add_options()
         ( "master,m", bpo::value<string>()->default_value( "localhost" ),
           "Hostname/IP of a master to connect to."
-          " The environment variable RDX_MASTER can be used to override the default value." )
+          " The environment variable RDX_HOST can be used to override the default value." )
         ( "port,p", bpo::value<string>()->default_value( "30000" ),
           "Port to use when connecting to a master."
           " The environment variable RDX_PORT can be used to override the default value." )
         ( "priority", bpo::value<int>()->default_value( 10 ), "Job priority" )
         ( "reg_alpha", bpo::value<float>(), "REG_ALPHA override" )
         ( "force,f", "Overwrite output file if exists" )
-        ( "kill,k", "Send exit command to Server." )
         ( "swap,s", "swap mode: write auxiliary data to files instead of keeping it in memory (compatibility flag, always enabled)" )
         ( "config,c", bpo::value< vector<string> >()->multitoken(), "Configuration file(s) to process." )
         ( "name", bpo::value<string>(), "Name to use for the supplied configurations." )
         ( "simxy", bpo::value<string>(), "(x,y) coordinate[s] of subimages to restore" )
-        ( "simx", bpo::value<string>(), "x coordinate[s] of subimages to restore" )
-        ( "simy", bpo::value<string>(), "y coordinate[s] of subimages to restore" )
+        ( "simx", bpo::value<string>()->implicit_value(""), "x coordinate[s] of subimages to restore" )
+        ( "simy", bpo::value<string>()->implicit_value(""), "y coordinate[s] of subimages to restore" )
         ( "imgn,n", bpo::value<string>(), "Image numbers" )
 //        ( "sequence", bpo::value<string>(), "sequence number to insert in filename template." )
         ( "print,P", "(debug) print the parsed configuration to console and exit without uploading." )
@@ -67,7 +66,7 @@ namespace {
         static map<string, string> vmap;
         if( vmap.empty() ) {
             vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
-            vmap["RDX_MASTER"] = "master";        // If it exists, it will override the default value (localhost) above
+            vmap["RDX_HOST"] = "master";        // If it exists, it will override the default value (localhost) above
             vmap["RDX_PORT"] = "port";            // If it exists, it will override the default value (30000) above
         }
         map<string, string>::const_iterator ci = vmap.find( envName );
@@ -78,33 +77,6 @@ namespace {
             return ci->second;
         }
     }
-}
-
-
-void killServer(TcpConnection::Ptr conn, Logger& logger) {
-    
-    Host::HostInfo me, master;
-    uint8_t cmd = CMD_CONNECT;
-    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
-    boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
-
-    if( cmd == CMD_AUTH ) {
-        // implement
-    }
-    if( cmd == CMD_CFG ) {  // handshake requested
-        LOG << "Requesting server to shutdown..." << ende;
-        *conn << me;
-        *conn >> master;
-        boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
-    }
-    if( cmd != CMD_OK ) {
-        LOG_ERR << "Handshake with server failed." << ende;
-        return;
-    }
-   
-    cmd = CMD_DIE;
-    boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
-   
 }
 
 
@@ -192,7 +164,8 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
     catch( const exception &e ) {
         LOG_ERR << "Error uploading jobs: " << e.what() << ende;
     }
-
+    
+    logger.flushAll();
 
 }
 
@@ -346,27 +319,22 @@ int main (int argc, char *argv[]) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            if(vm.count ("kill")) {
-                killServer(conn, logger);
-            } else {
-                std::vector<std::shared_ptr<std::thread> > threads;
-                for ( int i=0; i<5; ++i) {
-                    shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioservice ) ) );
-                    threads.push_back( t );
-                }
-                int priority = vm["priority"].as<int>();
-                shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs, priority, std::ref(logger)) ) );
+            std::vector<std::shared_ptr<std::thread> > threads;
+            for ( int i=0; i<5; ++i) {
+                shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_service::run, &ioservice ) ) );
                 threads.push_back( t );
-                //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
-                //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
-                //uploadJobs(conn, jobs, logger);
-                //ioservice.run();
-                //t.join();
-                //tt.join();
-                for( auto & it : threads ) {
-                    it->join();
-                }
-
+            }
+            int priority = vm["priority"].as<int>();
+            shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs, priority, std::ref(logger)) ) );
+            threads.push_back( t );
+            //thread t( boost::bind( &boost::asio::io_service::run, &ioservice ) );
+            //thread tt( boost::bind( &boost::asio::io_service::run, &ioservice ) );
+            //uploadJobs(conn, jobs, logger);
+            //ioservice.run();
+            //t.join();
+            //tt.join();
+            for( auto & it : threads ) {
+                it->join();
             }
         } else {
             cout << "Connection failed: " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << endl;

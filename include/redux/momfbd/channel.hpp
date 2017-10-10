@@ -70,6 +70,7 @@ namespace redux {
             //void addAllPQ(void) const;
             /*****************************************************/
 
+            std::string idString( void ) const;
             void dump( std::string tag );
         private:
             

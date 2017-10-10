@@ -72,6 +72,9 @@ namespace redux {
                                JSTEP_COMPLETED = 0x4000,
                                JSTEP_ERR = 0x8000
                             };
+        enum Flags : uint16_t { CHECKED = 1,
+                                NOCHECK = 2
+                            };
         constexpr static uint16_t StepUserMask = 0xFF;      // the job-specific steps
 
         typedef std::shared_ptr<Job> JobPtr;
@@ -94,6 +97,7 @@ namespace redux {
             uint32_t id, timeout, maxProcessingTime;
             uint8_t priority, verbosity, maxPartRetries;
             uint16_t maxThreads;
+            uint16_t flags;
             std::atomic<uint16_t> step;
             std::atomic<uint8_t> state;
             std::string typeString, name, user, host;

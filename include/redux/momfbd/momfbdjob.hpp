@@ -109,7 +109,7 @@ namespace redux {
         private:
 
             uint16_t checkParts( void );
-            void generatePatchPositions(void);
+            bool checkPatchPositions(void);
             void unloadCalib( boost::asio::io_service& );
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
             void initCache( void );

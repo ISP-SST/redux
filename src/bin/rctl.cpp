@@ -26,7 +26,7 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "rctl";
+    const string logChannel = "rdx_ctl";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
@@ -35,7 +35,7 @@ namespace {
         options.add_options()
         ( "master,m", bpo::value<string>()->default_value( "localhost" ),
           "Hostname/IP of a master to connect to."
-          " The environment variable RDX_MASTER can be used to override the default value." )
+          " The environment variable RDX_HOST can be used to override the default value." )
         ( "port,p", bpo::value<string>()->default_value( "30000" ),
           "Port to use when connecting to a master."
           " The environment variable RDX_PORT can be used to override the default value." )
@@ -56,7 +56,7 @@ namespace {
         static map<string, string> vmap;
         if( vmap.empty() ) {
             vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
-            vmap["RDX_MASTER"] = "master";        // If it exists, it will override the default value (localhost) above
+            vmap["RDX_HOST"] = "master";        // If it exists, it will override the default value (localhost) above
             vmap["RDX_PORT"] = "port";            // If it exists, it will override the default value (30000) above
         }
         map<string, string>::const_iterator ci = vmap.find( envName );

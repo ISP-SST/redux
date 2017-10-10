@@ -78,6 +78,7 @@ namespace redux {
             inline double metric(void) const { return weight*currentMetric; };
             /*****************************************************/
             
+            inline std::string idString( void ) const { return std::to_string(ID); }
             void dump( std::string tag );
         //private:
 

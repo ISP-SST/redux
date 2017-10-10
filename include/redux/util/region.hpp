@@ -38,6 +38,8 @@ namespace redux {
                 count += last.unpack(ptr+count,swap_endian);
                 return count;
             }
+            template <typename U> void shift( const PointType<U>& s ) { first += s; last += s; }
+            template <typename U> void shift(U y, U x) { PointType<U> tmp(y,x); first += tmp; last += tmp; }
             void shiftX(T x) { first.x += x; last.x += x; }
             void shiftY(T y) { first.y += y; last.y += y; }
             template <typename U> PointI outside(const RegionType<U>& rhs) const {
@@ -50,7 +52,8 @@ namespace redux {
             }
             template <typename U> void grow(const RegionType<U>& rhs) { first=first.min(rhs.first); last=last.max(rhs.last); }
             template <typename U> void grow(const PointType<U>& rhs) { first-=rhs; last+=rhs; }
-            void grow(T rhs) { PointType<T> tmp(rhs,rhs); first-=tmp; last+=tmp; }
+            template <typename U> void grow(U rhs) { PointType<U> tmp(rhs,rhs); first-=tmp; last+=tmp; }
+            template <typename U> void shrink(U rhs) { PointType<U> tmp(rhs,rhs); first+=tmp; last-=tmp; }
             template <typename U> RegionType<T> grown(const PointType<U>& rhs) const { RegionType<T> res(*this); res.grow(rhs); return std::move(res); }
             RegionType<T> grown(T rhs) const { RegionType<T> res(*this); res.grow(PointType<T>(rhs,rhs)); return std::move(res); }
             template <typename U> void restrict(const RegionType<U>& rhs) { first=first.max(rhs.first); last=last.min(rhs.last); }
@@ -58,7 +61,9 @@ namespace redux {
             template <typename U> RegionType<T>& operator+=(const PointType<U>& rhs) { first += rhs; last += rhs; return *this; }
             template <typename U> RegionType<T>& operator-=(const PointType<U>& rhs) { first -= rhs; last -= rhs; return *this; }
             template <typename U> RegionType<T> operator+(const PointType<U>& rhs) const { RegionType<T> res(*this); return std::move(res+=rhs); }
+            template <typename U> RegionType<T> operator+(const U& rhs) const { RegionType<T> res(*this); res.first+=rhs; res.last+=rhs; return std::move(res); }
             template <typename U> RegionType<T> operator-(const PointType<U>& rhs) const { RegionType<T> res(*this); return std::move(res-=rhs); }
+            RegionType<T> operator-(void) const { RegionType<T> tmp(first.y,first.x,last.y,last.x); return std::move(tmp); }
             RegionType<T>& operator=(const RegionType<T>& rhs) { first = rhs.first; last = rhs.last; return *this; }
             template <typename U> RegionType<T>& operator=(const RegionType<U>& rhs) { first = rhs.first; last = rhs.last; return *this; }
             RegionType<T>& operator=(T rhs) { first = rhs; last = rhs; return *this; }

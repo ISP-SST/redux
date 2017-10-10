@@ -180,7 +180,7 @@ bool Channel::checkCfg (void) {
             LOG_ERR << "Dark template contains wildcard and no dark-numbers given (with DARK_NUM)" << ende;
             return false;
         } else if (nWild == 0 && darkNumbers.size()) {
-            LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename." << ende;
+            //LOG_WARN << "Dark template contains no wildcard AND dark-numbers specified. Numbers will be ignored and the dark-template used as a single filename." << ende;
             darkNumbers.clear();    // TODO: fix this properly, numbers might reappear after transfer (because of inheritance)
         }
     }
@@ -941,7 +941,7 @@ void Channel::preprocessImage( size_t i ) {
 
             if (ccdScattering.valid() && psf.valid()) {           // apply backscatter correction
                 if (tmpImg.sameSize (ccdScattering) && tmpImg.sameSize (psf)) {
-                    LOG_DETAIL << "Applying correction for CCD transparency." << ende;
+                    LOG_DEBUG << "Applying correction for CCD transparency." << ende;
                     redux::image::descatter (tmpImg, ccdScattering, psf);
                 } else {
                     LOG_ERR << boost::format ("Dimensions of ccdScattering (%s) or psf (%s) does not match this image (%s), skipping flatfielding !!")
@@ -983,6 +983,11 @@ void Channel::preprocessImage( size_t i ) {
                 }
             }
 
+            // Fill larger features that the mask will exclude. This will fill e.g. black borders.
+            // TBD: Should this be skipped and force the user to be stricter with the clip/ROI instead?
+            function<double (size_t, size_t) > func = bind (inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
+            fillPixels (arrayPtr, sy, sx, func, std::bind2nd (std::less_equal<double>(), myJob.badPixelThreshold));
+            
             // FIXME: This is a hack to create truncated values as the old code!!
             //for(size_t i=0; i<sy*sx; ++i) arrayPtr[0][i] = (int)arrayPtr[0][i];
             
@@ -1233,6 +1238,11 @@ void Channel::logAndThrow( string msg ) {
     LOG_ERR << msg << ende;
     throw job_error(msg);
     
+}
+
+
+string Channel::idString( void ) const {
+    return to_string(myObject.ID) + ":" + to_string(ID);
 }
 
 

@@ -419,12 +419,11 @@ namespace redux {
 
             std::ostringstream oss;
             oss << std::setprecision( d );
-            if( name.empty() ) oss << "[";
-            else oss << name << "=[";
+            if( !name.empty() ) oss << name << "=[";
             bool separator( false );
             for( auto & element : data ) {
                 if( separator ) {
-                    oss << ", ";
+                    oss << ",";
                 }
                 //if( std::is_integral<T>::value ) {
                 //    oss << +element.first;   // trick to promote char to int before output to avoid interpretation as character
@@ -440,7 +439,7 @@ namespace redux {
                 separator = true;
             }
 
-            oss << "]";
+            if( !name.empty() ) oss << "]";
 
             return oss.str();
         }
@@ -449,12 +448,11 @@ namespace redux {
 
             std::ostringstream oss;
             oss << std::setprecision( d );
-            if( name.empty() ) oss << "[";
-            else oss << name << "=[";
+            if( !name.empty() ) oss << name << "=[";
             bool separator( false );
             for( auto & element : data ) {
                 if( separator ) {
-                    oss << ", ";
+                    oss << ",";
                 }
                 //if( std::is_integral<decltype(it)>::value ) {
                 //    oss << +it;   // FIXME for some reason it=string passes as integer...weird
@@ -464,7 +462,7 @@ namespace redux {
                 separator = true;
             }
 
-            oss << "]";
+            if( !name.empty() ) oss << "]";
 
             return oss.str();
         }

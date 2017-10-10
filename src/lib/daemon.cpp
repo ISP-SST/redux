@@ -766,11 +766,13 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     }
                     job->startLog();
                     job->printJobInfo();
-                    if( !job->check() ) {
-                        string msg = "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name + "   ";
-                        msg += "(see " + job->info.logFile + " for details)";
-                        throw job_error( msg );
-                    }
+                    if( !(job->info.flags&Job::NOCHECK) && !(job->info.flags&Job::CHECKED) ) {
+                        if( !job->check() ) {
+                            string msg = "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name + "   ";
+                            msg += "(see " + job->info.logFile + " for details)";
+                            throw job_error( msg );
+                        }
+                    } else job->info.step = Job::JSTEP_SUBMIT;
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
                     LLOG_DETAIL(job->logger) << "Sanity check passed, adding to queue." << ende;
                     ids.push_back( job->info.id );

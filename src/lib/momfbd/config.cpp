@@ -495,7 +495,8 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     wavelength = getValue( tree, "WAVELENGTH", defaults.wavelength );
 
     if( ( saveMask & SF_SAVE_PSF ) && ( saveMask & SF_SAVE_PSF_AVG ) ) {
-        LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested" << ende;
+        saveMask &= ~SF_SAVE_PSF;
+        //LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested" << ende;
     }
 
     ChannelCfg::parseProperties( tree, logger, defaults );

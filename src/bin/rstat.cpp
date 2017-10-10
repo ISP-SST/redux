@@ -17,14 +17,16 @@ using namespace boost::posix_time;
 
 namespace {
 
-    const string logChannel = "jstat";
+    const string logChannel = "rdx_stat";
 
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
 
         bpo::options_description options( "Program Options" );
         options.add_options()
-        ( "master,m", bpo::value<string>()->default_value( "localhost" ), "Hostname/IP of the master" )
+        ( "master,m", bpo::value<string>()->default_value( "localhost" ),
+          "Hostname/IP of a master to connect to."
+          " The environment variable RDX_HOST can be used to override the default value." )
         ( "port,p", bpo::value<string>()->default_value( "30000" ), "Port to use, either when connecting to the master." )
         ( "jobs,j", bpo::value<int>()->implicit_value( 0 ), "Get joblist" )
         ( "slaves,s", bpo::value<int>()->implicit_value( 0 ), "Get slavelist" )
@@ -42,6 +44,7 @@ namespace {
         static map<string, string> vmap;
         if( vmap.empty() ) {
             vmap["RDX_VERBOSITY"] = "verbosity";  // For debugging this might be convenient.
+            vmap["RDX_HOST"] = "master";        // If it exists, it will override the default value (localhost) above
             vmap["RDX_PORT"] = "port";            // This means the environment variable RDX_PORT will override the
                                                   // default value of 30000 specified above.
         }

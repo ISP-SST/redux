@@ -43,7 +43,7 @@ void LogOutput::addItem( LogItemPtr item ) {
     unique_lock<mutex> lock(queueMutex);
     itemQueue.push_back(item);
     itemCount = itemQueue.size();
-    if( (flushPeriod == 0) || (itemCount > flushPeriod) ) {
+    if( itemCount >= flushPeriod ) {
         if(async_) {
             std::thread( std::bind(&LogOutput::flushBuffer, this) ).detach();
         } else {

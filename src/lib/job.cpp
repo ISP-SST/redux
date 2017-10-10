@@ -70,6 +70,8 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, red
             tmpJob->parsePropertyTree( vm, property.second, logger );
             tmpJob->getLogger().addLogger( logger );
             if(!check || tmpJob->check()) {
+                if( check ) tmpJob->info.flags |= Job::CHECKED;
+                else tmpJob->info.flags |= Job::NOCHECK;
                 tmp.push_back(shared_ptr<Job>(tmpJob));
             } else LOG_ERR << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << ende;
         } else {
@@ -128,8 +130,8 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(5), maxThreads(255), 
-         step(JSTEP_NONE), state(JSTATE_NONE) {
+Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(5),
+         maxThreads(255), flags(0), step(JSTEP_NONE), state(JSTATE_NONE) {
 
 }
 
@@ -161,7 +163,7 @@ Job::Info::Info(const Info& rhs) {
 uint64_t Job::Info::size(void) const {
     
     static uint64_t fixed_sz = 2*sizeof(uint32_t)       // id, timeout, maxProcessingTime
-                             + 2*sizeof(uint16_t)       // maxThreads, step
+                             + 3*sizeof(uint16_t)       // maxThreads, step, flags
                              + 4                        // priority, verbosity, maxPartRetries, state
                              + 3*sizeof(time_t)         // submitTime, startedTime, completedTime
                              + 20 + 6;                  // progressString + \0 for typeString/name/user/host/logFile/outputDir
@@ -183,6 +185,7 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, priority);
     count += pack(ptr+count, verbosity);
     count += pack(ptr+count, maxThreads);
+    count += pack(ptr+count, flags);
     count += pack(ptr+count, maxPartRetries);
     count += pack(ptr+count, step.load());
     count += pack(ptr+count, state.load());
@@ -207,6 +210,7 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, priority);
     count += unpack(ptr+count, verbosity);
     count += unpack(ptr+count, maxThreads);
+    count += unpack(ptr+count, flags);
     count += unpack(ptr+count, maxPartRetries);
     uint16_t tmp16(0);
     count += unpack(ptr+count, tmp16);
@@ -406,6 +410,7 @@ void Job::printJobInfo(void) {
 
 
 void Job::stopLog(void) {
+    logger.flushAll();
     logger.removeAllOutputs();
     //jlog.reset();
 }
