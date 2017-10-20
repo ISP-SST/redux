@@ -320,14 +320,18 @@ Job::~Job(void) {
     LOG_DEBUG << "Destructing Job#" << info.id << ": (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1) << ende;
 #endif
 
-    
     if( !cachePath.empty() ) {
-        try {
-            bfs::remove_all( bfs::path(Cache::get().path()) / bfs::path(cachePath) );
-        } catch( const exception& e) {
-            cerr << "Failed to remove path: " << bfs::path(Cache::get().path()) / bfs::path(cachePath) << endl
-                 << "  reason: " << e.what() << endl;
+        try { startLog(); } catch( ... ) { };
+        bfs::path tmpPath( Cache::get().path() );
+        tmpPath /= bfs::path(cachePath);
+        boost::system::error_code ec;
+        if( bfs::exists(tmpPath,ec) && !ec ) {
+            bfs::remove_all( tmpPath, ec );
         }
+        if( ec ) {
+            LOG_ERR << "Failed to remove path: " << tmpPath << endl << "  reason: " << ec.message() << ende;
+        }
+        try { stopLog(); } catch( ... ) { };
     }
     
 }
