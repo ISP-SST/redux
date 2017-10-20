@@ -6,6 +6,7 @@
 #include <memory>               // unique_ptr
 #include <iostream>
 #include <immintrin.h>
+#include <pmmintrin.h>
 
 
 using namespace redux::util;
