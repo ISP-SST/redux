@@ -6,7 +6,6 @@
 #include <memory>               // unique_ptr
 #include <iostream>
 #include <immintrin.h>
-#include <pmmintrin.h>
 
 
 using namespace redux::util;
@@ -190,9 +189,7 @@ namespace {
         }
         
         // sum the acc vector
-        acc.v = _mm_hadd_ps( acc.v, acc.v );
-        acc.v = _mm_hadd_ps( acc.v, acc.v );
-        float sum = acc.f[0];   // first value now contains the sum of all elements.
+        float sum = acc.f[0]+acc.f[1]+acc.f[2]+acc.f[3];
 
         for( ; cnt<blockSize; cnt++) {  // if blockSize is not a multiple of 8, process the last pixels.
             const int16_t tmp = block[cnt] - refValue;
