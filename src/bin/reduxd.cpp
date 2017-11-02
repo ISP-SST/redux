@@ -29,6 +29,7 @@ namespace {
         ( "port,p", bpo::value<uint16_t>()->default_value( 30000 ), "Port to listen on, or connect to."
           " The environment variable RDX_PORT will be used as default if it is defined." )
         ( "threads,t", po::value<uint16_t>()->default_value( 0 ), "max number of threads to use.")
+        ( "max-transfers,T", po::value<uint16_t>()->default_value( 10 ), "max simultaneous data transfers.")
         ( "foreground,F", "Do not detach/background process.")
         ;
 

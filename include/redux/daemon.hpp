@@ -76,7 +76,8 @@ namespace redux {
         std::vector<Job::JobPtr> jobs;
         uint16_t nQueuedJobs;
         uint32_t hostTimeout;
-        
+        uint16_t maxTransfers;
+
         std::mutex peerMutex;
         network::Host& myInfo;
         std::map<network::TcpConnection::Ptr, network::Host::Ptr,

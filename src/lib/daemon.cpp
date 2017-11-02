@@ -29,7 +29,7 @@ using namespace std;
 
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
-    hostTimeout(3600), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+    hostTimeout(3600), maxTransfers(10), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
         
     file::setErrorHandling( file::EH_THROW );   // we want to catch and print messages to the log.
 
@@ -41,6 +41,10 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
         myInfo.status.nThreads = myInfo.status.maxThreads = nThreads;
     }
 
+    if( params.count("max-transfers") ) {
+        maxTransfers = params["max-transfers"].as<uint16_t>();
+    }
+    
     if( params.count("cache-dir") ) {
         auto & c = Cache::get();
         c.setPath( params["cache-dir"].as<string>() );
@@ -1053,8 +1057,8 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
     shared_ptr<char> data;
     uint64_t count(0); 
-    static int maxRequests(10);
     bool tooManyRequests(false);
+    static uint16_t currentRequests(0);
     WorkInProgress::Ptr wip;
     Host::Ptr host;
      
@@ -1071,8 +1075,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         }
         wip = wipit->second;
         host = wipit->first;
-        tooManyRequests = (maxRequests <= 0);
-        maxRequests -= !tooManyRequests;
+        tooManyRequests = ((++currentRequests > maxTransfers) && maxTransfers);
         lock.unlock();
 
         if( wip->job && wip->parts.size() ) {   // parts should have been cleared when results returned.
@@ -1106,6 +1109,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
               wip->previousJob = wip->job;
             }
         }
+        
     }
     
     if( count ) {
@@ -1118,10 +1122,8 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         host->idle();
     }
     
-    if( !tooManyRequests ) {
-        unique_lock<mutex> lock( peerMutex );
-        maxRequests += 1;
-    }
+    unique_lock<mutex> lock( peerMutex );
+    currentRequests--;
     
 }
 
@@ -1130,6 +1132,19 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
 
     size_t blockSize;
     Command reply = CMD_ERR;            // return err unless everything seems fine.
+    bool tooManyRequests;
+    static uint16_t currentRequests(0);
+    {
+        lock_guard<mutex> lock( peerMutex );
+        currentRequests++;
+        tooManyRequests = ((currentRequests > maxTransfers) && maxTransfers);
+    }
+    while( tooManyRequests ) {
+        unique_lock<mutex> lock( peerMutex );
+        tooManyRequests = ((currentRequests > maxTransfers) && maxTransfers);
+        if( tooManyRequests ) std::this_thread::yield();
+    }
+    
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
     if( blockSize ) {
@@ -1175,6 +1190,9 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
     }
     *conn << reply;
 
+    lock_guard<mutex> lock( peerMutex );
+    currentRequests--;
+    
 }
 
 
