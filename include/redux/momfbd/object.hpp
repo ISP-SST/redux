@@ -84,7 +84,7 @@ namespace redux {
 
             
             bool checkCfg(void);
-            bool checkData(void);
+            bool checkData(bool verbose=false);
 
             void initCache(void);
             void reInitialize(boost::asio::io_service&, bool reset=false);

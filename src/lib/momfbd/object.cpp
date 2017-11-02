@@ -654,7 +654,7 @@ bool Object::checkCfg( void ){
 }
 
 
-bool Object::checkData( void ){
+bool Object::checkData( bool verbose ){
 
     bfs::path outDir( myJob.info.outputDir );
     bfs::path tmpOF(outputFileName+".ext" );
@@ -683,16 +683,16 @@ bool Object::checkData( void ){
         if( i & myJob.outputFileType ){  // this filetype is specified.
             tmpOF.replace_extension(FileTypeExtensions.at( ( FileType )i) );
             if( bfs::exists(tmpOF )&& !(myJob.runFlags & RF_FORCE_WRITE ) ){
-                LOG_FATAL << boost::format( "output file %s already exists! Use -f( or OVERWRITE )to replace file." )% tmpOF << ende;
+                LOG_FATAL << boost::format( "output file %s already exists! Use -f (or cfg-keyword OVERWRITE) to replace file." )% tmpOF << ende;
                 return false;
             } else {
-                LOG_DETAIL << "Output filename: " << tmpOF << ende;
+                if( verbose ) LOG_DETAIL << "Output filename: " << tmpOF << ende;
             }
         }
     }
 
     for( shared_ptr<Channel>& ch: channels ){
-        if( !ch->checkData() )return false;
+        if( !ch->checkData(verbose) ) return false;
     }
     
     if( !pupilFile.empty() ){

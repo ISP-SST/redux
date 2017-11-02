@@ -75,7 +75,7 @@ namespace redux {
         private:
             
             bool checkCfg(void);
-            bool checkData(void);
+            bool checkData( bool verbose=false );
             
             void initCache(void);
             

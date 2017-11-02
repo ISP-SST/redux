@@ -977,12 +977,12 @@ bool MomfbdJob::check(void) {
     uint16_t step = info.step;
     switch (step) {
         case JSTEP_NONE: {
-            ret = checkCfg();// && checkCacheUsage();
+            ret = checkCfg() && checkData(false);// && checkCacheUsage();
             if(ret) info.step = JSTEP_SUBMIT;
             break;
         }
         case JSTEP_SUBMIT: {
-            ret = checkData(); // && checkCacheUsage();
+            ret = checkData(true); // && checkCacheUsage();
             if(ret) info.step = JSTEP_CHECKED;
             break;
         }
@@ -1121,10 +1121,10 @@ bool MomfbdJob::checkCfg(void) {
 }
 
 
-bool MomfbdJob::checkData(void) {
+bool MomfbdJob::checkData(bool verbose) {
     
     for( shared_ptr<Object>& obj: objects ) {
-        if( !obj->checkData() ) return false;
+        if( !obj->checkData(verbose) ) return false;
     }
     
     return true;

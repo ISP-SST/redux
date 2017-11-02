@@ -69,9 +69,11 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, red
             Job* tmpJob = it2->second.second();
             tmpJob->parsePropertyTree( vm, property.second, logger );
             tmpJob->getLogger().addLogger( logger );
-            if(!check || tmpJob->check()) {
-                if( check ) tmpJob->info.flags |= Job::CHECKED;
-                else tmpJob->info.flags |= Job::NOCHECK;
+            bool checkResult(false);
+            if(!check || (checkResult=tmpJob->check()) ) {
+                if( check ) {
+                    if(checkResult) tmpJob->info.flags |= Job::CHECKED;
+                } else tmpJob->info.flags |= Job::NOCHECK;
                 tmp.push_back(shared_ptr<Job>(tmpJob));
             } else LOG_ERR << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << ende;
         } else {

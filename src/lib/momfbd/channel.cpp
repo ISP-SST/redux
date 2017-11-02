@@ -218,7 +218,7 @@ bool Channel::checkCfg (void) {
 }
 
 
-bool Channel::checkData (void) {
+bool Channel::checkData( bool verbose ) {
 
     // Images
     if ( incomplete ) {   // check if files are present
@@ -302,7 +302,7 @@ bool Channel::checkData (void) {
         std::swap( waveFronts, tmpV );
     }
     string wfStr = redux::util::uIntsToString( waveFronts );
-    LOG_DETAIL << "Channel " << myObject.ID << ":" << ID << " waveFronts: " << wfStr << ende;
+    if( verbose ) LOG_DETAIL << "Channel " << myObject.ID << ":" << ID << " waveFronts: " << wfStr << ende;
 
     // Dark(s)
     if (!darkTemplate.empty()) {

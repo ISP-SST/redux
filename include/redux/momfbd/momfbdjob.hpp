@@ -98,7 +98,7 @@ namespace redux {
             bool checkCacheUsage(void);
             bool checkOutputUsage(void);
             bool checkCfg(void);
-            bool checkData(void);
+            bool checkData(bool verbose=false);
             bool checkPre(void);
             bool checkPost(void);
             bool checkWriting(void);
