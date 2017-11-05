@@ -519,18 +519,18 @@ bool MomfbdJob::checkPatchPositions(void) {
         uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
         // TODO: do split per channel instead, to allow for different image-scales and/or hardware
         // NOTE:  subImagePosX/Y are kept 1-based, so offset by 1 during cut-out.
-        LOG << boost::format("MomfbdJob::preProcess(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
+        LOG << boost::format("MomfbdJob::checkPatchPositions(): halfPatchSize=%d  overlap=%d") % halfPatchSize % totalOverlap << ende;
         if( subImagePosX.empty() ) { // x-coordinate of patch-centre
             subImagePosX = segment<uint16_t>( posLimits.first.x, posLimits.last.x, patchSize, totalOverlap );
-            LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
+            LOG << "MomfbdJob::checkPatchPositions(): Generated patch positions  " << printArray(subImagePosX,"X") << ende;
         }
         if( subImagePosY.empty() ) { // y-coordinate of patch-centre
             subImagePosY = segment<uint16_t>( posLimits.first.y, posLimits.last.y, patchSize, totalOverlap );
-            LOG << "MomfbdJob::preProcess(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
+            LOG << "MomfbdJob::checkPatchPositions(): Generated patch positions  " << printArray(subImagePosY,"Y") << ende;
         }
 
         if( subImagePosX.empty() || subImagePosY.empty() ) {
-            LOG_ERR << "MomfbdJob::preProcess(): No patches specified or generated, can't continue." << ende;
+            LOG_ERR << "MomfbdJob::checkPatchPositions(): No patches specified or generated, can't continue." << ende;
             info.step.store( JSTEP_ERR );
             info.state.store( JSTATE_IDLE );
             return false;

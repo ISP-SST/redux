@@ -659,31 +659,37 @@ bool Object::checkData( bool verbose ){
     bfs::path outDir( myJob.info.outputDir );
     bfs::path tmpOF(outputFileName+".ext" );
     
-    if( isRelative(tmpOF )&& !outDir.empty( ) ){
+    if( isRelative(tmpOF) && !outDir.empty() ){
         tmpOF = outDir / tmpOF;
     }
     bfs::path tmpPath = tmpOF.parent_path( );
     
 
     try {
-        if( !tmpPath.empty( )&& !bfs::exists(tmpPath ) ){
-            if( !bfs::create_directories(tmpPath ) ){
-                LOG_FATAL << boost::format( "failed to create directory for output: %s" )% tmpPath << ende;
-                return false;
-            } else LOG_TRACE << boost::format( "create output directory %s" )% tmpPath << ende;
+        struct Writable {}; 
+        auto isWritable = Cache::get().getMap<string,Writable>();
+        auto it = isWritable.second.find( tmpPath.string() );
+        if( it == isWritable.second.end() ) {
+            if( !tmpPath.empty() && !bfs::exists(tmpPath) ) {
+                if( !bfs::create_directories(tmpPath) ) {
+                    LOG_FATAL << boost::format( "failed to create directory for output: %s" ) % tmpPath << ende;
+                    return false;
+                } else LOG_TRACE << boost::format( "create output directory %s" ) % tmpPath << ende;
+            }
+            bfs::path slask = tmpPath / bfs::path("_test_writability_");
+            bfs::create_directory( slask );
+            bfs::remove_all( slask );
+            isWritable.second.emplace( tmpPath.string(), Writable() );
         }
-        bfs::path slask(tmpPath.string()+"_test_writability_" );
-        bfs::create_directory(slask );
-        bfs::remove_all(slask );
     } catch( bfs::filesystem_error& e ){
-        LOG_FATAL << boost::format( "output directory %s not writable: %s" )% tmpPath % e.what( )<< ende;
+        LOG_FATAL << boost::format( "output directory %s not writable: %s" ) % tmpPath % e.what( )<< ende;
         return false;
     }
     for( int i = 1; i & FT_MASK; i <<= 1 ){
-        if( i & myJob.outputFileType ){  // this filetype is specified.
+        if( i & myJob.outputFileType ) {  // this filetype is specified.
             tmpOF.replace_extension(FileTypeExtensions.at( ( FileType )i) );
-            if( bfs::exists(tmpOF )&& !(myJob.runFlags & RF_FORCE_WRITE ) ){
-                LOG_FATAL << boost::format( "output file %s already exists! Use -f (or cfg-keyword OVERWRITE) to replace file." )% tmpOF << ende;
+            if( bfs::exists(tmpOF ) && !(myJob.runFlags & RF_FORCE_WRITE ) ){
+                LOG_FATAL << boost::format( "output file %s already exists! Use -f (or cfg-keyword OVERWRITE) to replace file." ) % tmpOF << ende;
                 return false;
             } else {
                 if( verbose ) LOG_DETAIL << "Output filename: " << tmpOF << ende;
