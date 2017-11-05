@@ -184,7 +184,16 @@ string redux::util::alignRight(const string& s, size_t n, unsigned char c) {
 
 
 string redux::util::getUname(__uid_t id) {
+    
+    static map<__uid_t,string> users;
+    static mutex mtx;
+    lock_guard<mutex> lock(mtx);
+    
     if(!id) id = geteuid();
+    
+    auto it = users.find(id);
+    if( it != users.end() ) return it->second;
+
     string tmp;
     struct passwd pwent;
     struct passwd *pwentp;
@@ -195,6 +204,9 @@ string redux::util::getUname(__uid_t id) {
     else {
         tmp = std::to_string((int)id);
     }
+    
+    users.emplace( id, tmp );
+    
     return tmp;
 }
 

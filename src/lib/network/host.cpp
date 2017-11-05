@@ -27,7 +27,7 @@ const std::string Host::StateNames[] = { "offline", "idle", "active", "error" };
 const std::string Host::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
 
 
-Host::HostInfo::HostInfo( void ) : peerType(0), connectPort(0) {
+Host::HostInfo::HostInfo( string username ) : peerType(0), connectPort(0), user(username) {
 
     int one = 1;
     littleEndian = *(char*)&one;
@@ -36,7 +36,6 @@ Host::HostInfo::HostInfo( void ) : peerType(0), connectPort(0) {
     nCores = std::thread::hardware_concurrency();
     startedAt = boost::posix_time::second_clock::local_time();
     name = boost::asio::ip::host_name();
-    user = getUname();
     struct utsname nm;
     if( uname( &nm ) < 0 ) {
         os = "-";
@@ -120,7 +119,7 @@ void Host::idle(void) {
 
 Host& Host::myInfo(void) {
 
-    static Host singleton;
+    static Host singleton( getUname() );
     return singleton;
     
 }
