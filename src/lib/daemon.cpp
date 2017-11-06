@@ -18,7 +18,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-
 using boost::algorithm::iequals;
 
 using namespace redux::logging;
@@ -27,9 +26,13 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+namespace {
+    thread_local Host::Ptr connHost;
+    thread_local WorkInProgress::Ptr connWIP;
+}
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
-    hostTimeout(3600), maxTransfers(10), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+    hostTimeout(3600), inTransfers(10), outTransfers(10), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
         
     file::setErrorHandling( file::EH_THROW );   // we want to catch and print messages to the log.
 
@@ -42,7 +45,9 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
     }
 
     if( params.count("max-transfers") ) {
-        maxTransfers = params["max-transfers"].as<uint16_t>();
+        uint16_t maxTransfers = params["max-transfers"].as<uint16_t>();
+        inTransfers.set( maxTransfers );
+        outTransfers.set( maxTransfers );
     }
     
     if( params.count("cache-dir") ) {
@@ -407,11 +412,18 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
     try {
         try {
             *conn >> cmd;
+            lock_guard<mutex> lock( peerMutex );
+            connHost = connections[conn];
+            if( !connHost ) throw std::exception();
+            auto it = peerWIP.find(connHost);
+            if( it != peerWIP.end() ) {
+                connWIP = it->second;
+            }
         } catch( ... ) {      // no data, disconnected or some other unrecoverable error -> close socket and return.
             removeConnection(conn);
             return;
         }
-        connections[conn]->touch();
+        connHost->touch();
         processCommand( conn, cmd );
         conn->idle();
     } catch( const std::exception& e ) {      // disconnected -> close socket and return.
@@ -638,7 +650,7 @@ void Daemon::cleanup( void ) {
 
 void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
     
-    if( wip->job ) {
+    if( wip && wip->job ) {
         LOG_NOTICE << "Returning failed/unfinished part to queue: " << wip->print() << ende;
         wip->job->failWork( wip );
         for( auto& part: wip->parts ) {
@@ -673,15 +685,15 @@ void Daemon::die( TcpConnection::Ptr& conn, bool urgent ) {
         return;
     }
     
-    unique_lock<mutex> lock( peerMutex );
-    const Host::HostInfo& hi = connections[conn]->info;
-    lock.unlock();
+    if( !connHost ) return;
+    const Host::HostInfo& hi = connHost->info;
+
     
     //if( hi.user == myInfo.info.user || hi.peerType == Host::TP_MASTER ) {
     if( hi.peerType == Host::TP_MASTER ) {
         LOG_DEBUG << "Received exit command from " << hi.user << "@" << hi.name << ende;
         *conn << CMD_OK;
-        lock.lock();
+        lock_guard<mutex> lock( peerMutex );
         connections.clear();
         stop();
     } else {
@@ -711,9 +723,8 @@ void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
         return;
     }
     
-    unique_lock<mutex> lock( peerMutex );
-    const Host::HostInfo& hi = connections[conn]->info;
-    lock.unlock();
+    if( !connHost ) return;
+    const Host::HostInfo& hi = connHost->info;
 
     uint8_t lvl(0);
     *conn >> lvl;
@@ -822,11 +833,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
     size_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    if( blockSize ) {
+    if( blockSize && connHost ) {
 
-        unique_lock<mutex> plock( peerMutex );
-        const Host::HostInfo& hi = connections[conn]->info;
-        plock.unlock();
+        const Host::HostInfo& hi = connHost->info;
         
         vector<Job::JobPtr> removedJobs;
         bool done(false);
@@ -903,7 +912,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
         if( removedJobs.size() ) {
             for( auto &j: removedJobs ) {
                 if( !j ) continue;
-                plock.lock();
+                lock_guard<mutex> plock( peerMutex );
                 for( auto &pw: peerWIP ) {
                     if( !pw.second || !pw.second->job ) continue;
                     if( j != pw.second->job ) continue;
@@ -914,7 +923,6 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
                         }
                     }
                 }
-                plock.unlock();
             }
         }
 
@@ -1057,121 +1065,79 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
 
     shared_ptr<char> data;
     uint64_t count(0); 
-    bool tooManyRequests(false);
-    static uint16_t currentRequests(0);
-    WorkInProgress::Ptr wip;
-    Host::Ptr host;
-     
-    {
-        unique_lock<mutex> lock( peerMutex );
-        
-        auto wipit = peerWIP.find(connections[conn]);
-        if( wipit == peerWIP.end() ) {
-            auto rit = peerWIP.emplace( connections[conn], std::make_shared<WorkInProgress>() );
-            if( !rit.second ) {
-                LOG_ERR << "Failed to insert new connection into peerWIP" << ende;
-            }
-            wipit = rit.first;
-        }
-        wip = wipit->second;
-        host = wipit->first;
-        tooManyRequests = ((++currentRequests > maxTransfers) && maxTransfers);
-        lock.unlock();
 
-        if( wip->job && wip->parts.size() ) {   // parts should have been cleared when results returned.
-            wip->job->ungetWork( wip );
+    Semaphore::Scope ss( outTransfers, 5 ); // if we 're not allowed a transfer-slot in 5 secs, idle slave & try later.
+     
+    if( ss ) {
+
+        if( connWIP->job && connWIP->parts.size() ) {   // parts should have been cleared when results returned.
+            connWIP->job->ungetWork( connWIP );
             //wip->job->failWork( wip );
-            wip->resetParts();
+            connWIP->resetParts();
         }
         
         uint64_t blockSize = 0;
-        wip->isRemote = true;
-        wip->job.reset();
-        wip->parts.clear();
-        wip->nParts = 0;
+        connWIP->isRemote = true;
+        connWIP->job.reset();
+        connWIP->parts.clear();
+        connWIP->nParts = 0;
 
-        if( !tooManyRequests ) {
-            if ( getWork( wip, host->status.nThreads ) ) {
-              //auto jlock = wip->job->getLock();
-              for( auto& part: wip->parts ) {
-                  part->cacheLoad();
-              }
-              blockSize += wip->workSize();
-              //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
-              host->status.statusString = alignLeft(to_string(wip->job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
-              host->active();
-              data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
-              char* ptr = data.get()+sizeof(uint64_t);
-              count += wip->packWork( ptr+count );
-              for( auto& part: wip->parts ) {
-                  part->cacheClear();
-              }
-              wip->previousJob = wip->job;
-            }
+        if ( getWork( connWIP, connHost->status.nThreads ) ) {
+          //auto jlock = wip->job->getLock();
+          for( auto& part: connWIP->parts ) {
+              part->cacheLoad();
+          }
+          blockSize += connWIP->workSize();
+          //LLOG_DETAIL(wip->job->getLogger()) << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
+          connHost->status.statusString = alignLeft(to_string(connWIP->job->info.id) + ":" + to_string(connWIP->parts[0]->id),8) + " ...";
+          connHost->active();
+          data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
+          char* ptr = data.get()+sizeof(uint64_t);
+          count += connWIP->packWork( ptr+count );
+          for( auto& part: connWIP->parts ) {
+              part->cacheClear();
+          }
+          connWIP->previousJob = connWIP->job;
         }
         
-    }
+    } else LOG_TRACE << "Daemon::sendWork(): Too many active transfers." << ende;
     
     if( count ) {
         pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)
-        LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print() << ende;
+        LOG_DETAIL << "Sending work to " << connHost->info.name << ":" << connHost->info.pid << "   " << connWIP->print() << ende;
         conn->syncWrite( data.get(), count+sizeof(uint64_t) );
     } else {
         conn->syncWrite(count);
-        wip->previousJob.reset();
-        host->idle();
+        connWIP->previousJob.reset();
+        connHost->idle();
     }
-    
-    unique_lock<mutex> lock( peerMutex );
-    currentRequests--;
     
 }
 
 
 void Daemon::putParts( TcpConnection::Ptr& conn ) {
 
-    size_t blockSize;
     Command reply = CMD_ERR;            // return err unless everything seems fine.
-    bool tooManyRequests;
-    static uint16_t currentRequests(0);
-    {
-        lock_guard<mutex> lock( peerMutex );
-        currentRequests++;
-        tooManyRequests = ((currentRequests > maxTransfers) && maxTransfers);
-    }
-    while( tooManyRequests ) {
-        unique_lock<mutex> lock( peerMutex );
-        tooManyRequests = ((currentRequests > maxTransfers) && maxTransfers);
-        if( tooManyRequests ) std::this_thread::yield();
-    }
-    
-    shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    if( blockSize ) {
-        unique_lock<mutex> lock( peerMutex );
-        Host::Ptr host = connections[conn];
-        if( !host ) {
-            LOG_ERR << "This connection is not listed in connections: " << hexString(conn.get()) << "  ignoring." << ende;
-            return;
-        }
-        auto wipit = peerWIP.find(host);
-        if( wipit == peerWIP.end() ) {
-            LOG_ERR << "This slave is not listed in peerWIP: " << host->info.name << ":" << host->info.pid << ende;
-        } else {
-            
-            if( wipit->second && wipit->second->job ) {
-                shared_ptr<WorkInProgress> tmpwip( std::make_shared<WorkInProgress>(*wipit->second) );
-                bool endian = conn->getSwapEndian();
-                wipit->first->status.state = Host::ST_IDLE;
-                wipit->second->resetParts();
-                string msg = "Received results from " + wipit->first->info.name + ":" + to_string(wipit->first->info.pid);
+    Semaphore::Scope ss( inTransfers );
+
+    if( connWIP ) {
+       if( connWIP->job ) {
+            shared_ptr<WorkInProgress> tmpwip( std::make_shared<WorkInProgress>(*connWIP) );
+            bool endian = conn->getSwapEndian();
+            connHost->status.state = Host::ST_IDLE;
+            connWIP->resetParts();
+            string msg = "Received results from " + connHost->info.name + ":" + to_string(connHost->info.pid);
+            size_t blockSize;
+            shared_ptr<char> buf = conn->receiveBlock( blockSize );
+            if( blockSize ) {
                 std::thread([this,buf,tmpwip,endian,msg](){
                     auto oldParts = tmpwip->parts;     // so we can restore the patch-data in case of a failure below.
                     auto oldJob = tmpwip->job;
                     try {
                         tmpwip->unpackWork( buf.get(), endian );
                         LOG_DETAIL << msg << "   " + tmpwip->print() << ende;
-//                        LOG_DETAIL << "  Job = " << hexString(tmpwip->job.get()) << ende;
+    //                        LOG_DETAIL << "  Job = " << hexString(tmpwip->job.get()) << ende;
                         //LLOG_DETAIL(wip->job->getLogger()) << msg << "   " + wip->print() << ende;
                         tmpwip->returnResults();
                     } catch ( exception& e ) {
@@ -1182,16 +1148,14 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
                     }
                 }).detach();
                 reply = CMD_OK;         // all ok
-            } else {
-                LOG_TRACE << "Received results from unexpected host. It probably timed out." << ende;
             }
-            
+        } else {
+            //LOG_TRACE << "Received results from unexpected host. It probably timed out." << ende;
+            throw logic_error("Received results from unexpected host. It probably timed out.");
         }
     }
     *conn << reply;
 
-    lock_guard<mutex> lock( peerMutex );
-    currentRequests--;
     
 }
 

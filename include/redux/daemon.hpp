@@ -7,6 +7,7 @@
 #include "redux/worker.hpp"
 #include "redux/network/host.hpp"
 #include "redux/network/tcpserver.hpp"
+#include "redux/util/semaphore.hpp"
 
 #include <mutex>
 #include <thread>
@@ -76,7 +77,7 @@ namespace redux {
         std::vector<Job::JobPtr> jobs;
         uint16_t nQueuedJobs;
         uint32_t hostTimeout;
-        uint16_t maxTransfers;
+        util::Semaphore inTransfers, outTransfers;
 
         std::mutex peerMutex;
         network::Host& myInfo;
