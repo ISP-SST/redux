@@ -198,14 +198,16 @@ bool Worker::getWork( void ) {
 void Worker::returnWork( void ) {
 
     if( wip->hasResults ) {
-        
+
+        network::TcpConnection::Ptr conn = daemon.getMaster();
+    
         try {
-            
-            network::TcpConnection::Ptr conn = daemon.getMaster();
+
 
             if( conn && conn->socket().is_open() ) {
 
                 LLOG_DEBUG(daemon.logger) << "Returning result: " + wip->print() << ende;
+
                 uint64_t blockSize = wip->workSize();
                 size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
                 
@@ -230,8 +232,6 @@ void Worker::returnWork( void ) {
                 
             }
             
-            if( conn ) daemon.unlockMaster();
-            
         }
         catch( const exception& e ) {
             LLOG_ERR(daemon.logger) << "getJob: Exception caught while returning work: " << e.what() << ende;
@@ -240,6 +240,8 @@ void Worker::returnWork( void ) {
             LLOG_ERR(daemon.logger) << "getJob: Unrecognized exception caught while returning work." << ende;
         }
 
+        if( conn ) daemon.unlockMaster();
+            
     }
 
 }
