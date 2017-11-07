@@ -2,6 +2,7 @@
 #define REDUX_LOGGING_LOGTONETWORK_HPP
 
 #include <redux/logging/logoutput.hpp>
+#include <redux/network/host.hpp>
 #include <redux/network/tcpconnection.hpp>
 
 #include <fstream>
@@ -17,14 +18,17 @@ namespace redux {
         class LogToNetwork : public LogOutput {
 
         public:
-            LogToNetwork( const network::TcpConnection::Ptr&, uint32_t id, uint8_t m=LOG_MASK_ANY, unsigned int flushPeriod=5);
+            LogToNetwork( boost::asio::io_service&, const network::Host::Ptr&, uint32_t id, uint8_t m=LOG_MASK_ANY, unsigned int flushPeriod=5);
             ~LogToNetwork();
 
+            void connect(void);
             void flushBuffer( void );
 
         private:
-
+            boost::asio::io_service& service;
+            network::Host::Ptr host;
             network::TcpConnection::Ptr conn;
+            uint32_t id;
 
         };
 

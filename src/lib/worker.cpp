@@ -163,7 +163,7 @@ bool Worker::getWork( void ) {
                         }
                         TcpConnection::Ptr logConn;
                         daemon.connect( daemon.myMaster.host->info, logConn );
-                        wip->job->logger.addNetwork( logConn, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
+                        wip->job->logger.addNetwork( daemon.ioService, daemon.myMaster.host, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
                     }
                     wip->job->init();
                     wip->previousJob = wip->job;

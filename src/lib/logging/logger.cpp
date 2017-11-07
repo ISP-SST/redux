@@ -224,32 +224,24 @@ void Logger::addFile( const std::string &filename, uint8_t m, bool replace, unsi
 }
 
 
-void Logger::addNetwork( const TcpConnection::Ptr conn, uint32_t id, uint8_t m, unsigned int flushPeriod ) {
+void Logger::addNetwork( boost::asio::io_service& service, const Host::Ptr host, uint32_t id, uint8_t m, unsigned int flushPeriod ) {
     
-    if( !conn ) {
+    if( host->info.connectName.empty() || !host->info.connectPort ) {
         return;
     }
     
+    string name = host->info.connectName + ":" + to_string( host->info.connectPort ) + ":" + to_string( id );
+
     if( m == 0 ) {
         m = getMask();
     }
     
     try {
-        auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists
-        string name = hexString( conn.get() );
         unique_lock<mutex> lock( outputMutex );
         OutputMap::iterator it = outputs.find( name );
-        if( it == outputs.end() ) {
-            Command cmd;
-            *conn << CMD_LOG_CONNECT << id;
-            *conn >> cmd;
-            if( cmd != CMD_OK ) {
-                getItem(LOG_MASK_ERROR) << "Failed to connect to logging server (reply: " << cmd << ")" << ende;
-            } else {
-                std::shared_ptr<LogOutput> output( new LogToNetwork( conn, id, m, flushPeriod) );
-                outputs.insert(make_pair( name, output ));
-            }
-        }
+        if( it != outputs.end() ) return;
+        std::shared_ptr<LogOutput> output( new LogToNetwork( service, host, id, m, flushPeriod ) );
+        outputs.insert(make_pair( name, output ));
     } catch ( std::exception& e ) {
         getItem(LOG_MASK_ERROR) << "Logger::addNetwork exception: " << e.what() << ende;
         throw;

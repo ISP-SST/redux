@@ -35,7 +35,7 @@ namespace redux {
             void addLogger( Logger& );      // forward output to another Logger instance.
             void addStream( std::ostream&, uint8_t m=0, unsigned int flushPeriod=1 );
             void addFile( const std::string &filename, uint8_t m=0, bool replace=false, unsigned int flushPeriod=1 );
-            void addNetwork( const network::TcpConnection::Ptr, uint32_t id, uint8_t m=0, unsigned int flushPeriod=5 );
+            void addNetwork( boost::asio::io_service&, const network::Host::Ptr, uint32_t id, uint8_t m=0, unsigned int flushPeriod=5 );
             void removeOutput( const std::string& );
             void removeAllOutputs( void );
             void addConnection( network::TcpConnection::Ptr conn, network::Host::Ptr host );

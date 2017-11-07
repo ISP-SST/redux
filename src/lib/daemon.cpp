@@ -248,7 +248,7 @@ bool Daemon::workerInit( void ) {
         connect( myMaster.host->info, logConn );
 
         int remoteLogFlushPeriod = 5;       // TODO make this a config setting.
-        logger.addNetwork( logConn, 0, Logger::getDefaultMask(), remoteLogFlushPeriod );
+        logger.addNetwork( ioService, myMaster.host, 0, Logger::getDefaultMask(), remoteLogFlushPeriod );
         logger.setContext( myInfo.info.name+":"+to_string(myInfo.info.pid) );
         logger.setFlushPeriod( remoteLogFlushPeriod );
 
@@ -283,8 +283,10 @@ void Daemon::connect( network::Host::HostInfo& host, network::TcpConnection::Ptr
         conn->socket().close();
     }
 
+#ifdef DEBUG_
     LOG_TRACE << "Attempting to connect to " << host.connectName << ":" << host.connectPort << ende;
-
+#endif
+    
     try {
         conn->connect( host.connectName, to_string(host.connectPort) );
         if( conn->socket().is_open() ) {
