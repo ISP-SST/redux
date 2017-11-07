@@ -13,6 +13,7 @@
 #include "redux/revision.hpp"
 
 #include <functional>
+#include <sys/resource.h> 
 
 #include <boost/asio/time_traits.hpp>
 #include <boost/algorithm/string.hpp>
@@ -95,6 +96,17 @@ void Daemon::serverInit( void ) {
         server->accept();
         myInfo.info.peerType |= Host::TP_MASTER;
         LOG_DETAIL << "Starting server on port " << params["port"].as<uint16_t>() << "." << ende;
+        struct rlimit rl;   // FIXME: fugly hack until the FD usage is more streamlined.
+        if( getrlimit(RLIMIT_NOFILE, &rl) ) {
+            LOG_WARN << "Failed to get limit on file-descriptors. errno:" << strerror(errno) << ende;
+        } else if( rl.rlim_cur < rl.rlim_max ) {
+            LOG_DEBUG << "Raising max open files from " << rl.rlim_cur << " to " << rl.rlim_max << ende;
+            rl.rlim_cur = rl.rlim_max;
+            if( setrlimit(RLIMIT_NOFILE, &rl) ) {
+                LOG_ERR << "Failed to set limit on file-descriptors to max value. errno:" << strerror(errno) << ende;
+            }
+        }
+        
     }
 }
 
