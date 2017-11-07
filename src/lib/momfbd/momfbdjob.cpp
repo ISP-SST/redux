@@ -240,6 +240,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
     
     bool ret(false);
     uint16_t step = info.step.load();
+    uint16_t origStep = step;
     if( (step == JSTEP_COMPLETED) || (step == JSTEP_ERR) ) {
         return false;
     }
@@ -285,23 +286,23 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
         if( step == JSTEP_SUBMIT ) {
             startLog();
             if( checkData() ) {
-                info.step = JSTEP_CHECKED;
+                step = info.step = JSTEP_CHECKED;
             } else {
-                info.step = JSTEP_ERR;
+                step = info.step = JSTEP_ERR;
             }
             stopLog();
         }
         
-        if( (step == JSTEP_PREPROCESS) && checkPre() ) {
-            info.step = JSTEP_QUEUED;
-        }
-        
+//         if( (step == JSTEP_PREPROCESS) && checkPre() ) {
+//             step = info.step = JSTEP_QUEUED;
+//         }
+//         
         if( (step == JSTEP_VERIFIED) && checkPost() ) {
             ret = true;
         }
         
         if( (step == JSTEP_WRITING) && checkWriting() ) {
-            info.step = JSTEP_COMPLETED;
+            step = info.step = JSTEP_COMPLETED;
         }
 
         // check against maximum allowed active
@@ -324,7 +325,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
         
     }
     
-    if( info.step != step ) {
+    if( info.step != origStep ) {
         updateProgressString();
     }
     
@@ -611,7 +612,8 @@ void MomfbdJob::unloadCalib( boost::asio::io_service& service ) {
     } else {
         LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued:"
             << "  nPatches = " << patches.nElements() << "  nObjects = " << objects.size() << ende;
-        //info.step.store( JSTEP_QUEUED );
+        info.step.store( JSTEP_QUEUED );
+        updateProgressString();
         //info.progressString = "Q";
         //info.step.store( JSTEP_DONE );
         //check();
@@ -975,14 +977,15 @@ bool MomfbdJob::check(void) {
     
     bool ret(false);
     uint16_t step = info.step;
+           bool skipCheck = ((info.flags&Job::CHECKED) || (info.flags&Job::NOCHECK));
     switch (step) {
         case JSTEP_NONE: {
-            ret = checkCfg() && checkData(false);// && checkCacheUsage();
+             ret = skipCheck || (checkCfg() && checkData(false));// && checkCacheUsage();
             if(ret) info.step = JSTEP_SUBMIT;
             break;
         }
         case JSTEP_SUBMIT: {
-            ret = checkData(true); // && checkCacheUsage();
+            ret = skipCheck || checkData(true); // && checkCacheUsage();
             if(ret) info.step = JSTEP_CHECKED;
             break;
         }
