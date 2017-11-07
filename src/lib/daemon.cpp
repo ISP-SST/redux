@@ -32,7 +32,8 @@ namespace {
 }
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
-    hostTimeout(3600), inTransfers(10), outTransfers(10), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+    hostTimeout(3600), inTransfers(-1), outTransfers(-1), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+
         
     file::setErrorHandling( file::EH_THROW );   // we want to catch and print messages to the log.
 
@@ -45,7 +46,7 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
     }
 
     if( params.count("max-transfers") ) {
-        uint16_t maxTransfers = params["max-transfers"].as<uint16_t>();
+        uint32_t maxTransfers = params["max-transfers"].as<uint32_t>();
         inTransfers.set( maxTransfers );
         outTransfers.set( maxTransfers );
     }
@@ -415,6 +416,7 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
             lock_guard<mutex> lock( peerMutex );
             connHost = connections[conn];
             if( !connHost ) throw std::exception();
+            connHost->touch();
             auto it = peerWIP.find(connHost);
             if( it != peerWIP.end() ) {
                 connWIP = it->second;
@@ -423,7 +425,6 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
             removeConnection(conn);
             return;
         }
-        connHost->touch();
         processCommand( conn, cmd );
         conn->idle();
     } catch( const std::exception& e ) {      // disconnected -> close socket and return.
@@ -552,11 +553,14 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
     auto connit = connections.find(conn);
     if( connit != connections.end() ) {
         Host::Ptr& host = connit->second;
+        host->nConnections--;
+        bool lastConnection( !host->nConnections );
+        bool haveWIP(false);
         auto wipit = peerWIP.find( host );
         if( wipit != peerWIP.end() ) {
             WorkInProgress::Ptr& wip = wipit->second;
-            LOG_NOTICE << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
-            if( wip ) {
+            haveWIP = true;
+            if( lastConnection && wip ) {
                 if( wip->job && !wip->parts.empty() ) {
                     LOG_NOTICE << "Returning unfinished work to queue: " << wip->print() << ende;
                     wip->job->ungetWork( wip );
@@ -566,7 +570,9 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
                 peerWIP.erase(wipit);
             }
         }
-        host->nConnections--;
+        if( haveWIP && lastConnection ) {
+            LOG_NOTICE << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
+        }
         host.reset();
         connections.erase(connit);
     }
@@ -1069,6 +1075,15 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
     Semaphore::Scope ss( outTransfers, 5 ); // if we 're not allowed a transfer-slot in 5 secs, idle slave & try later.
      
     if( ss ) {
+        
+        if( !connWIP ) {
+            connWIP = std::make_shared<WorkInProgress>();
+            lock_guard<mutex> lock( peerMutex );
+            auto rit = peerWIP.emplace( connHost, connWIP );
+            if( !rit.second ) {
+                LOG_ERR << "Failed to insert new connection into peerWIP" << ende;
+            }
+        }
 
         if( connWIP->job && connWIP->parts.size() ) {   // parts should have been cleared when results returned.
             connWIP->job->ungetWork( connWIP );
@@ -1163,7 +1178,7 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
 void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
 
     uint64_t blockSize(0);
-    unique_lock<mutex>( jobsMutex );
+    //unique_lock<mutex> lock( jobsMutex );
     for( auto & job : jobs ) {
         blockSize += job->size();
     }
@@ -1174,6 +1189,7 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
     for( auto & job : jobs ) {
         packedSize += job->pack( ptr+packedSize );
     }
+    //lock.unlock();
     if( packedSize > blockSize ) {
         string msg = "sendJobList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
@@ -1208,7 +1224,7 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
 void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 
     uint64_t blockSize(0);
-    unique_lock<mutex>( jobsMutex );
+    //unique_lock<mutex> lock( jobsMutex );
     for( auto & job : jobs ) {
         if(job) {
             blockSize += job->info.size();
@@ -1225,6 +1241,7 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
             packedSize += job->info.pack( ptr+packedSize );
         }
     }
+    //lock.unlock();
     if( packedSize > blockSize ) {
         string msg = "sendJobStats(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
@@ -1280,13 +1297,13 @@ void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
 
         Command ret = CMD_ERR;
         if( logid == 0 ) {
-            logger.addConnection( conn, connections[conn] );
+            logger.addConnection( conn, connHost );
             ret = CMD_OK;
         } else {
-            unique_lock<mutex>( jobsMutex );
+            //unique_lock<mutex> lock( jobsMutex );
             for( Job::JobPtr & job : jobs ) {
                 if( job && (job->info.id == logid) ) {
-                    job->logger.addConnection( conn, connections[conn] );
+                    job->logger.addConnection( conn, connHost );
                     ret = CMD_OK;
                 }
             }
