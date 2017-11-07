@@ -149,12 +149,16 @@ void printPeerList( TcpConnection::Ptr conn, int ns, int sorting ) {
     uint64_t count(0);
     try {
         vector<Host::Ptr> hosts;
-        cout << "    " << Host::printHeader() << endl;
+        cout << "    " << Host::printHeader();
+        int nIdle(0);
         while( count < blockSize ) {
             Host::Ptr peer(new Host);
             count += peer->unpack( ptr+count, conn->getSwapEndian() );
+            if( peer->status.state == Host::ST_IDLE ) nIdle++;
             hosts.push_back(peer);
         }
+        if( nIdle ) cout << "   (idle:" << nIdle << ")";
+        cout << endl;
         if( sorting == by_runtime ) std::sort( hosts.begin()+1, hosts.end(), host_by_runtime );
         int nHosts = hosts.size();
         bool addComma(false);
