@@ -75,6 +75,7 @@ bool Worker::fetchWork( void ) {
 
     bool ret = false;
     network::TcpConnection::Ptr conn;
+    string msg;
     
     try {
 
@@ -107,14 +108,20 @@ bool Worker::fetchWork( void ) {
         
     }
     catch( const exception& e ) {
-        LLOG_ERR(daemon.logger) << "fetchWork: Exception caught while fetching job: " << e.what() << ende;
-        if( conn ) conn->socket().close();
-        ret = false;
+        msg = "fetchWork: Exception caught while fetching job: ";
+        msg += e.what();
     }
     catch( ... ) {
-        LLOG_ERR(daemon.logger) << "fetchWork: Unrecognized exception caught while fetching job." << ende;
-        if( conn ) conn->socket().close();
+        msg = "fetchWork: Unrecognized exception caught while fetching job.";
+    }
+    
+    if( !msg.empty() ) {
+        try {   // only log if the connection was not severed (otherwise the manager will get spammed by messages on restart)
+            auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists, will throw if not connected.
+            LLOG_ERR(daemon.logger) << "fetchWork: Unrecognized exception caught while fetching job." << ende;
+        } catch ( ... ) {}
         ret = false;
+        if( conn ) conn->socket().close();
     }
     
     if(conn) daemon.unlockMaster();
