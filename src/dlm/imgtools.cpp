@@ -2646,6 +2646,7 @@ namespace mz {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_INT blend;
         IDL_INT clip;
+        IDL_INT crop;
         IDL_INT help;
         IDL_INT margin;
         IDL_INT transpose;
@@ -2655,6 +2656,7 @@ namespace mz {
     IDL_KW_PAR kw_pars[] = {   IDL_KW_FAST_SCAN,       // NOTE:  The keywords MUST be listed in alphabetical order !!
         { ( char* ) "BLEND",         IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( blend ) },
         { ( char* ) "CLIP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( clip ) },
+        { ( char* ) "CROP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( crop ) },
         { ( char* ) "HELP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( help ) },
         { ( char* ) "MARGIN",        IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
         { ( char* ) "TRANSPOSE",     IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( transpose ) },
@@ -2674,6 +2676,7 @@ namespace mz {
                 ret +=  "   Accepted Keywords:\n"
                         "      BLEND               Size of smoothing region. (default = PatchSize/8)\n"
                         "      CLIP                Remove empty border after mozaic.\n"
+                        "      CROP                Crop away the fixed boundary.\n"
                         "      HELP                Display this info.\n"
                         "      MARGIN              Ignore outermost m pixels in each patch (default = PatchSize/8)\n"
                         "      TRANSPOSE           Transpose each patch before mozaic, and the resulting image afterwards.\n"
@@ -2772,7 +2775,8 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
         cout << "Mozaic:  nPatches = " << nPatches << endl;
         cout << "          imgSize = (" << imgCols << "," << imgRows << ")" << endl;
         cout << "        patchSize = (" << pCols << "," << pRows << ")" << endl;
-        cout << "             clip = " << ( kw.clip?"YES":"NO" ) << endl;
+        if( kw.crop ) cout << "             crop = YES" << endl;
+        else cout << "             clip = " << ( kw.clip?"YES":"NO" ) << endl;
         cout << "           margin = " << kw.margin << endl;
         cout << "            blend = " << kw.blend << endl;
         cout << "        transpose = " << ( kw.transpose?"YES":"NO" ) << endl;
@@ -2814,18 +2818,29 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
             default: ;
         }
        
-        if( kw.clip ) {
-            redux::image::img_trim( tmpImg, imgRows, imgCols, 1E-15 );
+        if( !kw.transpose ) {
+            redux::util::transpose( *tmpImg, imgRows, imgCols );
+            std::swap(imgRows, imgCols);
+            std::swap(minPosY, minPosX);
         }
         
-        //if( !kw.transpose ) {
-        //    redux::util::transpose( *tmpImg, imgRows, imgCols );
-        //    std::swap(imgRows, imgCols);
-        //}
+        size_t rm = std::max(pCols,pRows)/8; // hardcoded margin matching the one calculated in momfbd_read
+        if( kw.crop && (imgRows-minPosY>2*rm) && (imgCols-minPosX>2*rm) ) {
+            imgRows -= minPosY+2*rm;
+            imgCols -= minPosX+2*rm;
+            for( size_t i(0); i<imgRows; ++i ) {
+                memcpy( *tmpImg+i*imgRows, tmpImg[rm+minPosY+i]+rm+minPosX, imgRows*sizeof(double) );
+            }
+            IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
+            char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
+            copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
+        } else if( kw.clip ) {
+            redux::image::img_trim( tmpImg, imgRows, imgCols, 1E-15 );
+            IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
+            char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
+            copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
+        }
         
-        IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
-        char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
-        copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
         delArray( tmpImg );
         
     } catch( const exception& e ) {

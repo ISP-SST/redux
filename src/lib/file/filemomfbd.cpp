@@ -340,14 +340,14 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
 }
 
 
-FileMomfbd::FileMomfbd ( void ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), startX ( 0 ), endX ( 0 ), startY ( 0 ), endY ( 0 ),
+FileMomfbd::FileMomfbd ( void ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), 
     nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( 0 ),
     modesOffset ( 0 ), filenameOffset ( 0 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false )  {
 
 }
 
 
-FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), startX ( 0 ), endX ( 0 ), startY ( 0 ), endY ( 0 ),
+FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN),
     nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( -1 ),
     modesOffset ( -1 ), filenameOffset ( -1 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false ) {
 
@@ -401,7 +401,7 @@ size_t FileMomfbd::getPatchSize( const FileMomfbd* const info, uint8_t loadMask,
 void FileMomfbd::clear(void) {
     
     version = 0;
-    startX = endX = startY = endY = 0;
+    memset( region, 0, 4*sizeof(int32_t) );
     nChannels = 0;
     nFileNames = 0;
     nPH = 0;
@@ -518,14 +518,20 @@ void FileMomfbd::read ( std::ifstream& file ) {
         swapEndian ( nPoints );
     }
 
+    region[0] = region[2] = numeric_limits<int32_t>::max();
+    region[1] = region[3] = numeric_limits<int32_t>::min();
     patches.resize ( nPatchesX, nPatchesY );
     for ( int x = 0; x < nPatchesX; ++x ) {
         for ( int y = 0; y < nPatchesY; ++y ) {
             FileMomfbd::PatchInfo* patch = patches.ptr ( x, y );
             dataMask |= patch->parse ( file, swapNeeded, version );
+            region[0] = std::min( region[0], patch->region[0] );
+            region[1] = std::max( region[1], patch->region[1] );
+            region[2] = std::min( region[2], patch->region[2] );
+            region[3] = std::max( region[3], patch->region[3] );
         }
     }
-
+    
     try {
         readOrThrow ( file, &nFileNames, 1, "FileMomfbd:nFileNames" );
         dataMask |= MOMFBD_NAMES;

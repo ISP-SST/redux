@@ -80,7 +80,7 @@ namespace redux {
 
             std::shared_ptr<int16_t> clipStartX, clipEndX, clipStartY, clipEndY;
 
-            int32_t startX, endX, startY, endY;
+            int32_t region[4];         //!< FirstX, LastX, FirstY, LastY
             int32_t nChannels, nFileNames;
             int32_t nPH, nModes;
             int32_t nPatchesX, nPatchesY, nPoints;

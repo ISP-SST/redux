@@ -134,6 +134,7 @@ namespace {
         IDL_INT alpha;
         IDL_INT check;
         IDL_INT clip;
+        IDL_INT crop;
         IDL_INT div;
         IDL_INT help;
         IDL_INT img;
@@ -153,6 +154,7 @@ namespace {
         { ( char* ) "ALPHA",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( alpha ) },
         { ( char* ) "CHECK",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( check ) },
         { ( char* ) "CLIP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( clip ) },
+        { ( char* ) "CROP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( crop ) },
         { ( char* ) "DIV",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( div ) },
         { ( char* ) "HELP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( help ) },
         { ( char* ) "IMG",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( img ) },
@@ -244,6 +246,7 @@ namespace {
         cout << "        /NAMES                   Read/write Filenames used in reconstruction. (if present in file/struct)\n";
         cout << "        /ALL                     Read/write all data from file.\n";
         cout << "        /CLIP                    Remove dark rows/columns along edges after mozaic.\n";
+        cout << "        /CROP                    Remove the fixed-size border around the mozaic.\n";
         cout << "        MARGIN=m                 Ignore outermost m pixels in each patch (default = PatchSize/8)\n";
         cout << "        /NOTRANSPOSE             Do not transpose after mozaic. (transposing is default for backwards compatibility with old momfbd DLM)\n";
         cout << "        VERBOSE={0,1,2}          Verbosity, default is 0 (no output)." << endl;
@@ -359,6 +362,12 @@ namespace {
             appendTag ( tags, "CLIP", tmpDims, ( void* ) IDL_TYP_INT );
         }
 
+        // ROI will indicate the size of the mozaiced/clipped image.
+        tmpDims = new IDL_MEMINT[1];
+        tmpDims[0] = 1;
+        tmpDims[1] = 4;
+        appendTag ( tags, "ROI", tmpDims, (void*)IDL_TYP_INT );
+
         if ( loadMask & MOMFBD_MODES ) {
             if ( info->version >= 20110714.0 ) {
                 appendTag ( tags, "PIX2CF", 0, ( void* ) IDL_TYP_FLOAT );
@@ -451,6 +460,15 @@ namespace {
             count += 4 * info->nChannels * sizeof ( IDL_INT );
         }
 
+        // ROI
+        int32_t margin = info->nPoints/8; // default mozaic margin-value
+        intPtr = reinterpret_cast<IDL_INT*> ( data+count );
+        intPtr[0] = info->region[0] + margin;
+        intPtr[1] = info->region[1] - margin;
+        intPtr[2] = info->region[2] + margin;
+        intPtr[3] = info->region[3] - margin;
+        count += 4 * sizeof ( IDL_INT );
+        
         if ( ( loadMask & MOMFBD_MODES ) && info->version >= 20110714.0 ) {
             fPtr = reinterpret_cast<float*> ( data+count );
             fPtr[0] = info->pix2cf;
@@ -665,8 +683,9 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     // Calculate size of data to load.
     size_t totalSize = sizeof ( MomfdContainer );
 
-    totalSize += 3 * sizeof ( IDL_STRING );                               // VERSION - TIME - DATE
-    totalSize += 4 * info->nChannels * sizeof ( IDL_INT );                      // clip-values for each channel
+    totalSize += 3 * sizeof ( IDL_STRING );                             // VERSION - TIME - DATE
+    totalSize += 4 * info->nChannels * sizeof ( IDL_INT );              // clip-values for each channel
+    totalSize += 4 * sizeof ( IDL_INT );                                // ROI
 
     if ( loadMask & MOMFBD_MODES ) {
         if ( info->version >= 20110714.0 ) {
@@ -1207,7 +1226,8 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     if ( verbosity > 0 ) {
         cout << "Mozaic:  nPatches = (" << nPatchesY << "," << nPatchesX << ")" << endl;
         cout << "        patchSize = (" << patchSizeY << "," << patchSizeX << ")" << endl;
-        cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
+if( kw.crop ) cout << "             crop = YES" << endl;
+else          cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         cout << "           margin = " << margin << endl;
         cout << "        transpose = " << ( notranspose?"NO":"YES" ) << endl;
         cout << "      " << printArray(patchesFirstX,"firstPixelX") << endl;
@@ -1296,11 +1316,19 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
         pic.permuteDimensions ( {0,1} );
     }
 
-    if ( do_clip ) {
+    int rm = std::max ( patchSizeX, patchSizeY ) / 8; // hardcoded margin matching the one calculated in momfbd_read
+    if( kw.crop && (imgSizeY>2*rm) && (imgSizeX>2*rm) ) {
         if ( verbosity > 1 ) {
-            cout << "       Clipping image." << endl;
+            cout << "       Cropping image." << endl;
         }
-        img_clip ( pic );
+        pic.setLimits( rm, imgSizeY-rm-1, rm, imgSizeX-rm-1 );
+    } else {
+        if ( do_clip ) {
+            if ( verbosity > 1 ) {
+                cout << "       Clipping image." << endl;
+            }
+            img_clip ( pic );
+        }
     }
 
     IDL_MEMINT dims[] = { ( int ) pic.dimSize ( 1 ), ( int ) pic.dimSize ( 0 ) };
