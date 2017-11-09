@@ -1314,6 +1314,7 @@ else          cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         }
         redux::util::transpose ( pic.ptr ( 0 ), pic.dimSize ( 0 ), pic.dimSize ( 1 ) );
         pic.permuteDimensions ( {0,1} );
+        std::swap( imgSizeY, imgSizeX );
     }
 
     int rm = std::max ( patchSizeX, patchSizeY ) / 8; // hardcoded margin matching the one calculated in momfbd_read

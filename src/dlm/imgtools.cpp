@@ -2679,7 +2679,7 @@ namespace mz {
                         "      CROP                Crop away the fixed boundary.\n"
                         "      HELP                Display this info.\n"
                         "      MARGIN              Ignore outermost m pixels in each patch (default = PatchSize/8)\n"
-                        "      TRANSPOSE           Transpose each patch before mozaic, and the resulting image afterwards.\n"
+                        "      TRANSPOSE           Transpose each patch before mozaic, and transpose the final image back afterwards.\n"
                         "      VERBOSE             Verbosity, default is 0 (only error output).\n";
             }
         } else ret += "\n";
@@ -2740,6 +2740,8 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
         if( i > maxPosX ) maxPosX = i;
         if( i < minPosX ) minPosX = i;
     }
+    maxPosX -= minPosX;
+    for( auto& i: posX ) i -= minPosX;
     
     int32_t maxPosY(0);
     int32_t minPosY( std::numeric_limits<int32_t >::max() );
@@ -2747,6 +2749,8 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
         if( i > maxPosY ) maxPosY = i;
         if( i < minPosY ) minPosY = i;
     }
+    maxPosY -= minPosY;
+    for( auto& i: posY ) i -= minPosY;
     
     if( kw.margin < 0 ) {
         kw.margin = std::max(pCols,pRows)/8; // number of pixels to cut from the edges of each path,
@@ -2761,20 +2765,17 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
         return IDL_GettmpInt(0);
     }
     
-    size_t imgCols = maxPosX;
-    size_t imgRows = maxPosY;
-    if( kw.transpose ) {
-        imgCols += pRows;
-        imgRows += pCols;
-    } else {
-        imgCols += pCols;
-        imgRows += pRows;
-    }
+    size_t imgCols = maxPosX+pCols;
+    size_t imgRows = maxPosY+pRows;
 
     if ( kw.verbose > 0 ) {
         cout << "Mozaic:  nPatches = " << nPatches << endl;
         cout << "          imgSize = (" << imgCols << "," << imgRows << ")" << endl;
         cout << "        patchSize = (" << pCols << "," << pRows << ")" << endl;
+        if ( kw.verbose > 1 ) {
+            cout << "      " << printArray(posX,"patchPositionsX") << endl;
+            cout << "      " << printArray(posY,"patchPositionsY") << endl;
+        }
         if( kw.crop ) cout << "             crop = YES" << endl;
         else cout << "             clip = " << ( kw.clip?"YES":"NO" ) << endl;
         cout << "           margin = " << kw.margin << endl;
@@ -2818,28 +2819,22 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
             default: ;
         }
        
-        if( !kw.transpose ) {
-            redux::util::transpose( *tmpImg, imgRows, imgCols );
-            std::swap(imgRows, imgCols);
-            std::swap(minPosY, minPosX);
-        }
-        
         size_t rm = std::max(pCols,pRows)/8; // hardcoded margin matching the one calculated in momfbd_read
-        if( kw.crop && (imgRows-minPosY>2*rm) && (imgCols-minPosX>2*rm) ) {
-            imgRows -= minPosY+2*rm;
-            imgCols -= minPosX+2*rm;
+        if( kw.crop && (imgRows>2*rm) && (imgCols>2*rm) ) {
+            imgRows -= 2*rm;
+            imgCols -= 2*rm;
             for( size_t i(0); i<imgRows; ++i ) {
-                memcpy( *tmpImg+i*imgRows, tmpImg[rm+minPosY+i]+rm+minPosX, imgRows*sizeof(double) );
+                memcpy( *tmpImg+i*imgCols, tmpImg[rm+i]+rm, imgCols*sizeof(double) );
             }
-            IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
-            char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
-            copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
         } else if( kw.clip ) {
             redux::image::img_trim( tmpImg, imgRows, imgCols, 1E-15 );
-            IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
-            char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
-            copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
         }
+        
+        redux::util::transpose( *tmpImg, imgRows, imgCols );
+        
+        IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgRows), static_cast<IDL_LONG64>(imgCols) };
+        char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
+        copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
         
         delArray( tmpImg );
         
