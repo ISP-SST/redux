@@ -1192,6 +1192,7 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     info->nPatchesY = patchesData.dimSize(0 );
     info->nPatchesX = patchesData.dimSize(1 );
     info->patches.resize(info->nPatchesX, info->nPatchesY );
+    info->nPoints = patchSize;
 
     size_t modeSize = tmpModes.nElements()*sizeof( float );
     size_t blockSize = modeSize;

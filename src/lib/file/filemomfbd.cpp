@@ -529,6 +529,9 @@ void FileMomfbd::read ( std::ifstream& file ) {
             region[1] = std::max( region[1], patch->region[1] );
             region[2] = std::min( region[2], patch->region[2] );
             region[3] = std::max( region[3], patch->region[3] );
+            if( nPoints == 0 ) {    // hack for momfbd-files that does not have the nPoints value stored.
+                nPoints = abs(patch->region[1]-patch->region[0])+1;
+            }
         }
     }
     

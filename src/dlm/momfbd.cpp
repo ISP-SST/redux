@@ -367,6 +367,9 @@ namespace {
         tmpDims[0] = 1;
         tmpDims[1] = 4;
         appendTag ( tags, "ROI", tmpDims, (void*)IDL_TYP_INT );
+        
+        // The default margin that mozaic will use with /crop & /clip
+        appendTag ( tags, "MARGIN", 0, ( void* ) IDL_TYP_INT );
 
         if ( loadMask & MOMFBD_MODES ) {
             if ( info->version >= 20110714.0 ) {
@@ -467,7 +470,10 @@ namespace {
         intPtr[1] = info->region[1] - margin;
         intPtr[2] = info->region[2] + margin;
         intPtr[3] = info->region[3] - margin;
-        count += 4 * sizeof ( IDL_INT );
+        intPtr[4] = margin;                         // margin
+        count += 5 * sizeof ( IDL_INT );
+        
+        while ( count % 4 ) count++;                // align to 4-byte boundary
         
         if ( ( loadMask & MOMFBD_MODES ) && info->version >= 20110714.0 ) {
             fPtr = reinterpret_cast<float*> ( data+count );
@@ -685,7 +691,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
     totalSize += 3 * sizeof ( IDL_STRING );                             // VERSION - TIME - DATE
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );              // clip-values for each channel
-    totalSize += 4 * sizeof ( IDL_INT );                                // ROI
+    totalSize += 5 * sizeof ( IDL_INT );                                // ROI + MARGIN
 
     if ( loadMask & MOMFBD_MODES ) {
         if ( info->version >= 20110714.0 ) {
