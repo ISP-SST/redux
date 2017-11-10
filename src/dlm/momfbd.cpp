@@ -466,10 +466,10 @@ namespace {
         // ROI
         int32_t margin = info->nPoints/8; // default mozaic margin-value
         intPtr = reinterpret_cast<IDL_INT*> ( data+count );
-        intPtr[0] = info->region[0] + margin;
-        intPtr[1] = info->region[1] - margin;
-        intPtr[2] = info->region[2] + margin;
-        intPtr[3] = info->region[3] - margin;
+        intPtr[0] = info->region[0];
+        intPtr[1] = info->region[1];
+        intPtr[2] = info->region[2];
+        intPtr[3] = info->region[3];
         intPtr[4] = margin;                         // margin
         count += 5 * sizeof ( IDL_INT );
         
