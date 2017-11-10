@@ -692,6 +692,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     totalSize += 3 * sizeof ( IDL_STRING );                             // VERSION - TIME - DATE
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );              // clip-values for each channel
     totalSize += 5 * sizeof ( IDL_INT );                                // ROI + MARGIN
+    while ( totalSize % 4 ) totalSize++;                // align to 4-byte boundary
 
     if ( loadMask & MOMFBD_MODES ) {
         if ( info->version >= 20110714.0 ) {
