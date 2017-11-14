@@ -42,6 +42,7 @@ namespace redux {
         bool isHex( const std::string &s );
         bool contains(const std::string & haystack, const std::string & needle, bool ignoreCase=false);
         std::string replace_n(std::string input, const std::string& loc, const std::string& replace, size_t n=1);
+        std::string popword( std::string &line, const char *separator = " \t\n" );
         bool nocaseLess(const std::string& lhs, const std::string& rhs);
         
         bool isRelative( const std::string& );
@@ -498,6 +499,10 @@ namespace redux {
         std::string tsToString( const timespec&, bool millis = false );
 
 
+        std::string demangle_name( const std::string& name );
+        std::string demangle_symbol( const std::string& sym );
+        
+        
         /*! @} */
 
 

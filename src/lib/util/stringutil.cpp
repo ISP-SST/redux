@@ -8,6 +8,10 @@
 #include <pwd.h>
 #include <unistd.h>
 
+#ifdef __GNUG__
+#   include <cxxabi.h>
+#endif
+
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -90,6 +94,24 @@ string redux::util::replace_n( std::string input, const std::string& loc, const 
     
     return input;
     
+}
+
+
+string redux::util::popword( std::string &line, const char *separator ) {
+    
+    size_t pos = line.find_first_not_of( separator );
+    if( pos == string::npos ) line.clear();
+    else if( pos ) line.erase(0, pos);
+    
+    pos = line.find_last_not_of( separator );
+    if( pos != string::npos ) line.erase(pos+1);
+    else line.clear();
+    
+    pos = line.find_first_of( separator );
+    string result( line, 0, pos );
+    line.erase( 0, pos );
+
+    return result;
 }
 
 
@@ -358,4 +380,32 @@ string redux::util::tsToString( const timespec& a, bool millis ) {
 
 }
 
+
+#ifdef __GNUG__
+    std::string redux::util::demangle_name( const string& name ) {
+        int status(0);
+        std::unique_ptr<char, void(*)(void*)> res {
+            abi::__cxa_demangle( name.c_str(), 0, 0, &status ),
+            std::free
+        };
+        return (status==0) ? res.get() : name ;
+    }
+#else
+    std::string redux::util::demangle_name( const string& name ) { return name; }    // TODO: implement
+#endif
+
+
+string redux::util::demangle_symbol( const string& sym ) {
+    // Example symbol: ./module(func_name+0x15c) [0x8048a6d]
+    static const boost::regex sym_re("([[:alnum:]_]+)[+ ]+([0x[:xdigit:]]+)");      // match func_name & offset
+    boost::regex re( "(\\d+)+" );
+    boost::smatch match;
+    string ret = sym;
+    if( boost::regex_search( sym, match, sym_re ) ) {
+        string sym_name = string(match[1]);
+        ret = demangle_name( sym_name );
+    }
+    return ret;
+
+}
 
