@@ -712,8 +712,8 @@ void MomfbdJob::initCache(void) {
 
     if( !globalData ) {
         globalData.reset(new GlobalData(*this));
-        globalData->constraints.init();
     }
+    globalData->constraints.init();
 //globalData->constraints.dump();
     for( auto& obj: objects ) {
         obj->initCache();
