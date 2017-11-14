@@ -3,7 +3,7 @@
 
 #include "redux/util/stringutil.hpp"
 #include "redux/util/array.hpp"
-#include "redux/util/cache.hpp"
+#include "redux/util/cacheitem.hpp"
 #include "redux/util/point.hpp"
 
 #include <cstdint>

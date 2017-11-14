@@ -2,7 +2,7 @@
 #define REDUX_WORK_HPP
 
 #include "redux/network/tcpconnection.hpp"
-#include "redux/util/cache.hpp"
+#include "redux/util/cacheitem.hpp"
 
 #include <cstdint>
 #include <memory>

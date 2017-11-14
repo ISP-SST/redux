@@ -4,20 +4,17 @@
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
-#include <fstream>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <string>
-#include <typeinfo>
+
 #include <vector>
+#include <sys/types.h> 
+#include <unistd.h> 
 
-#include <boost/filesystem.hpp>
-
-#include <iostream>
-
-namespace bfs=boost::filesystem;
 
 namespace redux {
 
@@ -40,6 +37,25 @@ namespace redux {
         class Cache {
 
         public:
+            
+            typedef std::function<void(void)> void_cb;
+            typedef std::function<std::string(void)> string_cb;
+
+            struct Info {
+                Info( size_t id, const std::string& name, size_t typeSize=0 );
+                Info( size_t id1, size_t id2, const std::string& name, size_t typeSize=0 );
+                inline bool operator<( const Info& rhs ) const { if (id1==rhs.id1) return id2 < rhs.id2; return id1 < rhs.id1; }
+                std::string getInfo(void) const;
+                size_t id1;
+                size_t id2;
+                std::string name;
+                size_t size;
+                mutable size_t count;
+                mutable size_t totalSize;
+                mutable void_cb clear;
+                mutable void_cb info;
+            };
+
             static void cleanup(void);
             static std::string getStats(void);
             static Cache& get(void);
@@ -49,53 +65,86 @@ namespace redux {
             template<class T>
             static int erase(const T& entry) {
                 auto s = get().getSet<T>();
+                static const Info& i = get().getSetInfo<T>();
                 int ret = s.second.erase(entry);
+                i.count = s.second.size();
                 return ret;
             }
             template<class KeyT, class T>
             static int erase(const KeyT& key) {
                 auto m = get().getMap<KeyT,T>();
+                static const Info& i = get().getMapInfo<KeyT,T>();
                 int ret = m.second.erase(key);
+                i.count = m.second.size();
                 return ret;
             }
             template<class KeyT, class T>
             static T& get(const KeyT& key, const T& val=T()) {
                 auto m = get().getMap<KeyT,T>();        // m.first is a unique_lock for the map in m.second
+                static const Info& i = get().getMapInfo<KeyT,T>();
                 auto ret = m.second.emplace(key,val);
+                i.count = m.second.size();
                 return ret.first->second;
             }
             template<class T>
             static const std::shared_ptr<T>& get(const std::shared_ptr<T>& entry) {
                 auto s = get().getSet<std::shared_ptr<T>, PtrCompare<T>>();
+                static const Info& i = get().getSetInfo<std::shared_ptr<T>, PtrCompare<T>>();
                 auto ret = s.second.emplace(entry);
+                i.count = s.second.size();
                 return *ret.first;
             }
             template<class T>
             static const T& get(const T& entry) {
                 auto s = get().getSet<T>();
+                static const Info& i = get().getSetInfo<T>();
                 auto ret = s.second.emplace(entry);
+                i.count = s.second.size();
                 return *ret.first;
             }
             template<class KeyT, class T>
             static void clear(void) {
                 auto m = get().getMap<KeyT,T>();
+                static const Info& i = get().getMapInfo<KeyT,T>();
                 m.second.clear();
+                i.count = m.second.size();
             }
             template<class T>
             static void clear(void) {
                 auto s = get().getSet<T>();
+                static const Info& i = get().getSetInfo<T>();
                 s.second.clear();
+                i.count = s.second.size();
+            }
+            template<class KeyT, class T>
+            static size_t getID1(void) {
+                auto info = get().getMapInfo<KeyT,T>();
+                return info.id1;
+            }
+            template<class T>
+            static size_t getID1(void) {
+                auto info = get().getSetInfo<T>();
+                return info.id1;
+            }
+            template<class KeyT, class T>
+            static std::string getName(void) {
+                auto info = get().getMapInfo<KeyT,T>();
+                return info.name;
+            }
+            template<class T>
+            static std::string getName(void) {
+                auto info = get().getSetInfo<T>();
+                return info.name;
             }
             template<class KeyT, class T>
             static std::string stats(void) {
-                auto m = get().getMap<KeyT,T>();
-                return  std::string(typeid(KeyT).name()) + " -> " + std::string(typeid(T).name())
-                    + "   count: " + std::to_string(m.second.size());
+                auto info = get().getMapInfo<KeyT,T>();
+                return info.getInfo();
             }
             template<class T>
             static std::string stats(void) {
-                auto s = get().getSet<T>();
-                return std::string(typeid(T).name()) + "   count: " + std::to_string(s.second.size());
+                auto info = get().getSetInfo<T>();
+                return info.getInfo();
             }
             template<class KeyT, class T>
             static size_t size(void) {
@@ -115,6 +164,16 @@ namespace redux {
                 return ret.first->second;
                 
             }*/
+            template<class T, class U=std::less<T>>
+            const Info& getSetInfo(void) {
+                static const Info& info = initSetInfo<T,U>();
+                return info;
+            }
+            template<class KeyT, class T>
+            const Info& getMapInfo(void) {
+                static const Info& info = initMapInfo<KeyT,T>();
+                return info;
+            }
             template<class KeyT, class T>
             std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> getMap(void) {
                 static std::map<KeyT,T>& m = initMap<KeyT,T>();
@@ -129,6 +188,16 @@ namespace redux {
                 std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> ret(std::unique_lock<std::mutex>(mtx),s);
                 return std::move(ret);
             }
+            template<class KeyT, class T>
+            void for_each( std::function<void(std::pair<const KeyT,T>&)> func ) {
+                auto m = get().getMap<KeyT,T>();
+                std::for_each( m.second.begin(), m.second.end(), func );
+            }
+            template<class T, class U=std::less<T>>
+            void for_each( std::function<void(T&)> func ) {
+                auto s = get().getSet<T>();
+                std::for_each( s.second.begin(), s.second.end(), func );
+            }
 
         private:
             Cache() : path_(""), pid_(getpid()) {};
@@ -139,6 +208,40 @@ namespace redux {
             template<class T, class U>
             void setMaintenance(void) {
                 auto s = getSet<T,U>();
+            }
+            template<class KeyT, class T>
+            const Info& initMapInfo( void ) {       // called only once when a new KeyT/T pair is used.
+                const std::type_info& ki = typeid(KeyT);
+                const std::type_info& vi = typeid(T);
+                const std::string name = "std::map<"+demangle_name(ki.name())+","+demangle_name(vi.name())+">";
+                Info info( ki.hash_code(), vi.hash_code(), name, sizeof(KeyT)+sizeof(T) );
+                std::unique_lock<std::mutex> lock(mtx);
+                auto it = caches.emplace(info);
+                if( it.second ) {   // new element inserted
+                    std::function<void(void)> func = std::bind(&Cache::mapMaintenance<KeyT,T>,this);
+                    std::function<void(void)> cfunc = std::bind(&Cache::clear<KeyT,T>);
+                    std::function<std::string(void)> sfunc = std::bind(&Cache::stats<KeyT,T>);
+                    it.first->clear = cfunc;
+                    it.first->info = sfunc;
+                }
+                return *(it.first);
+            }
+            template<class T, class U>
+            const Info& initSetInfo( void ) {       // called only once when a new KeyT/T pair is used.
+                const std::type_info& ti = typeid(T);
+                const std::type_info& ui = typeid(U);
+                const std::string name = "std::set<"+demangle_name(ti.name())+">";
+                Info info( ti.hash_code(), ui.hash_code(), name, sizeof(T) );
+                std::unique_lock<std::mutex> lock(mtx);
+                auto it = caches.emplace(info);
+                if( it.second ) {   // new element inserted
+                    std::function<void(void)> func = std::bind(&Cache::setMaintenance<T,U>,this);
+                    std::function<void(void)> cfunc = std::bind(&Cache::clear<T>);
+                    std::function<std::string(void)> sfunc = std::bind(&Cache::stats<T>);
+                    it.first->clear = cfunc;
+                    it.first->info = sfunc;
+                }
+                return it.first;
             }
             template<class KeyT, class T>
             std::map<KeyT,T>& initMap(void) {       // called only once when a new KeyT/T pair is used.
@@ -168,47 +271,12 @@ namespace redux {
             std::mutex mtx;
             std::string path_;
             pid_t pid_;
+            std::set<Info> caches;
             std::vector<std::function<void(void)>> funcs;
             std::vector<std::function<void(void)>> cleanup_funcs;
             std::vector<std::function<std::string(void)>> stats_funcs;
             int pollTime;
         };
-        
-        
-        class CacheItem {
-        public:
-            CacheItem(void);
-            explicit CacheItem(const std::string& path);
-            CacheItem(const CacheItem&);
-            virtual ~CacheItem();
-            
-            /***** Methods to be overloaded *****/
-            virtual size_t csize(void) const { return 0; };                //!< returns the necessary buffer size for the call to "cpack"
-            virtual uint64_t cpack(char*) const { return 0; };             //!< put all relevant data into a char-array
-            virtual uint64_t cunpack(const char*, bool) { return 0; };     //!< read all relevant data from the char array (inverse of the above call)
-            virtual void cclear(void) {};                                  //!< free whatever memory possible, while being able to restore with "cunpack"
-            /************************************/
-            
-            void cacheClear(void);
-            void cacheRemove(void);
-            virtual void cacheTouch(void);
-            virtual bool cacheLoad(bool removeAfterLoad=false);
-            virtual bool cacheStore(bool clearAfterStore=false);
-            void setLoaded(bool il=true);
-            virtual const std::string& getFullPath(void) { return fullPath.string(); }
-            virtual void setPath( const std::string& path );
-            std::string path(void) const { return itemPath.string(); };
-        
-            
-        protected:
-            bfs::path itemPath;
-            bfs::path fullPath;
-            std::mutex itemMutex;
-            bool isLoaded;
-            uint64_t cachedSize;
-        };
-        
-        
         
         /*! @} */
 
