@@ -5,6 +5,7 @@
 #include "redux/logging/logger.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/util/bitoperations.hpp"
+#include "redux/util/cache.hpp"
 #include "redux/util/fileutil.hpp"
 #include "redux/util/stringutil.hpp"
 
