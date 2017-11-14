@@ -412,20 +412,20 @@ void Channel::initCache (void) {
         if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {
             mi2.firstMode = mi2.lastMode = 0;
         }
-        ModeSet& ret = myJob.globalData->get(mi2);
-        unique_lock<mutex> lock(ret.mtx);
-        if( ret.empty() ) {    // this set was inserted, so it is not generated yet.
+        const shared_ptr<ModeSet>& ret = myJob.globalData->get(mi2);
+        unique_lock<mutex> lock(ret->mtx);
+        if( ret->empty() ) {    // this set was inserted, so it is not generated yet.
             if(diversityTypes[i] == ZERNIKE) {
-                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes );
+                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes );
             } else {
-                ret.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff );
+                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff );
             }
-            if( ret.nDimensions() != 3 || ret.dimSize(1) != myObject.pupilPixels || ret.dimSize(2) != myObject.pupilPixels ) {    // mismatch
+            if( ret->nDimensions() != 3 || ret->dimSize(1) != myObject.pupilPixels || ret->dimSize(2) != myObject.pupilPixels ) {    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels
+                LOG_DEBUG << "Generated Modeset with " << ret->dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels
                 << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
-                ret.getNorms( myObject.pupil );
+                ret->getNorms( *(myObject.pupil) );
             }
         }  
     }
@@ -738,9 +738,9 @@ void Channel::initPatch (ChannelData& cd) {
     
     PointF totalshift = localShift + cd.residualOffset;
     
-    int32_t mIndex = myObject.modes.tiltMode.x;
+    int32_t mIndex = myObject.modes->tiltMode.x;
     if( mIndex >= 0 && fabs(totalshift.x) > 0 ) {
-        const double* modePtr = myObject.modes.modePointers[mIndex];
+        const double* modePtr = myObject.modes->modePointers[mIndex];
         float res = -totalshift.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [res](const double& p, const double& m) {
@@ -748,9 +748,9 @@ void Channel::initPatch (ChannelData& cd) {
             });
     }
     
-    mIndex = myObject.modes.tiltMode.y;
+    mIndex = myObject.modes->tiltMode.y;
     if( mIndex >= 0 && fabs(totalshift.y) > 0 ) {
-        const double* modePtr = myObject.modes.modePointers[mIndex];
+        const double* modePtr = myObject.modes->modePointers[mIndex];
         float res = -totalshift.y*myObject.shiftToAlpha.y;   // positive coefficient shifts image downwards
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [res](const double& p, const double& m) {
@@ -788,29 +788,29 @@ void Channel::initPhiFixed(void) {
             mi2.firstMode = mi2.lastMode = 0;
         }
         mi2.modeNumber = modeNumber;
-        ModeSet& ms = myJob.globalData->get(mi2);
+        const shared_ptr<ModeSet>& ms = myJob.globalData->get(mi2);
 
-        if( ms.empty() ) {    // generate
+        if( ms->empty() ) {    // generate
             if( diversityTypes[i] == ZERNIKE ) {
-                ms.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
             } else {
-                ms.generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
             }
-            if( ms.nDimensions() != 3 || ms.dimSize(1) != myObject.pupilPixels || ms.dimSize(2) != myObject.pupilPixels ) {    // mismatch
+            if( ms->nDimensions() != 3 || ms->dimSize(1) != myObject.pupilPixels || ms->dimSize(2) != myObject.pupilPixels ) {    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ms.dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
+                LOG_DEBUG << "Generated Modeset with " << ms->dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
 
-//                ms.getNorms( myObject.pupil );
+//                ms->getNorms( myObject.pupil );
 //cout << "initPhiFixed " << __LINE__ << endl;
-//                ms.normalize( 1.0/myObject.wavelength );
+//                ms->normalize( 1.0/myObject.wavelength );
 //cout << "initPhiFixed " << __LINE__ << endl;
             }
         }        
-        auto it = std::find(ms.modeNumbers.begin(), ms.modeNumbers.end(), modeNumber);
-        if( it != ms.modeNumbers.end() ) {
+        auto it = std::find(ms->modeNumbers.begin(), ms->modeNumbers.end(), modeNumber);
+        if( it != ms->modeNumbers.end() ) {
             double div = diversity[i]/myObject.wavelength;     // minus/sign is just to keep old cfg-files usable.
-            const double* modePtr = ms.modePointers[static_cast<size_t>(it-ms.modeNumbers.begin())];
+            const double* modePtr = ms->modePointers[static_cast<size_t>(it-ms->modeNumbers.begin())];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
                 [div](const double& p, const double& m) {
                     return p + div*m;

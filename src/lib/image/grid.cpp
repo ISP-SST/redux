@@ -64,19 +64,22 @@ void Grid::init (void) {
 }
 
 
-Grid& Grid::get(const Grid::ID& id) {
-    Grid& grid = Cache::get<ID,Grid>( id, Grid() );
+shared_ptr<Grid> Grid::get(const Grid::ID& id) {
+    shared_ptr<Grid>& grid = Cache::get<ID,shared_ptr<Grid>>( id, nullptr );
     unique_lock<mutex> lock(mtx);
-    if( grid.id.size == 0 ) {
-        grid.id = id;
-        grid.init();
+    if( !grid ) grid.reset( new Grid() );
+    if( grid->id.size == 0 ) {
+        grid->id = id;
+        grid->init();
     }
     return grid;
 }
 
 
 void Grid::clear(void) {
-    Cache::clear<ID,Grid>();
+    
+    Cache::clear<ID,shared_ptr<Grid>>();
+    
 }
 
 /*

@@ -28,10 +28,10 @@ namespace redux {
             Grid(void) : id(0) { };
             void init(void);
             bool operator<( const Grid& rhs ) const { return ( id < rhs.id ); }
-            static Grid& get(const ID&);
-            static Grid& get(uint32_t n) { return get( ID(n) ); };
-            static Grid& get(uint32_t n, float y, float x) { return get( ID(n,y,x) ); };
-            static Grid& get(uint32_t ny, uint32_t nx, float y, float x) { return get( ID(ny,nx,y,x) ); };
+            static std::shared_ptr<Grid> get(const ID&);
+            static std::shared_ptr<Grid> get(uint32_t n) { return get( ID(n) ); };
+            static std::shared_ptr<Grid> get(uint32_t n, float y, float x) { return get( ID(n,y,x) ); };
+            static std::shared_ptr<Grid> get(uint32_t ny, uint32_t nx, float y, float x) { return get( ID(ny,nx,y,x) ); };
             static void clear(void);
         };
 

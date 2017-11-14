@@ -3,6 +3,7 @@
 #include "redux/logging/logger.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/momfbd/solver.hpp"
+#include "redux/util/cache.hpp"
 
 #include "redux/file/fileana.hpp"
 #include "redux/image/utils.hpp"
@@ -458,26 +459,26 @@ void PatchData::dump( string tag ) {
 }
 
 
-
-ModeSet& GlobalData::get(const ModeInfo& id, const ModeSet& ms) {
+shared_ptr<ModeSet> GlobalData::get(const ModeInfo& id, const shared_ptr<ModeSet>& ms) {
 
     unique_lock<mutex> lock(mtx);
     auto it = modes.find(id);
     if( it == modes.end() ){
-        ModeSet& ret = redux::util::Cache::get<ModeInfo,ModeSet>(id, ms);
+        shared_ptr<ModeSet>& ret = redux::util::Cache::get<ModeInfo,shared_ptr<ModeSet>>(id, ms);
+        if( !ret ) ret.reset( new ModeSet() );
         return modes.emplace(id, ret).first->second;
     } else return it->second;
 
 }
 
 
-
-Pupil& GlobalData::get(const PupilInfo& id, const Pupil& ms) {
+shared_ptr<Pupil> GlobalData::get(const PupilInfo& id, const shared_ptr<Pupil>& ms) {
 
     unique_lock<mutex> lock(mtx);
     auto it = pupils.find(id);
     if( it == pupils.end() ){
-        Pupil& ret = redux::util::Cache::get<PupilInfo,Pupil>(id, ms);
+        shared_ptr<Pupil>& ret = redux::util::Cache::get<PupilInfo,shared_ptr<Pupil>>(id, ms);
+        if( !ret ) ret.reset( new Pupil() );
         return pupils.emplace(id, ret).first->second;
     } else return it->second;
 
@@ -497,11 +498,11 @@ uint64_t GlobalData::size( void ) const {
     uint64_t sz = 2*sizeof(uint16_t); // nModes & nPupils
     for( auto& mode: modes ) {
         sz += mode.first.size();
-        sz += mode.second.size();
+        sz += mode.second->size();
     }
     for( auto& pupil: pupils ) {
         sz += pupil.first.size();
-        sz += pupil.second.size();
+        sz += pupil.second->size();
     }
     sz += constraints.size();
     return sz;
@@ -514,12 +515,12 @@ uint64_t GlobalData::pack( char* ptr ) const {
     uint64_t count = pack(ptr,(uint16_t)modes.size());
     for(auto& mode: modes) {
         count += mode.first.pack(ptr+count);
-        count += mode.second.pack(ptr+count);
+        count += mode.second->pack(ptr+count);
     }
     count += pack(ptr+count,(uint16_t)pupils.size());
     for(auto& pupil: pupils) {
         count += pupil.first.pack(ptr+count);
-        count += pupil.second.pack(ptr+count);
+        count += pupil.second->pack(ptr+count);
     }
     count += constraints.pack(ptr+count);
     return count;
@@ -535,8 +536,9 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
         ModeInfo id("");
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
-            ModeSet& ms = redux::util::Cache::get<ModeInfo,ModeSet>(id);
-            count += ms.unpack(ptr+count,swap_endian);
+            shared_ptr<ModeSet>& ms = redux::util::Cache::get<ModeInfo,shared_ptr<ModeSet>>(id);
+            if( !ms ) ms.reset( new ModeSet() );
+            count += ms->unpack(ptr+count,swap_endian);
             modes.emplace(id, ms);
         }
     }
@@ -545,8 +547,9 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
         PupilInfo id("");
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
-            Pupil& pup = redux::util::Cache::get<PupilInfo,Pupil>(id);
-            count += pup.unpack(ptr+count,swap_endian);
+            shared_ptr<Pupil>& pup = redux::util::Cache::get<PupilInfo,shared_ptr<Pupil>>(id);
+            if( !pup ) pup.reset( new Pupil() );
+            count += pup->unpack(ptr+count,swap_endian);
             pupils.emplace(id, pup);
         }
     }

@@ -4,6 +4,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/math/linalg.hpp"
+#include "redux/util/cache.hpp"
 #include "redux/util/datautil.hpp"
 
 #include <algorithm>

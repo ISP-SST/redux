@@ -10,6 +10,7 @@
 #include "redux/image/utils.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/translators.hpp"
+#include "redux/util/cache.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/constants.hpp"
@@ -182,8 +183,10 @@ void Object::cleanup(void ){
     PS.clear( );
     QS.clear( );
     fittedPlane.clear( );
-    pupil.clear( );
-    modes.clear( );
+    pupil->clear( );
+    modes->clear( );
+    pupil.reset( );
+    modes.reset( );
 
 }
 
@@ -215,18 +218,18 @@ void Object::initProcessing( Solver& ws ){
         initCache( );            // load global pupil/modes
         
         double mode_scale = 1.0/wavelength;
-        scaled_ms_info id( modes.info, mode_scale );
-        ModeSet& ret = redux::util::Cache::get< std::pair<ModeInfo, double>, ModeSet>(id, modes );
-        unique_lock<mutex> lock(ret.mtx );
-        if( modes.get( )== ret.get( ) ){    // rescale local modes
-            ret = modes.clone( );
-            ret.getNorms( pupil );
-            ret.normalize( mode_scale );
+        scaled_ms_info id( modes->info, mode_scale );
+        shared_ptr<ModeSet>& ret = redux::util::Cache::get< std::pair<ModeInfo, double>, shared_ptr<ModeSet>>(id, modes );
+        unique_lock<mutex> lock(ret->mtx );
+        if( modes->get() == ret->get() ){    // rescale local modes
+            *ret = modes->clone( );
+            ret->getNorms( *pupil );
+            ret->normalize( mode_scale );
         }
         modes = ret;
 
-        //shiftToAlpha = modes.shiftToAlpha;
-        shiftToAlpha = modes.shiftToAlpha*(pupilPixels*1.0/patchSize ); ///wavelength );
+        //shiftToAlpha = modes->shiftToAlpha;
+        shiftToAlpha = modes->shiftToAlpha*(pupilPixels*1.0/patchSize ); ///wavelength );
         
         defocusToAlpha = util::def2cf(myJob.telescopeD/2.0 );
         alphaToDefocus = 1.0/defocusToAlpha;
@@ -236,15 +239,15 @@ void Object::initProcessing( Solver& ws ){
 //         if( ret.empty( ) ){    // this set was inserted, so it is not loaded yet.
 //             if( ret.load( modeFile, pupilPixels ) ){
 //                 LOG_DEBUG << "Loaded Mode-file " << modeFile << ende;
-//                 ret.getNorms( pupil );
+//                 ret.getNorms( *pupil );
 //                 modes = ret;
-//                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be( y,x)=" << modes.tiltMode
+//                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be( y,x)=" << modes->tiltMode
 //                          << ".  This should be auto-detected in the future..." << ende;
 //               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
 //         }
 //         
         
-        //modes.init( myJob, *this );                 // will get modes from globalData
+        //modes->init( myJob, *this );                 // will get modes from globalData
     } else {
         LOG_ERR << "Object patchSize is 0 !!!" << ende;
     }
@@ -490,7 +493,7 @@ void Object::addDiffToPQ(const redux::image::FourierTransform& ft, const Array<c
     const complex_t *otfPtr = otf.get( );
     const complex_t *ootfPtr = oldotf.get( );
 
-    for( auto& ind: pupil.otfSupport ){
+    for( auto& ind: pupil->otfSupport ){
         qPtr[ind] += norm(otfPtr[ind] )- norm(ootfPtr[ind] );
         pPtr[ind] += conj(ftPtr[ind] )*( otfPtr[ind] - ootfPtr[ind] );
     }
@@ -502,7 +505,7 @@ void Object::addToPQ(const complex_t* pp, const double* qq ){
     lock_guard<mutex> lock( mtx );
     double *qPtr = Q.get( );
     complex_t *pPtr = P.get( );
-    for( auto& ind: pupil.otfSupport ){
+    for( auto& ind: pupil->otfSupport ){
         qPtr[ind] += qq[ind];
         pPtr[ind] += pp[ind];
     }
@@ -533,7 +536,7 @@ void Object::calcHelpers(void ){
     double *psPtr = PS.get( );
     double *qsPtr = QS.get( );
 
-    for( auto& ind: pupil.otfSupport ){
+    for( auto& ind: pupil->otfSupport ){
         pqPtr[ind] = pPtr[ind] * qPtr[ind];
         psPtr[ind] = norm( pPtr[ind] );
         qsPtr[ind] = qPtr[ind] * qPtr[ind];
@@ -589,7 +592,7 @@ void Object::calcMetric( void ){
     currentMetric = 0;
     //size_t N = 4*pupilPixels*pupilPixels;
     //for( size_t ind=0; ind<N; ++ind ){
-    for( auto & ind : pupil.otfSupport ){
+    for( auto & ind : pupil->otfSupport ){
         currentMetric +=( ftsPtr[ind] - norm( pPtr[ind] )/ qPtr[ind] );
     }
 
@@ -679,8 +682,6 @@ bool Object::checkData( bool verbose ) {
         if( !ch->checkData(verbose) ) return false;
     }
     
-    if( myJob.info.flags&Job::NOCHECK || myJob.info.flags&Job::CHECKED ) return true;
-    
     bfs::path tmpPath = tmpOF.parent_path( );
     
     try {
@@ -735,20 +736,22 @@ void Object::initCache( void ){
     
     Pupil::calculatePupilSize( frequencyCutoff, pupilRadiusInPixels, pupilPixels, wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
     
+    if( !modes ) modes.reset( new ModeSet() );
+    if( !pupil ) pupil.reset( new Pupil() );
+
     myJob.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
     myJob.pupilPixels = pupilPixels;
-
     if( bfs::is_regular_file(pupilFile ) ){
         PupilInfo info( pupilFile, pupilPixels );
-        Pupil& ret = myJob.globalData->get(info );
-        lock_guard<mutex> lock(ret.mtx );
-        if( ret.empty( ) ){    // this set was inserted, so it is not loaded yet.
-            if( ret.load( pupilFile, pupilPixels ) ){
+        shared_ptr<Pupil> ret = myJob.globalData->get(info );
+        lock_guard<mutex> lock(ret->mtx );
+        if( ret->empty( ) ){    // this set was inserted, so it is not loaded yet.
+            if( ret->load( pupilFile, pupilPixels ) ){
                 LOG << "Loaded Pupil-file " << pupilFile << ende;
                 pupil = ret;
             } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
         } else {
-            if( ret.nPixels && ret.nPixels == pupilPixels ){    // matching pupil
+            if( ret->nPixels && ret->nPixels == pupilPixels ){    // matching pupil
                 //LOG_DEBUG << "Using pre-calculated pupil: ( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
@@ -757,20 +760,20 @@ void Object::initCache( void ){
         }
     }
     
-    if( pupil.empty( ) ){
+    if( pupil->empty( ) ){
         PupilInfo info(pupilPixels, pupilRadiusInPixels );
-        Pupil& ret = myJob.globalData->get(info );
-        lock_guard<mutex> lock(ret.mtx );
-        if( ret.empty( ) ){    // this set was inserted, so it is not generated yet.
-            ret.generate( pupilPixels, pupilRadiusInPixels );
-            if( ret.nDimensions( )!= 2 || ret.dimSize(0 )!= pupilPixels || ret.dimSize(1 )!= pupilPixels ){    // mismatch
+        shared_ptr<Pupil> ret = myJob.globalData->get(info );
+        lock_guard<mutex> lock(ret->mtx );
+        if( ret->empty( ) ){    // this set was inserted, so it is not generated yet.
+            ret->generate( pupilPixels, pupilRadiusInPixels );
+            if( ret->nDimensions( )!= 2 || ret->dimSize(0 )!= pupilPixels || ret->dimSize(1 )!= pupilPixels ){    // mismatch
                 LOG_ERR << "Generated Pupil does not match. This should NOT happen!!" << ende;
             } else {
                 LOG << "Generated pupil( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret; 
             }
         } else {
-            if( ret.nPixels && ret.nPixels == pupilPixels ){    // matching pupil
+            if( ret->nPixels && ret->nPixels == pupilPixels ){    // matching pupil
                 //LOG_DEBUG << "Using pre-calculated Pupil: ( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
@@ -781,19 +784,19 @@ void Object::initCache( void ){
 
     if( bfs::is_regular_file(modeFile ) ){
         ModeInfo info( modeFile, pupilPixels );
-        ModeSet& ret = myJob.globalData->get(info );
-        lock_guard<mutex> lock(ret.mtx );
-        if( ret.empty( ) ){    // this set was inserted, so it is not loaded yet.
-            if( ret.load( modeFile, pupilPixels ) ){
+        shared_ptr<ModeSet> ret = myJob.globalData->get(info );
+        lock_guard<mutex> lock(ret->mtx );
+        if( ret->empty( ) ){    // this set was inserted, so it is not loaded yet.
+            if( ret->load( modeFile, pupilPixels ) ){
                 LOG << "Loaded Mode-file " << modeFile << ende;
-                ret.getNorms( pupil );
+                ret->getNorms( *pupil );
                 modes = ret;
-                LOG_WARN << "Using a Mode-file will force the tilt-indices to be( y,x)=" << modes.tiltMode
+                LOG_WARN << "Using a Mode-file will force the tilt-indices to be( y,x)=" << modes->tiltMode
                          << ".  This should be auto-detected in the future..." << ende;
               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
         } else {
-            if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ){    // matching modes
-                //LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0 )<< " modes.( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+            if( ret->info.nPupilPixels && ret->info.nPupilPixels == pupilPixels ){    // matching modes
+                //LOG_DEBUG << "Using pre-calculated modeset with " << ret->dimSize(0 )<< " modes->( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This might happen if a loaded ModeSet was rescaled( which is not implemented yet!!)." << ende;
@@ -801,29 +804,29 @@ void Object::initCache( void ){
         }
     }
     
-    if( modes.empty( ) ){
+    if( modes->empty() ){
         ModeInfo info(myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
         if( myJob.modeBasis == ZERNIKE ){
             info.firstMode = info.lastMode = 0;
         }
-        ModeSet& ret = myJob.globalData->get(info );
-        lock_guard<mutex> lock(ret.mtx );
-        if( ret.empty( ) ){    // this set was inserted, so it is not generated yet.
+        shared_ptr<ModeSet> ret = myJob.globalData->get(info );
+        lock_guard<mutex> lock(ret->mtx );
+        if( ret->empty( ) ){    // this set was inserted, so it is not generated yet.
             if(myJob.modeBasis == ZERNIKE ){
-                ret.generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+                ret->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
             } else {
-                ret.generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+                ret->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
             }
-            if( ret.nDimensions( )!= 3 || ret.dimSize(1 )!= pupilPixels || ret.dimSize(2 )!= pupilPixels ){    // mismatch
+            if( ret->nDimensions( )!= 3 || ret->dimSize(1 )!= pupilPixels || ret->dimSize(2 )!= pupilPixels ){    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ret.dimSize(0 )<< " modes.( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
-                ret.getNorms( pupil );
+                LOG_DEBUG << "Generated Modeset with " << ret->dimSize(0 )<< " modes.( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                ret->getNorms( *pupil );
                 modes = ret; 
             }
         } else {
-            if( ret.info.nPupilPixels && ret.info.nPupilPixels == pupilPixels ){    // matching modes
-                //LOG_DEBUG << "Using pre-calculated modeset with " << ret.dimSize(0 )<< " modes.( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+            if( ret->info.nPupilPixels && ret->info.nPupilPixels == pupilPixels ){    // matching modes
+                //LOG_DEBUG << "Using pre-calculated modeset with " << ret->dimSize(0 )<< " modes.( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 modes = ret;
             } else {
                 LOG_ERR << "The Cache returned a non-matching ModeSet. This should NOT happen!!" << ende;
@@ -835,13 +838,13 @@ void Object::initCache( void ){
     pixelsToAlpha =  alphaToPixels = 0;
     //double pixelsToAlpha2(0 );
     //double alphaToPixels2(0 );
-    if( modes.tiltMode.y >= 0 ){
-        double delta = modes(modes.tiltMode.y,pupilPixels/2+1,pupilPixels/2 )- modes(modes.tiltMode.y,pupilPixels/2,pupilPixels/2 );
+    if( modes->tiltMode.y >= 0 ){
+        double delta = (*modes)(modes->tiltMode.y,pupilPixels/2+1,pupilPixels/2 )- (*modes)(modes->tiltMode.y,pupilPixels/2,pupilPixels/2 );
         //pixelsToAlpha2 =( 2 * M_PI /( delta*(pupilPixels-1)) )* pupilPixels/patchSize;
         //alphaToPixels2 = 1.0 / pixelsToAlpha2;
         pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta );
-    } else if( modes.tiltMode.x >= 0 ){
-        double delta = modes(modes.tiltMode.x,pupilPixels/2,pupilPixels/2+1 )- modes(modes.tiltMode.x,pupilPixels/2,pupilPixels/2 );
+    } else if( modes->tiltMode.x >= 0 ){
+        double delta = (*modes)(modes->tiltMode.x,pupilPixels/2,pupilPixels/2+1 )- (*modes)(modes->tiltMode.x,pupilPixels/2,pupilPixels/2 );
         pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta );
     }
     
@@ -1163,9 +1166,9 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         //if( channels.size() )pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
         tmpModes.resize(myJob.modeNumbers.size()+1, info->nPH, info->nPH );            // +1 to also fit pupil in the array
         tmpModes.zero( );
-        Array<double> mode_wrap(reinterpret_cast<Array<double>&>(modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1 );
+        Array<double> mode_wrap(reinterpret_cast<Array<double>&>(*modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1 );
         Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1 );     // subarray
-        tmp_slice.assign(reinterpret_cast<const Array<double>&>(pupil) );
+        tmp_slice.assign(reinterpret_cast<const Array<double>&>(*pupil) );
         info->phOffset = 0;
         tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1 );
         tmp_slice.assign(mode_wrap );
@@ -1436,8 +1439,8 @@ void Object::dump( std::string tag ){
     Ana::write( tag + "_q.f0", Q );
     Ana::write( tag + "_p.f0", P );
     Ana::write( tag + "_fittedplane.f0", fittedPlane );
-    Ana::write( tag + "_pupil.f0", pupil );
-    Ana::write( tag + "_modes.f0", modes );
+    if( pupil ) Ana::write( tag + "_pupil.f0", *pupil );
+    if( modes ) Ana::write( tag + "_modes.f0", *modes );
     for( auto& ch : channels ){
         ch->dump(tag );
     }

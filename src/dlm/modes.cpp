@@ -171,18 +171,18 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     }
 
     ModeInfo mi(kw.firstZernike, kw.lastZernike, 0, nPixels, radius, kw.angle, kw.cutoff);
-    ModeSet& modesRef = Cache::get<ModeInfo,ModeSet>(mi);
-
-    if( modesRef.empty() ) {
+    shared_ptr<ModeSet>& modesRef = Cache::get<ModeInfo,shared_ptr<ModeSet>>(mi );
+    if( ! modesRef ) modesRef.reset(new ModeSet());
+    if( modesRef->empty() ) {
         if( kw.firstZernike && kw.lastZernike ) {
-            modesRef.generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff );
+            modesRef->generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff );
         } else {    // first=last=0  =>  Zernike
             kw.firstZernike = kw.lastZernike = 0;   // in case only one was 0.
-            modesRef.generate( nPixels, radius, kw.angle, modeNumbers );
+            modesRef->generate( nPixels, radius, kw.angle, modeNumbers );
         }
     }
     
-    ModeSet modes = modesRef.clone();
+    ModeSet modes = modesRef->clone();
     if( kw.normalize ) {
         modes.getNorms( pupil );
         modes.normalize( 1.0 );

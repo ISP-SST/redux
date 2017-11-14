@@ -130,7 +130,7 @@ namespace redux {
             Object& object;
             const Channel& channel;
             logging::Logger& logger;
-            const ModeSet& modes;
+            const std::shared_ptr<ModeSet>& modes;
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;
             

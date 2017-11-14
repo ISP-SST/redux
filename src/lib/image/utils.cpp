@@ -89,8 +89,8 @@ double redux::image::makePupil (double** pupil, uint32_t nPoints, double radius)
         // TODO: warn or throw if nPoints is odd.
     }
 
-    const Grid& grid = Grid::get(mid + 1, origin, origin);
-    float** distPtr = grid.distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
+    const shared_ptr<Grid> grid = Grid::get(mid + 1, origin, origin);
+    float** distPtr = grid->distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
     // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
     double val;
     for (unsigned int x = 0; x < mid; ++x) {
@@ -150,9 +150,9 @@ void redux::image::makeZernike (double** modePtr, int modeNumber, uint32_t nPoin
     noll_to_mn (modeNumber, m, n);
 
     const vector<double>& coeff = Zernike::radialPolynomial (m, n);
-    const Grid& grid = Grid::get(nPoints, nPoints/2.0, nPoints/2.0);
-    float** distPtr = grid.distance.get();  // distance from pixels to centre (pupil & modes are centered on pixel (mid,mid))
-    float** aPtr = grid.angle.get();
+    const shared_ptr<Grid> grid = Grid::get(nPoints, nPoints/2.0, nPoints/2.0);
+    float** distPtr = grid->distance.get();  // distance from pixels to centre (pupil & modes are centered on pixel (mid,mid))
+    float** aPtr = grid->angle.get();
 
     memset (*modePtr, 0, nPoints * nPoints * sizeof (double));
 

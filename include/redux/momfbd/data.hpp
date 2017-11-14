@@ -150,12 +150,13 @@ namespace redux {
         struct GlobalData : public Part {   // Used for sending e.g. modes/pupils to the slaves.
             typedef std::shared_ptr<GlobalData> Ptr;
             std::mutex mtx;
-            std::map<ModeInfo, ModeSet&> modes;
-            std::map<redux::image::PupilInfo, redux::image::Pupil&> pupils;
+            std::map<ModeInfo, std::shared_ptr<ModeSet>> modes;
+            std::map<redux::image::PupilInfo, std::shared_ptr<redux::image::Pupil>> pupils;
             Constraints constraints;
             explicit GlobalData(MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
-            ModeSet& get(const ModeInfo&, const ModeSet& ms=ModeSet());
-            redux::image::Pupil& get(const redux::image::PupilInfo&, const redux::image::Pupil& ms=redux::image::Pupil());
+            std::shared_ptr<ModeSet> get(const ModeInfo&, const std::shared_ptr<ModeSet>& ms=nullptr);
+            std::shared_ptr<redux::image::Pupil> get(const redux::image::PupilInfo&,
+                                                     const std::shared_ptr<redux::image::Pupil>& ms=nullptr);
             bool verify(void) const;
             uint64_t size(void) const;
             uint64_t pack(char*) const;

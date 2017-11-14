@@ -108,7 +108,7 @@ void Solver::init( void ) {
         double scale = job.reg_alpha/object->wavelength;
         scale *= nTotalPixels;      // FIXME the other term in the metric should be normalized instead
         for( size_t i=0; i<object->nImages(); ++i ) {
-            transform(object->modes.atm_rms.begin(), object->modes.atm_rms.end(), raPtr,
+            transform(object->modes->atm_rms.begin(), object->modes->atm_rms.end(), raPtr,
                [scale](const float& a) { if(a==0) return 0.0; return scale/(a*a); } );
             raPtr += nModes;
         }
@@ -255,12 +255,12 @@ double Solver::metricAt( double step ) {
     progWatch.set( nTotalImages );
     for( const auto& o: objects ) {
         //if( o->weight > 0 ) {
-            double normalization = sqrt(1.0 / (o->pupil.area*otfSize2));
+            double normalization = sqrt(1.0 / (o->pupil->area*otfSize2));
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im: c->getSubImages() ) {
                     service.post( [this, &im, &o, normalization, step, otfPtr, phiPtr, phiGradPtr] {
-                        const double* pupilPtr = o->pupil.get();
-                        for( const auto& ind: o->pupil.pupilInOTF ) {
+                        const double* pupilPtr = o->pupil->get();
+                        for( const auto& ind: o->pupil->pupilInOTF ) {
                             otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+step*phiGradPtr[ind.first]);
                         }
                         //im->tmpOTF.ft(otfPtr); FIXME: broke with thread_local

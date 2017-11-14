@@ -231,7 +231,7 @@ void SubImage::addFT(Array<double>& ftsum) const {
 void SubImage::addPQ (const complex_t* otf, complex_t* P, double* Q) const {
 
     const complex_t* ftPtr = imgFT.get();
-    for( const size_t& ind: object.pupil.otfSupport ) {
+    for( const size_t& ind: object.pupil->otfSupport ) {
         Q[ind] += norm(otf[ind]);                    // Q += sj.re^2 + sj.im^2 = norm(sj)
         P[ind] += conj(ftPtr[ind]) * otf[ind];       // P += conj(ft)*sj            c.f. Vogel
     }
@@ -254,7 +254,7 @@ void SubImage::restore( complex_t* obj, double* obj_norm ) const {
 
     const complex_t* ftPtr = imgFT.get();
     const complex_t* otfPtr = OTF.get();
-    for( const size_t& ind: object.pupil.otfSupport ) {
+    for( const size_t& ind: object.pupil->otfSupport ) {
         obj_norm[ind] += norm(otfPtr[ind]);
         obj[ind] += conj(ftPtr[ind]) * (otfPtr[ind]);
     }
@@ -272,7 +272,7 @@ double SubImage::metricChange( const complex_t* newOTF ) const {
     
     complex_t dp, dsj;
     double dl = 0.0, dq, dn;
-    for( size_t& ind: object.pupil.otfSupport ) {
+    for( size_t& ind: object.pupil->otfSupport ) {
         dsj = newOTF[ind] - oldOTF[ind];            // change in sj
         dp = conj(ftPtr[ind]) * dsj;                // change p and q
         dq = 2.0 * (oldOTF[ind].real() * dsj.real() + oldOTF[ind].imag() * dsj.imag()) + norm (dsj);
@@ -290,7 +290,7 @@ double SubImage::gradientFiniteDifference( uint16_t modeIndex ) {
     complex_t* otfPtr = Solver::tmp.C.get();
     double* phiPtr = Solver::tmp.D.get();
     memcpy( phiPtr, phi.get(), pupilSize2*sizeof(double) );
-    addToPhi( phiPtr, modes.modePointers[modeIndex], grad_step );
+    addToPhi( phiPtr, modes->modePointers[modeIndex], grad_step );
     calcOTF( otfPtr, phiPtr );
     return metricChange( otfPtr )/grad_step*object.weight;
     
@@ -306,7 +306,7 @@ void SubImage::gradientFiniteDifference2( double* agrad, const bool* enabledMode
     for( uint16_t m=0; m<nModes; ++m ) {
         if( enabledModes[m] ) {
             memcpy( phiPtr, phi.get(), pupilSize2*sizeof(double) );
-            addToPhi( phiPtr, modes.modePointers[m], grad_step );
+            addToPhi( phiPtr, modes->modePointers[m], grad_step );
             calcOTF( otfPtr, phiPtr );
             agrad[m] += metricChange( otfPtr )/grad_step*object.weight;
         }
@@ -319,10 +319,10 @@ double SubImage::gradientVogel(uint16_t modeIndex ) {
     if( object.weight == 0 ) return 0;
     
     double ret = 0;
-    const double* modePtr = modes.modePointers[modeIndex];
+    const double* modePtr = modes->modePointers[modeIndex];
     const double* vogPtr = vogel.get();
-    double scale = -2.0 * object.pupil.area / otfSize2;
-    for( auto & ind : object.pupil.pupilSupport ) {
+    double scale = -2.0 * object.pupil->area / otfSize2;
+    for( auto & ind : object.pupil->pupilSupport ) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }
     
@@ -336,12 +336,12 @@ void SubImage::gradientVogel2( double* agrad, const bool* enabledModes ) {
     if( object.weight == 0 ) return;
     
     const double* vogPtr = vogel.get();
-    double scale = -2.0 * object.pupil.area / otfSize2 * object.weight;
+    double scale = -2.0 * object.pupil->area / otfSize2 * object.weight;
     for( uint16_t m=0; m<nModes; ++m ) {
         if( enabledModes[m] ) {
-            const double* modePtr = modes.modePointers[m];
+            const double* modePtr = modes->modePointers[m];
             double tmp(0);
-            for( auto & ind : object.pupil.pupilSupport ) {
+            for( auto & ind : object.pupil->pupilSupport ) {
                 tmp += vogPtr[ind] * modePtr[ind];
             }
             agrad[m] += tmp*scale;
@@ -353,7 +353,7 @@ void SubImage::gradientVogel2( double* agrad, const bool* enabledModes ) {
 void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
 
 #ifdef DEBUG_
-    LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size() << ende;
+    LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil->pupilInOTF.size() << ende;
 #endif
   
     const complex_t* otfPtr = OTF.get();
@@ -369,7 +369,7 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
 
     Solver::tmp.OTF.getIFT(hjPtr);       // normalize by otfSize2 below
     Solver::tmp.OTF.zero();
-    for( const size_t& ind: object.pupil.otfSupport ) {
+    for( const size_t& ind: object.pupil->otfSupport ) {
         tmpOtfPtr[ind] = (pq[ind]*ftPtr[ind] - ps[ind]*otfPtr[ind]) / qs[ind];
     }
 
@@ -387,8 +387,8 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
 
     double* vogPtr = vogel.get();
-    const double* pupilPtr = object.pupil.get();
-    for( auto & ind : object.pupil.pupilInOTF ) {
+    const double* pupilPtr = object.pupil->get();
+    for( auto & ind : object.pupil->pupilInOTF ) {
         vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*tmpOtfPtr[ind.second])*pupilPtr[ind.first];
     }
 
@@ -453,7 +453,7 @@ bool SubImage::adjustShifts( const T* alpha ) {
     PointD oldVal(0,0),newVal(0,0);
     bool ret(false);
     
-    int32_t mIndex = object.modes.tiltMode.y;   // FIXME: should be x, but image is transposed
+    int32_t mIndex = object.modes->tiltMode.y;   // FIXME: should be x, but image is transposed
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.y;
         double alphaToShift = 1.0/shiftToAlpha;
@@ -466,7 +466,7 @@ bool SubImage::adjustShifts( const T* alpha ) {
         }
     }
 
-    mIndex = object.modes.tiltMode.x;   // FIXME: should be y, but image is transposed
+    mIndex = object.modes->tiltMode.x;   // FIXME: should be y, but image is transposed
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.x;
         double alphaToShift = 1.0/shiftToAlpha;
@@ -480,7 +480,7 @@ bool SubImage::adjustShifts( const T* alpha ) {
     }
 
     if( oldShift != imageShift ) {
-        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << "   tiltMode=" << object.modes.tiltMode << printArray(alpha,2,"  tilts") << ende;
+        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << "   tiltMode=" << object.modes->tiltMode << printArray(alpha,2,"  tilts") << ende;
         LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                   << ":  cutout was shifted, from " << oldShift << " to " << imageShift
                   << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << ende;
@@ -500,12 +500,12 @@ void SubImage::resetShifts( void ) {
     shift( 2/*FIXME 1*/, -imageShift.y );
     shift( 1/*FIXME 2*/, -imageShift.x );
     imageShift = 0;
-    int32_t mIndex = object.modes.tiltMode.x;
+    int32_t mIndex = object.modes->tiltMode.x;
     if( mIndex >= 0 ) {
         localAlpha[mIndex] = 0;
     }
     
-    mIndex = object.modes.tiltMode.y;
+    mIndex = object.modes->tiltMode.y;
     if( mIndex >= 0 ) {
         localAlpha[mIndex] = 0;
     }
@@ -532,7 +532,7 @@ void SubImage::addToPhi( const T* a, double* phiPtr ) const {
     for( unsigned int i=0; i<nModes; ++i ) {
         double alpha = a[i] + localAlpha[i];
         if( fabs(alpha) > ALPHA_CUTOFF ) {
-            const double* modePtr = modes.modePointers[i];
+            const double* modePtr = modes->modePointers[i];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
                 [alpha](const double& p, const double& m) {
                     return p + alpha*m;
@@ -560,9 +560,9 @@ template void SubImage::calcPhi( const float* a, double* phiPtr ) const;
 void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale) {
 
     const double* phiPtr = phi.get();
-    const double* pupilPtr = object.pupil.get();
+    const double* pupilPtr = object.pupil->get();
     
-    for (auto & ind : object.pupil.pupilInOTF) {
+    for (auto & ind : object.pupil->pupilInOTF) {
 #ifdef USE_LUT
         otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]+scale*phiOffset[ind.first]);
 #else
@@ -582,9 +582,9 @@ void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
 
     memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
 
-    const double* pupilPtr = object.pupil.get();
+    const double* pupilPtr = object.pupil->get();
 
-    for( auto& ind : object.pupil.pupilInOTF ) {
+    for( auto& ind : object.pupil->pupilInOTF ) {
 #ifdef USE_LUT
         otfPtr[ind.second] = getPolar( pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]);
 #else
@@ -603,7 +603,7 @@ void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
 void SubImage::calcPFOTF(void) {
     
 #ifdef DEBUG_
-    LOG_TRACE << "SubImage::calcPFOTF(" << hexString(this) << ")   indexSize=" << object.pupil.pupilInOTF.size() << ende;
+    LOG_TRACE << "SubImage::calcPFOTF(" << hexString(this) << ")   indexSize=" << object.pupil->pupilInOTF.size() << ende;
 #endif
 
     complex_t* pfPtr = PF.get();
@@ -613,9 +613,9 @@ void SubImage::calcPFOTF(void) {
     memset( pfPtr, 0, pupilSize2*sizeof(complex_t) );
     memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
     
-    const double* pupilPtr = object.pupil.get();
+    const double* pupilPtr = object.pupil->get();
     
-    for( const auto& ind: object.pupil.pupilInOTF ) {
+    for( const auto& ind: object.pupil->pupilInOTF ) {
 #ifdef USE_LUT
         pfPtr[ind.first] = getPolar( pupilPtr[ind.first], phiPtr[ind.first]);
 #else
