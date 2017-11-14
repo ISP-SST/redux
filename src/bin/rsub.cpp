@@ -203,10 +203,12 @@ string filterOldCfg(string filename, string jobname, string logfile, string outp
     
     if (found) { // old cfg file, wrap inside momfbd { ... }
         text = "momfbd { \n" + text;
+        if( *(text.rbegin()) != '\n') text += "\n";
         text += "NAME " + jobname + "\n";
         text += "LOGFILE " + logfile + "\n";
         text += "OUTPUT_DIR " + outputDir + "\n";
-        text += "\n}";
+        if( *(text.rbegin()) != '\n') text += "\n";
+        text += "}";
     }
 
     return text;
@@ -281,7 +283,7 @@ int main (int argc, char *argv[]) {
             string bn = bfs::basename(it);
             string jobName = globalName.empty() ? bn : globalName;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
-            string tmpS = filterOldCfg(it, jobName, logFile, outputDir.string()) + "\n";
+            string tmpS = filterOldCfg(it, jobName, logFile, outputDir.string());
             filteredCfg.write(tmpS.c_str(),tmpS.size());
         }
 
