@@ -18,6 +18,7 @@ namespace redux {
             void get( void );
             void release( void );
             unsigned int count( void );
+            unsigned int getInit( void );
             
             void decrease( unsigned int );
             void increase( unsigned int );

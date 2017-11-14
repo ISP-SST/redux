@@ -29,6 +29,12 @@ unsigned int Semaphore::count( void ) {
 }
 
 
+unsigned int Semaphore::getInit( void ) {
+    lock_guard<mutex> lock(mtx);
+    return init;
+}
+
+
 void Semaphore::decrease( unsigned int val ) {
     lock_guard<mutex> lock(mtx);
     if( val < init ) {
