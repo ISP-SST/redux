@@ -1076,8 +1076,9 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
             part->partStarted = wip->workStarted;
         }
     }
-    
+
     return gotJob;
+    
 }
 
 

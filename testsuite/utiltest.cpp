@@ -896,7 +896,7 @@ void endianTest( void ) {
     } a, aa;
 
     a.i = 1;
-    BOOST_CHECK( a.b[0] == ( REDUX_BYTE_ORDER == REDUX_LITTLE_ENDIAN ) );
+    BOOST_CHECK( a.b[0] == ( RDX_BYTE_ORDER == RDX_LITTLE_ENDIAN ) );
 
     for( int i( 0 ); i < 4; i++ ) {
         a.c[i] = aa.c[i] = i;

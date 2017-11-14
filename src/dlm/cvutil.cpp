@@ -1,4 +1,4 @@
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
 
 #include "cvutil.hpp"
 

@@ -1,7 +1,7 @@
 #ifndef REDUX_FILE_FILEFITS_HPP
 #define REDUX_FILE_FILEFITS_HPP
 
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
 
 #include "redux/file/fileio.hpp"
 #include "redux/file/filemeta.hpp"
@@ -157,6 +157,6 @@ namespace redux {
 
 } // end namespace redux
 
-#endif  // REDUX_WITH_FITS
+#endif  // RDX_WITH_FITS
 
 #endif // REDUX_FILE_FILEFITS_HPP

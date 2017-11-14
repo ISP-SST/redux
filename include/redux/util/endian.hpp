@@ -5,13 +5,13 @@
 #include <cstdlib>
 #include <utility>
 
-#define REDUX_LITTLE_ENDIAN 1234
-#define REDUX_BIG_ENDIAN    4321
+#define RDX_LITTLE_ENDIAN 1234
+#define RDX_BIG_ENDIAN    4321
 
-// REDUX_BYTE_ORDER defined from cmake as one of the above values, if not -> panic
-#ifndef REDUX_BYTE_ORDER
-//#error REDUX_BYTE_ORDER is undefined, it should be set from cmake.
-#define REDUX_BYTE_ORDER REDUX_LITTLE_ENDIAN
+// RDX_BYTE_ORDER defined from cmake as one of the above values, if not -> panic
+#ifndef RDX_BYTE_ORDER
+//#error RDX_BYTE_ORDER is undefined, it should be set from cmake.
+#define RDX_BYTE_ORDER RDX_LITTLE_ENDIAN
 #endif
 
 namespace redux {

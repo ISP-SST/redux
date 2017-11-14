@@ -59,7 +59,7 @@ Format redux::file::readFmt( const string& filename ) {
                 case FileMomfbd::MAGIC_MOMFBD8: ;	// Fall through
                 case FileMomfbd::MAGIC_MOMFBD10: ;	// Fall through
                 case FileMomfbd::MAGIC_MOMFBD11: return FMT_MOMFBD;
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
                 case Fits::MAGIC_FITS: return FMT_FITS;
 #endif
                 //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
@@ -146,7 +146,7 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
             meta.reset( new Ana(fn) );
             break;
         }
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
         case FMT_FITS: {
             meta.reset( new Fits(fn) );
             break;
@@ -183,7 +183,7 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
                 }
                 break;
             }
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
             case FMT_FITS: {
                 if( !meta ) {
                     meta.reset( new Fits() );
@@ -226,7 +226,7 @@ void redux::file::readFile( const string& filename, redux::util::Array<T>& data 
                 Ana::read(filename,data,hdr);
                 break;
             }
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
             case FMT_FITS: {
                 shared_ptr<Fits> hdr(new Fits());
                 Fits::read(filename,data,hdr);
@@ -262,7 +262,7 @@ void redux::file::readFile( const string& filename, redux::image::Image<T>& imag
         Format fmt = readFmt(filename);
         switch(fmt) {
             case FMT_ANA: Ana::read(filename, image, metaOnly); break;
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
             case FMT_FITS: Fits::read(filename, image, metaOnly); break;
 #endif
             //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
@@ -294,7 +294,7 @@ void redux::file::writeFile( const string& filename, redux::util::Array<T>& data
         Format fmt = guessFmt(filename);
         switch(fmt) {
             case FMT_ANA: Ana::write(filename, data); break;
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
             case FMT_FITS: Fits::write(filename, data); break;
 #endif
             //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
@@ -327,7 +327,7 @@ void redux::file::writeFile( const string& filename, redux::image::Image<T>& ima
         Format fmt = guessFmt(filename);
         switch(fmt) {
             case FMT_ANA: Ana::write(filename, image); break;
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
             case FMT_FITS: Fits::write(filename, image); break;
 #endif
             //case Ncdf::MAGIC_NCDF: return FMT_NCDF;

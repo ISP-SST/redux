@@ -568,7 +568,7 @@ string hasopencv_info( int lvl ) {
 
 IDL_VPTR rdx_hasopencv( int argc, IDL_VPTR* argv, char* argk ) {
     
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
     return IDL_GettmpInt(1);
 #else
     return IDL_GettmpInt(0);

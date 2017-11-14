@@ -3,10 +3,10 @@
 # Author: Tomas Hillberg
 
 # simple include guard
-if(DEFINED REDUX_CONFIGURATION_LOADED)
+if(DEFINED RDX_CONFIGURATION_LOADED)
     return()
 endif()
-set(REDUX_CONFIGURATION_LOADED True)
+set(RDX_CONFIGURATION_LOADED True)
 
 # Enable empty ELSE and ENDIF's
 set(CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)
@@ -23,11 +23,16 @@ set(CMAKE_INSTALL_DEBUG_LIBRARIES "True")
 set(CMAKE_FIND_LIBRARY_PREFIXES "" lib)
 
 include(TestBigEndian)
-test_big_endian(REDUX_BIG_ENDIAN)
-if (REDUX_BIG_ENDIAN)
-    add_definitions(-DREDUX_BYTE_ORDER=REDUX_BIG_ENDIAN)
+test_big_endian(RDX_BIG_ENDIAN)
+if (RDX_BIG_ENDIAN)
+    add_definitions(-DRDX_BYTE_ORDER=RDX_BIG_ENDIAN)
 else()
-    add_definitions(-DREDUX_BYTE_ORDER=REDUX_LITTLE_ENDIAN)
+    add_definitions(-DRDX_BYTE_ORDER=RDX_LITTLE_ENDIAN)
+endif()
+
+option( RDX_SKIP_GUI "Should the gui/QT parts be skipped?" ON )
+option( RDX_AUTO_REVISION "Automatically run the revision script on each build ?" ON )
+
 endif()
 
 # Load platform specific configuration
@@ -77,28 +82,25 @@ if( EXISTS "${THIRDPARTY_DIR}" )
 endif()
 set(THIRDPARTY_DIR "${THIRDPARTY_DIR}" CACHE PATH "Path to thirdparty software.")
 
-get_filename_component(REDUX_DIR ${REDUX_DIR} REALPATH)
-
-option(REDUX_SKIP_GUI "Should the gui/QT parts be skipped?" ON)
-option(REDUX_AUTO_REVISION "Automatically run the revision script on each build ?" ON)
+get_filename_component(RDX_DIR ${RDX_DIR} REALPATH)
 
 # Try to find cppcheck
 # Rationale: running cppcheck outside the project means a lot of includes (e.g. thirdparty)
 # will not be found, this way the tests will use the "real" include enviroment of the compiler.
-find_program(REDUX_CPPCHECK_EXECUTABLE NAMES "cppcheck" "cppcheck.exe" PATHS "C:\\Program Files\\cppcheck" "C:\\Program Files (x86)\\cppcheck")
-if(NOT EXISTS "${REDUX_CPPCHECK_EXECUTABLE}")
+find_program(RDX_CPPCHECK_EXECUTABLE NAMES "cppcheck" "cppcheck.exe" PATHS "C:\\Program Files\\cppcheck" "C:\\Program Files (x86)\\cppcheck")
+if(NOT EXISTS "${RDX_CPPCHECK_EXECUTABLE}")
     message("Install cppcheck to enable target-specific source-code checking.")
 else()
-    option(REDUX_CPPCHECK_TARGETS "Should the targets for CppCheck be included?" OFF)
+    option(RDX_CPPCHECK_TARGETS "Should the targets for CppCheck be included?" OFF)
 endif()
 
-include_directories(${REDUX_DIR}/include)
+include_directories(${RDX_DIR}/include)
 
 message(STATUS "Redux will be installed into: \"${CMAKE_INSTALL_PREFIX}\"")
 
 # Setup a variable to indicate endian:ness of current system.
 include(TestBigEndian)
-TEST_BIG_ENDIAN(REDUX_BIG_ENDIAN)
+TEST_BIG_ENDIAN(RDX_BIG_ENDIAN)
 
 # Create a variable containing a list of the REDUX libraries. This is usefull for specifying
 # REDUX linkage with the target_link_libraries in projects using REDUX libraries.
@@ -106,8 +108,8 @@ TEST_BIG_ENDIAN(REDUX_BIG_ENDIAN)
 # before the libraries they depend on).
 # Note: reduxgui is not included in this list (to avoid that compilers adds it as a dependency).
 #   If reduxgui is needed, it should be added to the link_libraries() call, and it should go
-#   before REDUX_LIBLIST because reduxgui depends on pretty much everything else.
-set(REDUX_LIBLIST 
+#   before RDX_LIBLIST because reduxgui depends on pretty much everything else.
+set(RDX_LIBLIST 
     redux                         # depends on: none
     reduxgui                      # depends on: none
     CACHE INTERNAL "")
@@ -116,9 +118,9 @@ set(REDUX_LIBLIST
 # To build an application using REDUX as a binary distribution from outside the source tree, 
 # has to be run to make the project aware of the redux libraries. The reason is that
 # CMake won't be able to handle the -d debug suffix correctly otherwise.
-#file(GLOB BUILDING_REDUX "${REDUX_DIR}/CMakeLists.txt")
+#file(GLOB BUILDING_REDUX "${RDX_DIR}/CMakeLists.txt")
 #if (NOT BUILDING_REDUX AND NOT ${PROJECT_NAME} STREQUAL "REDUX")
-#    foreach(LIB ${REDUX_LIBLIST})
-#    IMPORT_REDUX_LIB(${LIB})
+#    foreach(LIB ${RDX_LIBLIST})
+#    IMPORT_RDX_LIB(${LIB})
 #    endforeach()
 #endif()

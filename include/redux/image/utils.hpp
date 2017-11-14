@@ -7,7 +7,7 @@
 #include "redux/util/progresswatch.hpp"
 #include "redux/types.hpp"
 
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
 #   include "redux/util/opencv.hpp"
 #endif
 
@@ -538,7 +538,7 @@ namespace redux {
         
         template <typename T, typename U>
         void make_mask( T* input, U* mask, size_t ySize, size_t xSize, double thres=0, int smooth=5, bool filterLarger=false, bool invert=false ) {
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
             cv::Mat inMat( ySize, xSize, cv::cvType<T>(), input );
             cv::Mat maskMat( ySize, xSize, cv::cvType<U>(), mask );
             cv::make_mask( inMat, maskMat, thres, smooth, filterLarger, invert );

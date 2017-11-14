@@ -1,6 +1,6 @@
 #include "redux/file/filefits.hpp"
 
-#ifdef REDUX_WITH_FITS
+#ifdef RDX_WITH_FITS
 
 #include "redux/util/arraystats.hpp"
 #include "redux/util/endian.hpp"
@@ -19,12 +19,12 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-#if REDUX_BYTE_ORDER == REDUX_LITTLE_ENDIAN
+#if RDX_BYTE_ORDER == RDX_LITTLE_ENDIAN
 static const int system_is_big_endian = 0;
-#elif REDUX_BYTE_ORDER == REDUX_BIG_ENDIAN
+#elif RDX_BYTE_ORDER == RDX_BIG_ENDIAN
 static const int system_is_big_endian = 1;
 #else
-#error REDUX_BYTE_ORDER not set
+#error RDX_BYTE_ORDER not set
 #endif
 
 const uint8_t Fits::typeSizes[] = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
@@ -1293,6 +1293,6 @@ template void Fits::write( const string&, const double*, size_t n );
 template void Fits::write( const string&, const complex_t*, size_t n );
 
 
-#endif  // REDUX_WITH_FITS
+#endif  // RDX_WITH_FITS
 
 

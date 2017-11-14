@@ -72,11 +72,11 @@ endmacro()
 
 # -----------------------------------------------------------------------------
 # Macro for creating targets which will run CppCheck on the source files.
-# Check the option "REDUX_CPPCHECK_TARGETS" (OFF by default) if you want/need these
+# Check the option "RDX_CPPCHECK_TARGETS" (OFF by default) if you want/need these
 # targets.
 # -----------------------------------------------------------------------------
 macro(MAKE_CPPCHECK tgt ...)
-    if(EXISTS ${REDUX_CPPCHECK_EXECUTABLE} AND REDUX_CPPCHECK_TARGETS)
+    if(EXISTS ${RDX_CPPCHECK_EXECUTABLE} AND RDX_CPPCHECK_TARGETS)
         get_property(IDS DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
         set(CPPCHECK_ARGS --force --enable=all -q -rp --std=c99 --std=posix --std=c++11)
         #set(CPPCHECK_ARGS --force --enable=all -q -rp --std=c99 --std=posix --std=c++11 --check-config)
@@ -100,7 +100,7 @@ macro(MAKE_CPPCHECK tgt ...)
             endif()
         endforeach()
         #list(APPEND CPPCHECK_ARGS "2>${CMAKE_BINARY_DIR}/cppcheck_${tgt}.log")
-        add_custom_target( CPPCHECK_${tgt} ${REDUX_CPPCHECK_EXECUTABLE} ${CPPCHECK_ARGS}
+        add_custom_target( CPPCHECK_${tgt} ${RDX_CPPCHECK_EXECUTABLE} ${CPPCHECK_ARGS}
             #COMMENT "Running CppCheck on target ${tgt}\noutput: \"${CMAKE_BINARY_DIR}/cppcheck_${tgt}.log\""
             COMMENT "Running CppCheck on target ${tgt}"
             WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -138,7 +138,7 @@ macro(INSTALL_DEPS TGT)
         OPTIONAL
     )
     # Generate an install script which will check dependencies at install-time and copy those as well.
-    configure_file(${REDUX_DIR}/cmake/install.cmake ${CMAKE_CURRENT_BINARY_DIR}/${TGT}_install.cmake)
+    configure_file(${RDX_DIR}/cmake/install.cmake ${CMAKE_CURRENT_BINARY_DIR}/${TGT}_install.cmake)
     install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${TGT}_install.cmake)
 endmacro()
 
@@ -147,7 +147,7 @@ endmacro()
 
 macro(USE_EXTERNAL ...)
     foreach(ext ${ARGV})
-        file(TO_CMAKE_PATH "${REDUX_DIR}/cmake/use_${ext}.cmake" EXT_CONFIG)
+        file(TO_CMAKE_PATH "${RDX_DIR}/cmake/use_${ext}.cmake" EXT_CONFIG)
         if(EXISTS "${EXT_CONFIG}")
             include( "${EXT_CONFIG}" )
         else()
@@ -166,27 +166,27 @@ endmacro()
 # This macro will accept an array and call the USE_EXTERNAL macro for each
 # module-dependency listed in redux???_DEPS (see the dependencies.cmake file for all
 # the module dependencies)
-# It will first clear the REDUX_CURRENT_LIBRARIES variable, and also append the
-# arguments to REDUX_CURRENT_LIBRARIES
+# It will first clear the RDX_CURRENT_LIBRARIES variable, and also append the
+# arguments to RDX_CURRENT_LIBRARIES
 # The common way to use these macros for an individual target:
-#   USE_REDUX( reduxgui ${REDUX_LIBLIST} )    # will load all the dependencies for
+#   USE_REDUX( reduxgui ${RDX_LIBLIST} )    # will load all the dependencies for
 #           all redux-modules, and also append the include/link paths needed.
 #   USE_EXTERNAL( sapera photonfocus )  # Add additional dependencies
 #   add_executable( "${MY_APPLICATION}" ${MY_SRC} ${MY_HPP} )
-#   target_link_libraries( ${MY_APPLICATION} ${REDUX_CURRENT_LIBRARIES} )
+#   target_link_libraries( ${MY_APPLICATION} ${RDX_CURRENT_LIBRARIES} )
 # -----------------------------------------------------------------------------
 macro(USE_REDUX ...)
     set(external_deps "")
-    set(REDUX_CURRENT_LIBRARIES "")
-    set(REDUX_CURRENT_INCLUDES "")
-    set(REDUX_CURRENT_LIBDIRS "")
+    set(RDX_CURRENT_LIBRARIES "")
+    set(RDX_CURRENT_INCLUDES "")
+    set(RDX_CURRENT_LIBDIRS "")
     foreach(lib ${ARGV})
         if(DEFINED ${lib}_DEPS)
             list(APPEND external_deps ${${lib}_DEPS})
         else()
             message(STATUS "${lib}_DEPS not defined.")
         endif()
-        list(APPEND REDUX_CURRENT_LIBRARIES ${lib})
+        list(APPEND RDX_CURRENT_LIBRARIES ${lib})
     endforeach()
     if(NOT external_deps STREQUAL "")
         USE_EXTERNAL(${external_deps})
@@ -211,24 +211,24 @@ endmacro()
 # -----------------------------------------------------------------------------
 # A couple of convenience functions 
 # -----------------------------------------------------------------------------
-macro(REDUX_SETDIRS)
-    if(DEFINED REDUX_CURRENT_INCLUDES)
-        list(REMOVE_DUPLICATES REDUX_CURRENT_INCLUDES)
+macro(RDX_SETDIRS)
+    if(DEFINED RDX_CURRENT_INCLUDES)
+        list(REMOVE_DUPLICATES RDX_CURRENT_INCLUDES)
     endif()
-    if(DEFINED REDUX_CURRENT_LIBDIRS)
-        list(REMOVE_DUPLICATES REDUX_CURRENT_LIBDIRS)
+    if(DEFINED RDX_CURRENT_LIBDIRS)
+        list(REMOVE_DUPLICATES RDX_CURRENT_LIBDIRS)
     endif()
-    include_directories( ${REDUX_CURRENT_INCLUDES} )
-    link_directories( ${REDUX_CURRENT_LIBDIRS} )
+    include_directories( ${RDX_CURRENT_INCLUDES} )
+    link_directories( ${RDX_CURRENT_LIBDIRS} )
 endmacro()
 
 
-macro(REDUX_ADD_EXECUTABLE target)
-    REDUX_SETDIRS()
+macro(RDX_ADD_EXECUTABLE target)
+    RDX_SETDIRS()
     add_executable(${target} ${ARGN})
     get_target_property(src ${target} SOURCES)
     MAKE_CPPCHECK(${target} ${src})
-    target_link_libraries(${target} ${REDUX_CURRENT_LIBRARIES} ${REDUX_CURRENT_LIBRARIES}) # REDUX_LIBLIST is needed a 2nd time because of circular dependencies
+    target_link_libraries(${target} ${RDX_CURRENT_LIBRARIES} ${RDX_CURRENT_LIBRARIES}) # RDX_LIBLIST is needed a 2nd time because of circular dependencies
     if(WIN32)   # allow delayloading DLLs - only for windows
         target_link_libraries(${target} delayimp)
     endif()
@@ -238,8 +238,8 @@ macro(REDUX_ADD_EXECUTABLE target)
 endmacro()
 
 
-macro(REDUX_ADD_LIBRARY target)
-    REDUX_SETDIRS()
+macro(RDX_ADD_LIBRARY target)
+    RDX_SETDIRS()
     add_library(${target} ${ARGN})
     get_target_property(src ${target} SOURCES)
     MAKE_CPPCHECK(${target} ${src})
@@ -309,7 +309,7 @@ macro(CHECK_REVISION REVNAME REVISION_TEMPLATE_LOCATION REVISION_FILE_LOCATION) 
                             -DREVISION_TEMPLATE_LOCATION="${REVISION_TEMPLATE_LOCATION}"
                             -DREVISION_FILE_LOCATION="${REVISION_FILE_LOCATION}"
                             -DBUILD_DIR="${CMAKE_BINARY_DIR}"
-                            -P "${REDUX_DIR}/cmake/revision.cmake"
+                            -P "${RDX_DIR}/cmake/revision.cmake"
                             ${CMAKE_BINARY_DIR}
         )
         set_source_files_properties(${REVISION_FILE_LOCATION} PROPERTIES GENERATED 1)

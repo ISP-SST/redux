@@ -19,7 +19,7 @@
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
 //#       include <opencv2/photo/photo.hpp>
 #endif
 using namespace redux::image;
@@ -561,7 +561,7 @@ template void redux::image::normalizeIfMultiFrames (redux::image::Image<float>&)
 
 template <typename T, typename U>
 void redux::image::inpaint( T* img, U* mask, T* out, size_t ySize, size_t xSize, double radius, int flags ) {
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
     cv::Mat imgMat( ySize, xSize, cv::cvType<T>(), img );
     cv::Mat maskMat( ySize, xSize, cv::cvType<U>(), mask );
     cv::Mat outMat( ySize, xSize, cv::cvType<T>(), out );
@@ -577,7 +577,7 @@ template void redux::image::inpaint( double*, uint8_t*, double*, size_t, size_t,
 
 template <typename T, typename U>
 void redux::image::resize( T* in, size_t inSizeY, size_t inSizeX, U* out, size_t outSizeY, size_t outSizeX ) {
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
     cv::Mat src( inSizeY, inSizeX, cv::cvType<T>(), in );
     cv::Mat dst( outSizeY, outSizeX, cv::cvType<T>(), out );
     if( (inSizeY > outSizeY) && (inSizeX > outSizeX) ) {

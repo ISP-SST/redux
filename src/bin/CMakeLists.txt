@@ -2,8 +2,8 @@ USE_REDUX(redux)
 
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
-if( REDUX_WITH_FFTW3 )
-    add_definitions(-DREDUX_WITH_FFTW3)
+if( RDX_WITH_FFTW3 )
+    add_definitions(-DRDX_WITH_FFTW3)
 endif()
 
 if( Boost_VERSION VERSION_LESS "1.41" )
@@ -12,14 +12,14 @@ if( Boost_VERSION VERSION_LESS "1.41" )
 endif()
 
 
-REDUX_ADD_EXECUTABLE( rdx_sub rsub.cpp )
-REDUX_ADD_EXECUTABLE( rdx_stat rstat.cpp )
-REDUX_ADD_EXECUTABLE( rdx_del rdel.cpp )
-REDUX_ADD_EXECUTABLE( rdx_ctl rctl.cpp )
+RDX_ADD_EXECUTABLE( rdx_sub rsub.cpp )
+RDX_ADD_EXECUTABLE( rdx_stat rstat.cpp )
+RDX_ADD_EXECUTABLE( rdx_del rdel.cpp )
+RDX_ADD_EXECUTABLE( rdx_ctl rctl.cpp )
 
-REDUX_ADD_EXECUTABLE( reduxd reduxd.cpp )
+RDX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
-if( REDUX_SKIP_GUI )
+if( RDX_SKIP_GUI )
     return()
 endif()
 
@@ -32,5 +32,5 @@ if (NOT QT4_FOUND)
 endif()
 
 set(CMAKE_AUTOMOC ON)
-REDUX_ADD_EXECUTABLE( rdx_gui redux-gui.cpp )
+RDX_ADD_EXECUTABLE( rdx_gui redux-gui.cpp )
 

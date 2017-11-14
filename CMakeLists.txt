@@ -9,18 +9,18 @@ ENDIF()
 
 project(REDUX)
 
-if(NOT REDUX_PROJECT)
+if(NOT RDX_PROJECT)
     # Not included as a submodule to another project
-    set(REDUX_PROJECT "REDUX")
+    set(RDX_PROJECT "REDUX")
 endif()
 
-set(REDUX_DIR ${CMAKE_CURRENT_LIST_DIR} CACHE PATH "Path to source tree.")
-mark_as_advanced(REDUX_DIR)
+set(RDX_DIR ${CMAKE_CURRENT_LIST_DIR} CACHE PATH "Path to source tree.")
+mark_as_advanced(RDX_DIR)
 
-include(${REDUX_DIR}/cmake/config.cmake)
-include(${REDUX_DIR}/cmake/doxygen.cmake)
+include(${RDX_DIR}/cmake/config.cmake)
+include(${RDX_DIR}/cmake/doxygen.cmake)
 
-include_directories(${REDUX_DIR}/include)
+include_directories(${RDX_DIR}/include)
 
 add_subdirectory(src)
 add_subdirectory(testsuite EXCLUDE_FROM_ALL)

@@ -9,12 +9,12 @@ using namespace redux::file;
 using namespace redux::util;
 using namespace std;
 
-#if REDUX_BYTE_ORDER == REDUX_LITTLE_ENDIAN
+#if RDX_BYTE_ORDER == RDX_LITTLE_ENDIAN
 static const int system_is_big_endian = 0;
-#elif REDUX_BYTE_ORDER == REDUX_BIG_ENDIAN
+#elif RDX_BYTE_ORDER == RDX_BIG_ENDIAN
 static const int system_is_big_endian = 1;
 #else
-#error REDUX_BYTE_ORDER not set
+#error RDX_BYTE_ORDER not set
 #endif
 
 

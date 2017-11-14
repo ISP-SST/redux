@@ -24,7 +24,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem.hpp>
 
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
 #    include "cvutil.hpp"
 #    include <redux/util/opencv.hpp>
 #    include <opencv2/core/core.hpp>
@@ -68,7 +68,7 @@ namespace {
     } KW_RESULT;
 
     
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
     
     // NOTE:  The keywords MUST be listed in alphabetical order !!
     static IDL_MEMINT dims3x3[] = { 3, 3 };
@@ -302,7 +302,7 @@ namespace {
 
 IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 	
-	static_assert( REDUX_WITH_OPENCV == 1, "redux has to be compiled with OpenCV support");
+	static_assert( RDX_WITH_OPENCV == 1, "redux has to be compiled with OpenCV support");
 
     KW_RESULT kw;
     kw.by_size = 0;
@@ -700,7 +700,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
 IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
 
-#ifndef REDUX_WITH_OPENCV
+#ifndef RDX_WITH_OPENCV
     cerr << "img_project: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
@@ -777,7 +777,7 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
 
 IDL_VPTR redux::img_remap (int argc, IDL_VPTR* argv, char* argk) {
 
-#ifndef REDUX_WITH_OPENCV
+#ifndef RDX_WITH_OPENCV
     cerr << "img_remap: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
@@ -847,7 +847,7 @@ cerr << "img_remap: " << printArray(map_in->value.arr->dim,map_in->value.arr->n_
 
 IDL_VPTR rdx_find_shift(int argc, IDL_VPTR* argv, char* argk) {
 
-#ifndef REDUX_WITH_OPENCV
+#ifndef RDX_WITH_OPENCV
     cerr << "rdx_find_shift: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
@@ -1117,7 +1117,7 @@ IDL_VPTR rdx_make_mask( int argc, IDL_VPTR* argv, char* argk ) {
         return IDL_GettmpInt(0);
     }
     
-#ifndef REDUX_WITH_OPENCV
+#ifndef RDX_WITH_OPENCV
     cerr << "rdx_make_mask: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
@@ -1538,7 +1538,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         atomic<size_t> nSummed(0);
         mutex mtx;
         
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
         Mat refImg;
         promise<cv::Rect> subImgROI;
         shared_future<cv::Rect> fut = subImgROI.get_future();
@@ -1572,7 +1572,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                         fillPixels( tmp2D.get(), (size_t)ySize, (size_t)xSize, mask2D.get() );
                     }
                     
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
                     Mat cvImg( ySize, xSize, CV_64FC1, myTmpPtr );
                     cv::Rect roi;
                     if( !imgIndex ) {
@@ -1674,7 +1674,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         }
         for (auto& th : threads) th.join();
         
-#ifdef REDUX_WITH_OPENCV
+#ifdef RDX_WITH_OPENCV
         if( kw.pinh_align > 1 ) {
             Mat cvImg( ySize, xSize, CV_64FC1, summedData );
             Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
@@ -1791,7 +1791,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
     
     if( filenames->type != IDL_TYP_STRING ) return sum_images( argc, argv, argk );
 
-#ifndef REDUX_WITH_OPENCV
+#ifndef RDX_WITH_OPENCV
     cerr << "rdx_sumfiles: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
@@ -2508,7 +2508,7 @@ static IDL_KW_PAR inp_kw_pars[] = {
 
 IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
     
-#ifndef REDUX_WITH_OPENCV
+#ifndef RDX_WITH_OPENCV
     cerr << "inpaint: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
     return IDL_GettmpInt(0);
 #else
@@ -2574,7 +2574,7 @@ IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
                         float scaled = (b-minValue)/(maxValue-minValue) * std::numeric_limits<uint32_t>::max();
                         uint32_t scaled_int = static_cast<uint32_t>(scaled);
                         uint8_t* ptr = reinterpret_cast<uint8_t*>(&scaled_int);
-                        if( REDUX_BYTE_ORDER == REDUX_BIG_ENDIAN ) ptr++;
+                        if( RDX_BYTE_ORDER == RDX_BIG_ENDIAN ) ptr++;
                         return VT(*ptr++,*ptr++,*ptr++);
                     }  );
 
@@ -2621,7 +2621,7 @@ IDL_VPTR redux::inpaint( int argc, IDL_VPTR* argv, char* argk ) {
                     [=](const VT& a, const float& b){
                         uint32_t scaled_int;
                         uint8_t* ptr = reinterpret_cast<uint8_t*>(&scaled_int);
-                        if( REDUX_BYTE_ORDER == REDUX_BIG_ENDIAN ) ptr++;
+                        if( RDX_BYTE_ORDER == RDX_BIG_ENDIAN ) ptr++;
                         *ptr++ = a[0];
                         *ptr++ = a[1];
                         *ptr++ = a[2];

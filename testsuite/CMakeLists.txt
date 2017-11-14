@@ -5,23 +5,23 @@ set(TEST_NAME "testsuite" CACHE INTERNAL "Name of test application")
 
 USE_REDUX(redux)
 
-if( REDUX_WITH_FFTW3 )
-    add_definitions(-DREDUX_WITH_FFTW3)
+if( RDX_WITH_FFTW3 )
+    add_definitions(-DRDX_WITH_FFTW3)
 endif()
 
 # Code for test module
-file(GLOB REDUX_TEST_SRC RELATIVE ${CMAKE_CURRENT_LIST_DIR} "*.cpp")
-file(GLOB REDUX_TEST_HPP RELATIVE ${CMAKE_CURRENT_LIST_DIR} "include/*.hpp")
+file(GLOB RDX_TEST_SRC RELATIVE ${CMAKE_CURRENT_LIST_DIR} "*.cpp")
+file(GLOB RDX_TEST_HPP RELATIVE ${CMAKE_CURRENT_LIST_DIR} "include/*.hpp")
 
-set(REDUX_TESTDATA_DIR "${CMAKE_CURRENT_LIST_DIR}/testdata/")
-add_definitions(-DREDUX_TESTDATA_DIR="${REDUX_TESTDATA_DIR}")
+set(RDX_TESTDATA_DIR "${CMAKE_CURRENT_LIST_DIR}/testdata/")
+add_definitions(-DRDX_TESTDATA_DIR="${RDX_TESTDATA_DIR}")
 
 # Turn on support for SEH exceptions to let test catch a exe crash
 if(WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHa")
 endif()
 
-REDUX_ADD_EXECUTABLE(${TEST_NAME} ${REDUX_TEST_SRC} ${REDUX_TEST_HPP})
+RDX_ADD_EXECUTABLE(${TEST_NAME} ${RDX_TEST_SRC} ${RDX_TEST_HPP})
 
 if("${CMAKE_BUILD_TYPE}" MATCHES "^([Dd][Ee][Bb][Uu][Gg])$")
 	get_target_property(TEST_LOCATION ${TEST_NAME} DEBUG_LOCATION)

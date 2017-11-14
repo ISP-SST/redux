@@ -32,7 +32,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/FindExternal.cmake")
 set( IDL_RDX 0 CACHE INTERNAL "" FORCE )
 mark_as_advanced( IDL_RDX )
 if( NOT DEFINED IDL_FOUND )     # no system installation found, use the header included with rdx
-    set( EXT_HINT "${REDUX_DIR}/include/IDL" )
+    set( EXT_HINT "${RDX_DIR}/include/IDL" )
     set( EXT_HEADER_FILE "idl_export.h" )
     set( EXT_VERSION_FILE "idl_export.h" )
     set( EXT_MAJOR_REGEXP "VERSION_MAJOR" )

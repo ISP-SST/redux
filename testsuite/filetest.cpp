@@ -13,8 +13,8 @@ using namespace redux::util;
 using namespace std;
 using namespace boost::unit_test_framework;
 
-#ifndef REDUX_TESTDATA_DIR
-#error REDUX_TESTDATA_DIR not set
+#ifndef RDX_TESTDATA_DIR
+#error RDX_TESTDATA_DIR not set
 #endif
 
 
@@ -37,7 +37,7 @@ namespace {
     void readAnaAs( void ) {
         T data;
         for( size_t i = 0; i < 5; ++i ) {
-            readFile( REDUX_TESTDATA_DIR + anaFiles[i], data );
+            readFile( RDX_TESTDATA_DIR + anaFiles[i], data );
             BOOST_CHECK_EQUAL( data.nDimensions(), 2 );
             BOOST_CHECK_EQUAL( data.dimSize( 0 ), 4 );
             BOOST_CHECK_EQUAL( data.dimSize( 1 ), 5 );
@@ -107,7 +107,7 @@ void anaTest( void ) {
     
     // test reading file saved on little-endian machine:
     Array<int32_t> array;
-    readFile( REDUX_TESTDATA_DIR + anaFiles[5], array );
+    readFile( RDX_TESTDATA_DIR + anaFiles[5], array );
     BOOST_CHECK_EQUAL( array.nDimensions(), 2 );
     BOOST_CHECK_EQUAL( array.dimSize( 0 ), 40 );
     BOOST_CHECK_EQUAL( array.dimSize( 1 ), 50 );
@@ -118,7 +118,7 @@ void anaTest( void ) {
     }
 
     // test reading file saved on big-endian machine:
-    readFile( REDUX_TESTDATA_DIR + anaFiles[6], array );
+    readFile( RDX_TESTDATA_DIR + anaFiles[6], array );
     BOOST_CHECK_EQUAL( array.nDimensions(), 2 );
     BOOST_CHECK_EQUAL( array.dimSize( 0 ), 40 );
     BOOST_CHECK_EQUAL( array.dimSize( 1 ), 50 );
@@ -130,7 +130,7 @@ void anaTest( void ) {
 
     // test reading compressed file saved on little-endian machine:
     Image<int32_t> image;
-    readFile( REDUX_TESTDATA_DIR + anaFiles[7], image );
+    readFile( RDX_TESTDATA_DIR + anaFiles[7], image );
     BOOST_CHECK_EQUAL( image.nDimensions(), 2 );
     BOOST_CHECK_EQUAL( image.dimSize( 0 ), 40 );
     BOOST_CHECK_EQUAL( image.dimSize( 1 ), 50 );
@@ -142,7 +142,7 @@ void anaTest( void ) {
 
     // test reading compressed file saved on big-endian machine:
     // TODO: this test-file is broken, fix it.
-//     readFile( REDUX_TESTDATA_DIR + anaFiles[8], array );
+//     readFile( RDX_TESTDATA_DIR + anaFiles[8], array );
 //     BOOST_CHECK_EQUAL( array.nDimensions(), 2 );
 //     BOOST_CHECK_EQUAL( array.dimSize( 0 ), 40 );
 //     BOOST_CHECK_EQUAL( array.dimSize( 1 ), 50 );

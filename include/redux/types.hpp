@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <complex>
 
-#ifdef REDUX_WITH_FFTW3
+#ifdef RDX_WITH_FFTW3
 #   include <fftw3.h>
 #else
     typedef std::complex<double> fftw_complex;
@@ -28,7 +28,7 @@ namespace redux {
         
         typedef std::complex<double> complex_t;
         
-#ifdef REDUX_WITH_FFTW3
+#ifdef RDX_WITH_FFTW3
         inline const complex_t& operator*=( complex_t& lhs, const fftw_complex& rhs ) { return lhs *= reinterpret_cast<const complex_t&>(rhs); }
         inline const fftw_complex& operator*=( fftw_complex& lhs, const complex_t& rhs ) { reinterpret_cast<complex_t&>(lhs) *= rhs; return lhs; }
 #endif
