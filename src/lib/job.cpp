@@ -1,5 +1,6 @@
 #include "redux/job.hpp"
 
+#include "redux/util/cache.hpp"
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
@@ -18,6 +19,11 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+std::mutex Job::globalMutex;
+std::map<Job::StepID, Job::CountT> Job::counts = { { {0,JSTEP_SUBMIT}, {1,5} },
+                                                   { {0,JSTEP_NONE}, {1,5} },
+                                                   { {0,JSTEP_COMPLETED}, {} },
+                                                   { {0,JSTEP_ERR}, {} } };
 
 #ifdef DEBUG_
 //#define DBG_JOB_
@@ -71,9 +77,7 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, red
             tmpJob->getLogger().addLogger( logger );
             bool checkResult(false);
             if(!check || (checkResult=tmpJob->check()) ) {
-                if( check ) {
-                    if(checkResult) tmpJob->info.flags |= Job::CHECKED;
-                } else tmpJob->info.flags |= Job::NOCHECK;
+                if(checkResult) tmpJob->info.flags |= Job::CHECKED;
                 tmp.push_back(shared_ptr<Job>(tmpJob));
             } else LOG_ERR << "Job \"" << tmpJob->info.name << "\" of type " << tmpJob->info.typeString << " failed cfgCheck, skipping." << ende;
         } else {
@@ -349,6 +353,16 @@ uint64_t Job::unpack(const char* ptr, bool swap_endian) {
 }
 
 
+uint16_t Job::getNextStep( uint16_t step ) const {
+
+    switch( step ) {
+        //
+        default: return JSTEP_ERR;
+    }
+    
+}
+
+        
 void Job::setFailed(void) {
     
     unique_lock<mutex>(jobMutex);
@@ -404,8 +418,8 @@ void Job::startLog( bool overwrite ) {
 
 void Job::printJobInfo(void) {
     
-    LOG_NOTICE << "Redux version = " << getLongVersionString();
-    LOG_NOTICE << "\nJob configuration:\n" << cfg() << ende;
+    LOG << "Redux version = " << getLongVersionString();
+    LOG << "\nJob configuration:\n" << cfg() << ende;
     
 }
 
@@ -414,6 +428,18 @@ void Job::stopLog(void) {
     logger.flushAll();
     logger.removeAllOutputs();
     //jlog.reset();
+}
+
+
+void Job::moveTo( Job* job, uint16_t to ) {
+    if( !job ) return;
+    auto glock = getGlobalLock();
+    CountT& c_old = counts[StepID(job->getTypeID(),job->info.step)];
+    CountT& c_new = counts[StepID(job->getTypeID(),to)];
+    c_old.active--;
+    c_new.active++;
+    glock.unlock();
+    job->info.step = to;
 }
 
 

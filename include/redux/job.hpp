@@ -85,6 +85,23 @@ namespace redux {
         typedef Job* ( *JobCreator )( void );
         typedef std::map<std::string, std::pair<size_t, JobCreator>> MapT;
 
+        struct StepID {
+            StepID( size_t i, uint16_t s ) : id(i), step(s) {}
+            bool operator<( const StepID& rhs ) const {
+                if(!id || !rhs.id || (id==rhs.id)) return (step<rhs.step);
+                return (id<rhs.id);
+            }
+            const size_t id;
+            const uint16_t step;
+        };
+        struct CountT {
+            CountT( void ) : min(0), max(std::numeric_limits<int64_t>::max()), active(0) {}
+            CountT( int64_t a ) : min(0), max(a), active(0) {}
+            CountT( int64_t a, int64_t b ) : min(a), max(b), active(0) {}
+            int64_t min, max;
+            int64_t active;
+        };
+        static std::map<StepID,CountT> counts;
         static MapT& getMap(void) { static MapT m; return m; };
         static size_t registerJob( const std::string&, JobCreator f );
         static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger&, bool check=false );
@@ -142,6 +159,7 @@ namespace redux {
 
         virtual bool active(void) { return false; };
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
+        virtual uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
         
         virtual bool getWork(WorkInProgress::Ptr, uint16_t, const std::map<uint16_t,uint16_t>&) { return false; };
         virtual void ungetWork(WorkInProgress::Ptr) { };
@@ -169,6 +187,12 @@ namespace redux {
             return std::move( std::unique_lock<std::mutex>(jobMutex) );
         }
         
+        static void moveTo( Job* job, uint16_t to );
+        static std::unique_lock<std::mutex> getGlobalLock(bool trylock=false) {
+            if(trylock) return std::move( std::unique_lock<std::mutex>(globalMutex,std::try_to_lock) );
+            return std::move( std::unique_lock<std::mutex>(globalMutex) );
+        }
+        
         virtual bool mayBeDeleted(void) { return true; }
         
         virtual size_t memUsage(void) { return 0; }       //!< Approximate current memory usage of this job
@@ -181,6 +205,7 @@ namespace redux {
     protected:
        
         std::mutex jobMutex;
+        static std::mutex globalMutex;
         std::string cachePath;
         std::string jobLogChannel;
         redux::logging::Logger logger;
