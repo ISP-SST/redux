@@ -102,9 +102,11 @@ size_t Channel::size (void) const {
 
     size_t sz = ChannelCfg::size();
     sz += sizeof (uint16_t) + sizeof(uint32_t);          // ID + nTotalFrames
+    sz += nFrames.size()*sizeof( size_t ) + sizeof( uint64_t );
     sz += imgSize.size();
-    sz += imageStats.size() * ArrayStats::size() + sizeof (uint16_t);
+    sz += imageStats.size() * ArrayStats().size() + sizeof (uint16_t);
     return sz;
+    
 }
 
 
@@ -113,6 +115,7 @@ uint64_t Channel::pack (char* ptr) const {
     uint64_t count = ChannelCfg::pack (ptr);
     count += pack (ptr + count, ID);
     count += pack (ptr + count, nTotalFrames);
+    count += pack (ptr + count, nFrames );
     count += imgSize.pack (ptr + count);
     uint16_t statSize = imageStats.size();
     count += pack (ptr + count, statSize);
@@ -131,6 +134,7 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
     uint64_t count = ChannelCfg::unpack (ptr, swap_endian);
     count += unpack (ptr + count, ID, swap_endian);
     count += unpack (ptr + count, nTotalFrames, swap_endian);
+    count += unpack (ptr + count, nFrames, swap_endian );
     count += imgSize.unpack (ptr + count, swap_endian);
     uint16_t statSize;
     count += unpack (ptr + count, statSize, swap_endian);
