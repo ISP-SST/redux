@@ -69,6 +69,8 @@ namespace redux {
 
             std::shared_ptr<char> receiveBlock( uint64_t& blockSize );
             
+            size_t readline( std::string& line );
+            void writeline( const std::string& line );
             template <class T>
             void asyncWrite( const std::vector<T>& data ) {
                 size_t sz = data.size();

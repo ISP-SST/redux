@@ -90,6 +90,35 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
 }
 
 
+namespace {
+    const string delimiter = "\r\n";
+}
+
+size_t TcpConnection::readline( string& line ) {
+
+    line.clear();
+
+    try {
+        boost::asio::streambuf streambuf;
+        size_t bytes_transferred = boost::asio::read_until( socket(), streambuf, delimiter );
+        auto data_begin = buffers_begin( streambuf.data() );
+        line = string( data_begin, data_begin + bytes_transferred - delimiter.size() );
+    } catch( const exception& e ) {
+        //cout << "TcpConnection::readline  e = " << e.what() << endl;
+    }
+    
+    return !line.length();
+
+}
+
+
+void TcpConnection::writeline( const string& line ) {
+
+    boost::asio::write( socket(), boost::asio::buffer(line + delimiter) );
+
+}
+
+
 void TcpConnection::connect( string host, string service ) {
     
     if( host == "" ) host = "localhost";
