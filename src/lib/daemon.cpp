@@ -31,6 +31,7 @@ using namespace std;
 namespace {
     thread_local Host::Ptr connHost;
     thread_local WorkInProgress::Ptr connWIP;
+    thread_local bool logPrint;
     std::map<boost::thread::id,boost::thread*> tmap;
     int nSysThreads;
 }
@@ -541,6 +542,7 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
             case CMD_DISCONNECT: removeConnection(conn); break;
             case CMD_DEL_SLV: ;
             case CMD_SLV_RES: resetSlaves(conn, cmd); break;
+            case CMD_INTERACTIVE: interactive( conn ); break;
             default: LOG_DEBUG << "processCommand: not implemented: " << cmdToString(cmd) << " (" << (int)cmd << "," << bitString(cmd) << ")" << ende;
                 removeConnection(conn);
                 return;
@@ -1091,6 +1093,141 @@ void Daemon::resetSlaves( TcpConnection::Ptr& conn, uint8_t cmd ) {
 
     }
 
+}
+
+
+void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
+
+    try {
+
+        if( !conn ) {
+            throw exception();
+        }
+        auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists, will throw if not connected.
+        size_t blockSize;
+        shared_ptr<char> buf = conn->receiveBlock( blockSize );
+
+        if( blockSize ) {
+            
+            string line( buf.get() );
+            if( logPrint && !line.empty() ) LOG_TRACE << "Command: \"" << line << "\"" << ende;
+            string cmdStr = popword(line);
+            string replyStr;
+            Command replyCmd = CMD_OK;
+            
+            try {
+                if( cmdStr == "q" || cmdStr == "quit" || cmdStr == "bye" ) {
+                    replyCmd = CMD_DISCONNECT;
+                } else if( cmdStr == "e" ) {
+                    logPrint = !logPrint;
+                    if( logPrint ) replyStr = "Printing interactive output to log.";
+                } else if( cmdStr == "cf" ) {
+                    auto mf = redux::util::Cache::get().getMap< redux::image::CachedFile, redux::image::Image<float> >();
+                    for( auto it: mf.second ) {
+                        replyStr += it.first.filename;
+                        replyStr += ": " + to_string(it.second.size()) + "\n";
+                    }
+                    auto mi = redux::util::Cache::get().getMap< redux::image::CachedFile, redux::image::Image<int16_t> >();
+                    for( auto it: mi.second ) {
+                        replyStr += it.first.filename;
+                        replyStr += "; " + to_string(it.second.size()) + "\n";
+                    }
+                } else if( cmdStr == "cacheclear" ) {
+                    Cache::cleanup();
+                } else if( cmdStr == "cacheinfo" ) {
+                    replyStr = Cache::getStats();
+                } else if( cmdStr == "die" ) {
+                    die();
+                    replyCmd = CMD_DISCONNECT;
+                } else if( cmdStr == "max-recv" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        int nTransfers = boost::lexical_cast<int>(argStr);
+                        inTransfers.set( nTransfers );
+                    }
+                    replyStr = to_string( inTransfers.getInit() );
+                } else if( cmdStr == "max-send" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        int nTransfers = boost::lexical_cast<int>(argStr);
+                        inTransfers.set( nTransfers );
+                    }
+                    replyStr = to_string( inTransfers.getInit() );
+                } else if( cmdStr == "reset" ) {
+                    reset();
+                    replyCmd = CMD_DISCONNECT;
+                } else if(cmdStr == "segfault") {
+                    ioService.post( [](){ std::this_thread::sleep_for (std::chrono::seconds(1));  // delay for reply to be sent back
+                                          *(int*)(8) = 0; } );
+                } else if( cmdStr == "sthreads" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        int nThreads = boost::lexical_cast<int>(argStr);
+                        setThreads(nThreads);
+                    }
+                    replyStr = to_string( nSysThreads );
+                } else if( cmdStr == "threads" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        int nThreads = boost::lexical_cast<int>(argStr);
+                        worker.setThreads(nThreads);
+                    }
+                    replyStr = to_string( myInfo.status.nThreads );
+                } else if( cmdStr == "tracestats" ) {
+                    replyStr = Trace::getStats();
+                } else if( cmdStr == "trace-bt" ) {
+                    replyStr = Trace::getBackTraces();
+                } else if( cmdStr == "trace-max-depth" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        int tmd = boost::lexical_cast<int>(argStr);
+                        Trace::setMaxDepth( tmd );
+                    }
+                    replyStr = to_string( Trace::maxDepth() );
+                } else {  // unrecognized
+                    if( !cmdStr.empty() ) replyStr = "Huh?";
+                }
+            } catch( const exception& e ) {
+                replyStr = "Failed to parse line: \"" + string(buf.get()) + string("\": ") + e.what();
+                LOG_ERR << replyStr << ende;
+            } catch( ... ) {
+                replyStr = "Failed to parse line: \"" + string(buf.get()) + "\"";
+                LOG_ERR << replyStr << ende;
+            }
+            
+            uint64_t replySize = replyStr.length() + 1;
+            uint64_t totalSize = replySize + sizeof(uint64_t);
+            if( blockSize <= totalSize ) {
+                buf.reset( new char[totalSize], []( char* p ){ delete[] p; } );
+            }
+            char* ptr = buf.get();
+            ptr += pack( ptr, replySize );
+            if( !replyStr.empty() ) {
+                replyCmd = CMD_INTERACTIVE;
+                if( logPrint ) LOG_DEBUG << "\n" << replyStr << ende;
+            }
+            ptr += pack( ptr, replyCmd );
+            replyStr.copy( ptr, replyStr.length() );
+            conn->syncWrite( buf.get(), totalSize );
+            
+            if( replyCmd == CMD_DISCONNECT ) throw exception();
+
+        } else throw exception();
+    } catch( ... ) {    // just disconnect if there is any error
+        removeConnection(conn);
+        //logPrint = false;
+        return;
+    }
+
+    conn->idle();
+    
+}
+
+
+void Daemon::interactive( TcpConnection::Ptr& conn ) {
+    LOG_DETAIL << "Interactive mode from: " << connHost->info.name << ":" << connHost->info.pid << ende;
+    *conn << CMD_OK;
+    conn->setCallback( bind( &Daemon::interactiveCB, this, std::placeholders::_1 ) );
 }
 
 

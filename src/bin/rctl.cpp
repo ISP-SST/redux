@@ -7,6 +7,7 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/stringutil.hpp"
 
+#include <iostream>
 #include <sstream>
 #include <thread>
 
@@ -41,6 +42,7 @@ namespace {
           " The environment variable RDX_PORT can be used to override the default value." )
         ( "force,f", "Bypass safeguards" )
         ( "kill,k", "Send exit command to Server." )
+        ( "interactive,i", "Interactive mode." )
         ( "reset,r", bpo::value<int>()->implicit_value(0), "Send reset command to Server." )
         ( "test,t", "For testing out new stuff." )
         ( "cmd,c", bpo::value<string>(), "Send a cmd.")
@@ -113,6 +115,59 @@ void checkReply( TcpConnection::Ptr conn, Logger& logger, uint8_t sentCmd ) {
 
     } catch ( exception &e ) {
         LOG_ERR << "Error while checking server reply: " << e.what() << ende;
+    }
+
+}
+
+
+void interactive( TcpConnection::Ptr conn, Logger& logger ) {
+    
+    try {
+        uint8_t cmd = CMD_INTERACTIVE;
+        boost::asio::write( conn->socket(), boost::asio::buffer(&cmd, 1) );
+        boost::asio::read( conn->socket(), boost::asio::buffer(&cmd,1) );
+
+        size_t bufSize = 1024;
+        shared_ptr<char> buf( new char[bufSize], []( char* p ){ delete[] p; } );
+
+        char* ptr; 
+        while( cmd != CMD_ERR ) {
+            string line,reply;
+
+            cout << "rdx_ctl>" << flush;
+            getline( cin, line );
+            uint64_t lineSize = line.length()+1;
+            if( lineSize > 1 ) {
+                if( bufSize <= lineSize ) {
+                    bufSize = lineSize + sizeof(uint64_t);
+                    buf.reset( new char[bufSize], []( char* p ){ delete[] p; } );
+                }
+                ptr = buf.get();
+                ptr += pack( ptr, lineSize );
+                line.copy( ptr, lineSize );
+                ptr[lineSize-1] = '\0';
+
+                conn->syncWrite( buf.get(), lineSize+sizeof(uint64_t) );
+                
+                // reply
+                buf = conn->receiveBlock( bufSize );
+                ptr = buf.get();
+                ptr += unpack( ptr, cmd );
+                if( bufSize > 1 ) { // contains text
+                    reply = string( ptr, bufSize-1 );
+                }
+
+                if( cmd == CMD_DISCONNECT ) {
+                    break;
+                } else if( cmd == CMD_INTERACTIVE ) {
+                    cout << reply << endl;
+                } else if( cmd == CMD_OK ) {
+                    cout << "OK" << endl;
+                }
+            }
+        }
+    } catch( ... ) { // ignore all errors and just exit.
+        
     }
 
 }
@@ -196,7 +251,9 @@ int main( int argc, char *argv[] ) {
             if( cmd == CMD_OK ) {
                 
                 swap_endian = (me.littleEndian != master.littleEndian);
+                conn->setErrorCallback( std::bind(exit,0) );     // just kill the program if the connection dies.
                 
+                if( vm.count("interactive") ) interactive( conn, logger );
                 if( vm.count("cmd") ) sendCmd( conn, logger, cmdFromString(vm["cmd"].as<string>()) );
                 if( vm.count("urgent") ) sendUrgent( conn, logger, cmdFromString(vm["urgent"].as<string>()) );
                 if( vm.count("reset") ) {
