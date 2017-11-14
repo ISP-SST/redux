@@ -43,7 +43,8 @@ namespace redux {
         class MomfbdJob : public Job, public GlobalCfg {
 
         enum Step : uint16_t { 
-                    JSTEP_CHECKED = 1,
+                    JSTEP_CHECKING = 1,
+                    JSTEP_CHECKED,
                     JSTEP_PREPROCESS,
                     JSTEP_QUEUED,
                     JSTEP_RUNNING,
@@ -60,6 +61,8 @@ namespace redux {
         public:
             static size_t jobType;
 
+            static int staticInit(void);
+            
             MomfbdJob( void );
             ~MomfbdJob( void );
 
@@ -102,13 +105,14 @@ namespace redux {
             bool checkPre(void);
             bool checkPost(void);
             bool checkWriting(void);
+            uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
             const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
 
             const MomfbdJob& operator=(const GlobalCfg&);
 
         private:
 
-            uint16_t checkParts( void );
+            void checkParts( void );
             bool checkPatchPositions(void);
             void unloadCalib( boost::asio::io_service& );
             void preProcess( boost::asio::io_service&, uint16_t nThreads );
@@ -133,6 +137,9 @@ namespace redux {
             
             static std::atomic<int> nActivePre, nActivePost;
             static std::map<uint16_t,uint16_t> maxActive;
+            
+            bool cfgChecked;
+            bool dataChecked;
         
             friend class Constraints;
             friend class Object;
@@ -156,8 +163,8 @@ namespace redux {
     
     namespace momfbd {
         // this will trigger the registration of MomfbdJob in Job::jobMap
-        const size_t MomfbdJobDummy = StaticJobTypeInit<MomfbdJob, void>::jobType;
-        inline size_t MomfbdJob::getTypeID(void) { return MomfbdJobDummy; }
+        const size_t MomfbdJobDummy RDX_UNUSED = StaticJobTypeInit<MomfbdJob, void>::jobType;
+        inline size_t MomfbdJob::getTypeID(void) { return jobType; }
 
     }
 
