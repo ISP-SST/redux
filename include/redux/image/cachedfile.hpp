@@ -21,17 +21,18 @@ namespace redux {
         struct CachedFile {
             
             CachedFile( const std::string& fn ) : filename(fn) {
-                filename = redux::util::cleanPath( filename.string() ) ;
+                filename = redux::util::cleanPath( filename ) ;
             }
             
-            bfs::path filename;
+            std::string filename;
 
             bool operator<(const CachedFile& rhs) const { return (filename < rhs.filename); }
 
             template <typename T>
             static void load( redux::image::Image<T>& img, const std::string& fn, bool metaOnly=false ) {
                 CachedFile cf( fn );
-                if( !bfs::exists( cf.filename ) || bfs::is_directory(cf.filename) ) throw std::runtime_error("Not a readable file: " + cf.filename.string() );
+                bfs::path cfp(cf.filename);
+                if( !bfs::exists(cfp) || bfs::is_directory(cfp) ) throw std::runtime_error("Not a readable file: " + cf.filename );
                 auto m = redux::util::Cache::get().getMap< CachedFile, redux::image::Image<T> >();
                 auto it = m.second.find(cf);
                 if( it != m.second.end() && ((it->second.nElements() > 0) || (it->second.meta && metaOnly)) ) {  // exists and loaded
