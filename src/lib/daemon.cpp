@@ -8,6 +8,7 @@
 #include "redux/util/endian.hpp"
 #include "redux/util/stopwatch.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/util/trace.hpp"
 #include "redux/translators.hpp"
 #include "redux/image/cachedfile.hpp"
 #include "redux/revision.hpp"

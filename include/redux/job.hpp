@@ -4,6 +4,10 @@
 #include "redux/logging/logger.hpp"
 #include "redux/work.hpp"
 
+#ifdef RDX_TRACE_JOB
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <atomic>
 #include <map>
 #include <memory>
@@ -55,8 +59,11 @@ namespace redux {
     /*! Base class for a "job" to be processed by the redux framework.
      * 
      */
-    class Job {
-        
+    class Job
+#ifdef RDX_TRACE_JOB
+            : public redux::util::TraceObject<Job>
+#endif
+    {
     public:
 
         enum State : uint8_t { JSTATE_NONE      = 0,

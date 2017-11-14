@@ -99,6 +99,7 @@ if (DEFINED IDL_FOUND)
          "${RDX_LIB_BASE}/util/stringutil.cpp"
          "${RDX_LIB_BASE}/util/astro_comp.cpp"
          "${RDX_LIB_BASE}/util/solar_system_geo.cpp"
+         "${RDX_LIB_BASE}/util/trace.cpp"
          "${RDX_LIB_BASE}/version.cpp"
          "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )

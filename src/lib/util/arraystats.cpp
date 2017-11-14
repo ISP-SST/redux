@@ -188,7 +188,7 @@ template void redux::util::ArrayStats::getStats( uint32_t, const Array<int32_t>&
             double noise, noiseRMS;
             uint8_t noiseType;              // flag indicating noise statistics (not used atm.)
 */
-size_t redux::util::ArrayStats::size( void ) {
+size_t redux::util::ArrayStats::size( void ) const {
     return sizeof(int) + 12*sizeof(double);
 }
 

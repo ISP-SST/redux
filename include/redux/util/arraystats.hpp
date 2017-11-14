@@ -4,13 +4,21 @@
 #include "redux/util/array.hpp"
 #include "redux/image/fouriertransform.hpp"
 
+#ifdef RDX_TRACE_ARRAY
+#   include "redux/util/trace.hpp"
+#endif
+
 namespace redux {
 
     namespace util {
 
         enum StatType { ST_VALUES=1, ST_RMS, ST_NOISE=4, ST_ALL=7 };
 
-        struct ArrayStats {
+        struct ArrayStats
+#ifdef RDX_TRACE_ARRAY
+            : public redux::util::TraceObject<ArrayStats>
+#endif
+        {
             typedef std::shared_ptr<ArrayStats> Ptr;
 
             ArrayStats() : clip(-1), cutoff(-1), min(0), max(0), median(0), sum(0), sqr_sum(0), norm(0),
@@ -41,7 +49,7 @@ namespace redux {
             template <typename T> void getStats(const redux::util::Array<T>& data, int flags=ST_ALL);
             template <typename T> void getStats(uint32_t borderClip, const redux::util::Array<T>& data, int flags=ST_ALL);
             
-            static size_t size( void );
+            size_t size( void ) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
 

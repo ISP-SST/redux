@@ -7,6 +7,10 @@
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
+#ifdef RDX_TRACE_ARRAY
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
@@ -14,6 +18,7 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
+
 
 namespace redux {
 
@@ -28,8 +33,11 @@ namespace redux {
          *  @note This class is intended for convenient access to sub-arrays, it is not optimized for speed.
          */
         template <class T = double>
-        class Array {
-
+        class Array
+#ifdef RDX_TRACE_ARRAY
+            : public TraceObject<Array<T>>
+#endif
+        {
         public:
 
             typedef size_t size_type;
@@ -276,7 +284,7 @@ namespace redux {
              */
             template <typename ...S> explicit Array( S ...sizes ) : dense_(true), begin_(0), end_(0) { resize( sizes... ); }
 
-            virtual ~Array() {};
+            virtual ~Array() {}
             
             long int use_count(void) const { return datablock.use_count(); };
             
@@ -990,7 +998,6 @@ namespace redux {
             }
             template <typename ...S>
             const_iterator pos( S ...indices ) const { return const_cast<Array<T>*>( this )->pos( indices... ); }
-        //private:
             
             iterator begin( void ) {
                 return iterator( *this, begin_, begin_, end_ );
@@ -1004,7 +1011,6 @@ namespace redux {
 
             iterator end( void ) { return iterator( *this, end_ , begin_, end_ ); }
             const_iterator end( void ) const { return const_iterator( *this, end_ , begin_, end_ ); }
-        public:
 
             /*!
              * @name Get a raw pointer to the datablock

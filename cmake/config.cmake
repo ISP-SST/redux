@@ -33,6 +33,27 @@ endif()
 option( RDX_SKIP_GUI "Should the gui/QT parts be skipped?" ON )
 option( RDX_AUTO_REVISION "Automatically run the revision script on each build ?" ON )
 
+option( RDX_TRACE_ALL "Enable tracing all supported objects" OFF )
+option( RDX_TRACE_ARRAY "Enable tracing of Array/ArrayStats objects" OFF )
+option( RDX_TRACE_CACHE "Enable tracing of CacheItem objects" OFF )
+option( RDX_TRACE_FILE "Enable tracing of FileMeta/CachedFile objects" OFF )
+option( RDX_TRACE_NET "Enable tracing of TcpConnection objects" OFF )
+option( RDX_TRACE_JOB "Enable tracing of Job objects" OFF )
+option( RDX_TRACE_PARTS "Enable tracing of Part/WorkInProgress objects" OFF )
+
+set(RDX_TRACE_ALL ${RDX_TRACE_ALL} CACHE BOOL "Enable tracing all supported objects" FORCE)
+
+if( RDX_TRACE_ALL )
+    set( RDX_TRACE_ARRAY ON  )
+    set( RDX_TRACE_CACHE ON )
+    set( RDX_TRACE_FILE  ON )
+    set( RDX_TRACE_NET   ON )
+    set( RDX_TRACE_JOB   ON )
+    set( RDX_TRACE_PARTS ON )
+endif()
+
+if( RDX_TRACE_ARRAY OR RDX_TRACE_CACHE OR RDX_TRACE_FILE OR RDX_TRACE_NET OR RDX_TRACE_JOB OR RDX_TRACE_PARTS )
+    set( RDX_TRACE True )
 endif()
 
 # Load platform specific configuration

@@ -14,8 +14,42 @@ else ()
     message(FATAL_ERROR "C++11 needed. Therefore a gcc compiler with a version higher than 4.3 is needed.")   
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing")
+if( RDX_TRACE )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -rdynamic -DRDX_TRACE")
+    message(STATUS "Enabling trace (with symbol demangling)")
+endif()
 
+if( RDX_TRACE_ARRAY )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_ARRAY")
+    message(STATUS "  Tracing Array objects")
+endif()
+
+if( RDX_TRACE_CACHE )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_CACHE")
+    message(STATUS "  Tracing CacheItem objects")
+endif()
+
+if( RDX_TRACE_FILE )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_FILE")
+    message(STATUS "  Tracing FileMeta/CachedFile objects")
+endif()
+
+if( RDX_TRACE_NET )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_NET")
+    message(STATUS "  Tracing TcpConnection objects")
+endif()
+
+if( RDX_TRACE_JOB )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_JOB")
+    message(STATUS "  Tracing Job objects")
+endif()
+
+if( RDX_TRACE_PARTS )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_PARTS")
+    message(STATUS "  Tracing Part objects")
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O4")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -pg -DDEBUG_ -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")

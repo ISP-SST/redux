@@ -1,5 +1,9 @@
 #include "momfbd.hpp"
 
+#ifdef RDX_TRACE_ARRAY
+#undef RDX_TRACE_ARRAY
+#endif
+
 #include "redux/file/filemomfbd.hpp"
 
 #include <algorithm>

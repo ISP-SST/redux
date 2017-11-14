@@ -4,6 +4,10 @@
 #include "redux/network/tcpconnection.hpp"
 #include "redux/util/cacheitem.hpp"
 
+#ifdef RDX_TRACE_PARTS
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -16,7 +20,11 @@ namespace redux {
 
     class Job;
 
-    struct Part : public redux::util::CacheItem {
+    struct Part : public redux::util::CacheItem
+#ifdef RDX_TRACE_PARTS
+            ,public redux::util::TraceObject<Part>
+#endif
+    {
         typedef std::shared_ptr<Part> Ptr;
         Part();
         //Part(const Part&) = delete;
@@ -38,7 +46,11 @@ namespace redux {
     };
 
 
-    struct WorkInProgress : std::enable_shared_from_this<WorkInProgress> {
+    struct WorkInProgress : std::enable_shared_from_this<WorkInProgress>
+#ifdef RDX_TRACE_PARTS
+            ,public redux::util::TraceObject<WorkInProgress>
+#endif
+    {
         typedef std::shared_ptr<WorkInProgress> Ptr;
         WorkInProgress(void);
         WorkInProgress(const WorkInProgress&);

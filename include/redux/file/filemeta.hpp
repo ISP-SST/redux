@@ -1,6 +1,10 @@
 #ifndef REDUX_FILE_FILEMETA_HPP
 #define REDUX_FILE_FILEMETA_HPP
 
+#ifdef RDX_TRACE_FILE
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -20,7 +24,11 @@ namespace redux {
          *  @{
          */
 
-        struct FileMeta {
+        struct FileMeta
+#ifdef RDX_TRACE_FILE
+            : public redux::util::TraceObject<FileMeta>
+#endif
+        {
 
             FileMeta ( void ) {}
             virtual ~FileMeta ( void ) = default;

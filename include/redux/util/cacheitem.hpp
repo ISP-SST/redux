@@ -1,6 +1,10 @@
 #ifndef REDUX_UTIL_CACHEITEM_HPP
 #define REDUX_UTIL_CACHEITEM_HPP
 
+#ifdef RDX_TRACE_CACHE
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <mutex>
 #include <string>
 
@@ -17,7 +21,11 @@ namespace redux {
          *  @{
          */
       
-        class CacheItem {
+        class CacheItem
+#ifdef RDX_TRACE_CACHE
+            : public redux::util::TraceObject<CacheItem>
+#endif
+        {
         public:
             CacheItem(void);
             explicit CacheItem(const std::string& path);

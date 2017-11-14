@@ -6,6 +6,10 @@
 #include "redux/util/cache.hpp"
 #include "redux/util/stringutil.hpp"
 
+#ifdef RDX_TRACE_FILE
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <iostream>
 #include <mutex>
 #include <string>
@@ -18,8 +22,15 @@ namespace redux {
 
     namespace image {
                 
-        struct CachedFile {
+        struct CachedFile
+#ifdef RDX_TRACE_FILE
+            : public redux::util::TraceObject<CachedFile>
+#endif
+        {
             
+#ifdef RDX_TRACE_FILE
+            inline size_t size( void ) const { return sizeof(CachedFile)+filename.size(); }
+#endif
             CachedFile( const std::string& fn ) : filename(fn) {
                 filename = redux::util::cleanPath( filename ) ;
             }

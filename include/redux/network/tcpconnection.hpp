@@ -4,6 +4,10 @@
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 
+#ifdef RDX_TRACE_NET
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -21,7 +25,11 @@ namespace redux {
 
     namespace network {
 
-       class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
+       class TcpConnection : public std::enable_shared_from_this<TcpConnection>
+#ifdef RDX_TRACE_NET
+            ,public redux::util::TraceObject<TcpConnection>
+#endif
+       {
 
             static void writeCallback( size_t sent, const boost::system::error_code& error, size_t transferred ) {
                 using namespace boost::asio;
