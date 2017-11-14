@@ -759,7 +759,6 @@ void convertlog_proc( int argc, IDL_VPTR* argv, char* argk ) {
             content.data();
         } else {
             throw std::ios_base::failure( "Failed to open file: " + infile );
-            return;
         }
     } catch( std::exception& e ) {
         cout << e.what() << endl;

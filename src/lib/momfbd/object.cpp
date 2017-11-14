@@ -320,7 +320,7 @@ void Object::getResults(ObjectData& od, double* alpha ){
     
 
     // PSF
-    if( saveMask &( SF_SAVE_PSF|SF_SAVE_PSF_AVG ) ){
+    if( saveMask &( SF_SAVE_PSF&SF_SAVE_PSF_AVG ) ){
         uint16_t nPSF =( saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
         od.psf.resize(nPSF, patchSize, patchSize );
         od.psf.zero( );
@@ -1153,7 +1153,7 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     int64_t imgSize = patchSize*patchSize*sizeof(float );
     
     if( info->fileNames.size( ) )writeMask |= MOMFBD_NAMES;
-    if( saveMask &( SF_SAVE_PSF|SF_SAVE_PSF_AVG ) )writeMask |= MOMFBD_PSF;
+    if( saveMask &( SF_SAVE_PSF&SF_SAVE_PSF_AVG ) )writeMask |= MOMFBD_PSF;
     if( saveMask & SF_SAVE_MODES &&( info->nPH > 0 ) )writeMask |= MOMFBD_MODES;
     if( saveMask & SF_SAVE_COBJ )writeMask |= MOMFBD_OBJ;
     if( saveMask & SF_SAVE_RESIDUAL )writeMask |= MOMFBD_RES;

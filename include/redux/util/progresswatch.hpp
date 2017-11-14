@@ -33,8 +33,8 @@ namespace redux {
             inline void increaseTarget(int count=1) { stepTarget(count); }
             inline void decreaseTarget(int count=1) { stepTarget(-count); }
             
-            inline void setHandler( std::function<void(void)> cb ) { std::lock_guard<std::mutex> lock(mtx); onCompletion = cb; }
-            inline void setTicker( std::function<void(void)> cb ) { std::lock_guard<std::mutex> lock(mtx); onChange = cb; }
+            inline void setHandler( const std::function<void(void)>& cb ) { std::lock_guard<std::mutex> lock(mtx); onCompletion = cb; }
+            inline void setTicker( const std::function<void(void)>& cb ) { std::lock_guard<std::mutex> lock(mtx); onChange = cb; }
             
             // prefix
             inline ProgressWatch& operator++() { step(); return *this; }
