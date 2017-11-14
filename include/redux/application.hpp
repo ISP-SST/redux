@@ -33,6 +33,14 @@ namespace redux {
             }
         };
 
+        struct ThreadExit {
+            ThreadExit( void ) {}
+            virtual const char *what( void ) const throw() {
+                return "exiting thread";
+            }
+        };
+
+
         Application( bpo::variables_map& vm, RunMode=EXIT );
         virtual ~Application( void );
 

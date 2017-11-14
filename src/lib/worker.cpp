@@ -12,14 +12,42 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+namespace {
+    std::map<boost::thread::id,boost::thread*> tmap;
+}
 
-Worker::Worker( Daemon& d ) : strand(ioService), runTimer( ioService ), running_(false), exitWhenDone_(false),
+Worker::Worker( Daemon& d ) : runTimer( d.ioService ), running_(false), exitWhenDone_(false),
     wip(nullptr), daemon( d ), myInfo(Host::myInfo()) {
 
 }
 
 
 Worker::~Worker( void ) {
+
+}
+
+
+void Worker::threadLoop( void ) {
+
+    while( true ) {
+        try {
+            boost::this_thread::interruption_point();
+            ioService.run();
+        } catch( const Application::ThreadExit& e ) {
+            break;
+        } catch( job_error& e ) {
+            LLOG_ERR(daemon.logger) << "Job error: " << e.what() << ende;
+        } catch( const boost::thread_interrupted& ) {
+            LLOG_TRACE(daemon.logger) << "Worker: Thread interrupted." << ende;
+            break;
+        } catch( exception& e ) {
+            LLOG_ERR(daemon.logger) << "Exception in thread: " << e.what() << ende;
+        } catch( ... ) {
+            LLOG_ERR(daemon.logger) << "Unhandled exception in thread." << ende;
+        }
+    }
+return; // FIXME it gets stuck on reset/kill
+    pool.remove_thread( tmap[boost::this_thread::get_id()] );
 
 }
 
@@ -31,28 +59,14 @@ void Worker::start( void ) {
     ioService.reset();
     workLoop.reset( new boost::asio::io_service::work(ioService) );
 
-    for( uint16_t t=0; t < myInfo.status.nThreads+1; ++t ) {
-        pool.create_thread( [&,t](){
-            while( true ) {
-                try {
-                    boost::this_thread::interruption_point();
-                    ioService.run();
-                } catch( job_error& e ) {
-                    LLOG_ERR(daemon.logger) << "Job error: " << e.what() << ende;
-                } catch( const boost::thread_interrupted& ) {
-                    LLOG_TRACE(daemon.logger) << "Worker: Thread interrupted." << ende;
-                    break;
-                } catch( exception& e ) {
-                    LLOG_ERR(daemon.logger) << "Exception in thread: " << e.what() << ende;
-                } catch( ... ) {
-                    LLOG_ERR(daemon.logger) << "Unhandled exception in thread." << ende;
-                }
-            }
-        });
-    }
+    uint16_t nThreads = myInfo.status.nThreads;
+    myInfo.status.nThreads = 0;
+    //boost::thread* t = pool.create_thread( std::bind( &Worker::threadLoop, this ) ); // add a timer thread which will not "count" as a thread
+    //tmap[ t->get_id() ] = t;
+    setThreads(nThreads);
     
     runTimer.expires_from_now( boost::posix_time::seconds( 5 ) );
-    runTimer.async_wait( strand.wrap(std::bind( &Worker::run, this, placeholders::_1 )) );
+    runTimer.async_wait( std::bind( &Worker::run, this, placeholders::_1 ) );
     myInfo.touch();
 
 }
@@ -68,6 +82,22 @@ void Worker::stop( void ) {
     pool.join_all();
     wip.reset();
 
+}
+
+
+void Worker::setThreads( int nThreads ) {
+
+    int diff = nThreads - myInfo.status.nThreads;
+    myInfo.status.nThreads += diff;
+    if( diff > 0 ) {
+        for( int i=0; i < diff; ++i ) {
+            boost::thread* t = pool.create_thread( std::bind( &Worker::threadLoop, this ) );
+            tmap[ t->get_id() ] = t;
+        }
+    } else while( diff++ < 0 ) {
+        ioService.post( [](){ throw Application::ThreadExit(); } );     // Make diff threads throw exception to exit.
+    }
+    
 }
 
 
@@ -283,7 +313,7 @@ void Worker::run( const boost::system::error_code& error ) {
     if( running_ ) {
         boost::this_thread::interruption_point();
         runTimer.expires_from_now( boost::posix_time::seconds(sleepS) );
-        runTimer.async_wait( strand.wrap(std::bind( &Worker::run, this, placeholders::_1 )) );
+        runTimer.async_wait( std::bind( &Worker::run, this, placeholders::_1 ) );
         if( sleepS < 4 ) {
             sleepS <<= 1;
         }
