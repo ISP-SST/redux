@@ -35,7 +35,9 @@ namespace redux {
         void maintenance( void );
         void checkSwapSpace( void );
         void checkCurrentUsage( void );
+        void threadLoop( void );
         bool doWork(void);
+        void setThreads( int nThreads );
         
         bool workerInit( void );
         void connect( network::Host::HostInfo& host, network::TcpConnection::Ptr& conn );

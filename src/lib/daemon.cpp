@@ -30,6 +30,8 @@ using namespace std;
 namespace {
     thread_local Host::Ptr connHost;
     thread_local WorkInProgress::Ptr connWIP;
+    std::map<boost::thread::id,boost::thread*> tmap;
+    int nSysThreads;
 }
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
@@ -95,16 +97,25 @@ void Daemon::serverInit( void ) {
         server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
         server->accept();
         myInfo.info.peerType |= Host::TP_MASTER;
-        LOG_DETAIL << "Starting server on port " << params["port"].as<uint16_t>() << "." << ende;
+        LOG << "Starting server on port " << params["port"].as<uint16_t>() << "." << ende;
         struct rlimit rl;   // FIXME: fugly hack until the FD usage is more streamlined.
         if( getrlimit(RLIMIT_NOFILE, &rl) ) {
             LOG_WARN << "Failed to get limit on file-descriptors. errno:" << strerror(errno) << ende;
         } else if( rl.rlim_cur < rl.rlim_max ) {
-            LOG_DEBUG << "Raising max open files from " << rl.rlim_cur << " to " << rl.rlim_max << ende;
+            LOG << "Raising max open files from " << rl.rlim_cur << " to " << rl.rlim_max << ende;
             rl.rlim_cur = rl.rlim_max;
             if( setrlimit(RLIMIT_NOFILE, &rl) ) {
                 LOG_ERR << "Failed to set limit on file-descriptors to max value. errno:" << strerror(errno) << ende;
             }
+        }
+        if( getrlimit(RLIMIT_CORE, &rl) ) {
+            LOG_WARN << "Failed to get limit on coredumps. errno:" << strerror(errno) << ende;
+        } else {
+            LOG << "Coredump limit " << rl.rlim_cur << " max: " << rl.rlim_max << ende;
+//             rl.rlim_cur = rl.rlim_max;
+//             if( setrlimit(RLIMIT_CORE, &rl) ) {
+//                 LOG_ERR << "Failed to set limit on coredumps to max value. errno:" << strerror(errno) << ende;
+//             }
         }
         
     }
@@ -182,6 +193,33 @@ void Daemon::checkCurrentUsage( void ) {
 }
 
 
+void Daemon::threadLoop( void ) {
+
+
+    while( runMode == LOOP ) {
+        try {
+            boost::this_thread::interruption_point();
+            ioService.run();
+        } catch( const ThreadExit& e ) {
+            break;
+        } catch( job_error& e ) {
+            LOG_ERR<< "Job error: " << e.what() << ende;
+        } catch( const boost::thread_interrupted& ) {
+            LOG_TRACE << "Daemon: Thread interrupted." << ende;
+            break;
+        } catch( exception& e ) {
+            LOG_ERR << "Exception in thread: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "Unhandled exception in thread." << ende;
+        }
+    }
+
+    // pool.remove_thread( tmap[boost::this_thread::get_id()] );
+
+
+}
+
+
 bool Daemon::doWork( void ) {
 
 
@@ -193,22 +231,12 @@ bool Daemon::doWork( void ) {
         LOG_DEBUG << "Initializing maintenance timer." << ende;
         timer.expires_from_now( boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
+        
         // Add some threads for the async work.
-        for( int i = 0; i < 50; ++i ) {
-            pool.create_thread( [&](){
-                while( runMode == LOOP ) {
-                    try {
-                        ioService.run();
-                    } catch( job_error& e ) {
-                        LOG_ERR << "Job error: " << e.what() << ende;
-                    } catch( exception& e ) {
-                        LOG_ERR << "Exception in thread: " << e.what() << ende;
-                    } catch( ... ) {
-                        LOG_ERR << "Unhandled exception in thread." << ende;
-                    }
-                }
-            });
-        }
+        int nThreads = 10; // nSysThreads;   // always start with a fixed number?
+        nSysThreads = 0;
+        setThreads( nThreads );
+        
         LOG_DEBUG << "Initializing worker." << ende;
         if( workerInit() ) {
             worker.start();
@@ -229,6 +257,28 @@ bool Daemon::doWork( void ) {
 
     return true;
 
+}
+
+
+void Daemon::setThreads( int nThreads ) {
+    
+    if( nThreads < 5 ) nThreads = 5;        // daemon will not respond to connections if it doesn't have threads
+    int diff = nThreads - nSysThreads;
+    if( diff < -nSysThreads ) diff = -nSysThreads;
+    
+    // FIXME  dynamically changing the number of sys-threads will cause threads to get stuck on pool.create_thread/remove_thread
+    diff = 50-nSysThreads;  // force 50 threads until bug is fixed
+    
+    nSysThreads += diff;
+    if( diff > 0 ) {
+        for( int i=0; i < diff; ++i ) {
+            /*boost::thread* t =*/ pool.create_thread( std::bind( &Daemon::threadLoop, this ) );
+            //tmap[ t->get_id() ] = t;
+        }
+    } else while( diff++ < 0 ) {
+        ioService.post( [](){ throw ThreadExit(); } );
+    }
+    
 }
 
 
@@ -494,9 +544,12 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
                 removeConnection(conn);
                 return;
         }
+        if( !conn || !conn->socket().is_open() ) throw std::ios_base::failure("Disconnected.");
 
-    }
-    catch( const exception& e ) {
+    } catch( const ios_base::failure& e ) { // severed connection, just remove it.
+        removeConnection(conn);
+        return;
+    } catch( const exception& e ) {
         LOG_DEBUG << "processCommand(): Exception when parsing incoming command: " << cmdToString(cmd)
                   << " (" << (int)cmd << "," << bitString(cmd) << "): " << e.what() << ende;
         removeConnection(conn);
@@ -691,7 +744,7 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
 
 void Daemon::die(void) {
 
-    LOG_DEBUG << "Received exit command from master." << ende;
+    LOG_DEBUG << "Received exit command." << ende;
     worker.stop();
     stop();
     
@@ -801,15 +854,11 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     }
                     job->startLog();
                     job->printJobInfo();
-                    if( !(job->info.flags&Job::NOCHECK) && !(job->info.flags&Job::CHECKED) ) {
-                        if( !job->check() ) {
-                            string msg = "Sanity check failed for \"" + tmpS + "\"-job " + job->info.name + "   ";
-                            msg += "(see " + job->info.logFile + " for details)";
-                            throw job_error( msg );
-                        }
-                    } else job->info.step = Job::JSTEP_SUBMIT;
+                    if( !(job->info.flags&Job::CHECKED) ) {
+                        Job::moveTo( job.get(), Job::JSTEP_SUBMIT );
+                    }
+
                     job->info.submitTime = boost::posix_time::second_clock::local_time();
-                    LLOG_DETAIL(job->logger) << "Sanity check passed, adding to queue." << ende;
                     ids.push_back( job->info.id );
                     ids[0]++;
                     jobCounter++;
@@ -1052,13 +1101,27 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
     unique_lock<mutex> lock( jobsMutex );
     vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     lock.unlock();
-    map<size_t,map<uint16_t,uint16_t>> activeCounts;
-    for( Job::JobPtr& job: tmpJobs ) {
-        if( job ) {
-            size_t tid = job->getTypeID();
-            activeCounts[tid][job->info.step]++;
-        }
+    
+    if( !wip->isRemote ) {
+        auto lock = Job::getGlobalLock();
+        std::sort( tmpJobs.begin(), tmpJobs.end(),[&](const Job::JobPtr& a, const Job::JobPtr& b ){
+            const Job::CountT& ca = Job::counts[Job::StepID(a->getTypeID(),a->getNextStep())];
+            const Job::CountT& cb = Job::counts[Job::StepID(b->getTypeID(),b->getNextStep())];
+            if( (ca.active<ca.min) != (cb.active<cb.min) ) return (ca.active<ca.min);
+            if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
+            if(a->info.step != b->info.step) return (a->info.step > b->info.step);
+            if( ca.active != cb.active ) return (ca.active<cb.active);
+            return (a->info.id < b->info.id);
+        } );
     }
+        
+        map<size_t,map<uint16_t,uint16_t>> activeCounts;
+        for( Job::JobPtr& job: tmpJobs ) {
+            if( job ) {
+                size_t tid = job->getTypeID();
+                activeCounts[tid][job->info.step]++;
+            }
+        }
 
     for( Job::JobPtr& job: tmpJobs ) {
         if( job && job->getWork( wip, nThreads, activeCounts[job->getTypeID()] ) ) {
@@ -1167,8 +1230,6 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
                     try {
                         tmpwip->unpackWork( buf.get(), endian );
                         LOG_DETAIL << msg << "   " + tmpwip->print() << ende;
-    //                        LOG_DETAIL << "  Job = " << hexString(tmpwip->job.get()) << ende;
-                        //LLOG_DETAIL(wip->job->getLogger()) << msg << "   " + wip->print() << ende;
                         tmpwip->returnResults();
                     } catch ( exception& e ) {
                         LOG_ERR << "putParts:  exception when unpacking results: " << e.what() << ende;
@@ -1180,8 +1241,8 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
                 reply = CMD_OK;         // all ok
             }
         } else {
-            //LOG_TRACE << "Received results from unexpected host. It probably timed out." << ende;
-            throw logic_error("Received results from unexpected host. It probably timed out.");
+            LOG_TRACE << "Received results from unexpected host. It probably timed out." << ende;
+            //throw logic_error("Received results from unexpected host. It probably timed out.");
         }
     }
     *conn << reply;
