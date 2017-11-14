@@ -29,7 +29,7 @@ namespace redux {
             network::Host::Ptr host;
             network::TcpConnection::Ptr conn;
             uint32_t id;
-
+            std::vector<LogItem> sendBuffer;
         };
 
     } // end namespace logging

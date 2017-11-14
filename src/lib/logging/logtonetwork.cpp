@@ -72,14 +72,17 @@ void LogToNetwork::flushBuffer( void ) {
     
     unique_lock<mutex> lock( queueMutex );
     if( itemQueue.empty() ) return;
-    vector<LogItemPtr> sendBuffer( itemQueue.begin(), itemQueue.end() );
+    sendBuffer.reserve( sendBuffer.size()+itemQueue.size() );
+    for( const auto& i : itemQueue ) {
+        if( i ) sendBuffer.push_back(*i); 
+    }
     itemQueue.clear();
     itemCount = 0;
     lock.unlock();
     
     uint64_t blockSize(0);
-    for( LogItemPtr& it: sendBuffer ) {
-        blockSize += it->size();
+    for( LogItem& it: sendBuffer ) {
+        blockSize += it.size();
     }
 
     Command cmd = CMD_PUT_LOG;
@@ -88,8 +91,8 @@ void LogToNetwork::flushBuffer( void ) {
     char* ptr = data.get();
     uint64_t count = pack( ptr, cmd );
     count += pack( ptr+count, blockSize );
-    for( LogItemPtr& it: sendBuffer ) {
-        count += it->pack( ptr+count );
+    for( LogItem& it: sendBuffer ) {
+        count += it.pack( ptr+count );
     }
 
     conn->lock();
@@ -103,13 +106,6 @@ void LogToNetwork::flushBuffer( void ) {
         // TODO Narrower catch, log error message
     }
     conn->unlock();
-    
-    lock.lock();
-    for( auto it=sendBuffer.rbegin(); it != sendBuffer.rend(); ++it ) {
-        itemQueue.push_front(*it);
-    }
-
-    itemCount = itemQueue.size();
 
 }
 

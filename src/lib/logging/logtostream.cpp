@@ -75,15 +75,17 @@ void LogToStream::writeFormatted( const LogItem &i ) {
 void LogToStream::flushBuffer( void ) {
     
     unique_lock<mutex> lock( queueMutex );
-    vector<LogItemPtr> tmpQueue( itemQueue.begin(), itemQueue.end() );
+    vector<LogItem> tmpQueue;
+    tmpQueue.reserve( itemQueue.size() );
+    for( const auto& i : itemQueue ) {
+        if( i ) tmpQueue.push_back(*i); 
+    }
     itemQueue.clear();
     itemCount = 0;
     lock.unlock();
 
-    for( LogItemPtr& it: tmpQueue ) {
-        if( it ) {
-            writeFormatted( *it );
-        }
+    for( LogItem& it: tmpQueue ) {
+        writeFormatted( it );
     }
 
 }
