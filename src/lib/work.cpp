@@ -26,7 +26,8 @@ namespace {
 #endif
     
 }
-Part::Part() : id( 0 ), partStarted(boost::posix_time::not_a_date_time), step( 0 ), nRetries( 0 ), partType(0) {
+Part::Part() : id( 0 ), partStarted(boost::posix_time::not_a_date_time), step( 0 ), nRetries( 0 ), partType(0),
+        nThreads(0), runtime_wall(0.0), runtime_cpu(0.0) {
 #ifdef DBG_PART_
     LOG_DEBUG << "Constructing Part: (" << hexString(this) << ") new instance count = " << (partCounter.fetch_add(1)+1);
 #endif
@@ -47,6 +48,9 @@ uint64_t Part::pack( char* ptr ) const {
     count += pack( ptr+count, step );
     count += pack( ptr+count, nRetries );
     count += pack( ptr+count, partType );
+    count += pack( ptr+count, nThreads );
+    count += pack( ptr+count, runtime_wall );
+    count += pack( ptr+count, runtime_cpu );
 
     return count;
 
@@ -61,6 +65,9 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, step, swap_endian );
     count += unpack( ptr+count, nRetries, swap_endian );
     count += unpack( ptr+count, partType, swap_endian );
+    count += unpack( ptr+count, nThreads, swap_endian );
+    count += unpack( ptr+count, runtime_wall, swap_endian );
+    count += unpack( ptr+count, runtime_cpu, swap_endian );
     
     return count;
 }

@@ -479,9 +479,12 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, 
                 logger.setContext( "job "+to_string(info.id)+":"+to_string(part->id) );
                 // Run main processing
                 auto data = static_pointer_cast<PatchData>(part);
+                StopWatch timer;
                 data->initPatch();
                 solver->run( data );
-                
+                part->nThreads = nThreads;
+                part->runtime_wall = timer.getSeconds();
+                part->runtime_cpu = timer.getCPUSeconds();
                 //solver->run_new(static_pointer_cast<PatchData>(part));
                 wip->hasResults = true;
             }
@@ -730,10 +733,49 @@ void MomfbdJob::initCache(void) {
 
 void MomfbdJob::clearPatches(void) {
 
+    auto lock = getLock();
+    uint64_t nTotalThreads(0);
+    double cpu_sum(0.0);
+    for( const PatchData::Ptr& p: patches ) {
+        nTotalThreads += p->nThreads;
+        cpu_sum += p->runtime_cpu;
+    }
+    size_t nPatches = patches.nElements();
     nActivePost--;
     patches.clear();
     moveTo( this, JSTEP_COMPLETED );
-
+    
+    boost::posix_time::time_duration elapsed = getElapsed( JSTEP_CHECKING, JSTEP_CHECKED );
+    boost::posix_time::time_duration total;
+    string timings = "\nTiming details:\n";
+    if( ! elapsed.is_not_a_date_time() ) {
+        timings += "       Checking: " + to_simple_string(elapsed) +"\n";
+        total += elapsed;
+    }
+    elapsed = getElapsed( JSTEP_PREPROCESS, JSTEP_QUEUED );
+    if( ! elapsed.is_not_a_date_time() ) {
+        timings += "  PreProcessing: " + to_simple_string(elapsed) +"\n";
+        total += elapsed;
+    }
+    elapsed = getElapsed( JSTEP_RUNNING, JSTEP_DONE );
+    if( ! elapsed.is_not_a_date_time() ) {
+        timings += "        Running: " + to_simple_string(elapsed) +"\n";
+        total += elapsed;
+    }
+    elapsed = getElapsed( JSTEP_WRITING, JSTEP_COMPLETED );
+    if( ! elapsed.is_not_a_date_time() ) {
+        timings += "        Writing: " + to_simple_string(elapsed) +"\n";
+        total += elapsed;
+    }
+    if( ! total.is_not_a_date_time() ) {
+        timings += "          TOTAL: " + to_simple_string(total) +"\n";
+    }
+    
+    LOG << nPatches << " patches, processed in: " << to_simple_string(total)
+        << ".  CPU-time: " << (cpu_sum/3600) << " hours." << ende;
+    
+    LOG_DETAIL << timings << ende;
+    
 }
 
  

@@ -131,6 +131,7 @@ namespace redux {
             boost::posix_time::ptime submitTime;
             boost::posix_time::ptime startedTime;
             boost::posix_time::ptime completedTime;
+            std::map<uint16_t,boost::posix_time::ptime> times;
             Info();
             Info(const Info&);
             uint64_t size(void) const;
@@ -167,6 +168,7 @@ namespace redux {
         virtual bool active(void) { return false; };
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
         virtual uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
+        boost::posix_time::time_duration getElapsed( uint16_t from, uint16_t to ) { return (info.times[to] - info.times[from]); }
         
         virtual bool getWork(WorkInProgress::Ptr, uint16_t, const std::map<uint16_t,uint16_t>&) { return false; };
         virtual void ungetWork(WorkInProgress::Ptr) { };

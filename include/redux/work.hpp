@@ -30,7 +30,8 @@ namespace redux {
         //Part(const Part&) = delete;
         virtual ~Part();
         virtual inline uint64_t size( void ) const {
-            static uint64_t fixed_sz = sizeof(id)+sizeof(step)+sizeof(nRetries)+sizeof(partType);
+            static uint64_t fixed_sz = sizeof(id)+sizeof(step)+sizeof(nRetries)+sizeof(partType)
+                                    +sizeof(nThreads)+sizeof(runtime_wall)+sizeof(runtime_cpu);
             return fixed_sz;
         }
         virtual uint64_t pack( char* ) const;
@@ -43,6 +44,9 @@ namespace redux {
         boost::posix_time::ptime partStarted;
         uint16_t step;
         uint8_t nRetries, partType;
+        uint16_t nThreads;
+        float runtime_wall;
+        float runtime_cpu;
     };
 
 

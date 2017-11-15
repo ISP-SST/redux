@@ -440,6 +440,9 @@ void PatchData::copyResults( const PatchData& rhs ) {
 
     finalMetric = rhs.finalMetric;
     metrics = rhs.metrics;
+    nThreads = rhs.nThreads;
+    runtime_wall = rhs.runtime_wall;
+    runtime_cpu = rhs.runtime_cpu;
 
     for( size_t i=0; i<objects.size(); ++i ) {
         objects[i]->copyResults( *(rhs.objects[i]) );

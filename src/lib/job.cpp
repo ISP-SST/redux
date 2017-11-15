@@ -440,6 +440,7 @@ void Job::moveTo( Job* job, uint16_t to ) {
     c_new.active++;
     glock.unlock();
     job->info.step = to;
+    job->info.times[to] = boost::posix_time::second_clock::local_time();
 }
 
 

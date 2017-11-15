@@ -254,7 +254,8 @@ bool Channel::checkData( bool verbose ) {
             return false;
         }
         Image<float> tmp;
-        CachedFile::load( tmp, fn.string(), true );       // Only read metadata
+        //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
+        redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
         uint8_t nDims = tmp.meta->nDims();
         //CachedFile::unload<float>( fn.string() );
         if( nDims == 3 ) {
@@ -273,7 +274,8 @@ bool Channel::checkData( bool verbose ) {
                 return false;
             }
             Image<float> tmp;
-            CachedFile::load( tmp, fn.string(), true );       // Only read metadata
+            //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
+            redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
             uint8_t nDims = tmp.meta->nDims();
             //CachedFile::unload<float>( fn.string() );
             if( nDims == 3 ) {
@@ -1220,7 +1222,7 @@ Point16 Channel::getImageSize(void) {
             }
 
             Image<float> tmp;
-            CachedFile::load( tmp, fn.string(), true );       // Image will be cached, so this is not a "wasted" load.
+            redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
 
             uint8_t nDims = tmp.meta->nDims();
 

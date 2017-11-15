@@ -161,6 +161,15 @@ float StopWatch::getSeconds( void ) {
 }
 
 
+float StopWatch::getCPUSeconds( void ) {
+    
+    stop();
+    if( suffixTot == "ms" ) return lapsedTot/1000.0;
+    return lapsedTot;
+   
+}
+
+
 string StopWatch::print(void) {
     
     stop();

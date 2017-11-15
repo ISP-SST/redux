@@ -36,6 +36,7 @@ namespace redux {
           
           float getLoad( void );
           float getSeconds( void );
+          float getCPUSeconds( void );
 
           std::string print( void );
 
