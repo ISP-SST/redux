@@ -243,7 +243,7 @@ void MomfbdJob::checkParts( void ) {
         moveTo( this, JSTEP_ERR );
         info.state.store( JSTATE_ERR );
         progWatch.clear();
-        info.progressString = "error";
+        updateProgressString();
     } else if( countBits( mask ) == 1 ) {  // if all parts are "done", set the whole job to done.
          if(mask == JSTEP_DONE) moveTo( this, mask );
     }
@@ -980,30 +980,23 @@ void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads
 
 
 void MomfbdJob::updateProgressString(void) {
-    
-    //cout << "updateProgressString0: " << endl;
-    //static int blark = sleep(1);
-    //cout << "updateProgressString1: " << hexString(this) << endl;
-    //sleep(1);
-    //cout << "updateProgressString2: " << progWatch.progressString() << endl;
-    //sleep(1);
-    
-    //info.progressString = "-";
-    //info.progressString = progWatch.dump();
-    //return;
+
+    memset( info.progressString, 0, RDX_JOB_PROGSTRING_LENGTH );
+    float prog = (100.0*progWatch.progress());
+    if( !isnormal(prog) ) prog = 0;
     switch( info.step ) {
-        case JSTEP_CHECKING:    info.progressString = "Checking"; break; //"(P:" + progWatch.progressString() + ")"; break;
-//        case JSTEP_CHECKED:    info.progressString = "Checked"; break; //"(P:" + progWatch.progressString() + ")"; break;
-        case JSTEP_PREPROCESS:  info.progressString = "Pre: (" + progWatch.progressString() + ")"; break;
-        case JSTEP_VERIFY:      info.progressString = "V"; break;
+        case JSTEP_CHECKING:    snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Checking" ); break;
+        case JSTEP_PREPROCESS:  snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Pre: (%03.1f%%)", prog ); break;
+        case JSTEP_VERIFY:      snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Verifying: (%03.1f%%)", prog ); break;
         case JSTEP_POSTPROCESS: ;
-        case JSTEP_WRITING:     info.progressString = "Writing"; break; // + progWatch.progressString() + ")"; break;
-        case JSTEP_QUEUED:      info.progressString = "Q"; break;
-        case JSTEP_RUNNING:     info.progressString = "(" + progWatch.progressString() + ")"; break;
-        case JSTEP_COMPLETED:   info.progressString = "(completed)"; break;
-        case JSTEP_ERR: info.progressString = "(failed)"; break;
-        default: info.progressString = "";
+        case JSTEP_WRITING:     snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Writing: (%03.1f%%)", prog ); break;
+        case JSTEP_QUEUED:      snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Q" ); break;
+        case JSTEP_RUNNING:     snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "(%03.1f%%)", prog ); break;
+        case JSTEP_COMPLETED:   snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "(completed)" ); break;
+        case JSTEP_ERR:         snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "(failed)" ); break;
+        default: ;
     }
+
 
 }
 

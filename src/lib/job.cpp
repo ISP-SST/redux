@@ -159,7 +159,7 @@ Job::Info::Info(const Info& rhs) {
     host = rhs.host;
     logFile = rhs.logFile;
     outputDir = rhs.outputDir;
-    progressString = "";
+    memset( progressString, 0, RDX_JOB_PROGSTRING_LENGTH );
     submitTime = rhs.submitTime;
     startedTime = rhs.startedTime;
     completedTime = rhs.completedTime;
@@ -172,7 +172,7 @@ uint64_t Job::Info::size(void) const {
                              + 3*sizeof(uint16_t)       // maxThreads, step, flags
                              + 4                        // priority, verbosity, maxPartRetries, state
                              + 3*sizeof(time_t)         // submitTime, startedTime, completedTime
-                             + 20 + 6;                  // progressString + \0 for typeString/name/user/host/logFile/outputDir
+                             + RDX_JOB_PROGSTRING_LENGTH + 6;  // progressString + \0 for typeString/name/user/host/logFile/outputDir
                                                         // fixed size for progressString, so it doesn't matter if it's updated between size() & pack()
 
     uint64_t sz = fixed_sz + typeString.length() + name.length() + user.length() + host.length();
@@ -198,7 +198,8 @@ uint64_t Job::Info::pack(char* ptr) const {
     count += pack(ptr+count, name);
     count += pack(ptr+count, user);
     count += pack(ptr+count, host);
-    count += pack(ptr+count, progressString);
+    memcpy( ptr+count, progressString, RDX_JOB_PROGSTRING_LENGTH );
+    count += RDX_JOB_PROGSTRING_LENGTH;
     count += pack(ptr+count, logFile);
     count += pack(ptr+count, outputDir);
     count += pack(ptr+count, redux::util::to_time_t(submitTime));
@@ -227,7 +228,8 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, name);
     count += unpack(ptr+count, user);
     count += unpack(ptr+count, host);
-    count += unpack(ptr+count, progressString);
+    memcpy( progressString, ptr+count, RDX_JOB_PROGSTRING_LENGTH );
+    count += RDX_JOB_PROGSTRING_LENGTH;
     count += unpack(ptr+count, logFile);
     count += unpack(ptr+count, outputDir);
     time_t timestamp;
@@ -254,7 +256,7 @@ std::string Job::Info::print(void) {
     if ( !startedTime.is_not_a_date_time() ) startedString = to_iso_extended_string(startedTime);
     info += alignCenter(to_iso_extended_string(submitTime), 20); // + alignCenter(startedString, 20);
     info += alignCenter(name, 15) + alignLeft(user + "@" + host, 15) + alignCenter(std::to_string(priority), 8)
-    + alignCenter(stateTag(state), 3) + alignLeft(progressString, 15);
+    + alignCenter(stateTag(state), 3) + alignLeft(string(progressString), 25);
     return info;
 }
 

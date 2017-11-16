@@ -111,7 +111,7 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
             info += alignCenter(startedString, 20);
             info += alignCenter(infos[i]->name, maxLength[0]+4) + alignLeft(infos[i]->user + "@" + infos[i]->host, maxLength[1]+5);
             info += alignCenter(std::to_string(infos[i]->priority), 8);
-            info += alignCenter(Job::stateTag(infos[i]->state), 3) + alignLeft(infos[i]->progressString, 15);
+            info += alignCenter(Job::stateTag(infos[i]->state), 3) + alignLeft(string(infos[i]->progressString), 25);
             cout << alignRight(to_string(i+1),4) << info << endl;
         }
     } catch ( const exception& e) {

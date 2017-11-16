@@ -26,6 +26,7 @@
 namespace bpo = boost::program_options;
 namespace bpt = boost::property_tree;
 
+#define RDX_JOB_PROGSTRING_LENGTH 30
 
 namespace redux {
         
@@ -127,7 +128,7 @@ namespace redux {
             std::string typeString, name, user, host;
             std::string logFile;
             std::string outputDir;                  //!< Where the output goes (defaults to current directory of rsub)
-            std::string progressString;
+            char progressString[RDX_JOB_PROGSTRING_LENGTH];     // fixed size to avoid crashed when it's updated while packing/sending.
             boost::posix_time::ptime submitTime;
             boost::posix_time::ptime startedTime;
             boost::posix_time::ptime completedTime;
