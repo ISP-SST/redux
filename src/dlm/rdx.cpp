@@ -11,7 +11,7 @@
 #include "redux/version.hpp"
 
 #include <iomanip>
-#include <iostream>
+#include <fstream>
 #include <typeinfo>
 #include <zlib.h>
 
