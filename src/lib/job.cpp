@@ -435,14 +435,19 @@ void Job::stopLog(void) {
 
 void Job::moveTo( Job* job, uint16_t to ) {
     if( !job ) return;
+    uint16_t current = job->info.step;
+    if( current == to ) return;
     auto glock = getGlobalLock();
-    CountT& c_old = counts[StepID(job->getTypeID(),job->info.step)];
+    CountT& c_old = counts[StepID(job->getTypeID(),current)];
     CountT& c_new = counts[StepID(job->getTypeID(),to)];
     c_old.active--;
     c_new.active++;
     glock.unlock();
     job->info.step = to;
     job->info.times[to] = boost::posix_time::second_clock::local_time();
+    if( to == JSTATE_ERR ) {
+        job->stopLog();
+    }
 }
 
 

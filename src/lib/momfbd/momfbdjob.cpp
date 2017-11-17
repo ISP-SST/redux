@@ -309,7 +309,9 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
             case JSTEP_VERIFY: 
             case JSTEP_POSTPROCESS: 
             case JSTEP_WRITING: 
-            default: check(); return false;
+            default:
+                check();
+                return false;
         }
         
         if( ret && !nThreads ) {    // don't start heavy/async jobs if nThreads=0.
@@ -318,15 +320,17 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
 
         auto lock = getGlobalLock();
         const CountT& limits = counts[StepID(jobType,nextStep)];
-
         if( limits.active >= limits.max ) {   // Not allowed to start until some jobs are done with this step
             return false;
         } else lock.unlock();
         
-        if( step == JSTEP_SUBMIT ) {
+        if( step == JSTEP_NONE || step == JSTEP_SUBMIT || step == JSTEP_CHECKED ) { // These are the 3 possible initial steps
             startLog();
+        }
+        
+        if( step == JSTEP_SUBMIT ) {    // No check done yet. It will now be run asynchronously, so return from here to avoid a race with moveTo() below.
             check();
-            stopLog();
+            return false;
         }
 
         if( step == JSTEP_CHECKED ) {
@@ -335,12 +339,10 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
             if( limits2.active >= limits2.max ) {
                 return false;
             }
-            startLog();
             info.startedTime = boost::posix_time::second_clock::local_time();
         }
        
         if( (step == JSTEP_WRITING) && !checkWriting() ) return false;
-
 
         moveTo( this, nextStep );
         updateProgressString();
@@ -657,6 +659,9 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     Point16 imageSizes;
     for( shared_ptr<Object>& obj : objects ) {
         Point16 tmp = obj->getImageSize();
+        if( tmp == 0 ) {
+            throw std::logic_error("An object returned imgSize=0, this probably means that the input data could not be read.");
+        }
         nTotalImages += obj->nImages( true );
         nTotalChannels += obj->channels.size();
         if(imageSizes == 0) {
