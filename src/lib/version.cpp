@@ -5,16 +5,16 @@
 using namespace redux;
 using namespace std;
 
-int redux::getVersionNumber ( void ) {
-    return (reduxVersionMajor<<16) + (reduxVersionMinor<<8) + reduxVersionPatch;
+uint64_t redux::getVersionNumber ( void ) {
+    return (uint64_t(reduxVersionMajor)<<32) + (reduxVersionMinor<<24) + (reduxVersionPatch<<16) + reduxVersionCommit;
 }
 
 string redux::getVersionString ( void ) {
-    return to_string(reduxVersionMajor) + "." + to_string(reduxVersionMinor) + "." + to_string(reduxVersionPatch);
+    return to_string(reduxVersionMajor) + "." + to_string(reduxVersionMinor) + "." + to_string(reduxVersionPatch) + "-" + to_string(reduxVersionCommit);
 }
 
-string redux::getVersionString ( int v ) {
-    return to_string((v>>16)&0xFF) + "." + to_string((v>>8)&0xFF) + "." + to_string(v&0xFF);
+string redux::getVersionString ( uint64_t v ) {
+    return to_string((v>>32)&0xFF) + "." + to_string((v>>24)&0xFF) + "." + to_string((v>>16)&0xFF) + "-" + to_string(v&0xFFFF);
 }
 
 string redux::getLongVersionString ( bool includeMessage ) {

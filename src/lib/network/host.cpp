@@ -127,7 +127,7 @@ Host& Host::myInfo(void) {
 
 std::string Host::printHeader(void) {
     string hdr = alignRight("ID",5) + alignCenter("NAME",25) + alignCenter("PID",7) + alignCenter("THREADS",9);
-    hdr += alignLeft("VERSION",9) + alignLeft("Usage/Load",12) + alignCenter("Uptime",12) + alignCenter("Runtime",12) + "STATUS";
+    hdr += alignLeft("VERSION",10) + alignLeft("Usage/Load",12) + alignCenter("Uptime",12) + alignCenter("Runtime",12) + "STATUS";
     return hdr;
 }
 
@@ -139,7 +139,7 @@ std::string Host::print(void) {
     if( ! elapsed.is_not_a_date_time() ) elapsedString = to_simple_string(elapsed);
     string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
     ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),9);
-    ret += alignCenter(getVersionString(info.reduxVersion),9);
+    ret += alignCenter(getVersionString(info.reduxVersion),10);
     ret += alignLeft(boost::str(boost::format("%.2f/%.2f") % status.load[0] % status.load[1]),12);
     ret += alignCenter(to_simple_string(uptime),12) + alignCenter(elapsedString,12);
     ret += status.statusString; 
