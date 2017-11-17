@@ -253,36 +253,53 @@ bool Channel::checkData( bool verbose ) {
             LOG_ERR << boost::format ("Input-file %s not found!") % fn << ende;
             return false;
         }
-        Image<float> tmp;
-        //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
-        redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
-        uint8_t nDims = tmp.meta->nDims();
-        //CachedFile::unload<float>( fn.string() );
-        if( nDims == 3 ) {
-            nFrames[0] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
-            //imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
-        } else if( nDims != 2 ) {
-            LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % imageTemplate << ende;
-            return false;
-        }
-    } else {                            // template + numbers
-        for( size_t i=0; i<fileNumbers.size(); ++i) {
-            uint32_t number = fileNumbers[i];
-            bfs::path fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)));
-            if (!bfs::is_regular_file(fn)) {
-                LOG_ERR << boost::format ("Input-file %s not found!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)) << ende;
-                return false;
-            }
+        try {
             Image<float> tmp;
             //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
             redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
             uint8_t nDims = tmp.meta->nDims();
             //CachedFile::unload<float>( fn.string() );
             if( nDims == 3 ) {
-                nFrames[i] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
+                nFrames[0] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
                 //imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
             } else if( nDims != 2 ) {
-                LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % boost::str (boost::format (imageTemplate) % (imageNumberOffset + number)) << ende;
+                LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % imageTemplate << ende;
+                return false;
+            }
+        } catch( const std::exception& e ) {
+            LOG_ERR << boost::format ("Failed to get nFrames from file %s what(): %s") % imageTemplate % e.what() << ende;
+            return false;
+        } catch( ... ) {
+            LOG_ERR << boost::format ("Failed to get nFrames from file %s") % imageTemplate << ende;
+            return false;
+        }
+    } else {                            // template + numbers
+        for( size_t i=0; i<fileNumbers.size(); ++i) {
+            uint32_t number = fileNumbers[i];
+            string thisFile = boost::str( boost::format(imageTemplate) % (imageNumberOffset + number) );
+            bfs::path fn = bfs::path (imageDataDir) / bfs::path( thisFile );
+            if (!bfs::is_regular_file(fn)) {
+                LOG_ERR << boost::format ("Input-file %s not found!") % thisFile << ende;
+                return false;
+            }
+            try {
+                Image<float> tmp;
+                //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
+                redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
+                uint8_t nDims = tmp.meta->nDims();
+                //CachedFile::unload<float>( fn.string() );
+                if( nDims == 3 ) {
+                    nFrames[i] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
+                    //imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
+                } else if( nDims != 2 ) {
+                    LOG_ERR << boost::format ("Input-file %s not 2D or 3D!") % thisFile << ende;
+                    return false;
+                }
+            } catch( const std::exception& e ) {
+                LOG_ERR << boost::format ("Failed to read nFrames from file %s what(): %s") % thisFile % e.what() << ende;
+                return false;
+            } catch( ... ) {
+                LOG_ERR << boost::format ("Failed to read nFrames from file %s") % thisFile << ende;
                 return false;
             }
             
@@ -1213,31 +1230,39 @@ Point16 Channel::getImageSize(void) {
 //         if( alignClip.size() == 4 ) {   // we have align-clip, but no mapping => reference channel.
 //             imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
 //         } else {                        //  No align-map or align-clip, get full image size.
-            bfs::path fn;
-
+            string thisFile;
             if( !fileNumbers.empty() ) {
-                fn = bfs::path(imageDataDir) / bfs::path(boost::str(boost::format (imageTemplate) % fileNumbers[0]));
+                thisFile = boost::str(boost::format (imageTemplate) % fileNumbers[0]);
             } else {
-                fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
+                thisFile = imageTemplate;
             }
-
-            Image<float> tmp;
-            redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
-
-            uint8_t nDims = tmp.meta->nDims();
-
-            if( nDims == 3 ) {
-                imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
-            } else if( nDims == 2 ) {
-                imgSize = Point16( tmp.meta->dimSize(0), tmp.meta->dimSize(1) );
-            } else LOG_ERR << "Image " << fn << " is not 2D or 3D." << ende;
+            bfs::path fn = bfs::path(imageDataDir) / bfs::path(thisFile);
+            
+            if( bfs::is_regular_file(fn) ) {
+                try {
+                    Image<float> tmp;
+                    redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
+                    uint8_t nDims = tmp.meta->nDims();
+                    if( nDims == 3 ) {
+                        imgSize = Point16( tmp.meta->dimSize(1), tmp.meta->dimSize(2) );
+                    } else if( nDims == 2 ) {
+                        imgSize = Point16( tmp.meta->dimSize(0), tmp.meta->dimSize(1) );
+                    } else LOG_ERR << "Image " << fn << " is not 2D or 3D." << ende;
+                } catch( const std::exception& e ) {
+                    LOG_ERR << boost::format ("Failed to get imgSize from file %s what(): %s") % thisFile % e.what() << ende;
+                } catch( ... ) {
+                    LOG_ERR << boost::format ("Failed to get imgSize from file %s") % thisFile << ende;
+                }
+            } else {
+                LOG_ERR << boost::format ("Input-file %s not found!") % thisFile << ende;
+            }
 //        }
     }
 
     return imgSize;
  
 }
-
+            
 
 void Channel::logAndThrow( string msg ) {
     msg = to_string(myObject.ID)+":"+to_string(ID)+": "+msg;
