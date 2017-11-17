@@ -238,14 +238,14 @@ namespace {
         
         int status(0);
         if( fits_read_key( ff, TINT, "BITPIX", &hdu.bitpix, NULL, &status ) ) {
-            throwStatusError( fn, status );
+            throwStatusError( "primaryHDU:BITPIX:"+fn, status );
         }
         
         hdu.dataType = getDataType( ff, hdu.bitpix );
         hdu.elementSize = getElementSize( hdu.dataType );
         
         if( fits_read_key( ff, TINT, "NAXIS", &hdu.nDims, NULL, &status ) ) {
-            throwStatusError( fn, status );
+            throwStatusError( "primaryHDU:NAXIS:"+fn, status );
         }
 
         if ( hdu.nDims > 999 ) {
@@ -259,7 +259,7 @@ namespace {
             for(uint16_t i=0; i<hdu.dims.size(); ++i) {
                 string key = "NAXIS" + to_string(i+1);
                 if( fits_read_key( ff, TINT, key.c_str(), &(hdu.dims[i]), NULL, &status ) ) {
-                    throwStatusError( fn, status );
+                    throwStatusError( "primaryHDU:"+key+":"+fn, status );
                 }
                 hdu.nElements *= hdu.dims[i];
             }
@@ -295,7 +295,7 @@ namespace {
         int tmpInt;
         int status(0);
         if( fits_read_key( ff, TINT, "TFIELDS", &tmpInt, NULL, &status ) ) {
-            throwStatusError( fn, status );
+            throwStatusError( "asciiHDU:TFIELDS:"+fn, status );
         }
         hdu.nColumns = tmpInt;
         hdu.table_info.clear();
@@ -304,22 +304,22 @@ namespace {
             Fits::ascii_hdu::table_info_t ti;
             string key = "TTYPE" + to_string(i);
             if( fits_read_key( ff,  TSTRING, key.c_str(), card, nullptr, &status ) ) {
-                throwStatusError( fn+key, status );
+                throwStatusError( "asciiHDU:"+key+":"+fn, status );
             }
             ti.columnName = card;
             key = "TBCOL" + to_string(i);
             if( fits_read_key( ff, TINT, key.c_str(), &tmpInt, NULL, &status ) ) {
-                throwStatusError( fn, status );
+                throwStatusError( "asciiHDU:"+key+":"+fn, status );
             }
             ti.columnStart = tmpInt;
             key = "TFORM" + to_string(i);
             if( fits_read_key( ff,  TSTRING, key.c_str(), card, nullptr, &status ) ) {
-                throwStatusError( fn+key, status );
+                throwStatusError( "asciiHDU:"+key+":"+fn, status );
             }
             ti.columnFormat = card;
             key = "TUNIT" + to_string(i);
             if( fits_read_key( ff,  TSTRING, key.c_str(), card, nullptr, &status ) ) {
-                throwStatusError( fn+key, status );
+                throwStatusError( "asciiHDU:"+key+":"+fn, status );
             }
             ti.columnUnit = card;
             hdu.table_info.push_back(ti);
@@ -350,11 +350,11 @@ namespace {
         memset( card, 0, FLEN_CARD );
         hdu.cards.clear();
         if ( fits_get_hdrpos( ff, &nkeys, &keypos, &status ) ) {
-            throwStatusError( fn, status );
+            throwStatusError( "readAllCards:nkeys:"+fn, status );
         }
         for (int jj = 1; jj <= nkeys; jj++)  {
             if ( fits_read_record(ff, jj, card, &status) ) {
-                throwStatusError( fn, status );
+                throwStatusError( "readAllCards:"+to_string(jj)+":"+fn, status );
             }
             memset( card+strlen(card), 32, FLEN_CARD-1-strlen(card) ); // make sure we copy all 80 chars
             hdu.cards.push_back(card);
@@ -379,15 +379,15 @@ void Fits::read( const string& filename ) {
     status_ = 0;
 
     if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
-        throwStatusError( filename, status_ );
+        throwStatusError( "read:open:"+filename, status_ );
     }
     
     if( fits_get_num_hdus( fitsPtr_, &nHDU, &status_ ) ) {
-        throwStatusError( filename, status_ );
+        throwStatusError( "read:num_hdus:"+filename, status_ );
     }
     
     if( fits_get_hdu_type( fitsPtr_, &hduType, &status_ ) ) {
-        throwStatusError( filename, status_ );
+        throwStatusError( "read:hdu_type:"+filename, status_ );
     }
     
     if ( hduType != IMAGE_HDU ) {
@@ -413,14 +413,14 @@ void Fits::read( const string& filename ) {
                 readRawHDU( filename, offset, *hdu );
                 extHDUs.push_back( hdu );
                 if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
-                    throwStatusError( filename, status_ );
+                    throwStatusError( "read:open2:"+filename, status_ );
                 }
                 fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_);
                 status_ = 0;
             }
             break;
         } else if( status_ ){
-            throwStatusError( filename, status_ );      // got an unexpected error   
+            throwStatusError( "read:movabs_hdu:"+to_string(ii)+":"+filename, status_ );      // got an unexpected error   
         }
 
         switch( hdutype ) {
@@ -464,7 +464,7 @@ void Fits::read( const string& filename ) {
     if( status_ == END_OF_FILE ) {
         status_ = 0;              // got the expected EOF error; reset = 0 
     } else if( status_ ) {
-        throwStatusError( filename, status_ );      // got an unexpected error   
+        throwStatusError( "read:eof:"+filename, status_ );      // got an unexpected error   
     }
 
 }
