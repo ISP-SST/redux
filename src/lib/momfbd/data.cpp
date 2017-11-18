@@ -469,8 +469,9 @@ shared_ptr<ModeSet> GlobalData::get(const ModeInfo& id, const shared_ptr<ModeSet
     if( it == modes.end() ){
         shared_ptr<ModeSet>& ret = redux::util::Cache::get<ModeInfo,shared_ptr<ModeSet>>(id, ms);
         if( !ret ) ret.reset( new ModeSet() );
-        return modes.emplace(id, ret).first->second;
-    } else return it->second;
+        it = modes.emplace(id, ret).first;
+    }
+    return it->second;
 
 }
 
@@ -482,8 +483,9 @@ shared_ptr<Pupil> GlobalData::get(const PupilInfo& id, const shared_ptr<Pupil>& 
     if( it == pupils.end() ){
         shared_ptr<Pupil>& ret = redux::util::Cache::get<PupilInfo,shared_ptr<Pupil>>(id, ms);
         if( !ret ) ret.reset( new Pupil() );
-        return pupils.emplace(id, ret).first->second;
-    } else return it->second;
+        it = pupils.emplace(id, ret).first;
+    }
+    return it->second;
 
 }
 
@@ -559,5 +561,21 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     count += constraints.unpack(ptr+count,swap_endian);
     constraints.makeRowsCols();
     return count;
+}
+
+
+void GlobalData::dump( string tag ) const {
+
+    for( auto& m: modes ) {
+        if( m.second->nElements() ) {
+            Ana::write( tag + "_modes_" + (string)m.first, *(m.second) );
+        }
+    }
+
+    for( auto& p: pupils ) {
+        p.second->dump( tag + "_pupil_" + (string)p.first );
+    }
+    constraints.dump( tag + "_constraints" );
+    
 }
 

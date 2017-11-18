@@ -24,7 +24,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             
             bool operator<( const PupilInfo& rhs ) const;
-            
+            operator std::string() const;
         };
 
 
@@ -46,6 +46,7 @@ namespace redux {
             void generate( uint16_t pixels, double pupilRadius );
             void generateSupport(double threshold=0);                           //!< Gets the indices of elements in the pupil/otf which are >threshold
             void normalize( void );                                             //!< Scale pupil to the interval [0,1]
+            void dump( std::string tag="pupil" ) const;
             
             Pupil& operator=( const Pupil& rhs );
             bool operator<(const Pupil& rhs) const;                             //!< So that the Pupil-struct can be stored in comparative containers (set/map)

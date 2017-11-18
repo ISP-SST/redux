@@ -1,5 +1,6 @@
 #include "redux/image/pupil.hpp"
 
+#include "redux/file/fileana.hpp"
 #include "redux/file/fileio.hpp"
 #include "redux/image/fouriertransform.hpp"
 #include "redux/image/grid.hpp"
@@ -57,11 +58,15 @@ uint64_t PupilInfo::unpack( const char* ptr, bool swap_endian ) {
 
 
 bool PupilInfo::operator<(const PupilInfo& rhs) const {
-    if(filename == rhs.filename) {
-        if(nPixels == rhs.nPixels) {
-            return (pupilRadius < rhs.pupilRadius);
-        } else return (nPixels < rhs.nPixels);
-    } else return (filename < rhs.filename);
+    if(filename != rhs.filename) return (filename < rhs.filename);
+    if(nPixels != rhs.nPixels) return (nPixels < rhs.nPixels);
+    return (pupilRadius < rhs.pupilRadius);
+}
+
+
+PupilInfo::operator string() const {
+    string ret = to_string(nPixels)+":"+to_string(pupilRadius)+":";
+    return ret;
 }
 
 
@@ -242,6 +247,39 @@ void Pupil::normalize( void ) {
     
 
 }
+
+
+void Pupil::dump( string tag ) const {
+
+    if( nElements() ) {
+        Ana::write( tag + ".f0", *this );
+        vector<size_t> dims = dimensions();
+        Array<uint8_t> support(dims);
+        support *= 0;
+        uint8_t* ptr = support.get();
+        for( const size_t& ind: pupilSupport ) {
+            ptr[ind] = 1;
+        }
+        Ana::write( tag + "_support.f0", support );
+        for( size_t& d: dims ) d *= 2;
+        support.resize(dims);
+        support.zero();
+        ptr = support.get();
+        for( const size_t& ind: otfSupport ) {
+            ptr[ind] = 1;
+        }
+        Ana::write( tag + "_otfsupport.f0", support );
+        support.zero();
+        ptr = support.get();
+        for( const auto& ind: pupilInOTF ) {
+            ptr[ind.second] = 1;
+        }
+        Ana::write( tag + "_pupilinotf.f0", support );
+    }
+
+
+}
+
 
 Pupil& Pupil::operator=( const Pupil& rhs ) {
     redux::util::Array<double>::operator=( reinterpret_cast<const redux::util::Array<double>&>(rhs) );

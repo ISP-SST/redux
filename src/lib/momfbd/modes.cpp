@@ -110,6 +110,14 @@ bool ModeInfo::operator<(const ModeInfo& rhs) const {
 }
 
 
+ModeInfo::operator string() const {
+    string ret = to_string(nPupilPixels)+":"+to_string(pupilRadius)+":"+to_string(modeNumber);
+    ret += "[" + to_string(firstMode) + "," +to_string(lastMode)+ "]:";
+    ret += "("+ printArray(modeNumbers) + ")";
+    return ret;
+}
+
+
 PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double angle) :
     Array<double> (nPoints, nPoints), atm_rms(0)  {      // Zernike
 

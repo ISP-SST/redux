@@ -764,11 +764,13 @@ void Constraints::write( void ) {
 
 void Constraints::dump( string tag ) const {
 
-    //LOG_DEBUG << "Dumping constraints.";
-    Ana::write( tag + "_order.f0", parameterOrder.get(), nParameters );
-    Ana::write( tag + ".f0", getMatrix(false) );
-    Ana::write( tag + "_ordered.f0", getMatrix(true) );
-    Ana::write( tag + "_reduced.f0", getReducedMatrix(true) );
+    LOG_DEBUG << "Dumping constraints." << ende;
+    if( parameterOrder ) { // if we have an ordering-list (only when the constraints were generated, not after sending or loading)
+        Ana::write( tag + "_order.f0", parameterOrder.get(), nParameters );
+        Ana::write( tag + ".f0", getMatrix(false) );
+        Ana::write( tag + "_ordered.f0", getMatrix(true) );
+        Ana::write( tag + "_reduced.f0", getReducedMatrix(true) );
+    }
     Ana::write( tag + "_ns.f0", getNullMatrix() );
     Ana::write( tag + "_reduced_ns.f0", getReducedNullMatrix() );
 

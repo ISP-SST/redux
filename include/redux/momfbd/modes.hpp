@@ -30,6 +30,7 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             bool operator<( const ModeInfo& rhs ) const;
+            operator std::string() const;
             
         };
 

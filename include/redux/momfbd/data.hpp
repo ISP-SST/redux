@@ -161,6 +161,7 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
+            void dump( std::string tag="gd" ) const;
 
         };
 
