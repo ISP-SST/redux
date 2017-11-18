@@ -183,14 +183,8 @@ void Object::cleanup(void ){
     PS.clear( );
     QS.clear( );
     fittedPlane.clear( );
-    if( pupil ) {
-        pupil->clear( );
-        pupil.reset( );
-    }
-    if( modes ) {
-        modes->clear( );
-        modes.reset( );
-    }
+    pupil.reset( );
+    modes.reset( );
 
 }
 
