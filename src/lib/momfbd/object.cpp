@@ -226,6 +226,20 @@ void Object::initProcessing( Solver& ws ){
         }
         modes = ret;
 
+        if( modes->empty() ) {
+            throw std::logic_error("The mode-set is empty.");
+        } 
+        auto& mdims = modes->dimensions();
+        if( mdims.size() != 3 || mdims[0] != myJob.modeNumbers.size() ||
+            mdims[1] != myJob.pupilPixels || mdims[2] != myJob.pupilPixels ) {
+            throw std::logic_error("The mode-set has the wrong dimensions.");
+        }
+    
+        auto& pdims = pupil->dimensions();
+        if( pdims.size() != 2 || pdims[0] != myJob.pupilPixels || pdims[0] != myJob.pupilPixels ) {
+            throw std::logic_error("The pupil has the wrong dimensions.");
+        }
+    
         //shiftToAlpha = modes->shiftToAlpha;
         shiftToAlpha = modes->shiftToAlpha*(pupilPixels*1.0/patchSize ); ///wavelength );
         

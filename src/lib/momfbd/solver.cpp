@@ -73,6 +73,12 @@ void Solver::init( void ) {
     nFreeParameters = job.globalData->constraints.nFreeParameters;
     nTotalImages = job.nImages();
     
+    if( job.globalData->constraints.ns_rows.size() != nParameters ||
+        job.globalData->constraints.ns_cols.size() != nFreeParameters ||
+        job.globalData->constraints.ns_entries.empty() ) {
+        throw std::logic_error("The constraint-set is corrupt, the nullspace has the wrong number of entries.");
+    }
+
     window.resize( patchSize, patchSize );
     window = 1.0;
     redux::image::apodizeInPlace( window, patchSize / 8);
