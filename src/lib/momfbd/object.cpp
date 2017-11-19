@@ -1065,7 +1065,9 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
     
     mozaic( tmpImg, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
 
-    img_trim( tmpImg, imgRows, imgCols, 1E-15 );
+    if( !(myJob.runFlags&RF_NO_CLIP) ) {
+        img_trim( tmpImg, imgRows, imgCols, 1E-15 );
+    }
     
     if( myJob.outputDataType == DT_F32T ){
         Array<float> wrap(*tmpImg, imgRows, imgCols );
