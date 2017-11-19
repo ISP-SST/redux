@@ -21,6 +21,9 @@ string redux::getLongVersionString ( bool includeMessage ) {
     
     string ret = to_string(reduxVersionMajor) + "." + to_string(reduxVersionMinor)
          + "." + to_string(reduxVersionPatch)+ "-" + to_string(reduxVersionCommit);
+#ifdef DEBUG_
+    ret += " dbg";
+#endif
     if( includeMessage ) ret += " (" + string(reduxCommitMessage) + ")";
     return ret;
 }
