@@ -1057,8 +1057,8 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
         }
     }
    
-    size_t imgCols = maxPosX+patchSize;
-    size_t imgRows = maxPosY+patchSize;
+    size_t imgCols = maxPosX+patchSize+1;
+    size_t imgRows = maxPosY+patchSize+1;
     float** tmpImg = newArray<float>( imgRows, imgCols );
     int margin = patchSize/8;
     int blend =( patchSize-2*margin)/3;
