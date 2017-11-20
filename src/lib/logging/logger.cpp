@@ -118,7 +118,14 @@ Logger::Logger(void) : LogOutput(defaultLevelMask,1) {
 
 
 Logger::~Logger() {
-
+    
+    unique_lock<mutex> lock( outputMutex );
+    for( auto& c: connections ) {
+        c.first->setErrorCallback(nullptr);
+        c.first->setCallback(nullptr);
+    }
+    lock.unlock();
+    
     this->flushAll();
     
     // clear them now so that the flushBuffer call from the LogOutput destructor does not attempt to access deleted items.
