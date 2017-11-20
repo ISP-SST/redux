@@ -23,12 +23,7 @@ ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
 
 
 ChannelData::~ChannelData() {
-    try {
-        cacheRemove();        // remove cache file
-    } catch( exception& e ) {
-        LLOG(myChannel->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
-    }
-    cclear();
+    
 }
 
 
@@ -40,6 +35,18 @@ void ChannelData::setPath(const std::string& path) {
 
 void ChannelData::initPatch(void) {
     myChannel->initPatch(*this);
+}
+
+
+void ChannelData::clear( void ) {
+    
+    try {
+        cacheRemove();        // remove cache file
+    } catch( exception& e ) {
+        LLOG(myChannel->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
+    }
+    cclear();
+    
 }
 
 
@@ -126,12 +133,7 @@ ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
 
 
 ObjectData::~ObjectData() {
-    try {
-        cacheRemove();        // remove cache file
-    } catch( exception& e ) {
-        LLOG(myObject->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
-    }
-    cclear();
+
 }
 
 
@@ -152,6 +154,21 @@ void ObjectData::initPatch(void) {
     myObject->fitAvgPlane();
     myObject->initPQ();
     myObject->addAllPQ();
+}
+
+
+void ObjectData::clear( void ) {
+    
+    for( auto& cd: channels ) {
+        if(cd) cd->clear();
+    }
+    try {
+        cacheRemove();        // remove cache file
+    } catch( exception& e ) {
+        LLOG(myObject->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
+    }
+    cclear();
+    
 }
 
 
@@ -313,6 +330,7 @@ PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j)
 
 
 PatchData::~PatchData() {
+    
 }
 
 
@@ -329,6 +347,15 @@ void PatchData::initPatch(void) {
     for( auto& obj: objects ) {
         if(obj) obj->initPatch();
     }
+}
+
+
+void PatchData::clear( void ) {
+    
+    for( auto& obj: objects ) {
+        if(obj) obj->clear();
+    }
+    
 }
 
 

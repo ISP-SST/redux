@@ -51,6 +51,7 @@ namespace redux {
             redux::util::PointF residualOffset;                         //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
             /*************************/
             
+            void clear(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
             uint64_t unpack(const char*, bool);
@@ -78,6 +79,7 @@ namespace redux {
             
             void setPath(const std::string& path);
             void initPatch(void);
+            void clear(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -123,6 +125,7 @@ namespace redux {
 
             void setPath(const std::string& path);
             void initPatch(void);
+            void clear(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);

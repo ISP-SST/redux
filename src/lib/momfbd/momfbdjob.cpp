@@ -744,6 +744,7 @@ void MomfbdJob::clearPatches(void) {
     for( const PatchData::Ptr& p: patches ) {
         nTotalThreads += p->nThreads;
         cpu_sum += p->runtime_cpu;
+        p->clear();
     }
     size_t nPatches = patches.nElements();
     nActivePost--;
