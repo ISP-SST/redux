@@ -15,6 +15,8 @@ set( EXT_HINT ${IDL_DIR} "${IDL_DIR}/external/" "${IDL_DIR}/external/include/"
               "/opt/harris/idl/external/include/"
               "/usr/local/rsi/idl/external/include/"
               "/opt/rsi/external/include/"
+              "/usr/local/exelis/idl/external/include/"
+              "/opt/exelis/idl/external/include/"
               "/usr/local/itt/idl/external/include/"
               "/opt/itt/idl/external/include/"
 )
