@@ -305,16 +305,17 @@ void Constraints::Group::mapNullspace(void) {
             storeNS = false;    // storing will overwrite the group we collided with.
             nullspace->ns.clear();
         }
-        
-        if( nullspace->ns.nDimensions() < 1 ) {
-            nullspace->calculateNullspace(storeNS);
-        }
+        {   // lock nullspace while (possibly) calculating/mapping.
+            auto lock = nullspace->getLock();
+            if( nullspace->ns.nDimensions() < 1 ) {
+                nullspace->calculateNullspace(storeNS);
+            }
             
-        if( nullspace->ns_entries.empty() ) {
-            nullspace->mapNullspace();
+            if( nullspace->ns_entries.empty() ) {
+                nullspace->mapNullspace();
+            }
         }
-
-        for( auto& entry: nullspace->ns_entries ) {
+        for( const auto& entry: nullspace->ns_entries ) {
             ns_entries.insert(make_pair(entry.first + groupOffset,entry.second));
         }
         
