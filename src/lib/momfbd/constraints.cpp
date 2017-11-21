@@ -23,6 +23,11 @@ using namespace redux;
 
 using namespace std;
 
+namespace {
+    
+    mutex calcMutex;    // local mutex to prevent concurrent calls to the GSL routines, since they seem to not like it.
+    
+}
 
 void Constraints::Constraint::replaceIndices( const map<int32_t, int32_t>& indexMap ) {
     map<int32_t, int8_t> newEntries;
@@ -306,7 +311,7 @@ void Constraints::Group::mapNullspace(void) {
             nullspace->ns.clear();
         }
         {   // lock nullspace while (possibly) calculating/mapping.
-            auto lock = nullspace->getLock();
+            unique_lock<mutex> lock(calcMutex);
             if( nullspace->ns.nDimensions() < 1 ) {
                 nullspace->calculateNullspace(storeNS);
             }
