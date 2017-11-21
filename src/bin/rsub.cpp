@@ -42,7 +42,7 @@ namespace {
         ( "priority", bpo::value<int>()->default_value( 10 ), "Job priority" )
         ( "reg_alpha", bpo::value<float>(), "REG_ALPHA override" )
         ( "force,f", "Overwrite output file if exists" )
-        ( "swap,s", "swap mode: write auxiliary data to files instead of keeping it in memory (compatibility flag, always enabled)" )
+        ( "no-swap", "disable swap mode: keeping temporary files in memory." )
         ( "config,c", bpo::value< vector<string> >()->multitoken(), "Configuration file(s) to process." )
         ( "name", bpo::value<string>(), "Name to use for the supplied configurations." )
         ( "simxy", bpo::value<string>(), "(x,y) coordinate[s] of subimages to restore" )

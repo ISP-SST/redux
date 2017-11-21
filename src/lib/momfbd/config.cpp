@@ -649,7 +649,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     if( getValue<bool>( tree, "NO_CONSTRAINTS", false ) )       runFlags |= RF_NO_CONSTRAINTS;
     if( getValue<bool>( tree, "NO_FILTER", false ) )            runFlags |= RF_NO_FILTER;
     if( getValue<bool>( tree, "OVERWRITE", false ) )            runFlags |= RF_FORCE_WRITE;
-    if( getValue<bool>( tree, "SWAP", false ) )                 runFlags |= RF_SWAP;
+    if( getValue<bool>( tree, "NOSWAP", false ) )               runFlags |= RF_NOSWAP;
     
 /*    if( ( runFlags & RF_CALIBRATE ) && ( runFlags & RF_FLATFIELD ) ) {
         LOG_WARN << "both FLATFIELD and CALIBRATE mode requested, forcing CALIBRATE";
@@ -824,7 +824,7 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( diff & RF_NO_CONSTRAINTS ) tree.put( "NO_CONSTRAINTS", bool( runFlags & RF_NO_CONSTRAINTS ) );
     if( diff & RF_NO_FILTER ) tree.put( "NO_FILTER", bool( runFlags & RF_NO_FILTER ) );
     if( diff & RF_FORCE_WRITE ) tree.put( "OVERWRITE", bool( runFlags & RF_FORCE_WRITE ) );
-    if( diff & RF_SWAP ) tree.put( "SWAP", bool( runFlags & RF_SWAP ) );
+    if( diff & RF_NOSWAP ) tree.put( "NOSWAP", bool( runFlags & RF_NOSWAP ) );
 
     if( modeBasis && modeBasis != defaults.modeBasis ) tree.put( "BASIS", basisTags[modeBasis%3] );
     if( klMinMode != defaults.klMinMode ) tree.put( "KL_MIN_MODE", klMinMode );

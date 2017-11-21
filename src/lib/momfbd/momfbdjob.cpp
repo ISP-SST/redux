@@ -102,7 +102,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, red
     if( vm.count( "output-file" ) ) tree.put( "OUTPUT_FILES", vm["output-file"].as<string>() );
     if( vm.count( "init" ) ) tree.put( "INIT_FILES", vm["init"].as<string>() );
     if( vm.count( "force" ) ) tree.put( "OVERWRITE", true );
-    if( vm.count( "swap" ) ) tree.put( "SWAP", true );
+    if( vm.count( "no-swap" ) ) tree.put( "NOSWAP", true );
 
     GlobalCfg::parseProperties(tree, logger);
     uint16_t nObj(0);
@@ -690,11 +690,14 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         uint64_t count(0);
         patches.resize( nPatchesY, nPatchesX );
         Point16 ps( patchSize, patchSize );
-        cachePath = to_string(Cache::pid()) +"_"+ to_string( info.id );
+        bool use_swap = !(runFlags&RF_NOSWAP);
+        if( use_swap ) {
+            cachePath = to_string(Cache::pid()) +"_"+ to_string( info.id );
+        }
         for( unsigned int y=0; y<nPatchesY; ++y ) {
             for( unsigned int x=0; x<nPatchesX; ++x ) {
                 PatchData::Ptr patch( new PatchData(*this, y, x ) );
-                patch->setPath(cachePath);
+                if( use_swap ) patch->setPath(cachePath);
                 patch->step = JSTEP_QUEUED;
                 if( hasXY ) {
                     patch->position = Point16( subImagePosY[x]-1, subImagePosX[x]-1 );   // subImagePosX/Y is 1-based
