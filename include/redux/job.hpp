@@ -67,6 +67,10 @@ namespace redux {
     {
     public:
 
+        enum JobTypes : size_t { DEBUGJOB = 1,
+                                 MOMFBDJOB
+                               };
+        
         enum State : uint8_t { JSTATE_NONE      = 0,
                                JSTATE_IDLE      = 1,
                                JSTATE_ACTIVE    = 2,    
@@ -110,6 +114,7 @@ namespace redux {
             int64_t active;
         };
         static std::map<StepID,CountT> counts;
+        static MapT jobCreators;
         static MapT& getMap(void) { static MapT m; return m; };
         static size_t registerJob( const std::string&, JobCreator f );
         static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger&, bool check=false );

@@ -1,5 +1,8 @@
 #include "redux/job.hpp"
 
+#include "redux/debugjob.hpp"
+#include "redux/momfbd/momfbdjob.hpp"
+
 #include "redux/util/cache.hpp"
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
@@ -24,6 +27,9 @@ std::map<Job::StepID, Job::CountT> Job::counts = { { {0,JSTEP_SUBMIT}, {1,5} },
                                                    { {0,JSTEP_NONE}, {1,5} },
                                                    { {0,JSTEP_COMPLETED}, {} },
                                                    { {0,JSTEP_ERR}, {} } };
+
+Job::MapT Job::jobCreators = { { "DEBUGJOB", { Job::DEBUGJOB,  DebugJob::create } },
+                               { "MOMFBD",   { Job::MOMFBDJOB, momfbd::MomfbdJob::create } } };
 
 #ifdef DEBUG_
 //#define DBG_JOB_
@@ -54,7 +60,7 @@ void redux::runThreadsAndWait(boost::asio::io_service& service, uint16_t nThread
 
 size_t Job::registerJob( const string& name, JobCreator f ) {
     
-    static size_t nJobTypes(0);
+    static size_t nJobTypes(2);
     std::unique_lock<mutex> lock(globalJobMutex);
     auto ret = getMap().insert({ boost::to_upper_copy(name), {nJobTypes + 1, f}});
     if( !ret.second ) {
