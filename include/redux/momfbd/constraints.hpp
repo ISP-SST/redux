@@ -57,17 +57,22 @@ namespace redux {
             
             struct NullSpace : public redux::util::CacheItem {
                 
-                NullSpace(logging::Logger& l, const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc);
+                NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc);
                 
-                void mapNullspace(void);
-                void calculateNullspace(bool store=true);
-                bool verify(const std::map<int32_t, int8_t>&, int32_t, int32_t);
+                void mapNullspace( void );
+                void calculateNullspace( logging::Logger&, bool store=true);
+                bool verify( logging::Logger&,const std::map<int32_t, int8_t>&, int32_t, int32_t );
+                std::unique_lock<std::mutex> getLock( bool trylock=false ) {
+                    if(trylock) return std::move( std::unique_lock<std::mutex>(nsMtx,std::try_to_lock) );
+                    return std::move( std::unique_lock<std::mutex>(nsMtx) );
+                }
+        
                 
                 size_t csize(void) const;
                 uint64_t cpack(char*) const;
                 uint64_t cunpack(const char*, bool);
                 void cclear(void);
-                bool operator<(const NullSpace&);
+                bool operator<( const NullSpace& ) const;
 
                 std::map<int32_t, int8_t> c_entries;                       //!< Index and value of (non-zero) constraint-matrix elements
                 size_t entriesHash;
@@ -75,8 +80,7 @@ namespace redux {
                 int32_t nConstraints;
                 redux::util::Array<double> ns;
                 std::map<redux::util::PointI, double> ns_entries;  //!< (row,col) and value of (non-zero) nullspace-matrix elements
-                logging::Logger& logger;
-                
+                std::mutex nsMtx;
             };
 
             /*!

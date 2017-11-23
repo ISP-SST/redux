@@ -23,11 +23,6 @@ using namespace redux;
 
 using namespace std;
 
-namespace {
-    
-    mutex calcMutex;    // local mutex to prevent concurrent calls to the GSL routines, since they seem to not like it.
-    
-}
 
 void Constraints::Constraint::replaceIndices( const map<int32_t, int32_t>& indexMap ) {
     map<int32_t, int8_t> newEntries;
@@ -59,8 +54,11 @@ bool Constraints::Constraint::operator>( const Constraint& rhs ) const {
 }
 
 
-Constraints::NullSpace::NullSpace(logging::Logger& l, const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc) :
-    c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc), logger(l) {
+Constraints::NullSpace::NullSpace( const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc ) :
+    c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc) {
+    
+    entriesHash = boost::hash_range( c_entries.begin(), c_entries.end() );
+    setPath( "Nullspace_"+to_string(np)+"x"+to_string(nc)+"_"+to_string(entriesHash) );
     
     isLoaded = false;
     
@@ -68,10 +66,9 @@ Constraints::NullSpace::NullSpace(logging::Logger& l, const std::map<int32_t, in
 
 
 #define NS_THRESHOLD 1E-10
-void Constraints::NullSpace::mapNullspace(void) {
+void Constraints::NullSpace::mapNullspace( void ) {
     ns_entries.clear();
     int nCols = nParameters - nConstraints;
-    LOG_DEBUG << "Mapping (" << nParameters << "x" << nCols << ") nullspace." << ende;
     int count = 0;
     for( auto& value: ns ) {
         if( abs(value) > NS_THRESHOLD ) {
@@ -84,13 +81,13 @@ void Constraints::NullSpace::mapNullspace(void) {
 
 
 #define NS_ANALYTIC 0
-void Constraints::NullSpace::calculateNullspace(bool store) {
+void Constraints::NullSpace::calculateNullspace( logging::Logger& logger, bool store ) {
     
     if (nParameters == nConstraints) {
         ns.clear();
     } else {
         if(NS_ANALYTIC) {
-            LOG_DETAIL << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group." << ende;
+            LOG << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group." << ende;
             ns.resize(nParameters,nParameters-nConstraints);
             if (nParameters == nConstraints+1) {    // 1D nullspace
                 ns = 1.0/sqrt(nParameters);
@@ -99,8 +96,7 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
             }
             
         } else {
-            LOG_DETAIL << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group." << ende;
-            cout << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group." << endl;
+            LOG << "Calculating QR-decomposition for (" << nConstraints << "x" << nParameters << ") group." << ende;
             Array<double> C,R;
             C.resize(nConstraints, nParameters);
             ns.resize(nParameters, nParameters);    // use ns rather than a temporary "Q" array
@@ -123,23 +119,18 @@ void Constraints::NullSpace::calculateNullspace(bool store) {
 #undef NS_ANALYTIC
 
 
-bool Constraints::NullSpace::verify(const std::map<int32_t, int8_t>& e, int32_t nP, int32_t nC) {
+bool Constraints::NullSpace::verify( logging::Logger& logger, const std::map<int32_t, int8_t>& e, int32_t nP, int32_t nC ) {
     
     if(nP != nParameters || nC != nConstraints || c_entries != e) return false;
     
-    if( entriesHash == 0 ) {
-        entriesHash = boost::hash_range(c_entries.begin(), c_entries.end());
-        setPath("Nullspace_"+to_string(nP)+"x"+to_string(nC)+"_"+to_string(entriesHash));
-    }
-    
     if( !isLoaded )  {
         if( cacheLoad() ) {
-            if(nP == nParameters && nC == nConstraints && c_entries == e) {
-                LOG_DEBUG << "Found matching constraint-group in file: " << itemPath << ende;
+            if( nP == nParameters && nC == nConstraints && c_entries == e ) {
+                LOG << "Found matching constraint-group in file: " << itemPath << ende;
                 return true;
             }
         } else {
-            LOG_DETAIL << "No matching constraint-group found." << ende;
+            LOG << "No matching constraint-group found." << ende;
             ns.resize(0);
             ns_entries.clear();
         }
@@ -185,7 +176,7 @@ void Constraints::NullSpace::cclear(void) {
 }
 
 
-bool Constraints::NullSpace::operator<(const NullSpace& rhs) {
+bool Constraints::NullSpace::operator<(const NullSpace& rhs) const {
     if( entriesHash == rhs.entriesHash) {
         return (c_entries < rhs.c_entries);
     }
@@ -299,27 +290,27 @@ void Constraints::Group::mapNullspace(void) {
     ns_entries.clear();
     if( nParameters > nConstraints ) {
         
-        shared_ptr<NullSpace> tmpNS( new NullSpace(logger, entries,nParameters,nConstraints) );
+        shared_ptr<NullSpace> tmpNS( new NullSpace( entries, nParameters, nConstraints ) );
         nullspace = redux::util::Cache::get( entriesHash, tmpNS );
+        auto lock = nullspace->getLock();
         bool storeNS = true;
         
-        if( !nullspace->verify(entries,nParameters,nConstraints) ) {
+        if( !nullspace->verify(logger, entries,nParameters,nConstraints) ) {
             LOG_WARN << "NullSpace verification failed: possible hash-collision. Using local instance." << ende;
             LOG_DEBUG << printArray(entries,"\ngroupEntries") << printArray(nullspace->c_entries,"\nnsEntries") << ende;
             nullspace = tmpNS;
             storeNS = false;    // storing will overwrite the group we collided with.
             nullspace->ns.clear();
         }
-        {   // lock nullspace while (possibly) calculating/mapping.
-            unique_lock<mutex> lock(calcMutex);
-            if( nullspace->ns.nDimensions() < 1 ) {
-                nullspace->calculateNullspace(storeNS);
-            }
-            
-            if( nullspace->ns_entries.empty() ) {
-                nullspace->mapNullspace();
-            }
+        if( nullspace->ns.nDimensions() < 1 ) {
+            nullspace->calculateNullspace( logger, storeNS );
         }
+        
+        if( nullspace->ns_entries.empty() ) {
+            LOG << "Mapping (" << nParameters << "x" << (nParameters-nConstraints) << ") nullspace." << ende;
+            nullspace->mapNullspace();
+        }
+
         for( const auto& entry: nullspace->ns_entries ) {
             ns_entries.insert(make_pair(entry.first + groupOffset,entry.second));
         }
