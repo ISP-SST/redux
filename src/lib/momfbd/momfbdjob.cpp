@@ -62,6 +62,7 @@ MomfbdJob::MomfbdJob( void ) : cfgChecked(false), dataChecked(false) {
 MomfbdJob::~MomfbdJob( void ) {
 
     cleanup();
+    Job::moveTo( this, Job::JSTEP_NONE );
     
 }
 
