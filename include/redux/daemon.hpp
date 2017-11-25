@@ -59,6 +59,10 @@ namespace redux {
         void softExit(void);
         void reset( network::TcpConnection::Ptr&, bool urgent=false );
         void addJobs( network::TcpConnection::Ptr& );
+        void failJobs( const std::vector<size_t>& );
+        void failJobs( std::string );
+        void removeJobs( const std::vector<size_t>& );
+        void removeJobs( std::string );
         void removeJobs( network::TcpConnection::Ptr& );
         void interactiveCB( network::TcpConnection::Ptr );
         void interactive( network::TcpConnection::Ptr& );

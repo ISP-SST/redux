@@ -899,6 +899,53 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
 
 }
 
+ 
+void Daemon::failJobs( const vector<size_t>& jobList ) {
+
+    std::set<size_t> jobSet( jobList.begin(), jobList.end() );
+    unique_lock<mutex> lock( jobsMutex );
+    for( auto job: jobs ) {
+        if( job && jobSet.count( job->info.id ) ) Job::moveTo( job.get(), Job::JSTATE_ERR );
+    }
+            
+}
+
+
+void Daemon::failJobs( string jobString ) {
+    
+    bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
+    tmpTree.put( "jobs", jobString );
+    vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
+    failJobs(jobList);
+    
+}
+
+
+void Daemon::removeJobs( const vector<size_t>& jobList ) {
+
+    std::set<size_t> jobSet( jobList.begin(), jobList.end() );
+    unique_lock<mutex> lock( jobsMutex );
+
+    jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
+                    if( !job ) return true;
+                    if( jobSet.count( job->info.id ) ) {
+                        return true;
+                    }
+                    return false;
+                }), jobs.end() );
+            
+}
+
+
+void Daemon::removeJobs( string jobString ) {
+    
+    bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
+    tmpTree.put( "jobs", jobString );
+    vector<size_t> jobList = tmpTree.get<vector<size_t>>( "jobs", vector<size_t>() );
+    removeJobs(jobList);
+    
+}
+
 
 void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
@@ -1136,9 +1183,19 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     Cache::cleanup();
                 } else if( cmdStr == "cacheinfo" ) {
                     replyStr = Cache::getStats();
+                } else if( cmdStr == "del" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        removeJobs(argStr);
+                    }
                 } else if( cmdStr == "die" ) {
                     die();
                     replyCmd = CMD_DISCONNECT;
+                } else if( cmdStr == "fail" ) {
+                    string argStr = popword(line);
+                    if( !argStr.empty() ) {
+                        failJobs(argStr);
+                    }
                 } else if( cmdStr == "max-recv" ) {
                     string argStr = popword(line);
                     if( !argStr.empty() ) {
