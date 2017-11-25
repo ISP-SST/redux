@@ -105,7 +105,8 @@ int main( int argc, char *argv[] ) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            Host::HostInfo me, master;
+            Host& me = Host::myInfo();
+            Host::HostInfo master;
             
             uint8_t cmd = CMD_CONNECT;
             boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
@@ -114,8 +115,8 @@ int main( int argc, char *argv[] ) {
                 // implement
             }
             if( cmd == CMD_CFG ) {  // handshake requested
-                if( vm.count("force") ) me.peerType = Host::TP_MASTER;
-                *conn << me;
+                if( vm.count("force") ) me.info.peerType = Host::TP_MASTER;
+                *conn << me.info;
                 *conn >> master;
                 boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
             }

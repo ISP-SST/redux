@@ -82,7 +82,8 @@ namespace {
 
 void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Logger& logger) {
     
-    Host::HostInfo me, master;
+    Host me;
+    Host::HostInfo master;
     uint8_t cmd = CMD_CONNECT;
     try {
         boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
@@ -92,7 +93,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
             // implement
         }
         if( cmd == CMD_CFG ) {  // handshake requested
-            *conn << me;
+            *conn << me.info;
             *conn >> master;
             boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));       // ok or err
         }
@@ -130,7 +131,7 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
 
         boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 
-        bool swap_endian = (me.littleEndian != master.littleEndian);
+        bool swap_endian = (me.info.littleEndian != master.littleEndian);
         uint64_t count, received;
         ptr = buf.get();
 
