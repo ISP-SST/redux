@@ -282,6 +282,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
                 moveTo( this, JSTEP_DONE );
                 updateProgressString();
             });
+            startLog();
             moveTo( this, JSTEP_RUNNING );
             updateProgressString();
         }
@@ -332,12 +333,10 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
             return false;
         } else lock.unlock();
         
-        if( step == JSTEP_NONE || step == JSTEP_SUBMIT || step == JSTEP_CHECKED ) { // These are the 3 possible initial steps
-            startLog();
-        }
-        
         if( step == JSTEP_SUBMIT ) {    // No check done yet. It will now be run asynchronously, so return from here to avoid a race with moveTo() below.
+            startLog();
             check();
+            stopLog();
             return false;
         }
 
@@ -345,8 +344,10 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
             // we are also restricted by nQueued.
             const CountT& limits2 = counts[StepID(jobType,JSTEP_QUEUED)];
             if( limits2.active >= limits2.max ) {
+                stopLog();  // close the log while we're queued
                 return false;
             }
+            startLog();
             info.startedTime = boost::posix_time::second_clock::local_time();
         }
        
@@ -647,6 +648,7 @@ void MomfbdJob::unloadCalib( boost::asio::io_service& service ) {
             << "  nObjects = " << objects.size() << "  nImages = " << nImages()
             << "  nPatches = " << patches.nElements() << ende;
         moveTo( this, JSTEP_QUEUED );
+        stopLog();
         //info.progressString = "Q";
         //info.step.store( JSTEP_DONE );
         //check();
