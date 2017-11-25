@@ -40,7 +40,7 @@ int MomfbdJob::staticInit(void) {
     counts[ StepID(jobType,JSTEP_CHECKED) ]     = CountT();
     counts[ StepID(jobType,JSTEP_PREPROCESS) ]  = CountT(1,1);
     counts[ StepID(jobType,JSTEP_QUEUED) ]      = CountT(0,2);
-    counts[ StepID(jobType,JSTEP_RUNNING) ]     = CountT(1,3);
+    counts[ StepID(jobType,JSTEP_RUNNING) ]     = CountT(1,5);
     counts[ StepID(jobType,JSTEP_DONE) ]        = CountT();
     counts[ StepID(jobType,JSTEP_VERIFY) ]      = CountT(1,1);
     counts[ StepID(jobType,JSTEP_VERIFIED) ]    = CountT();
@@ -264,37 +264,44 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
     }
 
     if( wip->isRemote ) {
-        auto lock = getLock( true );
-        if( lock.owns_lock() ) {
-            if( step == JSTEP_QUEUED ) {                       // preprocessing ready -> start
-                progWatch.clear();
-                progWatch.set( patches.nElements() );
-                progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
-                progWatch.setHandler([this](){
-                    moveTo( this, JSTEP_DONE );
-                    updateProgressString();
-                });
-                moveTo( this, JSTEP_RUNNING );
+        
+        if( (step != JSTEP_QUEUED) && (step != JSTEP_RUNNING) ) {
+            return false;
+        }
+
+        auto lock = getLock(false);
+        if( info.step == JSTEP_QUEUED ) {                            // preprocessing ready -> start
+            auto glock = getGlobalLock();
+            const CountT& limits = counts[StepID(jobType,JSTEP_RUNNING)];
+            if( limits.active < limits.max ) glock.unlock();     // Allowed to start?
+            else return ret;
+            progWatch.clear();
+            progWatch.set( patches.nElements() );
+            progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
+            progWatch.setHandler([this](){
+                moveTo( this, JSTEP_DONE );
                 updateProgressString();
-            }
-            if( info.step == JSTEP_RUNNING ) {                      // running
-                 for( auto & patch : patches ) {
-                    if( patch && (patch->step == JSTEP_QUEUED) ) {
-                        patch->step = JSTEP_RUNNING;
-                        wip->parts.push_back( patch );
-                        auto pJob = wip->previousJob.lock();
-                        if( pJob.get() != this ) {     // First time for this slave -> include global data
-                            wip->parts.push_back( globalData );
-                        }
-                        ret = true;
-                        break;// only 1 part at a time for MomfbdJob
+            });
+            moveTo( this, JSTEP_RUNNING );
+            updateProgressString();
+        }
+        if( info.step == JSTEP_RUNNING ) {                      // running
+            for( auto & patch : patches ) {
+                if( patch && (patch->step == JSTEP_QUEUED) ) {
+                    patch->step = JSTEP_RUNNING;
+                    patch->load();
+                    wip->parts.push_back( patch );
+                    auto pJob = wip->previousJob.lock();
+                    if( pJob.get() != this ) {     // First time for this slave -> include global data
+                        wip->parts.push_back( globalData );
                     }
+                    ret = true;
+                    break;// only 1 part at a time for MomfbdJob
                 }
             }
         }
         wip->nParts = wip->parts.size();
         return ret;
-        
     } else {    // local processing, i.e. on master.
         uint16_t nextStep = getNextStep(step);
         switch( step ) {
