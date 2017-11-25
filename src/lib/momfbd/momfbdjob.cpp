@@ -721,8 +721,14 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
             }
         }   // end nPatchesY
 
+        cachePath = cleanPath(Cache::get().path() + "/" + to_string(Cache::pid()) +"_"+ to_string( info.id )) + "/";   // this is used in Channel::loadData()
+        bfs::path tmpP(cachePath);
+        if( !bfs::exists(tmpP) ) {
+            bfs::create_directories( tmpP );
+        }
         service.post( [this](){
             initCache();
+            ++progWatch;
         } );
         
     }       // end RF_FLATFIELD
