@@ -18,7 +18,9 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
-
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 namespace redux {
 
@@ -1177,7 +1179,55 @@ namespace redux {
             
             std::shared_ptr<T>& getData(void) { return datablock; }
 
+            void createMmap( const std::string& fn ) {
+                if( !dataSize || fn.empty() ) throw std::logic_error( "Array::createMmap() !dataSize || !fn: "+fn ); //return;
+                size_t blockSize = dataSize*sizeof(T);
+                int fd = open( fn.c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0664 );
+                if( fd == -1 ) throw std::logic_error( "Array::createMmap() failed to open file: "+fn+"  :" +std::string(strerror(errno)) );
+                if( fallocate(fd, 0, 0, blockSize) == -1 ) {
+                    close(fd);
+                    throw std::logic_error( "Array::createMmap() failed to resize file: "+fn+"  :" +std::string(strerror(errno)) );
+                }
+                T* map = (T*)mmap( 0, blockSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+                close( fd );
+                if( map == MAP_FAILED ) throw std::logic_error( "Array::createMmap() MAP_FAILED: "+fn+"  :" +std::string(strerror(errno)) );
+                if( datablock ) memcpy( map, datablock.get(), blockSize );
+                datablock.reset( map, std::bind( munmap, std::placeholders::_1, blockSize ) );
+            }
+            template <typename ...S> void createMmap( const std::string& fn, S ...sizes ) {
+                setSizes( {static_cast<size_t>( sizes )...} );
+                setStrides();
+                countElements();
+                createMmap( fn );
+            }
+            
+            void openMmap( const std::string& fn ) {
+                int fd = open( fn.c_str(), O_RDWR);
+                if( fd == -1 ) throw std::logic_error( "Array::openMmap() failed to open file: "+fn+"  :" +std::string(strerror(errno)) );
+                struct stat sb;
+                if( fstat(fd, &sb) == -1 ) throw std::logic_error( "Array::openMmap() failed to stat file: "+fn+"  :" +std::string(strerror(errno)) );
+                size_t blockSize = dataSize*sizeof(T);
+                if( (__off_t)blockSize != sb.st_size ) {
+                    if( sb.st_size%sizeof(T) ) std::cerr << "openMmap(" << fn << "): file-size is not a multiple of typesize!" << std::endl;
+                    size_t nEl = sb.st_size/sizeof(T);
+                    setSizes( nEl );
+                    blockSize = dataSize*sizeof(T);
+                }
+                T* map = (T*)mmap( 0, blockSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+                close( fd );
+                if( map == MAP_FAILED ) throw std::logic_error( "Array::openMmap() MAP_FAILED: "+fn+"  :" +std::string(strerror(errno)) );
+                datablock.reset( map, std::bind( munmap, std::placeholders::_1, blockSize ) );
+            }
+            template <typename ...S> void openMmap( const std::string& fn, S ...sizes ) {
+                setSizes( {static_cast<size_t>( sizes )...} );
+                setStrides();
+                countElements();
+                openMmap( fn );
+            }
+            
         private:
+            
+            
             void setSizes( const std::vector<size_t>& sizes ) {
                 begin_ = end_ = nElements_ = dataSize = 0;
                 dimSizes = sizes;
