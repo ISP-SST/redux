@@ -32,12 +32,10 @@ namespace redux {
                 
         class Channel;
         struct PatchData;
-        struct ChannelData : public redux::util::CacheItem {
+        struct ChannelData {
             
             explicit ChannelData( std::shared_ptr<Channel> c );
             ~ChannelData();
-            
-            void setPath(const std::string& path);
             
             /**** Local processing (slaves) ****/
             void initPatch(void);
@@ -52,13 +50,10 @@ namespace redux {
             /*************************/
             
             void clear(void);
+            void load(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
             uint64_t unpack(const char*, bool);
-            size_t csize(void) const { return size(); };
-            uint64_t cpack(char* p) const { return pack(p); };
-            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
-            void cclear(void);
             const ChannelData& operator=(const ChannelData&);
 
             void copyResults( const ChannelData& rhs );
@@ -80,6 +75,7 @@ namespace redux {
             void setPath(const std::string& path);
             void initPatch(void);
             void clear(void);
+            void load(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -94,7 +90,7 @@ namespace redux {
             void copyResults( const ObjectData& rhs );
             void dump( std::string );
             
-            std::vector<std::shared_ptr<redux::util::Compressed<ChannelData,5>>> channels;
+            std::vector<std::shared_ptr<ChannelData>> channels;
             
             /********* Results ********/
             redux::util::Array<float> img;              //!< Restored image.
@@ -126,6 +122,7 @@ namespace redux {
             void setPath(const std::string& path);
             void initPatch(void);
             void clear(void);
+            void load(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);

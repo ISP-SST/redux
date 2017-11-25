@@ -48,7 +48,7 @@ namespace {
 }
 
 
-Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), nTotalFrames(0), myObject(o),
+Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), flipX(false), flipY(false), nTotalFrames(0), myObject(o),
     myJob(j), logger(j.logger) {
 
     setLogChannel(myJob.getLogChannel());
@@ -94,6 +94,17 @@ void Channel::cleanup(void) {
     subImages.clear();
     phi_fixed.clear();
     phi_channel.clear();
+    
+    if( !cacheFile.empty() ) {
+        bfs::path tmpP(cacheFile);
+        if( bfs::exists(tmpP) ) {
+            try {
+                bfs::remove(tmpP);
+            } catch( exception& e ) {
+                LOG_ERR << "Channel(" << ID << ") failed to remove cacheFile: " << cacheFile << "  reason: " << e.what() << endl;
+            }
+        }
+    }
 
 }
 
@@ -101,7 +112,7 @@ void Channel::cleanup(void) {
 size_t Channel::size (void) const {
 
     size_t sz = ChannelCfg::size();
-    sz += sizeof (uint16_t) + sizeof(uint32_t);          // ID + nTotalFrames
+    sz += sizeof (uint16_t) + sizeof(uint32_t) + 2;          // ID + nTotalFrames + flipX/Y
     sz += nFrames.size()*sizeof( size_t ) + sizeof( uint64_t );
     sz += imgSize.size();
     sz += imageStats.size() * ArrayStats().size() + sizeof (uint16_t);
@@ -116,6 +127,8 @@ uint64_t Channel::pack (char* ptr) const {
     count += pack (ptr + count, ID);
     count += pack (ptr + count, nTotalFrames);
     count += pack (ptr + count, nFrames );
+    count += pack (ptr + count, flipX );
+    count += pack (ptr + count, flipY );
     count += imgSize.pack (ptr + count);
     uint16_t statSize = imageStats.size();
     count += pack (ptr + count, statSize);
@@ -135,6 +148,8 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
     count += unpack (ptr + count, ID, swap_endian);
     count += unpack (ptr + count, nTotalFrames, swap_endian);
     count += unpack (ptr + count, nFrames, swap_endian );
+    count += unpack (ptr + count, flipX );
+    count += unpack (ptr + count, flipY );
     count += imgSize.unpack (ptr + count, swap_endian);
     uint16_t statSize;
     count += unpack (ptr + count, statSize, swap_endian);
@@ -199,6 +214,14 @@ bool Channel::checkCfg (void) {
             LOG_WARN << "ALIGN_CLIP values should be 1-based, i.e. first pixel is (1,1)." << ende;
             alignClip.clear();
         }
+    }
+    
+    if( alignMap.size() == 9 ) {
+        if( alignMap[0] < 0 ) flipX = true;
+        if( alignMap[4] < 0 ) flipY = true;
+    } else if( alignClip.size() == 4) {
+        if( alignClip[0] > alignClip[1] ) flipX = true;
+        if( alignClip[2] > alignClip[3] ) flipY = true;
     }
     
     if( discard.size() > 2 ) {
@@ -550,7 +573,11 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     }
     
     // Prepare needed storage
-    images.resize( nTotalFrames, imgSize.y, imgSize.x );
+    if( !(myJob.runFlags&RF_NOSWAP) ) {    // unless swap is deactivated for this job
+        cacheFile = myJob.cachePath + "images_" + to_string(myObject.ID) + "_" + to_string(ID);
+    }
+    
+    maybeLoadImages();
     imageStats.resize( nTotalFrames );
     
     bool saveFFData = (myObject.saveMask&SF_SAVE_FFDATA) || (myJob.runFlags&RF_FLATFIELD);
@@ -561,7 +588,11 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     loadCalib(service);
     
     progWatch.set(patches.dimSize(0)*patches.dimSize(1)+nFiles);
-    progWatch.setHandler( std::bind( &Channel::storePatches, this, std::ref(service), std::ref(patches)) );
+    progWatch.setHandler( [this](){
+        if( !(myJob.runFlags&RF_NOSWAP) ) {
+            images.clear();
+        }
+    });
     for( unsigned int y=0; y<patches.dimSize(0); ++y ) {
         for( unsigned int x=0; x<patches.dimSize(1); ++x ) {
             service.post( [this,&patches,y,x](){
@@ -601,12 +632,17 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
                     }
                     ++myObject.progWatch;
                 }
+                ++progWatch;
+                return;
             } catch ( const std::exception& e ) {
                 LOG_ERR << "Failed to load/preprocess file. reason: " << e.what() << ende;
             } catch ( ... ) {
                 LOG_ERR << "Failed to load/preprocess file for unknown reason." << ende;
             }
-            ++progWatch;
+            Job::moveTo( &myJob, Job::JSTATE_ERR );
+            myJob.progWatch.clear();
+            progWatch.clear();
+            myJob.updateProgressString();
         });
         nPreviousFrames += nFrames[i];
     }
@@ -618,10 +654,6 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
 
     size_t nPatchesY = patches.dimSize(0);
     size_t nPatchesX = patches.dimSize(1);
-    progWatch.set(nPatchesX*nPatchesY);
-    progWatch.setHandler([this](){
-        images.clear();                                                                 // release resources after storing the patch-data.
-    });
 
     for(unsigned int py=0; py<nPatchesY; ++py) {
         for(unsigned int px=0; px<nPatchesX; ++px) {
@@ -630,12 +662,10 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
                     auto chData = patches(py,px)->objects[myObject.ID]->channels[ID];
                     try {
                         copyImagesToPatch(*chData);
-                        chData->cacheStore(true);    // store to disk and clear array
                     } catch( std::exception& e ) {
                         myJob.setFailed();
                         LOG_ERR << "Failed to copy/store patch(" << py << "," << px << "): " << e.what() << ende;
                     } 
-                    ++progWatch;
                     ++myJob.progWatch;
                 }
             });
@@ -733,6 +763,14 @@ void Channel::initPatch (ChannelData& cd) {
     }
     
     uint16_t patchSize = myObject.patchSize;
+
+    std::shared_ptr<float*> arrayPtr = cd.images.reshape(nTotalFrames*blockSizeY, blockSizeX);
+    float** imgPtr = arrayPtr.get();
+    for( size_t i=0; i<nTotalFrames; ++i) {
+        if( flipX ) redux::util::reverseX(imgPtr, blockSizeY, blockSizeX);
+        if( flipY ) redux::util::reverseY(imgPtr, blockSizeY, blockSizeX);
+        imgPtr += blockSizeY;
+    }
     
     PointF localShift; 
     int firstY = max( cd.patchStart.y, 0 );
@@ -819,11 +857,6 @@ void Channel::initPhiFixed(void) {
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
             } else {
                 LOG_DEBUG << "Generated Modeset with " << ms->dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
-
-//                ms->getNorms( myObject.pupil );
-//cout << "initPhiFixed " << __LINE__ << endl;
-//                ms->normalize( 1.0/myObject.wavelength );
-//cout << "initPhiFixed " << __LINE__ << endl;
             }
         }        
         auto it = std::find(ms->modeNumbers.begin(), ms->modeNumbers.end(), modeNumber);
@@ -847,12 +880,6 @@ void Channel::addAllFT (redux::util::Array<double>& ftsum) {
     }
 }
 
-// void Channel::addAllPQ(void) const {
-//     for (const auto& subimage : subImages) {
-//         myObject.addToPQ( subimage->imgFT.get(), subimage->OTF.get() );
-//     }
-// }
-
 
 void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd ) {
 
@@ -867,8 +894,7 @@ void Channel::addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEn
 
 
 void Channel::loadFile( size_t fileIndex, size_t offset ) {
-    static mutex lmtx;
-    unique_lock<mutex> lock(lmtx);
+
     bfs::path fn = bfs::path(imageDataDir) / bfs::path( );
     Image<float> tmpImg;
     
@@ -1035,37 +1061,31 @@ void Channel::preprocessImage( size_t i ) {
 }
 
 
-void Channel::copyImagesToPatch(ChannelData& chData) {
-
-    Array<float> block(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
+void Channel::maybeLoadImages( void ) {
     
-    bool flipX(false);
-    bool flipY(false);
-    if( alignMap.size() == 9 ) {
-        if( alignMap[0] < 0 ) flipX = true;
-        if( alignMap[4] < 0 ) flipY = true;
-    } else if( alignClip.size() == 4) {
-        if( alignClip[0] > alignClip[1] ) flipX = true;
-        if( alignClip[2] > alignClip[3] ) flipY = true;
-    }
-    if( flipX || flipY ) {
-        size_t sy = chData.cutout.last.y - chData.cutout.first.y + 1;
-        size_t sx = chData.cutout.last.x - chData.cutout.first.x + 1;
-        Array<float> tmp = block.copy(true);
-        std::shared_ptr<float*> arrayPtr = tmp.reshape(nTotalFrames*sy, sx);
-        float** imgPtr = arrayPtr.get();
-        for( size_t i=0; i<nTotalFrames; ++i) {
-            if( flipX ) redux::util::reverseX(imgPtr, sy, sx);
-            if( flipY ) redux::util::reverseY(imgPtr, sy, sx);
-            imgPtr += sy;
+    lock_guard<mutex> lock(mtx);
+    if( images.nElements() ) return;        // already allocated/loaded
+    
+    if( !(myJob.runFlags&RF_NOSWAP) ) {     // should we mmap?
+        if( bfs::exists( bfs::path(cacheFile) ) ) {
+            LOG_TRACE << "opening: cachePath: " << cacheFile << ende;
+            images.openMmap( cacheFile, nTotalFrames, imgSize.y, imgSize.x );
+        } else {
+            LOG_TRACE << "creating: cachePath: " << cacheFile << ende;
+            images.createMmap( cacheFile, nTotalFrames, imgSize.y, imgSize.x );
         }
-        chData.images = std::move(tmp);
     } else {
-        chData.images = std::move(block);       // chData.images will share datablock with the "images" stack, so minimal RAM usage.
+        images.resize( nTotalFrames, imgSize.y, imgSize.x );
     }
     
-    chData.setLoaded();
-    
+}
+
+
+void Channel::copyImagesToPatch( ChannelData& chData ) {
+
+    maybeLoadImages();
+    chData.images.wrap(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
+ 
 }
 
 

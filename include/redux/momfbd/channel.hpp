@@ -87,6 +87,7 @@ namespace redux {
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
             void loadFile( size_t fileIndex, size_t offset );
             void preprocessImage( size_t index );
+            void maybeLoadImages( void );          
             void copyImagesToPatch(ChannelData&);          
             
             redux::util::Point16 getImageSize(void);
@@ -105,6 +106,7 @@ namespace redux {
             bpx::ptime startT, endT;
             std::future<bool> patchWriteFail;
             std::vector<size_t> nFrames;                                    //!< Number of frames in each file
+            std::string cacheFile;
             /*****************************************************/
             
             /*************   Local variables for   ***************/
@@ -119,6 +121,7 @@ namespace redux {
             
             uint16_t ID;
             redux::util::Point16 imgSize;
+            bool flipX, flipY;
             uint32_t nTotalFrames;
             Object& myObject;
             MomfbdJob& myJob;

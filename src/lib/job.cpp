@@ -333,12 +333,12 @@ Job::~Job(void) {
 #ifdef DBG_JOB_
     LOG_DEBUG << "Destructing Job#" << info.id << ": (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1) << ende;
 #endif
-
-    if( !cachePath.empty() ) {
+    bfs::path cp(cachePath);
+    if( !cp.empty() && bfs::exists(cp) ) {
         try {
-            bfs::remove_all( bfs::path(Cache::get().path()) / bfs::path(cachePath) );
+            bfs::remove_all( cp );
         } catch( const exception& e) {
-            cerr << "Failed to remove path: " << bfs::path(Cache::get().path()) / bfs::path(cachePath) << endl
+            cerr << "Failed to remove path: " << cp << endl
                  << "  reason: " << e.what() << endl;
         }
     }

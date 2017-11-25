@@ -27,12 +27,6 @@ ChannelData::~ChannelData() {
 }
 
 
-void ChannelData::setPath(const std::string& path) {
-    string mypath = path + "_" + to_string(myChannel->id());
-    CacheItem::setPath(mypath);
-}
-
-
 void ChannelData::initPatch(void) {
     myChannel->initPatch(*this);
 }
@@ -40,12 +34,12 @@ void ChannelData::initPatch(void) {
 
 void ChannelData::clear( void ) {
     
-    try {
-        cacheRemove();        // remove cache file
-    } catch( exception& e ) {
-        LLOG(myChannel->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
-    }
-    cclear();
+}
+
+
+void ChannelData::load( void ) {
+    
+    myChannel->copyImagesToPatch(*this);
     
 }
 
@@ -81,27 +75,16 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     if( hasImages ) {
         count += images.unpack(ptr+count, swap_endian);
     }
-    if( images.size() > sizeof(uint64_t) ) isLoaded = true;
-    else isLoaded = false;
     return count;
-}
-
-
-void ChannelData::cclear(void) {
-    images.clear();
-    isLoaded = false;
 }
 
 
 const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
 
-    //images = rhs.images;
     cutout = rhs.cutout;
     channelOffset = rhs.channelOffset;
     patchStart = rhs.patchStart;
     residualOffset = rhs.residualOffset;
-
-    isLoaded = images.nElements();
     
     return *this;
     
@@ -110,8 +93,8 @@ const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
 
 void ChannelData::copyResults( const ChannelData& rhs ) {
     
-    isLoaded = false;
-
+    images.clear();
+    
 }
 
 
@@ -140,9 +123,6 @@ ObjectData::~ObjectData() {
 void ObjectData::setPath(const std::string& path) {
     string mypath = path + "_" + to_string(myObject->id());
     CacheItem::setPath(mypath);
-    for( auto& cd: channels ) {
-        if(cd) cd->setPath(mypath);
-    }
 }
 
 
@@ -172,6 +152,15 @@ void ObjectData::clear( void ) {
 }
 
 
+void ObjectData::load( void ) {
+    
+    for( auto& cd: channels ) {
+        if(cd) cd->load();
+    }
+    
+}
+
+
 uint64_t ObjectData::size( void ) const {
     uint64_t sz = img.size();
     sz += psf.size();
@@ -180,8 +169,7 @@ uint64_t ObjectData::size( void ) const {
     sz += alpha.size();
     sz += div.size();
     for( auto& cd: channels ) {
-        // use explicit scope to bypass compression (only compress the patch, not the individual channels)
-        if(cd) sz += cd->ChannelData::size();
+        if(cd) sz += cd->size();
     }
     return sz;
 }
@@ -196,8 +184,7 @@ uint64_t ObjectData::pack( char* ptr ) const {
     count += alpha.pack(ptr+count);
     count += div.pack(ptr+count);
     for( auto& cd: channels ) {
-        // use explicit scope to bypass compression (only compress the patch, not the individual channels)
-        if(cd) count += cd->ChannelData::pack( ptr+count );
+        if(cd) count += cd->pack( ptr+count );
     }
     return count;
 }
@@ -214,8 +201,7 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     if( count > 6*sizeof(uint64_t) ) isLoaded = true;
     else isLoaded = false;
     for( auto& cd: channels ) {
-        // use explicit scope to bypass compression (only compress the patch, not the individual channels)
-        if(cd) count += cd->ChannelData::unpack( ptr+count, swap_endian );
+        if(cd) count += cd->unpack( ptr+count, swap_endian );
     }
     return count;
 }
@@ -224,18 +210,12 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
 bool ObjectData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
     loaded |= CacheItem::cacheLoad(removeAfterLoad);
-    for( auto& cd: channels ) {
-        if(cd) loaded |= cd->cacheLoad(removeAfterLoad);
-    }
     return loaded;      // true if any part was loaded, TODO better control of partial fails.
 }
 
 
 bool ObjectData::cacheStore(bool clearAfterStore) {
     bool stored(false);
-    for( auto& cd: channels ) {
-        if(cd) stored |= cd->cacheStore(clearAfterStore);
-    }
     stored |= CacheItem::cacheStore(clearAfterStore);      // true if any part was stored, TODO better control of partial fails.
     return stored;
 }
@@ -249,9 +229,6 @@ void ObjectData::cclear(void) {
     res.clear();
     alpha.clear();
     div.clear();
-    for( auto& cd: channels ) {
-        cd->cclear();
-    }
     isLoaded = false;
 }
 
@@ -354,6 +331,15 @@ void PatchData::clear( void ) {
     
     for( auto& obj: objects ) {
         if(obj) obj->clear();
+    }
+    
+}
+
+
+void PatchData::load( void ) {
+    
+    for( auto& obj: objects ) {
+        if(obj) obj->load();
     }
     
 }

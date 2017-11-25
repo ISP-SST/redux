@@ -695,7 +695,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         if ( hasXY ) nPatchesY = 1;         // since the .momfbd format expects a rectangular grid of points, we store
                                             // the results as a 1 x nPatches array.
         
-        progWatch.increaseTarget( nPatchesX*nPatchesY*nTotalChannels );
+        progWatch.increaseTarget( 1 );
 
         uint64_t count(0);
         patches.resize( nPatchesY, nPatchesX );
