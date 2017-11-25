@@ -17,6 +17,7 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+//#define DEBUG_SIMG_
 
 //#define USE_LUT
 #define ALPHA_CUTOFF 0.0
@@ -352,7 +353,7 @@ void SubImage::gradientVogel2( double* agrad, const bool* enabledModes ) {
 
 void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
 
-#ifdef DEBUG_
+#ifdef DEBUG_SIMG_
     LOG_TRACE << "SubImage::calcVogelWeight(" << hexString(this) << ")   indexSize=" << object.pupil->pupilInOTF.size() << ende;
 #endif
   
@@ -525,7 +526,7 @@ void SubImage::addToPhi( double* phiPtr, const double* modePtr, double w ) const
 template <typename T>
 void SubImage::addToPhi( const T* a, double* phiPtr ) const {
 
-#ifdef DEBUG_
+#ifdef DEBUG_SIMG_
     LOG_TRACE << "SubImage(" << object.ID << ":" << index << ")::addToPhi()" << printArray( a, nModes, "  newAlpha" ) << ende;
 #endif
 
@@ -602,7 +603,7 @@ void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
 
 void SubImage::calcPFOTF(void) {
     
-#ifdef DEBUG_
+#ifdef DEBUG_SIMG_
     LOG_TRACE << "SubImage::calcPFOTF(" << hexString(this) << ")   indexSize=" << object.pupil->pupilInOTF.size() << ende;
 #endif
 
