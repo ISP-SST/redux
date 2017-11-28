@@ -680,14 +680,24 @@ namespace redux {
         string Fits::getValue( const vector<string>& hdr, string key ) {
             
             key.resize(8,' ');       // pad with spaces, or truncate, to 8 characters
-            
-            for( string k: hdr ) {
-                if( boost::iequals( k.substr(0,8), key) ) {
-                    size_t commentStart = k.find('/');
-                    return trimStringValue( k.substr( 10, commentStart-10 ) );
+            string ret = "";
+            auto it = hdr.begin();
+            for( ; it<hdr.end(); ++it ) {
+                if( boost::iequals( it->substr(0,8), key) ) {
+                    size_t commentStart = it->find('/');
+                    ret = trimStringValue( it->substr( 10, commentStart-10 ) );
+                    while( *(ret.rbegin()) == '&' ) {
+                        ret.resize( ret.size()-1 );
+                        if( ++it<hdr.end() ) {
+                            if( boost::iequals( it->substr(0,8), "CONTINUE" )) {
+                                commentStart = it->find('/');
+                                ret += trimStringValue( it->substr( 10, commentStart-10 ) );
+                            }
+                        }
+                    }
                 }
             }
-            return "";
+            return ret;
         }
         
         template <>
