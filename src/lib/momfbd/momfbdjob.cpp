@@ -327,23 +327,22 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
             return false;
         }
 
-        const CountT& limits = nActive.at(StepID(jobType,nextStep));
+        auto lock = getGlobalLock();
+        const CountT& limits = counts[StepID(jobType,nextStep)];
         if( limits.active >= limits.max ) {   // Not allowed to start until some jobs are done with this step
             return false;
-        }
+        } else lock.unlock();
         
         if( step == JSTEP_SUBMIT ) {    // No check done yet. It will now be run asynchronously, so return from here to avoid a race with moveTo() below.
             startLog();
             check();
-            stopLog();
             return false;
         }
 
         if( step == JSTEP_CHECKED ) {
             // we are also restricted by nQueued.
-            const CountT& limits2 = nActive.at(StepID(jobType,JSTEP_QUEUED));
+            const CountT& limits2 = counts[StepID(jobType,JSTEP_QUEUED)];
             if( limits2.active >= limits2.max ) {
-                stopLog();  // close the log while we're queued
                 return false;
             }
             startLog();
@@ -1057,6 +1056,7 @@ bool MomfbdJob::check(void) {
                 moveTo( this, JSTEP_CHECKED );
                 updateProgressString();
             }
+            stopLog();
             break;
         }
         case JSTEP_SUBMIT: {    // When checking is delegated to the manager.
@@ -1073,6 +1073,7 @@ bool MomfbdJob::check(void) {
                     moveTo( this, JSTEP_ERR );
                     updateProgressString();
                 }
+                stopLog();
             }).detach();
             break;
         }
