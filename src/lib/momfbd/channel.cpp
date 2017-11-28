@@ -1114,13 +1114,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     chData.residualOffset = 0;
     chData.patchStart = myObject.maxLocalShift;
     
-    
-    bool flipX(false);
-    bool flipY(false);
-    
     if( alignMap.size() == 9 ) {
-        if( alignMap[0] < 0 ) flipX = true;
-        if( alignMap[4] < 0 ) flipY = true;
         ProjectiveMap map( alignMap );
         localPos = map*(refPos + myJob.roi.first);  // position in reference-channel, global coordinates
     } else {                                // old style alignment with clips & offsetfiles
@@ -1135,13 +1129,11 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
         }
         if( alignClip.size() == 4 ) {
             if( alignClip[0] > alignClip[1] ) {
-                flipX = true;
                 localPos.x = alignClip[0] - localPos.x - 1 + myObject.patchSize%2;
             } else {
                 localPos.x += alignClip[0] - 1;
             }
             if( alignClip[2] > alignClip[3] ) {
-                flipY = true;
                 localPos.y = alignClip[2] - localPos.y - 1 + myObject.patchSize%2;
             } else {
                 localPos.y += alignClip[2] - 1;

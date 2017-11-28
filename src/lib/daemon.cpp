@@ -655,6 +655,7 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
 void Daemon::cleanup( void ) {
 
+    vector<WorkInProgress::Ptr> deletedWIPs;        // will clear/reset jobs when the vector goes out of scope.
     {
         unique_lock<mutex> lock( peerMutex );
         for( auto it=connections.begin(); it != connections.end(); ) {
@@ -673,54 +674,46 @@ void Daemon::cleanup( void ) {
                 boost::posix_time::time_duration elapsed = (now - wip->workStarted);
                 if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
                     LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << wip->print() << ende;
-                    failedWIP( wip );
-                    //peerWIP.erase(it++);                // N.B iterator is invalidated on erase, so the postfix increment is necessary.
-                    continue;
+                    deletedWIPs.push_back( std::move(wip) );
                 }
                 
                 if( host ) {
                     elapsed = (now - host->status.lastSeen);
                     if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
                         LOG_NOTICE << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << ende;
-                        failedWIP( wip );
                         for( auto it2 = begin(connections); it2 != end(connections); ++it2 ) {
                             if( (*it2->second) == (*host) ) {
                                 it2->first->socket().close();
                                 break;
                             }
                         }
-                        peerWIP.erase(wipit++);            // N.B iterator is invalidated on erase, so the postfix increment is necessary.
-                        continue;
+                        deletedWIPs.push_back( std::move(wip) );
                     }
                 }
             } else {
                 LOG_DEBUG << "Peer has an invalid WIP." << ende;
-                failedWIP( wip );
-                peerWIP.erase(wipit++);            // N.B iterator is invalidated on erase, so the postfix increment is necessary.
-                continue;
             }
-            ++wipit;
+            if( !wip ) {
+                peerWIP.erase(wipit++);            // N.B iterator is invalidated on erase, so the postfix increment is necessary.
+            } else ++wipit;
         }
     }
+    for( auto& wip: deletedWIPs ) failedWIP( wip );
     
+    vector<Job::JobPtr> deletedJobs;        // will clear/reset jobs when the vector goes out of scope.
     {
         unique_lock<mutex> lock( jobsMutex );
         for( auto& job : jobs ) {
             if( !job ) continue;
-            //job->check();
             if( job->info.step == Job::JSTEP_COMPLETED ) {
                 LOG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
                 LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
-//                 ioService.post( [job](){
-//                     job->cleanup();
-//                     job->logger.flushAll();
-//                 });
-                job.reset();
+                deletedJobs.push_back( std::move(job) );
             }
         }
-        jobs.erase(std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){return (j == nullptr);}), jobs.end());
+        jobs.erase( std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){ return !j; }), jobs.end() );
     }
-
+    
 }
 
 
@@ -1296,12 +1289,14 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
     unique_lock<mutex> lock( jobsMutex );
     vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     lock.unlock();
+    auto glock = Job::getGlobalLock();
+    map<Job::StepID,Job::CountT> activeCounts = Job::counts;
+    glock.unlock();
     
     if( !wip->isRemote ) {
-        auto lock = Job::getGlobalLock();
         std::sort( tmpJobs.begin(), tmpJobs.end(),[&](const Job::JobPtr& a, const Job::JobPtr& b ){
-            const Job::CountT& ca = Job::counts[Job::StepID(a->getTypeID(),a->getNextStep())];
-            const Job::CountT& cb = Job::counts[Job::StepID(b->getTypeID(),b->getNextStep())];
+            const Job::CountT& ca = activeCounts[Job::StepID(a->getTypeID(),a->getNextStep())];
+            const Job::CountT& cb = activeCounts[Job::StepID(b->getTypeID(),b->getNextStep())];
             if( (ca.active<ca.min) != (cb.active<cb.min) ) return (ca.active<ca.min);
             if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
             if(a->info.step != b->info.step) return (a->info.step > b->info.step);
@@ -1309,17 +1304,9 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
             return (a->info.id < b->info.id);
         } );
     }
-        
-        map<size_t,map<uint16_t,uint16_t>> activeCounts;
-        for( Job::JobPtr& job: tmpJobs ) {
-            if( job ) {
-                size_t tid = job->getTypeID();
-                activeCounts[tid][job->info.step]++;
-            }
-        }
 
     for( Job::JobPtr& job: tmpJobs ) {
-        if( job && job->getWork( wip, nThreads, activeCounts[job->getTypeID()] ) ) {
+        if( job && job->getWork( wip, nThreads, activeCounts ) ) {
             newJob = (job.get() != wip->job.get());
             wip->job = job;
             gotJob = true;

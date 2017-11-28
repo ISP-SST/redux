@@ -866,7 +866,7 @@ void Object::initCache( void ){
     
     LOG_TRACE << "Tilt-to-pixels conversion: " << alphaToPixels << ende;
 
-    for( auto& ch : channels ){
+    for( shared_ptr<Channel>& ch: channels ){
         ch->initCache( );
     }
     

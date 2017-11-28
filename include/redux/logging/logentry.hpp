@@ -113,7 +113,7 @@ namespace redux {
             inline void finalize(void) {
                 now();
                 message = buffer.str();
-                buffer.str("");
+                buffer.str( std::string() );
                 settings.restore();
             }
 

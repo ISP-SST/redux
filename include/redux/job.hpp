@@ -176,7 +176,7 @@ namespace redux {
         virtual uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
         boost::posix_time::time_duration getElapsed( uint16_t from, uint16_t to ) { return (info.times[to] - info.times[from]); }
         
-        virtual bool getWork(WorkInProgress::Ptr, uint16_t, const std::map<uint16_t,uint16_t>&) { return false; };
+        virtual bool getWork(WorkInProgress::Ptr, uint16_t, const std::map<StepID,CountT>& ) { return false; };
         virtual void ungetWork(WorkInProgress::Ptr) { };
         virtual void failWork(WorkInProgress::Ptr) { };
         virtual void returnResults(WorkInProgress::Ptr) { };

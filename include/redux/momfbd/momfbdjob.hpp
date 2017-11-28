@@ -67,7 +67,7 @@ namespace redux {
 
             size_t nImages(void) const;
             
-            bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<uint16_t,uint16_t>& );
+            bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<Job::StepID,Job::CountT>& );
             void ungetWork( WorkInProgress::Ptr );
             void failWork( WorkInProgress::Ptr );
             void returnResults( WorkInProgress::Ptr );

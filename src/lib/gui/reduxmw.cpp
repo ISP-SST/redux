@@ -210,7 +210,7 @@ void ReduxMW::readSettings() {
     Qt::DockWidgetArea dwArea = ( Qt::DockWidgetArea ) settings.value ( "dockingarea", Qt::BottomDockWidgetArea ).toInt();
     pos = settings.value ( "position", QPoint ( 200, 200 ) ).toPoint();
     size = settings.value ( "size", QSize ( 400, 400 ) ).toSize();
-    if(~bl) {
+    if(!bl) {
         addDockWidget ( dwArea, outputDW );
     }
     outputDW->resize ( size );

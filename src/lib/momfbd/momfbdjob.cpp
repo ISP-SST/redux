@@ -252,7 +252,7 @@ void MomfbdJob::checkParts( void ) {
 }
 
 
-bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<uint16_t,uint16_t>& nActive ) {
+bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<Job::StepID,Job::CountT>& nActive ) {
 
     //uint16_t partMask = checkParts();
     
@@ -271,10 +271,12 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
 
         auto lock = getLock(false);
         if( info.step == JSTEP_QUEUED ) {                            // preprocessing ready -> start
-            auto glock = getGlobalLock();
+            auto glock = Job::getGlobalLock();
             const CountT& limits = counts[StepID(jobType,JSTEP_RUNNING)];
-            if( limits.active < limits.max ) glock.unlock();     // Allowed to start?
-            else return ret;
+            if( limits.active >= limits.max ) return ret;
+            glock.unlock();
+            moveTo( this, JSTEP_RUNNING );
+            updateProgressString();
             progWatch.clear();
             progWatch.set( patches.nElements() );
             progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
@@ -283,8 +285,6 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
                 updateProgressString();
             });
             startLog();
-            moveTo( this, JSTEP_RUNNING );
-            updateProgressString();
         }
         if( info.step == JSTEP_RUNNING ) {                      // running
             for( auto & patch : patches ) {
@@ -327,11 +327,10 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
             return false;
         }
 
-        auto lock = getGlobalLock();
-        const CountT& limits = counts[StepID(jobType,nextStep)];
+        const CountT& limits = nActive.at(StepID(jobType,nextStep));
         if( limits.active >= limits.max ) {   // Not allowed to start until some jobs are done with this step
             return false;
-        } else lock.unlock();
+        }
         
         if( step == JSTEP_SUBMIT ) {    // No check done yet. It will now be run asynchronously, so return from here to avoid a race with moveTo() below.
             startLog();
@@ -342,7 +341,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<u
 
         if( step == JSTEP_CHECKED ) {
             // we are also restricted by nQueued.
-            const CountT& limits2 = counts[StepID(jobType,JSTEP_QUEUED)];
+            const CountT& limits2 = nActive.at(StepID(jobType,JSTEP_QUEUED));
             if( limits2.active >= limits2.max ) {
                 stopLog();  // close the log while we're queued
                 return false;
@@ -574,8 +573,12 @@ bool MomfbdJob::checkPatchPositions(void) {
 
         uint16_t minP(-1),maxP(0);
         for( uint16_t pos : subImagePosX ) {
-            if( pos < posLimits.first.x || pos > posLimits.last.x ) {
-                pos = std::min<uint16_t>(std::max<uint16_t>(posLimits.first.x,pos),posLimits.last.x);
+            if( pos < posLimits.first.x ) {
+                pos = posLimits.first.x;
+                xOutside = true;
+            }
+            if( pos > posLimits.last.x ) {
+                pos = posLimits.last.x;
                 xOutside = true;
             }
             if( pos < minP ) minP = pos;
@@ -590,14 +593,17 @@ bool MomfbdJob::checkPatchPositions(void) {
                    "\n\tcommand with extraclip large enough to force the patches inside.";
             msg += "\n\tTo autogenerate locations, you can add --simx (without locations) to the rdx_sub command.\n\t"
                    "You can also pass the locations as --simx=\"" + printArray(tmpX,"") + "\" to rdx_sub.";
-            //msg += "\n\tTo FORCE the use of your current patch-positions, add the --no-check flag to the rdx_sub command. (NOT recommended)";
             LOG_ERR << msg << ende;
         }
         minP = -1;
         maxP = 0;
         for( uint16_t pos : subImagePosY ) {
-            if( pos < posLimits.first.y || pos > posLimits.last.y ) {
-                pos = std::min<uint16_t>(std::max<uint16_t>(posLimits.first.y,pos),posLimits.last.y);
+            if( pos < posLimits.first.y ) {
+                pos = posLimits.first.y;
+                yOutside = true;
+            }
+            if( pos > posLimits.last.y ) {
+                pos = posLimits.last.y;
                 yOutside = true;
             }
             if( pos < minP ) minP = pos;
@@ -612,7 +618,6 @@ bool MomfbdJob::checkPatchPositions(void) {
                    "\n\tcommand with extraclip large enough to force the patches inside.";
             msg += "\n\tTo autogenerate locations, you can add --simy (without locations) to the rdx_sub command.\n\t"
                    "You can also pass the locations as --simy=\"" + printArray(tmpY,"") + " to rdx_sub.";
-            //msg += "\n\tTo FORCE the use of your current patch-positions, add the --no-check flag to the rdx_sub command. (NOT recommended)";
             LOG_ERR << msg << ende;
         }
 
@@ -744,14 +749,12 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
 
 void MomfbdJob::initCache(void) {
     
-    auto lock = getLock();
-
     if( !globalData ) {
         globalData.reset(new GlobalData(*this));
     }
     globalData->constraints.init();
     
-    for( auto& obj: objects ) {
+    for( shared_ptr<Object>& obj: objects ) {
         obj->initCache();
     }
     
