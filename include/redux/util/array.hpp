@@ -1184,7 +1184,7 @@ namespace redux {
                 size_t blockSize = dataSize*sizeof(T);
                 int fd = open( fn.c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0664 );
                 if( fd == -1 ) throw std::logic_error( "Array::createMmap() failed to open file: "+fn+"  :" +std::string(strerror(errno)) );
-                if( fallocate(fd, 0, 0, blockSize) == -1 ) {
+                if( posix_fallocate(fd, 0, blockSize) == -1 ) {
                     close(fd);
                     throw std::logic_error( "Array::createMmap() failed to resize file: "+fn+"  :" +std::string(strerror(errno)) );
                 }
