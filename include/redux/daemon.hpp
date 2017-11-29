@@ -68,7 +68,7 @@ namespace redux {
         void interactive( network::TcpConnection::Ptr& );
         void resetSlaves( network::TcpConnection::Ptr&, uint8_t );
         //Job::JobPtr selectJob(bool);
-        bool getWork( WorkInProgress::Ptr&, uint8_t nThreads = 1);
+        bool getWork( WorkInProgress::Ptr, uint8_t nThreads = 1);
         void sendWork( network::TcpConnection::Ptr& );
         void putParts( network::TcpConnection::Ptr& );
         void sendJobList( network::TcpConnection::Ptr& );

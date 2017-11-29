@@ -1281,22 +1281,25 @@ void Daemon::interactive( TcpConnection::Ptr& conn ) {
 }
 
 
-bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
+bool Daemon::getWork( WorkInProgress::Ptr wip, uint8_t nThreads ) {
 
     bool gotJob(false);
     bool newJob(false);
+    
+    if( !wip ) return false;
 
-    unique_lock<mutex> lock( jobsMutex );
-    vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
-    lock.unlock();
     auto glock = Job::getGlobalLock();
     map<Job::StepID,Job::CountT> activeCounts = Job::counts;
     glock.unlock();
+    unique_lock<mutex> lock( jobsMutex );
+    vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
+    lock.unlock();
+    tmpJobs.erase( std::remove_if( tmpJobs.begin(), tmpJobs.end(), [&]( const shared_ptr<Job>& j ) { return !j; }), tmpJobs.end() );
     
     if( !wip->isRemote ) {
         std::sort( tmpJobs.begin(), tmpJobs.end(),[&](const Job::JobPtr& a, const Job::JobPtr& b ){
-            const Job::CountT& ca = activeCounts[Job::StepID(a->getTypeID(),a->getNextStep())];
-            const Job::CountT& cb = activeCounts[Job::StepID(b->getTypeID(),b->getNextStep())];
+            const Job::CountT& ca = activeCounts.at( Job::StepID(a->getTypeID(),a->getNextStep()) );
+            const Job::CountT& cb = activeCounts.at( Job::StepID(b->getTypeID(),b->getNextStep()) );
             if( (ca.active<ca.min) != (cb.active<cb.min) ) return (ca.active<ca.min);
             if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
             if(a->info.step != b->info.step) return (a->info.step > b->info.step);
@@ -1305,7 +1308,7 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, uint8_t nThreads ) {
         } );
     }
 
-    for( Job::JobPtr& job: tmpJobs ) {
+    for( Job::JobPtr job: tmpJobs ) {
         if( job && job->getWork( wip, nThreads, activeCounts ) ) {
             newJob = (job.get() != wip->job.get());
             wip->job = job;
