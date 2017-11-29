@@ -24,13 +24,6 @@ using namespace redux;
 using namespace std;
 
 
-atomic<int> MomfbdJob::nActivePre(0);
-atomic<int> MomfbdJob::nActivePost(0);
-std::map<uint16_t,uint16_t> MomfbdJob::maxActive = { {JSTEP_PREPROCESS,1},
-                                                     {JSTEP_QUEUED,2},
-                                                     {JSTEP_VERIFY,1},
-                                                     {JSTEP_POSTPROCESS,1} };
-
 size_t MomfbdJob::jobType = Job::registerJob( "momfbd", momfbd::MomfbdJob::create );
 
 
@@ -662,7 +655,6 @@ void MomfbdJob::unloadCalib( boost::asio::io_service& service ) {
     }
     info.state.store( JSTATE_IDLE );
     updateProgressString();
-    nActivePre--;
     
 }
 
@@ -771,7 +763,6 @@ void MomfbdJob::clearPatches(void) {
         p->clear();
     }
     size_t nPatches = patches.nElements();
-    nActivePost--;
     patches.clear();
     moveTo( this, JSTEP_COMPLETED );
     

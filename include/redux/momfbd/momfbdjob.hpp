@@ -122,9 +122,6 @@ namespace redux {
             
             redux::util::ProgressWatch progWatch;
             
-            static std::atomic<int> nActivePre, nActivePost;
-            static std::map<uint16_t,uint16_t> maxActive;
-            
             bool cfgChecked;
             bool dataChecked;
         
