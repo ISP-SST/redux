@@ -30,6 +30,7 @@ namespace sp=std::placeholders;
 thread_local thread::TmpStorage Solver::tmp;
 
 //#define DEBUG_
+//#define MASSIVE_DEBUG_
 //#define RDX_DUMP_PATCHDATA
 
 namespace {
@@ -422,9 +423,9 @@ void Solver::run( PatchData::Ptr data ) {
         Array<double> gwrapper(grad_alpha.get(), nTotalImages, nModes);
         Ana::write("grad_alpha_"+to_string(totalIterations)+".f0",gwrapper);
         dump("iter_"+to_string(totalIterations));
-        job.globalData->constraints.reverse( s->gradient->data, grad_alpha );
-        Ana::write("grad_alphac_"+to_string(totalIterations)+".f0",gwrapper);
-        cout << printArray(grad_alpha.get(), nParameters, "\nreversed_agrad") << endl;
+        //job.globalData->constraints.reverse( s->gradient->data, grad_alpha );
+        //Ana::write("grad_alphac_"+to_string(totalIterations)+".f0",gwrapper);
+        //cout << printArray(grad_alpha.get(), nParameters, "\nreversed_agrad") << endl;
 #endif
 
         do {

@@ -1294,16 +1294,16 @@ bool Daemon::getWork( WorkInProgress::Ptr wip, uint8_t nThreads ) {
     unique_lock<mutex> lock( jobsMutex );
     vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     lock.unlock();
-    tmpJobs.erase( std::remove_if( tmpJobs.begin(), tmpJobs.end(), [&]( const shared_ptr<Job>& j ) { return !j; }), tmpJobs.end() );
+    tmpJobs.erase( std::remove_if( tmpJobs.begin(), tmpJobs.end(), []( const shared_ptr<Job>& j ) { return !j; }), tmpJobs.end() );
     
     if( !wip->isRemote ) {
         std::sort( tmpJobs.begin(), tmpJobs.end(),[&](const Job::JobPtr& a, const Job::JobPtr& b ){
-            const Job::CountT& ca = activeCounts.at( Job::StepID(a->getTypeID(),a->getNextStep()) );
-            const Job::CountT& cb = activeCounts.at( Job::StepID(b->getTypeID(),b->getNextStep()) );
-            if( (ca.active<ca.min) != (cb.active<cb.min) ) return (ca.active<ca.min);
-            if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
+//             const Job::CountT& ca = activeCounts.at( Job::StepID(a->getTypeID(),a->getNextStep()) );
+//             const Job::CountT& cb = activeCounts.at( Job::StepID(b->getTypeID(),b->getNextStep()) );
+//             if( (ca.active<ca.min) != (cb.active<cb.min) ) return (ca.active<ca.min);
             if(a->info.step != b->info.step) return (a->info.step > b->info.step);
-            if( ca.active != cb.active ) return (ca.active<cb.active);
+            if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
+//             if( ca.active != cb.active ) return (ca.active<cb.active);
             return (a->info.id < b->info.id);
         } );
     }
