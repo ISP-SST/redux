@@ -59,7 +59,9 @@ namespace {
         IDL_INT max_points;
         IDL_INT niter;
         IDL_INT nrefpoints;
+        IDL_INT orientation;
         IDL_INT show;
+        IDL_INT smooth;
         IDL_INT verbose;
         IDL_VPTR h_init;
         IDL_VPTR status;
@@ -85,27 +87,32 @@ namespace {
         { (char*) "MAX_SHIFT",  IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_shift) },
         { (char*) "NITER",      IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (niter) },
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
+        { (char*) "ORIENTATION",IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (orientation) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
         { (char*) "SHOW",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (show) },
+        { (char*) "SMOOTH",     IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (smooth) },
         { (char*) "STATUS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (status) },
         { (char*) "THRESHOLD",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (threshold) },
         { (char*) "VERBOSE",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (verbose) },
         { NULL }
     };
     
-    bool transformCheck (const Mat& trans, const Size& imgSize1, const Size& imgSize2, double approximateScale, double maxShift = 10000, double maxScaleDiff = 1.5) {
+    bool transformCheck (const Mat& trans, const Size& imgSize1, const Size& imgSize2, double approximateScale,
+                         double maxShift=10000, double maxScaleDiff=1.5, int orientation=0 ) {
 
         // check that orthogonality is approximately preserved
         double ortho = trans.at<float>(0,0)*trans.at<float>(0,1) + trans.at<float>(1,0)*trans.at<float>(1,1);
         if( fabs(ortho) > 0.05 ) {
-            //cout << "   Discarding: ortho = " << ortho << endl;
             return false;
         }
         
+        double det = determinant( trans (cv::Rect_<int> (0, 0, 2, 2)) );
+        // check that the determinant has the right sign (i.e. if the matrix has the right orientaion)
+        if( orientation && (orientation*det<0) ) return false;
+        
         // check that the scaling is close enough to the one measured from pinhole distances.
-        double det = sqrt(fabs (determinant (trans (cv::Rect_<int> (0, 0, 2, 2)))));
-        if (det < approximateScale/maxScaleDiff || det > approximateScale*maxScaleDiff ) {
-            //cout << "   Discarding: det = " << det << " min = " << (approximateScale/maxScaleDiff) << " max = " << (approximateScale*maxScaleDiff) << endl;
+        double scl = sqrt( fabs(det) );
+        if (scl < approximateScale/maxScaleDiff || scl > approximateScale*maxScaleDiff ) {
             return false;
         }
         
@@ -150,7 +157,7 @@ namespace {
 
     // find approximate (affine) transforms by matching 3 central points in the object, to a reference + its nNeighbours nearest points
     vector<Mat> getInitializations( const vector<KeyPoint>& ref, const vector<KeyPoint>& target, const Size& imgSize1, const Size& imgSize2,
-                                    double approximateScale, double maxShift = 10000, double maxScaleDiff=1.5) {
+                                    double approximateScale, double maxShift = 10000, double maxScaleDiff=1.5, int orientation=0) {
 
         vector<Mat> initializations;
         size_t nRP = ref.size();
@@ -198,7 +205,7 @@ namespace {
                         Mat trans = getAffineTransform( refPoints, targetPoints );
                         Mat H_init = Mat::eye(3, 3, CV_32F);            // unit
                         trans.copyTo(H_init(cv::Rect_<int> (0, 0, 3, 2))); // copy (affine) initialization to the top 2 rows
-                        if (transformCheck (H_init, imgSize1, imgSize2, approximateScale, maxShift, maxScaleDiff)) {
+                        if (transformCheck (H_init, imgSize1, imgSize2, approximateScale, maxShift, maxScaleDiff, orientation)) {
                             perspectiveTransform( allRefPoints, mappedRefPoints, H_init );
                             maps.emplace( getNearestIndex(mappedRefPoints,target), H_init);
                         }
@@ -415,6 +422,13 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
         }
         
+        if( kw.smooth ) {
+            if( kw.smooth%2 == 0 ) kw.smooth--;     // size has to be odd in the Gaussian filtering
+            if ( kw.verbose > 1 ) cout << "img_align: applying Gaussian filter of size " << kw.smooth << endl;
+            GaussianBlur( imgByte1, imgByte1, Size(kw.smooth,kw.smooth), 0, 0 );
+            GaussianBlur( imgByte2, imgByte2, Size(kw.smooth,kw.smooth), 0, 0 );
+        }
+        
         double otsu1 = threshold( imgByte1, tmp1, 0, 0, THRESH_TOZERO|THRESH_OTSU );
         double otsu2 = threshold( imgByte2, tmp2, 0, 0, THRESH_TOZERO|THRESH_OTSU );
         
@@ -536,13 +550,13 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             H_init = arrayToMat( kw.h_init );
             Mat H_initf;
             H_init.assignTo(H_initf, CV_32F);
-            if( transformCheck( H_initf, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale ) ) {
+            if( transformCheck( H_initf, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale, kw.orientation ) ) {
                 initializations.push_back( H_initf );
             }
         }
 
         if( initializations.empty() ) {
-            initializations = getInitializations( selectedKP1, selectedKP2, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale);
+            initializations = getInitializations( selectedKP1, selectedKP2, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale, kw.orientation);
         }
 
         vector< DMatch > matches;
