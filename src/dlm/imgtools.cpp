@@ -235,7 +235,6 @@ namespace {
         return ret / nP;
     }
 
-    
     vector<DMatch> matchNearest (const vector<KeyPoint>& kp1, const vector<KeyPoint>& kp2, const Mat& H, double maxDistance=30, double scale=1.0) {
 
         vector<DMatch> matches;
@@ -245,60 +244,52 @@ namespace {
         KeyPoint::convert (kp2, points2);
 
         size_t nPoints = points1.size();
-        mappedPoints.resize (nPoints);
-        std::pair<int, double> nearest;
-        perspectiveTransform (points1, mappedPoints, H);
-
-        for (size_t i = 0; i < nPoints; ++i) {
-            nearest = make_pair (-1, 1E12);
-
-            for (size_t j = 0; j < points2.size(); ++j) {
-                double dist = norm( mappedPoints[i] - points2[j]);
-                if (fabs (dist) < nearest.second) {
-                    nearest.second = dist;
-                    nearest.first = j;
+        mappedPoints.resize(nPoints);
+        perspectiveTransform( points1, mappedPoints, H );
+        for( size_t i=0; i<nPoints; ++i ) {
+            double nearestDistance = 1E12;
+            int nearestIndex = -1;
+            for( size_t j=0; j<points2.size(); ++j ) {
+                double dist = norm( mappedPoints[i] - points2[j] );
+                if( dist < nearestDistance) {
+                    nearestDistance = dist;
+                    nearestIndex = j;
                 }
             }
-
-            if (nearest.first >= 0 && nearest.second < maxDistance*scale) {
-                matches.push_back (DMatch (i, nearest.first, nearest.second));
+            if( nearestIndex >= 0 && (nearestDistance < maxDistance*scale) ) {
+                matches.push_back( DMatch(i, nearestIndex, nearestDistance) );
             }
         }
 
         nPoints = points2.size();
-        mappedPoints.resize (nPoints);
-        perspectiveTransform (points2, mappedPoints, H.inv());
-
-        for (size_t i = 0; i < nPoints; ++i) {
-            nearest = make_pair (-1, 1E12);
-
-            for (size_t j = 0; j < points1.size(); ++j) {
-                double dist = norm(mappedPoints[i] - points1[j]);
-                if (fabs (dist) < nearest.second) {
-                    nearest.second = dist;
-                    nearest.first = j;
+        mappedPoints.resize(nPoints);
+        perspectiveTransform( points2, mappedPoints, H.inv() );
+        for( size_t i=0; i<nPoints; ++i ) {
+            double nearestDistance = 1E12;
+            int nearestIndex = -1;
+            for( size_t j=0; j<points1.size(); ++j ) {
+                double dist = norm( mappedPoints[i] - points1[j] );
+                if( dist < nearestDistance ) {
+                    nearestDistance = dist;
+                    nearestIndex = j;
                 }
             }
-
-            if (nearest.first >= 0 && nearest.second < maxDistance) {
-                matches.push_back (DMatch (nearest.first, i, nearest.second));
+            if (nearestIndex >= 0 && nearestDistance < maxDistance) {
+                matches.push_back( DMatch(nearestIndex, i, nearestDistance) );
             }
         }
 
-        std::sort (matches.begin(), matches.end(),
-        [] (const DMatch & a, const DMatch & b) {
-            if (a.queryIdx == b.queryIdx) return a.trainIdx < b.trainIdx;
-
-            return a.queryIdx < b.queryIdx;
-        });
-
-        auto imgEnd1 = std::unique (matches.begin(), matches.end(),
-        [] (const DMatch & a, const DMatch & b) { return (a.queryIdx == b.queryIdx && a.trainIdx == b.trainIdx); });
-
-        matches.erase (imgEnd1, matches.end());
-
-        std::sort (matches.begin(), matches.end());
-
+        std::sort( matches.begin(), matches.end());
+        set<int> allQueryInd;
+        set<int> allTrainInd;
+        matches.erase( std::remove_if( matches.begin(), matches.end(),
+                       [&]( const DMatch& m ) {
+                            if( allQueryInd.count(m.queryIdx) || allTrainInd.count(m.trainIdx) ) return true;
+                            allQueryInd.insert( m.queryIdx );
+                            allTrainInd.insert( m.trainIdx );
+                            return false;
+                        }), matches.end() );
+        
         return std::move (matches);
 
     }
