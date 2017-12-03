@@ -673,11 +673,12 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         if (kw.verbose) {
             cout << "Transformation matrix:\n" << H << endl;
             cout << "Scale: " << sqrt(fabs(determinant (H (cv::Rect_<int> (0, 0, 2, 2))))) << endl;
-            vector<Point2f> refMid(1, Point2f(imgSize1.height/2,imgSize1.width/2));
+            vector<Point2f> refMid(1, Point2f(imgSize1.width/2,imgSize1.height/2));
             vector<Point2f> mappedRefMid(1);
             perspectiveTransform( refMid, mappedRefMid, H );
-            double shift = norm( mappedRefMid[0] - Point2f(imgSize2.height/2,imgSize2.width/2) );
-            cout << "Shift: " << shift << " " << (mappedRefMid[0]-Point2f(imgSize2.height/2,imgSize2.width/2)) << endl;
+            Point2f diff =  mappedRefMid[0] - Point2f(imgSize2.width/2,imgSize2.height/2);
+            double shift = norm( diff );
+            cout << "Shift: " << shift << " " << diff << endl;
          }
         
         H.assignTo( retMat, retMat.type() );
