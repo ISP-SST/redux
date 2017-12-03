@@ -446,8 +446,8 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 #endif
         detector->detect( imgByte2, keypoints2 );
         
-        imgIn1.convertTo( imgByte1, CV_8UC1, 255 );
-        imgIn2.convertTo( imgByte2, CV_8UC1, 255 );
+        //imgIn1.convertTo( imgByte1, CV_8UC1, 255 );
+        //imgIn2.convertTo( imgByte2, CV_8UC1, 255 );
         
         copyMakeBorder( imgByte1, imgByte, 0, maxSize-imgSize1.height, 0, maxSize-imgSize1.width, BORDER_CONSTANT, Scalar::all(0) );
         imgByte.copyTo(imgByte1);
