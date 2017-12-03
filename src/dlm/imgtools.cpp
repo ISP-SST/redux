@@ -545,20 +545,48 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             initializations = getInitializations( selectedKP1, selectedKP2, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale);
         }
 
-        if ( kw.verbose > 1 && initializations.size() > 1 ) {
-            cout << "Matching the " << kw.nrefpoints << " largest keypoints in the images." << endl;
-            cout << "Restricting the transformation to have shifts smaller than " << kw.max_shift
-                 << " and a maximal scaling of " << (approximateScale*kw.max_scale) << " gave " << initializations.size()
-                 << " valid permutations." << endl;
-        }
+        vector< DMatch > matches;
+        if ( initializations.size() ) {
+            
+            if ( kw.verbose > 1 ) {
+                cout << "Matching the " << kw.nrefpoints << " largest keypoints in the images." << endl;
+                cout << "Restricting the transformation to have shifts smaller than " << kw.max_shift
+                    << " and a maximal scaling of " << (approximateScale*kw.max_scale) << " gave " << initializations.size()
+                    << " valid permutations." << endl;
+            }
 
+            size_t nMatches(0);
+            for( auto& h: initializations ) {       // find the mapping which can pair the most keypoints.
+                vector< DMatch > tmpmatches = matchNearest( keypoints1, keypoints2, h, medianNN1/3, approximateScale );
+                vector<Point2f> obj, scene;
+                for( auto & m: tmpmatches ) {
+                    obj.push_back( keypoints1[ m.queryIdx ].pt );
+                    scene.push_back( keypoints2[ m.trainIdx ].pt );
+                }
+                Mat HH = findHomography( obj, scene, CV_LMEDS );
+                HH.assignTo( h, CV_32F );
+                size_t nm = tmpmatches.size();
+                h.at<float>(2,2) = static_cast<float>(nm);  // temporarily store nMatches in the map
+                if( nm > nMatches ) {
+                    matches = std::move(tmpmatches);
+                    nMatches = nm;
+                }
+            }
+            std::sort (initializations.begin(), initializations.end(),  // sort by number of succesfully paired pinholes.
+                [] (const Mat& a, const Mat& b) {
+                    return (a.at<float>(2,2) > b.at<float>(2,2));
+            });
+            for( auto& h: initializations ) {
+                h.at<float>(2,2) = 1.0;  // reset the temporary value 
+            }
+            if( initializations.size() > 8 ) initializations.resize( 8 );   // keep the 8 maps which could pair the most pinholes
+        }
         
-        // Create mask with the strongest 50% of the pinholes.
-        // This will introduce asymmetry so that the crosscorrelation gives a clearer unique maximum
+        // Create a mask from the best mapping found above.
         imgByte.setTo( Scalar::all(0) );
-        for( size_t i=0; i<keypoints2.size()/2; ++i ) {
-            KeyPoint& kp = keypoints2[i];
-            circle( imgByte, kp.pt, 4*kp.size, Scalar(255), -1 );
+        for( auto& m: matches ) {
+            KeyPoint& kp = keypoints2[ m.trainIdx ];
+            circle( imgByte, kp.pt, 3*kp.size, Scalar(255), -1 );
         }
         
         std::map<double, Mat> results;
@@ -599,18 +627,16 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
             return ret;
         }
+        
         H = results.rbegin()->second;
-
-        vector< DMatch > matches = matchNearest( keypoints1, keypoints2, H, medianNN1/3, approximateScale );
-
-        if (kw.verbose) {
-            if (kw.verbose > 1) {
-                vector<double> cc;
-                for (auto r : results) cc.push_back (r.first);
-                std::sort(cc.rbegin(),cc.rend());
-                cout << printArray (cc, "correlations") << endl;
-                cout << matches.size() << " pairs matched using a max_distance of " << kw.max_dist << " for pairing." << endl;
-            }
+        matches = matchNearest( keypoints1, keypoints2, H, medianNN1/3, approximateScale );
+        
+        if( kw.verbose > 1 ) {
+            vector<double> cc;
+            for (auto r : results) cc.push_back (r.first);
+            std::sort(cc.rbegin(),cc.rend());
+            cout << printArray (cc, "correlations") << endl;
+            cout << matches.size() << " pairs matched using a max_distance of " << kw.max_dist << " for pairing." << endl;
         }
 
         if( kw.max_points < 0 ) kw.max_points = 25;   // by default, do refinement by using the strongest 25 pinholes
