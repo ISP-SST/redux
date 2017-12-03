@@ -24,6 +24,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem.hpp>
 
+#define DEBUG_DLM_
+
 #ifdef RDX_WITH_OPENCV
 #    include "cvutil.hpp"
 #    include <redux/util/opencv.hpp>
@@ -89,11 +91,11 @@ namespace {
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
         { (char*) "ORIENTATION",IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (orientation) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
-        { (char*) "SHOW",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (show) },
+        { (char*) "SHOW",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (show) },
         { (char*) "SMOOTH",     IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (smooth) },
         { (char*) "STATUS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (status) },
         { (char*) "THRESHOLD",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (threshold) },
-        { (char*) "VERBOSE",    IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (verbose) },
+        { (char*) "VERBOSE",    IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (verbose) },
         { NULL }
     };
     
@@ -313,8 +315,6 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
     kw.max_shift = 200;
     kw.niter = 30;
     kw.nrefpoints = 4;
-    kw.show = 0;
-    kw.verbose = 0;
     kw.threshold = 0;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
@@ -375,7 +375,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
         Mat tmp2( imgSize2, CV_8UC1 );
         Mat H, H_init;
 
-#ifdef DEBUG_
+#ifdef DEBUG_DLM_
         Mat result( imgSize, CV_8UC3 );
 #endif
 
@@ -483,7 +483,8 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
             nearestNeighbour = min(nearestNeighbour,cv::norm(kp.pt-mid1));
             nearestNeighbours1.push_back(nearestNeighbour);
-            kp.response = kp.size * imgByte1.at<uchar>( kp.pt );
+            float val = imgByte1.at<uchar>( kp.pt );
+            kp.response = kp.size * val;
         }
         std::nth_element( nearestNeighbours1.begin(), nearestNeighbours1.begin() + nearestNeighbours1.size()/2, nearestNeighbours1.end() );
         float medianNN1 = *( nearestNeighbours1.begin() + nearestNeighbours1.size() / 2 );
@@ -497,7 +498,8 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
                 }
             }
             nearestNeighbours2.push_back(nearestNeighbour);
-            kp.response = kp.size * imgByte2.at<uchar>( kp.pt );
+            float val = imgByte2.at<uchar>( kp.pt );
+            kp.response = kp.size * val;
         }
         std::nth_element( nearestNeighbours2.begin(), nearestNeighbours2.begin() + nearestNeighbours2.size()/2, nearestNeighbours2.end() );
         float medianNN2 = *( nearestNeighbours2.begin() + nearestNeighbours2.size() / 2 );
@@ -661,32 +663,32 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
         }
 
-        if( matches.size() > 3 && kw.max_points > 3 ) {     // at least 4 points needed for findHomography
-
-            if( kw.by_size ) {                              // sort by size*intensity
-                std::sort( matches.begin(), matches.end(),
-                    [&] (const DMatch& a, const DMatch& b) {
-                        return (keypoints1[ a.queryIdx ].response*keypoints2[ a.trainIdx ].response >
-                                keypoints1[ b.queryIdx ].response*keypoints2[ b.trainIdx ].response);
-                });
-            } else {                                        // sort according to distance from image centre
-                std::sort( matches.begin(), matches.end(),
-                    [&] (const DMatch& a, const DMatch& b) {
-                        return (norm(keypoints1[ a.queryIdx ].pt - mid1) > norm(keypoints1[ b.queryIdx ].pt - mid1));
-                });
-            }
-
-            if( size_t(kw.max_points) < matches.size() ) matches.resize( kw.max_points );
-        }
-        
-        if( matches.size() > 3 ) {
+        if( matches.size() > 3 ) {     // at least 4 points needed for findHomography
             
+            if( kw.max_points > 3 ) {
+
+                if( kw.by_size ) {                              // sort by size*intensity
+                    std::sort( matches.begin(), matches.end(),
+                        [&] (const DMatch& a, const DMatch& b) {
+                            return (keypoints1[ a.queryIdx ].response*keypoints2[ a.trainIdx ].response >
+                                    keypoints1[ b.queryIdx ].response*keypoints2[ b.trainIdx ].response);
+                    });
+                } else {                                        // sort according to distance from image centre
+                    std::sort( matches.begin(), matches.end(),
+                        [&] (const DMatch& a, const DMatch& b) {
+                            return (norm(keypoints1[ a.queryIdx ].pt - mid1) > norm(keypoints1[ b.queryIdx ].pt - mid1));
+                    });
+                }
+
+                if( size_t(kw.max_points) < matches.size() ) matches.resize( kw.max_points );
+            }
+        
             if( kw.verbose > 1 ) {
                 cout << "Using " << matches.size() << " pairs to refine the fit." << endl;
             }
 
             vector<Point2f> obj, scene;
-            for (auto & m : matches) {
+            for( auto & m: matches ) {
                 obj.push_back (keypoints1[ m.queryIdx ].pt);
                 scene.push_back (keypoints2[ m.trainIdx ].pt);
             }
