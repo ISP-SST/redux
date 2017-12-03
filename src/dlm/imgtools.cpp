@@ -557,9 +557,11 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             
             if ( kw.verbose > 1 ) {
                 cout << "Matching the " << kw.nrefpoints << " largest keypoints in the images." << endl;
-                cout << "Restricting the transformation to have shifts smaller than " << kw.max_shift
+                if ( initializations.size() > 1 ) {
+                    cout << "Restricting the transformation to have shifts smaller than " << kw.max_shift
                     << " and a maximal scaling of " << (approximateScale*kw.max_scale) << " gave " << initializations.size()
                     << " valid permutations." << endl;
+                }
             }
 
             size_t nMatches(0);
