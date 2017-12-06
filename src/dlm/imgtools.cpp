@@ -62,6 +62,7 @@ namespace {
         IDL_INT niter;
         IDL_INT nrefpoints;
         IDL_INT orientation;
+        IDL_INT preserve;
         IDL_INT show;
         IDL_INT smooth;
         IDL_INT verbose;
@@ -91,6 +92,7 @@ namespace {
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
         { (char*) "ORIENTATION",IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (orientation) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
+        { (char*) "PRESERVE_SIZE", IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (preserve) },
         { (char*) "SHOW",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (show) },
         { (char*) "SMOOTH",     IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (smooth) },
         { (char*) "STATUS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (status) },
@@ -780,6 +782,10 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
 
     IDL_VPTR out;
     IDL_ARRAY_DIM outDims = { maxX-minX+1, maxY-minY+1, 0, 0, 0, 0, 0, 0 };
+    if( kw.preserve ) {
+        outDims[0] = inSize.width;
+        outDims[1] = inSize.height;
+    }
     IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_NOP, &out);
 
     Mat outImg = arrayToMat(out);
