@@ -70,12 +70,10 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool 
             wip->parts[0].reset(tmpPD);
             count += tmpPD->unpack( ptr+count, swap_endian );
             if( wip->nParts > 1 ) {
-                LOG_DEBUG << "Unpacking globalData for job #" << info.id << ende;
                 globalData.reset( new GlobalData(*this) );
                 count += globalData->unpack( ptr+count, swap_endian );
             }
         } catch( const std::exception& e ) {
-            LOG_ERR << "Unpacking of parts failed: " << e.what() << ende;
             wip->parts.clear();
             throw;
         }

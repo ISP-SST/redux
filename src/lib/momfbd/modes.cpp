@@ -113,7 +113,7 @@ bool ModeInfo::operator<(const ModeInfo& rhs) const {
 ModeInfo::operator string() const {
     string ret = to_string(nPupilPixels)+":"+to_string(pupilRadius)+":"+to_string(modeNumber);
     ret += "[" + to_string(firstMode) + "," +to_string(lastMode)+ "]:";
-    ret += "("+ printArray(modeNumbers) + ")";
+    if( !modeNumbers.empty() ) ret += "("+ printArray(modeNumbers,"modes") + ")";
     return ret;
 }
 
