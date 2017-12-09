@@ -34,7 +34,7 @@ namespace redux {
             
             struct HostInfo {       // "static" information, only exchanged on connect.
                 char littleEndian;
-                int reduxVersion;
+                uint64_t reduxVersion;
                 pid_t pid;
                 uint8_t peerType;
                 uint16_t nCores;
