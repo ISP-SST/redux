@@ -552,6 +552,7 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     uint64_t count = unpack(ptr,tmp,swap_endian);
     if(tmp) {
         ModeInfo id("");
+        modes.clear();
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
             shared_ptr<ModeSet>& ms = redux::util::Cache::get<ModeInfo,shared_ptr<ModeSet>>(id);
@@ -563,6 +564,7 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count,tmp,swap_endian);
     if(tmp) {
         PupilInfo id("");
+        pupils.clear();
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);
             shared_ptr<Pupil>& pup = redux::util::Cache::get<PupilInfo,shared_ptr<Pupil>>(id);

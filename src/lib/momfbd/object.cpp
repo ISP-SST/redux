@@ -216,7 +216,9 @@ void Object::initProcessing( Solver& ws ){
         initCache( );            // load global pupil/modes
         
         double mode_scale = 1.0/wavelength;
-        scaled_ms_info id( modes->info, mode_scale );
+        ModeInfo info(myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+        scaled_ms_info id( info, mode_scale );
+
         shared_ptr<ModeSet>& ret = redux::util::Cache::get< std::pair<ModeInfo, double>, shared_ptr<ModeSet>>(id, modes );
         unique_lock<mutex> lock(ret->mtx );
         if( modes->get() == ret->get() ){    // rescale local modes
@@ -232,6 +234,7 @@ void Object::initProcessing( Solver& ws ){
         auto& mdims = modes->dimensions();
         if( mdims.size() != 3 || mdims[0] != myJob.modeNumbers.size() ||
             mdims[1] != myJob.pupilPixels || mdims[2] != myJob.pupilPixels ) {
+            Cache::clear< std::pair<ModeInfo, double>, shared_ptr<ModeSet>>();
             throw std::logic_error("The mode-set has the wrong dimensions.");
         }
     

@@ -454,6 +454,7 @@ void Channel::initCache (void) {
         if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {
             mi2.firstMode = mi2.lastMode = 0;
         }
+        mi2.modeNumber = modeNumber;
         const shared_ptr<ModeSet>& ret = myJob.globalData->get(mi2);
         unique_lock<mutex> lock(ret->mtx);
         if( ret->empty() ) {    // this set was inserted, so it is not generated yet.
