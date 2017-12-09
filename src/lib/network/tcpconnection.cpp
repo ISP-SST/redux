@@ -27,7 +27,8 @@ namespace {
 
 
 TcpConnection::TcpConnection( boost::asio::io_service& io_service )
-    : activityCallback( nullptr ), urgentCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ), myService( io_service ), swapEndian_(false), strand(io_service) {
+    : activityCallback( nullptr ), urgentCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ),
+    myService( io_service ), swapEndian_(false), urgentActive(false), strand(io_service) {
 #ifdef DBG_NET_
     LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
 #endif
@@ -160,10 +161,12 @@ void TcpConnection::close( void ) {
 void TcpConnection::uIdle( void ) {
 
     unique_lock<mutex> lock(mtx);
-    if( !urgentCallback ) {
+    if( !urgentCallback || urgentActive ) {
         return;
     }
 
+    urgentActive = true;
+    
     if( mySocket.is_open() ) {
         lock.unlock();
                 
@@ -182,6 +185,8 @@ void TcpConnection::urgentHandler( const boost::system::error_code& error, size_
     
     try {
         unique_lock<mutex> lock(mtx);
+        if( !urgentActive ) return;     // prevent multiple uIdle
+        urgentActive = false;
         if( mySocket.is_open() && !mySocket.at_mark() ) {
             lock.unlock();
             uIdle();

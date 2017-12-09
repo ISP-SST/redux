@@ -111,6 +111,7 @@ namespace redux {
             void connect( std::string host, std::string service );
             void close( void );
             callback getCallback( void ) { std::unique_lock<std::mutex> lock(mtx); return activityCallback; };
+            bool hasUrgentCallback( void ) const { return (urgentCallback != nullptr); };
             void setCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); activityCallback = cb; };
             void setUrgentCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); urgentCallback = cb; };
             void setErrorCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); errorCallback = cb; };
@@ -162,6 +163,7 @@ namespace redux {
             boost::asio::io_service& myService;
             bool swapEndian_;
             uint8_t urgentData;
+            bool urgentActive;
             std::mutex mtx;
 
        public:
