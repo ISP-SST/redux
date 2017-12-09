@@ -422,7 +422,15 @@ network::TcpConnection::Ptr Daemon::getMaster(void) {
         try {
             myMaster.conn->lock();
             connect( myMaster.host->info, myMaster.conn );          // will return without doing anything if the remote endpoint exists.
-            if( myMaster.conn->socket().is_open() ) return myMaster.conn;
+            if( myMaster.conn->socket().is_open() ) {
+                myMaster.conn->unlock();
+                if( !myMaster.conn->hasUrgentCallback() ) {
+                    myMaster.conn->setUrgentCallback( bind( &Daemon::urgentHandler, this, std::placeholders::_1 ) );
+                }
+                myMaster.conn->uIdle();
+                myMaster.conn->lock();
+                return myMaster.conn;
+            }
         }
         catch( exception& e ) {
             LOG_DEBUG << "getMaster: Exception caught while getting connection to master: " << e.what() << ende;
