@@ -1438,17 +1438,20 @@ void Daemon::putParts( TcpConnection::Ptr& conn ) {
 
 void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
 
+    unique_lock<mutex> lock( jobsMutex );
+    vector<Job::JobPtr> tmpJobs( jobs );
+    lock.unlock();
+    
     uint64_t blockSize(0);
-    //unique_lock<mutex> lock( jobsMutex );
-    for( auto & job : jobs ) {
-        blockSize += job->size();
+    for( auto& job : tmpJobs ) {
+        if(job) blockSize += job->size();
     }
     uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
     shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
     char* ptr = buf.get()+sizeof( uint64_t );
     uint64_t packedSize(0);
-    for( auto & job : jobs ) {
-        packedSize += job->pack( ptr+packedSize );
+    for( auto& job : tmpJobs ) {
+        if(job) packedSize += job->pack( ptr+packedSize );
     }
     //lock.unlock();
     if( packedSize > blockSize ) {
@@ -1484,29 +1487,29 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
 
 void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
 
+    unique_lock<mutex> lock( jobsMutex );
+    vector<Job::JobPtr> tmpJobs( jobs );
+    lock.unlock();
+    
     uint64_t blockSize(0);
-    //unique_lock<mutex> lock( jobsMutex );
-    for( auto & job : jobs ) {
-        if(job) {
-            blockSize += job->info.size();
-        }
+    for( auto& job : tmpJobs ) {
+        if( job ) blockSize += job->info.size();
     }
     uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
     shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
     char* ptr = buf.get()+sizeof( uint64_t );
     uint64_t packedSize(0);                                                      // store real blockSize
-    for( auto & job : jobs ) {
+    for( auto& job : tmpJobs ) {
         if(job) {
             // should not be necessary to lock since we use a hardcoded string-length for the statusstring.
             // auto lock = job->getLock();
             packedSize += job->info.pack( ptr+packedSize );
         }
     }
-    //lock.unlock();
+
     if( packedSize > blockSize ) {
         string msg = "sendJobStats(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
         throw length_error(msg);
-        //LOG_DEBUG << msg << ende;
     }
     totalSize = packedSize + sizeof( uint64_t );
     pack( buf.get(), packedSize );                                                // store real blockSize
