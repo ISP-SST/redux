@@ -1051,6 +1051,91 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 }
 
 
+void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
+
+    boost::trim( slvString );
+    if( slvString.empty() ) return;
+    
+    string msgStr = "Killing";
+    if( cmd == CMD_RESET ) msgStr = "Restarting";
+    switch( cmd ) {
+        case CMD_DIE:       msgStr = "die"; break;
+        case CMD_EXIT:      msgStr = "exit"; break;
+        case CMD_RESET:     msgStr = "reset"; break;
+        default:            msgStr = to_string((int)cmd); break;
+    }
+    
+    if( iequals( slvString, "all" ) ) {
+        unique_lock<mutex> lock( peerMutex );
+        if( peerWIP.size() ) {
+            LOG << "Sending command \"" << msgStr << "\" to all " << peerWIP.size() << " slaves." << ende;
+            for( auto &pw: peerWIP ) {
+                Host::Ptr host = pw.first;
+                for( auto& hconn: connections ) {
+                    if( (*hconn.second) == (*host) ) {
+                        hconn.first->sendUrgent( cmd );
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    try {   // remove by ID
+        bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
+        tmpTree.put( "slaves", slvString );
+        vector<uint64_t> slaveList = tmpTree.get<vector<uint64_t>>( "slaves", vector<uint64_t>() );
+        std::set<uint64_t> slaveSet( slaveList.begin(), slaveList.end() );
+        unique_lock<mutex> lock( peerMutex );
+        slaveList.clear(); 
+        for( auto &pw: peerWIP ) {
+            Host::Ptr host = pw.first;
+            if( slaveSet.count( host->id ) ) {
+                LOG << "Sending command \"" << msgStr << "\" to slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
+                slaveList.push_back(host->id);
+                for( auto& hconn: connections ) {
+                    if( (*hconn.second) == (*host) ) {
+                        hconn.first->sendUrgent( cmd );
+                    }
+                }
+            }
+        }
+        if( !slaveList.empty() ) LOG << "Sending command \"" << msgStr << "\" to " << printArray(slaveList,"slaves") << ende;
+        return;
+    }
+    catch( const boost::bad_lexical_cast& e ) {
+        // ignore: it just means the specified list of jobs count not be cast into unsigned integers (could also be "all" or list of names)
+    }
+
+    try {   // remove by name
+        vector<string> slaveList;
+        boost::split( slaveList, slvString, boost::is_any_of( "," ) );
+        std::set<string> slaveSet( slaveList.begin(), slaveList.end() );
+        unique_lock<mutex> lock( peerMutex );
+        vector<uint64_t> slaveIdList;
+        for( auto &pw: peerWIP ) {
+            Host::Ptr host = pw.first;
+            if( slaveSet.count( host->info.name ) ) {
+                LOG << "Sending command \"" << msgStr << "\" to slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
+                slaveIdList.push_back(host->id);
+                for( auto& hconn: connections ) {
+                    if( (*hconn.second) == (*host) ) {
+                        hconn.first->sendUrgent( cmd );
+                    }
+                }
+            }
+        }
+        if( !slaveIdList.empty() ) LOG << "Sending command \"" << msgStr << "\" to " << printArray(slaveIdList,"slaves") << ende;
+        return;
+    }
+    catch( const std::exception& e ) {
+        LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
+        throw e;
+    }
+
+}
+
+
 void Daemon::resetSlaves( TcpConnection::Ptr& conn, uint8_t cmd ) {
 
     uint8_t hardExit(0);
@@ -1064,81 +1149,9 @@ void Daemon::resetSlaves( TcpConnection::Ptr& conn, uint8_t cmd ) {
     else if( hardExit ) cmd = CMD_DIE;
     else cmd = CMD_EXIT;
 
-    string msgStr = "Killing";
-    if( cmd == CMD_RESET ) msgStr = "Restarting";
-    
     if( blockSize ) {
-
         string slvString = string( buf.get() );
-       if( iequals( slvString, "all" ) ) {
-            unique_lock<mutex> lock( peerMutex );
-            if( peerWIP.size() ) {
-                LOG << msgStr << " " << peerWIP.size() << " slaves." << ende;
-                for( auto &pw: peerWIP ) {
-                    Host::Ptr host = pw.first;
-                    for( auto& hconn: connections ) {
-                        if( (*hconn.second) == (*host) ) {
-                            hconn.first->sendUrgent( cmd );
-                        }
-                    }
-                }
-            }
-            return;
-        }
-
-        try {   // remove by ID
-            bpt::ptree tmpTree;      // just to be able to use the VectorTranslator
-            tmpTree.put( "slaves", slvString );
-            vector<uint64_t> slaveList = tmpTree.get<vector<uint64_t>>( "slaves", vector<uint64_t>() );
-            std::set<uint64_t> slaveSet( slaveList.begin(), slaveList.end() );
-            unique_lock<mutex> lock( peerMutex );
-            slaveList.clear(); 
-            for( auto &pw: peerWIP ) {
-                Host::Ptr host = pw.first;
-                if( slaveSet.count( host->id ) ) {
-                    LOG << msgStr << " slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
-                    slaveList.push_back(host->id);
-                    for( auto& hconn: connections ) {
-                        if( (*hconn.second) == (*host) ) {
-                            hconn.first->sendUrgent( cmd );
-                        }
-                    }
-                }
-            }
-            if( !slaveList.empty() ) LOG << msgStr << " " << printArray(slaveList,"slaves") << ende;
-            return;
-        }
-        catch( const boost::bad_lexical_cast& e ) {
-            // ignore: it just means the specified list of jobs count not be cast into unsigned integers (could also be "all" or list of names)
-        }
-
-        try {   // remove by name
-            vector<string> slaveList;
-            boost::split( slaveList, slvString, boost::is_any_of( "," ) );
-            std::set<string> slaveSet( slaveList.begin(), slaveList.end() );
-            unique_lock<mutex> lock( peerMutex );
-            vector<uint64_t> slaveIdList;
-            for( auto &pw: peerWIP ) {
-                Host::Ptr host = pw.first;
-                if( slaveSet.count( host->info.name ) ) {
-                    LOG << msgStr << " slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
-                    slaveIdList.push_back(host->id);
-                    for( auto& hconn: connections ) {
-                        if( (*hconn.second) == (*host) ) {
-                            hconn.first->sendUrgent( cmd );
-                        }
-                    }
-                }
-            }
-            if( !slaveIdList.empty() ) LOG << msgStr << " " << printArray(slaveIdList,"slaves") << ende;
-            return;
-        }
-        catch( const std::exception& e ) {
-            LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
-            throw e;
-        }
-
-
+        sendToSlaves( cmd, slvString );
     }
 
 }
@@ -1197,6 +1210,10 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     if( !argStr.empty() ) {
                         failJobs(argStr);
                     }
+                } else if( cmdStr == "kill" ) {
+                    if( !line.empty() ) {
+                        sendToSlaves( CMD_DIE, line );
+                    }
                 } else if( cmdStr == "max-recv" ) {
                     string argStr = popword(line);
                     if( !argStr.empty() ) {
@@ -1212,8 +1229,12 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     }
                     replyStr = to_string( inTransfers.getInit() );
                 } else if( cmdStr == "reset" ) {
-                    reset();
-                    replyCmd = CMD_DISCONNECT;
+                    if( !line.empty() ) {
+                        sendToSlaves( CMD_RESET, line );
+                    } else {
+                        reset();
+                        replyCmd = CMD_DISCONNECT;
+                    }
                 } else if(cmdStr == "segfault") {
                     ioService.post( [](){ std::this_thread::sleep_for (std::chrono::seconds(1));  // delay for reply to be sent back
                                           *(int*)(8) = 0; } );
