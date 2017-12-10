@@ -6,6 +6,7 @@
 #include "redux/file/anacompress.hpp"
 #include "redux/file/anadecompress.hpp"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -151,15 +152,16 @@ void Ana::read( const string& filename ) {
 void Ana::write( ofstream& file ) {
 
     size_t hdrSize = sizeof( struct raw_header );   // = 512 by construction
+    boost::trim( m_ExtendedHeader );
     size_t textSize = m_ExtendedHeader.length();
     m_Header.nhb = 1;
     if( textSize > 255 ) {
         m_Header.nhb = static_cast<uint8_t>( 1+(textSize+256)/512 );
         if( m_Header.nhb > 16 ) {
             cout << "Warning: Ana::write() - this = " << hexString(this) << endl;
-            cout << "Warning: Ana::write() - textSize = " << textSize << "   nhb = " << m_Header.nhb << endl;
-            cout << "Warning: Ana::write() - text = \"" << m_ExtendedHeader << "\n" << endl;
+            cout << "Warning: Ana::write() - textSize = " << textSize << "   nhb = " << (int)m_Header.nhb << endl;
             cout << "Warning: Ana::write() - header text is too long, it will be truncated!! (max = 7935 characters)" << endl;
+            cout << "Warning: Ana::write() - text = \"" << m_ExtendedHeader << "\n" << endl;
             m_Header.nhb = 16;
             textSize = 7935;
         }
