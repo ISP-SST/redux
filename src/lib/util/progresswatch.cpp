@@ -90,7 +90,7 @@ void ProgressWatch::set(int end, int start) {
     lock_guard<mutex> lock(mtx);
     target_ = end;
     counter_ = start_ = start;
-    completed_ = false;
+    completed_ = (counter_ == target_);
     
 }
 

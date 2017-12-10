@@ -2289,14 +2289,17 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     }
 
                 } catch( const exception& e ) {
-                    cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                    //cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                    for( size_t j=0; j<nFrames[i]; ++j ) {
+                        frameNumbers[frameCount+j] = -frameCount-j;
+                        checkedPtr[frameCount+j] = std::numeric_limits<double>::infinity();
+                    }
                     progWatch.decreaseTarget( nFrames[i] );
                 }
                 ++progWatch;
             });
             frameCount += nFrames[i];
         }
-
         progWatch.wait();
 
         for( size_t t=0; t<kw.nthreads; ++t ) {
@@ -2327,7 +2330,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 progWatch.set( 0 );
                 size_t frameCount(0);
                 for( size_t i=0; i<existingFiles.size(); ++i ) {
-                    bool allOk(true);
+                    bool shouldSubtract(false);
                     for( size_t j=0; j<nFrames[i]; ++j ) {
                         if( !isfinite(checkedPtr[frameCount+j]) || checkedPtr[frameCount+j] == 0 ) {
                             if( kw.lun ) {
@@ -2336,10 +2339,10 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                 IDL_PoutRaw( kw.lun, (char*)msg.c_str(), msg.length() );
                                 IDL_PoutRaw( kw.lun, nl, 1 );
                             }
-                            allOk = false;
+                            if( isfinite(checkedPtr[frameCount+j]) ) shouldSubtract = true;
                         }
                     }
-                    if( !allOk ) {
+                    if( shouldSubtract ) {
                         progWatch.increaseTarget(1);
                         ioService.post([&,i,frameCount](){
                             shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
@@ -2407,17 +2410,15 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         vector<int32_t> discarded;
-        if( kw.discarded || kw.framenumbers ) {
-            for( size_t i=0; i<frameNumbers.size(); ) {
-                int32_t val = frameNumbers[i];
-                if( val < 0 ) {
-                    discarded.push_back(-val);
-                    frameNumbers.erase( frameNumbers.begin()+i );
-                } else {
-                    i++;
-                }
-            }
-        }
+        frameNumbers.erase( std::remove_if(frameNumbers.begin(), frameNumbers.end(),
+                                           [&discarded]( const int32_t& i ){
+                                               if( i < 0 ) {
+                                                   discarded.push_back(-i);
+                                                   return true;
+                                               }
+                                               return false;
+                                               
+                                        }), frameNumbers.end() );
         
         nDiscarded = discarded.size();
         nSummed = frameNumbers.size();
