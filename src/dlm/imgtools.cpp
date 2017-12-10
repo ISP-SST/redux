@@ -2413,10 +2413,12 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     }
 
                 } catch( const exception& e ) {
-                    //cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                    string msg = "Failed to load file: " + existingFiles[i] + "  Reason: ";
+                    msg += e.what();
+                    IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
                     for( size_t j=0; j<nFrames[i]; ++j ) {
                         frameNumbers[frameCount+j] = -frameCount-j;
-                        checkedPtr[frameCount+j] = std::numeric_limits<double>::infinity();
+                        checkedPtr[frameCount+j] = std::numeric_limits<double>::infinity();     // flag frames as discarded in the log
                     }
                     progWatch.decreaseTarget( nFrames[i] );
                 }
