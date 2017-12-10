@@ -2307,7 +2307,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 if( isfinite(checkedPtr[i]) ) {
                     checkedPtr[i] = (abs(checkedPtr[i]-checkedPtr[nTotalFrames+i]) <= tmean);
                     if ( checkedPtr[i] > 0 ) continue;      // check passed
-                } else checkedPtr[i] = 0;
+                    else checkedPtr[i] = 0;
+                }
                 ++nDiscarded;
             }
             if( nDiscarded ) {
@@ -2319,7 +2320,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 for( size_t i=0; i<existingFiles.size(); ++i ) {
                     bool allOk(true);
                     for( size_t j=0; j<nFrames[i]; ++j ) {
-                        if( checkedPtr[frameCount+j] == 0 ) {
+                        if( !isfinite(checkedPtr[frameCount+j]) || checkedPtr[frameCount+j] == 0 ) {
                             if( kw.lun ) {
                                 string msg = existingFiles[i];
                                 if( nFrames[i] > 1 ) msg += ", frame # " + to_string(j);
@@ -2335,18 +2336,16 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                             shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
                             shared_ptr<redux::file::FileMeta> threadMeta;
                             try {
-                                readFile( existingFiles[0], threadBuffer.get(), threadMeta );
+                                readFile( existingFiles[i], threadBuffer.get(), threadMeta );
                                 size_t bufferOffset(0);
                                 for( size_t j=0; j<nFrames[i]; ++j ) {
-                                    if( checkedPtr[frameCount+j] == 0 ) {     // subtract discarded images
-                                        progWatch.increaseTarget(1);
-                                        ioService.post( std::bind(sumFunc, frameCount+j, threadBuffer, bufferOffset) );
+                                    if( !isfinite(checkedPtr[frameCount+j]) || checkedPtr[frameCount+j] == 0 ) {
+                                        if( checkedPtr[frameCount+j] == 0 ) {     // subtract discarded images
+                                            progWatch.increaseTarget(1);
+                                            ioService.post( std::bind(sumFunc, frameCount+j, threadBuffer, bufferOffset) );
+                                        }
                                         --nSummed;
                                         frameNumbers[frameCount+j] *= -1;
-                                        if( shifts ) {
-                                            shifts[frameCount+j][0] = 0;
-                                            shifts[frameCount+j][1] = 0;
-                                        }
                                         if( !time_beg.empty() ) {
                                             time_beg[frameCount+j] = time_end[frameCount+j] = bpx::ptime();
                                         }
@@ -2354,7 +2353,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                     bufferOffset += frameSize;
                                 }
                             } catch( const exception& e ) {
-                                cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                                //cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
                             }
                             ++progWatch;
                         });
@@ -2376,6 +2375,28 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         ioService.stop();
         pool.join_all();
 
+        if( kw.pinh_align ) {
+            Mat cvImg( ySize, xSize, CV_64FC1, summedData );
+            Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
+            size_t cnt(0);
+            for( size_t n=1; n<nTotalFrames; ++n ) {
+                if( frameNumbers[n] >= 0 ) {
+                    warp_matrix.at<float>(0,2) -= shifts[n][0];
+                    warp_matrix.at<float>(1,2) -= shifts[n][1];
+                    cnt++;
+                } else {
+                    shifts[n][0] = shifts[n][1] = 0;
+                }
+            }
+            if( cnt ) {
+                warp_matrix.at<float>(0,2) /= cnt;
+                warp_matrix.at<float>(1,2) /= cnt;
+            }
+            Mat slask( ySize, xSize, CV_64FC1, tmpPtr );
+            warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
+            memcpy( summedData, tmpPtr, nPixels*sizeof(double) );
+        }
+        
         vector<int32_t> discarded;
         if( kw.discarded || kw.framenumbers ) {
             for( size_t i=0; i<frameNumbers.size(); ) {
@@ -2393,20 +2414,6 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         nSummed = frameNumbers.size();
         if( nSummed+nDiscarded != nTotalFrames ) {
             cout << "  FrameCount mismatch: " << nSummed << "+" << nDiscarded << " != " << nTotalFrames << endl;
-        }
-        
-        if( kw.pinh_align ) {
-            Mat cvImg( ySize, xSize, CV_64FC1, summedData );
-            Mat warp_matrix = Mat::eye( 2, 3, CV_32F );
-            for( size_t n=1; n<nTotalFrames; ++n ) {
-                warp_matrix.at<float>(0,2) -= shifts[n][0];
-                warp_matrix.at<float>(1,2) -= shifts[n][1];
-            }
-            warp_matrix.at<float>(0,2) /= nSummed;
-            warp_matrix.at<float>(1,2) /= nSummed;
-            Mat slask( ySize, xSize, CV_64FC1, tmpPtr );
-            warpAffine( cvImg, slask, warp_matrix, cvImg.size(), flags, borderMode, borderValue );
-            memcpy( summedData, tmpPtr, nPixels*sizeof(double) );
         }
         
         if( kw.verbose > 1 ) {
