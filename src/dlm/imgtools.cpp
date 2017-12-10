@@ -1862,6 +1862,8 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
     kw.padding = max<IDL_INT>(0, min<IDL_INT>(kw.padding, 4096));   // prevent insane padding
 
+    file::setErrorHandling( file::EH_THROW );   // we want to catch and manage errors here
+    
     try {
         
         IDL_VPTR ret;
