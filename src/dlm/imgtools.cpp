@@ -550,8 +550,10 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
         }
 
+        bool initialized(false);
         if( initializations.empty() ) {
             initializations = getInitializations( selectedKP1, selectedKP2, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale, kw.orientation);
+            initialized = true;
         }
 
         vector< DMatch > matches;
@@ -565,23 +567,30 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
                     << " valid permutations." << endl;
                 }
             }
-
+            try_again:
             size_t nMatches(0);
             for( auto& h: initializations ) {       // find the mapping which can pair the most keypoints.
                 vector< DMatch > tmpmatches = matchNearest( keypoints1, keypoints2, h, medianNN1/3, approximateScale );
-                vector<Point2f> obj, scene;
-                for( auto & m: tmpmatches ) {
-                    obj.push_back( keypoints1[ m.queryIdx ].pt );
-                    scene.push_back( keypoints2[ m.trainIdx ].pt );
-                }
-                Mat HH = findHomography( obj, scene, CV_LMEDS );
-                HH.assignTo( h, CV_32F );
                 size_t nm = tmpmatches.size();
-                h.at<float>(2,2) = static_cast<float>(nm);  // temporarily store nMatches in the map
-                if( nm > nMatches ) {
-                    matches = std::move(tmpmatches);
-                    nMatches = nm;
+                if( nm > 3 ) {
+                    vector<Point2f> obj, scene;
+                    for( auto & m: tmpmatches ) {
+                        obj.push_back( keypoints1[ m.queryIdx ].pt );
+                        scene.push_back( keypoints2[ m.trainIdx ].pt );
+                    }
+                    Mat HH = findHomography( obj, scene, CV_LMEDS );
+                    HH.assignTo( h, CV_32F );
+                    h.at<float>(2,2) = static_cast<float>(nm);  // temporarily store nMatches in the map
+                    if( nm > nMatches ) {
+                        matches = std::move(tmpmatches);
+                        nMatches = nm;
+                    }
                 }
+            }
+            if( nMatches == 0 && !initialized ) {  // img_align was probably called with a bad initial guess.
+                initializations = getInitializations( selectedKP1, selectedKP2, imgSize1, imgSize2, approximateScale, kw.max_shift, kw.max_scale, kw.orientation);
+                initialized = true;
+                goto try_again;
             }
             std::sort (initializations.begin(), initializations.end(),  // sort by number of succesfully paired pinholes.
                 [] (const Mat& a, const Mat& b) {
@@ -652,21 +661,6 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
 
         if( kw.max_points < 0 ) kw.max_points = 25;   // by default, do refinement by using the strongest 25 pinholes
 
-        if( kw.points && matches.size()) {
-            IDL_VPTR points;
-            IDL_MEMINT dims[] = { 2, 2, static_cast<IDL_MEMINT>(matches.size()) };    // x/y, im#, nMatches 
-            IDL_MakeTempArray( IDL_TYP_FLOAT, 3, dims, IDL_ARR_INI_ZERO, &points );
-            IDL_VarCopy( points, kw.points );
-            Mat pointsMat = arrayToMat( kw.points );
-            int mCount(0);
-            for ( auto & m : matches ) {
-                pointsMat.at<float>(mCount, 0, 0 ) = keypoints1[ m.queryIdx ].pt.x;
-                pointsMat.at<float>(mCount, 0, 1 ) = keypoints1[ m.queryIdx ].pt.y;
-                pointsMat.at<float>(mCount, 1, 0 ) = keypoints2[ m.trainIdx ].pt.x;
-                pointsMat.at<float>(mCount++, 1, 1 ) = keypoints2[ m.trainIdx ].pt.y;
-            }
-        }
-
         if( matches.size() > 3 ) {     // at least 4 points needed for findHomography
             
             if( kw.max_points > 3 ) {
@@ -704,6 +698,21 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
          
             if (kw.verbose > 1) {
                 cout << "   -> error (avg,max): (" << metric1 << "," << max1 << ") -> (" << metric2 << "," << max2 << ")" << endl;
+            }
+        }
+
+        if( kw.points && matches.size()) {
+            IDL_VPTR points;
+            IDL_MEMINT dims[] = { 2, 2, static_cast<IDL_MEMINT>(matches.size()) };    // x/y, im#, nMatches 
+            IDL_MakeTempArray( IDL_TYP_FLOAT, 3, dims, IDL_ARR_INI_ZERO, &points );
+            IDL_VarCopy( points, kw.points );
+            Mat pointsMat = arrayToMat( kw.points );
+            int mCount(0);
+            for ( auto & m : matches ) {
+                pointsMat.at<float>(mCount, 0, 0 ) = keypoints1[ m.queryIdx ].pt.x;
+                pointsMat.at<float>(mCount, 0, 1 ) = keypoints1[ m.queryIdx ].pt.y;
+                pointsMat.at<float>(mCount, 1, 0 ) = keypoints2[ m.trainIdx ].pt.x;
+                pointsMat.at<float>(mCount++, 1, 1 ) = keypoints2[ m.trainIdx ].pt.y;
             }
         }
 
