@@ -221,8 +221,8 @@ bool Worker::getWork( void ) {
     LLOG_TRACE(daemon.logger) << "No work available." << ende;
 #endif
 
+    wip->resetParts();
     wip->job.reset();
-    wip->parts.clear();
     
     myInfo.idle();
     boost::this_thread::interruption_point();
