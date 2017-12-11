@@ -78,7 +78,17 @@ Object::Object( MomfbdJob& j, uint16_t id ): ObjectCfg(j), myJob(j), logger(j.lo
 }
 
 
-Object::~Object( ){
+Object::Object( const Object& rhs, uint16_t id ) : ObjectCfg(rhs), myJob(rhs.myJob), logger(rhs.logger), channels(rhs.channels), currentMetric(rhs.currentMetric),
+                                reg_gamma(rhs.reg_gamma), frequencyCutoff(rhs.frequencyCutoff), pupilRadiusInPixels(rhs.pupilRadiusInPixels),
+                                ID (id), objMaxMean(rhs.objMaxMean), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
+                                startT(rhs.startT), endT(rhs.endT) {
+
+    setLogChannel(myJob.getLogChannel());
+
+}
+
+
+Object::~Object() {
 
     cleanup( );
 

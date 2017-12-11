@@ -38,6 +38,7 @@ namespace redux {
         public:
 
             Object( MomfbdJob&, uint16_t id=0 );
+            Object( const Object&, uint16_t id=0 );
             ~Object();
 
             void parsePropertyTree( bpt::ptree&, redux::logging::Logger& );
