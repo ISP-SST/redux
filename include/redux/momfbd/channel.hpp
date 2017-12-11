@@ -56,6 +56,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&) const;
+            uint32_t nImages( const std::vector<uint32_t>& );
             uint32_t nImages(void);
             void adjustCutout(ChannelData&, const PatchData::Ptr&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          

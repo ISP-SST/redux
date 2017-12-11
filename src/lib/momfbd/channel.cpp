@@ -1093,6 +1093,18 @@ void Channel::copyImagesToPatch( ChannelData& chData ) {
 }
 
 
+uint32_t Channel::nImages( const std::vector<uint32_t>& wf ) {
+    set<uint32_t> wfSet( wf.begin(), wf.end() );
+    uint32_t nIms(0);
+    for( uint32_t& w: waveFronts ) {
+        if( wfSet.count( w) ) {
+            nIms++;
+        }
+    }
+    return nIms;
+}
+
+
 uint32_t Channel::nImages(void) {
     
     if( nTotalFrames == 0 ) {
