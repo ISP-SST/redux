@@ -39,9 +39,10 @@ namespace redux {
                 return count;
             }
             template <typename U> void shift( const PointType<U>& s ) { first += s; last += s; }
-            template <typename U> void shift(U y, U x) { PointType<U> tmp(y,x); first += tmp; last += tmp; }
             void shiftX(T x) { first.x += x; last.x += x; }
             void shiftY(T y) { first.y += y; last.y += y; }
+            template <typename U> void shift(U y, U x) { shift( PointType<U>(y,x) ); }
+            template <typename U> void shift(U s) { first += s; last += s; }
             template <typename U> PointI outside(const RegionType<U>& rhs) const {
                 PointI res(0,0);
                 if(rhs.first.x<first.x) res.x = rhs.first.x-first.x;
@@ -52,8 +53,11 @@ namespace redux {
             }
             template <typename U> void grow(const RegionType<U>& rhs) { first=first.min(rhs.first); last=last.max(rhs.last); }
             template <typename U> void grow(const PointType<U>& rhs) { first-=rhs; last+=rhs; }
-            template <typename U> void grow(U rhs) { PointType<U> tmp(rhs,rhs); first-=tmp; last+=tmp; }
+            void grow(T rhs) { grow( PointType<T>(rhs,rhs) ); }
+            template <typename U> void grow(U rhs) { grow( PointType<U>(rhs,rhs) ); }
+            void shrink(T rhs) { shrink( PointType<T>(rhs,rhs) ); }
             template <typename U> void shrink(U rhs) { PointType<U> tmp(rhs,rhs); first+=tmp; last-=tmp; }
+            template <typename U> void shrink(const PointType<U>& rhs) { first+=rhs; last-=rhs; }
             template <typename U> RegionType<T> grown(const PointType<U>& rhs) const { RegionType<T> res(*this); res.grow(rhs); return std::move(res); }
             RegionType<T> grown(T rhs) const { RegionType<T> res(*this); res.grow(PointType<T>(rhs,rhs)); return std::move(res); }
             template <typename U> void restrict(const RegionType<U>& rhs) { first=first.max(rhs.first); last=last.min(rhs.last); }
