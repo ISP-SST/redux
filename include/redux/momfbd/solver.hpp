@@ -4,6 +4,7 @@
 
 #include "redux/momfbd/data.hpp"
 #include "redux/momfbd/subimage.hpp"
+#include "redux/momfbd/wavefront.hpp"
 
 #include "redux/util/gsl.hpp"
 #include "redux/util/progresswatch.hpp"
@@ -126,6 +127,7 @@ namespace redux {
             MomfbdJob& job;
             network::Host& myInfo;
             logging::Logger& logger;
+            std::map<uint32_t,std::shared_ptr<WaveFront>> wavefronts;
             const std::vector<std::shared_ptr<Object>>& objects;
             boost::asio::io_service& service;
             

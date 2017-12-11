@@ -103,6 +103,25 @@ namespace redux {
             
         };
 
+        struct WavefrontData : public redux::util::CacheItem {
+
+            uint64_t size(void) const;
+            uint64_t pack(char*) const;
+            uint64_t unpack(const char*, bool);
+            size_t csize(void) const { return size(); };
+            uint64_t cpack(char* p) const { return pack(p); };
+            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
+            void cclear(void);
+            const WavefrontData& operator=(const WavefrontData&);
+            void dump( std::string );
+            
+            /********* Results ********/
+            std::vector<uint32_t> ids;                  //!< Wavefront indices   (nWf)
+            redux::util::Array<float> alpha;            //!< Mode coefficients   (nWf x nModes)
+            /**************************/
+            
+        };
+
         enum PartType { PT_DEFAULT=0, PT_GLOBAL };
         
         class MomfbdJob;
@@ -110,6 +129,7 @@ namespace redux {
             typedef std::shared_ptr<PatchData> Ptr;
             const MomfbdJob& myJob;
             std::vector<std::shared_ptr<redux::util::Compressed<ObjectData,5>>> objects;
+            redux::util::Compressed<WavefrontData,5> waveFronts;
             redux::util::Point16 index;                      //! Patch-index in mozaic
             redux::util::Point16 position;                   //! Patch position (centre coordinates in the reference channel)
             redux::util::Region16 roi;                       //! Region/position of this patch in the full image
@@ -138,10 +158,17 @@ namespace redux {
             
             template <typename T>
             void loadAlpha( T* a ) const {
+                if( waveFronts.alpha.nElements() ) {
+                    waveFronts.alpha.copyTo<T>(a);
+                }
             }
             template <typename T>
             void storeAlpha( T* a ) {
+                if( waveFronts.alpha.nElements() ) {
+                    waveFronts.alpha.copyFrom<T>(a);
+                }
             }
+
             void copyResults( const PatchData& rhs );
             void dump( std::string );
             

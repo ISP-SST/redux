@@ -122,6 +122,12 @@ void Solver::init( void ) {
         max_wavelength = std::max( max_wavelength, object->wavelength );
     }
 
+    size_t offset(0);
+    for( auto it: wavefronts ) {
+        it.second->setData( alpha.get()+offset, grad_alpha.get()+offset, nModes );
+        offset += nModes;
+    }
+    
     // FIXME: this is a rather kludgy way to allow for resizing the TLS, think of something neater...
     set<std::thread::id> initDone;
     progWatch.set( nThreads );
@@ -526,6 +532,12 @@ void Solver::run( PatchData::Ptr data ) {
     }
     
     data->finalMetric = thisMetric;
+    data->waveFronts.ids.clear();
+    data->waveFronts.alpha.resize( wavefronts.size(), nModes );
+    data->storeAlpha(alpha.get());
+    for( auto it: wavefronts ) {
+        data->waveFronts.ids.push_back(it.first);
+    }
     
 #ifdef RDX_DUMP_PATCHDATA
     data->dump( "final" );

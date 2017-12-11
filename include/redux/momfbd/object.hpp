@@ -126,6 +126,7 @@ namespace redux {
             mutable uint32_t nObjectImages;
             bpx::ptime startT, endT;
             friend struct ObjectData;
+            friend struct WaveFront;
             friend class MomfbdJob;
             friend class Channel;
 

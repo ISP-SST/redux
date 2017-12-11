@@ -735,6 +735,9 @@ void Channel::initProcessing( Solver& solver ) {
     subImages.resize(nTotalFrames);
     for (uint16_t i=0; i < nTotalFrames; ++i) {
         if( !subImages[i] ) subImages[i].reset( new SubImage(myObject, *this, solver.window, solver.noiseWindow) );
+        auto ret = solver.wavefronts.emplace( waveFronts[i], nullptr );
+        if( !ret.first->second ) ret.first->second.reset( new WaveFront(waveFronts[i]) );
+        ret.first->second->addImage( subImages[i] );
     }
     
 }

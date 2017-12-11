@@ -298,6 +298,58 @@ void ObjectData::dump( string tag ) {
 }
 
 
+uint64_t WavefrontData::size( void ) const {
+    uint64_t sz = alpha.size();
+    sz += ids.size()*sizeof(uint32_t) + sizeof(uint64_t);
+    return sz;
+}
+
+
+uint64_t WavefrontData::pack( char* ptr ) const {
+    using redux::util::pack;
+    uint64_t count = alpha.pack(ptr);
+    count += pack(ptr+count, ids);
+    return count;
+}
+
+
+uint64_t WavefrontData::unpack( const char* ptr, bool swap_endian ) {
+    using redux::util::unpack;
+    uint64_t count = alpha.unpack(ptr,swap_endian);
+    count += unpack(ptr+count, ids, swap_endian);
+    return count;
+}
+
+
+void WavefrontData::cclear(void) {
+
+    ids.clear();
+    alpha.clear();
+    isLoaded = false;
+    
+}
+
+
+const WavefrontData& WavefrontData::operator=( const WavefrontData& rhs ) {
+
+    ids = rhs.ids;
+    alpha = rhs.alpha;
+    return *this;
+    
+}
+
+
+void WavefrontData::dump( string tag ) {
+
+    if( !ids.empty() ) {
+        vector<int32_t> tmp( ids.begin(), ids.end() );
+        Ana::write( tag + "_wfi.f0", tmp );
+    }
+    if( alpha.nElements() ) Ana::write( tag + "_wf.f0", alpha );
+ 
+}
+
+
 PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
     vector<shared_ptr<Object>> objs = myJob.getObjects();
     for( auto& o: objs ) {
@@ -314,6 +366,7 @@ PatchData::~PatchData() {
 void PatchData::setPath(const std::string& path) {
     string mypath = path+"/patch_"+(string)index;
     CacheItem::setPath(mypath);
+    waveFronts.setPath(mypath+"_wf");
     for( auto& obj: objects ) {
         if(obj) obj->setPath(mypath);
     }
@@ -357,6 +410,7 @@ uint64_t PatchData::size( void ) const {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         if(obj) sz += obj->ObjectData::size();
     }
+    sz += waveFronts.size();
     return sz;
 }
 
@@ -373,6 +427,7 @@ uint64_t PatchData::pack( char* ptr ) const {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         if(obj) count += obj->ObjectData::pack(ptr+count);
     }
+    count += waveFronts.WavefrontData::pack(ptr+count);
     return count;
 }
 
@@ -389,6 +444,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
         if(obj) count += obj->ObjectData::unpack( ptr+count, swap_endian );
     }
+    count += waveFronts.WavefrontData::unpack(ptr+count, swap_endian);
     return count;
 }
 
@@ -397,13 +453,16 @@ void PatchData::cclear(void) {
     for( auto& obj: objects ) {
         if(obj) obj->cclear();
     }
+    waveFronts.cclear();
 }
+
 
 bool PatchData::cacheLoad(bool removeAfterLoad) {
     bool loaded(false);
     for( auto& obj: objects ) {
         if(obj) loaded |= obj->cacheLoad(removeAfterLoad);
     }
+    loaded |= waveFronts.cacheLoad(removeAfterLoad);
     return loaded;
 }
 
@@ -412,6 +471,7 @@ bool PatchData::cacheStore(bool clearAfterStore) {
     for( auto& obj: objects ) {
         if(obj) stored |= obj->cacheStore(clearAfterStore);
     }
+    stored |= waveFronts.cacheStore(clearAfterStore);
     //stored |= CacheItem::cacheStore(clearAfterStore);
     return stored;
 }
@@ -439,6 +499,7 @@ const PatchData& PatchData::operator=( const PatchData& rhs ) {
     for( size_t i=0; i<objects.size(); ++i ) {
         objects[i] = rhs.objects[i];
     }
+    waveFronts = rhs.waveFronts;
     
     return *this;
     
@@ -452,6 +513,7 @@ void PatchData::copyResults( const PatchData& rhs ) {
     }
 
     finalMetric = rhs.finalMetric;
+    waveFronts = rhs.waveFronts;
     metrics = rhs.metrics;
     nThreads = rhs.nThreads;
     runtime_wall = rhs.runtime_wall;
@@ -471,6 +533,7 @@ void PatchData::dump( string tag ) {
     for( auto & object : objects ) {
         object->dump(tag);
     }
+    waveFronts.dump(tag);
      
 }
 
