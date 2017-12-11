@@ -52,6 +52,8 @@ namespace {
 //        ( "sequence", bpo::value<string>(), "sequence number to insert in filename template." )
         ( "print,P", "(debug) print the parsed configuration to console and exit without uploading." )
         ( "no-check", "Don't verify the configuration." )
+        ( "trace", "Generate trace objects." )
+        ( "no-trace", "Don't generate trace objects." )
         ( "output-dir,O", bpo::value<string>(), "Output directory. If left blank, the current directory is used.")
         ( "output-file,o", bpo::value<string>(), "Output file base names." )
         ( "init", bpo::value<string>()->implicit_value(""), "File with initial values for alpha. If no argument is provided, the output is used.")

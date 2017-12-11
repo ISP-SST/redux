@@ -145,8 +145,9 @@ const map<string, int, cicomp> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), physicalDefocusDistance(false), borderClip(100), incomplete(0),
-        discard(2,0), mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel( "config" ) {
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), physicalDefocusDistance(false), noRestore(false),
+        borderClip(100), incomplete(0), discard(2,0),
+        mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel("config") {
 
 }
 
@@ -169,8 +170,9 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logg
     
     rotationAngle = getValue( tree, "ANGLE", defaults.rotationAngle );
 
-    noiseFudge = getValue( tree, "NF", defaults.noiseFudge );
-    weight = getValue( tree, "WEIGHT", defaults.weight );
+    noiseFudge = tree.get<double>("NF", defaults.noiseFudge);
+    weight = tree.get<double>("WEIGHT", defaults.weight);
+    noRestore = tree.get<bool>("NO_RESTORE", defaults.noRestore);
     
     // TODO: collect diversity settings in a struct and write a translator
     string tmpString = getValue<string>( tree, "DIVERSITY", "" );
@@ -289,8 +291,9 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) c
 
     if( rotationAngle != defaults.rotationAngle ) tree.put( "ANGLE", rotationAngle );
 
-    if( noiseFudge != defaults.noiseFudge ) tree.put( "NF", noiseFudge );
-    if( weight != defaults.weight ) tree.put( "WEIGHT", weight );
+    if(noiseFudge != defaults.noiseFudge) tree.put("NF", noiseFudge);
+    if(weight != defaults.weight) tree.put("WEIGHT", weight);
+    if(noRestore != defaults.noRestore) tree.put("NO_RESTORE", noRestore);
     
     if( diversity != defaults.diversity ) tree.put( "DIVERSITY", diversity );
     
@@ -332,7 +335,7 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) c
 
 uint64_t ChannelCfg::size( void ) const {
     uint64_t sz = 3*sizeof( double );         // rotationAngle, weight, noiseFudge
-    sz += sizeof( uint16_t)+4;             // borderClip, incomplete, mmRow, mmWidth,physicalDefocusDistance
+    sz += sizeof( uint16_t)+5;             // borderClip, incomplete, mmRow, mmWidth,physicalDefocusDistance
     sz += sizeof( uint32_t );                 // imageNumberOffset
     sz += subImagePosXY.size()*sizeof( uint16_t ) + sizeof( uint64_t );
     sz += subImagePosX.size()*sizeof( uint16_t ) + sizeof( uint64_t );
@@ -364,6 +367,7 @@ uint64_t ChannelCfg::pack( char* ptr ) const {
     count += pack( ptr+count, diversityModes );
     count += pack( ptr+count, diversityTypes );
     count += pack( ptr+count, physicalDefocusDistance );
+    count += pack( ptr+count, noRestore );
     count += pack( ptr+count, alignMap );
     count += pack( ptr+count, alignClip );
     count += pack( ptr+count, discard );
@@ -402,6 +406,7 @@ uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, diversityModes, swap_endian );
     count += unpack( ptr+count, diversityTypes, swap_endian );
     count += unpack( ptr+count, physicalDefocusDistance, swap_endian );
+    count += unpack( ptr+count, noRestore );
     count += unpack( ptr+count, alignMap, swap_endian );
     count += unpack( ptr+count, alignClip, swap_endian );
     count += unpack( ptr+count, discard, swap_endian );
@@ -451,11 +456,11 @@ bool ChannelCfg::operator==( const ChannelCfg& rhs ) const {
 
 /********************   Object  ********************/
 
-ObjectCfg::ObjectCfg() : telescopeF( 0), arcSecsPerPixel( 0), pixelSize( 1E-5),
-                         alphaToPixels( 0), pixelsToAlpha( 0),
-                         alphaToDefocus( 0), defocusToAlpha( 0),
-                         maxLocalShift( 5), minimumOverlap( 16), 
-                         patchSize( 128), pupilPixels( 64), saveMask( 0), wavelength( 0 ) {
+ObjectCfg::ObjectCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5),
+                         alphaToPixels(0), pixelsToAlpha(0),
+                         alphaToDefocus(0), defocusToAlpha(0),
+                         maxLocalShift(5), minimumOverlap(16), 
+                         patchSize(128), pupilPixels(64), saveMask(0), wavelength(0), traceObject(false) {
 
 }
 
@@ -488,6 +493,7 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     if( getValue<bool>( tree, "GET_PSF_AVG", defaults.saveMask&SF_SAVE_PSF_AVG ) ) saveMask |= SF_SAVE_PSF_AVG;
     if( getValue<bool>( tree, "GET_RESIDUAL", defaults.saveMask&SF_SAVE_RESIDUAL ) ) saveMask |= SF_SAVE_RESIDUAL;
     if( getValue<bool>( tree, "SAVE_FFDATA", defaults.saveMask&SF_SAVE_FFDATA ) ) saveMask |= SF_SAVE_FFDATA;
+    traceObject = tree.get<bool>( "TRACE_REF", defaults.traceObject );
     outputFileName = getValue<string>( tree, "OUTPUT_FILE", defaults.outputFileName );
     initFile = getValue<string>( tree, "INIT_FILE", defaults.initFile );
     modeFile = getValue<string>( tree, "MODE_FILE", defaults.modeFile );
@@ -526,6 +532,7 @@ void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( diff & SF_SAVE_PSF_AVG ) tree.put( "GET_PSF_AVG", bool( saveMask & SF_SAVE_PSF_AVG ) );
     if( diff & SF_SAVE_RESIDUAL ) tree.put( "GET_RESIDUAL", bool( saveMask & SF_SAVE_RESIDUAL ) );
     if( diff & SF_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", bool( saveMask & SF_SAVE_FFDATA ) );
+    if( traceObject != defaults.traceObject ) tree.put( "TRACE_REF", traceObject );
     if( outputFileName != defaults.outputFileName ) tree.put( "OUTPUT_FILE", outputFileName );
     if( initFile != defaults.initFile ) tree.put( "INIT_FILE", initFile );
     if( modeFile != defaults.modeFile ) tree.put( "MODE_FILE", modeFile );
@@ -539,7 +546,7 @@ void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
 
 uint64_t ObjectCfg::size( void ) const {
     uint64_t sz = ChannelCfg::size();
-    sz += 5*sizeof( uint16_t );
+    sz += 5*sizeof(uint16_t)+1;
     sz += outputFileName.length() + initFile.length() + 2;
     sz += modeFile.length() + pupilFile.length() + 2;
     sz += 8*sizeof( double );
@@ -562,6 +569,7 @@ uint64_t ObjectCfg::pack( char* ptr ) const {
     count += pack( ptr+count, patchSize );
     count += pack( ptr+count, pupilPixels );
     count += pack( ptr+count, saveMask );
+    count += pack( ptr+count, traceObject );
     count += pack( ptr+count, outputFileName );
     count += pack( ptr+count, initFile );
     count += pack( ptr+count, modeFile );
@@ -586,6 +594,7 @@ uint64_t ObjectCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, patchSize, swap_endian );
     count += unpack( ptr+count, pupilPixels, swap_endian );
     count += unpack( ptr+count, saveMask, swap_endian );
+    count += unpack( ptr+count, traceObject );
     count += unpack( ptr+count, outputFileName );
     count += unpack( ptr+count, initFile );
     count += unpack( ptr+count, modeFile );
@@ -619,11 +628,11 @@ GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis( ZERNIKE), klMinMode( 2), klMax
     nInitialModes( 5), nModeIncrement( 5),
     modeNumbers( { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
-    telescopeD( 0), minIterations( 5), maxIterations( 500), targetIterations( 3),
-    fillpixMethod( FPM_INVDISTWEIGHT), gradientMethod( GM_DIFF), getstepMethod( GSM_BFGS_inv),
-    badPixelThreshold( 1E-5), FTOL( 1E-3), EPS( 1E-10), reg_alpha( 0), graddiff_step( 1E-2),
-    outputFileType( FT_NONE), outputDataType( DT_I16T), sequenceNumber( 0),
-    observationTime( ""), observationDate( "N/A"), tmpDataDir( "./data" ) {
+    telescopeD(0), minIterations(5), maxIterations(500), targetIterations(3),
+    fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
+    badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2), trace(false),
+    outputFileType(FT_NONE), outputDataType(DT_I16T), sequenceNumber(0),
+    observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
 
 
 }
@@ -636,7 +645,7 @@ GlobalCfg::~GlobalCfg() {
 
 void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& def ) {
     
-    const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>( def );
+    const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
 
     if( getValue<bool>( tree, "CALIBRATE", false ) )            runFlags |= RF_CALIBRATE;
     if( getValue<bool>( tree, "DONT_MATCH_IMAGE_NUMS", false ) ) runFlags |= RF_DONT_MATCH_IMAGE_NUMS;
@@ -650,6 +659,8 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     if( getValue<bool>( tree, "NO_FILTER", false ) )            runFlags |= RF_NO_FILTER;
     if( getValue<bool>( tree, "OVERWRITE", false ) )            runFlags |= RF_FORCE_WRITE;
     if( getValue<bool>( tree, "NOSWAP", false ) )               runFlags |= RF_NOSWAP;
+
+    trace = tree.get<bool>( "TRACE", defaults.trace );
     
 /*    if( ( runFlags & RF_CALIBRATE ) && ( runFlags & RF_FLATFIELD ) ) {
         LOG_WARN << "both FLATFIELD and CALIBRATE mode requested, forcing CALIBRATE";
@@ -776,42 +787,8 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
 
 void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     
-    const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>( def );
-    
-/*
-    defaults.modeBasis = 123;
-    defaults.klMinMode = 123;
-    defaults.klMaxMode = 123;
-    defaults.klCutoff = 123;
-    defaults.nInitialModes = 123;
-    defaults.nModeIncrement = 123;
-    defaults.modeNumbers = {17,66};
-    defaults.telescopeD = 123;
-    defaults.telescopeF = 123;
-    defaults.minIterations = 123;
-    defaults.maxIterations = 123;
-    defaults.fillpixMethod = 123;
-    defaults.gradientMethod = 123;
-    defaults.getstepMethod = 123;
-    defaults.badPixelThreshold = 123;
-    defaults.FTOL = 123;
-    defaults.EPS = 123;
-    defaults.reg_gamma = 123;
-    defaults.outputFileType = 123;
-    defaults.outputDataType = 123;
-    defaults.sequenceNumber = 123;
-    defaults.observationTime = "time";
-    defaults.observationDate = "date";
-    defaults.tmpDataDir = "ddir";
-    defaults.outputFiles = {"file1", "file2"};
+    const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
 
-    defaults.wavelength = 123;
-
-    defaults.arcSecsPerPixel = 123;
-    defaults.pixelSize = 123;
-    defaults.rotationAngle = 123;
-    defaults.weight = 123;
-*/
     uint16_t diff = runFlags ^ defaults.runFlags;
     if( diff & RF_CALIBRATE ) tree.put( "CALIBRATE", bool( runFlags & RF_CALIBRATE ) );
     if( diff & RF_DONT_MATCH_IMAGE_NUMS ) tree.put( "DONT_MATCH_IMAGE_NUMS", bool( runFlags & RF_DONT_MATCH_IMAGE_NUMS ) );
@@ -826,6 +803,8 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( diff & RF_FORCE_WRITE ) tree.put( "OVERWRITE", bool( runFlags & RF_FORCE_WRITE ) );
     if( diff & RF_NOSWAP ) tree.put( "NOSWAP", bool( runFlags & RF_NOSWAP ) );
 
+    if( trace != defaults.trace ) tree.put( "TRACE", trace );
+    
     if( modeBasis && modeBasis != defaults.modeBasis ) tree.put( "BASIS", basisTags[modeBasis%3] );
     if( klMinMode != defaults.klMinMode ) tree.put( "KL_MIN_MODE", klMinMode );
     if( klMaxMode != defaults.klMaxMode ) tree.put( "KL_MAX_MODE", klMaxMode );
@@ -864,7 +843,7 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
 
 uint64_t GlobalCfg::size( void ) const {
     uint64_t sz = ObjectCfg::size();
-    sz += 6*sizeof( uint8_t );                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType
+    sz += 7*sizeof( uint8_t );                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType, trace
     sz += 9*sizeof( uint16_t );                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
     sz += modeNumbers.size()*sizeof( uint16_t ) + sizeof( uint64_t );
     sz += 6*sizeof( float );                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma, graddiff_step
@@ -903,6 +882,7 @@ uint64_t GlobalCfg::pack( char* ptr ) const {
     count += pack( ptr+count, EPS );
     count += pack( ptr+count, reg_alpha );
     count += pack( ptr+count, graddiff_step );
+    count += pack( ptr+count, trace );
     count += pack( ptr+count, outputFileType );
     count += pack( ptr+count, outputDataType );
     count += pack( ptr+count, sequenceNumber );
@@ -942,6 +922,7 @@ uint64_t GlobalCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, EPS, swap_endian );
     count += unpack( ptr+count, reg_alpha, swap_endian );
     count += unpack( ptr+count, graddiff_step, swap_endian );
+    count += unpack( ptr+count, trace );
     count += unpack( ptr+count, outputFileType );
     count += unpack( ptr+count, outputDataType );
     count += unpack( ptr+count, sequenceNumber, swap_endian );

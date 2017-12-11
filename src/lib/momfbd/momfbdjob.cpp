@@ -95,6 +95,8 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, red
     if( vm.count( "init" ) ) tree.put( "INIT_FILES", vm["init"].as<string>() );
     if( vm.count( "force" ) ) tree.put( "OVERWRITE", true );
     if( vm.count( "no-swap" ) ) tree.put( "NOSWAP", true );
+    if( vm.count( "trace" ) ) tree.put( "TRACE", true );
+    if( vm.count( "no-trace" ) ) tree.erase( "TRACE" );
 
     GlobalCfg::parseProperties(tree, logger);
     uint16_t nObj(0);

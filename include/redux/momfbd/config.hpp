@@ -86,6 +86,7 @@ namespace redux {
             std::vector<uint16_t> diversityModes;    //!< mode numbers
             std::vector<uint16_t> diversityTypes;    //!< mode types (Zernike/KL)
             bool physicalDefocusDistance;
+            bool noRestore;
             /*****************************/
             
             /******* Data settings *******/
@@ -164,6 +165,7 @@ namespace redux {
             std::string modeFile;
             std::string pupilFile;
             double wavelength;                      //!< (default: 0, has to be specified)
+            bool traceObject;                       //!< specifies that this object should be used as a reference for spatial distortions.
             /*****************************/
             
         };
@@ -216,6 +218,7 @@ namespace redux {
             float EPS;
             float reg_alpha;
             float graddiff_step;            //!< step-length when calculating numerical derivative
+            bool trace;                     //!< specifies that this object should be used as a reference for spatial distortions.
             /*****************************/
 
             /******* Data settings *******/
