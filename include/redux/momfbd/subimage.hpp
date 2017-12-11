@@ -40,6 +40,7 @@ namespace redux {
             ~SubImage(void);
             
             void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, uint16_t, uint16_t);
+            void setData( const double* a ) { wfAlpha=a; };
             void getWindowedImg( Array<double>&, redux::util::ArrayStats& s, bool rescaled ) const;
             void initialize( bool doReset=false );
             
@@ -126,6 +127,7 @@ namespace redux {
             uint32_t otfSize, pupilSize2, otfSize2;
             double oldRG;
             double grad_step;
+            const double* wfAlpha;
             
             Object& object;
             const Channel& channel;
