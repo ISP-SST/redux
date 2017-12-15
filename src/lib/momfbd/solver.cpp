@@ -526,7 +526,6 @@ void Solver::run( PatchData::Ptr data ) {
         }
         objData->myObject->getResults(*objData,alphaPtr);
         alphaPtr += objData->myObject->nObjectImages*nModes;
-        objData->setLoaded( objData->size()>6*sizeof(uint64_t) );
 #ifdef RDX_DUMP_PATCHDATA
         Ana::write( "patch_"+(string)data->index+"_obj_"+to_string(objData->myObject->ID)+"_result.f0", objData->img );
 #endif

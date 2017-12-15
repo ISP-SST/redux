@@ -196,6 +196,17 @@ void Object::cleanup(void ){
     pupil.reset( );
     modes.reset( );
 
+    if( !cacheFile.empty() ) {
+        bfs::path tmpP(cacheFile);
+        if( bfs::exists(tmpP) ) {
+            try {
+                bfs::remove(tmpP);
+            } catch( exception& e ) {
+                LOG_ERR << "Object::cleanup: failed to remove cacheFile: " << cacheFile << "  reason: " << e.what() << endl;
+            }
+        }
+    }
+
 }
 
 
@@ -939,6 +950,10 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
         LOG_DEBUG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     } );
     
+    if( !(myJob.runFlags&RF_NOSWAP) ) {    // unless swap is deactivated for this job
+        cacheFile = myJob.cachePath + "results_" + to_string(ID);
+    }
+    
     for( shared_ptr<Channel>& ch: channels ){
         ch->loadData( service, patches );
     }
@@ -1040,6 +1055,70 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
     
     //LOG << "Loading initialization from file: " << tmpFile << ende;
     //++progWatch;
+}
+
+
+size_t Object::getResultSize( void ) {
+    size_t ret = patchSize*patchSize;
+    if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
+        uint16_t nPSF = ( saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
+        ret += nPSF*patchSize*patchSize;
+    }
+    if( saveMask & SF_SAVE_COBJ ){
+        ret += nObjectImages*patchSize*patchSize;
+    }
+    if( saveMask & SF_SAVE_RESIDUAL ){
+        ret += nObjectImages*patchSize*patchSize;
+    }
+    return ret;
+}
+
+
+void Object::maybeInitializeStorage( void ) {
+    
+    lock_guard<mutex> lock(mtx);
+    if( results.nElements() ) return;        // already allocated/loaded
+    
+    size_t nPatchesX = myJob.subImagePosX.size();
+    size_t nPatchesY = myJob.subImagePosY.size();
+    size_t resultSize = getResultSize();
+
+    if( !(myJob.runFlags&RF_NOSWAP) ) {     // should we mmap?
+        if( bfs::exists( bfs::path(cacheFile) ) ) {
+            LOG_DEBUG << "opening: Object: " << cacheFile << ende;
+            results.openMmap( cacheFile, nPatchesY, nPatchesX, resultSize );
+        } else {
+            LOG_DEBUG << "creating: Object: " << cacheFile << ende;
+            results.createMmap( cacheFile, nPatchesY, nPatchesX, resultSize );
+        }
+    } else {
+        results.resize(  nPatchesY, nPatchesX, resultSize );
+    }
+    
+}
+
+
+void Object::getStorage( PatchData& pData ) {
+
+    maybeInitializeStorage();
+    auto oData = pData.objects[ID];
+    float* resPtr = results.ptr( pData.index.y, pData.index.x, 0 );
+    oData->img.wrap( resPtr, patchSize, patchSize );
+    resPtr += patchSize*patchSize;
+    if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
+        uint16_t nPSF = ( saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
+        oData->psf.wrap( resPtr, nPSF, patchSize, patchSize );
+        resPtr += nPSF*patchSize*patchSize;
+    }
+    if( saveMask & SF_SAVE_COBJ ){
+        oData->cobj.wrap( resPtr, nObjectImages, patchSize, patchSize );
+        resPtr += nObjectImages*patchSize*patchSize;
+    }
+    if( saveMask & SF_SAVE_RESIDUAL ){
+        oData->res.wrap( resPtr, nObjectImages, patchSize, patchSize );
+        resPtr += nObjectImages*patchSize*patchSize;
+    }
+
 }
 
 
@@ -1373,11 +1452,6 @@ void Object::writeResults( boost::asio::io_service& service, const redux::util::
 
 void Object::writeResults( redux::util::Array<PatchData::Ptr>& patches ) {
     
-    for( auto& patch: patches ) {
-        //patch->CacheItem::cacheLoad(false);
-        patch->objects[ID]->CacheItem::cacheLoad(false);
-    }
-    
     if( myJob.outputFileType & FT_ANA ) {
         writeAna(patches);
     }
@@ -1388,11 +1462,6 @@ void Object::writeResults( redux::util::Array<PatchData::Ptr>& patches ) {
         writeMomfbd(patches);
     }
 
-    for( auto& patch: patches ) {
-        patch->objects[ID]->CacheItem::cacheRemove();
-        patch->objects[ID]->CacheItem::cacheClear();
-    }
-    
     ++myJob.progWatch;
 }
 

@@ -39,7 +39,7 @@ void ChannelData::clear( void ) {
 
 void ChannelData::load( void ) {
     
-    myChannel->copyImagesToPatch(*this);
+    myChannel->getStorage(*this);
     
 }
 
@@ -118,12 +118,6 @@ ObjectData::~ObjectData() {
 }
 
 
-void ObjectData::setPath(const std::string& path) {
-    string mypath = path + "_" + to_string(myObject->id());
-    CacheItem::setPath(mypath);
-}
-
-
 void ObjectData::initPatch(void) {
     myObject->initPatch();
     for( auto& cd: channels ) {
@@ -140,13 +134,14 @@ void ObjectData::clear( void ) {
     for( auto& cd: channels ) {
         if(cd) cd->clear();
     }
-    try {
-        cacheRemove();        // remove cache file
-    } catch( exception& e ) {
-        LLOG(myObject->logger) << "Exception while removing the cache-file: \"" << getFullPath() << "\" what:" << e.what() << ende;
-    }
-    cclear();
     
+    img.clear();
+    psf.clear();
+    cobj.clear();
+    res.clear();
+    alpha.clear();
+    div.clear();
+
 }
 
 
@@ -196,38 +191,10 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
     count += res.unpack(ptr+count,swap_endian);
     count += alpha.unpack(ptr+count,swap_endian);
     count += div.unpack(ptr+count,swap_endian);
-    if( count > 6*sizeof(uint64_t) ) isLoaded = true;
-    else isLoaded = false;
     for( auto& cd: channels ) {
         if(cd) count += cd->unpack( ptr+count, swap_endian );
     }
     return count;
-}
-
-
-bool ObjectData::cacheLoad(bool removeAfterLoad) {
-    bool loaded(false);
-    loaded |= CacheItem::cacheLoad(removeAfterLoad);
-    return loaded;      // true if any part was loaded, TODO better control of partial fails.
-}
-
-
-bool ObjectData::cacheStore(bool clearAfterStore) {
-    bool stored(false);
-    stored |= CacheItem::cacheStore(clearAfterStore);      // true if any part was stored, TODO better control of partial fails.
-    return stored;
-}
-
-
-void ObjectData::cclear(void) {
-
-    img.clear();
-    psf.clear();
-    cobj.clear();
-    res.clear();
-    alpha.clear();
-    div.clear();
-    isLoaded = false;
 }
 
 
@@ -244,9 +211,6 @@ const ObjectData& ObjectData::operator=( const ObjectData& rhs ) {
     alpha = rhs.alpha;
     div = rhs.div;
     
-    isLoaded = (img.nElements() || psf.nElements() || cobj.nElements()
-             || res.nElements() || alpha.nElements() || div.nElements() );
-
     for( size_t i=0; i<channels.size(); ++i ) {
         channels[i] = rhs.channels[i];
     }
@@ -262,15 +226,13 @@ void ObjectData::copyResults( const ObjectData& rhs ) {
         throw runtime_error("Can not copy ObjectResults if they contain different number of channels.");
     }
 
-    img = rhs.img;
-    psf = rhs.psf;
-    cobj = rhs.cobj;
-    res = rhs.res;
+    rhs.img.copyTo<float>( img.ptr() );
+    rhs.psf.copyTo<float>( psf.get() );
+    rhs.cobj.copyTo<float>( cobj.get() );
+    rhs.res.copyTo<float>( res.get() );
+
     alpha = rhs.alpha;
     div = rhs.div;
-    
-    isLoaded = (img.nElements() || psf.nElements() || cobj.nElements()
-             || res.nElements() || alpha.nElements() || div.nElements() );
 
     for( size_t i=0; i<channels.size(); ++i ) {
         channels[i]->copyResults( *(rhs.channels[i]) );
@@ -319,20 +281,19 @@ uint64_t WavefrontData::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-void WavefrontData::cclear(void) {
-
-    ids.clear();
-    alpha.clear();
-    isLoaded = false;
-    
-}
-
-
 const WavefrontData& WavefrontData::operator=( const WavefrontData& rhs ) {
 
     ids = rhs.ids;
     alpha = rhs.alpha;
     return *this;
+    
+}
+
+
+void WavefrontData::copyResults( const WavefrontData& rhs ) {
+    
+    alpha.copyFrom<float>( rhs.alpha.ptr() );
+    ids = rhs.ids;
     
 }
 
@@ -351,7 +312,7 @@ void WavefrontData::dump( string tag ) {
 PatchData::PatchData( MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
     vector<shared_ptr<Object>> objs = myJob.getObjects();
     for( auto& o: objs ) {
-        if(o) objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
+        if(o) objects.push_back( make_shared<ObjectData>(o) );
     }
 }
 
@@ -364,10 +325,6 @@ PatchData::~PatchData() {
 void PatchData::setPath(const std::string& path) {
     string mypath = path+"/patch_"+(string)index;
     CacheItem::setPath(mypath);
-    waveFronts.setPath(mypath+"_wf");
-    for( auto& obj: objects ) {
-        if(obj) obj->setPath(mypath);
-    }
 }
 
 
@@ -405,8 +362,7 @@ uint64_t PatchData::size( void ) const {
     sz += metrics.size()*sizeof(float) + sizeof(uint64_t);
 
     for( auto& obj: objects ) {
-        // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        if(obj) sz += obj->ObjectData::size();
+        if(obj) sz += obj->size();
     }
     sz += waveFronts.size();
     return sz;
@@ -422,8 +378,7 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += pack( ptr+count, finalMetric );
     count += pack( ptr+count, metrics );
     for( auto& obj: objects ) {
-        // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        if(obj) count += obj->ObjectData::pack(ptr+count);
+        if(obj) count += obj->pack(ptr+count);
     }
     count += waveFronts.WavefrontData::pack(ptr+count);
     return count;
@@ -440,7 +395,7 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, metrics, swap_endian );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        if(obj) count += obj->ObjectData::unpack( ptr+count, swap_endian );
+        if(obj) count += obj->unpack( ptr+count, swap_endian );
     }
     count += waveFronts.WavefrontData::unpack(ptr+count, swap_endian);
     return count;
@@ -448,30 +403,16 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
 
 
 void PatchData::cclear(void) {
-    for( auto& obj: objects ) {
-        if(obj) obj->cclear();
-    }
-    waveFronts.cclear();
+
 }
 
 
 bool PatchData::cacheLoad(bool removeAfterLoad) {
-    bool loaded(false);
-    for( auto& obj: objects ) {
-        if(obj) loaded |= obj->cacheLoad(removeAfterLoad);
-    }
-    loaded |= waveFronts.cacheLoad(removeAfterLoad);
-    return loaded;
+    return false;
 }
 
 bool PatchData::cacheStore(bool clearAfterStore) {
-    bool stored(false);
-    for( auto& obj: objects ) {
-        if(obj) stored |= obj->cacheStore(clearAfterStore);
-    }
-    stored |= waveFronts.cacheStore(clearAfterStore);
-    //stored |= CacheItem::cacheStore(clearAfterStore);
-    return stored;
+    return false;
 }
 
 
@@ -511,13 +452,14 @@ void PatchData::copyResults( const PatchData& rhs ) {
     }
 
     finalMetric = rhs.finalMetric;
-    waveFronts = rhs.waveFronts;
     metrics = rhs.metrics;
     nThreads = rhs.nThreads;
     runtime_wall = rhs.runtime_wall;
     runtime_cpu = rhs.runtime_cpu;
 
+    waveFronts.copyResults( rhs.waveFronts );
     for( size_t i=0; i<objects.size(); ++i ) {
+        objects[i]->myObject->getStorage( *this );
         objects[i]->copyResults( *(rhs.objects[i]) );
     }
     

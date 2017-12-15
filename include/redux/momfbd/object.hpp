@@ -91,6 +91,9 @@ namespace redux {
             void reInitialize(boost::asio::io_service&, bool reset=false);
             void loadData(boost::asio::io_service&, uint16_t nThreads, redux::util::Array<PatchData::Ptr>&);
             void loadInit(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
+            size_t getResultSize( void );
+            void maybeInitializeStorage( void );          
+            void getStorage( PatchData& );          
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
@@ -119,6 +122,8 @@ namespace redux {
             double currentMetric;
             double reg_gamma;
             double frequencyCutoff, pupilRadiusInPixels;
+            std::string cacheFile;
+            redux::util::Array<float> results;
             /*****************************************************/
 
             uint16_t ID;

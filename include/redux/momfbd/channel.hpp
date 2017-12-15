@@ -89,7 +89,7 @@ namespace redux {
             void loadFile( size_t fileIndex, size_t offset );
             void preprocessImage( size_t index );
             void maybeLoadImages( void );          
-            void copyImagesToPatch(ChannelData&);          
+            void getStorage(ChannelData&);          
             
             redux::util::Point16 getImageSize(void);
             void logAndThrow( std::string );

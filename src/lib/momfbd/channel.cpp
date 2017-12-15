@@ -101,7 +101,7 @@ void Channel::cleanup(void) {
             try {
                 bfs::remove(tmpP);
             } catch( exception& e ) {
-                LOG_ERR << "Channel(" << ID << ") failed to remove cacheFile: " << cacheFile << "  reason: " << e.what() << endl;
+                LOG_ERR << "Channel::cleanup: failed to remove storage: " << cacheFile << "  reason: " << e.what() << endl;
             }
         }
     }
@@ -662,7 +662,7 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
                 if( myJob.isOK() ) {
                     auto chData = patches(py,px)->objects[myObject.ID]->channels[ID];
                     try {
-                        copyImagesToPatch(*chData);
+                        getStorage(*chData);
                     } catch( std::exception& e ) {
                         myJob.setFailed();
                         LOG_ERR << "Failed to copy/store patch(" << py << "," << px << "): " << e.what() << ende;
@@ -1085,7 +1085,7 @@ void Channel::maybeLoadImages( void ) {
 }
 
 
-void Channel::copyImagesToPatch( ChannelData& chData ) {
+void Channel::getStorage( ChannelData& chData ) {
 
     maybeLoadImages();
     chData.images.wrap(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);

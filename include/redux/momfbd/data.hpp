@@ -65,26 +65,19 @@ namespace redux {
 
         
         class Object;
-        struct ObjectData : public redux::util::CacheItem {
+        struct ObjectData {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
             explicit ObjectData( std::shared_ptr<Object> o );
             ~ObjectData();
             
-            void setPath(const std::string& path);
             void initPatch(void);
             void clear(void);
             void load(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
-            size_t csize(void) const { return size(); };
-            uint64_t cpack(char* p) const { return pack(p); };
-            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
-            bool cacheLoad(bool removeAfterLoad=false);
-            bool cacheStore(bool clearAfterStore=false);
-            void cclear(void);
             const ObjectData& operator=(const ObjectData&);
             
             void copyResults( const ObjectData& rhs );
@@ -103,16 +96,13 @@ namespace redux {
             
         };
 
-        struct WavefrontData : public redux::util::CacheItem {
+        struct WavefrontData {
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
-            size_t csize(void) const { return size(); };
-            uint64_t cpack(char* p) const { return pack(p); };
-            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
-            void cclear(void);
             const WavefrontData& operator=(const WavefrontData&);
+            void copyResults( const WavefrontData& rhs );
             void dump( std::string );
             
             /********* Results ********/
@@ -128,8 +118,8 @@ namespace redux {
         struct PatchData : public Part {
             typedef std::shared_ptr<PatchData> Ptr;
             MomfbdJob& myJob;
-            std::vector<std::shared_ptr<redux::util::Compressed<ObjectData,5>>> objects;
-            redux::util::Compressed<WavefrontData,5> waveFronts;
+            std::vector<std::shared_ptr<ObjectData>> objects;
+            WavefrontData waveFronts;
             redux::util::Point16 index;                      //! Patch-index in mozaic
             redux::util::Point16 position;                   //! Patch position (centre coordinates in the reference channel)
             redux::util::Region16 roi;                       //! Region/position of this patch in the full image
