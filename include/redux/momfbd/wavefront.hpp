@@ -1,6 +1,7 @@
 #ifndef REDUX_MOMFBD_WAVEFRONT_HPP
 #define REDUX_MOMFBD_WAVEFRONT_HPP
 
+#include "redux/momfbd/data.hpp"
 #include "redux/momfbd/subimage.hpp"
 
 #include <memory>
@@ -13,6 +14,8 @@ namespace redux {
         /*! @ingroup momfbd
          *  @{
          */
+        
+        class MomfbdJob;
         
         /*! @brief Structure representing a wavefront. I.e. a parametrization of the atmospheric seeing sampled by
          *         one or more (co-temporal) images.
@@ -42,6 +45,33 @@ namespace redux {
             
         };
         
+        /*! @brief Class containing the collection of wavefronts. Basically just a container for alphas.
+         * 
+         */
+        class WaveFronts {
+
+        public:
+
+            explicit WaveFronts( MomfbdJob& );
+        
+            MomfbdJob& myJob;
+            logging::Logger& logger;
+            
+            void maybeInitializeStorage( void );          
+            void getStorage( PatchData& );          
+            void loadInit( boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>& patches );
+            void setLogChannel( std::string channel ) { logChannel = channel; };
+
+            size_t nModes;
+            size_t nWaveFronts;
+            redux::util::Array<float> coefficients;
+            std::string cacheFile;
+            std::string logChannel;
+            std::mutex mtx;
+
+        };
+
+
 
         /*! @} */
 

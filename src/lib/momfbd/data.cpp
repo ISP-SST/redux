@@ -457,6 +457,7 @@ void PatchData::copyResults( const PatchData& rhs ) {
     runtime_wall = rhs.runtime_wall;
     runtime_cpu = rhs.runtime_cpu;
 
+    myJob.waveFronts.getStorage( *this );
     waveFronts.copyResults( rhs.waveFronts );
     for( size_t i=0; i<objects.size(); ++i ) {
         objects[i]->myObject->getStorage( *this, objects[i] );

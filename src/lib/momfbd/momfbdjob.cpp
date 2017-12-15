@@ -44,7 +44,7 @@ int MomfbdJob::staticInit(void) {
 }
 
 
-MomfbdJob::MomfbdJob( void ) : cfgChecked(false), dataChecked(false) {
+MomfbdJob::MomfbdJob( void ) : waveFronts(*this), cfgChecked(false), dataChecked(false) {
     
     static int si RDX_UNUSED = staticInit();
     info.typeString = "momfbd";
@@ -517,6 +517,7 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, 
 void MomfbdJob::setLogChannel(std::string channel) {
     Job::setLogChannel(channel);
     GlobalCfg::setLogChannel(channel);
+    waveFronts.setLogChannel(channel);
     for( auto& obj : objects ) {
         obj->setLogChannel(channel);
         for (auto& ch : obj->channels) {
@@ -739,6 +740,8 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
     for( shared_ptr<Object>& obj : objects ) {
         obj->loadData( service, nThreads, patches );
     }
+    
+    waveFronts.loadInit( service, patches );
     
 }
 

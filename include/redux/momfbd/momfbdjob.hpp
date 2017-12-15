@@ -3,6 +3,7 @@
 
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/object.hpp"
+#include "redux/momfbd/wavefront.hpp"
 
 #include "redux/momfbd/solver.hpp"
 
@@ -113,6 +114,7 @@ namespace redux {
             void updateProgressString(void);
 
             std::vector<std::shared_ptr<Object>> objects;
+            WaveFronts waveFronts;
 
             redux::util::Array<PatchData::Ptr> patches;
             redux::util::Region16 roi;            // patch locations etc. are specified relative to the reference align-clip, this variable stores that region.
@@ -126,10 +128,12 @@ namespace redux {
             bool dataChecked;
         
             friend struct Constraints;
+            friend class WaveFronts;
             friend class Object;
             friend class Channel;
             friend class Solver;
             friend struct SubImage;
+            friend struct PatchData;
             friend struct ModeSet;
             friend struct redux::image::Pupil;
 
