@@ -901,7 +901,7 @@ void Object::reInitialize( boost::asio::io_service& service, ProgressWatch& pw, 
             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
                 service.post( [this,&pw,im,doReset](){
                     //im->initialize(true);   // always re-calculate noise statistics
-                    im->initialize( doReset );
+                    im->initialize( *this, doReset );
                     ++pw;
                 } );
             }

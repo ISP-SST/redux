@@ -102,7 +102,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
 }
 
 
-void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s, bool rescaled ) const {
+void SubImage::getWindowedImg( Array<double>& img, redux::util::Array<float>& surf, ArrayStats& imgStats, bool rescaled ) const {
     
     if( img.dimSize(0) < imgSize || img.dimSize(1) < imgSize  ) {
         string msg = "SubImage::getWindowedImg: Output container is smaller than image! " +
@@ -111,23 +111,24 @@ void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s, bool rescaled 
         throw std::logic_error(msg);
     }
 
+    double* imgPtr;
     for( size_t y=0; y<imgSize; ++y ) {
         const float* rowPtr = ptr(0,y,0);
         std::copy( rowPtr, rowPtr+imgSize, img.ptr(y,0) );
     }
     
     size_t nEl = img.nElements();
-    s.getStats( img.get(), nEl, ST_VALUES );
-    double avg = s.mean;
+    imgStats.getStats( img.get(), nEl, ST_VALUES );
+    double avg = imgStats.mean;
     double newAvg(0);
-    double* imgPtr = img.get();
+    imgPtr = img.get();
     const double* winPtr = window.get();
-    if( object.fittedPlane.nElements() == nEl ) {
-        const float* planePtr = object.fittedPlane.get();
+    if( surf.nElements() == nEl ) {
+        const float* surfPtr = surf.get();
         for( size_t i=0; i<nEl; ++i) {
             // Note: mean(plane) = 0, so subtracting it will not affect the mean value.
-//            imgPtr[i] = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
-            double tmp = (imgPtr[i]-avg-planePtr[i])*winPtr[i]+avg;
+//            imgPtr[i] = (imgPtr[i]-avg-surfPtr[i])*winPtr[i]+avg;
+            double tmp = (imgPtr[i]-avg-surfPtr[i])*winPtr[i]+avg;
             newAvg += tmp;
             imgPtr[i] = tmp;
         }
@@ -148,14 +149,19 @@ void SubImage::getWindowedImg( Array<double>& img, ArrayStats& s, bool rescaled 
         avg = 1.0/newAvg;
         s.mean = newAvg;
     }*/
-    s.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
+    imgStats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
     
     transpose( img.get(), imgSize, imgSize );                      // to match MvN
     
 }
 
 
-void SubImage::initialize( bool doReset ) {
+void SubImage::getWindowedImg( Array<double>& im, redux::util::ArrayStats& s, bool rescaled ) const {
+    getWindowedImg( im, object.fittedPlane, s, rescaled);
+}
+
+
+void SubImage::initialize( Object& o, bool doReset ) {
     
     if( doReset ) {
         Solver::tmp.FT.zero();
@@ -163,14 +169,14 @@ void SubImage::initialize( bool doReset ) {
         memcpy( Solver::tmp.FT.get(), imgFT.get(), imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
     }
     
-    getWindowedImg( Solver::tmp.D, stats, false );
+    getWindowedImg( Solver::tmp.D, o.fittedPlane, stats, false );
     double* imgPtr = Solver::tmp.D.get();
     
     size_t noiseSize = noiseWindow.dimSize(0);
     size_t nEl = Solver::tmp.D.nElements();
     string msg;
     if( doReset ) {
-        msg = "Initializing image " + to_string(object.ID) + ":" + to_string(channel.ID) + ":" + to_string(index)
+        msg = "Initializing image " + to_string(o.ID) + ":" + to_string(channel.ID) + ":" + to_string(index)
             + "   mean=" + to_string (stats.mean) + " stddev=" + to_string (stats.stddev);
         if( imgSize == noiseSize ) {
             transform( imgPtr, imgPtr+nEl, noiseWindow.get(), Solver::tmp.D2.get(),
@@ -194,7 +200,7 @@ void SubImage::initialize( bool doReset ) {
         msg += " noise=" + to_string (stats.noise) + " rg=" + to_string(rg);
         msg += "  initial shift=" + (string)imageShift;
         LOG_TRACE << msg << ende;
-        object.addRegGamma( rg );
+        o.addRegGamma( rg );
     }
     
     if( imgSize == otfSize ) {                                                                   // imgSize = 2*pupilSize
@@ -213,10 +219,16 @@ void SubImage::initialize( bool doReset ) {
     FourierTransform::reorder(imgFT);                                                          // keep FT in centered form
     
     if( doReset ) {
-        object.addToFT( imgFT );
+        o.addToFT( imgFT );
     } else {
-        object.addDiffToFT( imgFT, Solver::tmp.FT );
+        o.addDiffToFT( imgFT, Solver::tmp.FT );
     }
+    
+}
+
+
+void SubImage::initialize( bool doReset ) {
+    initialize( object, doReset );
 }
 
 

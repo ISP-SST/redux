@@ -41,7 +41,9 @@ namespace redux {
             
             void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, uint16_t, uint16_t);
             void setData( const double* a ) { wfAlpha=a; };
-            void getWindowedImg( Array<double>&, redux::util::ArrayStats& s, bool rescaled ) const;
+            void getWindowedImg( Array<double>&, redux::util::Array<float>& surf, redux::util::ArrayStats& s, bool rescaled ) const;
+            void getWindowedImg( Array<double>& im, redux::util::ArrayStats& s, bool rescaled ) const;
+            void initialize( Object&, bool doReset=false );
             void initialize( bool doReset=false );
             
             void addFT(redux::util::Array<double>& ftsum) const;
