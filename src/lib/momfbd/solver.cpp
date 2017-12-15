@@ -556,12 +556,12 @@ void Solver::run( PatchData::Ptr data ) {
 template <typename T>
 void Solver::shiftAndInit( const T* a, bool doReset ) {
     
-    job.progWatch.set( nTotalImages );
+    progWatch.set( nTotalImages );
     for( const auto& o: job.objects ) {
         o->progWatch.clear();
         o->imgShifted = static_cast<int>( doReset );  // force re-initialization if reset is passed
         o->progWatch.set( o->nImages() );
-        o->progWatch.setHandler( std::bind( &Object::reInitialize, o.get(), std::ref(service), doReset ) );
+        o->progWatch.setHandler( std::bind( &Object::reInitialize, o.get(), std::ref(service), std::ref(progWatch), doReset ) );
         for( const auto& c: o->channels ) {
             for( const auto& im: c->getSubImages() ) {
                 service.post( [&,a](){
@@ -573,7 +573,7 @@ void Solver::shiftAndInit( const T* a, bool doReset ) {
         }
 
     }
-    job.progWatch.wait();
+    progWatch.wait();
 
 }
 template void Solver::shiftAndInit( const double*, bool );

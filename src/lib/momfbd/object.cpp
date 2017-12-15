@@ -891,24 +891,23 @@ void Object::initCache( void ){
 }
 
 
-void Object::reInitialize( boost::asio::io_service& service, bool doReset ){
+void Object::reInitialize( boost::asio::io_service& service, ProgressWatch& pw, bool doReset ) {
     
-    progWatch.clear( );
-    if( imgShifted ){
-        fitAvgPlane( );
-        if( doReset )initPatch( );
-        for( const shared_ptr<Channel>& c: channels ){
-            for( const shared_ptr<SubImage>& im: c->getSubImages( ) ){
-                service.post( [this,im,doReset](){
-                    //im->initialize(true );   // always re-calculate noise statistics
+    progWatch.clear();
+    if( imgShifted ) {
+        fitAvgPlane();
+        if( doReset ) initPatch();
+        for( const shared_ptr<Channel>& c: channels ) {
+            for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
+                service.post( [this,&pw,im,doReset](){
+                    //im->initialize(true);   // always re-calculate noise statistics
                     im->initialize( doReset );
-                    ++myJob.progWatch;
-
+                    ++pw;
                 } );
             }
         }
     } else {
-        myJob.progWatch.increase( nImages( ) );
+        pw.increase( nImages() );
     }
 
 }
