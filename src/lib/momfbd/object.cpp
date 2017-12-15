@@ -298,53 +298,56 @@ void Object::initPatch( void ){
 }
 
 
-void Object::getResults(ObjectData& od, double* alpha ){
+void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
 
     unique_lock<mutex> lock( mtx );
+    set<uint32_t> wfSet( wf.begin(), wf.end() );
+    vector<shared_ptr<SubImage>> images;
+    for( const shared_ptr<Channel>& ch : channels ) {
+        if( ch->noRestore ) continue;
+        for( size_t i=0; i<ch->waveFrontList.size(); ++i) {
+            if( wfSet.count( ch->waveFrontList[i] ) && ch->subImages[i] ) {
+                images.push_back( ch->subImages[i] );
+            }
+        }
+    }
     
-    FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER ); //|FT_NORMALIZE );
-    Array<complex_t> tmpC(patchSize, patchSize );
-    Array<double> tmpD(patchSize, patchSize );
-    avgObjFT.zero( );
-    tmpD.zero( );
-    complex_t* aoPtr = avgObjFT.get( );
-    double* dPtr = tmpD.get( );
+    if( images.empty() ) return;
+    
+    size_t nModes = myJob.modeNumbers.size();
+    
+    FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
+    Array<complex_t> tmpC(patchSize, patchSize);
+    Array<double> tmpD(patchSize, patchSize);
+    avgObjFT.zero();
+    tmpD.zero();
+    complex_t* aoPtr = avgObjFT.get();
+    double* dPtr = tmpD.get();
     double avgNoiseVariance = 0.0;
     PointD avgShift;
-    Array<int16_t> shifts(nObjectImages,2 );
-    size_t imgIndex=0;
-    for( auto& ch : channels ){
-        for( auto& im : ch->subImages ){
-            im->restore( aoPtr, dPtr );
-            avgNoiseVariance += sqr(im->stats.noise );
-            avgShift += im->imageShift;
-            shifts(imgIndex,0 )= im->imageShift.x;
-            shifts(imgIndex++,1 )= im->imageShift.y;
+
+    uint32_t imgCount(0);
+    for( shared_ptr<SubImage>& si: images ) {
+        if( si ) {
+            si->restore( aoPtr, dPtr );
+            avgNoiseVariance += sqr(si->stats.noise);
+            avgShift += si->imageShift;
+            imgCount++;
         }
     }
     avgObjFT.conj( );    // This is because we re recycling addPQ in SubImage.restore(),
                         // which actually returns the complex conjugate of the deconvolution.
-    
-//Ana::write( "ao1.f0", avgObjFT );  
-    avgNoiseVariance /= nObjectImages;
-    avgShift *= 1.0/nObjectImages;
-    
-    //LOG_DETAIL << "Average shift for object #" << ID << ":" << avgShift << ende;
+    avgNoiseVariance /= imgCount;
+    avgShift *= 1.0/imgCount;
 
     avgObjFT.safeDivide( tmpD );     // TBD: non-zero cutoff by default? based on reg_gamma ?
-//Ana::write( "ao2.f0", avgObjFT );  
     
-    if( !(myJob.runFlags&RF_NO_FILTER) ){
-        LOG_DEBUG << boost::format("Object %d: Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g" )% ID %( 0.9*frequencyCutoff )% avgNoiseVariance << ende;
-        ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff );
+    if (!(myJob.runFlags&RF_NO_FILTER)) {
+        LOG_DEBUG << boost::format("Object %d: Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % ID % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
+        ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
-    
-//Ana::write( "ao3.f0", avgObjFT );  
 
     avgObjFT.getIFT( tmpC.get( ) );
-//static int cnt(0 );
-//Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_cresult.f0", tmpC );
-//Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_aoft.f0", avgObjFT );
     od.img.resize( patchSize, patchSize );
     size_t nEl = avgObjFT.nElements( );
     double normalization = 1.0 / nEl;
@@ -352,90 +355,70 @@ void Object::getResults(ObjectData& od, double* alpha ){
                 [normalization]( const complex_t& a ){
                     return std::real(a)*normalization;
                 } );
-//Ana::write( "obj_"+to_string(ID)+"_"+to_string(cnt++)+"_dresult.f0", tmpC );
-    
 
     // PSF
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
-        uint16_t nPSF =( saveMask&SF_SAVE_PSF_AVG)? 1 : nObjectImages;
+        uint16_t nPSF =( saveMask&SF_SAVE_PSF_AVG)? 1 : imgCount;
         od.psf.resize(nPSF, patchSize, patchSize );
         od.psf.zero( );
         Array<float> view( od.psf, 0, 0, 0, patchSize-1, 0, patchSize-1 );
         tmpD.zero( );
         if( nPSF > 1 ){
-            for( auto& ch: channels ){
-                for( auto& si: ch->subImages ){
+            for( shared_ptr<SubImage>& si: images ) {
                     si->getPSF( tmpD.get( ) );
                     view.assign( tmpD );
                     view.shift( 0, 1 );
-                }
             }
         } else if( nPSF == 1 ){
-            for( auto& ch: channels ){
-                for( auto& si: ch->subImages ){
+            for( shared_ptr<SubImage>& si: images ) {
                     si->addPSF( tmpD.get( ) );
-                }
             }
             view.assign( tmpD );
-            od.psf *=( 1.0/nObjectImages );
+            od.psf *=( 1.0/imgCount );
         }
+    } else {
+        od.psf.clear();
     }
 
     // Convolved objects
     if( saveMask & SF_SAVE_COBJ ){
-        if( nObjectImages ){
-            od.cobj.resize(nObjectImages, patchSize, patchSize );
-            od.cobj.zero( );
-            Array<float> view(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
-            for( auto& ch: channels ){
-                for( auto& si: ch->subImages ){
-                    view.assign(si->convolveImage(od.img) );
-                    view.shift(0,1 );
-                }
-            }
-        } else {
-            od.cobj.clear( );
+        od.cobj.resize(imgCount, patchSize, patchSize );
+        od.cobj.zero( );
+        Array<float> view(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
+        for( shared_ptr<SubImage>& si: images ) {
+                view.assign(si->convolveImage(od.img) );
+                view.shift(0,1 );
         }
+    } else {
+        od.cobj.clear( );
     }
 
     // Residuals
     if( saveMask & SF_SAVE_RESIDUAL ){
-        if( nObjectImages  ){
-            od.res.resize(nObjectImages, patchSize, patchSize );
-            od.res.zero( );
-            Array<float> view(od.res,0,0,0,patchSize-1,0,patchSize-1 );
-            if( od.cobj.sameSizes(od.res ) ){
-                Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
-                for( auto& ch: channels ){
-                    for( auto& si: ch->subImages ){
-                        view.assign(si->convolvedResidual(cview) );
-                        view.shift(0,1 );
-                        cview.shift(0,1 );
-                    }
-                }
-            } else {
-                for( auto& ch: channels ){
-                    for( auto& si: ch->subImages ){
-                        view.assign(si->residual(od.img) );
-                        view.shift(0,1 );
-                    }
-                }
+        od.res.resize(imgCount, patchSize, patchSize );
+        od.res.zero( );
+        Array<float> view(od.res,0,0,0,patchSize-1,0,patchSize-1 );
+        if( od.cobj.sameSizes(od.res ) ){
+            Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
+            for( shared_ptr<SubImage>& si: images ) {
+                    view.assign(si->convolvedResidual(cview) );
+                    view.shift(0,1 );
+                    cview.shift(0,1 );
             }
         } else {
-            od.res.clear( );
+            for( shared_ptr<SubImage>& si: images ) {
+                    view.assign(si->residual(od.img) );
+                    view.shift(0,1 );
+            }
         }
+    } else {
+        od.res.clear( );
     }
-
-//     std::transform( od.img.get(), od.img.get()+nEl, od.img.get(), std::bind2nd<>(std::multiplies<float>(), objMaxMean ) );
-//     if(( saveMask & SF_SAVE_COBJ )&& nObjectImages ){
-//         std::transform( od.cobj.get(), od.cobj.get()+nObjectImages*nEl, od.cobj.get(),
-//                         std::bind2nd<>(std::multiplies<float>(), objMaxMean ) );
-//     }
 
     // Note: re-adding the plane has to be done *after* calculating the convolved objects and residuals
     if( fittedPlane.sameSize(od.img ) ){
         transpose( fittedPlane.get(), fittedPlane.dimSize(0), fittedPlane.dimSize(1 ) );                 // to match the transposed subimage.
-        //LOG_DETAIL << "Re-adding fitted plane to result." << ende;
+        LOG_DETAIL << "Object " << to_string(ID) << ": re-adding fitted plane to result." << ende;
         od.img += fittedPlane;
     } else if( !fittedPlane.empty( ) ){
         LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
@@ -443,31 +426,28 @@ void Object::getResults(ObjectData& od, double* alpha ){
     
     // Mode coefficients
     if( saveMask & SF_SAVE_ALPHA ){
-        if( nObjectImages  ){
-            od.alpha.resize( nObjectImages, myJob.modeNumbers.size( ) );
-            od.alpha.copyFrom<double>(alpha );
-        } else {
-            od.alpha.clear( );
+        od.alpha.resize( imgCount, myJob.modeNumbers.size( ) );
+        float* aPtr = od.alpha.get();
+        for( shared_ptr<SubImage>& si: images ) {
+            std::copy( si->wfAlpha, si->wfAlpha+nModes, aPtr );
+            aPtr += nModes;
         }
-
+    } else {
+        od.alpha.clear( );
     }
 
     // Diversity
     if( saveMask & SF_SAVE_DIVERSITY ){
-        int nCh = channels.size( );
-        if( nCh  ){
-            od.div.resize(nCh, pupilPixels, pupilPixels );
-            Array<float> view(od.div,0,0,0,pupilPixels-1,0,pupilPixels-1 );
-            for( auto& ch: channels ){
-                view = ch->phi_fixed;
-                view.shift(0,1 );
-            }
-        } else {
-            od.div.clear( );
+    int nCh = channels.size( );
+        od.div.resize(nCh, pupilPixels, pupilPixels );
+        Array<float> view(od.div,0,0,0,pupilPixels-1,0,pupilPixels-1 );
+        for( auto& ch: channels ){
+            view = ch->phi_fixed;
+            view.shift(0,1 );
         }
-
+    } else {
+        od.div.clear( );
     }
-
 
 }
 

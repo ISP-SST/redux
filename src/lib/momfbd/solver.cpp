@@ -524,8 +524,7 @@ void Solver::run( PatchData::Ptr data ) {
         for( auto& cd: objData->channels ) {
             cd->images.clear();         // don't need input data anymore.
         }
-        objData->myObject->getResults(*objData,alphaPtr);
-        alphaPtr += objData->myObject->nObjectImages*nModes;
+        objData->myObject->restorePatch( *objData );
 #ifdef RDX_DUMP_PATCHDATA
         Ana::write( "patch_"+(string)data->index+"_obj_"+to_string(objData->myObject->ID)+"_result.f0", objData->img );
 #endif
