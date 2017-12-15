@@ -73,7 +73,8 @@ namespace redux {
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
             void calcHelpers(void);
-            void fitAvgPlane(void);
+            void fitAvgPlane( redux::util::Array<float>& plane, const std::vector<uint32_t>& wf );
+            void fitAvgPlane(void) { fitAvgPlane( fittedPlane, waveFrontList ); };
             void calcMetric(void);
             inline double metric(void) const { return weight*currentMetric; };
             /*****************************************************/

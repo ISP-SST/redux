@@ -561,36 +561,45 @@ void Object::calcHelpers(void ){
 }
 
 
-void Object::fitAvgPlane( void ){
+void Object::fitAvgPlane( redux::util::Array<float>& plane, const vector<uint32_t>& wf ){
     
-    if( myJob.runFlags & RF_FIT_PLANE ){
-        size_t count(0 );
-        fittedPlane.zero( );
-        for( const shared_ptr<Channel> c: channels ){
-            if( !c )continue;
-            for( const shared_ptr<SubImage> im: c->getSubImages( ) ){
-                if( !im )continue;
-                if( !im->sameSize(fittedPlane ) ){
-                    LOG_ERR << "Size mismatch when fitting average plane for object #" << ID << ende;
-                    fittedPlane.clear( );
-                    return;
-                }
-                fittedPlane += *im;
-                count++;
+    set<uint32_t> wfSet( wf.begin(), wf.end() );
+    vector<shared_ptr<SubImage>> images;
+    for( const shared_ptr<Channel>& ch : channels ) {
+        if( !ch ) continue;
+        for( size_t i=0; i<ch->waveFrontList.size(); ++i) {
+            if( wfSet.count( ch->waveFrontList[i] ) && ch->subImages[i] ) {
+                images.push_back( ch->subImages[i] );
             }
+        }
+    }
+    
+    if( (myJob.runFlags & RF_FIT_PLANE) && !images.empty() ){
+        size_t count(0);
+        plane.zero();
+        for( const shared_ptr<SubImage> im: images ){
+            if( !im )continue;
+            if( !im->sameSize(plane) ){
+                LOG_ERR << "Size mismatch when fitting average plane for object #" << ID
+                        << printArray(im->dimensions(),"  imdims") << printArray(plane.dimensions(),"  pdims") << ende;
+                plane.clear( );
+                return;
+            }
+            plane += *im;
+            count++;
         }
         if( count == 0 ){
             LOG_ERR << "No images present when fitting average plane for object #" << ID << ende;
-            fittedPlane.clear( );
+            plane.clear( );
             return;
         }
         
-        fittedPlane /= count;
-        vector<double> coeffs(3,0.0 );
-        fittedPlane = fitPlane( fittedPlane, true, coeffs.data( ) );          // fit plane to the average image, and subtract average
-        LOG_TRACE << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
+        plane /= count;
+        vector<double> coeffs(3,0.0);
+        plane = fitPlane( plane, true, coeffs.data( ) );          // fit plane to the average image, and subtract average
+        LOG_DEBUG << "Fitting average plane:  p = " << coeffs[0] << "x + " << coeffs[1] << "y + " << coeffs[2] << ende;
     } else {
-        fittedPlane.clear( );
+        plane.clear( );
     }
     
 }
