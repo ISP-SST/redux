@@ -330,24 +330,24 @@ bool Channel::checkData( bool verbose ) {
     }
     
     nTotalFrames = std::accumulate( nFrames.begin(), nFrames.end(), 0 );
-    if( waveFronts.size() != nFiles ) {
-        waveFronts.resize( nFiles, imageNumberOffset );
+    if( waveFrontList.size() != nFiles ) {
+        waveFrontList.resize( nFiles, imageNumberOffset );
     }
 
-    if( waveFronts.size() == fileNumbers.size() ) {
-        std::transform( waveFronts.begin(), waveFronts.end(), fileNumbers.begin(), waveFronts.begin(), std::plus<uint32_t>() );
+    if( waveFrontList.size() == fileNumbers.size() ) {
+        std::transform( waveFrontList.begin(), waveFrontList.end(), fileNumbers.begin(), waveFrontList.begin(), std::plus<uint32_t>() );
     }
 
     if( nFiles != nTotalFrames ) {
         vector<uint32_t> tmpV;
         for( size_t i=0; i<nFiles; ++i ) {
             for( size_t j=0; j<nFrames[i]; ++j ) {
-                tmpV.push_back( waveFronts[i]+j+discard[0] );
+                tmpV.push_back( waveFrontList[i]+j+discard[0] );
             }
         }
-        std::swap( waveFronts, tmpV );
+        std::swap( waveFrontList, tmpV );
     }
-    string wfStr = redux::util::uIntsToString( waveFronts );
+    string wfStr = redux::util::uIntsToString( waveFrontList );
     if( verbose ) LOG_DETAIL << "Channel " << myObject.ID << ":" << ID << " waveFronts: " << wfStr << ende;
 
     // Dark(s)
@@ -735,8 +735,8 @@ void Channel::initProcessing( Solver& solver ) {
     subImages.resize(nTotalFrames);
     for (uint16_t i=0; i < nTotalFrames; ++i) {
         if( !subImages[i] ) subImages[i].reset( new SubImage(myObject, *this, solver.window, solver.noiseWindow) );
-        auto ret = solver.wavefronts.emplace( waveFronts[i], nullptr );
-        if( !ret.first->second ) ret.first->second.reset( new WaveFront(waveFronts[i]) );
+        auto ret = solver.wavefronts.emplace( waveFrontList[i], nullptr );
+        if( !ret.first->second ) ret.first->second.reset( new WaveFront(waveFrontList[i]) );
         ret.first->second->addImage( subImages[i] );
     }
     
@@ -1096,7 +1096,7 @@ void Channel::copyImagesToPatch( ChannelData& chData ) {
 uint32_t Channel::nImages( const std::vector<uint32_t>& wf ) {
     set<uint32_t> wfSet( wf.begin(), wf.end() );
     uint32_t nIms(0);
-    for( uint32_t& w: waveFronts ) {
+    for( uint32_t& w: waveFrontList ) {
         if( wfSet.count( w) ) {
             nIms++;
         }

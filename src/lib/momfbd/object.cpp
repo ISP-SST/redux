@@ -703,9 +703,14 @@ bool Object::checkData( bool verbose ) {
         }
     }
     
-    for( shared_ptr<Channel>& ch: channels ){
-        if( !ch->checkData(verbose) ) return false;
+    set<uint32_t> tmpWf;
+    for( shared_ptr<Channel>& ch: channels ) {
+        if( !ch->checkData() ) return false;
+        tmpWf.insert( ch->waveFrontList.begin(), ch->waveFrontList.end() );
     }
+    waveFrontList.assign( tmpWf.begin(), tmpWf.end() );
+    string wfStr = redux::util::uIntsToString( waveFrontList );
+    LOG << "Object " << ID << " waveFronts: " << wfStr << ende;
     
     bfs::path tmpPath = tmpOF.parent_path( );
     

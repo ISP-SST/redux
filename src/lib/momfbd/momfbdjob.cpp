@@ -1216,9 +1216,14 @@ bool MomfbdJob::checkData(bool verbose) {
     
     if( dataChecked ) return true;
 
+    set<uint32_t> wfs;
     for( shared_ptr<Object>& obj: objects ) {
         if( !obj->checkData(verbose) ) return false;
+        wfs.insert( obj->waveFrontList.begin(), obj->waveFrontList.end() );
     }
+    
+    waveFrontList.resize( wfs.size() );
+    std::copy( wfs.begin(), wfs.end(), waveFrontList.begin() );
     
     dataChecked = true;
     return true;

@@ -262,7 +262,7 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logg
     if( fileNumbers.empty() ) {
         fileNumbers = getValue( tree, "IMAGE_NUMS", defaults.fileNumbers );
     }
-    waveFronts = getValue( tree, "WFINDEX", defaults.waveFronts );
+    waveFrontList = getValue( tree, "WFINDEX", defaults.waveFrontList );
     darkNumbers = getValue( tree, "DARK_NUM", defaults.darkNumbers );
     stokesWeights = getValue( tree, "VECTOR", defaults.stokesWeights );
     if( mmFile.length() > 0 ) {
@@ -325,7 +325,7 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) c
 
     if( imageNumberOffset != defaults.imageNumberOffset ) tree.put( "DT", imageNumberOffset );
     if( fileNumbers != defaults.fileNumbers ) tree.put( "IMAGE_NUM", fileNumbers );
-    if( waveFronts != defaults.waveFronts ) tree.put( "WFINDEX", waveFronts );
+    if( waveFrontList != defaults.waveFrontList ) tree.put( "WFINDEX", waveFrontList );
     if( darkNumbers != defaults.darkNumbers ) tree.put( "DARK_NUM", darkNumbers );
     
     if( stokesWeights != defaults.stokesWeights ) tree.put( "VECTOR", stokesWeights );
@@ -351,7 +351,7 @@ uint64_t ChannelCfg::size( void ) const {
     sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
     sz += xOffsetFile.length() + yOffsetFile.length() + 2;
     sz += fileNumbers.size()*sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += waveFronts.size()*sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += waveFrontList.size()*sizeof( uint32_t ) + sizeof( uint64_t );
     sz += darkNumbers.size()*sizeof( uint32_t ) + sizeof( uint64_t );
     sz += stokesWeights.size()*sizeof( float ) + sizeof( uint64_t );
     return sz;
@@ -390,7 +390,7 @@ uint64_t ChannelCfg::pack( char* ptr ) const {
     count += pack( ptr+count, yOffsetFile );
     count += pack( ptr+count, imageNumberOffset );
     count += pack( ptr+count, fileNumbers );
-    count += pack( ptr+count, waveFronts );
+    count += pack( ptr+count, waveFrontList );
     count += pack( ptr+count, darkNumbers );
     count += pack( ptr+count, stokesWeights );
     return count;
@@ -429,7 +429,7 @@ uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, yOffsetFile );
     count += unpack( ptr+count, imageNumberOffset, swap_endian );
     count += unpack( ptr+count, fileNumbers, swap_endian );
-    count += unpack( ptr+count, waveFronts, swap_endian );
+    count += unpack( ptr+count, waveFrontList, swap_endian );
     count += unpack( ptr+count, darkNumbers, swap_endian );
     count += unpack( ptr+count, stokesWeights, swap_endian );
     return count;
@@ -448,7 +448,7 @@ bool ChannelCfg::operator==( const ChannelCfg& rhs ) const {
            ( darkTemplate == rhs.darkTemplate ) &&
            ( imageTemplate == rhs.imageTemplate ) &&
            ( fileNumbers == rhs.fileNumbers ) &&
-           ( waveFronts == rhs.waveFronts ) &&
+           ( waveFrontList == rhs.waveFrontList ) &&
            ( darkNumbers == rhs.darkNumbers );
 }
 

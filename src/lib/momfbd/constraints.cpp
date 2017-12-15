@@ -467,7 +467,7 @@ void Constraints::init( void ) {
                 int32_t parameterOffset(0);
                 for( auto& obj : objects ) {            // \alpha_{tkm} - \alpha_{t1m} - \alpha_{1km} + \alpha_{11m} = 0
                     for( auto& ch : obj->getChannels() ) {
-                        for( auto& wf : ch->waveFronts ) {
+                        for( auto& wf : ch->waveFrontList ) {
                             auto ret = wfCons.insert( make_pair( wf, Constraint( logger, parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
                                 shared_ptr<Constraint> thisConstraint( new Constraint( logger, ret.first->second ) );
@@ -503,7 +503,7 @@ void Constraints::init( void ) {
                 map<int32_t, Constraint> wfCons;
                 for( auto& obj : objects ) {
                     for( auto& ch : obj->getChannels() ) {
-                        for( auto& wf : ch->waveFronts ) {
+                        for( auto& wf : ch->waveFrontList ) {
                             int32_t parameterOffset = imageCount * nModes;
                             auto ret = wfCons.insert( make_pair( wf, Constraint( logger, parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
