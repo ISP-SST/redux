@@ -66,6 +66,7 @@ void Solver::init( void ) {
     LOG_TRACE << "Initializing Solver." << ende;
 
     clear();
+    job.globalData->constraints.makeRowsCols();
 
     patchSize = job.patchSize;
     pupilSize = job.pupilPixels;
@@ -514,7 +515,7 @@ void Solver::run( PatchData::Ptr data ) {
     
 
 #ifdef RDX_DUMP_PATCHDATA
-    dump( "patch_"+(string)data->index );
+    dump( "final_patch_"+(string)data->index );
 #endif
     
     alphaPtr = alpha.get();

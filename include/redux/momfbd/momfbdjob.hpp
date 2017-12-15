@@ -125,11 +125,11 @@ namespace redux {
             bool cfgChecked;
             bool dataChecked;
         
-            friend class Constraints;
+            friend struct Constraints;
             friend class Object;
             friend class Channel;
             friend class Solver;
-            friend class SubImage;
+            friend struct SubImage;
             friend struct ModeSet;
             friend struct redux::image::Pupil;
 

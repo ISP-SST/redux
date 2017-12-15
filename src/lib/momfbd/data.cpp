@@ -92,9 +92,7 @@ const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
 
 
 void ChannelData::copyResults( const ChannelData& rhs ) {
-    
     images.clear();
-    
 }
 
 
@@ -109,7 +107,7 @@ void ChannelData::dump( string tag ) {
 ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
     if( !o ) throw logic_error("Cannot construct ObjectData from a null ObjectPtr.");
     for( auto& c: o->getChannels() ) {
-        channels.push_back( make_shared<Compressed<ChannelData,5>>(c) );
+        channels.push_back( make_shared<ChannelData>(c) );
     }
 
 }
@@ -350,7 +348,7 @@ void WavefrontData::dump( string tag ) {
 }
 
 
-PatchData::PatchData( const MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
+PatchData::PatchData( MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
     vector<shared_ptr<Object>> objs = myJob.getObjects();
     for( auto& o: objs ) {
         if(o) objects.push_back( make_shared<Compressed<ObjectData,5>>(o) );
@@ -637,7 +635,7 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
         }
     }
     count += constraints.unpack(ptr+count,swap_endian);
-    constraints.makeRowsCols();
+
     return count;
 }
 

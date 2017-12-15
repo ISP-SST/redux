@@ -65,9 +65,8 @@ uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool 
     uint64_t count(0);
     if( wip->nParts ) {
         try {
-            wip->parts.resize(1);        // if size > 1 the old "wip" has a globalData appended to it, we don't need it anymore.
             PatchData* tmpPD = new PatchData(*this);
-            wip->parts[0].reset(tmpPD);
+            wip->parts.assign(1,Part::Ptr(tmpPD));        // if size > 1 the old "wip" has a globalData appended to it, we don't need it anymore.
             count += tmpPD->unpack( ptr+count, swap_endian );
             if( wip->nParts > 1 ) {
                 globalData.reset( new GlobalData(*this) );
@@ -953,7 +952,7 @@ void MomfbdJob::loadPatchResults( boost::asio::io_service& service, uint16_t nTh
 
 void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
-    LOG_DEBUG << "MomfbdJob::postProcess()" << ende;
+    LOG_TRACE << "MomfbdJob::postProcess()" << ende;
  
 
     progWatch.set( patches.nElements() );

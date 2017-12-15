@@ -393,7 +393,7 @@ namespace redux {
                 setStrides();
                 countElements();
                 if( dataSize ) {
-                    datablock.reset( data, []( T * p ) {} );
+                    datablock.reset( data, []( T* ) {} );
                 }
                 dense_ = true;
             }
@@ -472,9 +472,11 @@ namespace redux {
 
             template <typename U>
             void copyFrom( const void* data ) {
+                if( !nElements_ ) return;
                 const U* dptr = reinterpret_cast<const U*>( data );
                 if( dense_ ) {
-                    std::transform( get()+begin_, get()+end_, dptr, get()+begin_, [](const T& a, const T& b) { return static_cast<T>(b); } );
+                    //std::transform( get()+begin_, get()+end_, dptr, get()+begin_, [](const T& a, const T& b) { return static_cast<T>(b); } );
+                    std::copy( dptr, dptr+nElements_, get()+begin_ );
                 } else {
                     std::transform( begin(), end(), dptr, begin(), [](const T& a, const T& b) { return static_cast<T>(b); }  );
                 }
@@ -482,12 +484,13 @@ namespace redux {
 
             template <typename U>
             void copyTo( void* data ) const {
+                if( !nElements_ ) return;
                 U* dptr = reinterpret_cast<U*>( data );
                 if( dense_ ) {
                     std::copy( get()+begin_, get()+end_, dptr );
                     //std::transform( get()+begin_, get()+end_, dptr, get()+begin_, [](const T& a, const T& b) { return static_cast<T>(b); } );
                 } else {
-                    std::transform( begin(), end(), dptr, dptr, [](const T& a, const T& b) { return static_cast<U>(a); }  );
+                    std::transform( begin(), end(), dptr, [](const T& a) { return static_cast<U>(a); }  );
                 }
             }
 

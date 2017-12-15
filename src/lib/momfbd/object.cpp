@@ -698,7 +698,7 @@ bool Object::checkData( bool verbose ) {
                 LOG_FATAL << boost::format( "output file %s already exists! Use -f (or cfg-keyword OVERWRITE) to replace file." ) % tmpOF << ende;
                 return false;
             } else {
-                if( verbose ) LOG_DETAIL << "Output filename: " << tmpOF << ende;
+                if( verbose ) LOG_DETAIL << "Object #" << ID << ", filename: " << tmpOF << ende;
             }
         }
     }

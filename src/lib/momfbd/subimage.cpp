@@ -668,7 +668,7 @@ redux::util::Array<double> SubImage::getPSF( void ) const {
     using namespace redux::image;
     redux::util::Array<double> tmp( otfSize, otfSize );
     getPSF(tmp.get());
-    return std::move(tmp);
+    return tmp;
 }
 
 

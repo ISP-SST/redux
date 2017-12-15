@@ -1072,10 +1072,10 @@ void Channel::maybeLoadImages( void ) {
     
     if( !(myJob.runFlags&RF_NOSWAP) ) {     // should we mmap?
         if( bfs::exists( bfs::path(cacheFile) ) ) {
-            LOG_TRACE << "opening: cachePath: " << cacheFile << ende;
+            LOG_TRACE << "opening: Images: " << cacheFile << ende;
             images.openMmap( cacheFile, nTotalFrames, imgSize.y, imgSize.x );
         } else {
-            LOG_TRACE << "creating: cachePath: " << cacheFile << ende;
+            LOG_TRACE << "creating: Images: " << cacheFile << ende;
             images.createMmap( cacheFile, nTotalFrames, imgSize.y, imgSize.x );
         }
     } else {

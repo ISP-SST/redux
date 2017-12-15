@@ -43,7 +43,7 @@ string WaveFront::print(void) {
         ret += im->idString() + (string)im->imageShift;
     }
     ret += "]";
-    return std::move(ret);
+    return ret;
     
 }
 

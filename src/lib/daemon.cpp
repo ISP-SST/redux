@@ -1407,7 +1407,11 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
           connWIP->previousJob = connWIP->job;
         }
         
-    } else LOG_TRACE << "Daemon::sendWork(): Too many active transfers." << ende;
+    } else {
+#ifdef DEBUG_
+        LOG_TRACE << "Daemon::sendWork(): Too many active transfers." << ende;
+#endif
+    }
     
     if( count ) {
         pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)

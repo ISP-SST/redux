@@ -127,7 +127,7 @@ namespace redux {
         class MomfbdJob;
         struct PatchData : public Part {
             typedef std::shared_ptr<PatchData> Ptr;
-            const MomfbdJob& myJob;
+            MomfbdJob& myJob;
             std::vector<std::shared_ptr<redux::util::Compressed<ObjectData,5>>> objects;
             redux::util::Compressed<WavefrontData,5> waveFronts;
             redux::util::Point16 index;                      //! Patch-index in mozaic
@@ -135,7 +135,7 @@ namespace redux {
             redux::util::Region16 roi;                       //! Region/position of this patch in the full image
             float finalMetric;
             std::vector<float> metrics;
-            PatchData( const MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
+            PatchData( MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
             PatchData( const PatchData& ) = delete;
             ~PatchData();
 
