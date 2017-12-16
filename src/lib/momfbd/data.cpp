@@ -226,10 +226,10 @@ void ObjectData::copyResults( const ObjectData& rhs ) {
         throw runtime_error("Can not copy ObjectResults if they contain different number of channels.");
     }
 
-    rhs.img.copyTo<float>( img.ptr() );
-    rhs.psf.copyTo<float>( psf.get() );
-    rhs.cobj.copyTo<float>( cobj.get() );
-    rhs.res.copyTo<float>( res.get() );
+    if( img.nElements() == rhs.img.nElements() ) rhs.img.copyTo<float>( img.ptr() );
+    if( psf.nElements() == rhs.psf.nElements() ) rhs.psf.copyTo<float>( psf.get() );
+    if( cobj.nElements() == rhs.cobj.nElements() ) rhs.cobj.copyTo<float>( cobj.get() );
+    if( res.nElements() == rhs.res.nElements() ) rhs.res.copyTo<float>( res.get() );
 
     alpha = rhs.alpha;
     div = rhs.div;
