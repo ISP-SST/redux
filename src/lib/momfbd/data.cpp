@@ -459,7 +459,7 @@ void PatchData::copyResults( const PatchData& rhs ) {
 
     waveFronts.copyResults( rhs.waveFronts );
     for( size_t i=0; i<objects.size(); ++i ) {
-        objects[i]->myObject->getStorage( *this );
+        objects[i]->myObject->getStorage( *this, objects[i] );
         objects[i]->copyResults( *(rhs.objects[i]) );
     }
     

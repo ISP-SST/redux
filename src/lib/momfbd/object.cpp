@@ -1098,10 +1098,12 @@ void Object::maybeInitializeStorage( void ) {
 }
 
 
-void Object::getStorage( PatchData& pData ) {
+void Object::getStorage( PatchData& pData, shared_ptr<ObjectData> oData ) {
 
     maybeInitializeStorage();
-    auto oData = pData.objects[ID];
+    
+    if( !oData ) return;
+    
     float* resPtr = results.ptr( pData.index.y, pData.index.x, 0 );
     oData->img.wrap( resPtr, patchSize, patchSize );
     resPtr += patchSize*patchSize;

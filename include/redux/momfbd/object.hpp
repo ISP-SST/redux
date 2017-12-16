@@ -93,7 +93,7 @@ namespace redux {
             void loadInit(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             size_t getResultSize( void );
             void maybeInitializeStorage( void );          
-            void getStorage( PatchData& );          
+            void getStorage( PatchData&, std::shared_ptr<ObjectData> );          
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);
