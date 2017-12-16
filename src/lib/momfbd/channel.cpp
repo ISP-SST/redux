@@ -718,11 +718,25 @@ double Channel::getMaxMean(void) {
 }
 
 
-void Channel::getFileNames(std::vector<std::string>& files) const {
+void Channel::getFileNames( std::vector<std::string>& files, const std::vector<uint32_t>& wf ) const {
 
-    for (auto &num: fileNumbers) {
-        bfs::path fn = bfs::path(imageDataDir)/bfs::path(boost::str(boost::format(imageTemplate) % num));
-        files.push_back(fn.string());
+    set<uint32_t> wfSet( wf.begin(), wf.end() );
+    size_t frameCounter(0);
+    size_t nFiles = std::min( nFrames.size(), fileNumbers.size() );
+    for( size_t i=0; i<nFiles; ++i ) {
+        bool inList(false);
+        for( size_t j=0; j<nFrames[i]; ++j ) {
+            if( frameCounter+j >= waveFrontList.size() ) continue;
+            if( wfSet.count( waveFrontList[frameCounter+j] ) ) {
+                inList = true;
+                break;
+            }
+        }
+        if( inList ) {
+            bfs::path fn = bfs::path(imageDataDir)/bfs::path(boost::str(boost::format(imageTemplate) % fileNumbers[i]));
+            files.push_back(fn.string());
+        }
+        frameCounter += nFrames[i];
     }
     
 }

@@ -95,6 +95,10 @@ namespace redux {
             bool checkWriting(void);
             uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
             const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
+            const std::vector<std::shared_ptr<Channel>>& getChannels(uint16_t objID) const {
+                if( objID >= objects.size() || !objects[objID] ) throw std::out_of_range("invalid object-index.");
+                return objects[objID]->getChannels();
+            }
 
             const MomfbdJob& operator=(const GlobalCfg&);
 
@@ -109,11 +113,14 @@ namespace redux {
             void verifyPatches( void );
             void writeOutput( boost::asio::io_service& );
             void loadPatchResults( boost::asio::io_service&, uint16_t nThreads );
+            void generateTraceObjects( void );
+            void generateTraceData(PatchData::Ptr);
             void postProcess( boost::asio::io_service&, uint16_t nThreads );
             
             void updateProgressString(void);
 
             std::vector<std::shared_ptr<Object>> objects;
+            std::vector<std::shared_ptr<Object>> trace_objects;
             WaveFronts waveFronts;
 
             redux::util::Array<PatchData::Ptr> patches;

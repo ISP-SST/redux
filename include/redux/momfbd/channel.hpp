@@ -55,7 +55,8 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             double getMaxMean(void);
-            void getFileNames(std::vector<std::string>&) const;
+            void getFileNames(std::vector<std::string>&, const std::vector<uint32_t>&) const;
+            void getFileNames(std::vector<std::string>& list) const { getFileNames( list, waveFrontList ); };
             uint32_t nImages( const std::vector<uint32_t>& );
             uint32_t nImages(void);
             void adjustCutout(ChannelData&, const PatchData::Ptr&) const;

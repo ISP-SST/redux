@@ -416,11 +416,12 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
     }
 
     // Note: re-adding the plane has to be done *after* calculating the convolved objects and residuals
-    if( fittedPlane.sameSize(od.img ) ){
-        transpose( fittedPlane.get(), fittedPlane.dimSize(0), fittedPlane.dimSize(1 ) );                 // to match the transposed subimage.
-        LOG_DETAIL << "Object " << to_string(ID) << ": re-adding fitted plane to result." << ende;
+    if( fittedPlane.sameSize(od.img) ) {
+        transpose( fittedPlane.get(), fittedPlane.dimSize(0), fittedPlane.dimSize(1) );                 // to match the transposed subimage.
+        LOG_DEBUG << "Object " << to_string(ID) << ": re-adding fitted plane to result." << ende;
         od.img += fittedPlane;
-    } else if( !fittedPlane.empty( ) ){
+        transpose( fittedPlane.get(), fittedPlane.dimSize(1), fittedPlane.dimSize(0) );                 // restore fittedPlane for future use.
+    } else if( !fittedPlane.empty() ) {
         LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
     }
     
@@ -437,13 +438,13 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
     }
 
     // Diversity
-    if( saveMask & SF_SAVE_DIVERSITY ){
     int nCh = channels.size( );
-        od.div.resize(nCh, pupilPixels, pupilPixels );
-        Array<float> view(od.div,0,0,0,pupilPixels-1,0,pupilPixels-1 );
+    if( nCh && (saveMask & SF_SAVE_DIVERSITY) ) {
+        od.div.resize( nCh, pupilPixels, pupilPixels );
+        Array<float> view(od.div,0,0,0,pupilPixels-1,0,pupilPixels-1);
         for( auto& ch: channels ){
             view = ch->phi_fixed;
-            view.shift(0,1 );
+            view.shift(0,1);
         }
     } else {
         od.div.clear( );
@@ -978,7 +979,7 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
         size_t nImgs =( patchSize-offset)/(info->nModes*sizeof(float) );
 
         if(( patches.dimSize(0 )!= nPatchesY )||( patches.dimSize(1 )!= nPatchesX ) ){
-            LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of patches." << ende;
+            LOG_ERR << "Initialization file: " << tmpFile <<  " has the wrong number of patches." << ende;
             LOG_ERR << "nPatchesX = " << nPatchesX << " - " << patches.dimSize(1 )<< ende;
             LOG_ERR << "nPatchesY = " << nPatchesY << " - " << patches.dimSize(0 )<< ende;
             return;
@@ -1192,7 +1193,7 @@ void Object::writeFits( const redux::util::Array<PatchData::Ptr>& patches ) {
 }
 
 
-void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData ){
+void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData ) {
 
     bfs::path fn = bfs::path(outputFileName + ".momfbd" );      // TODO: fix storage properly
 
@@ -1223,6 +1224,11 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         info->timeString = bpx::to_simple_string((startT+obs_interval/2).time_of_day() );
     }
     
+    if( myJob.objects[ID].get() != this ) {     // this is a trace-object, copy some stuff...
+        channels = myJob.getChannels(ID);
+        modes = myJob.objects[ID]->modes;
+        pupil = myJob.objects[ID]->pupil;
+    }
     
     int32_t nChannels = info->nChannels = channels.size( );
     info->clipStartX = sharedArray<int16_t>( nChannels );
@@ -1231,7 +1237,7 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     info->clipEndY = sharedArray<int16_t>( nChannels );
     info->fileNames.clear( );
     for( int i = 0; i < nChannels; ++i ){
-        channels[i]->getFileNames(info->fileNames );
+        channels[i]->getFileNames( info->fileNames, waveFrontList );
         if(channels[i]->alignClip.empty() ){
             Point16 sz = channels[i]->getImageSize( );
             info->clipStartX.get()[i] = info->clipStartY.get()[i] = 1;
@@ -1255,38 +1261,32 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     if( saveMask & SF_SAVE_COBJ ) writeMask |= MOMFBD_OBJ;
     if( saveMask & SF_SAVE_RESIDUAL ) writeMask |= MOMFBD_RES;
     if( saveMask & SF_SAVE_ALPHA ) writeMask |= MOMFBD_ALPHA;
-    if( saveMask & SF_SAVE_DIVERSITY  )writeMask |= MOMFBD_DIV;
+    if( nChannels && (saveMask & SF_SAVE_DIVERSITY) ) writeMask |= MOMFBD_DIV;
     
     Array<float> tmpModes;
     if( writeMask&MOMFBD_MODES ){     // copy modes from local cache
         //double pupilRadiusInPixels = pupilPixels / 2.0;
-        //if( channels.size() )pupilRadiusInPixels = channels[0]->pupilRadiusInPixels;
-        tmpModes.resize(myJob.modeNumbers.size()+1, info->nPH, info->nPH );            // +1 to also fit pupil in the array
-        tmpModes.zero( );
-        Array<double> mode_wrap(reinterpret_cast<Array<double>&>(*modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1 );
-        Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1 );     // subarray
-        tmp_slice.assign(reinterpret_cast<const Array<double>&>(*pupil) );
-        info->phOffset = 0;
-        tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1 );
-        tmp_slice.assign(mode_wrap );
-        tmp_slice /= wavelength;
-        if( myJob.modeNumbers.size() ){
-            //ModeInfo id( myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
-            info->nModes = myJob.modeNumbers.size( );
-            info->modesOffset = pupilPixels * pupilPixels * sizeof( float );
-            /*for( uint16_t & it : myJob.modeNumbers ){   // Note: globalData might also contain modes we don't want to save here, e.g. PhaseDiversity modes.
-                if( it > 3 && myJob.modeBasis != ZERNIKE ){       // use Zernike modes for the tilts
-                    id.firstMode = myJob.klMinMode;
-                    id.lastMode = myJob.klMaxMode;
-                } else id.firstMode = id.lastMode = 0;
-                tmp_slice.shift( 0, 1 );     // shift subarray 1 step
-                id.modeNumber = it;
-                tmp_slice.assign(reinterpret_cast<const Array<double>&>(myJob.globalData->get(id)) );
-            }*/
+        //if( objChannels.size() )pupilRadiusInPixels = objChannels[0]->pupilRadiusInPixels;
+        if( !modes || !pupil ) {
+            writeMask &= ~MOMFBD_MODES;
+        } else {
+            tmpModes.resize(myJob.modeNumbers.size()+1, info->nPH, info->nPH );            // +1 to also fit pupil in the array
+            tmpModes.zero( );
+            Array<double> mode_wrap(reinterpret_cast<Array<double>&>(*modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1 );
+            Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1 );     // subarray
+            tmp_slice.assign(reinterpret_cast<const Array<double>&>(*pupil) );
+            info->phOffset = 0;
+            tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1 );
+            tmp_slice.assign(mode_wrap );
+            tmp_slice /= wavelength;
+            if( myJob.modeNumbers.size() ){
+                //ModeInfo id( myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+                info->nModes = myJob.modeNumbers.size( );
+                info->modesOffset = pupilPixels * pupilPixels * sizeof( float );
+            }
         }
     }
 
-    
     info->pix2cf = pixelsToAlpha;
     info->cf2pix = alphaToPixels;
     info->nPatchesY = patchesData.dimSize(0 );
@@ -1296,10 +1296,13 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
 
     size_t modeSize = tmpModes.nElements()*sizeof( float );
     size_t blockSize = modeSize;
-    for( int x = 0; x < info->nPatchesX; ++x ){
-        for( int y = 0; y < info->nPatchesY; ++y ){
-            PatchData::Ptr thisPatch = patchesData(y,x );
+    shared_ptr<ObjectData> oData( make_shared<ObjectData>() );
+    for( int x=0; x < info->nPatchesX; ++x ){
+        for( int y=0; y < info->nPatchesY; ++y ){
+            PatchData::Ptr thisPatch = patchesData(y,x);
             if( thisPatch ){
+                getStorage( *thisPatch, oData );
+                oData->channels = thisPatch->objects[ID]->channels;
                 info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
                 info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
                 info->patches(x,y).region[2] = thisPatch->roi.first.y+1;
@@ -1308,40 +1311,40 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                 info->patches(x,y).nim = sharedArray<int32_t>( nChannels );
                 info->patches(x,y).dx = sharedArray<int32_t>( nChannels );
                 info->patches(x,y).dy = sharedArray<int32_t>( nChannels );
-                for( int i = 0; i < nChannels; ++i ){
-                    info->patches(x,y).nim.get()[i] = channels[i]->nImages( );
-                    info->patches(x,y).dx.get()[i] = thisPatch->objects[ID]->channels[i]->channelOffset.x;
-                    info->patches(x,y).dy.get()[i] = thisPatch->objects[ID]->channels[i]->channelOffset.y;
+                for( int i=0; i < nChannels; ++i ){
+                    info->patches(x,y).nim.get()[i] = channels[i]->nImages( waveFrontList );
+                    info->patches(x,y).dx.get()[i] = oData->channels[i]->channelOffset.x;
+                    info->patches(x,y).dy.get()[i] = oData->channels[i]->channelOffset.y;
                 }
                 blockSize += imgSize;
                 if( writeMask&MOMFBD_PSF ){
-                    if(thisPatch->objects[ID]->psf.nDimensions()>1 ){
-                        info->patches(x,y).npsf = thisPatch->objects[ID]->psf.dimSize(0 );
+                    if(oData->psf.nDimensions()>1 ){
+                        info->patches(x,y).npsf = oData->psf.dimSize(0);
                         blockSize += info->patches(x,y).npsf*imgSize;
                     }
                 }
                 if( writeMask&MOMFBD_OBJ ){
-                    if(thisPatch->objects[ID]->cobj.nDimensions()>1 ){
-                        info->patches(x,y).nobj = thisPatch->objects[ID]->cobj.dimSize(0 );
+                    if(oData->cobj.nDimensions()>1 ){
+                        info->patches(x,y).nobj = oData->cobj.dimSize(0);
                         blockSize += info->patches(x,y).nobj*imgSize;
                     }
                 }
                 if( writeMask&MOMFBD_RES ){
-                    if(thisPatch->objects[ID]->res.nDimensions()>1 ){
-                        info->patches(x,y).nres = thisPatch->objects[ID]->res.dimSize(0 );
+                    if(oData->res.nDimensions()>1 ){
+                        info->patches(x,y).nres = oData->res.dimSize(0);
                         blockSize += info->patches(x,y).nres*imgSize;
                     }
                 }
                 if( writeMask&MOMFBD_ALPHA ){
-                    if(thisPatch->objects[ID]->alpha.nDimensions()==2 ){
-                        info->patches(x,y).nalpha = thisPatch->objects[ID]->alpha.dimSize(0 );
-                        info->patches(x,y).nm = thisPatch->objects[ID]->alpha.dimSize(1 );
+                    if(oData->alpha.nDimensions()==2 ){
+                        info->patches(x,y).nalpha = oData->alpha.dimSize(0);
+                        info->patches(x,y).nm = oData->alpha.dimSize(1 );
                         blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
                     }
                 }
                 if( writeMask&MOMFBD_DIV ){
-                    if(thisPatch->objects[ID]->div.nDimensions()>1 ){
-                        info->patches(x,y).ndiv = thisPatch->objects[ID]->div.dimSize(0 );
+                    if(oData->div.nDimensions()>1 ){
+                        info->patches(x,y).ndiv = oData->div.dimSize(0);
                         info->patches(x,y).nphx = info->nPH;
                         info->patches(x,y).nphy = info->nPH;
                         blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );

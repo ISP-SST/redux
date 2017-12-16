@@ -359,10 +359,12 @@ uint64_t PatchData::size( void ) const {
     uint64_t sz = Part::size();
     sz += index.size() + position.size() + roi.size();
     sz += sizeof(float);
-    sz += metrics.size()*sizeof(float) + sizeof(uint64_t);
-
+    sz += metrics.size()*sizeof(float) + sizeof(uint64_t) + sizeof(uint16_t);
     for( auto& obj: objects ) {
         if(obj) sz += obj->size();
+    }
+    for( auto& td: trace_data ) {
+        if(td) sz += td->size();
     }
     sz += waveFronts.size();
     return sz;
@@ -381,6 +383,15 @@ uint64_t PatchData::pack( char* ptr ) const {
         if(obj) count += obj->pack(ptr+count);
     }
     count += waveFronts.WavefrontData::pack(ptr+count);
+    uint16_t tmp = trace_data.size();
+    count += pack( ptr+count, tmp );
+    if( tmp ) {
+        for( const auto& tobj: trace_data ) {
+            if( tobj ) {
+                count += tobj->pack( ptr+count );
+            }
+        }
+    }
     return count;
 }
 
@@ -398,6 +409,14 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
         if(obj) count += obj->unpack( ptr+count, swap_endian );
     }
     count += waveFronts.WavefrontData::unpack(ptr+count, swap_endian);
+    uint16_t tmp;
+    count += unpack( ptr+count, tmp, swap_endian );
+    trace_data.resize(tmp);
+    for( auto& tobj: trace_data ) {
+        tobj.reset( new ObjectData() );
+        count += tobj->unpack( ptr+count, swap_endian );
+    }
+
     return count;
 }
 
@@ -439,6 +458,14 @@ const PatchData& PatchData::operator=( const PatchData& rhs ) {
         objects[i] = rhs.objects[i];
     }
     waveFronts = rhs.waveFronts;
+    trace_data.resize( rhs.trace_data.size() );
+    if( trace_data.size() != myJob.trace_objects.size() ) {
+        throw runtime_error("Can not copy trace-data if they contain different number of objects.");
+    }
+    for( size_t i=0; i<trace_data.size(); ++i ) {
+        trace_data[i] = rhs.trace_data[i];
+        trace_data[i]->myObject = myJob.trace_objects[i];
+    }
     
     return *this;
     
@@ -462,6 +489,17 @@ void PatchData::copyResults( const PatchData& rhs ) {
     for( size_t i=0; i<objects.size(); ++i ) {
         objects[i]->myObject->getStorage( *this, objects[i] );
         objects[i]->copyResults( *(rhs.objects[i]) );
+    }
+    trace_data.resize( rhs.trace_data.size() );
+    if( trace_data.size() != myJob.trace_objects.size() ) {
+        throw runtime_error("Can not copy trace-data if they contain different number of objects.");
+    }
+    for( size_t i=0; i<trace_data.size(); ++i ) {
+        if( !rhs.trace_data[i] )  continue;
+        trace_data[i].reset( new ObjectData() );
+        trace_data[i]->myObject = myJob.trace_objects[i];
+        trace_data[i]->myObject->getStorage( *this, trace_data[i] );
+        trace_data[i]->copyResults( *(rhs.trace_data[i]) );
     }
     
 }

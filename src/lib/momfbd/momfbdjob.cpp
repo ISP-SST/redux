@@ -160,9 +160,12 @@ uint64_t MomfbdJob::size( void ) const {
     uint64_t sz = Job::size();
     sz += GlobalCfg::size();
     sz += roi.size();
-    sz += sizeof(uint16_t) + 2;           // objects.size() + cfgChecked & dataChecked
+    sz += 2*sizeof(uint16_t) + 2;           // objects.size() + trace_objects.size() + cfgChecked & dataChecked
     for( const auto& obj: objects ) {
         sz += obj->size();
+    }
+    for( const auto& tobj: trace_objects ) {
+        sz += tobj->size();
     }
     return sz;
 }
@@ -178,6 +181,10 @@ uint64_t MomfbdJob::pack( char* ptr ) const {
     count += pack( ptr+count, (uint16_t)objects.size() );
     for( const auto& obj: objects ) {
         count += obj->pack( ptr+count );
+    }
+    count += pack( ptr+count, (uint16_t)trace_objects.size() );
+    for( const auto& tobj: trace_objects ) {
+        count += tobj->pack( ptr+count );
     }
     
     return count;
@@ -198,6 +205,12 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
     for( auto& obj: objects ) {
         obj.reset(new Object(*this));
         count += obj->unpack( ptr+count, swap_endian );
+    }
+    count += unpack( ptr+count, tmp, swap_endian );
+    trace_objects.resize( tmp );
+    for( auto& tobj: trace_objects ) {
+        tobj.reset(new Object(*this));
+        count += tobj->unpack( ptr+count, swap_endian );
     }
     return count;
 }
@@ -483,6 +496,7 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, boost::asio::io_service& service, 
                 StopWatch timer;
                 data->initPatch();
                 solver->run( data );
+                generateTraceData( data );
                 part->nThreads = nThreads;
                 part->runtime_wall = timer.getSeconds();
                 part->runtime_cpu = timer.getCPUSeconds();
@@ -725,9 +739,13 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         if( !bfs::exists(tmpP) ) {
             bfs::create_directories( tmpP );
         }
+        generateTraceObjects();
         if( use_swap ) {
             for( shared_ptr<Object>& obj: objects ) {
                 obj->cacheFile = cachePath + "results_" + to_string(obj->ID);
+            }
+            for( shared_ptr<Object>& obj: trace_objects ) {
+                obj->cacheFile = cachePath + "trace_" + to_string(obj->ID) + "_" + uIntsToString( obj->waveFrontList );
             }
         }
         service.post( [this](){
@@ -902,7 +920,7 @@ void MomfbdJob::writeOutput( boost::asio::io_service& service ) {
     moveTo( this, JSTEP_WRITING );
     
     progWatch.clear();
-    progWatch.set( objects.size() );
+    progWatch.set( objects.size()+trace_objects.size() );
     progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
     progWatch.setHandler( std::bind( &MomfbdJob::clearPatches, this) );
     
@@ -942,6 +960,11 @@ void MomfbdJob::writeOutput( boost::asio::io_service& service ) {
             obj->writeResults( patches );
         });
     }
+    for( auto tobj : trace_objects ) {
+        service.post( [this,tobj,&service](){
+            tobj->writeResults( patches );
+        });
+    }
 
 }
 
@@ -958,51 +981,95 @@ void MomfbdJob::loadPatchResults( boost::asio::io_service& service, uint16_t nTh
 }
 
 
+void MomfbdJob::generateTraceObjects( void ) {
+
+    int refID = -1;
+    if( trace ) {
+        for( shared_ptr<Object>& ref_obj: objects ) {
+            if ( ref_obj && ref_obj->traceObject ) {
+                refID = ref_obj->ID;
+                break;
+            }
+        }
+    }
+    if( refID >= 0 ) {
+        shared_ptr<Object> ref_obj = objects[refID];
+        set< set<uint32_t> > generatedWF; 
+        LOG << "Generating trace-objects for reference #" << refID << ende;
+        for( shared_ptr<Object>& obj: objects ) {
+            if ( obj && (obj->ID != refID) ) {
+                set<uint32_t> thisWf( obj->waveFrontList.begin(), obj->waveFrontList.end() );
+                auto ret = generatedWF.insert( thisWf );
+                if( ret.second ) {      // inserted, so this WF combination has not been generated yet.
+                    shared_ptr<Object> tmpObj( new Object( *ref_obj, refID ) );
+                    tmpObj->outputFileName = obj->outputFileName + "_trace";
+                    tmpObj->waveFrontList = obj->waveFrontList;
+                    tmpObj->nObjectImages = tmpObj->waveFrontList.size();
+                    trace_objects.push_back( tmpObj );
+                }                                   // TODO: symlink to previously generated?
+            }
+        }
+    }
+    
+}
+
+
+void MomfbdJob::generateTraceData( PatchData::Ptr patch ) {
+    
+    for( shared_ptr<Object>& tobj: trace_objects ) {
+        shared_ptr<Object> o = objects[ tobj->ID ];
+        shared_ptr<ObjectData> od = make_shared<ObjectData>();
+        od->myObject = o;
+        if( runFlags & RF_FIT_PLANE ) {
+            tobj->fittedPlane.resize( patchSize, patchSize );
+            o->fitAvgPlane( tobj->fittedPlane, tobj->waveFrontList );
+        }
+        o->restorePatch( *od, tobj->waveFrontList );
+        patch->trace_data.push_back( od );
+    }
+    
+}
+
+
 void MomfbdJob::postProcess( boost::asio::io_service& service, uint16_t nThreads ) {
 
     LOG_TRACE << "MomfbdJob::postProcess()" << ende;
  
 
-    progWatch.set( patches.nElements() );
+    progWatch.set( 1 );
     progWatch.setHandler( std::bind( &MomfbdJob::writeOutput, this, std::ref(service)) );
-//     progWatch.setHandler([this,&service](){      // triggered when all patches are loaded from the cache-files.
-//         progWatch.set( objects.size() );
-//         if( saveMask&SF_SAVE_METRIC ) {
-//             progWatch.increaseTarget();
-//             service.post( [this](){
-//                 bfs::path fn = bfs::path(info.outputDir) / bfs::path(info.name+"_metrics.f0");
-//                 Array<float> metrics( patches.dimensions() );
-//                 for( auto& patch: patches ) {
-//                     metrics( patch->index.y, patch->index.x ) = patch->finalMetric; 
-//                 }
-//                 LOG << "Writing metrics to file: " << fn << ende;
-//                 Ana::write( fn.string(), metrics );
-//                 ++progWatch;
-//             });
-// 
-//         }
-//     
-//         for( auto obj : objects ) {
-//             service.post( [this,obj](){
-//                 obj->writeResults( patches );
-//                 ++progWatch;
-//             });
-//         }
-//         
-//         progWatch.setHandler([this](){      // triggered when all object results (and possible the metric data) are written
-//             patches.clear();
-//             info.step = JSTEP_COMPLETED;
-//         });
-// 
-// 
-//     });
 
-    for( auto& patch: patches ) {
-        service.post( [this,patch](){
-            patch->cacheLoad(false); //true);        // load and erase cache-file.
-            ++progWatch;
-        });
-    }
+//     int nPatchesX = patches.dimSize(1);
+//     int nPatchesY = patches.dimSize(0);
+//     
+//     if( trace_objects.size() ) {
+//         //ProgressWatch pw;
+//         for( int y=0; y<nPatchesY; ++y ) {
+//             for( int x=0; x<nPatchesX; ++x ) {
+//                 PatchData::Ptr patch = patches(y,x);
+//                 patch->cacheLoad();
+//                 patch->load();
+//                 patch->initPatch();
+//                 patch->loadAlpha( solver->alpha.get() );
+//                 solver->shiftAndInit( true );
+//                 solver->applyAlpha();
+//                 //pw.set( tmpObjects.size() );
+//                 for( shared_ptr<Object>& tobj: trace_objects ) {
+//                 //    service.post([this,&pw,&objIdMap,patch,tobj](){
+//                         shared_ptr<ObjectData> tmpOD( make_shared<ObjectData>(tobj) );
+//                         tmpOD->channels = patch->objects[ objIdMap[tobj->ID] ]->channels;
+//                         objects[ objIdMap[tobj->ID] ]->fitAvgPlane(tobj->fittedPlane, tobj->waveFrontList );
+//                         tobj->restorePatch( *tmpOD );
+//                         patch->objects.push_back( tmpOD );
+//                  //       ++pw;
+//                 //    });
+//                 }
+//                 //pw.wait();
+//             }
+//         }
+//     }
+    ++progWatch;
+
     
 }
 

@@ -120,6 +120,7 @@ namespace redux {
             typedef std::shared_ptr<PatchData> Ptr;
             MomfbdJob& myJob;
             std::vector<std::shared_ptr<ObjectData>> objects;
+            std::vector<std::shared_ptr<ObjectData>> trace_data;
             WavefrontData waveFronts;
             redux::util::Point16 index;                      //! Patch-index in mozaic
             redux::util::Point16 position;                   //! Patch position (centre coordinates in the reference channel)
