@@ -96,7 +96,7 @@ void ChannelData::copyResults( const ChannelData& rhs ) {
 }
 
 
-void ChannelData::dump( string tag ) {
+void ChannelData::dump( string tag ) const {
 
     tag += "_c"+to_string(myChannel->ID);
     if( images.nElements() ) Ana::write( tag + "_images.f0", images);
@@ -241,7 +241,7 @@ void ObjectData::copyResults( const ObjectData& rhs ) {
 }
 
 
-void ObjectData::dump( string tag ) {
+void ObjectData::dump( string tag ) const {
 
     tag += "_o"+to_string(myObject->ID);
     for( auto& ch : channels ) {
@@ -298,7 +298,7 @@ void WavefrontData::copyResults( const WavefrontData& rhs ) {
 }
 
 
-void WavefrontData::dump( string tag ) {
+void WavefrontData::dump( string tag ) const {
 
     if( !ids.empty() ) {
         vector<int32_t> tmp( ids.begin(), ids.end() );
@@ -467,7 +467,7 @@ void PatchData::copyResults( const PatchData& rhs ) {
 }
 
 
-void PatchData::dump( string tag ) {
+void PatchData::dump( string tag ) const {
 
     tag += "_patch" + (string)index;
     

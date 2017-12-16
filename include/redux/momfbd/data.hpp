@@ -57,7 +57,7 @@ namespace redux {
             const ChannelData& operator=(const ChannelData&);
 
             void copyResults( const ChannelData& rhs );
-            void dump( std::string );
+            void dump( std::string ) const;
             
             std::shared_ptr<Channel> myChannel;
             
@@ -69,6 +69,7 @@ namespace redux {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
+            ObjectData(void) {};
             explicit ObjectData( std::shared_ptr<Object> o );
             ~ObjectData();
             
@@ -81,7 +82,7 @@ namespace redux {
             const ObjectData& operator=(const ObjectData&);
             
             void copyResults( const ObjectData& rhs );
-            void dump( std::string );
+            void dump( std::string ) const;
             
             std::vector<std::shared_ptr<ChannelData>> channels;
             
@@ -103,7 +104,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             const WavefrontData& operator=(const WavefrontData&);
             void copyResults( const WavefrontData& rhs );
-            void dump( std::string );
+            void dump( std::string ) const;
             
             /********* Results ********/
             std::vector<uint32_t> ids;                  //!< Wavefront indices   (nWf)
@@ -160,7 +161,7 @@ namespace redux {
             }
 
             void copyResults( const PatchData& rhs );
-            void dump( std::string );
+            void dump( std::string ) const;
             
         };
        
