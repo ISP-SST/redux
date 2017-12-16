@@ -724,6 +724,11 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         if( !bfs::exists(tmpP) ) {
             bfs::create_directories( tmpP );
         }
+        if( use_swap ) {
+            for( shared_ptr<Object>& obj: objects ) {
+                obj->cacheFile = cachePath + "results_" + to_string(obj->ID);
+            }
+        }
         service.post( [this](){
             initCache();
             ++progWatch;

@@ -950,10 +950,6 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
         LOG_DEBUG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
     } );
     
-    if( !(myJob.runFlags&RF_NOSWAP) ) {    // unless swap is deactivated for this job
-        cacheFile = myJob.cachePath + "results_" + to_string(ID);
-    }
-    
     for( shared_ptr<Channel>& ch: channels ){
         ch->loadData( service, patches );
     }
