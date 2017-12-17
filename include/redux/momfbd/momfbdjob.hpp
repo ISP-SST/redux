@@ -113,6 +113,7 @@ namespace redux {
             void verifyPatches( void );
             void writeOutput( boost::asio::io_service& );
             void loadPatchResults( boost::asio::io_service&, uint16_t nThreads );
+            int getReferenceObject( void );
             void generateTraceObjects( void );
             void generateTraceData(PatchData::Ptr);
             void postProcess( boost::asio::io_service&, uint16_t nThreads );

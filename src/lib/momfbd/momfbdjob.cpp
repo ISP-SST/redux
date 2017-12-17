@@ -981,8 +981,44 @@ void MomfbdJob::loadPatchResults( boost::asio::io_service& service, uint16_t nTh
 }
 
 
+int MomfbdJob::getReferenceObject( void ) {
+    
+    set<uint32_t> allWaveFronts;
+    for( shared_ptr<Object>& obj: objects ) {
+        if( obj ) allWaveFronts.insert( obj->waveFrontList.begin(), obj->waveFrontList.end() );
+    }
+    
+    int ret = -1;
+    vector<shared_ptr<Object>> tmpObjs( objects );
+    tmpObjs.erase( std::remove_if(tmpObjs.begin(), tmpObjs.end(),
+                                        [&allWaveFronts]( const shared_ptr<Object>& o ){
+                                            if( !o ) return true;
+                                            set<uint32_t> objWaveFronts( o->waveFrontList.begin(), o->waveFrontList.end() ); 
+                                            for( auto wf: allWaveFronts ) {
+                                                if( objWaveFronts.count(wf) == 0 ) return true;
+                                            }
+                                            return false;
+                                    }), tmpObjs.end() );
+    
+    if( tmpObjs.size() >= 1 ) {     // only one object contains all wave-fronts, this should be the desired reference
+        ret = tmpObjs[0]->ID;
+        if( tmpObjs.size() > 1 ) {
+            LOG_WARN << "More than one object contained all wavefronts." << ende;
+        }
+        LOG << "Selecting object #" << ret << " as reference." << ende;
+    } else if( tmpObjs.size() > 1 ) {
+        LOG_DEBUG << "No suitable object found to use as reference." << ende;
+    }
+    
+    return ret;
+
+}
+
+
 void MomfbdJob::generateTraceObjects( void ) {
 
+    if( !trace ) return;
+    
     int refID = -1;
     if( trace ) {
         for( shared_ptr<Object>& ref_obj: objects ) {
@@ -992,22 +1028,24 @@ void MomfbdJob::generateTraceObjects( void ) {
             }
         }
     }
-    if( refID >= 0 ) {
-        shared_ptr<Object> ref_obj = objects[refID];
-        set< set<uint32_t> > generatedWF; 
-        LOG << "Generating trace-objects for reference #" << refID << ende;
-        for( shared_ptr<Object>& obj: objects ) {
-            if ( obj && (obj->ID != refID) ) {
-                set<uint32_t> thisWf( obj->waveFrontList.begin(), obj->waveFrontList.end() );
-                auto ret = generatedWF.insert( thisWf );
-                if( ret.second ) {      // inserted, so this WF combination has not been generated yet.
-                    shared_ptr<Object> tmpObj( new Object( *ref_obj, refID ) );
-                    tmpObj->outputFileName = obj->outputFileName + "_trace";
-                    tmpObj->waveFrontList = obj->waveFrontList;
-                    tmpObj->nObjectImages = tmpObj->waveFrontList.size();
-                    trace_objects.push_back( tmpObj );
-                }                                   // TODO: symlink to previously generated?
-            }
+    
+    if( refID < 0 ) refID = getReferenceObject();
+    if( refID < 0 ) return;
+
+    shared_ptr<Object> ref_obj = objects[refID];
+    set< set<uint32_t> > generatedWF; 
+    LOG << "Generating trace-objects for reference #" << refID << ende;
+    for( shared_ptr<Object>& obj: objects ) {
+        if ( obj && (obj->ID != refID) ) {
+            set<uint32_t> thisWf( obj->waveFrontList.begin(), obj->waveFrontList.end() );
+            auto ret = generatedWF.insert( thisWf );
+            if( ret.second ) {      // inserted, so this WF combination has not been generated yet.
+                shared_ptr<Object> tmpObj( new Object( *ref_obj, refID ) );
+                tmpObj->outputFileName = obj->outputFileName + "_trace";
+                tmpObj->waveFrontList = obj->waveFrontList;
+                tmpObj->nObjectImages = tmpObj->waveFrontList.size();
+                trace_objects.push_back( tmpObj );
+            }                                   // TODO: symlink to previously generated?
         }
     }
     
