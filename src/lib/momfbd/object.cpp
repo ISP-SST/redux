@@ -313,7 +313,7 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
     }
     
     if( images.empty() ) return;
-    
+
     size_t nModes = myJob.modeNumbers.size();
     
     FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
@@ -355,7 +355,7 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
                 [normalization]( const complex_t& a ){
                     return std::real(a)*normalization;
                 } );
-
+    
     // PSF
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
         uint16_t nPSF =( saveMask&SF_SAVE_PSF_AVG)? 1 : imgCount;
@@ -1055,6 +1055,17 @@ size_t Object::getResultSize( void ) {
     if( saveMask & SF_SAVE_RESIDUAL ){
         ret += nObjectImages*patchSize*patchSize;
     }
+    if( saveMask & SF_SAVE_ALPHA ){
+        ret += nObjectImages*myJob.modeNumbers.size();
+    }
+    vector<shared_ptr<Channel>>& objChannels = channels;
+    if( objChannels.empty() ) {
+        objChannels = myJob.getChannels(ID);
+    }
+    int nCh = objChannels.size();
+    if( nCh && (saveMask & SF_SAVE_DIVERSITY) ){
+        ret += nCh*pupilPixels*pupilPixels;
+    }
     return ret;
 }
 
@@ -1064,8 +1075,8 @@ void Object::maybeInitializeStorage( void ) {
     lock_guard<mutex> lock(mtx);
     if( results.nElements() ) return;        // already allocated/loaded
     
-    size_t nPatchesX = myJob.subImagePosX.size();
-    size_t nPatchesY = myJob.subImagePosY.size();
+    size_t nPatchesX = myJob.subImagePosY.size();     // FIXME x/y swapped to be in the right order for block-copy in writeMOMFBD
+    size_t nPatchesY = myJob.subImagePosX.size();
     size_t resultSize = getResultSize();
 
     if( !(myJob.runFlags&RF_NOSWAP) ) {     // should we mmap?
@@ -1089,7 +1100,7 @@ void Object::getStorage( PatchData& pData, shared_ptr<ObjectData> oData ) {
     
     if( !oData ) return;
     
-    float* resPtr = results.ptr( pData.index.y, pData.index.x, 0 );
+    float* resPtr = results.ptr( pData.index.x, pData.index.y, 0 );     // FIXME x/y swapped to be in the right order for block-copy in writeMOMFBD
     oData->img.wrap( resPtr, patchSize, patchSize );
     resPtr += patchSize*patchSize;
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
@@ -1104,6 +1115,19 @@ void Object::getStorage( PatchData& pData, shared_ptr<ObjectData> oData ) {
     if( saveMask & SF_SAVE_RESIDUAL ){
         oData->res.wrap( resPtr, nObjectImages, patchSize, patchSize );
         resPtr += nObjectImages*patchSize*patchSize;
+    }
+    if( saveMask & SF_SAVE_ALPHA ){
+        oData->alpha.wrap( resPtr, nObjectImages, myJob.modeNumbers.size() );
+        resPtr += nObjectImages*myJob.modeNumbers.size();
+    }
+    vector<shared_ptr<Channel>>& objChannels = channels;
+    if( objChannels.empty() ) {
+        objChannels = myJob.getChannels(ID);
+    }
+    int nCh = objChannels.size();
+    if( nCh && (saveMask & SF_SAVE_DIVERSITY) ){
+        oData->div.wrap( resPtr, nCh, pupilPixels, pupilPixels );
+        resPtr += nCh*pupilPixels*pupilPixels;
     }
 
 }
@@ -1250,6 +1274,7 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
             info->clipEndY.get()[i] = channels[i]->alignClip[3];
         }
     }
+    
     info->nPH = pupilPixels;
 
     uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
@@ -1358,55 +1383,23 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     memcpy(tmp.get(), tmpModes.get(), modeSize );
     char* tmpPtr = tmp.get( );
     int64_t offset = modeSize;
+    results.copyTo<float>(tmpPtr+offset);
     for( int x = 0; x < info->nPatchesX; ++x ){
         for( int y = 0; y < info->nPatchesY; ++y ){
-            PatchData::Ptr thisPatch = patchesData(y,x );
-            if( thisPatch && ID < thisPatch->objects.size( ) ){
-                auto &objData = thisPatch->objects[ID];
-                if( objData->img.nElements( ) ){
-                    memcpy(tmpPtr+offset, objData->img.get(), imgSize );
-                } else {
-                    memset(tmpPtr+offset, 0, imgSize );
-                }
+            PatchData::Ptr thisPatch = patchesData(y,x);
+            if( thisPatch ){
                 info->patches(x,y).imgPos = offset;
                 offset += imgSize;
-                if( objData->psf.nElements( ) ){
-                    memcpy(tmpPtr+offset, objData->psf.get(), info->patches(x,y).npsf*imgSize );
-                } else {
-                    memset(tmpPtr+offset, 0, info->patches(x,y).npsf*imgSize );
-                }
                 info->patches(x,y).psfPos = offset;
                 offset += info->patches(x,y).npsf*imgSize;
-                if( objData->cobj.nElements( ) ){
-                    memcpy(tmpPtr+offset, objData->cobj.get(), info->patches(x,y).nobj*imgSize );
-                } else {
-                    memset(tmpPtr+offset, 0, info->patches(x,y).nobj*imgSize );
-                }
                 info->patches(x,y).objPos = offset;
                 offset += info->patches(x,y).nobj*imgSize;
-                if( objData->res.nElements( ) ){
-                    memcpy(tmpPtr+offset, objData->res.get(), info->patches(x,y).nres*imgSize );
-                } else {
-                    memset(tmpPtr+offset, 0, info->patches(x,y).nres*imgSize );
-                }
                 info->patches(x,y).resPos = offset;
                 offset += info->patches(x,y).nres*imgSize;
-                size_t alphaSize = info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
-                if( objData->alpha.nElements( ) ){
-                    memcpy(tmpPtr+offset, objData->alpha.get(), alphaSize );
-                } else {
-                    memset(tmpPtr+offset, 0, alphaSize );
-                }
                 info->patches(x,y).alphaPos = offset;
-                offset += alphaSize;
-                size_t divSize = info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
-                if( objData->div.nElements( ) ){
-                    memcpy(tmpPtr+offset, objData->div.get(), divSize );
-                } else {
-                    memset(tmpPtr+offset, 0, divSize );
-                }
+                offset += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
                 info->patches(x,y).diversityPos = offset;
-                offset += divSize;
+                offset += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
             }
         }
     }

@@ -225,14 +225,18 @@ void ObjectData::copyResults( const ObjectData& rhs ) {
     if( channels.size() != rhs.channels.size() ) {
         throw runtime_error("Can not copy ObjectResults if they contain different number of channels.");
     }
-
-    if( img.nElements() == rhs.img.nElements() ) rhs.img.copyTo<float>( img.ptr() );
-    if( psf.nElements() == rhs.psf.nElements() ) rhs.psf.copyTo<float>( psf.get() );
-    if( cobj.nElements() == rhs.cobj.nElements() ) rhs.cobj.copyTo<float>( cobj.get() );
-    if( res.nElements() == rhs.res.nElements() ) rhs.res.copyTo<float>( res.get() );
-
-    alpha = rhs.alpha;
-    div = rhs.div;
+    size_t nEl = img.nElements();
+    if( nEl && (nEl == rhs.img.nElements()) ) rhs.img.copyTo<float>( img.ptr() );
+    nEl = psf.nElements();
+    if( nEl && (nEl == rhs.psf.nElements()) )  rhs.psf.copyTo<float>( psf.ptr() );
+    nEl = cobj.nElements();
+    if( nEl && (nEl == rhs.cobj.nElements()) ) rhs.cobj.copyTo<float>( cobj.ptr() );
+    nEl = res.nElements();
+    if( nEl && (nEl == rhs.res.nElements()) ) rhs.res.copyTo<float>( res.ptr() );
+    nEl = alpha.nElements();
+    if( nEl && (nEl == rhs.alpha.nElements()) ) rhs.alpha.copyTo<float>( alpha.ptr() );
+    nEl = div.nElements();
+    if( nEl && (nEl == rhs.div.nElements()) ) rhs.div.copyTo<float>( div.ptr() );
 
     for( size_t i=0; i<channels.size(); ++i ) {
         channels[i]->copyResults( *(rhs.channels[i]) );
