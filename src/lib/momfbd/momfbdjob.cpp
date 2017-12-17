@@ -1216,6 +1216,11 @@ bool MomfbdJob::checkCfg(void) {
 
     if( cfgChecked ) return true;
 
+    if( patchSize%4 ) {
+        LOG_ERR << "The patch-size has to be a multiple of 4." << ende;
+        return false;
+    }
+    
     if( (runFlags&RF_FLATFIELD) && (runFlags&RF_CALIBRATE) ) {
         LOG_ERR << "Both FLATFIELD and CALIBRATE mode requested" << ende;
         return false;
