@@ -543,8 +543,9 @@ void MomfbdJob::setLogChannel(std::string channel) {
 
 bool MomfbdJob::checkPatchPositions(void) {
 
-    const vector<int16_t>& clip = objects[0]->channels[0]->alignClip;
-    Point16 imageSizes = objects[0]->getImageSize();
+    shared_ptr<Object> ref = getObject(0);
+    const vector<int16_t>& clip = ref->channels[0]->alignClip;
+    Point16 imageSizes = ref->getImageSize();
     if( clip.size() == 4 ) {
         roi = Region16( min(clip[3],clip[2]), min(clip[1],clip[0]), max(clip[3],clip[2]), max(clip[1],clip[0]) );
     } else roi = Region16( imageSizes.y-1, imageSizes.x-1 );
@@ -677,6 +678,8 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
 
     LOG_TRACE << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processing..." << ende;
 
+    generateTraceObjects();
+    
     uint32_t nTotalImages = 0;
     uint32_t nTotalChannels(0);
     Point16 imageSizes;
@@ -739,7 +742,7 @@ void MomfbdJob::preProcess( boost::asio::io_service& service, uint16_t nThreads 
         if( !bfs::exists(tmpP) ) {
             bfs::create_directories( tmpP );
         }
-        generateTraceObjects();
+
         if( use_swap ) {
             for( shared_ptr<Object>& obj: objects ) {
                 obj->cacheFile = cachePath + "results_" + to_string(obj->ID);
@@ -1000,12 +1003,12 @@ int MomfbdJob::getReferenceObject( void ) {
                                             return false;
                                     }), tmpObjs.end() );
     
-    if( tmpObjs.size() >= 1 ) {     // only one object contains all wave-fronts, this should be the desired reference
+    if( tmpObjs.size() >= 1 ) {     // if only one object contains all wave-fronts, this should be the desired reference
         ret = tmpObjs[0]->ID;
         if( tmpObjs.size() > 1 ) {
             LOG_WARN << "More than one object contained all wavefronts." << ende;
         }
-        LOG << "Selecting object #" << ret << " as reference." << ende;
+        LOG_DETAIL << "Selecting object #" << ret << " as reference." << ende;
     } else if( tmpObjs.size() > 1 ) {
         LOG_DEBUG << "No suitable object found to use as reference." << ende;
     }
@@ -1020,8 +1023,10 @@ void MomfbdJob::generateTraceObjects( void ) {
     if( !trace ) return;
     
     int refID = -1;
+    set<int> idSet;
     if( trace ) {
         for( shared_ptr<Object>& ref_obj: objects ) {
+            idSet.insert(ref_obj->ID);
             if ( ref_obj && ref_obj->traceObject ) {
                 refID = ref_obj->ID;
                 break;
@@ -1032,22 +1037,104 @@ void MomfbdJob::generateTraceObjects( void ) {
     if( refID < 0 ) refID = getReferenceObject();
     if( refID < 0 ) return;
 
+    LOG_DETAIL << "Generating trace-objects for reference #" << refID << ende;
+    
     shared_ptr<Object> ref_obj = objects[refID];
-    set< set<uint32_t> > generatedWF; 
-    LOG << "Generating trace-objects for reference #" << refID << ende;
+    size_t found =  ref_obj->outputFileName.find_first_of("_.");
+    string refTag;
+    if( found != string::npos ) {
+        refTag = ref_obj->outputFileName.substr( 0, found );
+    }
+    set<uint32_t> refWaveFronts( ref_obj->waveFrontList.begin(), ref_obj->waveFrontList.end() );
+    vector<string> refFiles;
+    for( auto& c: ref_obj->channels ) {
+        c->getFileNames(refFiles);
+    }
+    set<string> refFileSet;
+    for( auto& fn: refFiles ) {
+        bfs::path resolved = bfs::canonical(fn);
+        refFileSet.insert( resolved.string() );
+    }
+    
+    map< set<uint32_t>, vector<string> > wfSets;        // TODO better generation of output filenames for trace-objects?
+                                                        // For now, we are using the same names as the old-style trace objects.
+    // convert old-style trace-objects
+    for( shared_ptr<Object>& obj: objects ) {
+        if ( obj && (obj->ID != refID) && (obj->weight == 0) ) {
+            set<uint32_t> thisWf( obj->waveFrontList.begin(), obj->waveFrontList.end() );
+            for( auto& wf: thisWf ) {
+                if( refWaveFronts.count(wf) == 0 ) {    // not present in reference -> can't be traced.
+                    goto loopend;
+                }
+            }
+            vector<string> objFiles;
+            for( auto& c: obj->channels ) {
+                c->getFileNames(objFiles);
+            }
+            set<string> objFileSet;
+            for( auto& fn: objFiles ) {
+                bfs::path resolved = bfs::canonical(fn);
+                objFileSet.insert( resolved.string() );
+            }
+            for( auto& fn: objFileSet ) {
+                if( refFileSet.count(fn) == 0 ) {    // not present in reference -> can't be traced.
+                    goto loopend;
+                }
+            }
+            auto ret = wfSets.emplace( thisWf, vector<string>(1,obj->outputFileName) );
+            if( !ret.second ) {      // not inserted, so this WF already existed
+                ret.first->second.push_back( obj->outputFileName );
+            }
+            obj->traceID = refID;
+            obj->channels.clear();
+            trace_objects.push_back( std::move(obj) );
+        }
+loopend: ;
+    }
+
+    objects.erase( std::remove_if(objects.begin(), objects.end(),
+                                        []( const shared_ptr<Object>& o ){
+                                            if( !o ) return true;
+                                            return false;
+                                    }), objects.end() );
+
+    size_t nOld = trace_objects.size();
+    if( nOld ) LOG_DETAIL << "Converted " << nOld << " old-style trace objects." << ende;
+
+    uint16_t idCnt(0);
+    while( idSet.count(idCnt) ) idCnt++;
     for( shared_ptr<Object>& obj: objects ) {
         if ( obj && (obj->ID != refID) ) {
             set<uint32_t> thisWf( obj->waveFrontList.begin(), obj->waveFrontList.end() );
-            auto ret = generatedWF.insert( thisWf );
+            auto ret = wfSets.emplace( thisWf, vector<string>(1,obj->outputFileName) );
             if( ret.second ) {      // inserted, so this WF combination has not been generated yet.
-                shared_ptr<Object> tmpObj( new Object( *ref_obj, refID ) );
-                tmpObj->outputFileName = obj->outputFileName + "_trace";
+                shared_ptr<Object> tmpObj( new Object( *ref_obj, idCnt, refID ) );
+                tmpObj->outputFileName = obj->outputFileName;
                 tmpObj->waveFrontList = obj->waveFrontList;
                 tmpObj->nObjectImages = tmpObj->waveFrontList.size();
                 trace_objects.push_back( tmpObj );
-            }                                   // TODO: symlink to previously generated?
+            } else {                // already in list, append outputFileName
+                ret.first->second.push_back(obj->outputFileName);
+            }
         }
     }
+    size_t nNew = trace_objects.size() - nOld;
+    if( nNew ) LOG_DETAIL << "Generated " << nNew << " trace-objects with reference object " << refID << ende;
+
+    if( !refTag.empty() ) {
+        for( shared_ptr<Object>& obj: trace_objects ) {
+            size_t found =  obj->outputFileName.find_first_of("_.");
+            string objTag;
+            if( found != string::npos ) {
+                objTag = obj->outputFileName.substr( 0, found );
+            }
+            if( !objTag.empty() && (objTag != refTag) ) {
+                obj->outputFileName = replace_n( obj->outputFileName, objTag, refTag );
+            }
+        }
+    }
+    
+    
     
 }
 
