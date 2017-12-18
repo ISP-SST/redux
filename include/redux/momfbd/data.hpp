@@ -131,6 +131,7 @@ namespace redux {
             PatchData( const PatchData& ) = delete;
             ~PatchData();
 
+            std::shared_ptr<ObjectData> getObjectData( uint16_t id ) const;
             void setPath(const std::string& path);
             void initPatch(void);
             void clear(void);

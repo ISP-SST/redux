@@ -95,10 +95,8 @@ namespace redux {
             bool checkWriting(void);
             uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
             const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
-            const std::vector<std::shared_ptr<Channel>>& getChannels(uint16_t objID) const {
-                if( objID >= objects.size() || !objects[objID] ) throw std::out_of_range("invalid object-index.");
-                return objects[objID]->getChannels();
-            }
+            const std::shared_ptr<Object> getObject( uint16_t id ) const;
+            const std::vector<std::shared_ptr<Channel>>& getChannels(uint16_t objID) const;
 
             const MomfbdJob& operator=(const GlobalCfg&);
 

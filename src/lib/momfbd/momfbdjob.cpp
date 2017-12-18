@@ -1403,7 +1403,25 @@ uint16_t MomfbdJob::getNextStep( uint16_t step ) const {
     
 }
 
-        
+
+const shared_ptr<Object> MomfbdJob::getObject( uint16_t id ) const {
+    for( auto& o: objects ) {
+        if( o && (o->ID == id) ) return o;
+    }
+    for( auto& o: trace_objects ) {
+        if( o && (o->ID == id) ) return o;
+    }
+    return shared_ptr<Object>();
+}
+
+
+const vector<shared_ptr<Channel>>& MomfbdJob::getChannels( uint16_t objID ) const {
+    shared_ptr<Object> o = getObject(objID);
+    if( !o ) throw out_of_range("invalid object-id: " + to_string(objID) );
+    return o->getChannels();
+}
+
+
 const MomfbdJob& MomfbdJob::operator=(const GlobalCfg& rhs) {
     GlobalCfg::operator=(rhs);
     return *this;
