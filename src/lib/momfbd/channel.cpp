@@ -596,8 +596,10 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
     });
     for( unsigned int y=0; y<patches.dimSize(0); ++y ) {
         for( unsigned int x=0; x<patches.dimSize(1); ++x ) {
-            service.post( [this,&patches,y,x](){
-                auto chData = patches(y,x)->objects[myObject.ID]->channels[ID];
+            service.post( [this,&patches,y,x]() {
+                auto oData = patches(y,x)->getObjectData(myObject.ID);
+                if( !oData ) throw runtime_error("patches(y,x)->getObjectData() returned a null pointer !");
+                auto chData = oData->channels[ID];
                 adjustCutout( *chData, patches(y,x) );
                 ++progWatch;
             } );
@@ -660,7 +662,9 @@ void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Pt
         for(unsigned int px=0; px<nPatchesX; ++px) {
             service.post( [this,&patches,py,px](){
                 if( myJob.isOK() ) {
-                    auto chData = patches(py,px)->objects[myObject.ID]->channels[ID];
+                    auto oData = patches(py,px)->getObjectData(myObject.ID);
+                    if( !oData ) throw runtime_error("patches(y,x)->getObject() returned a null pointer !");
+                    auto chData = oData->channels[ID];
                     try {
                         getStorage(*chData);
                     } catch( std::exception& e ) {
@@ -1257,7 +1261,9 @@ void Channel::adjustCutouts( Array<PatchData::Ptr>& patches ) {
         for( unsigned int py=0; py<nPatchesY; ++py ) {
             for( unsigned int px=0; px<nPatchesX; ++px ) {
                 PatchData::Ptr& patch( patches(py,px) );
-                auto chData = patch->objects[myObject.ID]->channels[ID];
+                auto oData = patch->getObjectData(myObject.ID);
+                if( !oData ) throw runtime_error("patch->getObjectData() returned a null pointer !");
+                auto chData = oData->channels[ID];
                 adjustCutout( *chData, patch );
             }
         }

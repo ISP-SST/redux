@@ -1142,7 +1142,7 @@ loopend: ;
 void MomfbdJob::generateTraceData( PatchData::Ptr patch ) {
     
     for( shared_ptr<Object>& tobj: trace_objects ) {
-        shared_ptr<Object> o = objects[ tobj->ID ];
+        shared_ptr<Object> o = getObject( tobj->traceID );
         shared_ptr<ObjectData> od = make_shared<ObjectData>();
         od->myObject = o;
         if( runFlags & RF_FIT_PLANE ) {
@@ -1504,6 +1504,7 @@ const shared_ptr<Object> MomfbdJob::getObject( uint16_t id ) const {
 
 const vector<shared_ptr<Channel>>& MomfbdJob::getChannels( uint16_t objID ) const {
     shared_ptr<Object> o = getObject(objID);
+    if( o && (o->traceID >= 0) ) o = getObject( o->traceID );       // for trace-objects we return the channel-list for the reference object.
     if( !o ) throw out_of_range("invalid object-id: " + to_string(objID) );
     return o->getChannels();
 }

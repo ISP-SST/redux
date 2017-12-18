@@ -1003,7 +1003,8 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
         for( size_t y=0; y<nPatchesY; ++y ){
             for( size_t x=0; x<nPatchesX; ++x ){
                 info->patches(y,x).load( file, tmpData.get(), info->swapNeeded, info->version, MOMFBD_ALPHA );
-                auto oData = patches(y,x)->objects[ID];
+                auto oData = patches(y,x)->getObjectData(ID);
+                if( !oData ) throw runtime_error("patches(y,x)->getObjectData(ID) returned a null pointer !");
                 oData->alpha.resize( nImgs, info->nModes );
                 oData->alpha.copyFrom<float>( reinterpret_cast<float*>(tmpData.get()+offset ) );
             }
@@ -1155,11 +1156,13 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
     for( unsigned int y = 0; y < patches.dimSize(0 ); ++y ){
         for( unsigned int x = 0; x < patches.dimSize(1 ); ++x ){
             const Point16& first = patches(y,x)->roi.first;
-            if( first.x > maxPosX )maxPosX = first.x;
-            if( first.x < minPosX )minPosX = first.x;
-            if( first.y > maxPosY )maxPosY = first.y;
-            if( first.y < minPosY )minPosY = first.y;
-            auto pPtr = patches(y,x)->objects[ID]->img.reshape(patchSize,patchSize );
+            if( first.x > maxPosX ) maxPosX = first.x;
+            if( first.x < minPosX ) minPosX = first.x;
+            if( first.y > maxPosY ) maxPosY = first.y;
+            if( first.y < minPosY ) minPosY = first.y;
+            auto oData = patches(y,x)->getObjectData(ID);
+            if( !oData ) throw runtime_error("patches(y,x)->getObject(ID) returned a null pointer !");
+            auto pPtr = oData->img.reshape(patchSize,patchSize );
             patchPtrs.push_back( pPtr );
             patchData.push_back( pPtr.get( ) );
             xpos.push_back( first.x );
@@ -1199,7 +1202,9 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
         Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size() );
         for( auto& patch: patches ){
             Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1 );
-            patch->objects[ID]->alpha.copy(subalpha );
+            auto oData = patch->getObjectData(ID);
+            if( !oData ) throw runtime_error("patches(y,x)->getObject() returned a null pointer !");
+            oData->alpha.copy( subalpha );
        }
        Ana::write(fn.string(), alpha );
     }
