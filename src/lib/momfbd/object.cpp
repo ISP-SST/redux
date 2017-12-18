@@ -71,16 +71,16 @@ namespace {
 }
 
 Object::Object( MomfbdJob& j, uint16_t id ): ObjectCfg(j), myJob(j), logger(j.logger), currentMetric(0), reg_gamma(0),
-    frequencyCutoff(0),pupilRadiusInPixels(0), ID( id), objMaxMean(0), imgSize(0), nObjectImages(0 ){
+    frequencyCutoff(0),pupilRadiusInPixels(0), ID(id), traceID(-1), objMaxMean(0), imgSize(0), nObjectImages(0 ){
 
     setLogChannel(myJob.getLogChannel() );
 
 }
 
 
-Object::Object( const Object& rhs, uint16_t id ) : ObjectCfg(rhs), myJob(rhs.myJob), logger(rhs.logger), channels(rhs.channels), currentMetric(rhs.currentMetric),
+Object::Object( const Object& rhs, uint16_t id, int tid ) : ObjectCfg(rhs), myJob(rhs.myJob), logger(rhs.logger), channels(rhs.channels), currentMetric(rhs.currentMetric),
                                 reg_gamma(rhs.reg_gamma), frequencyCutoff(rhs.frequencyCutoff), pupilRadiusInPixels(rhs.pupilRadiusInPixels),
-                                ID (id), objMaxMean(rhs.objMaxMean), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
+                                ID (id), traceID(tid), objMaxMean(rhs.objMaxMean), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
                                 startT(rhs.startT), endT(rhs.endT) {
 
     setLogChannel(myJob.getLogChannel());
@@ -130,7 +130,7 @@ bpt::ptree Object::getPropertyTree( bpt::ptree& tree ){
 
 size_t Object::size(void )const {
     size_t sz = ObjectCfg::size( );
-    sz += 2*sizeof(uint16_t )+ 4*sizeof(double );                   // channels.size( )+ ID + maxMean
+    sz += 2*sizeof(uint16_t ) + 4*sizeof(double) + sizeof(traceID);                   // channels.size( )+ ID + maxMean
     for( const auto& ch : channels ){
         sz += ch->size( );
     }
@@ -144,6 +144,7 @@ uint64_t Object::pack(char* ptr )const {
     using redux::util::pack;
     uint64_t count = ObjectCfg::pack(ptr );
     count += pack(ptr+count, ID );
+    count += pack(ptr+count, traceID );
     count += pack(ptr+count, currentMetric );
     count += pack(ptr+count, frequencyCutoff );
     count += pack(ptr+count, pupilRadiusInPixels );
@@ -166,6 +167,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian ){
 
     uint64_t count = ObjectCfg::unpack(ptr, swap_endian );
     count += unpack(ptr+count, ID, swap_endian );
+    count += unpack(ptr+count, traceID, swap_endian );
     count += unpack(ptr+count, currentMetric, swap_endian );
     count += unpack(ptr+count, frequencyCutoff, swap_endian );
     count += unpack(ptr+count, pupilRadiusInPixels, swap_endian );
@@ -173,7 +175,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian ){
     count += imgSize.unpack(ptr+count, swap_endian );
     uint16_t tmp;
     count += unpack(ptr+count, tmp, swap_endian );
-    channels.resize(tmp );
+    channels.resize(tmp);
     for( auto& ch : channels ){
         ch.reset(new Channel(*this,myJob) );
         count += ch->unpack(ptr+count, swap_endian );
@@ -1248,18 +1250,22 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         info->timeString = bpx::to_simple_string((startT+obs_interval/2).time_of_day() );
     }
     
-    if( myJob.objects[ID].get() != this ) {     // this is a trace-object, copy some stuff...
-        channels = myJob.getChannels(ID);
-        modes = myJob.objects[ID]->modes;
-        pupil = myJob.objects[ID]->pupil;
+    if( traceID >= 0 ) {     // this is a trace-object, copy some stuff...
+        shared_ptr<Object> ref = myJob.getObject(traceID);
+        if( ref ) {
+            channels = ref->getChannels();
+            modes = ref->modes;
+            pupil = ref->pupil;
+        }
     }
-    
+
     int32_t nChannels = info->nChannels = channels.size( );
     info->clipStartX = sharedArray<int16_t>( nChannels );
     info->clipEndX = sharedArray<int16_t>( nChannels );
     info->clipStartY = sharedArray<int16_t>( nChannels );
     info->clipEndY = sharedArray<int16_t>( nChannels );
     info->fileNames.clear( );
+
     for( int i = 0; i < nChannels; ++i ){
         channels[i]->getFileNames( info->fileNames, waveFrontList );
         if(channels[i]->alignClip.empty() ){
@@ -1327,7 +1333,11 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
             PatchData::Ptr thisPatch = patchesData(y,x);
             if( thisPatch ){
                 getStorage( *thisPatch, oData );
-                oData->channels = thisPatch->objects[ID]->channels;
+                shared_ptr<ObjectData> refData = thisPatch->getObjectData( ID );
+                if( traceID >= 0 ) {
+                    refData = thisPatch->getObjectData(traceID);
+                }
+                if( refData ) oData->channels = refData->channels;
                 info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
                 info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
                 info->patches(x,y).region[2] = thisPatch->roi.first.y+1;

@@ -38,7 +38,7 @@ namespace redux {
         public:
 
             Object( MomfbdJob&, uint16_t id=0 );
-            Object( const Object&, uint16_t id=0 );
+            Object( const Object&, uint16_t id=0, int tid=-1 );
             ~Object();
 
             void parsePropertyTree( bpt::ptree&, redux::logging::Logger& );
@@ -130,6 +130,7 @@ namespace redux {
             /*****************************************************/
 
             uint16_t ID;
+            int traceID;
             double objMaxMean;
             redux::util::Point16 imgSize;
             mutable uint32_t nObjectImages;
