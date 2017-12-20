@@ -716,7 +716,8 @@ void Daemon::cleanup( void ) {
             if( job->info.step == Job::JSTEP_COMPLETED ) {
                 LOG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
                 LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
-                deletedJobs.push_back( std::move(job) );
+                deletedJobs.push_back( job );
+                job.reset();
             }
         }
         jobs.erase( std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){ return !j; }), jobs.end() );
