@@ -22,6 +22,8 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+namespace bpx = boost::posix_time;
+
 std::mutex Job::globalMutex;
 std::map<Job::StepID, Job::CountT> Job::counts = { { {0,JSTEP_SUBMIT}, {1,5} },
                                                    { {0,JSTEP_NONE}, {1,5} },
@@ -240,11 +242,11 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += unpack(ptr+count, outputDir);
     time_t timestamp;
     count += unpack(ptr+count, timestamp, swap_endian);
-    submitTime = boost::posix_time::from_time_t(timestamp);
+    submitTime = bpx::from_time_t(timestamp);
     count += unpack(ptr+count, timestamp, swap_endian);
-    startedTime = boost::posix_time::from_time_t(timestamp);
+    startedTime = bpx::from_time_t(timestamp);
     count += unpack(ptr+count, timestamp, swap_endian);
-    completedTime = boost::posix_time::from_time_t(timestamp);
+    completedTime = bpx::from_time_t(timestamp);
     return count;
 }
 
@@ -450,7 +452,11 @@ void Job::moveTo( Job* job, uint16_t to ) {
     c_new.active++;
     glock.unlock();
     job->info.step = to;
-    job->info.times[to] = boost::posix_time::second_clock::local_time();
+    bpx::ptime now = bpx::second_clock::local_time();
+    auto it = job->info.times.emplace( to, now );
+    if( !it.second ) {
+        it.first->second = now;
+    }
     if( to == JSTATE_ERR ) {
         job->stopLog();
     }

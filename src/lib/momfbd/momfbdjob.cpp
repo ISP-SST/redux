@@ -409,7 +409,6 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
     }
     
     for( auto p : pV ) {
-        p->cacheStore(true);
         auto lock = getLock();
         ++progWatch;
     }
@@ -852,7 +851,6 @@ static int bla(1);
     cout << "verifyPatches  " << __LINE__ << "  x=" << x << "  y=" << y << endl;
             PatchData::Ptr patch = patches(y,x);
 patch->dump( "ver"+to_string(bla) );
-            patch->cacheLoad();
             patch->initPatch();
             patch->loadAlpha( solver->alpha.get() );
 cout << printArray( solver->alpha.get(), 20, "alphaA" ) << endl;
@@ -976,7 +974,6 @@ void MomfbdJob::loadPatchResults( boost::asio::io_service& service, uint16_t nTh
 
     for( auto& patch: patches ) {
         service.post( [this,patch](){
-            patch->cacheLoad(false);
             ++progWatch;
         });
     }
