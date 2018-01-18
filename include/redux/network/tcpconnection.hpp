@@ -48,11 +48,9 @@ namespace redux {
             void asyncWrite( const std::shared_ptr<T>& data, size_t sz ) {
                 if( mySocket.is_open() ) {
                     boost::asio::async_write( mySocket, boost::asio::buffer( data.get(), sz ),
-                                          //    strand.wrap(
                                               boost::bind( &TcpConnection::writeCallback, sz,
                                                            boost::asio::placeholders::error,
                                                            boost::asio::placeholders::bytes_transferred )
-                                          //         )
                                             );
 
                 }
@@ -167,7 +165,6 @@ namespace redux {
             std::mutex mtx;
 
        public:
-            boost::asio::strand strand;
 
         };
         
