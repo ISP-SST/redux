@@ -177,6 +177,7 @@ namespace redux {
             template<class KeyT, class T>
             std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> getMap(void) {
                 static std::map<KeyT,T>& m = initMap<KeyT,T>();
+                static const Info& info RDX_UNUSED = getMapInfo<KeyT,T>();
                 static std::mutex mtx;
                 std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> ret(std::unique_lock<std::mutex>(mtx),m);
                 return std::move(ret);
@@ -184,6 +185,7 @@ namespace redux {
             template<class T, class U=std::less<T>>
             std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> getSet(void) {
                 static std::set<T,U>& s = initSet<T,U>();
+                static const Info& info RDX_UNUSED = getSetInfo<T,U>();
                 static std::mutex mtx;
                 std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> ret(std::unique_lock<std::mutex>(mtx),s);
                 return std::move(ret);
