@@ -55,7 +55,6 @@ namespace {
         IDL_INT by_size;
         float eps;
         IDL_INT margin;
-        IDL_INT max_dist;
         IDL_INT max_shift;
         float max_scale;
         IDL_INT max_points;
@@ -84,7 +83,6 @@ namespace {
         { (char*) "HELP",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
         { (char*) "H_INIT",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (h_init) },
         { (char*) "MARGIN",     IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (margin) },
-        { (char*) "MAX_DIST",   IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_dist) },
         { (char*) "MAX_POINTS", IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_points) },
         { (char*) "MAX_SCALE",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_scale) },
         { (char*) "MAX_SHIFT",  IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_shift) },
@@ -301,17 +299,44 @@ namespace {
 
 }
 
+string img_align_info( int lvl ) {
+    string ret = "RDX_IMG_ALIGN";
+    if( lvl > 0 ) {
+        ret += ((lvl > 1)?"\n":"        ");          // newline if lvl>1
+        ret += "   Syntax:   map = rdx_img_align( ph1, ph2, /KEYWORDS )\n";
+        if( lvl > 1 ) {
+            ret +=  "   Accepted Keywords:\n"
+                    "      BY_SIZE             Select pinholes by size for the refinement (default is by distance from center).\n"
+                    "      EPS                 Tolerance used as exit criterion in the minimization. (default=1E-3).\n"
+                    "      HELP                Display this info.\n"
+                    "      H_INIT              (IN/OUT) Initial guess (3x3 matrix).\n"
+                    "      MARGIN              Pinholes detected closer to the edges will be ignored. (default=30)\n"
+                    "      MAX_POINTS          Use this many pinholes for the refinement (default=25).\n"
+                    "      MAX_SCALE           The allowed scale difference (default=1.04).\n"
+                    "      MAX_SHIFT           The maximum allowed translation (default=200).\n"
+                    "      NITER               Max iterations when fitting the homography (default=30).\n"
+                    "      NREF                The number of reference points in each image to attempt to pair and fit (default=4).\n"
+                    "      ORIENTATION         If you wish to enforce an overall oriention (determinant) of the mapping, set this value to +1 or -1. (default=0).\n"
+                    "      POINTS              (OUT) Output the coordinates of the detected pinholes in both images (as N x 4 matrix).\n"
+                    "      SMOOTH              Apply a Gaussian filter of this width to the images before detecting pinholes.\n"
+                    "      STATUS              (OUT) Set to 0 on succes, <0 on failure.\n"
+                    "      THRESHOLD           Hard threshold applied before detecting pinholes. Can be a vector with 2 different values. (default: 0)\n"
+                    "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+        }
+    } else ret += "\n";
+    return ret;
+}
 
-IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
-	
-	static_assert( RDX_WITH_OPENCV == 1, "redux has to be compiled with OpenCV support");
+
+IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
+
+    static_assert( RDX_WITH_OPENCV == 1, "redux has to be compiled with OpenCV support");
 
     KW_RESULT kw;
     kw.by_size = 0;
     kw.eps = 1E-3;
     kw.help = 0;
     kw.margin = 30;
-    kw.max_dist = 80;
     kw.max_scale = 1.04;
     kw.max_points = -1;
     kw.max_shift = 200;
@@ -656,7 +681,7 @@ IDL_VPTR redux::img_align (int argc, IDL_VPTR* argv, char* argk) {
             for (auto r : results) cc.push_back (r.first);
             std::sort(cc.rbegin(),cc.rend());
             cout << printArray (cc, "correlations") << endl;
-            cout << matches.size() << " pairs matched using a max_distance of " << kw.max_dist << " for pairing." << endl;
+            cout << matches.size() << " pairs matched using a maximum distance of " << (medianNN1/3) << " for pairing." << endl;
         }
 
         if( kw.max_points < 0 ) kw.max_points = 25;   // by default, do refinement by using the strongest 25 pinholes
@@ -913,7 +938,6 @@ IDL_VPTR rdx_find_shift(int argc, IDL_VPTR* argv, char* argk) {
     kw.eps = 1E-3;
     kw.help = 0;
     kw.margin = 30;
-    kw.max_dist = 80;
     kw.max_scale = 1.1;
     kw.max_points = -1;
     kw.niter = 100;
@@ -2912,6 +2936,7 @@ namespace {
     static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_find_shift, (char*)"RDX_FIND_SHIFT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_fillpix, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)img_align, (char*)"RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_align_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_mask,  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_images, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +

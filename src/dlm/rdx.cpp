@@ -1064,7 +1064,6 @@ extern "C" {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) cbezier3}, (char*) "RDX_CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::inpaint}, (char*) "RDX_INPAINT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) redux::img_align}, (char*) "RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::img_project}, (char*) "RDX_IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::img_remap}, (char*) "RDX_IMG_REMAP", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
