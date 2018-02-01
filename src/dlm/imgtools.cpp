@@ -769,23 +769,68 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
     
 }
 
+namespace {
+    
+        typedef struct {
+            IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+            IDL_VPTR center;
+            IDL_INT  help;
+            IDL_INT  preserve;
+            IDL_VPTR size;
+            IDL_INT  verbose;
+        } kw_img_trans;
+        
+        // NOTE:  The keywords MUST be listed in alphabetical order !!
+        static IDL_KW_PAR kw_img_trans_pars[] = {
+            IDL_KW_FAST_SCAN,
+            { (char*) "CENTER",        IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, center ) },
+            { (char*) "HELP",          IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, help) },
+            { (char*) "PRESERVE_SIZE", IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, preserve) },
+            { (char*) "SIZE",          IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, size ) },
+            { (char*) "VERBOSE",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2( kw_img_trans, verbose) },
+            { NULL }
+        };
 
-IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
+    
+    string img_transform_info( int lvl ) {
+        string ret = "RDX_IMG_TRANSFORM";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"        ");          // newline if lvl>1
+            ret += "   Syntax:   map = rdx_img_transform( map, image, /KEYWORDS )\n";
+            if( lvl > 1 ) {
+                ret +=  "   where map is a 3x3 or 2x3 transformation matrix.\n";
+                ret +=  "   Accepted Keywords:\n"
+                        "      CENTER              Map the center of the input to the center of the output, or specified point (float, 1-2 elements).\n"
+                        "      HELP                Display this info.\n"
+                        "      PRESERVE_SIZE       Make the output the same size as the input (default is to resize so the whole mapping fits).\n"
+                        "      SIZE                Specify size of output image (integer, 1-2 elements).\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+            }
+        } else ret += "\n";
+        return ret;
+    }
+
+}
+
+
+IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
 
 #ifndef RDX_WITH_OPENCV
-    cerr << "img_project: redux has to be re-compiled with OpenCV enabled to be able to use this function." << endl;
-    return IDL_GettmpInt(0);
+    IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "The rdx DLM has to be re-compiled with OpenCV enabled to be able to use this function." );
 #else
 
-    KW_RESULT kw;
-    kw.help = 0;
-    kw.nrefpoints = 4;
-    kw.verbose = 0;
-    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    kw_img_trans kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_img_trans_pars, (IDL_VPTR*)0, 255, &kw );
 
     if (nPlainArgs != 2) {
-        cerr << "img_project needs 2 arguments. A 3x3 or 2x3 transformation matrix, and an image." << endl;
-        return IDL_GettmpInt (0);
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Two arguments needed. A 3x3 or 2x3 transformation matrix, and an image." );
+    }
+    
+    if( kw.help ) {
+        int lvl = 1;
+        if( kw.verbose ) lvl++;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, img_transform_info(lvl).c_str() );
+        return IDL_GettmpInt(0);
     }
 
     IDL_VPTR H_in = argv[0];
@@ -796,52 +841,107 @@ IDL_VPTR redux::img_project (int argc, IDL_VPTR* argv, char* argk) {
     IDL_ENSURE_ARRAY (H_in);
 
     const Mat img = arrayToMat(img_in);
-    const Mat H = arrayToMat(H_in);
+    Mat H = arrayToMat(H_in);
+    int trans_type(0);  // 0 = undefined, +1 = perspective, -1 = affine
+    if( H.cols == 3 ) {
+        if ( H.rows == 3 ) {
+            trans_type = 1;
+        } else if ( H.rows == 2 ) {
+            trans_type = -1;
+        }
+    }
     
+    if( trans_type == 0 ) {
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Transformation matrix has to be 2x3 or 3x3." );
+    }
+
+
     Size2f inSize = img.size();
-
-    vector<Point2f> corners({{0,0}, {inSize.width,0}, {0,inSize.height}, {inSize.width,inSize.height}});
-    vector<Point2f>  mappedCorners;
-    perspectiveTransform( corners, mappedCorners, H );
-    int maxX = mappedCorners[0].x;
-    int minX = mappedCorners[0].x;
-    int maxY = mappedCorners[0].y;
-    int minY = mappedCorners[0].y;
-    for( auto& c: mappedCorners ) {
-        maxX = max<int>(maxX, c.x+0.5);
-        minX = min<int>(minX, c.x+0.5);
-        maxY = max<int>(maxY, c.y+0.5);
-        minY = min<int>(minY, c.y+0.5);
-    }
-
     IDL_VPTR out;
-    IDL_ARRAY_DIM outDims = { maxX-minX+1, maxY-minY+1, 0, 0, 0, 0, 0, 0 };
-    if( kw.preserve ) {
-        outDims[0] = inSize.width;
-        outDims[1] = inSize.height;
-    }
-    IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_NOP, &out);
-
-    Mat outImg = arrayToMat(out);
-    Size dsize = outImg.size();
-
-    int flags = INTER_CUBIC;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
-    int borderMode = BORDER_CONSTANT;
-    const Scalar borderValue = Scalar();
-
+    
     try {
-        if (H.cols == 3 && H.rows == 3) {
-            if (kw.verbose) cout << "Applying perspective transform."  << endl;
+        vector<Point2f> corners( {{0,0}, {inSize.width-1,0},
+                                  {0,inSize.height-1}, {inSize.width-1,inSize.height-1},
+                                  {inSize.width/2,inSize.height/2}});   // also map the center
+        vector<Point2f>  mappedCorners;
+
+        if ( trans_type > 0 ) {
+            perspectiveTransform( corners, mappedCorners, H );
+        } else { // affine
+            transform( corners, mappedCorners, H );
+        }
+
+        int maxX = mappedCorners[0].x;
+        int minX = maxX;
+        int maxY = mappedCorners[0].y;
+        int minY = maxY;
+        for( auto& c: mappedCorners ) {
+            maxX = max<int>(maxX, c.x);
+            minX = min<int>(minX, c.x);
+            maxY = max<int>(maxY, c.y);
+            minY = min<int>(minY, c.y);
+        }
+
+        IDL_ARRAY_DIM outDims = { maxX-minX+1, maxY-minY+1, 0, 0, 0, 0, 0, 0 };
+        if( kw.preserve ) {
+            if( kw.verbose > 1 ) {
+                IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, "Preserving image size." );
+            }
+            outDims[0] = inSize.width;
+            outDims[1] = inSize.height;
+        } else if( kw.size ) {
+            vector<int> sz = getAsVector<int>( kw.size );
+            if( sz.size() == 2 ) {
+                outDims[0] = sz[0];
+                outDims[1] = sz[1];
+            } else if( sz.size() == 1 ) {     // just a /center flag
+                outDims[0] = outDims[1] = sz[0];
+            }
+            if( kw.verbose > 1 ) {
+                string msg = "Setting image size to " + printArray( outDims, 2, "" );
+                IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+            }
+        }
+        
+        IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_NOP, &out);
+
+        if( kw.center ) {
+            vector<float> cent = getAsVector<float>( kw.center );
+            if( cent.size() == 1 ) {    // just use as a flag which means center in output image
+                 cent.resize( 2, (outDims[1]/2) );
+                 cent[0] = (outDims[0]/2);
+            }
+            if( cent.size() == 2 ) {
+                if( kw.verbose > 1 ) {
+                    string msg = "Centering image at " + printArray( cent, "" );
+                    IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+                }
+                H.at<float>(0,2) += cent[0]-mappedCorners[4].x;
+                H.at<float>(1,2) += cent[1]-mappedCorners[4].y;
+            }
+        }
+
+        Mat outImg = arrayToMat(out);
+        Size dsize = outImg.size();
+
+        int flags = INTER_CUBIC;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
+        int borderMode = BORDER_CONSTANT;
+        const Scalar borderValue = Scalar();
+
+        if( trans_type > 0 ) {
+            if( kw.verbose ) {
+                IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, "Applying perspective transform." );
+            }
             warpPerspective (img, outImg, H, dsize, flags, borderMode, borderValue);
-        } else if (H.cols == 3 && H.rows == 2) {
-            if (kw.verbose) cout << "Applying affine transform." << endl;
-            warpAffine (img, outImg, H, dsize, flags, borderMode, borderValue);
         } else {
-            cerr << "img_project: Transformation matrix has to have 2 or 3 rows." << endl;
-            return IDL_GettmpInt (0);
+            if( kw.verbose ) {
+                IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, "Applying affine transform." );
+            }
+            warpAffine (img, outImg, H, dsize, flags, borderMode, borderValue);
         }
     } catch( const cv::Exception& e ) {
-        cout << "OpenCV error: " << e.msg << endl;
+        string msg = "OpenCV error: " + e.msg;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
 
     return out;
@@ -2934,12 +3034,14 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_find_shift, (char*)"RDX_FIND_SHIFT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_fillpix, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)img_align, (char*)"RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_align_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_mask,  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_make_win,  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_images, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_mozaic, (char*)"RDX_MOZAIC", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, mz::info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)sum_files,  (char*)"RDX_SUMFILES",  1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_files_info );
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_find_shift}, (char*)"RDX_FIND_SHIFT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_fillpix}, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_align}, (char*)"RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_align_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_transform}, (char*)"RDX_IMG_TRANSFORM", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_transform_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_transform}, (char*)"RDX_IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_make_mask},  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_make_win},  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)sum_images}, (char*)"RDX_SUMIMAGES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_images_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_mozaic}, (char*)"RDX_MOZAIC", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, mz::info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)sum_files},  (char*)"RDX_SUMFILES",  1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, sum_files_info );
 }

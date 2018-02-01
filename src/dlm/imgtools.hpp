@@ -6,7 +6,6 @@
 
 namespace redux {
 
-    IDL_VPTR img_project( int argc, IDL_VPTR* argv, char* argk );
     IDL_VPTR img_remap( int argc, IDL_VPTR* argv, char* argk );
     //IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk );
     //IDL_VPTR load_files( int argc, IDL_VPTR* argv, char* argk );

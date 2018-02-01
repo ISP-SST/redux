@@ -420,7 +420,8 @@ namespace redux {
 
             std::ostringstream oss;
             oss << std::setprecision( d );
-            if( !name.empty() ) oss << name << "=[";
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool separator( false );
             for( auto & element : data ) {
                 if( separator ) {
@@ -440,7 +441,7 @@ namespace redux {
                 separator = true;
             }
 
-            if( !name.empty() ) oss << "]";
+            oss << "]";
 
             return oss.str();
         }
@@ -449,7 +450,8 @@ namespace redux {
 
             std::ostringstream oss;
             oss << std::setprecision( d );
-            if( !name.empty() ) oss << name << "=[";
+            if( name.empty() ) oss << "[";
+            else oss << name << "=[";
             bool separator( false );
             for( auto & element : data ) {
                 if( separator ) {
@@ -463,7 +465,7 @@ namespace redux {
                 separator = true;
             }
 
-            if( !name.empty() ) oss << "]";
+            oss << "]";
 
             return oss.str();
         }

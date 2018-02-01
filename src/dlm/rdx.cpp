@@ -1046,25 +1046,24 @@ extern "C" {
         
         IDL_ExitRegister( IdlContainer::exit );
         
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)IdlContainer::info, (char*)"RDX", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_start, (char*)"RDX_TIC", 0, 0, 0, 0 }, 0 );
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)timer_elapsed, (char*)"RDX_TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_segment, (char*)"RDX_SEGMENT", 0, 4, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, segment_info );
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_hasopencv, (char*)"RDX_HASOPENCV", 0, 0, 0, 0 }, 1, hasopencv_info );
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_filetype, (char*)"RDX_FILETYPE", 0, 1, 0, 0 }, 1, filetype_info );
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_cache, (char*)"RDX_CACHECLEAR", 0, 0, 0, 0 }, 0 , clear_cache_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheinfo, (char*)"RDX_CACHEINFO", 0, 0, 0, 0 }, 0 , cacheinfo_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cache, (char*)"RDX_CACHE", 2, 2, 0, 0 }, 0 , cache_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheget, (char*)"RDX_CACHEGET", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 , cacheget_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cachedel, (char*)"RDX_CACHEDEL", 1, 1, 0, 0 }, 0 , cachedel_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cachestore, (char*)"RDX_CACHESTORE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cachestore_info);
-        IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)cacheload, (char*)"RDX_CACHELOAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cacheload_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)IdlContainer::info}, (char*)"RDX", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)timer_start}, (char*)"RDX_TIC", 0, 0, 0, 0 }, 0 );
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)timer_elapsed}, (char*)"RDX_TOC", 0, 0, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, timer_info );
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_segment}, (char*)"RDX_SEGMENT", 0, 4, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, segment_info );
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_hasopencv}, (char*)"RDX_HASOPENCV", 0, 0, 0, 0 }, 1, hasopencv_info );
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_filetype}, (char*)"RDX_FILETYPE", 0, 1, 0, 0 }, 1, filetype_info );
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)clear_cache}, (char*)"RDX_CACHECLEAR", 0, 0, 0, 0 }, 0 , clear_cache_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cacheinfo}, (char*)"RDX_CACHEINFO", 0, 0, 0, 0 }, 0 , cacheinfo_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cache}, (char*)"RDX_CACHE", 2, 2, 0, 0 }, 0 , cache_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cacheget}, (char*)"RDX_CACHEGET", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 , cacheget_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cachedel}, (char*)"RDX_CACHEDEL", 1, 1, 0, 0 }, 0 , cachedel_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cachestore}, (char*)"RDX_CACHESTORE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cachestore_info);
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cacheload}, (char*)"RDX_CACHELOAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cacheload_info);
     
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) cbezier3}, (char*) "RDX_CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::inpaint}, (char*) "RDX_INPAINT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
-            { { (IDL_VPTR (*) ()) redux::img_project}, (char*) "RDX_IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) redux::img_remap}, (char*) "RDX_IMG_REMAP", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
         };
 
