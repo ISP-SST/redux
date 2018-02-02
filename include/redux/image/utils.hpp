@@ -24,7 +24,7 @@ namespace redux {
 
     namespace image {
         
-        double makePupil( double** pupil, uint32_t nPoints, double radius);
+        double makePupil( double** pupil, uint32_t nPoints, double outerRadius, double innerRadius=0.0 );
 
         void makeZernike( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
 

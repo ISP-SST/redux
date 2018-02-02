@@ -3,6 +3,7 @@
 
 #include "redux/constants.hpp"
 #include "redux/momfbd/modes.hpp"
+#include "redux/image/utils.hpp"
 #include "redux/util/cache.hpp"
 
 using namespace redux::image;
@@ -12,40 +13,79 @@ using namespace redux;
 
 using namespace std;
 
+namespace {
 
-string make_pupil_info( int lvl ) {
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_INT  help;
+        IDL_INT  verbose;
+    } kw_pup;
     
-    string ret = "RDX_MAKE_PUPIL";
-    if( lvl > 0 ) {
-        ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
-        ret += "   Syntax:   pup = rdx_make_pupil(pixels,radius)\n";
-    } else ret += "\n";
+    // NOTE:  The keywords MUST be listed in alphabetical order !!
+    static IDL_KW_PAR kw_img_trans_pars[] = {
+        IDL_KW_FAST_SCAN,
+        { (char*) "HELP",          IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_pup, help ) },
+        { (char*) "VERBOSE",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2( kw_pup, verbose ) },
+        { NULL }
+    };
 
-    return ret;
-    
+    string make_pupil_info( int lvl ) {
+        
+        string ret = "RDX_MAKE_PUPIL";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
+            ret += "   Syntax:   pupil = rdx_make_pupil( pixels, radius [, central_obscuration_radius] )\n";
+            if( lvl > 1 ) {
+                ret +=  "   Accepted Keywords:\n"
+                        "      HELP                Display this info.\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+            }
+        } else ret += "\n";
+
+        return ret;
+        
+    }
+
 }
 
 
 IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
-    
-    if (argc < 2) {
-        cout << "rdx_make_pupil: needs 2 arguments: nPixels & pupil-radius (in pixels). " << endl;
-        return IDL_GettmpInt (-1);
+
+    kw_pup kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_img_trans_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if( nPlainArgs < 2 ) {
+        string msg = "Two arguments needed. nPixels & pupil-radius (in pixels).";
+        msg += " An optional argument can be supplied to central-obscuration radius.";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
     
-    IDL_LONG nPixels = IDL_LongScalar(argv[0]);
-    double radius = IDL_DoubleScalar(argv[1]);
+    if( kw.help ) {
+        int lvl = 1;
+        if( kw.verbose ) lvl++;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, make_pupil_info(lvl).c_str() );
+        return IDL_GettmpInt(0);
+    }
+    
+    IDL_LONG nPixels = IDL_LongScalar( argv[0] );
+    double radius = IDL_DoubleScalar( argv[1] );
+    double innerRadius = 0.0;
+    if( nPlainArgs == 3 ) {
+        innerRadius = IDL_DoubleScalar( argv[2] );
+    }
+    
     IDL_VPTR tmp;
- 
-    PupilInfo pi(nPixels, radius);
-    Pupil pupil = redux::util::Cache::get<PupilInfo,Pupil>(pi);
-    if( pupil.empty() ) {    // this set was inserted, so it is not generated yet.
-        pupil.generate( nPixels, radius );
+    IDL_MEMINT dims[] = { nPixels, nPixels };
+    double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &tmp );
+    
+    if( kw.verbose ) {
+        string msg = "Generating " + printArray( dims, 2, "" ) + " pupil with radius " + to_string(radius);
+        if( innerRadius > 0.0 ) msg += " and central obscuration of radius " + to_string(innerRadius) + ".";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
-        
-    IDL_MEMINT dims[] = { (int)pupil.dimSize(1), (int)pupil.dimSize(0) };
-    float* tmpData = (float*)IDL_MakeTempArray(IDL_TYP_FLOAT,2,dims,IDL_ARR_INI_NOP,&tmp);
-    pupil.copyTo<float>(tmpData);
+    
+    auto tmp2D = reshapeArray( tmpData, nPixels, nPixels );
+    redux::image::makePupil( tmp2D.get(), nPixels, radius, innerRadius );
     
     return tmp;
 
@@ -245,7 +285,7 @@ void clear_modecache(int argc, IDL_VPTR argv[], char* argk) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_pupil, (char*)"RDX_MAKE_PUPIL", 2, 2, 0, 0 }, 1, make_pupil_info, clear_pupils ) +
+    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_pupil, (char*)"RDX_MAKE_PUPIL", 2, 3, 0, 0 }, 1, make_pupil_info, clear_pupils ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_modes, (char*)"RDX_MAKE_MODES", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_modes_info, clear_modes ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_modecache, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info);
 }

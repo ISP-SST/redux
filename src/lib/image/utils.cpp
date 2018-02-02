@@ -78,7 +78,7 @@ static __inline T sqr (T x) {
 }
 
 
-double redux::image::makePupil (double** pupil, uint32_t nPoints, double radius) {
+double redux::image::makePupil( double** pupil, uint32_t nPoints, double outerRadius, double innerRadius ) {
 
     double area = 0.0, origin = 0.5;
     memset (*pupil, 0, nPoints * nPoints * sizeof (double));
@@ -96,15 +96,28 @@ double redux::image::makePupil (double** pupil, uint32_t nPoints, double radius)
     for (unsigned int x = 0; x < mid; ++x) {
         for (unsigned int y = 0; y <= x; ++y) {     // We only generate the first octant, then copy.
             val = 0;
-            if (distPtr[y + 1][x + 1] < radius) {
-                val = 1;
-            } else if (distPtr[y][x] < radius) {    // partial pixel
+            if( distPtr[y+1][x+1] < innerRadius ) {
+                val = 0;
+            } else if( distPtr[y][x] < innerRadius ) {    // partial pixel
                 if (x == 0 && y == 0) {     // central pixel = 1 for all practical cases
-                    if (radius < 0.5) val = M_PI * radius * radius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
-                    else val = M_PI * radius * radius + (radius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI * radius * radius);
+                    if (innerRadius < 0.5) val = M_PI * innerRadius * innerRadius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
+                    else val = M_PI * innerRadius * innerRadius + (innerRadius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI * innerRadius * innerRadius);
                 } else {
                     // TBD: better approximation of pixel fill-factor ??
-                    val = (radius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
+                    val = (innerRadius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
+                }
+                val = 1.0 - val;
+            } else {
+                if( distPtr[y+1][x+1] < outerRadius ) {
+                    val = 1;
+                } else if (distPtr[y][x] < outerRadius) {    // partial pixel
+                    if (x == 0 && y == 0) {     // central pixel = 1 for all practical cases
+                        if (outerRadius < 0.5) val = M_PI * outerRadius * outerRadius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
+                        else val = M_PI * outerRadius * outerRadius + (outerRadius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI * outerRadius * outerRadius);
+                    } else {
+                        // TBD: better approximation of pixel fill-factor ??
+                        val = (outerRadius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
+                    }
                 }
             }
             if (val > 0) {
