@@ -79,8 +79,7 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_conv_pars, (IDL_VPTR*) 0, 255, &kw);
     
     if (nPlainArgs < 2) {
-        cout << "rdx_convolve: needs 2 arguments (image and psf).\n" << convolve_info(2) << endl;
-        return IDL_GettmpInt (-1);
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Needs 2 arguments (image and psf)." );
     }
 
     IDL_VPTR imageVar  = argv[0];
@@ -92,30 +91,30 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
     IDL_ENSURE_SIMPLE(psfVar);
     IDL_ENSURE_ARRAY(psfVar);
 
-    if (kw.help) {
-        cout << convolve_info(2) << endl;
-        return IDL_GettmpInt (-1);
+    if( kw.help ) {
+        int lvl = 1;
+        if( kw.verbose ) lvl++;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, convolve_info(lvl).c_str() );
+        return IDL_GettmpInt(-1);
     }
 
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
 
     if( psfVar->value.arr->n_dim != 2 ) {
-        cout << "rdx_convolve: psf must be A 2D array." << endl;
-        return IDL_GettmpInt (-1);
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "PSF must be A 2D array." );
     }
     IDL_LONG64 xSize = psfVar->value.arr->dim[0];
     IDL_LONG64 ySize = psfVar->value.arr->dim[1];
 
     if( xSize != imageVar->value.arr->dim[0] || ySize != imageVar->value.arr->dim[1] ) {
-        cout << "rdx_convolve: psf and image(s) must be of the same size."
-             << printArray(imageVar->value.arr->dim, imageVar->value.arr->n_dim, "\n   img")
-             << printArray(psfVar->value.arr->dim, psfVar->value.arr->n_dim, "\n   psf") << endl;
-        return IDL_GettmpInt (-1);
+        string msg = "PSF and image(s) must be of the same size."
+                   + printArray( imageVar->value.arr->dim, imageVar->value.arr->n_dim, "\n   img")
+                   + printArray( psfVar->value.arr->dim, psfVar->value.arr->n_dim, "\n   psf");
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
 
     if( !xSize || !ySize ) {
-        cout << "rdx_convolve: input has zero-size." << endl;
-        return IDL_GettmpInt (-1);
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Input has zero-size." );
     }
 
     size_t nImages = 1;
@@ -164,13 +163,12 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
         }
         
         double* allocatedData = nullptr;
-        double* dataPtr;
+        double* dataPtr = nullptr;
         if( kw.in_place && (imageVar->type == IDL_TYP_DOUBLE) ) {
             fft_memalign( 1, &imageVar );   // align if needed, else no action.
             dataPtr = reinterpret_cast<double*>( imageVar->value.arr->data );
         } else if ( kw.in_place ) {
-            cerr << "\rrdx_convolve: images have to be of type double when transforming in_place." << endl;
-            return IDL_GettmpInt (-1);
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Images have to be of type double when transforming in_place." );
         } else {
             //dataAlign = 0;
             allocatedData = (double*)fftw_malloc(nImages*dataSize*sizeof(double));
@@ -209,7 +207,8 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
         }
     
     } catch( const exception& e ) {
-        cout << "rdx_convolve: unhandled exception: " << e.what() << endl;
+        string msg = string("Unhandled exception: ") + e.what();
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
 
 
@@ -244,7 +243,7 @@ static IDL_KW_PAR kw_descatter_pars[] = {
     { (char*) "HELP",      IDL_TYP_INT,    1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,help) },
     { (char*) "IN_PLACE",  IDL_TYP_INT,    1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,in_place) },
     { (char*) "NITER",     IDL_TYP_INT,    1, 0,           0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,niter) },
-    { (char*) "NORMALIZE", IDL_TYP_INT,    1, 0,           0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,normalize) },
+    { (char*) "NORMALIZE", IDL_TYP_INT,    1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,normalize) },
     { (char*) "NTHREADS",  IDL_TYP_BYTE,   1, 0,           0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,nthreads) },
     { (char*) "PADDING",   IDL_TYP_INT,    1, 0,           0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,padding) },
     { (char*) "VERBOSE",   IDL_TYP_INT,    1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_DESCATTER_RESULT,verbose) },
@@ -280,17 +279,14 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
 
     KW_DESCATTER_RESULT kw;
     kw.epsilon = 1E-8;
-    kw.help = 0;
-    kw.verbose = 0;
-    kw.normalize = 0;
     kw.padding = 256;
     kw.niter = 50;
     kw.nthreads = 1; //thread::hardware_concurrency();
-    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_descatter_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_descatter_pars, (IDL_VPTR*) 0, 255, &kw );
 
-    if (nPlainArgs < 3) {
-        cout << "rdx_descatter: needs at least 3 arguments (image(s), backgain and psf). " << rdx_descatter_info(2) << endl;
-        return IDL_GettmpInt (-1);
+    if( nPlainArgs < 3 ) {
+        string msg = "Needs at least 3 arguments, image(s), backgain and PSF.";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
 
     IDL_VPTR imageVar  = argv[0];
@@ -306,32 +302,32 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_ENSURE_SIMPLE(psfVar);
     IDL_ENSURE_ARRAY(psfVar);
 
-    if (kw.help) {
-        cout << rdx_descatter_info(2) << endl;
+    if( kw.help ) {
+        int lvl = 1;
+        if( kw.verbose ) lvl++;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, rdx_descatter_info(lvl).c_str() );
         return IDL_GettmpInt (-1);
     }
 
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
     
     if( psfVar->value.arr->n_dim != 2 || gainVar->value.arr->n_dim != 2 ) {
-        cout << "rdx_descatter: backgain and psf must be A 2D arrays." << endl;
-        return IDL_GettmpInt (-1);
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Backgain and psf must be A 2D arrays." );
     }
     IDL_LONG64 xSize = psfVar->value.arr->dim[0];
     IDL_LONG64 ySize = psfVar->value.arr->dim[1];
 
     if( xSize != gainVar->value.arr->dim[0] || ySize != gainVar->value.arr->dim[1] ||
         xSize != imageVar->value.arr->dim[0] || ySize != imageVar->value.arr->dim[1] ) {
-        cout << "rdx_descatter: backgain, psf and image(s) must be of the same size."
-             << printArray(imageVar->value.arr->dim, imageVar->value.arr->n_dim, "\n   img")
-             << printArray(gainVar->value.arr->dim, gainVar->value.arr->n_dim, "\n  gain")
-             << printArray(psfVar->value.arr->dim, psfVar->value.arr->n_dim, "\n   psf") << endl;
-        return IDL_GettmpInt (-1);
+        string msg = "Backgain, PSF and image(s) must be of the same size.";
+        msg += printArray(imageVar->value.arr->dim, imageVar->value.arr->n_dim, "\n   img")
+             + printArray(gainVar->value.arr->dim, gainVar->value.arr->n_dim, "\n  gain")
+             + printArray(psfVar->value.arr->dim, psfVar->value.arr->n_dim, "\n   psf");
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
     
     if( !xSize || !ySize ) {
-        cout << "rdx_descatter: input has zero-size." << endl;
-        return IDL_GettmpInt (-1);
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Input has zero-size." );
     }
 
     size_t nImages = 1;
@@ -389,13 +385,12 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         double* allocatedData = nullptr;
-        double* dataPtr;
+        double* dataPtr = nullptr;
         if( kw.in_place && (imageVar->type == IDL_TYP_DOUBLE) ) {
             fft_memalign( 1, &imageVar );   // align if needed, else no action.
             dataPtr = reinterpret_cast<double*>( imageVar->value.arr->data );
         } else if ( kw.in_place ) {
-            cerr << "\rrdx_descatter: images have to be of type double when transforming in_place." << endl;
-            return IDL_GettmpInt (-1);
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Images have to be of type double when transforming in_place." );
         } else {
             //dataAlign = 0;
             allocatedData = (double*)fftw_malloc(nImages*dataSize*sizeof(double));
@@ -434,7 +429,8 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
     } catch( const exception& e ) {
-        cout << "rdx_descatter: unhandled exception: " << e.what() << endl;
+        string msg = string("Unhandled exception: ") + e.what();
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
     
     return IDL_GettmpInt(0);
@@ -472,8 +468,8 @@ void fft_reorder(int argc, IDL_VPTR* argv) {
     IDL_ENSURE_ARRAY(array);
     
     if ( array->value.arr->n_dim != 2 ) {
-        cout << "rdx_reorder: needs a single 2D array as input." << endl;
-        return;
+        string msg = "A single 2D array should be passed as input.";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
 
     size_t nX = array->value.arr->dim[0];
@@ -490,7 +486,8 @@ void fft_reorder(int argc, IDL_VPTR* argv) {
             default: FourierTransform::reorder( data, nY, nX);
         }
     } catch ( const exception& e ) {   // catch-all to avoid killing the idl session.
-        cout << "rdx_reorder: Error during call to FourierTransform::reorder() : " << e.what() << endl;
+        string msg = string("Error during call to FourierTransform::reorder(): ") + e.what();
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
 
 }
@@ -547,8 +544,8 @@ void fft_memalign( int argc, IDL_VPTR* argv ) {
         }
         
     } catch ( const exception& e ) {   // catch-all to avoid killing the idl session.
-        cout << "rdx_memalign: Error during re-alignment : " << e.what() << endl;
-        return;
+        string msg = string("Error during re-alignment: ") + e.what();
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
 
     
@@ -562,8 +559,8 @@ void fft_cleanup(void) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)convolve, (char*)"RDX_CONVOLVE", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, convolve_info, convolve_cleanup ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)rdx_descatter, (char*)"RDX_DESCATTER", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_descatter_info/*, descatter_cleanup*/ ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)fft_reorder, (char*)"RDX_REORDER", 1, 1, 0, 0 }, 0 , fft_reorder_info) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)fft_memalign, (char*)"RDX_MEMALIGN", 1, 1, 0, 0 }, 0 , fft_memalign_info);
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)convolve}, (char*)"RDX_CONVOLVE", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, convolve_info, convolve_cleanup ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_descatter}, (char*)"RDX_DESCATTER", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_descatter_info/*, descatter_cleanup*/ ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)fft_reorder}, (char*)"RDX_REORDER", 1, 1, 0, 0 }, 0 , fft_reorder_info) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)fft_memalign}, (char*)"RDX_MEMALIGN", 1, 1, 0, 0 }, 0 , fft_memalign_info);
 }

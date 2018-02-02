@@ -20,24 +20,24 @@ namespace bfs = boost::filesystem;
 
 namespace {
 
-typedef struct {
-    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
-    IDL_INT help;
-    UCHAR nthreads;
-    IDL_VPTR times;
-    IDL_INT verbose;
-} KW_LOADFILES;
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_INT help;
+        UCHAR nthreads;
+        IDL_VPTR times;
+        IDL_INT verbose;
+    } KW_LOADFILES;
 
 
-// NOTE:  The keywords MUST be listed in alphabetical order !!
-static IDL_KW_PAR kw_loadfiles_pars[] = {
-    IDL_KW_FAST_SCAN,
-    { (char*) "HELP",             IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,help) },
-    { (char*) "NTHREADS",         IDL_TYP_BYTE,  1, 0,                      0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,nthreads) },
-    { (char*) "TIMES",            IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,times) },
-    { (char*) "VERBOSE",          IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,verbose) },
-    { NULL }
-};
+    // NOTE:  The keywords MUST be listed in alphabetical order !!
+    static IDL_KW_PAR kw_loadfiles_pars[] = {
+        IDL_KW_FAST_SCAN,
+        { (char*) "HELP",             IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,help) },
+        { (char*) "NTHREADS",         IDL_TYP_BYTE,  1, 0,                      0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,nthreads) },
+        { (char*) "TIMES",            IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,times) },
+        { (char*) "VERBOSE",          IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_LOADFILES,verbose) },
+        { NULL }
+    };
 
 }
 

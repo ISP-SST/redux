@@ -797,6 +797,6 @@ void convertlog_proc( int argc, IDL_VPTR* argv, char* argk ) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)convertlog_proc, (char*)"RDX_CONVERTLOG", 0, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, cvtlog_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)convertlog, (char*)"RDX_CONVERTLOG", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, 0 );
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)convertlog_proc}, (char*)"RDX_CONVERTLOG", 0, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0, cvtlog_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)convertlog}, (char*)"RDX_CONVERTLOG", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, 0 );
 }

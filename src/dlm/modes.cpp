@@ -80,7 +80,8 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
     
     if( kw.verbose ) {
         string msg = "Generating " + printArray( dims, 2, "" ) + " pupil with radius " + to_string(radius);
-        if( innerRadius > 0.0 ) msg += " and central obscuration of radius " + to_string(innerRadius) + ".";
+        if( innerRadius > 0.0 ) msg += " and a central obscuration of radius " + to_string(innerRadius);
+        msg += ".";
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
     
@@ -92,80 +93,79 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
-typedef struct {
-    IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
-    IDL_INT help;
-    IDL_INT firstZernike;
-    IDL_INT lastZernike;
-    IDL_INT normalize;
-    float angle;
-    float cutoff;
-    IDL_VPTR pupil;
-    IDL_VPTR variance;
-    IDL_INT verbose;
-    IDL_INT zernike;
-} MODE_KW;
-
-
-// NOTE:  The keywords MUST be listed in alphabetical order !!
-static IDL_KW_PAR mode_kw_pars[] = {
-    IDL_KW_FAST_SCAN,
-    { (char*) "ANGLE",     IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,angle) },
-    { (char*) "CUTOFF",    IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,cutoff) },
-    { (char*) "FIRST",     IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,firstZernike) },
-    { (char*) "HELP",      IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,help) },
-    { (char*) "LAST",      IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,lastZernike) },
-    { (char*) "NORMALIZE", IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,normalize) },
-    { (char*) "PUPIL",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,pupil) },
-    { (char*) "VARIANCE",  IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,variance) },
-    { (char*) "VERBOSE",   IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,verbose) },
-    { (char*) "ZERNIKE",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,zernike) },
-    { NULL }
-};
-
-
-string make_modes_info( int lvl ) {
+namespace {
     
-    string ret = "RDX_MAKE_MODES";
-    if( lvl > 0 ) {
-        ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
-        ret += "   Syntax:   modes = rdx_make_modes([2,4,5,9],pixels,radius)\n";
-        if( lvl > 1 ) {
-            ret +=  "   Accepted Keywords:\n"
-                    "      HELP                Display this info.\n"
-                    "      ANGLE               Rotate the modes (degrees).\n"
-                    "      CUTOFF              Smallest coefficient to consider for the Karhunen-Loeve expansion. (0.001)\n"
-                    "      FIRST               First Zernike-mode to use for the Karhunen-Loeve expansion. (2)\n"
-                    "      LAST                Last Zernike-mode to use for the Karhunen-Loeve expansion.(2000)\n"
-                    "      NORMALIZE           Normalize the modes.\n"
-                    "      PUPIL               (input/output) Use pupil, or keep the generated pupil.\n"
-                    "      VARIANCE            (output) Mode variances.\n"
-                    "      VERBOSE             Verbosity, default is 0 (only error output).\n"
-                    "      ZERNIKE             Use Zernike modes (default is KL).\n";
-        }
-    } else ret += "\n";
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_INT help;
+        IDL_INT firstZernike;
+        IDL_INT lastZernike;
+        IDL_INT normalize;
+        float angle;
+        float cutoff;
+        IDL_VPTR pupil;
+        IDL_VPTR variance;
+        IDL_INT verbose;
+        IDL_INT zernike;
+    } MODE_KW;
 
-    return ret;
-    
+
+    // NOTE:  The keywords MUST be listed in alphabetical order !!
+    static IDL_KW_PAR mode_kw_pars[] = {
+        IDL_KW_FAST_SCAN,
+        { (char*) "ANGLE",     IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,angle) },
+        { (char*) "CUTOFF",    IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,cutoff) },
+        { (char*) "FIRST",     IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,firstZernike) },
+        { (char*) "HELP",      IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,help) },
+        { (char*) "LAST",      IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,lastZernike) },
+        { (char*) "NORMALIZE", IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,normalize) },
+        { (char*) "PUPIL",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,pupil) },
+        { (char*) "VARIANCE",  IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,variance) },
+        { (char*) "VERBOSE",   IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,verbose) },
+        { (char*) "ZERNIKE",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,zernike) },
+        { NULL }
+    };
+
+
+    string make_modes_info( int lvl ) {
+        
+        string ret = "RDX_MAKE_MODES";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
+            ret += "   Syntax:   modes = rdx_make_modes([2,4,5,9],pixels,radius)\n";
+            if( lvl > 1 ) {
+                ret +=  "   Accepted Keywords:\n"
+                        "      HELP                Display this info.\n"
+                        "      ANGLE               Rotate the modes (degrees).\n"
+                        "      CUTOFF              Smallest coefficient to consider for the Karhunen-Loeve expansion. (0.001)\n"
+                        "      FIRST               First Zernike-mode to use for the Karhunen-Loeve expansion. (2)\n"
+                        "      LAST                Last Zernike-mode to use for the Karhunen-Loeve expansion.(2000)\n"
+                        "      NORMALIZE           Normalize the modes.\n"
+                        "      PUPIL               (input/output) Use pupil, or keep the generated pupil.\n"
+                        "      VARIANCE            (output) Mode variances.\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n"
+                        "      ZERNIKE             Use Zernike modes (default is KL).\n";
+            }
+        } else ret += "\n";
+
+        return ret;
+        
+    }
+
 }
 
 
 IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     
     MODE_KW kw;
-    kw.help = 0;
-    kw.verbose = 0;
-    kw.normalize = 0;
     kw.firstZernike = 2;
     kw.lastZernike = 2000;
-    kw.angle = 0;
-    kw.pupil = kw.variance = nullptr;
     kw.cutoff = 1E-3;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, mode_kw_pars, (IDL_VPTR*) 0, 255, &kw);
     
     if (nPlainArgs < 3) {
-        cout << "rdx_make_modes: needs 3 arguments: mode-number(s), nPixels & pupil-radius (in pixels). " << endl;
-        return IDL_GettmpInt (-1);
+        string msg = "Three arguments needed: Mode-number(s), nPixels & pupil-radius (in pixels).";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
     
     IDL_VPTR index = argv[0];
@@ -184,8 +184,8 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
             auto beg = reinterpret_cast<int32_t*>(index->value.arr->data);
             std::copy( beg, beg + index->value.arr->n_elts , back_inserter(modeNumbers) );
         } else  {
-            cout << "rdx_make_modes: mode-numbers must be of type BYTE, INT or LONG." << endl;
-            return IDL_GettmpInt (-1);
+            string msg = "Mode-numbers must be of type BYTE, INT or LONG.";
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
         }
     } else {
         modeNumbers.push_back( IDL_LongScalar(index) );
@@ -209,8 +209,13 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
             pupil.generate( nPixels, radius );
         }
     }
-
+    
     ModeInfo mi(kw.firstZernike, kw.lastZernike, 0, nPixels, radius, kw.angle, kw.cutoff);
+    if( kw.verbose ) {
+        string msg = "Generating modes: " + (string)mi+ ".";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+    }
+
     shared_ptr<ModeSet>& modesRef = Cache::get<ModeInfo,shared_ptr<ModeSet>>(mi );
     if( ! modesRef ) modesRef.reset(new ModeSet());
     if( modesRef->empty() ) {
@@ -226,8 +231,9 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     if( kw.normalize ) {
         modes.getNorms( pupil );
         modes.normalize( 1.0 );
-        cout << "rdx_make_modes: Normalizing not properly implemented at the moment." << endl;
         // TODO: do the actual normalization of the local copy of the modes below
+        string msg = "Normalizing not fully implemented/tested yet.";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
         
     IDL_MEMINT dims[] = { (int)modes.dimSize(2), (int)modes.dimSize(1), (int)modes.dimSize(0) };
@@ -239,7 +245,6 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     }
     
     if( kw.pupil ) {
-
         IDL_VPTR tmpPup; // = IDL_Gettmp();
         float* tmpData =(float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_NOP, &tmpPup );
         pupil.copyTo<float>(tmpData);
@@ -254,13 +259,9 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
-void clear_pupils(void) {
-    Cache::clear<PupilInfo,Pupil>();
-}
-
-
 void clear_modes(void) {
     Cache::clear<ModeInfo,ModeSet>();
+    Cache::clear<PupilInfo,Pupil>();
 }
 
 
@@ -269,6 +270,7 @@ string clear_modecache_info( int lvl ) {
     string ret = "RDX_CLEAR_MODES";
     if( lvl > 0 ) {
         ret += ((lvl > 1)?"\n":"    ");          // newline if lvl>1
+        ret +=  "  Clear the cache of existing modes.\n";
         ret += "   Syntax:   rdx_clear_modes\n";
     } else ret += "\n";
 
@@ -277,16 +279,15 @@ string clear_modecache_info( int lvl ) {
 }
 
 
-void clear_modecache(int argc, IDL_VPTR argv[], char* argk) {
-    Cache::clear<PupilInfo,Pupil>();
-    Cache::clear<ModeInfo,ModeSet>();
+void clear_modecache(int, IDL_VPTR, char* ) {
+    clear_modes();
 }
 
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_pupil, (char*)"RDX_MAKE_PUPIL", 2, 3, 0, 0 }, 1, make_pupil_info, clear_pupils ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)make_modes, (char*)"RDX_MAKE_MODES", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_modes_info, clear_modes ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)clear_modecache, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info);
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_pupil}, (char*)"RDX_MAKE_PUPIL", 2, 3, 0, 0 }, 1, make_pupil_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_modes}, (char*)"RDX_MAKE_MODES", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_modes_info, clear_modes ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)clear_modecache}, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info);
 }
 
