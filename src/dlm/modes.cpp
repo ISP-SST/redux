@@ -17,6 +17,8 @@ namespace {
 
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_VPTR area;
+        IDL_VPTR center;
         IDL_INT  help;
         IDL_INT  verbose;
     } kw_pup;
@@ -24,6 +26,8 @@ namespace {
     // NOTE:  The keywords MUST be listed in alphabetical order !!
     static IDL_KW_PAR kw_img_trans_pars[] = {
         IDL_KW_FAST_SCAN,
+        { (char*) "AREA",          IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(kw_pup, area) },
+        { (char*) "CENTER",        IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_pup, center ) },
         { (char*) "HELP",          IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_pup, help ) },
         { (char*) "VERBOSE",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2( kw_pup, verbose ) },
         { NULL }
@@ -37,6 +41,8 @@ namespace {
             ret += "   Syntax:   pupil = rdx_make_pupil( pixels, radius [, central_obscuration_radius] )\n";
             if( lvl > 1 ) {
                 ret +=  "   Accepted Keywords:\n"
+                        "      AREA                (out) Return the area of the pupil.\n"
+                        "      CENTER              Center of the pupil. (float, 1-2 elements, default is [pixels,pixels]/2+0.5).\n"
                         "      HELP                Display this info.\n"
                         "      VERBOSE             Verbosity, default is 0 (only error output).\n";
             }
@@ -74,6 +80,19 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
         innerRadius = IDL_DoubleScalar( argv[2] );
     }
     
+    float c = nPixels/2.0+0.5;
+    PointF center( c, c );
+    if( kw.center ) {
+        vector<float> centv = getAsVector<float>( kw.center );
+        if( centv.size() == 1 ) {    // just use as a flag which means center in output image
+            centv.resize( 2, centv[0] );  // copy the value
+        }
+        if( centv.size() == 2 ) {
+            center.x = centv[0];
+            center.y = centv[1];
+        }
+    }
+    
     IDL_VPTR tmp;
     IDL_MEMINT dims[] = { nPixels, nPixels };
     double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &tmp );
@@ -81,13 +100,19 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
     if( kw.verbose ) {
         string msg = "Generating " + printArray( dims, 2, "" ) + " pupil with radius " + to_string(radius);
         if( innerRadius > 0.0 ) msg += " and a central obscuration of radius " + to_string(innerRadius);
+        if( kw.center ) msg += ", centered at " + (string)center;
         msg += ".";
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
     
     auto tmp2D = reshapeArray( tmpData, nPixels, nPixels );
-    redux::image::makePupil( tmp2D.get(), nPixels, radius, innerRadius );
-    
+    double area = redux::image::makePupil( tmp2D.get(), nPixels, center, radius, innerRadius );
+
+    if( kw.area ) {
+        IDL_VPTR tmpArea = IDL_GettmpFloat( area );
+        IDL_VarCopy( tmpArea, kw.area );
+    }
+
     return tmp;
 
 }
@@ -286,7 +311,7 @@ void clear_modecache(int, IDL_VPTR, char* ) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_pupil}, (char*)"RDX_MAKE_PUPIL", 2, 3, 0, 0 }, 1, make_pupil_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_pupil}, (char*)"RDX_MAKE_PUPIL", 2, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_pupil_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_modes}, (char*)"RDX_MAKE_MODES", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_modes_info, clear_modes ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)clear_modecache}, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info);
 }

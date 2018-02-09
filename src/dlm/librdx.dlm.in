@@ -23,7 +23,7 @@ FUNCTION        RDX_INTS2STR      1       1          KEYWORDS
 FUNCTION        RDX_LOADFILES     1       1          KEYWORDS
 FUNCTION        RDX_MAKE_MASK     0       1          KEYWORDS
 FUNCTION        RDX_MAKE_MODES    3       3          KEYWORDS
-FUNCTION        RDX_MAKE_PUPIL    2       3
+FUNCTION        RDX_MAKE_PUPIL    2       3          KEYWORDS
 FUNCTION        RDX_MAKE_TEMPLATE 1       1          KEYWORDS
 FUNCTION        RDX_MAKE_WINDOW   1       2          KEYWORDS
 PROCEDURE       RDX_MEMALIGN      1       1
