@@ -13,6 +13,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <math.h>
 
 #include <gsl/gsl_multifit.h>
 
@@ -78,92 +79,72 @@ static __inline T sqr (T x) {
 }
 
 
-double redux::image::makePupil( double** pupil, uint32_t nPoints, double outerRadius, double innerRadius ) {
+double redux::image::makePupil( double** pupil, uint32_t nPoints, PointF center, double outerRadius, double innerRadius ) {
 
-    double area = 0.0, origin = 0.5;
-    memset (*pupil, 0, nPoints * nPoints * sizeof (double));
-    uint32_t mid = nPoints / 2; // N.B: Don't use odd number of points for pupils !!
-    // Pupil should be centered ON pixel (mid,mid), to match the location of the origin for Fourier-transforms.
+    double area = 0.0;
+    size_t nPixels = nPoints*nPoints;
+    memset( *pupil, 0, nPixels*sizeof(double) );
 
-    if (nPoints % 2) {
-        // TODO: warn or throw if nPoints is odd.
-    }
+    struct Grid grid;
+    grid.id.size = nPoints;
+    grid.id.origin = center;
+    grid.init();
+    
+    float** distPtr = grid.distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the center of pixel (i,j)
+    float** anglePtr = grid.angle.get();
+    bool hasInner = (innerRadius > 0.0);
 
-    const shared_ptr<Grid> grid = Grid::get(mid + 1, origin, origin);
-    float** distPtr = grid->distance.get();      // distance(i,j) is the distance from the centre of the pupil, to the inner boundary of pixel (i,j)
-    // i.e. dist(0,0) = dist(0,1) = dist(1,0) = dist(1,1) = sqrt(2)/2  (it is centered on that pixel)
-    double val;
-    for (unsigned int x = 0; x < mid; ++x) {
-        for (unsigned int y = 0; y <= x; ++y) {     // We only generate the first octant, then copy.
-            val = 0;
-            if( distPtr[y+1][x+1] < innerRadius ) {
-                val = 0;
-            } else if( distPtr[y][x] < innerRadius ) {    // partial pixel
-                if (x == 0 && y == 0) {     // central pixel = 1 for all practical cases
-                    if (innerRadius < 0.5) val = M_PI * innerRadius * innerRadius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
-                    else val = M_PI * innerRadius * innerRadius + (innerRadius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI * innerRadius * innerRadius);
-                } else {
-                    // TBD: better approximation of pixel fill-factor ??
-                    val = (innerRadius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
-                }
-                val = 1.0 - val;
+    for( unsigned int x=0; x<nPoints; ++x ) {
+        for( unsigned int y=0; y<nPoints; ++y ) {
+            const double D = distPtr[y][x];
+            const double absangle = abs(anglePtr[y][x]);
+            double d;
+            if( absangle > M_PI/4 && absangle < 3*M_PI/4 ) {
+                d = abs(1/sin(absangle));
             } else {
-                if( distPtr[y+1][x+1] < outerRadius ) {
-                    val = 1;
-                } else if (distPtr[y][x] < outerRadius) {    // partial pixel
-                    if (x == 0 && y == 0) {     // central pixel = 1 for all practical cases
-                        if (outerRadius < 0.5) val = M_PI * outerRadius * outerRadius;    // a pupil of size < sqrt(2) pixel is a bit absurd...
-                        else val = M_PI * outerRadius * outerRadius + (outerRadius - 0.5) / (sqrt (0.5) - 0.5) * (1 - M_PI * outerRadius * outerRadius);
-                    } else {
-                        // TBD: better approximation of pixel fill-factor ??
-                        val = (outerRadius - distPtr[y][x]) / (distPtr[y + 1][x + 1] - distPtr[y][x]); // linear fill-factor from radial ratio
-                    }
-                }
+                d = abs(1/cos(absangle));
             }
-            if (val > 0) {
-                pupil[mid + y][mid + x] = val;
-                area += val;
-                if (x != y) {
-                    pupil[mid + x][mid + y] = val; // Use symmetry to fill the second octant
-                    area += val;
-                }
+            double dir = (D-innerRadius);
+            if( hasInner && (dir < -d) ) {                  // Entire pixel inside innerRadius
+                continue;
             }
-        }
-    }
-    for (unsigned int x = 0; x < mid; ++x) {
-        for (unsigned int y = 0; y < mid; ++y) {     // copy 1st quadrant to 2,3,4
-            val = pupil[mid + y][mid + x];
-            if (val > 0) {
-                if (x) {
-                    pupil[mid + y][mid - x] = val;
-                    area += val;
-                }
-                if (y) {
-                    pupil[mid - y][mid + x] = val;
-                    area += val;
-                }
-                if (x && y) {
-                    pupil[mid - y][mid - x] = val;
-                    area += val;
-                }
+            double dor = (D-outerRadius);
+            if( dor > d ) {                                 // Entire pixel outside outerRadius
+                continue;
             }
-        }
-    }
+            if( (dor < -d) && (!hasInner || (dir > d)) ) {   // Entire pixel inside outerRadius and outside innerRadius 
+                pupil[y][x] = 1;
+                area += 1;
+                continue;
+            }
+            double R = dor;
+            d *= 2;
+            if( hasInner && (dor < -d) ) {    
+                R = dir;
+                d = -d;
+            }
+            double val = 0.5 - R/d;
+            pupil[y][x] = val;
+            area += val;
 
+        }
+    }
+    
     return area;
+
 
 }
 
 
-void redux::image::makeZernike (double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle) {
+void redux::image::makeZernike( double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle ) {
 
-    redux::image::Pupil pupil(nPoints, r_c);
+    redux::image::Pupil pupil( nPoints, r_c );
 
     int m, n;
     noll_to_mn (modeNumber, m, n);
-
+    float midPlusHalf = nPoints/2.0 + 0.5;
     const vector<double>& coeff = Zernike::radialPolynomial (m, n);
-    const shared_ptr<Grid> grid = Grid::get(nPoints, nPoints/2.0, nPoints/2.0);
+    const shared_ptr<Grid> grid = Grid::get( nPoints, midPlusHalf, midPlusHalf );
     float** distPtr = grid->distance.get();  // distance from pixels to centre (pupil & modes are centered on pixel (mid,mid))
     float** aPtr = grid->angle.get();
 

@@ -4,6 +4,7 @@
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/util/point.hpp"
 #include "redux/util/progresswatch.hpp"
 #include "redux/types.hpp"
 
@@ -24,7 +25,12 @@ namespace redux {
 
     namespace image {
         
-        double makePupil( double** pupil, uint32_t nPoints, double outerRadius, double innerRadius=0.0 );
+        double makePupil( double** pupil, uint32_t nPoints, redux::util::PointF center, double outerRadius, double innerRadius=0.0 );
+        inline double makePupil( double** pupil, uint32_t nPoints, double outerRadius, double innerRadius=0.0 ) {
+            float midPlusHalf = nPoints/2.0 + 0.5;  // The default center is on the (nPoints,nPoints)/2 pixel.
+            redux::util::PointF cent( midPlusHalf, midPlusHalf );
+            return makePupil( pupil, nPoints, cent, outerRadius, innerRadius );
+        }
 
         void makeZernike( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
 

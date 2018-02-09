@@ -48,11 +48,12 @@ void Grid::init (void) {
     angle = sharedArray<float> (id.size.y, id.size.x);
     float** distPtr = distance.get();
     float** anglePtr = angle.get();
+    PointF shiftedOrigin = id.origin - 0.5;                // (0,0) means cetered in the lower left corner, (0.5,0.5) means on the first pixel
     for (unsigned int y = 0; y < id.size.y; ++y) {
-        double yDist = y - id.origin.y;
+        double yDist = y - shiftedOrigin.y;
         double y2 = yDist*yDist;
         for (unsigned int x = 0; x < id.size.x; ++x) {
-            double xDist = x - id.origin.x;
+            double xDist = x - shiftedOrigin.x;
             if (yDist || xDist) {
                 double x2 = xDist*xDist;
                 distPtr[y][x] = sqrt (y2 + x2);
