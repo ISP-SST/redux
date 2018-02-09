@@ -20,20 +20,20 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 
-PupilInfo::PupilInfo( string filename, uint16_t pixels )
-    : nPixels(pixels), pupilRadius(0), filename(filename) {
+PupilInfo::PupilInfo( string filename, double pupilRadius, uint16_t pixels )
+    : nPixels(pixels), pupilRadius(pupilRadius), filename(filename) {
 
 }
 
 
-PupilInfo::PupilInfo( uint16_t pixels, double pupilRadius )
-    : nPixels(pixels), pupilRadius(pupilRadius), filename("") {
+PupilInfo::PupilInfo( uint16_t pupilPixels, double pupilRadius, double coRadius )
+    : nPixels(pupilPixels), pupilRadius(pupilRadius), coRadius(coRadius), filename("") {
 
 }
 
       
 uint64_t PupilInfo::size( void ) const {
-    static uint64_t sz = sizeof(uint16_t) + sizeof(double) + 1;
+    static uint64_t sz = sizeof(uint16_t) + 2*sizeof(double) + 1;
     sz += filename.length();
     return sz;
 }
@@ -43,6 +43,7 @@ uint64_t PupilInfo::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = pack(ptr,nPixels);
     count += pack(ptr+count,pupilRadius);
+    count += pack(ptr+count,coRadius);
     count += pack(ptr+count,filename);
     return count;
 }
@@ -52,6 +53,7 @@ uint64_t PupilInfo::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = unpack(ptr,nPixels,swap_endian);
     count += unpack(ptr+count,pupilRadius,swap_endian);
+    count += unpack(ptr+count,coRadius,swap_endian);
     count += unpack(ptr+count,filename,swap_endian);
     return count;
 }
@@ -60,12 +62,14 @@ uint64_t PupilInfo::unpack( const char* ptr, bool swap_endian ) {
 bool PupilInfo::operator<(const PupilInfo& rhs) const {
     if(filename != rhs.filename) return (filename < rhs.filename);
     if(nPixels != rhs.nPixels) return (nPixels < rhs.nPixels);
-    return (pupilRadius < rhs.pupilRadius);
+    if(pupilRadius != rhs.pupilRadius) return (pupilRadius < rhs.pupilRadius);
+    return (coRadius < rhs.coRadius);
 }
 
 
 PupilInfo::operator string() const {
     string ret = to_string(nPixels)+":"+to_string(pupilRadius)+":";
+    if( coRadius > 0 ) ret += to_string(coRadius)+":";
     return ret;
 }
 
@@ -153,20 +157,40 @@ uint64_t Pupil::unpack( const char* data, bool swap_endian ) {
 }
 
 
-bool Pupil::load( const string& filename, uint16_t pixels ) {
+bool Pupil::load( const string& filename, uint16_t pixels, double pupilRadius ) {
     
     if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
         if( nDimensions() != 2 ) {    // not a 2D image
             clear();
         } else {
-            if( dimSize(0) != pixels || dimSize(1) != pixels ) {    // size mismatch
+            size_t inSz = dimSize(0);
+            if( inSz != dimSize(1)) {    // not a square image
+                clear();
+                return false;
+            } 
+            if( inSz != pixels ) {    // size mismatch
                 Array<double> tmp = Array<double>::copy(true);
                 resize( pixels, pixels );
-                redux::image::resize( tmp.get(), tmp.dimSize(0), tmp.dimSize(1), get(), pixels, pixels );
+                cv::Mat src( inSz, inSz, cv::cvType<double>(), tmp.get() );
+                cv::Mat dst( pixels, pixels, cv::cvType<double>(), get() );
+                cv::Mat map = cv::Mat::eye( 2, 3, CV_32F );         // unit affine transformation
+                double scale = 2.0*pupilRadius/inSz;                // input image is assumed to have a pupil-diameter = inSz.
+                map *= scale;
+                map.at<float>(0,2) = (pixels-1-inSz*scale)/2.0;     // center pupil image on the output image
+                map.at<float>(1,2) = (pixels-1-inSz*scale)/2.0;
+                if( !(pixels&1) ) {                                 // center pupil on the (N/2,N/2) pixel for even pixels
+                    map.at<float>(0,2) += 0.5;
+                    map.at<float>(1,2) += 0.5;
+                }
+                int flags = cv::INTER_AREA;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
+                int borderMode = cv::BORDER_CONSTANT;
+                const cv::Scalar borderValue = cv::Scalar();
+                cv::Size dsize = dst.size();
+                cv::warpAffine( src, dst, map, dsize, flags, borderMode, borderValue );
             }
             nPixels = pixels;
-            radius = 0;
+            radius = pupilRadius;
             normalize();
             generateSupport(1E-9);                         // TODO: tweak or make into a config parameter?
             return true;
@@ -177,13 +201,14 @@ bool Pupil::load( const string& filename, uint16_t pixels ) {
 }
 
 
-void Pupil::generate( uint16_t pixels, double pupilRadius ) {
+void Pupil::generate( uint16_t pixels, double pupilRadius, double coRadius ) {
     
     nPixels = pixels;
     radius = pupilRadius;
+    co_radius = coRadius;
     resize( nPixels, nPixels );
     auto ptr = reshape( nPixels, nPixels );        // returns a 2D shared_ptr
-    area = makePupil( ptr.get(), nPixels, radius );
+    area = makePupil( ptr.get(), nPixels, radius, co_radius );
     
     normalize();
     generateSupport(1E-9);                         // TODO: tweak or make into a config parameter?

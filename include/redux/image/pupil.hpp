@@ -14,10 +14,11 @@ namespace redux {
             
             uint16_t nPixels;
             double pupilRadius;
+            double coRadius;
             std::string filename;
             
-            PupilInfo( std::string, uint16_t pixels=0 );
-            PupilInfo( uint16_t pixels, double pupilRadius );
+            PupilInfo( std::string filename, double pupilRadius, uint16_t pupilPixels=0 );
+            PupilInfo( uint16_t pupilPixels, double pupilRadius, double coRadius=0.0 );
             
             uint64_t size(void) const;
             uint64_t pack(char*) const;
@@ -41,9 +42,9 @@ namespace redux {
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
             
-            bool load( const std::string& filename, uint16_t pixels );
+            bool load( const std::string& filename, uint16_t pupilPixels, double pupilRadius );
             
-            void generate( uint16_t pixels, double pupilRadius );
+            void generate( uint16_t pixels, double pupilRadius, double coRadius=0.0 );
             void generateSupport(double threshold=0);                           //!< Gets the indices of elements in the pupil/otf which are >threshold
             void normalize( void );                                             //!< Scale pupil to the interval [0,1]
             void dump( std::string tag="pupil" ) const;
@@ -53,6 +54,7 @@ namespace redux {
 
             uint16_t nPixels;
             double radius;
+            double co_radius;
             double area;
             
             std::vector<size_t> pupilSupport, otfSupport;                       //!< The indices to the support of the pupil/otf (i.e. elements greater than some threshold)

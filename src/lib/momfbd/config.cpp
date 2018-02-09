@@ -628,7 +628,7 @@ GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis( ZERNIKE), klMinMode( 2), klMax
     nInitialModes( 5), nModeIncrement( 5),
     modeNumbers( { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
-    telescopeD(0), minIterations(5), maxIterations(500), targetIterations(3),
+    telescopeD(0), telescopeCO(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2), trace(false),
     outputFileType(FT_NONE), outputDataType(DT_I16T), sequenceNumber(0),
@@ -694,6 +694,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     modeNumbers = getValue( tree, "MODES", defaults.modeNumbers );
 
     telescopeD = getValue( tree, "TELESCOPE_D", defaults.telescopeD );
+    telescopeCO = getValue( tree, "TELESCOPE_CO", defaults.telescopeCO );
 
     minIterations = getValue( tree, "MIN_ITER", defaults.minIterations );
     maxIterations = getValue( tree, "MAX_ITER", defaults.maxIterations );
@@ -814,6 +815,7 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( modeNumbers != defaults.modeNumbers ) tree.put( "MODES", modeNumbers );
     
     if( telescopeD != defaults.telescopeD) tree.put( "TELESCOPE_D", telescopeD );
+    if( telescopeCO != defaults.telescopeCO) tree.put( "TELESCOPE_CO", telescopeCO );
     
     if( minIterations != defaults.minIterations ) tree.put( "MIN_ITER", minIterations );
     if( maxIterations != defaults.maxIterations ) tree.put( "MAX_ITER", maxIterations );
@@ -847,7 +849,7 @@ uint64_t GlobalCfg::size( void ) const {
     sz += 9*sizeof( uint16_t );                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
     sz += modeNumbers.size()*sizeof( uint16_t ) + sizeof( uint64_t );
     sz += 6*sizeof( float );                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma, graddiff_step
-    sz += sizeof( double );                    // telescopeD
+    sz += 2*sizeof( double );                  // telescopeD, telescopeCO
     sz += sizeof( uint32_t );                  // sequenceNumber
     sz += observationTime.length() + 1;
     sz += observationDate.length() + 1;
@@ -871,6 +873,7 @@ uint64_t GlobalCfg::pack( char* ptr ) const {
     count += pack( ptr+count, nModeIncrement );
     count += pack( ptr+count, modeNumbers );
     count += pack( ptr+count, telescopeD );
+    count += pack( ptr+count, telescopeCO );
     count += pack( ptr+count, minIterations );
     count += pack( ptr+count, maxIterations );
     count += pack( ptr+count, targetIterations );
@@ -911,6 +914,7 @@ uint64_t GlobalCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, nModeIncrement, swap_endian );
     count += unpack( ptr+count, modeNumbers, swap_endian );
     count += unpack( ptr+count, telescopeD, swap_endian );
+    count += unpack( ptr+count, telescopeCO, swap_endian );
     count += unpack( ptr+count, minIterations, swap_endian );
     count += unpack( ptr+count, maxIterations, swap_endian );
     count += unpack( ptr+count, targetIterations, swap_endian );
@@ -961,6 +965,7 @@ bool GlobalCfg::operator==( const GlobalCfg& rhs ) const {
            ( nInitialModes == rhs.nInitialModes ) &&
            ( nModeIncrement == rhs.nModeIncrement ) &&
            ( telescopeD == rhs.telescopeD ) &&
+           ( telescopeCO == rhs.telescopeCO ) &&
            ( minIterations == rhs.minIterations ) &&
            ( maxIterations == rhs.maxIterations ) &&
            ( fillpixMethod == rhs.fillpixMethod ) &&

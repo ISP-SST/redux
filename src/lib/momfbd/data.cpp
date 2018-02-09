@@ -620,7 +620,7 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     }
     count += unpack(ptr+count,tmp,swap_endian);
     if(tmp) {
-        PupilInfo id("");
+        PupilInfo id( "", 0.0 );
         pupils.clear();
         while( tmp-- > 0 ) {
             count += id.unpack(ptr+count,swap_endian);

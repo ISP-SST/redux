@@ -775,11 +775,11 @@ void Object::initCache( void ){
     myJob.patchSize = patchSize;     // TODO: fulhack until per-channel sizes is implemented
     myJob.pupilPixels = pupilPixels;
     if( bfs::is_regular_file(pupilFile ) ){
-        PupilInfo info( pupilFile, pupilPixels );
+        PupilInfo info( pupilFile, pupilRadiusInPixels, pupilPixels );
         shared_ptr<Pupil> ret = myJob.globalData->get(info );
         lock_guard<mutex> lock(ret->mtx );
         if( ret->empty( ) ){    // this set was inserted, so it is not loaded yet.
-            if( ret->load( pupilFile, pupilPixels ) ){
+            if( ret->load( pupilFile, pupilPixels, pupilRadiusInPixels ) ){
                 LOG << "Loaded Pupil-file " << pupilFile << ende;
                 pupil = ret;
             } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
@@ -793,12 +793,16 @@ void Object::initCache( void ){
         }
     }
     
-    if( pupil->empty( ) ){
-        PupilInfo info(pupilPixels, pupilRadiusInPixels );
+    if( pupil->empty( ) ) {
+        double co_radius = 0.0;
+        if( myJob.telescopeCO > 0.0 ) {
+            co_radius = pupilRadiusInPixels * myJob.telescopeCO/myJob.telescopeD;
+        }
+        PupilInfo info( pupilPixels, pupilRadiusInPixels, co_radius );
         shared_ptr<Pupil> ret = myJob.globalData->get(info );
         lock_guard<mutex> lock(ret->mtx );
         if( ret->empty( ) ){    // this set was inserted, so it is not generated yet.
-            ret->generate( pupilPixels, pupilRadiusInPixels );
+            ret->generate( pupilPixels, pupilRadiusInPixels, co_radius );
             if( ret->nDimensions( )!= 2 || ret->dimSize(0 )!= pupilPixels || ret->dimSize(1 )!= pupilPixels ){    // mismatch
                 LOG_ERR << "Generated Pupil does not match. This should NOT happen!!" << ende;
             } else {

@@ -204,6 +204,7 @@ namespace redux {
             
             /********* Hardware **********/
             double telescopeD;           //!< Telescope diameter
+            double telescopeCO;          //!< Telescope central obscuration diameter
             /*****************************/
 
             /**** Numerical settings *****/
