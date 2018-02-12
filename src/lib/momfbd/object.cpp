@@ -1148,72 +1148,80 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
     }
     LOG << "Writing output to file: " << fn << ende;
     
-    size_t nPatches = patches.nElements( );
-    vector<shared_ptr<float*>> patchPtrs;
-    vector<float**> patchData;
-    vector<int32_t> xpos,ypos;
-    uint16_t maxPosX(0 );
-    uint16_t minPosX( std::numeric_limits<uint16_t >::max( ) );
-    uint16_t maxPosY = maxPosX;
-    uint16_t minPosY = minPosX;
+    try {
 
-    for( unsigned int y = 0; y < patches.dimSize(0 ); ++y ){
-        for( unsigned int x = 0; x < patches.dimSize(1 ); ++x ){
-            const Point16& first = patches(y,x)->roi.first;
-            if( first.x > maxPosX ) maxPosX = first.x;
-            if( first.x < minPosX ) minPosX = first.x;
-            if( first.y > maxPosY ) maxPosY = first.y;
-            if( first.y < minPosY ) minPosY = first.y;
-            auto oData = patches(y,x)->getObjectData(ID);
-            if( !oData ) throw runtime_error("patches(y,x)->getObject(ID) returned a null pointer !");
-            auto pPtr = oData->img.reshape(patchSize,patchSize );
-            patchPtrs.push_back( pPtr );
-            patchData.push_back( pPtr.get( ) );
-            xpos.push_back( first.x );
-            ypos.push_back( first.y );
+        size_t nPatches = patches.nElements( );
+        vector<shared_ptr<float*>> patchPtrs;
+        vector<float**> patchData;
+        vector<int32_t> xpos,ypos;
+        uint16_t maxPosX(0 );
+        uint16_t minPosX( std::numeric_limits<uint16_t >::max( ) );
+        uint16_t maxPosY = maxPosX;
+        uint16_t minPosY = minPosX;
+
+        for( unsigned int y = 0; y < patches.dimSize(0 ); ++y ){
+            for( unsigned int x = 0; x < patches.dimSize(1 ); ++x ){
+                const Point16& first = patches(y,x)->roi.first;
+                if( first.x > maxPosX ) maxPosX = first.x;
+                if( first.x < minPosX ) minPosX = first.x;
+                if( first.y > maxPosY ) maxPosY = first.y;
+                if( first.y < minPosY ) minPosY = first.y;
+                auto oData = patches(y,x)->getObjectData(ID);
+                if( !oData ) throw runtime_error("patches(y,x)->getObject(ID) returned a null pointer !");
+                auto pPtr = oData->img.reshape(patchSize,patchSize );
+                patchPtrs.push_back( pPtr );
+                patchData.push_back( pPtr.get( ) );
+                xpos.push_back( first.x );
+                ypos.push_back( first.y );
+            }
         }
-    }
-   
-    size_t imgCols = maxPosX+patchSize+1;
-    size_t imgRows = maxPosY+patchSize+1;
-    float** tmpImg = newArray<float>( imgRows, imgCols );
-    int margin = patchSize/8;
-    int blend =( patchSize-2*margin)/3;
     
-    mozaic( tmpImg, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
+        size_t imgCols = maxPosX+patchSize+1;
+        size_t imgRows = maxPosY+patchSize+1;
+        float** tmpImg = newArray<float>( imgRows, imgCols );
+        int margin = patchSize/8;
+        int blend =( patchSize-2*margin)/3;
+        
+        mozaic( tmpImg, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
 
-    if( !(myJob.runFlags&RF_NO_CLIP) ) {
-        img_trim( tmpImg, imgRows, imgCols, 1E-15 );
-    }
-    
-    if( myJob.outputDataType == DT_F32T ){
-        Array<float> wrap(*tmpImg, imgRows, imgCols );
-        Ana::write( fn.string(), wrap );
-    } else {
-        Array<int16_t> wrap(imgRows, imgCols );
-        wrap.copyFrom<float>( *tmpImg );
-        Ana::write( fn.string(), wrap );
-    }
-
-    delArray( tmpImg );
-    
-    if( saveMask & SF_SAVE_ALPHA ){
-        bfs::path fn = bfs::path(outputFileName + ".alpha.f0" );
-        if( isRelative(fn ) ){
-            fn = bfs::path(myJob.info.outputDir )/ fn;
+        if( !(myJob.runFlags&RF_NO_CLIP) ) {
+            img_trim( tmpImg, imgRows, imgCols, 1E-15 );
         }
-        LOG << "Saving alpha-coefficients to: " << fn << ende;
-        Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size() );
-        for( auto& patch: patches ){
-            Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1 );
-            auto oData = patch->getObjectData(ID);
-            if( !oData ) throw runtime_error("patches(y,x)->getObject() returned a null pointer !");
-            oData->alpha.copy( subalpha );
-       }
-       Ana::write(fn.string(), alpha );
+        
+        if( myJob.outputDataType == DT_F32T ){
+            Array<float> wrap(*tmpImg, imgRows, imgCols );
+            Ana::write( fn.string(), wrap );
+        } else {
+            Array<int16_t> wrap(imgRows, imgCols );
+            wrap.copyFrom<float>( *tmpImg );
+            Ana::write( fn.string(), wrap );
+        }
+
+        delArray( tmpImg );
+        
+        if( saveMask & SF_SAVE_ALPHA ){
+            bfs::path fn = bfs::path(outputFileName + ".alpha.f0" );
+            if( isRelative(fn ) ){
+                fn = bfs::path(myJob.info.outputDir )/ fn;
+            }
+            LOG << "Saving alpha-coefficients to: " << fn << ende;
+            Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.modeNumbers.size() );
+            for( auto& patch: patches ){
+                Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.modeNumbers.size()-1 );
+                auto oData = patch->getObjectData(ID);
+                if( !oData ) throw runtime_error("patches(y,x)->getObject() returned a null pointer !");
+                oData->alpha.copy( subalpha );
+            }
+            Ana::write(fn.string(), alpha );
+        }
+        
+    } catch( const exception& e ) {
+        LOG_ERR << "Error when writing output to file: " << fn << " what: " << e.what() << ende;
+        myJob.setFailed();
     }
-    
+
     ++progWatch;
+    
 }
 
 
@@ -1237,195 +1245,203 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
     }
     LOG << "Writing output to file: " << fn << ende;
 
-    std::shared_ptr<FileMomfbd> info( new FileMomfbd() );
+    try {
+        
+        std::shared_ptr<FileMomfbd> info( new FileMomfbd() );
 
-    // Extract date/time from the git commit.
-    int day, month, year, hour;
-    char buffer [15];
-    sscanf (reduxCommitTime, "%4d-%2d-%2d %2d", &year, &month, &day, &hour);
-    snprintf( buffer, 15, "%4d%02d%02d.%01d", year, month, day, hour );
-    info->versionString = buffer;
-    info->version = atof( info->versionString.c_str( ) );
+        // Extract date/time from the git commit.
+        int day, month, year, hour;
+        char buffer [15];
+        sscanf (reduxCommitTime, "%4d-%2d-%2d %2d", &year, &month, &day, &hour);
+        snprintf( buffer, 15, "%4d%02d%02d.%01d", year, month, day, hour );
+        info->versionString = buffer;
+        info->version = atof( info->versionString.c_str( ) );
 
-    info->dateString = myJob.observationDate;
-    if(startT.is_special( )&& endT.is_special() ){
-        info->timeString = "N/A";
-    } else if(startT.is_special() ){
-        info->timeString = bpx::to_simple_string(endT.time_of_day() );
-    } else if(endT.is_special() ){
-        info->timeString = bpx::to_simple_string(startT.time_of_day() );
-    } else {
-        bpx::time_duration obs_interval =( endT - startT );
-        info->timeString = bpx::to_simple_string((startT+obs_interval/2).time_of_day() );
-    }
-    
-    if( traceID >= 0 ) {     // this is a trace-object, copy some stuff...
-        shared_ptr<Object> ref = myJob.getObject(traceID);
-        if( ref ) {
-            channels = ref->getChannels();
-            modes = ref->modes;
-            pupil = ref->pupil;
-        }
-    }
-
-    int32_t nChannels = info->nChannels = channels.size( );
-    info->clipStartX = sharedArray<int16_t>( nChannels );
-    info->clipEndX = sharedArray<int16_t>( nChannels );
-    info->clipStartY = sharedArray<int16_t>( nChannels );
-    info->clipEndY = sharedArray<int16_t>( nChannels );
-    info->fileNames.clear( );
-
-    for( int i = 0; i < nChannels; ++i ){
-        channels[i]->getFileNames( info->fileNames, waveFrontList );
-        if(channels[i]->alignClip.empty() ){
-            Point16 sz = channels[i]->getImageSize( );
-            info->clipStartX.get()[i] = info->clipStartY.get()[i] = 1;
-            info->clipEndX.get()[i] = sz.x;
-            info->clipEndY.get()[i] = sz.y;
+        info->dateString = myJob.observationDate;
+        if(startT.is_special( )&& endT.is_special() ){
+            info->timeString = "N/A";
+        } else if(startT.is_special() ){
+            info->timeString = bpx::to_simple_string(endT.time_of_day() );
+        } else if(endT.is_special() ){
+            info->timeString = bpx::to_simple_string(startT.time_of_day() );
         } else {
-            info->clipStartX.get()[i] = channels[i]->alignClip[0];
-            info->clipEndX.get()[i] = channels[i]->alignClip[1];
-            info->clipStartY.get()[i] = channels[i]->alignClip[2];
-            info->clipEndY.get()[i] = channels[i]->alignClip[3];
+            bpx::time_duration obs_interval =( endT - startT );
+            info->timeString = bpx::to_simple_string((startT+obs_interval/2).time_of_day() );
         }
-    }
-    
-    info->nPH = pupilPixels;
-
-    uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
-    int64_t imgSize = patchSize*patchSize*sizeof(float );
-    
-    if( info->fileNames.size( ) ) writeMask |= MOMFBD_NAMES;
-    if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) writeMask |= MOMFBD_PSF;
-    if( saveMask & SF_SAVE_MODES && (info->nPH > 0) ) writeMask |= MOMFBD_MODES;
-    if( saveMask & SF_SAVE_COBJ ) writeMask |= MOMFBD_OBJ;
-    if( saveMask & SF_SAVE_RESIDUAL ) writeMask |= MOMFBD_RES;
-    if( saveMask & SF_SAVE_ALPHA ) writeMask |= MOMFBD_ALPHA;
-    if( nChannels && (saveMask & SF_SAVE_DIVERSITY) ) writeMask |= MOMFBD_DIV;
-    
-    Array<float> tmpModes;
-    if( writeMask&MOMFBD_MODES ){     // copy modes from local cache
-        //double pupilRadiusInPixels = pupilPixels / 2.0;
-        //if( objChannels.size() )pupilRadiusInPixels = objChannels[0]->pupilRadiusInPixels;
-        if( !modes || !pupil ) {
-            writeMask &= ~MOMFBD_MODES;
-        } else {
-            tmpModes.resize(myJob.modeNumbers.size()+1, info->nPH, info->nPH );            // +1 to also fit pupil in the array
-            tmpModes.zero( );
-            Array<double> mode_wrap(reinterpret_cast<Array<double>&>(*modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1 );
-            Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1 );     // subarray
-            tmp_slice.assign(reinterpret_cast<const Array<double>&>(*pupil) );
-            info->phOffset = 0;
-            tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1 );
-            tmp_slice.assign(mode_wrap );
-            tmp_slice /= wavelength;
-            if( myJob.modeNumbers.size() ){
-                //ModeInfo id( myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
-                info->nModes = myJob.modeNumbers.size( );
-                info->modesOffset = pupilPixels * pupilPixels * sizeof( float );
+        
+        if( traceID >= 0 ) {     // this is a trace-object, copy some stuff...
+            shared_ptr<Object> ref = myJob.getObject(traceID);
+            if( ref ) {
+                channels = ref->getChannels();
+                modes = ref->modes;
+                pupil = ref->pupil;
             }
         }
-    }
 
-    info->pix2cf = pixelsToAlpha;
-    info->cf2pix = alphaToPixels;
-    info->nPatchesY = patchesData.dimSize(0 );
-    info->nPatchesX = patchesData.dimSize(1 );
-    info->patches.resize(info->nPatchesX, info->nPatchesY );
-    info->nPoints = patchSize;
+        int32_t nChannels = info->nChannels = channels.size( );
+        info->clipStartX = sharedArray<int16_t>( nChannels );
+        info->clipEndX = sharedArray<int16_t>( nChannels );
+        info->clipStartY = sharedArray<int16_t>( nChannels );
+        info->clipEndY = sharedArray<int16_t>( nChannels );
+        info->fileNames.clear( );
 
-    size_t modeSize = tmpModes.nElements()*sizeof( float );
-    size_t blockSize = modeSize;
-    shared_ptr<ObjectData> oData( make_shared<ObjectData>() );
-    for( int x=0; x < info->nPatchesX; ++x ){
-        for( int y=0; y < info->nPatchesY; ++y ){
-            PatchData::Ptr thisPatch = patchesData(y,x);
-            if( thisPatch ){
-                getStorage( *thisPatch, oData );
-                shared_ptr<ObjectData> refData = thisPatch->getObjectData( ID );
-                if( traceID >= 0 ) {
-                    refData = thisPatch->getObjectData(traceID);
-                }
-                if( refData ) oData->channels = refData->channels;
-                info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
-                info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
-                info->patches(x,y).region[2] = thisPatch->roi.first.y+1;
-                info->patches(x,y).region[3] = thisPatch->roi.last.y+1;
-                info->patches(x,y).nChannels = nChannels;
-                info->patches(x,y).nim = sharedArray<int32_t>( nChannels );
-                info->patches(x,y).dx = sharedArray<int32_t>( nChannels );
-                info->patches(x,y).dy = sharedArray<int32_t>( nChannels );
-                for( int i=0; i < nChannels; ++i ){
-                    info->patches(x,y).nim.get()[i] = channels[i]->nImages( waveFrontList );
-                    info->patches(x,y).dx.get()[i] = oData->channels[i]->channelOffset.x;
-                    info->patches(x,y).dy.get()[i] = oData->channels[i]->channelOffset.y;
-                }
-                blockSize += imgSize;
-                if( writeMask&MOMFBD_PSF ){
-                    if(oData->psf.nDimensions()>1 ){
-                        info->patches(x,y).npsf = oData->psf.dimSize(0);
-                        blockSize += info->patches(x,y).npsf*imgSize;
-                    }
-                }
-                if( writeMask&MOMFBD_OBJ ){
-                    if(oData->cobj.nDimensions()>1 ){
-                        info->patches(x,y).nobj = oData->cobj.dimSize(0);
-                        blockSize += info->patches(x,y).nobj*imgSize;
-                    }
-                }
-                if( writeMask&MOMFBD_RES ){
-                    if(oData->res.nDimensions()>1 ){
-                        info->patches(x,y).nres = oData->res.dimSize(0);
-                        blockSize += info->patches(x,y).nres*imgSize;
-                    }
-                }
-                if( writeMask&MOMFBD_ALPHA ){
-                    if(oData->alpha.nDimensions()==2 ){
-                        info->patches(x,y).nalpha = oData->alpha.dimSize(0);
-                        info->patches(x,y).nm = oData->alpha.dimSize(1 );
-                        blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
-                    }
-                }
-                if( writeMask&MOMFBD_DIV ){
-                    if(oData->div.nDimensions()>1 ){
-                        info->patches(x,y).ndiv = oData->div.dimSize(0);
-                        info->patches(x,y).nphx = info->nPH;
-                        info->patches(x,y).nphy = info->nPH;
-                        blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
-                    }
-                }
-            }
-        }   // y-loop
-    }   // x-loop
-
-    auto tmp = sharedArray<char>( blockSize );
-    memcpy(tmp.get(), tmpModes.get(), modeSize );
-    char* tmpPtr = tmp.get( );
-    int64_t offset = modeSize;
-    results.copyTo<float>(tmpPtr+offset);
-    for( int x = 0; x < info->nPatchesX; ++x ){
-        for( int y = 0; y < info->nPatchesY; ++y ){
-            PatchData::Ptr thisPatch = patchesData(y,x);
-            if( thisPatch ){
-                info->patches(x,y).imgPos = offset;
-                offset += imgSize;
-                info->patches(x,y).psfPos = offset;
-                offset += info->patches(x,y).npsf*imgSize;
-                info->patches(x,y).objPos = offset;
-                offset += info->patches(x,y).nobj*imgSize;
-                info->patches(x,y).resPos = offset;
-                offset += info->patches(x,y).nres*imgSize;
-                info->patches(x,y).alphaPos = offset;
-                offset += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
-                info->patches(x,y).diversityPos = offset;
-                offset += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
+        for( int i = 0; i < nChannels; ++i ){
+            channels[i]->getFileNames( info->fileNames, waveFrontList );
+            if(channels[i]->alignClip.empty() ){
+                Point16 sz = channels[i]->getImageSize( );
+                info->clipStartX.get()[i] = info->clipStartY.get()[i] = 1;
+                info->clipEndX.get()[i] = sz.x;
+                info->clipEndY.get()[i] = sz.y;
+            } else {
+                info->clipStartX.get()[i] = channels[i]->alignClip[0];
+                info->clipEndX.get()[i] = channels[i]->alignClip[1];
+                info->clipStartY.get()[i] = channels[i]->alignClip[2];
+                info->clipEndY.get()[i] = channels[i]->alignClip[3];
             }
         }
-    }
+        
+        info->nPH = pupilPixels;
 
-    info->write( fn.string(), reinterpret_cast<char*>( tmp.get()), writeMask );
+        uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
+        int64_t imgSize = patchSize*patchSize*sizeof(float );
+        
+        if( info->fileNames.size( ) ) writeMask |= MOMFBD_NAMES;
+        if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) writeMask |= MOMFBD_PSF;
+        if( saveMask & SF_SAVE_MODES && (info->nPH > 0) ) writeMask |= MOMFBD_MODES;
+        if( saveMask & SF_SAVE_COBJ ) writeMask |= MOMFBD_OBJ;
+        if( saveMask & SF_SAVE_RESIDUAL ) writeMask |= MOMFBD_RES;
+        if( saveMask & SF_SAVE_ALPHA ) writeMask |= MOMFBD_ALPHA;
+        if( nChannels && (saveMask & SF_SAVE_DIVERSITY) ) writeMask |= MOMFBD_DIV;
+        
+        Array<float> tmpModes;
+        if( writeMask&MOMFBD_MODES ){     // copy modes from local cache
+            //double pupilRadiusInPixels = pupilPixels / 2.0;
+            //if( objChannels.size() )pupilRadiusInPixels = objChannels[0]->pupilRadiusInPixels;
+            if( !modes || !pupil ) {
+                writeMask &= ~MOMFBD_MODES;
+            } else {
+                tmpModes.resize(myJob.modeNumbers.size()+1, info->nPH, info->nPH );            // +1 to also fit pupil in the array
+                tmpModes.zero( );
+                Array<double> mode_wrap(reinterpret_cast<Array<double>&>(*modes), 0, myJob.modeNumbers.size()-1, 0, info->nPH-1, 0, info->nPH-1 );
+                Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1 );     // subarray
+                tmp_slice.assign(reinterpret_cast<const Array<double>&>(*pupil) );
+                info->phOffset = 0;
+                tmp_slice.wrap(tmpModes, 1, myJob.modeNumbers.size(), 0, info->nPH - 1, 0, info->nPH - 1 );
+                tmp_slice.assign(mode_wrap );
+                tmp_slice /= wavelength;
+                if( myJob.modeNumbers.size() ){
+                    //ModeInfo id( myJob.klMinMode, myJob.klMaxMode, 0, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+                    info->nModes = myJob.modeNumbers.size( );
+                    info->modesOffset = pupilPixels * pupilPixels * sizeof( float );
+                }
+            }
+        }
+
+        info->pix2cf = pixelsToAlpha;
+        info->cf2pix = alphaToPixels;
+        info->nPatchesY = patchesData.dimSize(0 );
+        info->nPatchesX = patchesData.dimSize(1 );
+        info->patches.resize(info->nPatchesX, info->nPatchesY );
+        info->nPoints = patchSize;
+
+        size_t modeSize = tmpModes.nElements()*sizeof( float );
+        size_t blockSize = modeSize;
+        shared_ptr<ObjectData> oData( make_shared<ObjectData>() );
+        for( int x=0; x < info->nPatchesX; ++x ){
+            for( int y=0; y < info->nPatchesY; ++y ){
+                PatchData::Ptr thisPatch = patchesData(y,x);
+                if( thisPatch ){
+                    getStorage( *thisPatch, oData );
+                    shared_ptr<ObjectData> refData = thisPatch->getObjectData( ID );
+                    if( traceID >= 0 ) {
+                        refData = thisPatch->getObjectData(traceID);
+                    }
+                    if( refData ) oData->channels = refData->channels;
+                    info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
+                    info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
+                    info->patches(x,y).region[2] = thisPatch->roi.first.y+1;
+                    info->patches(x,y).region[3] = thisPatch->roi.last.y+1;
+                    info->patches(x,y).nChannels = nChannels;
+                    info->patches(x,y).nim = sharedArray<int32_t>( nChannels );
+                    info->patches(x,y).dx = sharedArray<int32_t>( nChannels );
+                    info->patches(x,y).dy = sharedArray<int32_t>( nChannels );
+                    for( int i=0; i < nChannels; ++i ){
+                        info->patches(x,y).nim.get()[i] = channels[i]->nImages( waveFrontList );
+                        info->patches(x,y).dx.get()[i] = oData->channels[i]->channelOffset.x;
+                        info->patches(x,y).dy.get()[i] = oData->channels[i]->channelOffset.y;
+                    }
+                    blockSize += imgSize;
+                    if( writeMask&MOMFBD_PSF ){
+                        if(oData->psf.nDimensions()>1 ){
+                            info->patches(x,y).npsf = oData->psf.dimSize(0);
+                            blockSize += info->patches(x,y).npsf*imgSize;
+                        }
+                    }
+                    if( writeMask&MOMFBD_OBJ ){
+                        if(oData->cobj.nDimensions()>1 ){
+                            info->patches(x,y).nobj = oData->cobj.dimSize(0);
+                            blockSize += info->patches(x,y).nobj*imgSize;
+                        }
+                    }
+                    if( writeMask&MOMFBD_RES ){
+                        if(oData->res.nDimensions()>1 ){
+                            info->patches(x,y).nres = oData->res.dimSize(0);
+                            blockSize += info->patches(x,y).nres*imgSize;
+                        }
+                    }
+                    if( writeMask&MOMFBD_ALPHA ){
+                        if(oData->alpha.nDimensions()==2 ){
+                            info->patches(x,y).nalpha = oData->alpha.dimSize(0);
+                            info->patches(x,y).nm = oData->alpha.dimSize(1 );
+                            blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
+                        }
+                    }
+                    if( writeMask&MOMFBD_DIV ){
+                        if(oData->div.nDimensions()>1 ){
+                            info->patches(x,y).ndiv = oData->div.dimSize(0);
+                            info->patches(x,y).nphx = info->nPH;
+                            info->patches(x,y).nphy = info->nPH;
+                            blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
+                        }
+                    }
+                }
+            }   // y-loop
+        }   // x-loop
+
+        auto tmp = sharedArray<char>( blockSize );
+        memcpy(tmp.get(), tmpModes.get(), modeSize );
+        char* tmpPtr = tmp.get( );
+        int64_t offset = modeSize;
+        results.copyTo<float>(tmpPtr+offset);
+        for( int x = 0; x < info->nPatchesX; ++x ){
+            for( int y = 0; y < info->nPatchesY; ++y ){
+                PatchData::Ptr thisPatch = patchesData(y,x);
+                if( thisPatch ){
+                    info->patches(x,y).imgPos = offset;
+                    offset += imgSize;
+                    info->patches(x,y).psfPos = offset;
+                    offset += info->patches(x,y).npsf*imgSize;
+                    info->patches(x,y).objPos = offset;
+                    offset += info->patches(x,y).nobj*imgSize;
+                    info->patches(x,y).resPos = offset;
+                    offset += info->patches(x,y).nres*imgSize;
+                    info->patches(x,y).alphaPos = offset;
+                    offset += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
+                    info->patches(x,y).diversityPos = offset;
+                    offset += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
+                }
+            }
+        }
+
+        info->write( fn.string(), reinterpret_cast<char*>( tmp.get()), writeMask );
+        
+    } catch( const exception& e ) {
+        LOG_ERR << "Error when writing output to file: " << fn << " what: " << e.what() << ende;
+        myJob.setFailed();
+    }
+    
     ++progWatch;
-    
+
 }
 
 void Object::writeResults( boost::asio::io_service& service, const redux::util::Array<PatchData::Ptr>& patches ){
