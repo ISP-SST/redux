@@ -1182,6 +1182,27 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
         int margin = patchSize/8;
         int blend =( patchSize-2*margin)/3;
         
+        shared_ptr<redux::file::Ana> hdr( new redux::file::Ana() );
+        boost::posix_time::ptime now = boost::posix_time::microsec_clock::local_time();
+
+        string timeString = "N/A";
+        if( !startT.is_special( ) && !endT.is_special() ){
+            cout << "using avgT." << endl;
+            bpx::time_duration obs_interval = ( endT - startT );
+            boost::posix_time::ptime avgtime = (startT+obs_interval/2);
+            if( !avgtime.is_special() ) {
+                timeString = bpx::to_simple_string( avgtime.time_of_day() );
+            } else cout << "avgtime is special." << endl;
+        } else if( !endT.is_special() ){
+            cout << "using endT." << endl;
+            timeString = bpx::to_simple_string( endT.time_of_day() );
+        } else if( !startT.is_special() ){
+            cout << "using startT." << endl;
+            timeString = bpx::to_simple_string( startT.time_of_day() );
+        }
+        hdr->m_ExtendedHeader = "TIME_OBS=" + timeString + " DATE_OBS=" + myJob.observationDate
+                            + " NX=" + to_string(imgCols) + " NY=" + to_string(imgRows) + " DATE=" + to_iso_extended_string( now );
+
         mozaic( tmpImg, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
 
         if( !(myJob.runFlags&RF_NO_CLIP) ) {
@@ -1190,11 +1211,11 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
         
         if( myJob.outputDataType == DT_F32T ){
             Array<float> wrap(*tmpImg, imgRows, imgCols );
-            Ana::write( fn.string(), wrap );
+            Ana::write( fn.string(), wrap, hdr );
         } else {
             Array<int16_t> wrap(imgRows, imgCols );
             wrap.copyFrom<float>( *tmpImg );
-            Ana::write( fn.string(), wrap );
+            Ana::write( fn.string(), wrap, hdr, 5 );
         }
 
         delArray( tmpImg );
