@@ -659,6 +659,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     if( getValue<bool>( tree, "NO_FILTER", false ) )            runFlags |= RF_NO_FILTER;
     if( getValue<bool>( tree, "OVERWRITE", false ) )            runFlags |= RF_FORCE_WRITE;
     if( getValue<bool>( tree, "NOSWAP", false ) )               runFlags |= RF_NOSWAP;
+    if( getValue<bool>( tree, "OLD_NS", false ) )               runFlags |= RF_OLD_NS;
 
     trace = tree.get<bool>( "TRACE", defaults.trace );
     

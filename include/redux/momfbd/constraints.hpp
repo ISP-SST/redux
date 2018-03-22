@@ -57,10 +57,10 @@ namespace redux {
             
             struct NullSpace : public redux::util::CacheItem {
                 
-                NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc);
+                NullSpace(const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc, bool old_ns);
                 
                 void mapNullspace( void );
-                void calculateNullspace( logging::Logger&, bool store=true);
+                void calculateNullspace( logging::Logger&, bool store=true, bool nc=false );
                 bool verify( logging::Logger&,const std::map<int32_t, int8_t>&, int32_t, int32_t );
                 std::unique_lock<std::mutex> getLock( bool trylock=false ) {
                     if(trylock) return std::move( std::unique_lock<std::mutex>(nsMtx,std::try_to_lock) );
@@ -88,7 +88,7 @@ namespace redux {
              */
             struct Group {
                 
-                explicit Group (logging::Logger& l, std::shared_ptr<Constraint>& con);
+                explicit Group (logging::Logger& l, std::shared_ptr<Constraint>& con, bool old_ns=false);
                 
                 void add (const std::shared_ptr<Constraint>& con);
                 void addConnectedConstraints (std::vector<std::shared_ptr<Constraint>>& cons);
@@ -107,6 +107,7 @@ namespace redux {
                 size_t entriesHash;
                 std::shared_ptr<NullSpace> nullspace;
                 logging::Logger& logger;
+                bool old_ns;
             };
 
             explicit Constraints(MomfbdJob&);

@@ -33,7 +33,8 @@ namespace redux {
                          SF_SAVE_NAMES=256, SF_SAVE_FFDATA=512 };
         enum RunFlags  { RF_CALIBRATE=1, RF_DONT_MATCH_IMAGE_NUMS, RF_FAST_QR=4, RF_FIT_PLANE=8,
                          RF_FLATFIELD=16, RF_GLOBAL_NOISE=32, RF_NEW_CONSTRAINTS=64, RF_NO_CLIP=128,
-                         RF_NO_CONSTRAINTS=256, RF_NO_FILTER=512, RF_FORCE_WRITE=1024, RF_NOSWAP=2048 };
+                         RF_NO_CONSTRAINTS=256, RF_NO_FILTER=512, RF_FORCE_WRITE=1024, RF_NOSWAP=2048,
+                         RF_OLD_NS=4096 };
 
         struct cicomp {  // case-insensitive comparator for the maps below.
             bool operator() ( const std::string& a,const std::string& b ) const { return redux::util::nocaseLess(a,b); }

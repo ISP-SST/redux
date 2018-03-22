@@ -96,6 +96,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, red
     if( vm.count( "no-swap" ) ) tree.put( "NOSWAP", true );
     if( vm.count( "trace" ) ) tree.put( "TRACE", true );
     if( vm.count( "no-trace" ) ) tree.erase( "TRACE" );
+    if( vm.count( "old-ns" ) ) tree.put( "OLD_NS", true );
 
     GlobalCfg::parseProperties(tree, logger);
     uint16_t nObj(0);
@@ -1021,21 +1022,18 @@ void MomfbdJob::generateTraceObjects( void ) {
     
     int refID = -1;
     set<int> idSet;
-    if( trace ) {
-        for( shared_ptr<Object>& ref_obj: objects ) {
-            idSet.insert(ref_obj->ID);
-            if ( ref_obj && ref_obj->traceObject ) {
-                refID = ref_obj->ID;
-                break;
-            }
+
+    for( shared_ptr<Object>& ref_obj: objects ) {
+        idSet.insert(ref_obj->ID);
+        if ( ref_obj && ref_obj->traceObject ) {
+            refID = ref_obj->ID;
+            break;
         }
     }
     
     if( refID < 0 ) refID = getReferenceObject();
     if( refID < 0 ) return;
 
-    LOG_DETAIL << "Generating trace-objects for reference #" << refID << ende;
-    
     shared_ptr<Object> ref_obj = objects[refID];
     size_t found =  ref_obj->outputFileName.find_first_of("_.");
     string refTag;
@@ -1079,7 +1077,7 @@ void MomfbdJob::generateTraceObjects( void ) {
                 }
             }
             auto ret = wfSets.emplace( thisWf, vector<string>(1,obj->outputFileName) );
-            if( !ret.second ) {      // not inserted, so this WF already existed
+            if( !ret.second ) {      // not inserted, so this WF-set already existed
                 ret.first->second.push_back( obj->outputFileName );
             }
             obj->traceID = refID;
@@ -1096,7 +1094,6 @@ loopend: ;
                                     }), objects.end() );
 
     size_t nOld = trace_objects.size();
-    if( nOld ) LOG_DETAIL << "Converted " << nOld << " old-style trace objects." << ende;
 
     uint16_t idCnt(0);
     while( idSet.count(idCnt) ) idCnt++;
@@ -1116,7 +1113,6 @@ loopend: ;
         }
     }
     size_t nNew = trace_objects.size() - nOld;
-    if( nNew ) LOG_DETAIL << "Generated " << nNew << " trace-objects with reference object " << refID << ende;
 
     if( !refTag.empty() ) {
         for( shared_ptr<Object>& obj: trace_objects ) {
@@ -1131,7 +1127,12 @@ loopend: ;
         }
     }
     
-    
+    if( nNew || nOld ) {
+        LOG_DETAIL << "Generated trace-objects for reference #" << refID << ende;
+        if( nNew ) LOG_DETAIL << "Generated " << nNew << " trace-objects for reference object " << refID << ende;
+        if( nOld ) LOG_DETAIL << "Converted " << nOld << " old-style trace objects." << ende;
+    }
+
     
 }
 

@@ -796,7 +796,7 @@ namespace {
         string ret = "RDX_IMG_TRANSFORM";
         if( lvl > 0 ) {
             ret += ((lvl > 1)?"\n":"        ");          // newline if lvl>1
-            ret += "   Syntax:   map = rdx_img_transform( map, image, /KEYWORDS )\n";
+            ret += "   Syntax:   mapped_image = rdx_img_transform( map, image, /KEYWORDS )\n";
             if( lvl > 1 ) {
                 ret +=  "   where map is a 3x3 or 2x3 transformation matrix.\n";
                 ret +=  "   Accepted Keywords:\n"

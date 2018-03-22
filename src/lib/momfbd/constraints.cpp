@@ -54,12 +54,14 @@ bool Constraints::Constraint::operator>( const Constraint& rhs ) const {
 }
 
 
-Constraints::NullSpace::NullSpace( const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc ) :
+Constraints::NullSpace::NullSpace( const std::map<int32_t, int8_t>& e, int32_t np, int32_t nc, bool old_ns ) :
     c_entries(e), entriesHash(0), nParameters(np), nConstraints(nc) {
     
     entriesHash = boost::hash_range( c_entries.begin(), c_entries.end() );
-    setPath( "Nullspace_"+to_string(np)+"x"+to_string(nc)+"_"+to_string(entriesHash) );
-    
+    string path_name = "Nullspace_";
+    if( old_ns ) path_name += "old_";
+    path_name +=  to_string(np)+"x"+to_string(nc)+"_"+to_string(entriesHash);
+    setPath( path_name );
     isLoaded = false;
     
 }
@@ -80,19 +82,97 @@ void Constraints::NullSpace::mapNullspace( void ) {
 #undef NS_THRESHOLD
 
 
-#define NS_ANALYTIC 0
-void Constraints::NullSpace::calculateNullspace( logging::Logger& logger, bool store ) {
-    
-    if (nParameters == nConstraints) {
+void Constraints::NullSpace::calculateNullspace( logging::Logger& logger, bool store, bool old_ns ) {
+
+    int32_t nFreeParams = nParameters-nConstraints;
+    if( nFreeParams < 1 ) {
         ns.clear();
+        return;
     } else {
-        if(NS_ANALYTIC) {
-            LOG << "Finding nullspace basis for (" << nConstraints << "x" << nParameters << ") group." << ende;
-            ns.resize(nParameters,nParameters-nConstraints);
-            if (nParameters == nConstraints+1) {    // 1D nullspace
+        if(!old_ns) {
+            LOG << "Constructing optimal nullspace basis for (" << nConstraints << "x" << nParameters << ") group." << ende;
+            ns.resize( nParameters, nFreeParams );
+            if( nFreeParams == 1 ) {    // 1D nullspace (i.e. non-tilts)
                 ns = 1.0/sqrt(nParameters);
             } else {
-                // TODO implement
+                Array<int32_t> C( nConstraints, nParameters );
+                C.zero();
+                ns.zero();
+                shared_ptr<double*> tmpNS = ns.reshape( nFreeParams, nParameters ); // we will work in row-major form, then transpose at the end
+                double** nsArr = tmpNS.get();
+                
+                for( auto & entry: c_entries ) {
+                    C( entry.first/nParameters, entry.first%nParameters ) = entry.second;
+                }
+                int32_t row_index(0);
+                int32_t max_element_count(0);
+                for( int32_t i(0); i<nConstraints; ++i ) {
+                    int32_t this_element_count(0);
+                    for( int32_t j(0); j<nParameters; ++j ) this_element_count += (C( i, j ) != 0);
+                    if( this_element_count > max_element_count ) {
+                        max_element_count = this_element_count;
+                        row_index = i;
+                    }
+                }
+                // The constraint just selected will be the constraint that the sum of all tilts is 0, i.e.
+                // it will be a row consisting of max_element_count x 1 and the rest 0
+                
+                int32_t block_length(1);
+                size_t basis_count(0);
+                while( block_length < max_element_count ) {
+                    int32_t offset(0);
+                    while( offset+block_length < max_element_count ) {
+                        int32_t rem = max(min(max_element_count-offset-block_length,block_length),0);
+                        for( int32_t i(0); i<block_length; ++i ) {
+                            nsArr[basis_count][offset+i] = 1.0;
+                            if( offset+block_length+i < max_element_count ) {
+                                nsArr[basis_count][offset+block_length+i] = -block_length*1.0/rem;
+                            }
+                        }
+                        basis_count++;
+                        offset += 2*block_length;
+                    }
+                    block_length *= 2;
+                }
+                for( int32_t i(0); i<nFreeParams; ++i ) {    // loop over nullspace base vectors
+                    for( int32_t j(0); j<max_element_count; ++j ) {
+                        double ns_val = nsArr[i][j];
+                        if( fabs(ns_val) > 0 ) {;
+                            for( int32_t k(0); k<nConstraints; ++k ) {
+                                int32_t v1 = C(k,j);
+                                if( (k != row_index) && v1 ) {    // skip the constraint we already used to construct the nullspace
+                                    // find the other non-zero value (there will only be 1)
+                                    for( int32_t p(0); p<nParameters; ++p ) {
+                                        if( p == j ) continue;
+                                        int32_t v2 = C(k,p);
+                                        if( v2 ) nsArr[i][p] = -v1*ns_val/v2;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                for( int32_t i(0); i<nFreeParams; ++i ) {    // loop over nullspace base vectors
+                    double sum(0);
+                    for( int32_t k=0; k<nParameters; ++k ) {
+                        sum += nsArr[i][k]*nsArr[i][k];
+                    }
+                    for( int32_t j(i+1); j<nFreeParams; ++j ) {
+                        double scalar_product(0);
+                        for( int32_t k=0; k<nParameters; ++k ) {
+                            scalar_product += nsArr[i][k]*nsArr[j][k];
+                        }
+                        if( fabs(scalar_product) > 0.0 ) {
+                            scalar_product /= sum;
+                            std::transform( nsArr[j], nsArr[j]+nParameters, nsArr[i], nsArr[j], [&]( double& a, double& b ){ return a-scalar_product*b; } );
+                        }
+                    }
+                    if( sum > 0 && sum != 1.0 ) {
+                        sum = 1.0/sqrt(sum);
+                        std::transform( nsArr[i], nsArr[i]+nParameters, nsArr[i], [&]( double& a ){ return a*sum; } );
+                    }
+                }
+                transpose( ns.get(), nFreeParams, nParameters );
             }
             
         } else {
@@ -116,7 +196,6 @@ void Constraints::NullSpace::calculateNullspace( logging::Logger& logger, bool s
     if(store) cacheStore();
     
 }
-#undef NS_ANALYTIC
 
 
 bool Constraints::NullSpace::verify( logging::Logger& logger, const std::map<int32_t, int8_t>& e, int32_t nP, int32_t nC ) {
@@ -184,7 +263,7 @@ bool Constraints::NullSpace::operator<(const NullSpace& rhs) const {
 }
 
 
-Constraints::Group::Group( logging::Logger& l, shared_ptr<Constraint>& con ) : nParameters(0), entriesHash(0), logger(l) {
+Constraints::Group::Group( logging::Logger& l, shared_ptr<Constraint>& con, bool ons ) : nParameters(0), entriesHash(0), logger(l), old_ns(ons) {
     add( con );
 }
 
@@ -231,14 +310,29 @@ void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, in
     vector<int32_t> newIndices(nParameters);
     std::iota( newIndices.begin(), newIndices.end(), rOffset );         // newIndices is a dense range starting at rOffset
     
+    vector<int32_t> entry_count( nParameters, 0 );
+    map<int32_t, int32_t> entryCount;
+    struct my_comp {
+        bool operator() ( const PointI& lhs, const PointI& rhs ) const {
+            if( lhs.y != rhs.y ) return lhs.y>rhs.y;
+            return lhs.x<rhs.x;
+        }
+    };
+    set<PointI,my_comp> entryCounts;
+    for( auto& i: indices ) {
+        PointI p(0, i);
+        for( auto &c: constraints ) {
+            if( c->has(i) ) p.y++;
+        }
+        entryCounts.insert(p);
+    }
+
     map<int32_t, int32_t> indexMap;
-    std::transform( indices.begin(), indices.end(),
-                    newIndices.begin(),
-                    std::inserter( indexMap, indexMap.end() ),
-                    [columnOrdering](const int32_t& oldIndex, const int32_t& newIndex) {
-                        columnOrdering[newIndex] = oldIndex;            
-                        return make_pair(oldIndex, newIndex);
-                    } );
+    size_t cnt(0);
+    for( auto& ec: entryCounts ) {
+        columnOrdering[newIndices[cnt]] = ec.x;
+        indexMap[ec.x] = newIndices[cnt++];
+    }
 
     indices.clear();
     indices.insert( newIndices.begin(), newIndices.end() );
@@ -290,7 +384,7 @@ void Constraints::Group::mapNullspace(void) {
     ns_entries.clear();
     if( nParameters > nConstraints ) {
         
-        shared_ptr<NullSpace> tmpNS( new NullSpace( entries, nParameters, nConstraints ) );
+        shared_ptr<NullSpace> tmpNS( new NullSpace( entries, nParameters, nConstraints, old_ns ) );
         nullspace = redux::util::Cache::get( entriesHash, tmpNS );
         auto lock = nullspace->getLock();
         bool storeNS = true;
@@ -303,7 +397,7 @@ void Constraints::Group::mapNullspace(void) {
             nullspace->ns.clear();
         }
         if( nullspace->ns.nDimensions() < 1 ) {
-            nullspace->calculateNullspace( logger, storeNS );
+            nullspace->calculateNullspace( logger, storeNS, old_ns );
         }
         
         if( nullspace->ns_entries.empty() ) {
@@ -379,7 +473,7 @@ void Constraints::groupConnectedVariables( void ) {
 
     auto tmpC = constraints;
     while( tmpC.size() ) {
-        Group g( logger, tmpC[0] );
+        Group g( logger, tmpC[0], (job.runFlags&RF_OLD_NS)  );
         g.addConnectedConstraints( tmpC );  // adds connected constraints to group and removes them from tmpC
         g.sortRows();
         groups.push_back( g );

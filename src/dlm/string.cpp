@@ -370,9 +370,9 @@ IDL_VPTR str_replace(int argc, IDL_VPTR* argv, char* argk) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)str2ints, (char*)"RDX_STR2INTS", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, str2ints_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)ints2str, (char*)"RDX_INTS2STR", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, ints2str_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)maketemplate, (char*)"RDX_MAKE_TEMPLATE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, maketemplate_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)str_replace, (char*)"RDX_STRREPLACE", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, strreplace_info );
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)str2ints}, (char*)"RDX_STR2INTS", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, str2ints_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)ints2str}, (char*)"RDX_INTS2STR", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, ints2str_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)maketemplate}, (char*)"RDX_MAKE_TEMPLATE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, maketemplate_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)str_replace}, (char*)"RDX_STRREPLACE", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, strreplace_info );
 }
 
