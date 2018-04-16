@@ -109,7 +109,9 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
     double area = redux::image::makePupil( tmp2D.get(), nPixels, center, radius, innerRadius );
 
     if( kw.area ) {
-        IDL_VPTR tmpArea = IDL_GettmpFloat( area );
+        IDL_VPTR tmpArea = IDL_Gettmp();
+        tmpArea->type = IDL_TYP_FLOAT;
+        tmpArea->value.f = area;
         IDL_VarCopy( tmpArea, kw.area );
     }
 
