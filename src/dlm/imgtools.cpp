@@ -58,12 +58,14 @@ namespace {
         IDL_INT max_shift;
         float max_scale;
         IDL_INT max_points;
+        IDL_VPTR min_area;
+        IDL_VPTR min_distance;
         IDL_INT niter;
         IDL_INT nrefpoints;
         IDL_INT orientation;
         IDL_INT preserve;
         IDL_INT show;
-        IDL_INT smooth;
+        IDL_VPTR smooth;
         IDL_INT verbose;
         IDL_VPTR h_init;
         IDL_VPTR status;
@@ -86,13 +88,15 @@ namespace {
         { (char*) "MAX_POINTS", IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_points) },
         { (char*) "MAX_SCALE",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_scale) },
         { (char*) "MAX_SHIFT",  IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_shift) },
+        { (char*) "MIN_AREA",   IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (min_area) },
+        { (char*) "MIN_DISTANCE", IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (min_distance) },
         { (char*) "NITER",      IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (niter) },
         { (char*) "NREF",       IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (nrefpoints) },
         { (char*) "ORIENTATION",IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (orientation) },
         { (char*) "POINTS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (points) },
         { (char*) "PRESERVE_SIZE", IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (preserve) },
         { (char*) "SHOW",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (show) },
-        { (char*) "SMOOTH",     IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (smooth) },
+        { (char*) "SMOOTH",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (smooth) },
         { (char*) "STATUS",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (status) },
         { (char*) "THRESHOLD",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (threshold) },
         { (char*) "VERBOSE",    IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (verbose) },
@@ -314,11 +318,14 @@ string img_align_info( int lvl ) {
                     "      MAX_POINTS          Use this many pinholes for the refinement (default=25).\n"
                     "      MAX_SCALE           The allowed scale difference (default=1.04).\n"
                     "      MAX_SHIFT           The maximum allowed translation (default=200).\n"
+                    "      MIN_AREA            Smallest area of blob to qualify as pinhole. Can be a vector with 2 different values. (default: 10)\n"
+                    "      MIN_DISTANCE        Smallest allowed distance between pinholes. Can be a vector with 2 different values. (default: 20)\n"
                     "      NITER               Max iterations when fitting the homography (default=30).\n"
                     "      NREF                The number of reference points in each image to attempt to pair and fit (default=4).\n"
                     "      ORIENTATION         If you wish to enforce an overall oriention (determinant) of the mapping, set this value to +1 or -1. (default=0).\n"
                     "      POINTS              (OUT) Output the coordinates of the detected pinholes in both images (as N x 4 matrix).\n"
                     "      SMOOTH              Apply a Gaussian filter of this width to the images before detecting pinholes.\n"
+                    "                            Can be a vector with 2 different values.\n"
                     "      STATUS              (OUT) Set to 0 on succes, <0 on failure.\n"
                     "      THRESHOLD           Hard threshold applied before detecting pinholes. Can be a vector with 2 different values. (default: 0)\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n";
@@ -391,7 +398,38 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
     params.filterByArea = true;
     params.minArea = 10;
     params.maxArea = 150;
+
+    int hsz1 = std::min( imgSize1.height, imgSize1.width )/2;
+    int hsz2 = std::min( imgSize2.height, imgSize2.width )/2;
     
+    vector<float> areas;
+    if( kw.min_area ) {
+        areas = getAsVector<float>( kw.min_area );
+        if( areas.size() ) {
+            areas.resize( 2, areas[0] );  // if only 1 value, it will be copied
+            areas[0] = std::min<float>( std::max(areas[0], 0.0f), hsz1 );
+            areas[1] = std::min<float>( std::max(areas[1], 0.0f), hsz2 );
+            params.minArea = areas[0];
+        }
+    }
+    
+    vector<float> distances;
+    if( kw.min_area ) {
+        distances = getAsVector<float>( kw.min_area );
+        if( distances.size() ) {
+            distances.resize( 2, distances[0] );  // if only 1 value, it will be copied
+            distances[0] = std::min<float>( std::max(distances[0], 0.0f), hsz1 );
+            distances[1] = std::min<float>( std::max(distances[1], 0.0f), hsz2 );
+            params.minDistBetweenBlobs = distances[0];
+        }
+    }
+    
+    if ( kw.verbose > 1 ) {
+        if( areas.size() > 1 ) cout << "img_align: applying " << printArray(areas,"min_area") << endl;
+        else cout << "img_align: applying min_area = " << params.minArea << endl;
+        if( distances.size() > 1 ) cout << "img_align: applying " << printArray(areas,"min_distance") << endl;
+        else cout << "img_align: applying min_distance = " << params.minDistBetweenBlobs << endl;
+    }
 
     try {
 
@@ -440,11 +478,24 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
             }
         }
         
+        vector<int> smooths;
         if( kw.smooth ) {
-            if( kw.smooth%2 == 0 ) kw.smooth--;     // size has to be odd in the Gaussian filtering
-            if ( kw.verbose > 1 ) cout << "img_align: applying Gaussian filter of size " << kw.smooth << endl;
-            GaussianBlur( imgByte1, imgByte1, Size(kw.smooth,kw.smooth), 0, 0 );
-            GaussianBlur( imgByte2, imgByte2, Size(kw.smooth,kw.smooth), 0, 0 );
+            smooths = getAsVector<int>(kw.smooth);
+            if( smooths.size() ) {
+                smooths.resize( 2, smooths[0] );  // if only 1 value, it will be copied
+                if( smooths[0]%2 == 0 ) smooths[0]--;     // size has to be odd in the Gaussian filtering
+                if( smooths[1]%2 == 0 ) smooths[1]--;     // size has to be odd in the Gaussian filtering
+                if( smooths[0]>0 ) {
+                    GaussianBlur( imgByte1, imgByte1, Size(smooths[0],smooths[0]), 0, 0 );
+                }
+                if( smooths[1]>0 ) {
+                    GaussianBlur( imgByte2, imgByte2, Size(smooths[0],smooths[0]), 0, 0 );
+                }
+            }
+        }
+        
+        if ( kw.verbose > 1 ) {
+            if( smooths.size() > 1 ) cout << "img_align: applying " << printArray(smooths,"smooth") << endl;
         }
         
         double otsu1 = threshold( imgByte1, tmp1, 0, 0, THRESH_TOZERO|THRESH_OTSU );
@@ -466,6 +517,13 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
         detector->detect( imgByte1, keypoints1 );
         
         params.minThreshold = otsu2/4;
+        if( areas.size() > 1 ) {
+            params.minArea = areas[1];
+        }
+        if( distances.size() > 1 ) {
+            params.minDistBetweenBlobs = distances[1];
+        }
+
 #if CV_MAJOR_VERSION >= 3
         detector = SimpleBlobDetector::create(params);
 #else
