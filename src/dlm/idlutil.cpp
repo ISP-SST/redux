@@ -697,13 +697,15 @@ typedef struct {
     IDL_INT help;
     IDL_INT indent;
     IDL_INT max_length;
+    IDL_VPTR name;
 } KW_RESULT;
 
 static IDL_KW_PAR kw_pars[] = {
     IDL_KW_FAST_SCAN,
-    { (char*) "HELP",      IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
-    { (char*) "INDENT",    IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (indent) },
-    { (char*) "MAX_LENGTH",IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_length) },
+    { (char*) "HELP",       IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF (help) },
+    { (char*) "INDENT",     IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF (indent) },
+    { (char*) "MAX_LENGTH", IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF (max_length) },
+    { (char*) "NAME",       IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (name) },
     { NULL }
 };
 
@@ -718,7 +720,8 @@ string structinfo_help( int lvl ) {
         if( lvl > 1 ) {
             ret +=  "   Accepted Keywords:\n"
                     "      HELP                Display this info.\n"
-                    "      INDENT              Indentation for each level in the structure (2).\n";
+                    "      INDENT              Indentation for each level in the structure (2).\n"
+                    "      NAME                Get the name of the struct.\n";
         }
     
     } else ret += "\n";
@@ -742,6 +745,7 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
     }
 
     IDL_VPTR data = argv[0];
+    IDL_ENSURE_STRUCTURE( data );
 
     if (kw.help) {
         cout << structinfo_help(2) << endl;
@@ -749,7 +753,11 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
     }
 
     int indent = std::min (std::max ( (int) kw.indent, 0), 30);
-
+    if( kw.name && data->value.s.sdef->id->len ) {
+        IDL_VPTR tmp = IDL_StrToSTRING( data->value.s.sdef->id->name );
+        IDL_VarCopy( tmp, kw.name );
+    }
+    
     printStruct( data, -1, indent, kw.max_length );
     
 }
