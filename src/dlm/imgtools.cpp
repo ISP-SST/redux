@@ -55,6 +55,7 @@ namespace {
         IDL_INT by_size;
         float eps;
         IDL_INT margin;
+        IDL_VPTR max_area;
         IDL_INT max_shift;
         float max_scale;
         IDL_INT max_points;
@@ -85,6 +86,7 @@ namespace {
         { (char*) "HELP",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (help) },
         { (char*) "H_INIT",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (h_init) },
         { (char*) "MARGIN",     IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (margin) },
+        { (char*) "MAX_AREA",   IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF (max_area) },
         { (char*) "MAX_POINTS", IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_points) },
         { (char*) "MAX_SCALE",  IDL_TYP_FLOAT, 1, 0,           0, (char*) IDL_KW_OFFSETOF (max_scale) },
         { (char*) "MAX_SHIFT",  IDL_TYP_INT,   1, 0,           0, (char*) IDL_KW_OFFSETOF (max_shift) },
@@ -315,6 +317,7 @@ string img_align_info( int lvl ) {
                     "      HELP                Display this info.\n"
                     "      H_INIT              (IN/OUT) Initial guess (3x3 matrix).\n"
                     "      MARGIN              Pinholes detected closer to the edges will be ignored. (default=30)\n"
+                    "      MAX_AREA            Largest area of blob to qualify as pinhole. Can be a vector with 2 different values. (default: 150)\n"
                     "      MAX_POINTS          Use this many pinholes for the refinement (default=25).\n"
                     "      MAX_SCALE           The allowed scale difference (default=1.04).\n"
                     "      MAX_SHIFT           The maximum allowed translation (default=200).\n"
@@ -402,14 +405,25 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
     int hsz1 = std::min( imgSize1.height, imgSize1.width )/2;
     int hsz2 = std::min( imgSize2.height, imgSize2.width )/2;
     
-    vector<float> areas;
+    vector<float> min_areas;
     if( kw.min_area ) {
-        areas = getAsVector<float>( kw.min_area );
-        if( areas.size() ) {
-            areas.resize( 2, areas[0] );  // if only 1 value, it will be copied
-            areas[0] = std::min<float>( std::max(areas[0], 0.0f), hsz1 );
-            areas[1] = std::min<float>( std::max(areas[1], 0.0f), hsz2 );
-            params.minArea = areas[0];
+        min_areas = getAsVector<float>( kw.min_area );
+        if( min_areas.size() ) {
+            min_areas.resize( 2, min_areas[0] );  // if only 1 value, it will be copied
+            min_areas[0] = std::min<float>( std::max(min_areas[0], 0.0f), hsz1 );
+            min_areas[1] = std::min<float>( std::max(min_areas[1], 0.0f), hsz2 );
+            params.minArea = min_areas[0];
+        }
+    }
+    
+    vector<float> max_areas;
+    if( kw.max_area ) {
+        max_areas = getAsVector<float>( kw.max_area );
+        if( max_areas.size() ) {
+            max_areas.resize( 2, max_areas[0] );  // if only 1 value, it will be copied
+            max_areas[0] = std::min<float>( std::max(max_areas[0], 0.0f), hsz1 );
+            max_areas[1] = std::min<float>( std::max(max_areas[1], 0.0f), hsz2 );
+            params.maxArea = min_areas[0];
         }
     }
     
@@ -425,9 +439,11 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
     }
     
     if ( kw.verbose > 1 ) {
-        if( areas.size() > 1 ) cout << "img_align: applying " << printArray(areas,"min_area") << endl;
+        if( min_areas.size() > 1 ) cout << "img_align: applying " << printArray(min_areas,"min_area") << endl;
         else cout << "img_align: applying min_area = " << params.minArea << endl;
-        if( distances.size() > 1 ) cout << "img_align: applying " << printArray(areas,"min_distance") << endl;
+        if( min_areas.size() > 1 ) cout << "img_align: applying " << printArray(max_areas,"max_area") << endl;
+        else cout << "img_align: applying max_area = " << params.maxArea << endl;
+        if( distances.size() > 1 ) cout << "img_align: applying " << printArray(min_areas,"min_distance") << endl;
         else cout << "img_align: applying min_distance = " << params.minDistBetweenBlobs << endl;
     }
 
@@ -517,8 +533,11 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
         detector->detect( imgByte1, keypoints1 );
         
         params.minThreshold = otsu2/4;
-        if( areas.size() > 1 ) {
-            params.minArea = areas[1];
+        if( min_areas.size() > 1 ) {
+            params.minArea = min_areas[1];
+        }
+        if( max_areas.size() > 1 ) {
+            params.maxArea = max_areas[1];
         }
         if( distances.size() > 1 ) {
             params.minDistBetweenBlobs = distances[1];
