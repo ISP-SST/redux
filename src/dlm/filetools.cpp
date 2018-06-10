@@ -180,6 +180,7 @@ namespace {
 typedef struct {
     IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
     IDL_INT all;
+    IDL_VPTR date_beg;
     IDL_VPTR header;
     IDL_INT help;
     IDL_VPTR status;
@@ -191,6 +192,7 @@ typedef struct {
 static IDL_KW_PAR kw_readdata_pars[] = {
     IDL_KW_FAST_SCAN,
     { (char*) "ALL",        IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READDATA,all) },
+    { (char*) "DATE_BEG",   IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_READDATA,date_beg) },
     { (char*) "HEADER",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_READDATA,header) },
     { (char*) "HELP",       IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READDATA,help) },
     { (char*) "RAW",        IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_READDATA,raw) },
@@ -208,6 +210,7 @@ string readdata_info( int lvl ) {
         ret += "   Syntax:   out = rdx_readdata(filename, /KEYWORDS)\n";
         if( lvl > 1 ) {
             ret +=  "   Accepted Keywords:\n"
+                    "      DATE_BEG            Extract tabulated frame timestamps.\n"
                     "      HELP                Display this info.\n"
                     "      HEADER              Return metadata.\n"
                     "      ALL                 Return all metadata.\n"
@@ -307,6 +310,20 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
                     }
                 } else tmpHdr = IDL_StrToSTRING((char*)"");
                 IDL_VarCopy( tmpHdr, kw.header );
+            }
+            if( kw.date_beg ) {
+                vector<boost::posix_time::ptime> date_beg = myMeta->getStartTimes();
+                if( date_beg.empty() ) date_beg.push_back( myMeta->getStartTime() );
+                IDL_VPTR tmp;
+                IDL_MEMINT nDB = date_beg.size();
+                IDL_MEMINT dims[] = { nDB };
+                IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &tmp );
+                IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>( tmp->value.arr->data );
+                for( int j=0; j<nDB; ++j ) {
+                    string tStr = bpx::to_iso_extended_string( date_beg[j] );
+                    IDL_StrStore( strptr++, const_cast<char*>(tStr.c_str()) );
+                }
+                IDL_VarCopy( tmp, kw.date_beg );
             }
             size_t nDims = myMeta->nDims();
             if( !nDims ) {
