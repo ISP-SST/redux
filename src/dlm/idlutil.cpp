@@ -261,6 +261,11 @@ void redux::addToRaw( const UCHAR* in, T* out, int64_t nElements, UCHAR type ) {
             for( int64_t i=0; i<nElements; ++i) out[i] += inPtr[i];
             break;
         }
+        case( IDL_TYP_UINT ): {
+            auto inPtr = reinterpret_cast<const IDL_UINT*>( in );
+            for( int64_t i=0; i<nElements; ++i) out[i] += inPtr[i];
+            break;
+        }
         case( IDL_TYP_LONG ): {
             auto inPtr = reinterpret_cast<const IDL_LONG*>( in );
             for( int64_t i=0; i<nElements; ++i) out[i] += inPtr[i];
@@ -276,7 +281,9 @@ void redux::addToRaw( const UCHAR* in, T* out, int64_t nElements, UCHAR type ) {
             for( int64_t i=0; i<nElements; ++i) out[i] += inPtr[i];
             break;
         }
-        default: ;
+        default:
+            string msg = "redux::addToRaw: (" + string(__FILE__) + ":" + to_string(__LINE__) + ") not implemented for type=" + to_string(type);
+            throw runtime_error( msg.c_str() );
     }
 
 }

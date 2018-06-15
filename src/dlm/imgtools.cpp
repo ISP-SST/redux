@@ -2423,7 +2423,13 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     }
 
                 } else {
-                    addToRaw( framePtr, threadSum, nPixels, dataType );
+                    try {
+                        addToRaw( framePtr, threadSum, nPixels, dataType );
+                    } catch( const exception& e ) {
+                        string msg = "Summing failed! Reason: ";
+                        msg += e.what();
+                        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+                    }
                 }
                 
                 size_t ns = nSummed++;
