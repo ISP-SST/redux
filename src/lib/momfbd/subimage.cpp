@@ -593,7 +593,7 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale)
 
 void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
 
-    memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
+    std::fill_n( otfPtr, otfSize2, complex_t(0) );
 
     const double* pupilPtr = object.pupil->get();
 
@@ -623,8 +623,8 @@ void SubImage::calcPFOTF(void) {
     complex_t* otfPtr = OTF.get();
     const double* phiPtr = phi.get();
 
-    memset( pfPtr, 0, pupilSize2*sizeof(complex_t) );
-    memset( otfPtr, 0, otfSize2*sizeof(complex_t) );
+    std::fill_n( pfPtr, pupilSize2, complex_t(0) );
+    std::fill_n( otfPtr, otfSize2, complex_t(0) );
     
     const double* pupilPtr = object.pupil->get();
     

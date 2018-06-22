@@ -375,7 +375,7 @@ uint16_t Job::getNextStep( uint16_t step ) const {
         
 void Job::setFailed(void) {
     
-    unique_lock<mutex>(jobMutex);
+    lock_guard<mutex> lock(jobMutex);
     info.state |= JSTATE_ERR;
     
 }
@@ -383,7 +383,7 @@ void Job::setFailed(void) {
 
 bool Job::isOK(void) {
     
-    unique_lock<mutex>(jobMutex);
+    lock_guard<mutex> lock(jobMutex);
     return !(info.state&JSTATE_ERR);
     
 }

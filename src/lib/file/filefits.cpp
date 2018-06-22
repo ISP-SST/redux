@@ -912,7 +912,7 @@ bpx::time_duration Fits::getExposureTime(void) {
     if( exposureTime == 0.0 ) {     // also look for old non-SolarNet keyword
         exposureTime = getValue<float>( primaryHDU.cards, "EXPTIME" );
     }
-    return bpx::microseconds( exposureTime*1E6 );
+    return bpx::microseconds( static_cast<long>(exposureTime*1E6) );
 
 }
 

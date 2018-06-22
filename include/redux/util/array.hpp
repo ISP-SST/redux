@@ -904,7 +904,7 @@ namespace redux {
             
             
             
-            virtual void zero( void ) { if( nElements_ && datablock ) memset( datablock.get(), 0, nElements_ * sizeof( T ) ); }
+            virtual void zero( void ) { if( nElements_ && datablock ) std::fill_n( datablock.get(), nElements_, T(0) ); }
 
 
             template <typename U, typename V>

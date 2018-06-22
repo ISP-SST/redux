@@ -243,7 +243,7 @@ namespace redux {
                     it.first->clear = cfunc;
                     it.first->info = sfunc;
                 }
-                return it.first;
+                return *(it.first);
             }
             template<class KeyT, class T>
             std::map<KeyT,T>& initMap(void) {       // called only once when a new KeyT/T pair is used.

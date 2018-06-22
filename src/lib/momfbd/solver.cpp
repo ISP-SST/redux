@@ -369,7 +369,7 @@ void Solver::run( PatchData::Ptr data ) {
     double previousMetric(0);
     double thisMetric(0);
     double gradNorm(0);
-    double* alphaPtr = alpha.get();
+//    double* alphaPtr = alpha.get();
     double tol = 1.0E-1;
     size_t failCount(0);
     size_t totalIterations(0);
@@ -518,7 +518,7 @@ void Solver::run( PatchData::Ptr data ) {
     dump( "final_patch_"+(string)data->index );
 #endif
     
-    alphaPtr = alpha.get();
+//    alphaPtr = alpha.get();
     for( auto& objData: data->objects ) {
         if(!objData) continue;
         for( auto& cd: objData->channels ) {

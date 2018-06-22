@@ -314,7 +314,8 @@ template <typename T>
 void redux::image::smooth(T** data, size_t sizeY, size_t sizeX, size_t nY, size_t nX) {
     if (nY == 0 || nX == 0) return;
     T** tmp = newArray<T> (sizeY, sizeX);
-    memset (*tmp, 0, sizeY * sizeX * sizeof (T));
+    size_t n = sizeY*sizeX;
+    std::fill_n( *tmp, n, T(0) );
     for (unsigned int y = 0; y < sizeY; ++y) {
         int yl = std::max<int>(y-nY, 0);
         int yh = std::min(y+nY, sizeY);
@@ -331,7 +332,7 @@ void redux::image::smooth(T** data, size_t sizeY, size_t sizeX, size_t nY, size_
             tmp[y][x] /= cnt;
         }
     }
-    memcpy (*data, *tmp, sizeY * sizeX * sizeof (T));
+    std::copy_n( *tmp, n, *data );
     delArray (tmp);
 }
 template void redux::image::smooth (float**, size_t, size_t, size_t, size_t);

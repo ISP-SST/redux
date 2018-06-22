@@ -81,10 +81,10 @@ int main( int argc, char *argv[] ) {
                 Daemon daemon( vm );
                 return daemon.run();
             }
-            catch( Application::KillException ) {
+            catch( Application::KillException& ) {
                 break;
             }
-            catch( Application::ResetException ) {
+            catch( Application::ResetException& ) {
                 continue;
             }
         }

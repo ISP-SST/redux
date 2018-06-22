@@ -35,7 +35,7 @@ namespace redux {
                        
             struct PatchInfo {
                 
-                PatchInfo() : /*region({0,0,0,0}),*/ nChannels(0), offx(0), offy(0), nPixelsX(0), nPixelsY(0), npsf(0), nobj(0), nres(0), nalpha(0), nm(0),
+                PatchInfo( int dummy=0 ) : /*region({0,0,0,0}),*/ nChannels(0), offx(0), offy(0), nPixelsX(0), nPixelsY(0), npsf(0), nobj(0), nres(0), nalpha(0), nm(0),
                      ndiv(0), nphx(0), nphy(0), offset(0), imgPos(0), psfPos(0), objPos(0), resPos(0), alphaPos(0), diversityPos(0) {};
 
                 int32_t region[4];         //!< FirstX, LastX, FirstY, LastY
