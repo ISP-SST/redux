@@ -271,10 +271,6 @@ int main (int argc, char *argv[]) {
             globalName = vm["name"].as<string>();
         }
         
-        if( vm.count ("user") ) {
-            Host::myInfo().info.user = vm["user"].as<string>();
-        }
-
         bfs::path outputDir = bfs::current_path();
         if( vm.count ("output-dir") ) {
             bfs::path tmpPath = vm["output-dir"].as<string>();
@@ -316,6 +312,14 @@ int main (int argc, char *argv[]) {
             }
         }
         
+        if( vm.count ("user") ) {
+            string user = vm["user"].as<string>();
+            Host::myInfo().info.user = user;
+            for( auto & job : jobs ) {
+                job->info.user = user;
+            }
+        }
+
         if( vm.count ("print") ) {       // dump configuration to console and exit
             bpt::ptree dump;
             for( auto & job : jobs ) {
