@@ -45,6 +45,7 @@ namespace {
         ( "no-swap", "disable swap mode: keeping temporary files in memory." )
         ( "config,c", bpo::value< vector<string> >()->multitoken(), "Configuration file(s) to process." )
         ( "name", bpo::value<string>(), "Name to use for the supplied configurations." )
+        ( "user", bpo::value<string>(), "Username to use for the supplied configurations (default is to use current user)." )
         ( "simxy", bpo::value<string>(), "(x,y) coordinate[s] of subimages to restore" )
         ( "simx", bpo::value<string>()->implicit_value(""), "x coordinate[s] of subimages to restore" )
         ( "simy", bpo::value<string>()->implicit_value(""), "y coordinate[s] of subimages to restore" )
@@ -85,7 +86,7 @@ namespace {
 
 void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Logger& logger) {
     
-    Host me;
+    Host& me = Host::myInfo();
     Host::HostInfo master;
     uint8_t cmd = CMD_CONNECT;
     try {
@@ -268,6 +269,9 @@ int main (int argc, char *argv[]) {
         string globalName;
         if( vm.count ("name") ) {
             globalName = vm["name"].as<string>();
+        
+        if( vm.count ("user") ) {
+            Host::myInfo().info.user = vm["user"].as<string>();
         }
 
         bfs::path outputDir = bfs::current_path();
@@ -311,7 +315,7 @@ int main (int argc, char *argv[]) {
             }
         }
         
-        if (vm.count ("print")) {       // dump configuration to console and exit
+        if( vm.count ("print") ) {       // dump configuration to console and exit
             bpt::ptree dump;
             for( auto & job : jobs ) {
                 job->getPropertyTree( &dump );

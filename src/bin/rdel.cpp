@@ -39,6 +39,7 @@ namespace {
           "Hostname/IP of a master to connect to."
           " The environment variable RDX_HOST can be used to override the default value." )
         ( "port,p", bpo::value<string>()->default_value( "30000" ), "Port to use, either when connecting to the master." )
+        ( "user", bpo::value<string>(), "Username (default is to use current user)." )
         ( "force,f", "Bypass safeguards" )
         ( "ids,i", bpo::value< vector<string> >()->composing(), "ID(s) to delete/reset, as ID(s) or name(s)."
         "All additional arguments on the command-line will be interpreted as IDs/names to delete."
@@ -107,6 +108,10 @@ int main( int argc, char *argv[] ) {
         if( conn->socket().is_open() ) {
             Host& me = Host::myInfo();
             Host::HostInfo master;
+            
+            if( vm.count ("user") ) {
+                me.info.user = vm["user"].as<string>();
+            }
             
             uint8_t cmd = CMD_CONNECT;
             boost::asio::write(conn->socket(),boost::asio::buffer(&cmd,1));
