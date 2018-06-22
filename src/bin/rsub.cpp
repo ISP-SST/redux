@@ -269,6 +269,7 @@ int main (int argc, char *argv[]) {
         string globalName;
         if( vm.count ("name") ) {
             globalName = vm["name"].as<string>();
+        }
         
         if( vm.count ("user") ) {
             Host::myInfo().info.user = vm["user"].as<string>();
