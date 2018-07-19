@@ -164,7 +164,8 @@ void Daemon::maintenance( void ) {
 void Daemon::checkSwapSpace( void ) {
     bfs::path cachePath( Cache::get().path() );
     if( !cachePath.empty() && bfs::exists(cachePath) ) {
-        boost::system::error_code ec;
+// Disabled temporarily for test-compilation on redhat 6.6
+/*        boost::system::error_code ec;
         bfs::space_info si = bfs::space(cachePath,ec);
         if( ec ) {
             LOG_ERR << "checkSwapSpace failed for path" << cachePath<< ": " << ec.message() << ende;
@@ -177,6 +178,7 @@ void Daemon::checkSwapSpace( void ) {
                          << "\n\tYour jobs will fail if you run out of space!!" << ende;
             }
         }
+*/
     }
 }
 
