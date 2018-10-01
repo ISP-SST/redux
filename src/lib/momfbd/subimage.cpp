@@ -79,8 +79,6 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
     
     if( patchSize != imgSize ) {
         imgSize = patchSize;
-        imgFT.resize( imgSize, imgSize );
-        imgFT.zero();
     }
     
     if( pupSz != pupilSize ) {
@@ -92,6 +90,8 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
         PF.resize( pupilSize, pupilSize );
         vogel.resize( pupilSize, pupilSize );
         OTF.resize( otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX );
+        imgFT.resize( otfSize, otfSize );
+        imgFT.zero();
         vogel.zero();
     }
     
@@ -166,7 +166,7 @@ void SubImage::initialize( Object& o, bool doReset ) {
     if( doReset ) {
         Solver::tmp.FT.zero();
     } else {
-        memcpy( Solver::tmp.FT.get(), imgFT.get(), imgSize*imgSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
+        memcpy( Solver::tmp.FT.get(), imgFT.get(), otfSize*otfSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
     }
     
     getWindowedImg( Solver::tmp.D, o.fittedPlane, stats, false );
@@ -204,11 +204,11 @@ void SubImage::initialize( Object& o, bool doReset ) {
     }
     
     if( imgSize == otfSize ) {                                                                   // imgSize = 2*pupilSize
-        imgFT.reset( imgPtr, imgSize, imgSize, FT_FULLCOMPLEX ); //|FT_NORMALIZE );        // full-complex for now, perhaps half-complex later for performance
+        imgFT.reset( imgPtr, otfSize, otfSize, FT_FULLCOMPLEX ); //|FT_NORMALIZE );        // full-complex for now, perhaps half-complex later for performance
     } else {                                                                                    // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
         int offset = (otfSize - imgSize) / 2;
         Array<double> tmpD (otfSize, otfSize);
-        tmpD.zero();
+        tmpD = stats.mean;
         double* tmpPtr = tmpD.get();
         for (int i = 0; i < imgSize; ++i) {
             memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));

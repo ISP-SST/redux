@@ -228,7 +228,7 @@ void Object::initProcessing( Solver& ws ){
         PQ.resize(2*pupilPixels,2*pupilPixels );
         PS.resize(2*pupilPixels,2*pupilPixels );
         QS.resize(2*pupilPixels,2*pupilPixels );
-        ftSum.resize(patchSize,patchSize );          // full-complex for now
+        ftSum.resize( 2*pupilPixels, 2*pupilPixels );          // full-complex for now
         if( myJob.runFlags & RF_FIT_PLANE ){
             fittedPlane.resize( patchSize, patchSize );
         }
@@ -318,9 +318,11 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
 
     size_t nModes = myJob.modeNumbers.size();
     
-    FourierTransform avgObjFT(patchSize, patchSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
-    Array<complex_t> tmpC(patchSize, patchSize);
-    Array<double> tmpD(patchSize, patchSize);
+    size_t otfSize = pupilPixels<<1;
+    
+    FourierTransform avgObjFT(otfSize, otfSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
+    Array<complex_t> tmpC(otfSize, otfSize);
+    Array<double> tmpD(otfSize, otfSize);
     avgObjFT.zero();
     tmpD.zero();
     complex_t* aoPtr = avgObjFT.get();
@@ -346,11 +348,11 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
     
     if (!(myJob.runFlags&RF_NO_FILTER)) {
         LOG_DEBUG << boost::format("Object %d: Applying Scharmer filter with frequency-cutoff = %g and noise-variance = %g") % ID % (0.9*frequencyCutoff) % avgNoiseVariance << ende;
-        ScharmerFilter( aoPtr, dPtr, patchSize, patchSize, avgNoiseVariance, 0.90 * frequencyCutoff);
+        ScharmerFilter( aoPtr, dPtr, otfSize, otfSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
 
     avgObjFT.getIFT( tmpC.get( ) );
-    od.img.resize( patchSize, patchSize );
+    od.img.resize( otfSize, otfSize );
     size_t nEl = avgObjFT.nElements( );
     double normalization = 1.0 / nEl;
     std::transform( tmpC.get(), tmpC.get()+nEl, od.img.get(),
@@ -359,11 +361,12 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
                 } );
     
     // PSF
+    uint16_t nPSF = 0;
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
-        uint16_t nPSF =( saveMask&SF_SAVE_PSF_AVG)? 1 : imgCount;
-        od.psf.resize(nPSF, patchSize, patchSize );
+        nPSF =( saveMask&SF_SAVE_PSF_AVG)? 1 : imgCount;
+        od.psf.resize(nPSF, otfSize, otfSize );
         od.psf.zero( );
-        Array<float> view( od.psf, 0, 0, 0, patchSize-1, 0, patchSize-1 );
+        Array<float> view( od.psf, 0, 0, 0, otfSize-1, 0, otfSize-1 );
         tmpD.zero( );
         if( nPSF > 1 ){
             for( shared_ptr<SubImage>& si: images ) {
@@ -384,9 +387,9 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
 
     // Convolved objects
     if( saveMask & SF_SAVE_COBJ ){
-        od.cobj.resize(imgCount, patchSize, patchSize );
+        od.cobj.resize(imgCount, otfSize, otfSize );
         od.cobj.zero( );
-        Array<float> view(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
+        Array<float> view(od.cobj,0,0,0,otfSize-1,0,otfSize-1 );
         for( shared_ptr<SubImage>& si: images ) {
                 view.assign(si->convolveImage(od.img) );
                 view.shift(0,1 );
@@ -395,17 +398,31 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         od.cobj.clear( );
     }
 
+    if( otfSize > patchSize ) {
+        size_t offset = (otfSize - patchSize)/2;
+        od.img.setLimits( offset, offset+patchSize-1, offset, offset+patchSize-1 );
+        od.img.trim();
+        if( nPSF ) {
+            od.psf.setLimits( 0, nPSF-1, offset, offset+patchSize-1, offset, offset+patchSize-1 );
+            od.psf.trim(false);
+        }
+        if( saveMask & SF_SAVE_COBJ ) {
+            od.cobj.setLimits( 0, imgCount-1, offset, offset+patchSize-1, offset, offset+patchSize-1 );
+            od.cobj.trim(false);
+        }
+    }
+    
     // Residuals
     if( saveMask & SF_SAVE_RESIDUAL ){
-        od.res.resize(imgCount, patchSize, patchSize );
+        od.res.resize( imgCount, patchSize, patchSize );
         od.res.zero( );
-        Array<float> view(od.res,0,0,0,patchSize-1,0,patchSize-1 );
+        Array<float> view( od.res, 0, 0, 0, patchSize-1, 0,patchSize-1 );
         if( od.cobj.sameSizes(od.res ) ){
             Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
             for( shared_ptr<SubImage>& si: images ) {
-                    view.assign(si->convolvedResidual(cview) );
-                    view.shift(0,1 );
-                    cview.shift(0,1 );
+                    view.assign( si->convolvedResidual(cview) );
+                    view.shift( 0, 1 );
+                    cview.shift( 0, 1 );
             }
         } else {
             for( shared_ptr<SubImage>& si: images ) {
@@ -536,7 +553,7 @@ void Object::addAllPQ(void ){
     for( auto& ch : channels ){
         for( auto& im : ch->subImages ){
             lock_guard<mutex> lock( mtx );
-            im->addPQ(P.get(),Q.get() );
+            im->addPQ( P.get(),Q.get() );
         }
     }
 }

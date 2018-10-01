@@ -38,10 +38,8 @@ namespace redux {
                         patchSize = patchSz;
                         if( patchSize ) {
                             D.resize( patchSize, patchSize );
-                            FT.resize( patchSize, patchSize );
                         } else {
                             D.clear();
-                            FT.clear();
                         }
                     }
                     if( pupSz != pupilSize ) {
@@ -52,11 +50,13 @@ namespace redux {
                             C.resize( otfSize, otfSize );
                             C2.resize( otfSize, otfSize );
                             OTF.resize( otfSize, otfSize, redux::image::FT_FULLCOMPLEX );
+                            FT.resize( otfSize, otfSize );
                         } else {
                             D2.clear();
                             C.clear();
                             C2.clear();
                             OTF.clear();
+                            FT.clear();
                         }
                     }
                 }

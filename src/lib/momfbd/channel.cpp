@@ -1333,6 +1333,7 @@ void Channel::dump (std::string tag) {
     Ana::write (tag + "_phi_channel.f0", phi_channel);
     
     uint16_t patchSize = myObject.patchSize;
+    uint16_t otfSize = myObject.pupilPixels<<1;
     size_t blockSize = patchSize*patchSize;
     Array<float> tmpF( subImages.size(), patchSize, patchSize );
     Array<double> tmpD( patchSize, patchSize );
@@ -1380,6 +1381,9 @@ void Channel::dump (std::string tag) {
     Ana::write( tag + "_shift.f0", shiftArr );
     tmpC.resize();      // free some memory
     
+    tmpD.resize( otfSize, otfSize );
+    tmpF.resize( subImages.size(), otfSize, otfSize );
+    blockSize = otfSize*otfSize;
     tmpPtr = tmpF.get();
     for( shared_ptr<SubImage>& im: subImages ) {
         im->getPSF( tmpD.get() );
