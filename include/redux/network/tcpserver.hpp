@@ -2,8 +2,11 @@
 #define REDUX_NETWORK_TCPSERVER_HPP
 
 #include "redux/network/tcpconnection.hpp"
+#include "redux/network/host.hpp"
+#include "redux/util/datautil.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/thread.hpp>
 
 using boost::asio::ip::tcp;
 
@@ -16,17 +19,37 @@ namespace redux {
 
         public:
 
-            TcpServer( boost::asio::io_service& io_service, uint16_t port );
+            TcpServer( uint16_t port, uint16_t threads );
 
             void accept(void);
             void setCallback( TcpConnection::callback cb = nullptr ) { onConnected = cb; };
-
+            void start(void);
+            void stop(void);
+            void cleanup(void);
+            void addThread(uint16_t n=1);
+            void delThread(uint16_t n=1);
+            void addConnection( const Host::HostInfo&, TcpConnection::Ptr );
+            void removeConnection( TcpConnection::Ptr );
+            void releaseConnection( TcpConnection::Ptr );
+            Host::Ptr getHost( const TcpConnection::Ptr ) const;
+            TcpConnection::Ptr getConnection( Host::Ptr );
+            size_t size( void ) const;
+            
         private:
 
             void onAccept( TcpConnection::Ptr conn, const boost::system::error_code& error );
+            void threadLoop( void );
 
+            std::map<TcpConnection::Ptr, Host::Ptr, redux::util::PtrCompare<TcpConnection>> connections;
+            mutable std::mutex mtx;
+            boost::asio::io_service ioService;
+            std::shared_ptr<boost::asio::io_service::work> workLoop;
             tcp::acceptor acceptor;
             TcpConnection::callback onConnected;
+            boost::thread_group pool;
+            uint16_t minThreads;
+            std::atomic<uint16_t> nThreads, nConnections;
+            bool running,do_handshake,do_auth;
 
         };
 

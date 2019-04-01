@@ -71,6 +71,17 @@ void Semaphore::reset( void ) {
 }
 
 
+string Semaphore::getStatus(void) const {
+    unsigned int i(0),c(0);
+    {
+        lock_guard<mutex> lock(mtx);
+        i = init;
+        c = counter;
+    }
+    return to_string(c) + "/" + to_string(i);
+}
+
+
 Semaphore::Scope::Scope( Semaphore& s ) : sem(s), active(true) {
     sem.get();
 }

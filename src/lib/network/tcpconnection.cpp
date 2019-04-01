@@ -16,30 +16,48 @@ using namespace std;
 //#define DBG_NET_
 #endif
 
-
 namespace {
+    
+    set<uint64_t> connection_ids;
+    mutex gmtx;
 
-#ifdef DBG_NET_
-    static atomic<int> connCounter(0);
-#endif
-
+    uint64_t getID( void ) {
+        lock_guard<mutex> lock( gmtx );
+        uint64_t id(1);
+        while( connection_ids.count( id ) ) id++;     // find first unused ID.
+        connection_ids.insert( id );
+        return id;
+    }
+    
+    void freeID( uint64_t id ) {
+        lock_guard<mutex> lock( gmtx );
+        connection_ids.erase( id );
+    }
+    
+    /*size_t idCount( void ) RDX_UNUSED {
+        lock_guard<mutex> lock( gmtx );
+        return connection_ids.size();
+    }*/
+    
 }
 
 
 TcpConnection::TcpConnection( boost::asio::io_service& io_service )
     : activityCallback( nullptr ), urgentCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ),
-    myService( io_service ), swapEndian_(false), urgentActive(false) {
+    myService( io_service ), swapEndian_(false), urgentActive(false), id( getID() ) {
 #ifdef DBG_NET_
-    LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_add(1)+1);
+    LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ")  ID: " << id << "/" << idCount() << ende;
 #endif
+
 }
 
             
 TcpConnection::~TcpConnection( void ) {
     mySocket.close();
 #ifdef DBG_NET_
-    LOG_DEBUG << "Destructing TcpConnection: (" << hexString(this) << ") new instance count = " << (connCounter.fetch_sub(1)-1);
+    LOG_DEBUG << "Destructing TcpConnection: (" << hexString(this) << ")  ID: " << id << "/" << idCount() << ende;
 #endif
+    freeID( id );
 }
 
 

@@ -24,6 +24,9 @@ namespace redux {
             void increase( unsigned int );
             void set( unsigned int );
             void reset( void );
+            
+            std::string getStatus(void) const;
+            inline operator std::string() const { return getStatus(); };
 
             template< typename R,typename P >
             bool get( const std::chrono::duration<R,P>& timeout ) {
@@ -57,7 +60,7 @@ namespace redux {
         private:
             unsigned int counter;
             unsigned int init;
-            std::mutex mtx;
+            mutable std::mutex mtx;
             std::condition_variable cond;
 
         };

@@ -5,6 +5,10 @@
 #   include <cxxabi.h>
 #endif
 
+#include "redux/util/cache.hpp"
+
+#include <thread>
+
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -20,6 +24,46 @@ using namespace std;
 int redux::util::trace::BT::max_depth = 5;
 std::map<size_t, Trace::trace_t> Trace::traces;
 std::mutex Trace::mtx;
+
+void redux::util::thread_trace( const char* file, int line ) {
+    string mark = string(file) + ":" + to_string(line);
+    std::thread::id thread_id = std::this_thread::get_id();
+    auto m = Cache::get().getMap<std::thread::id,string>();        // m.first is a unique_lock for the map in m.second
+    m.second[ thread_id ] = mark;
+
+}
+
+
+void redux::util::thread_untrace( void ) {
+    
+    std::thread::id thread_id = std::this_thread::get_id();
+    auto m = Cache::get().getMap<std::thread::id,string>();        // m.first is a unique_lock for the map in m.second
+    m.second.erase( thread_id );
+
+}
+
+
+string redux::util::thread_traces( bool all ) {
+
+    auto m = Cache::get().getMap<std::thread::id,string>();        // m.first is a unique_lock for the map in m.second
+    ostringstream ss;
+    map<string,size_t> counts;
+    for( auto& t: m.second ) {
+        counts[t.second]++;
+        ss <<  t.first << " - " << t.second << endl;
+    }
+    string ret;
+    if( counts.size() ) {
+        multimap<size_t, string, greater<size_t>> sorted_counts;
+        std::transform( counts.begin(), counts.end(), inserter(sorted_counts, sorted_counts.begin()),
+                        [](const pair<string,size_t>& in) { return pair<size_t,string>(in.second,in.first); });
+        for( auto& t: sorted_counts ) {
+            ret += to_string(t.first) + " - " + t.second + "\n";
+        }
+    }
+    if( all ) ret += ss.str();
+    return ret;
+}
 
 
 void getBT( redux::util::trace::BT& bt ) {

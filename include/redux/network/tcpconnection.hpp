@@ -24,8 +24,8 @@ using boost::asio::ip::tcp;
 namespace redux {
 
     namespace network {
-
-       class TcpConnection : public std::enable_shared_from_this<TcpConnection>
+        class TcpServer;
+        class TcpConnection : public std::enable_shared_from_this<TcpConnection>
 #ifdef RDX_TRACE_NET
             ,public redux::util::TraceObject<TcpConnection>
 #endif
@@ -162,7 +162,10 @@ namespace redux {
             bool swapEndian_;
             uint8_t urgentData;
             bool urgentActive;
+            uint64_t id;
             std::mutex mtx;
+            
+            friend class TcpServer;
 
        public:
 

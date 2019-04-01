@@ -25,7 +25,10 @@ namespace redux {
             
         }
         
-
+        void thread_trace( const char* file, int line );
+        void thread_untrace( void );
+        std::string thread_traces( bool all=false );
+        
         class Trace {
             
             typedef std::function<std::string(void)> string_cb_t;
@@ -120,6 +123,13 @@ namespace redux {
 
 }   // redux
 
+#ifdef TRACE_THREADS
+#define THREAD_MARK redux::util::thread_trace(__FILE__,__LINE__)
+#define THREAD_UNMARK redux::util::thread_untrace()
+#else
+#define THREAD_MARK 
+#define THREAD_UNMARK 
+#endif
 
 #endif  // REDUX_UTIL_TRACE_HPP
 

@@ -50,8 +50,8 @@ namespace redux {
         void urgentHandler( network::TcpConnection::Ptr );
         void processCommand( network::TcpConnection::Ptr, uint8_t, bool urgent=false);
         
-        void addConnection(const network::Host::HostInfo&, network::TcpConnection::Ptr&);
-        void removeConnection(network::TcpConnection::Ptr);
+        void addConnection( network::TcpConnection::Ptr );
+        void removeConnection( network::TcpConnection::Ptr );
         void cleanup(void);
         void failedWIP( WorkInProgress::Ptr wip );
         void die(void);
@@ -69,6 +69,8 @@ namespace redux {
         void sendToSlaves( uint8_t cmd, std::string slvString );
         void resetSlaves( network::TcpConnection::Ptr&, uint8_t );
         //Job::JobPtr selectJob(bool);
+        WorkInProgress::Ptr getWIP( const network::Host::Ptr& );
+        void removeWIP( const network::Host::Ptr& );
         bool getWork( WorkInProgress::Ptr, uint8_t nThreads = 1);
         void sendWork( network::TcpConnection::Ptr& );
         void putParts( network::TcpConnection::Ptr& );
@@ -90,8 +92,6 @@ namespace redux {
 
         std::mutex peerMutex;
         network::Host& myInfo;
-        std::map<network::TcpConnection::Ptr, network::Host::Ptr,
-                 redux::util::PtrCompare<network::TcpConnection>> connections;
         std::map<network::Host::Ptr, WorkInProgress::Ptr, network::Host::Compare> peerWIP;
         
         struct {

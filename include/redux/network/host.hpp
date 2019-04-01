@@ -65,6 +65,7 @@ namespace redux {
             
             Host(void);
             Host(const HostInfo&, uint64_t i=0);
+            ~Host();
 
             uint64_t size(void) const;
             uint64_t pack( char* ) const;

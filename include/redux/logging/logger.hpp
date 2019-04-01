@@ -1,5 +1,5 @@
-#ifndef REDUX_LOGGING_LOGGER_HP
-#define REDUX_LOGGING_LOGGER_HP
+#ifndef REDUX_LOGGING_LOGGER_HPP
+#define REDUX_LOGGING_LOGGER_HPP
 
 #include <redux/logging/logitem.hpp>
 #include <redux/logging/logoutput.hpp>
@@ -104,4 +104,4 @@ namespace redux {
 
 
 
-#endif //   REDUX_LOGGING_LOGGER_HP
+#endif //   REDUX_LOGGING_LOGGER_HPP

@@ -27,6 +27,31 @@ const std::string Host::StateNames[] = { "offline", "idle", "active", "error" };
 const std::string Host::TypeNames[] = { "", "worker", "master", "m/w", "util", "u/w", "u/m", "u/m/w" };
 
 
+namespace {
+    
+    set<uint64_t> host_ids;
+    mutex gmtx;
+
+    uint64_t getID( void ) {
+        lock_guard<mutex> lock( gmtx );
+        uint64_t id(0);
+        while( host_ids.count( id ) ) id++;     // find first unused ID.
+        host_ids.insert( id );
+        return id;
+    }
+    
+    void freeID( uint64_t id ) {
+        lock_guard<mutex> lock( gmtx );
+        host_ids.erase( id );
+    }
+    
+    /*size_t idCount( void )  {
+        lock_guard<mutex> lock( gmtx );
+        return host_ids.size();
+    }*/
+    
+}
+
 Host::HostInfo::HostInfo( string username ) : peerType(0), connectPort(0), user(username) {
 
     int one = 1;
@@ -57,12 +82,19 @@ Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread:
     load[0] = load[1] = 0;
 }
 
-Host::Host() : id(0), nConnections(0) {
+
+Host::Host() : id(getID()), nConnections(0) {
 
 }
 
-Host::Host(const HostInfo& hi, uint64_t i) : info(hi), id(i), nConnections(0) {
 
+Host::Host(const HostInfo& hi, uint64_t i) : info(hi), id(getID()), nConnections(0) {
+
+}
+
+
+Host::~Host() {
+    freeID( id );
 }
 
 
@@ -81,6 +113,7 @@ uint64_t Host::pack( char* ptr ) const {
     
     return count;
 }
+
 
 uint64_t Host::unpack( const char* ptr, bool swap_endian ) {
     
@@ -131,6 +164,7 @@ std::string Host::printHeader(void) {
     return hdr;
 }
 
+
 std::string Host::print(void) {
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
     boost::posix_time::time_duration elapsed = (now - status.lastActive);
@@ -145,6 +179,7 @@ std::string Host::print(void) {
     ret += status.statusString; 
     return ret;
 }
+
 
 bool Host::operator>( const Host& rhs ) const {
 //    if( info.peerType == rhs.info.peerType ) {
@@ -207,6 +242,7 @@ uint64_t Host::HostInfo::pack( char* ptr ) const {
     return count;
     
 }
+
 
 uint64_t Host::HostInfo::unpack( const char* ptr, bool swap_endian ) {
     
