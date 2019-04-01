@@ -186,7 +186,7 @@ namespace redux {
         
         virtual void init(void) {};
         virtual void cleanup(void) {};
-        virtual bool run(WorkInProgress::Ptr, boost::asio::io_service&, uint16_t) = 0;
+        virtual bool run(WorkInProgress::Ptr, uint16_t) = 0;
         
         std::string cfg(void);
         
@@ -214,6 +214,11 @@ namespace redux {
         virtual size_t diskUsage(void) { return 0; }      //!< Approximate current disk usage of this job
         virtual size_t procUsage(void) { return 0; }      //!< Approximate memory usage for processing 1 part
         
+        void addThread( uint16_t n );
+        void delThread( uint16_t n );
+        void cleanupThreads( void );
+        void threadLoop( void );
+        
         bool operator<(const Job& rhs);
         bool operator!=(const Job& rhs);
     
@@ -224,6 +229,10 @@ namespace redux {
         std::string cachePath;
         std::string jobLogChannel;
         redux::logging::Logger logger;
+        
+        boost::asio::io_service ioService;
+        std::shared_ptr<boost::asio::io_service::work> workLoop;
+        boost::thread_group pool;
         
         friend class Daemon;
         friend class Worker;

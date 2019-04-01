@@ -25,10 +25,8 @@ namespace redux {
         ~Worker( void );
 
         void connect( void );
-        void threadLoop( void );
         void start( void );
         void stop( void );
-        void setThreads( int );
         void exitWhenDone( void ) { running_ = false; exitWhenDone_ = true; };
 
     private:
@@ -42,10 +40,6 @@ namespace redux {
         
         void run( const boost::system::error_code& );
         
-        boost::asio::io_service ioService;
-
-        std::shared_ptr<boost::asio::io_service::work> workLoop;
-        boost::thread_group pool;
         boost::asio::deadline_timer runTimer;
         bool running_;
         bool exitWhenDone_;

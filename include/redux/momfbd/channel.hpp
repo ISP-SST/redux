@@ -83,7 +83,6 @@ namespace redux {
             
             void loadCalib(boost::asio::io_service&);
             void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
-            void storePatches(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void unloadCalib(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );

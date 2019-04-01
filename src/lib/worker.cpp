@@ -1,10 +1,15 @@
 #include "redux/worker.hpp"
 
+#ifdef DEBUG_
+#   define TRACE_THREADS
+#endif
+
 #include "redux/daemon.hpp"
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/util/trace.hpp"
 
 using namespace redux::logging;
 using namespace redux::network;
@@ -27,44 +32,10 @@ Worker::~Worker( void ) {
 }
 
 
-void Worker::threadLoop( void ) {
-
-    while( true ) {
-        try {
-            boost::this_thread::interruption_point();
-            ioService.run();
-        } catch( const Application::ThreadExit& e ) {
-            break;
-        } catch( job_error& e ) {
-            LLOG_ERR(daemon.logger) << "Job error: " << e.what() << ende;
-        } catch( const boost::thread_interrupted& ) {
-            LLOG_TRACE(daemon.logger) << "Worker: Thread interrupted." << ende;
-            break;
-        } catch( exception& e ) {
-            LLOG_ERR(daemon.logger) << "Exception in thread: " << e.what() << ende;
-        } catch( ... ) {
-            LLOG_ERR(daemon.logger) << "Unhandled exception in thread." << ende;
-        }
-    }
-return; // FIXME it gets stuck on reset/kill
-    pool.remove_thread( tmap[boost::this_thread::get_id()] );
-
-}
-
-
 void Worker::start( void ) {
 
     running_ = true;
     wip.reset( new WorkInProgress() );
-    ioService.reset();
-    workLoop.reset( new boost::asio::io_service::work(ioService) );
-
-    uint16_t nThreads = myInfo.status.nThreads;
-    myInfo.status.nThreads = 0;
-    //boost::thread* t = pool.create_thread( std::bind( &Worker::threadLoop, this ) ); // add a timer thread which will not "count" as a thread
-    //tmap[ t->get_id() ] = t;
-    setThreads(nThreads);
-    
     runTimer.expires_from_now( boost::posix_time::seconds( 5 ) );
     runTimer.async_wait( std::bind( &Worker::run, this, placeholders::_1 ) );
     myInfo.touch();
@@ -75,29 +46,9 @@ void Worker::start( void ) {
 void Worker::stop( void ) {
 
     running_ = false;
-    pool.interrupt_all();
-    workLoop.reset();
-    ioService.stop();
     runTimer.cancel();
-    pool.join_all();
     wip.reset();
 
-}
-
-
-void Worker::setThreads( int nThreads ) {
-
-    int diff = nThreads - myInfo.status.nThreads;
-    myInfo.status.nThreads += diff;
-    if( diff > 0 ) {
-        for( int i=0; i < diff; ++i ) {
-            boost::thread* t = pool.create_thread( std::bind( &Worker::threadLoop, this ) );
-            tmap[ t->get_id() ] = t;
-        }
-    } else while( diff++ < 0 ) {
-        ioService.post( [](){ throw Application::ThreadExit(); } );     // Make diff threads throw exception to exit.
-    }
-    
 }
 
 
@@ -205,11 +156,14 @@ bool Worker::getWork( void ) {
                     wip->job->init();
                     wip->previousJob = wip->job;
                 }
+                THREAD_MARK;
                 for( auto& part: wip->parts ) {
                     part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
                 }
+                THREAD_MARK;
                 myInfo.active();
                 myInfo.status.statusString = "...";
+                THREAD_UNMARK;
                 return true;
             }
         }
@@ -226,6 +180,7 @@ bool Worker::getWork( void ) {
     
     myInfo.idle();
     boost::this_thread::interruption_point();
+    THREAD_UNMARK;
     return false;
 
 }
@@ -292,11 +247,15 @@ void Worker::run( const boost::system::error_code& error ) {
         return;
     }
  //   LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
+    THREAD_MARK;
     while( getWork() ) {
         sleepS = 1;
         try {
-            while( wip->job && wip->job->run( wip, ioService, myInfo.status.nThreads ) ) ;
+            THREAD_MARK;
+            while( wip->job && wip->job->run( wip, myInfo.status.nThreads ) ) ;
+            THREAD_MARK;
             if( wip->job ) wip->job->logger.flushAll(); 
+            THREAD_MARK;
         }
         catch( const boost::thread_interrupted& ) {
             LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;
@@ -309,18 +268,16 @@ void Worker::run( const boost::system::error_code& error ) {
             LLOG_ERR(daemon.logger) << "Worker: Unrecognized exception caught while processing job." << ende;
         }
     }
-
+    THREAD_MARK;
     if( running_ ) {
         boost::this_thread::interruption_point();
         runTimer.expires_from_now( boost::posix_time::seconds(sleepS) );
         runTimer.async_wait( std::bind( &Worker::run, this, placeholders::_1 ) );
-        if( sleepS < 4 ) {
+        if( sleepS < 16 ) {
             sleepS <<= 1;
         }
     } else if( exitWhenDone_ ) {
-        workLoop.reset();
-        ioService.stop();
         daemon.stop();
     }
-
+    THREAD_UNMARK;
 }

@@ -5,6 +5,10 @@
 #include "redux/momfbd/data.hpp"
 #include "redux/momfbd/util.hpp"
 
+#ifdef DEBUG_
+#   define TRACE_THREADS
+#endif
+
 #include "redux/file/fileana.hpp"
 #include "redux/file/filemomfbd.hpp"
 #include "redux/image/utils.hpp"
@@ -13,6 +17,7 @@
 #include "redux/util/cache.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/util/trace.hpp"
 #include "redux/constants.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/revision.hpp"
@@ -90,8 +95,9 @@ Object::Object( const Object& rhs, uint16_t id, int tid ) : ObjectCfg(rhs), myJo
 
 Object::~Object() {
 
+    THREAD_MARK;
     cleanup( );
-
+    THREAD_MARK;
 }
 
 
@@ -187,6 +193,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian ){
 
 void Object::cleanup(void ){
 
+    THREAD_MARK;
     channels.clear( );
     ftSum.clear( );
     Q.clear( );
@@ -198,6 +205,7 @@ void Object::cleanup(void ){
     pupil.reset( );
     modes.reset( );
 
+    THREAD_MARK;
     if( !cacheFile.empty() ) {
         bfs::path tmpP(cacheFile);
         if( bfs::exists(tmpP) ) {
@@ -208,6 +216,7 @@ void Object::cleanup(void ){
             }
         }
     }
+    THREAD_MARK;
 
 }
 
@@ -937,7 +946,7 @@ void Object::reInitialize( boost::asio::io_service& service, ProgressWatch& pw, 
 }
 
 
-void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Array<PatchData::Ptr>& patches ){
+void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& patches ){
     
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
@@ -950,7 +959,7 @@ void Object::loadData( boost::asio::io_service& service, uint16_t nThreads, Arra
 //         LOG_WARN << "Object" << to_string(ID )<< ")::loadData( ) otick: " << progWatch.dump( )<< ende;
 //     } );
 
-    progWatch.setHandler([this,&service,&patches](){        // this will be triggered after all images in this object are loaded/pre-processed
+    progWatch.setHandler([this](){        // this will be triggered after all images in this object are loaded/pre-processed
         objMaxMean = std::numeric_limits<double>::lowest( );
         for( auto& ch : channels ){
             objMaxMean = std::max(objMaxMean,ch->getMaxMean() );

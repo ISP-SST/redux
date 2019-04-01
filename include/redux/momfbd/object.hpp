@@ -92,7 +92,7 @@ namespace redux {
 
             void initCache(void);
             void reInitialize(boost::asio::io_service&, redux::util::ProgressWatch& pw, bool reset=false);
-            void loadData(boost::asio::io_service&, uint16_t nThreads, redux::util::Array<PatchData::Ptr>&);
+            void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void loadInit(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             size_t getResultSize( void );
             void maybeInitializeStorage( void );          

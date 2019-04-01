@@ -5,6 +5,10 @@
 #include "redux/momfbd/subimage.hpp"
 #include "redux/momfbd/util.hpp"
 
+#ifdef DEBUG_
+#   define TRACE_THREADS
+#endif
+
 #include "redux/constants.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/math/functions.hpp"
@@ -16,6 +20,7 @@
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/util/projective.hpp"
+#include "redux/util/trace.hpp"
 
 #include <functional>
 #include <math.h>
@@ -57,7 +62,9 @@ Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), flipX(false),
 
 
 Channel::~Channel() {
+    THREAD_MARK;
     cleanup();
+    THREAD_MARK;
 }
 
 
@@ -81,6 +88,7 @@ bpt::ptree Channel::getPropertyTree (bpt::ptree& tree) {
 
 void Channel::cleanup(void) {
     
+    THREAD_MARK;
     imageStats.clear();
     images.clear();
     dark.clear();
@@ -95,6 +103,7 @@ void Channel::cleanup(void) {
     phi_fixed.clear();
     phi_channel.clear();
     
+    THREAD_MARK;
     if( !cacheFile.empty() ) {
         bfs::path tmpP(cacheFile);
         if( bfs::exists(tmpP) ) {
@@ -105,6 +114,7 @@ void Channel::cleanup(void) {
             }
         }
     }
+    THREAD_MARK;
 
 }
 
@@ -650,33 +660,6 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
         nPreviousFrames += nFrames[i];
     }
 
-}
-
-
-void Channel::storePatches(boost::asio::io_service& service, Array<PatchData::Ptr>& patches) {
-
-    size_t nPatchesY = patches.dimSize(0);
-    size_t nPatchesX = patches.dimSize(1);
-
-    for(unsigned int py=0; py<nPatchesY; ++py) {
-        for(unsigned int px=0; px<nPatchesX; ++px) {
-            service.post( [this,&patches,py,px](){
-                if( myJob.isOK() ) {
-                    auto oData = patches(py,px)->getObjectData(myObject.ID);
-                    if( !oData ) throw runtime_error("patches(y,x)->getObject() returned a null pointer !");
-                    auto chData = oData->channels[ID];
-                    try {
-                        getStorage(*chData);
-                    } catch( std::exception& e ) {
-                        myJob.setFailed();
-                        LOG_ERR << "Failed to copy/store patch(" << py << "," << px << "): " << e.what() << ende;
-                    } 
-                    ++myJob.progWatch;
-                }
-            });
-        }
-    }
-    
 }
 
 

@@ -27,7 +27,7 @@ using namespace std;
 namespace sp=std::placeholders;
 
 
-thread_local thread::TmpStorage Solver::tmp;
+thread_local thread::TmpStorage* Solver::tmp = nullptr;
 
 //#define DEBUG_
 //#define MASSIVE_DEBUG_
@@ -130,22 +130,25 @@ void Solver::init( void ) {
     }
     
     // FIXME: this is a rather kludgy way to allow for resizing the TLS, think of something neater...
+    tmps.resize( nThreads+1 );
+    tmp = &tmps[0];     // main thread.
+    tmp->resize( patchSize, pupilSize );
     set<std::thread::id> initDone;
     progWatch.set( nThreads );
     for( uint16_t i=0; i<nThreads; ++i ) { 
-        service.post([&](){
+        service.post([&,i](){
             unique_lock<mutex> lock(mtx);
             std::thread::id id = std::this_thread::get_id();
             auto ret = initDone.emplace(id);
             if( ret.second ) {
-                tmp.resize( patchSize, pupilSize );
+                tmp = &tmps[i+1];
+                tmp->resize( patchSize, pupilSize );
                 ++progWatch;
                 lock.unlock();
                 progWatch.wait();
             }
         });
     }
-    tmp.resize( patchSize, pupilSize );
     progWatch.wait();
 
 }
@@ -757,13 +760,13 @@ double Solver::metric(void) {
                     o->progWatch.increaseTarget();
                     service.post( [o,c,begIndex,endIndex,this] {
                         const vector< shared_ptr<SubImage> >& imgs = c->getSubImages();
-                        tmp.C.zero();
-                        tmp.D.zero();
+                        tmp->C.zero();
+                        tmp->D.zero();
                         for( size_t i=begIndex; i<endIndex; ++i ) {
-                            imgs[i]->addPQ( tmp.C.get(), tmp.D.get() );
+                            imgs[i]->addPQ( tmp->C.get(), tmp->D.get() );
                             ++o->progWatch;
                         }
-                        o->addToPQ( tmp.C.get(), tmp.D.get() );
+                        o->addToPQ( tmp->C.get(), tmp->D.get() );
                         ++o->progWatch;
                     } );
                     begIndex = endIndex;
@@ -806,15 +809,15 @@ void Solver::calcPQ(void) {
                 o->progWatch.increaseTarget();
                 service.post( [o,c,begIndex,endIndex,this] {
                     const vector< shared_ptr<SubImage> >& imgs = c->getSubImages();
-                    tmp.C.zero();
-                    tmp.D.zero();
+                    tmp->C.zero();
+                    tmp->D.zero();
                     int cnt(0);
                     for( size_t i=begIndex; i<endIndex; ++i ) {
                         cnt++;
-                        imgs[i]->addPQ( tmp.C.get(), tmp.D.get() );
+                        imgs[i]->addPQ( tmp->C.get(), tmp->D.get() );
                         ++o->progWatch;
                     }
-                    o->addToPQ( tmp.C.get(), tmp.D.get() );
+                    o->addToPQ( tmp->C.get(), tmp->D.get() );
                     ++o->progWatch;
                 } );
                 begIndex = endIndex;

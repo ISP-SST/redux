@@ -74,7 +74,7 @@ namespace redux {
             void returnResults( WorkInProgress::Ptr );
 
             void cleanup(void);
-            bool run( WorkInProgress::Ptr, boost::asio::io_service&, uint16_t );
+            bool run( WorkInProgress::Ptr, uint16_t );
             
             void setLogChannel(std::string channel);
             
@@ -104,17 +104,17 @@ namespace redux {
 
             void checkParts( void );
             bool checkPatchPositions(void);
-            void unloadCalib( boost::asio::io_service& );
-            void preProcess( boost::asio::io_service&, uint16_t nThreads );
+            void unloadCalib( void );
+            void preProcess( void );
             void initCache( void );
             void clearPatches( void );
             void verifyPatches( void );
-            void writeOutput( boost::asio::io_service& );
-            void loadPatchResults( boost::asio::io_service&, uint16_t nThreads );
+            void writeOutput( void );
+            void loadPatchResults( void );
             int getReferenceObject( void );
             void generateTraceObjects( void );
             void generateTraceData(PatchData::Ptr);
-            void postProcess( boost::asio::io_service&, uint16_t nThreads );
+            void postProcess( void );
             
             void updateProgressString(void);
 

@@ -3,11 +3,17 @@
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
 
+#ifdef DEBUG_
+#   define TRACE_THREADS
+#endif
+
 #include "redux/util/cache.hpp"
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stringutil.hpp"
+#include "redux/util/trace.hpp"
+#include "redux/application.hpp"
 #include "redux/version.hpp"
 
 #include <mutex>
@@ -42,6 +48,9 @@ namespace {
 
     mutex globalJobMutex;
     /*const*/ Job::Info globalDefaults;
+
+    std::map<boost::thread::id,boost::thread*> thread_map;
+    std::set<boost::thread::id> old_threads;
     
 #ifdef DBG_JOB_
     static atomic<int> jobCounter(0);
@@ -335,6 +344,7 @@ Job::~Job(void) {
 #ifdef DBG_JOB_
     LOG_DEBUG << "Destructing Job#" << info.id << ": (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1) << ende;
 #endif
+    THREAD_MARK;
     bfs::path cp(cachePath);
     if( !cp.empty() && bfs::exists(cp) ) {
         try {
@@ -344,7 +354,9 @@ Job::~Job(void) {
                  << "  reason: " << e.what() << endl;
         }
     }
-    
+    THREAD_MARK;
+    cleanupThreads();
+    THREAD_MARK;
 }
 
 
@@ -374,16 +386,17 @@ uint16_t Job::getNextStep( uint16_t step ) const {
 
         
 void Job::setFailed(void) {
-    
+    THREAD_MARK;
     lock_guard<mutex> lock(jobMutex);
     info.state |= JSTATE_ERR;
-    
+    THREAD_MARK;
 }
 
 
 bool Job::isOK(void) {
-    
+    THREAD_MARK;
     lock_guard<mutex> lock(jobMutex);
+    THREAD_MARK;
     return !(info.state&JSTATE_ERR);
     
 }
@@ -400,7 +413,7 @@ string Job::cfg(void) {
 
 
 void Job::startLog( bool overwrite ) {
-    
+    THREAD_MARK;
     bfs::path logFilePath = bfs::path( info.logFile );
 
     string tmpChan = "job "+to_string( info.id );
@@ -413,7 +426,7 @@ void Job::startLog( bool overwrite ) {
         }
         logFilePath = bfs::path(info.outputDir) / logFilePath;
     }
-
+    THREAD_MARK;
     logger.setLevel( info.verbosity );
     logger.setContext( "job "+to_string(info.id) );
     try {
@@ -422,7 +435,8 @@ void Job::startLog( bool overwrite ) {
         throw job_error( info.name + ": " + string(e.what()) );
     }
     
-
+    THREAD_MARK;
+    
 }
 
 
@@ -435,8 +449,10 @@ void Job::printJobInfo(void) {
 
 
 void Job::stopLog(void) {
+    THREAD_MARK;
     logger.flushAll();
     logger.removeAllOutputs();
+    THREAD_MARK;
     //jlog.reset();
 }
 
@@ -445,12 +461,14 @@ void Job::moveTo( Job* job, uint16_t to ) {
     if( !job ) return;
     uint16_t current = job->info.step;
     if( current == to ) return;
+    THREAD_MARK;
     auto glock = getGlobalLock();
     CountT& c_old = counts[StepID(job->getTypeID(),current)];
     CountT& c_new = counts[StepID(job->getTypeID(),to)];
     c_old.active--;
     c_new.active++;
     glock.unlock();
+    THREAD_MARK;
     job->info.step = to;
     bpx::ptime now = bpx::second_clock::local_time();
     auto it = job->info.times.emplace( to, now );
@@ -460,6 +478,70 @@ void Job::moveTo( Job* job, uint16_t to ) {
     if( to == JSTATE_ERR ) {
         job->stopLog();
     }
+}
+
+
+void Job::addThread( uint16_t n ) {
+    
+    lock_guard<mutex> lock(jobMutex);
+    while( n-- ) {
+        boost::thread* t = pool.create_thread( std::bind( &Job::threadLoop, this ) );
+        thread_map[ t->get_id() ] = t;
+    }
+    
+}
+
+
+void Job::delThread( uint16_t n ) {
+    
+    lock_guard<mutex> lock(jobMutex);
+    while( n-- ) {
+        ioService.post( [](){ throw Application::ThreadExit(); } );
+    }
+    
+}
+
+
+void Job::cleanupThreads( void ) {
+    
+    lock_guard<mutex> lock(globalJobMutex);
+    std::set<boost::thread::id> tmp_ot = old_threads;   // loop over local copy since we might delete elements.
+    for( auto& tid: tmp_ot ) {
+        boost::thread* t = thread_map[tid];
+        if( pool.is_thread_in(t) ) {
+            pool.remove_thread( t );
+            old_threads.erase( tid );
+            thread_map.erase( tid );
+        }
+    }
+    
+}
+
+
+void Job::threadLoop( void ) {
+
+    while( true ) {
+        try {
+            boost::this_thread::interruption_point();
+            ioService.run();
+        } catch( const Application::ThreadExit& e ) {
+            break;
+        } catch( job_error& e ) {
+            LOG_ERR << "Job: Error: " << e.what() << ende;
+        } catch( const boost::thread_interrupted& ) {
+            LOG_TRACE << "Job: Thread interrupted." << ende;
+            break;
+        } catch( exception& e ) {
+            LOG_ERR << "Job: Exception in thread: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "Job: Unhandled exception in thread." << ende;
+        }
+    }
+    
+    lock_guard<mutex> lock(globalJobMutex);
+    old_threads.insert( boost::this_thread::get_id() );
+    THREAD_UNMARK;
+    
 }
 
 

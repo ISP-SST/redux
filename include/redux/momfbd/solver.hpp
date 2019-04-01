@@ -159,7 +159,8 @@ namespace redux {
             redux::util::StopWatch timer;
             redux::util::ProgressWatch progWatch;
             
-            static thread_local thread::TmpStorage tmp;
+            std::vector< thread::TmpStorage > tmps;
+            static thread_local thread::TmpStorage* tmp;
             std::mutex mtx;
             
         };

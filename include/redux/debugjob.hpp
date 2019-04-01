@@ -56,7 +56,7 @@ namespace redux {
         void ungetWork(WorkInProgress::Ptr);
         void returnResults(WorkInProgress::Ptr);
         
-        bool run( WorkInProgress::Ptr, boost::asio::io_service&, uint16_t );
+        bool run( WorkInProgress::Ptr, uint16_t );
 
     private:
 

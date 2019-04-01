@@ -1,7 +1,12 @@
 #include "redux/util/cacheitem.hpp"
 
+#ifdef DEBUG_
+#   define TRACE_THREADS
+#endif
+
 #include <redux/util/cache.hpp>
 #include <redux/file/fileio.hpp>
+#include <redux/util/trace.hpp>
 
 #include <fstream>
 #include <memory>
@@ -38,7 +43,9 @@ CacheItem::~CacheItem() {
 
 void CacheItem::cacheClear(void) {
 
+    THREAD_MARK;
     unique_lock<mutex> lock(itemMutex);
+    THREAD_MARK;
     try {
         cclear();
         isLoaded = false;
@@ -75,7 +82,9 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
 
     bool ret(false);
     try {
+        THREAD_MARK;
         unique_lock<mutex> lock(itemMutex);
+        THREAD_MARK;
         if( fullPath.empty() ) {
             return ret;
         }
@@ -98,6 +107,7 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                 }
             }
         }
+        THREAD_MARK;
         if( isLoaded && removeAfterLoad ) {
             bfs::remove(fullPath);
         }
@@ -116,7 +126,9 @@ bool CacheItem::cacheStore(bool clearAfterStore){
 
     bool ret(false);
     try {
+        THREAD_MARK;
         unique_lock<mutex> lock(itemMutex);
+        THREAD_MARK;
         if(fullPath.empty()) {
             return ret;
         }
@@ -137,6 +149,7 @@ bool CacheItem::cacheStore(bool clearAfterStore){
                 }
             }
         }
+        THREAD_MARK;
         if(ret && clearAfterStore) {
             cclear();
             isLoaded = false;
