@@ -1390,6 +1390,9 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         info->nPatchesX = patchesData.dimSize(1 );
         info->patches.resize(info->nPatchesX, info->nPatchesY );
         info->nPoints = patchSize;
+        
+        info->region[0] = info->region[2] = numeric_limits<int32_t>::max();
+        info->region[1] = info->region[3] = numeric_limits<int32_t>::min();
 
         size_t modeSize = tmpModes.nElements()*sizeof( float );
         size_t blockSize = modeSize;
@@ -1404,6 +1407,11 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                         refData = thisPatch->getObjectData(traceID);
                     }
                     if( refData ) oData->channels = refData->channels;
+                    info->region[0] = std::min( info->region[0], thisPatch->roi.first.x+1 );
+                    info->region[1] = std::max( info->region[1], thisPatch->roi.last.x+1 );
+                    info->region[2] = std::min( info->region[2], thisPatch->roi.first.y+1 );
+                    info->region[3] = std::max( info->region[3], thisPatch->roi.last.y+1 );
+
                     info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
                     info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
                     info->patches(x,y).region[2] = thisPatch->roi.first.y+1;

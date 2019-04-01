@@ -50,6 +50,7 @@ namespace redux {
                 int64_t offset, imgPos, psfPos, objPos, resPos, alphaPos, diversityPos;
 
                 uint8_t parse( std::ifstream& file, const bool& swapNeeded, const float& version );
+                int64_t parseMeta( std::ifstream& file, const bool& swapNeeded, const float& version );
                 size_t load ( std::ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask=MOMFBD_ALL, int verbosity=0, uint8_t alignTo=4 ) const;
                 void write( std::ofstream& file, const char* data, const float& version, uint8_t writeMask=MOMFBD_ALL );
 
@@ -63,8 +64,8 @@ namespace redux {
             
             void clear(void);
 
-            void read( std::ifstream& );
-            void read( const std::string& );
+            void read( std::ifstream&, bool onlyMeta=false );
+            void read( const std::string&, bool onlyMeta=false );
 
             void write( std::ofstream&, const char* data, uint8_t writeMask=MOMFBD_ALL, int verbosity=0 );
             void write( const std::string&, const char* data, uint8_t writeMask=MOMFBD_ALL, int verbosity=0 );

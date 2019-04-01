@@ -60,6 +60,8 @@ if (DEFINED IDL_FOUND)
     target_link_libraries (ana ${RDX_CURRENT_LIBRARIES})
     
     set( RDX_MOMFBD_DEPS
+         "${RDX_LIB_BASE}/file/filefits.cpp"
+         "${RDX_LIB_BASE}/util/stringutil.cpp"
          "${RDX_LIB_BASE}/file/filemomfbd.cpp"
          "${RDX_LIB_BASE}/math/functions.cpp"
     )

@@ -536,20 +536,23 @@ vector<string> Fits::getText( bool raw ) {
     return ret;
 }
 
-
-template <typename T>
-string redux::file::Fits::makeCard( string key, T value, string comment ) {
-    string ret = key;
-    ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
-    ret += "= " + alignRight(to_string(value),20);
-    if( comment != "" ) {
-        ret += " / " + comment;
-    }
-    ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
-    return ret;
-}
 namespace redux {
     namespace file {
+
+        template <typename T>
+        string Fits::makeCard( string key, T value, string comment ) {
+            string ret = key;
+            ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+            ret += "= " + alignRight(to_string(value),20);
+            if( comment != "" ) {
+                ret += " / " + comment;
+            }
+            ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+            return ret;
+        }
+        template string Fits::makeCard( string, int, string );
+
+
         template <>
         string Fits::makeCard( string key, string value, string comment ) {
             string ret = key;

@@ -52,14 +52,14 @@ namespace redux {
             std::vector<std::string> getText( bool );
             
             template <typename T>
-            std::string makeCard( std::string key, T value, std::string comment="" );
-            void insertCard( std::vector<std::string>& hdr, std::string card, size_t location=std::string::npos );
-            void insertCardAfter( std::vector<std::string>& hdr, std::string card, std::string after );
-            void insertCardBefore( std::vector<std::string>& hdr, std::string card, std::string before );
-            bool updateCard( std::vector<std::string>& hdr, size_t location, std::string card );
-            bool updateCard( std::vector<std::string>& hdr, std::string key, std::string card );
+            static std::string makeCard( std::string key, T value, std::string comment="" );
+            static void insertCard( std::vector<std::string>& hdr, std::string card, size_t location=std::string::npos );
+            static void insertCardAfter( std::vector<std::string>& hdr, std::string card, std::string after );
+            static void insertCardBefore( std::vector<std::string>& hdr, std::string card, std::string before );
+            static bool updateCard( std::vector<std::string>& hdr, size_t location, std::string card );
+            static bool updateCard( std::vector<std::string>& hdr, std::string key, std::string card );
             template <typename T>
-            T getValue( const std::vector<std::string>& hdr, std::string key);
+            static T getValue( const std::vector<std::string>& hdr, std::string key);
             template <typename T>
             std::vector<T> getTableArray( std::string key );
             

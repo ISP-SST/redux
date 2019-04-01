@@ -153,6 +153,141 @@ uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, c
 }
 
 
+int64_t FileMomfbd::PatchInfo::parseMeta ( ifstream& file, const bool& swapNeeded, const float& version ) {
+
+    int64_t tmpSize, patchSize ( 0 );
+    uint8_t dataMask( 0 );
+
+    offset = file.tellg();
+
+    patchSize += readOrThrow ( file, region, 4, "PatchInfo:region" );
+    
+    if( version >= 20110714.0 ){
+        patchSize += readOrThrow ( file, &offx, 1, "PatchInfo:offx" );
+        patchSize += readOrThrow ( file, &offy, 1, "PatchInfo:offy" );
+    }
+    
+    patchSize += readOrThrow ( file, &nChannels, 1, "PatchInfo:nChannels" );
+    if ( swapNeeded ) {
+        swapEndian ( &region, 4 );
+        swapEndian ( nChannels );
+    }
+
+    if ( region[0] > region[1] ) swap ( region[0], region[1] );
+    if ( region[2] > region[3] ) swap ( region[2], region[3] );
+
+    nPixelsX = region[1] - region[0] + 1;
+    nPixelsY = region[3] - region[2] + 1;
+
+    nim.reset ( new int32_t [nChannels], [] ( int32_t * p ) { delete[] p; } );
+    dx.reset ( new int32_t [nChannels], [] ( int32_t * p ) { delete[] p; } );
+    dy.reset ( new int32_t [nChannels], [] ( int32_t * p ) { delete[] p; } );
+
+    patchSize += readOrThrow ( file, nim.get(), nChannels, "PatchInfo:nim" );
+    patchSize += readOrThrow ( file, dx.get(), nChannels, "PatchInfo:dx" );
+    patchSize += readOrThrow ( file, dy.get(), nChannels, "PatchInfo:dy" );
+
+    if ( swapNeeded ) {
+        swapEndian ( nim.get(), nChannels );
+        swapEndian ( dx.get(), nChannels );
+        swapEndian ( dy.get(), nChannels );
+    }
+
+    char hasImage;
+    patchSize += readOrThrow ( file, &hasImage, 1, "PatchInfo:hasImage" );
+
+    if ( hasImage ) {
+        dataMask |= MOMFBD_IMG;
+        imgPos = file.tellg();
+        tmpSize = nPixelsX * nPixelsY * sizeof ( float );
+        patchSize += tmpSize;
+        file.seekg ( tmpSize, ios_base::cur );
+    }
+
+    npsf = 0;
+    patchSize += readOrThrow ( file, &npsf, 1, "PatchInfo:npsf" );
+    if ( swapNeeded ) {
+        swapEndian ( npsf );
+    }
+
+    if ( npsf ) {
+        dataMask |= MOMFBD_PSF;
+        psfPos = file.tellg();
+        tmpSize = npsf * nPixelsX * nPixelsY * sizeof ( float );
+        patchSize += tmpSize;
+        file.seekg ( tmpSize, ios_base::cur );
+    }
+
+    nobj = 0;
+    patchSize += readOrThrow ( file, &nobj, 1, "PatchInfo:nobj" );
+    if ( swapNeeded ) swapEndian ( nobj );
+    if ( nobj ) {
+        dataMask |= MOMFBD_OBJ;
+        objPos = file.tellg();
+        tmpSize = nobj * nPixelsX * nPixelsY * sizeof ( float );
+        patchSize += tmpSize;
+        file.seekg ( tmpSize, ios_base::cur );
+    }
+
+    nres = 0;
+    patchSize += readOrThrow ( file, &nres, 1, "PatchInfo:nres" );
+    if ( swapNeeded ) swapEndian ( nres );
+    if ( nres ) {
+        dataMask |= MOMFBD_RES;
+        resPos = file.tellg();
+        tmpSize = nres * nPixelsX * nPixelsY * sizeof ( float );
+        patchSize += tmpSize;
+        file.seekg ( tmpSize, ios_base::cur );
+    }
+
+    nalpha = nm = 0;
+    patchSize += readOrThrow ( file, &nalpha, 1, "PatchInfo:nalpha" );
+    if ( swapNeeded ) swapEndian ( nalpha );
+    if ( nalpha ) {
+        dataMask |= MOMFBD_ALPHA;
+        patchSize += readOrThrow ( file, &nm, 1, "PatchInfo:nm" );
+        if ( swapNeeded ) swapEndian ( nm );
+        alphaPos = file.tellg();
+        tmpSize = nalpha * nm * sizeof ( float );
+        patchSize += tmpSize;
+        file.seekg ( tmpSize, ios_base::cur );
+    }
+
+    ndiv = 0;
+    if ( version >= 20100726.0 ) {  // check if this is a version that can have div info...
+        patchSize += readOrThrow ( file, &ndiv, 1, "PatchInfo:ndiv" );
+        if ( swapNeeded ) swapEndian ( ndiv );
+    }
+
+    nphx = nPixelsX / 2;
+    nphy = nPixelsY / 2;
+    if ( ndiv ) {
+        dataMask |= MOMFBD_DIV;
+        if ( version >= 20110708.0 ) {
+            patchSize += readOrThrow ( file, &nphx, 1, "PatchInfo:nphx" );
+            patchSize += readOrThrow ( file, &nphy, 1, "PatchInfo:nphy" );
+            if( swapNeeded) {
+                swapEndian ( nphx );
+                swapEndian ( nphy );
+            }
+
+        } else cout << "WARNING: diversity of versions < 20110708.0 may have wrong dimensions!  (version = " << version << ")" << endl;
+
+        diversityPos = file.tellg();
+        tmpSize = ndiv * nphy *  nphx * sizeof ( float );
+        if( version >= 20110916.0 ) tmpSize += ndiv;        // + byte with diversity-type.
+        patchSize += tmpSize;
+        file.seekg ( tmpSize, ios_base::cur );
+    }
+
+    if ( patchSize != ( file.tellg() - offset ) ) {
+        throw ios_base::failure ( "Failed to read Momfbd Patch. Size mismatch: "+to_string ( patchSize ) +" <-> " + to_string ( file.tellg() - offset ) );
+    }
+
+    return patchSize;
+}
+
+
 size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask, int verbosity, uint8_t alignTo ) const {
 
     size_t count(0);
@@ -425,7 +560,7 @@ void FileMomfbd::clear(void) {
 }
 
 
-void FileMomfbd::read ( std::ifstream& file ) {
+void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
 
     headerSize = 0;
     file.seekg ( 0 );
@@ -433,6 +568,7 @@ void FileMomfbd::read ( std::ifstream& file ) {
     char tmp8;
     int32_t tmp32;
     vector<char> tmpStr ( 1024, 0 );
+    bool hasROI(false);
 
     // first byte = endian-flag
     readOrThrow ( file, &tmp8, 1, "FileMomfbd:endian" );
@@ -443,7 +579,7 @@ void FileMomfbd::read ( std::ifstream& file ) {
     if ( swapNeeded ) swapEndian ( &tmp32 );
     tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:version-string" );
-    versionString.assign ( tmpStr.begin(), tmpStr.begin() + tmp32 );
+    versionString = string(tmpStr.data());
     version = atof ( versionString.c_str() );
 
     // time string
@@ -451,14 +587,24 @@ void FileMomfbd::read ( std::ifstream& file ) {
     if ( swapNeeded ) swapEndian ( &tmp32 );
     tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:time-string" );
-    timeString.assign ( tmpStr.begin(), tmpStr.begin() + tmp32 );
+    timeString = string(tmpStr.data());
 
     // date string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:date-length" );
     if ( swapNeeded ) swapEndian ( &tmp32 );
     tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:date-string" );
-    dateString.assign ( tmpStr.begin(), tmpStr.begin() + tmp32 );
+    dateString = string(tmpStr.data());
+
+    if ( version >= 20190401.17 ) {
+        readOrThrow ( file, region, 4, "FileMomfbd:region" );
+        if ( swapNeeded ) {
+            swapEndian ( &region, 4 );
+        }
+        if ( region[0] > region[1] ) swap ( region[0], region[1] );
+        if ( region[2] > region[3] ) swap ( region[2], region[3] );
+        hasROI = true;
+    }
 
     readOrThrow ( file, &tmp8, 1, "FileMomfbd:hasModes" );
     if ( tmp8 ) {
@@ -518,40 +664,72 @@ void FileMomfbd::read ( std::ifstream& file ) {
         swapEndian ( nPoints );
     }
 
-    region[0] = region[2] = numeric_limits<int32_t>::max();
-    region[1] = region[3] = numeric_limits<int32_t>::min();
-    patches.resize ( nPatchesX, nPatchesY );
-    for ( int x = 0; x < nPatchesX; ++x ) {
-        for ( int y = 0; y < nPatchesY; ++y ) {
-            FileMomfbd::PatchInfo* patch = patches.ptr ( x, y );
-            dataMask |= patch->parse ( file, swapNeeded, version );
-            region[0] = std::min( region[0], patch->region[0] );
-            region[1] = std::max( region[1], patch->region[1] );
-            region[2] = std::min( region[2], patch->region[2] );
-            region[3] = std::max( region[3], patch->region[3] );
-            if( nPoints == 0 ) {    // hack for momfbd-files that does not have the nPoints value stored.
-                nPoints = abs(patch->region[1]-patch->region[0])+1;
-            }
-        }
+    if(!hasROI) {
+        region[0] = region[2] = numeric_limits<int32_t>::max();
+        region[1] = region[3] = numeric_limits<int32_t>::min();
     }
     
-    try {
-        readOrThrow ( file, &nFileNames, 1, "FileMomfbd:nFileNames" );
-        dataMask |= MOMFBD_NAMES;
-        if ( swapNeeded ) {
-            swapEndian ( nFileNames );
+    if( onlyMeta ) {
+        if(!hasROI) {
+            FileMomfbd::PatchInfo tmpPatch;
+            int64_t pstart = file.tellg();
+            tmpPatch.parse( file, swapNeeded, version );
+            int64_t pskip = file.tellg();
+            pskip -= pstart + sizeof(tmpPatch.region);
+            region[0] = std::min( region[0], tmpPatch.region[0] );
+            region[1] = std::max( region[1], tmpPatch.region[1] );
+            region[2] = std::min( region[2], tmpPatch.region[2] );
+            region[3] = std::max( region[3], tmpPatch.region[3] );
+            int nPatches = nPatchesX*nPatchesY-1;    // we already did the first one, so -1
+            for( int i(0); i<nPatches; ++i ) {
+                readOrThrow ( file, tmpPatch.region, 4, "PatchInfo:region" );
+                if ( swapNeeded ) {
+                    swapEndian ( &tmpPatch.region, 4 );
+                }
+                if ( tmpPatch.region[0] > tmpPatch.region[1] ) swap ( tmpPatch.region[0], tmpPatch.region[1] );
+                if ( tmpPatch.region[2] > tmpPatch.region[3] ) swap ( tmpPatch.region[2], tmpPatch.region[3] );
+                region[0] = std::min( region[0], tmpPatch.region[0] );
+                region[1] = std::max( region[1], tmpPatch.region[1] );
+                region[2] = std::min( region[2], tmpPatch.region[2] );
+                region[3] = std::max( region[3], tmpPatch.region[3] );
+                file.seekg ( pskip, ios_base::cur );
+            }
         }
-        filenameOffset = file.tellg();
-    } catch ( const std::ios_base::failure& e ) {
-        nFileNames = 0;
+    } else {
+        patches.resize ( nPatchesX, nPatchesY );
+        for ( int x = 0; x < nPatchesX; ++x ) {
+            for ( int y = 0; y < nPatchesY; ++y ) {
+                FileMomfbd::PatchInfo* patch = patches.ptr ( x, y );
+                dataMask |= patch->parse ( file, swapNeeded, version );
+                if(!hasROI) {
+                    region[0] = std::min( region[0], patch->region[0] );
+                    region[1] = std::max( region[1], patch->region[1] );
+                    region[2] = std::min( region[2], patch->region[2] );
+                    region[3] = std::max( region[3], patch->region[3] );
+                }
+                if( nPoints == 0 ) {    // hack for momfbd-files that does not have the nPoints value stored.
+                    nPoints = abs(patch->region[1]-patch->region[0])+1;
+                }
+            }
+        }
+        
+        try {
+            readOrThrow ( file, &nFileNames, 1, "FileMomfbd:nFileNames" );
+            dataMask |= MOMFBD_NAMES;
+            if ( swapNeeded ) {
+                swapEndian ( nFileNames );
+            }
+            filenameOffset = file.tellg();
+        } catch ( const std::ios_base::failure& e ) {
+            nFileNames = 0;
+        }
     }
-
 
 }
 
-void FileMomfbd::read ( const std::string& filename ) {
+void FileMomfbd::read ( const std::string& filename, bool onlyMeta ) {
     ifstream file ( filename );
-    read ( file );
+    read ( file, onlyMeta );
 }
 #include "redux/file/fileana.hpp"
 void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMask, int verbosity ) {
@@ -591,6 +769,8 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     tmp32 = dateString.length() + 1;
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:date-length" );
     writeOrThrow ( file, dateString.c_str(), tmp32, "FileMomfbd:date-string" );
+    
+    writeOrThrow ( file, region, 4, "FileMomfbd:region" );
 
     tmp8 = (writeMask&MOMFBD_MODES);
     writeOrThrow ( file, &tmp8, 1, "FileMomfbd:hasModes" );

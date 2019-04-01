@@ -5,6 +5,7 @@
 #endif
 
 #include "redux/file/filemomfbd.hpp"
+#include "redux/file/filefits.hpp"
 
 #include <algorithm>
 #include <map>
@@ -35,20 +36,6 @@ using namespace std;
 //http://idlastro.gsfc.nasa.gov/idl_html_help/Structure_Variables.html
 
 // Local implementation to avoid including boost dependencies in the DLM
-bool redux::util::contains ( const std::string & haystack, const std::string & needle, bool ignoreCase ) {
-
-    auto it = std::search (
-                  haystack.begin(), haystack.end(),
-                  needle.begin(),   needle.end(),
-    [ignoreCase] ( char ch1, char ch2 ) {
-        if ( ignoreCase ) return std::toupper ( ch1 ) == std::toupper ( ch2 );
-        return ch1 == ch2;
-    }
-              );
-    if ( it != haystack.end() ) return true;
-    return false;
-
-}
 
 
 namespace {
@@ -741,6 +728,96 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+//
+// Routine to read the global/metadata part of .momfbd files.
+//
+IDL_VPTR redux::momfbd_header ( int argc, IDL_VPTR* argv, char* argk ) {
+
+    KW_RESULT kw;
+    kw.verbose = 0;
+    kw.help = 0;
+    int nPlainArgs = IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
+
+    if ( nPlainArgs < 1 ) {
+        cout << "MOMFBD_HEADER: takes exactly 1 argument." << endl;
+        momfbd_help();
+        return IDL_GettmpInt ( 0 ); // return a dummy
+    }
+
+    if ( kw.help ) {
+        momfbd_help();
+        return IDL_GettmpInt ( 0 ); // return a dummy
+    }
+
+    IDL_VPTR fileName = argv[0];
+
+    IDL_ENSURE_SIMPLE ( fileName );
+    IDL_ENSURE_STRING ( fileName );
+
+    char *name = IDL_VarGetString ( fileName );
+    int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
+
+    if ( verbosity > 0 ) {
+        cout << "Loading file:       \"" << name << "\"" << endl;
+    }
+
+    ifstream file;
+    std::shared_ptr<FileMomfbd> info( new FileMomfbd() );
+
+    try {
+        file.open( name );
+        info->read( file, true );
+    } catch ( exception& e ) {
+        cout << "Failed to read info from Momfbd file: " << name << endl << "Reason: " << e.what() << endl;
+        return IDL_GettmpInt ( -1 ); // return a dummy
+    }
+
+    if ( verbosity > 1 ) {
+        cout << "File Version:       \"" << info->versionString << "\"" << endl;
+    }
+
+    IDL_KW_FREE;
+    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+    vector<string> cards;
+    Fits::insertCard( cards, Fits::makeCard( "SIMPLE", "Written by momfbd_header: "+to_iso_extended_string(now) ) );
+    Fits::insertCard( cards, Fits::makeCard( "BITPIX", -32 ) );
+    Fits::insertCard( cards, Fits::makeCard( "NAXIS", 2 ) );
+    Fits::insertCard( cards, Fits::makeCard( "NAXIS1", (int)(info->region[1]-info->region[0]+1 - info->nPoints/4) ) );
+    Fits::insertCard( cards, Fits::makeCard( "NAXIS2", (int)(info->region[3]-info->region[2]+1 - info->nPoints/4) ) );
+    Fits::insertCard( cards, Fits::makeCard( "DATE", to_iso_extended_string(now.date()), "Creation (CCCC-MM-DD) date of FITS header" ) );
+    Fits::insertCard( cards, Fits::makeCard( "DATE-AVG", info->dateString+"T"+info->timeString, "Average time of observing raw data" ) );
+    float version = atof ( info->versionString.c_str() );
+    if( version > 20160525 ) {
+        Fits::insertCard( cards, Fits::makeCard( "REDUX_V", info->versionString ) );
+    } else {
+        Fits::insertCard( cards, Fits::makeCard( "MOMFBD_V", info->versionString ) );
+    }
+
+    IDL_VPTR ret;
+    IDL_MEMINT nCards = cards.size();
+    if( nCards ) {
+        IDL_MEMINT dims[] = { nCards };    // x/y, im#, nMatches 
+        IDL_MakeTempArray( IDL_TYP_STRING, 1, dims, IDL_ARR_INI_ZERO, &ret );
+        IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(ret->value.arr->data);
+        for( int j=0; j<nCards; ++j ) {
+            if( cards[j].size() > 1 ) {
+                IDL_StrEnsureLength( strptr, 80 );
+                memcpy( strptr->s, cards[j].data(), 80 );
+                strptr++;
+                if ( verbosity > 1 ) {
+                    cout << "\"" << cards[j] << "\"" << endl;
+                }
+            }
+        }
+    } else {
+        ret = IDL_StrToSTRING( (char*)"" );
+    }
+
+    return ret;
+
+}
+
+
 void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
 
     KW_RESULT kw;
@@ -1358,6 +1435,7 @@ extern "C" {
     int IDL_Load ( void ) {
 
         static IDL_SYSFUN_DEF2 function_addr[] = {
+            { { ( IDL_VPTR ( * ) () ) redux::momfbd_header}, ( char* ) "MOMFBD_HEADER", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { ( IDL_VPTR ( * ) () ) redux::momfbd_read}, ( char* ) "MOMFBD_READ", 0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { ( IDL_VPTR ( * ) () ) redux::momfbd_mozaic}, ( char* ) "MOMFBD_MOZAIC", 0, 5, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { ( IDL_VPTR ( * ) () ) redux::momfbd_mozaic}, ( char* ) "MOZAIC", 0, 5, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
