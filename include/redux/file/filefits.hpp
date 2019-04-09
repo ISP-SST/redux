@@ -53,11 +53,15 @@ namespace redux {
             
             template <typename T>
             static std::string makeCard( std::string key, T value, std::string comment="" );
+            static void addCard( std::vector<std::string>& hdr, std::string card );
             static void insertCard( std::vector<std::string>& hdr, std::string card, size_t location=std::string::npos );
             static void insertCardAfter( std::vector<std::string>& hdr, std::string card, std::string after );
             static void insertCardBefore( std::vector<std::string>& hdr, std::string card, std::string before );
             static bool updateCard( std::vector<std::string>& hdr, size_t location, std::string card );
             static bool updateCard( std::vector<std::string>& hdr, std::string key, std::string card );
+            static bool updateCard( std::vector<std::string>& hdr, std::string card );
+            static bool emplaceCard( std::vector<std::string>& hdr, std::string key, std::string card );
+            static bool emplaceCard( std::vector<std::string>& hdr, std::string card );
             template <typename T>
             static T getValue( const std::vector<std::string>& hdr, std::string key);
             template <typename T>

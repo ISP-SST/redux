@@ -5,6 +5,7 @@
 #include "redux/util/arraystats.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/ricecompress.hpp"
+#include "redux/util/stringutil.hpp"
 #include "redux/types.hpp"
 
 #include <fstream>
@@ -123,6 +124,12 @@ namespace {
         boost::replace_all( str, "''",  "'" );
         return str;
     }
+    
+    struct cicomp {  // case-insensitive comparator for the maps below.
+        bool operator() ( const std::string& a, const std::string& b ) const { return redux::util::nocaseLess(a,b); }
+    };
+    const std::set<string, cicomp> multiKeys = { "        ", "COMMENT ", "HISTORY ", "CONTINUE" };
+    
 }
 
 
@@ -593,6 +600,21 @@ namespace redux {
 }
 
 
+void Fits::addCard( vector<string>& hdr, string card ) {
+    
+    string key = card.substr(0,8);
+    if( multiKeys.count(key) == 0 ) {   // only allow single occurrances for non-multikeys
+        for( auto& k: hdr ) {
+            if( boost::iequals( k.substr(0,8), key) ) {
+                return;
+            }
+        }
+    }
+    hdr.push_back(card);
+    
+}
+
+
 void Fits::insertCard( vector<string>& hdr, string card, size_t location ) {
     
     if( location < hdr.size() ) {
@@ -610,7 +632,6 @@ void Fits::insertCardAfter( vector<string>& hdr, string card, string after ) {
     for( size_t i=0; i<hdr.size(); ++i ) {
         if( boost::iequals( hdr[i].substr(0,8), after) ) {
             location = i+1;
-            break;
         }
     }
     insertCard( hdr, card, location );
@@ -635,10 +656,10 @@ bool Fits::updateCard( vector<string>& hdr, size_t location, string card ) {
     
     if( location < hdr.size() ) {
         hdr[location] = card;
-    } else {
-        return false;
+        return true;
     }
-    return true;
+    return false;
+    
 }
 
 
@@ -646,13 +667,41 @@ bool Fits::updateCard( vector<string>& hdr, string key, string card ) {
     
     key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
     size_t location = string::npos;
-    for( size_t i=0; i<hdr.size(); ++i ) {
-        if( boost::iequals( hdr[i].substr(0,8), key) ) {
-            location = i;
-            break;
+    if( multiKeys.count(key) == 0 ) {   // never overwrite keywords which might have multiple entries
+        for( size_t i=0; i<hdr.size(); ++i ) {
+            if( boost::iequals( hdr[i].substr(0,8), key) ) {
+                location = i;
+                break;
+            }
         }
     }
     return updateCard( hdr, location, card );
+
+}
+
+
+bool Fits::updateCard( vector<string>& hdr, string card ) {
+    
+    string key = card.substr(0,8);
+    return updateCard( hdr, key, card );
+
+}
+
+
+bool Fits::emplaceCard( vector<string>& hdr, string key, string card ) {
+    
+    bool inserted = !updateCard( hdr, key, card );
+    if( inserted ) insertCard( hdr, card );
+    return inserted;
+
+}
+
+
+bool Fits::emplaceCard( vector<string>& hdr, string card ) {
+    
+    bool inserted = !updateCard( hdr, card );
+    if( inserted ) insertCard( hdr, card );
+    return inserted;
 
 }
 
