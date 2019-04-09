@@ -475,14 +475,14 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
 }
 
 
-FileMomfbd::FileMomfbd ( void ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), 
+FileMomfbd::FileMomfbd ( void ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), modifiedTime(bpx::not_a_date_time),
     nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( 0 ),
     modesOffset ( 0 ), filenameOffset ( 0 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false )  {
 
 }
 
 
-FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN),
+FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), modifiedTime(bpx::not_a_date_time),
     nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( -1 ),
     modesOffset ( -1 ), filenameOffset ( -1 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false ) {
 
@@ -582,6 +582,16 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
     versionString = string(tmpStr.data());
     version = atof ( versionString.c_str() );
 
+    // created/modified string
+    if ( version >= 20190408.0 ) {
+        readOrThrow ( file, &tmp32, 1, "FileMomfbd:modifiedTime-length" );
+        if ( swapNeeded ) swapEndian ( &tmp32 );
+        tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
+        readOrThrow ( file, &(tmpStr[0]), tmp32, "FileMomfbd:modifiedTime-string" );
+        string modifiedString = replace_n(string(tmpStr.data()),"T"," ",1);
+        modifiedTime = bpx::time_from_string( modifiedString );
+    }
+    
     // time string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:time-length" );
     if ( swapNeeded ) swapEndian ( &tmp32 );
@@ -760,11 +770,22 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:version-length" );
     writeOrThrow ( file, versionString.c_str(), tmp32, "FileMomfbd:version-string" );
     
+    // created/modified string
+    if ( version >= 20190408.0 ) {
+        if( modifiedTime.is_not_a_date_time() ) {
+            modifiedTime = bpx::second_clock::universal_time();
+        }
+        string modString = to_iso_extended_string( modifiedTime );
+        tmp32 = modString.length() + 1;
+        writeOrThrow ( file, &tmp32, 1, "FileMomfbd:modifiedTime-length" );
+        writeOrThrow ( file, modString.c_str(), tmp32, "FileMomfbd:modifiedTime-string" );
+    }
+    
     // time string
     tmp32 = timeString.length() + 1;
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:time-length" );
     writeOrThrow ( file, timeString.c_str(), tmp32, "FileMomfbd:time-string" );
-
+    
     // date string
     tmp32 = dateString.length() + 1;
     writeOrThrow ( file, &tmp32, 1, "FileMomfbd:date-length" );

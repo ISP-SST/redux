@@ -339,6 +339,9 @@ namespace {
     void createTags ( vector<IDL_STRUCT_TAG_DEF>& tags, uint8_t loadMask, const FileMomfbd* const info ) {
 
         appendTag ( tags, "VERSION", 0, ( void* ) IDL_TYP_STRING );
+        if ( info->version >= 20190408.0 ) {
+            appendTag ( tags, "MODIFIED", 0, ( void* ) IDL_TYP_STRING );
+        }
         appendTag ( tags, "TIME", 0, ( void* ) IDL_TYP_STRING );
         appendTag ( tags, "DATE", 0, ( void* ) IDL_TYP_STRING );
 
@@ -429,16 +432,22 @@ namespace {
         float* fPtr;
 
         // Version string
-        IDL_StrStore(&strPtr[0], const_cast<char*>(info->versionString.c_str()));
         // strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        IDL_StrStore(strPtr++, const_cast<char*>(info->versionString.c_str()));
 
+        if ( info->version >= 20190408.0 ) {
+            string modString = to_iso_extended_string( info->modifiedTime );
+            IDL_StrStore(strPtr++, const_cast<char*>(modString.c_str()));
+            count += sizeof ( IDL_STRING );
+        }
+        
         // Time string
-        IDL_StrStore(&strPtr[1], const_cast<char*>(info->timeString.c_str()));
-        // strPtr[1].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        // strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        IDL_StrStore(strPtr++, const_cast<char*>(info->timeString.c_str()));
 
         // Date string
-        IDL_StrStore(&strPtr[2], const_cast<char*>(info->dateString.c_str()));
-        // strPtr[2].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        // strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
+        IDL_StrStore(strPtr++, const_cast<char*>(info->dateString.c_str()));
 
         count += 3*sizeof ( IDL_STRING );
 
@@ -616,6 +625,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
         info->read ( file );
     } catch ( exception& e ) {
         cout << "Failed to read info from Momfbd file: " << name << endl << "Reason: " << e.what() << endl;
+        cout << "Make sure your DLM is up to date!" << endl;
         return IDL_GettmpInt ( -1 ); // return a dummy
     }
 
@@ -681,6 +691,9 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     size_t totalSize = sizeof ( MomfdContainer );
 
     totalSize += 3 * sizeof ( IDL_STRING );                             // VERSION - TIME - DATE
+    if ( info->version >= 20190408.0 ) {
+        totalSize +=  sizeof( IDL_STRING );                             // MODIFIED
+    }
     totalSize += 4 * info->nChannels * sizeof ( IDL_INT );              // clip-values for each channel
     totalSize += 5 * sizeof ( IDL_INT );                                // ROI + MARGIN
     while ( totalSize % 4 ) totalSize++;                // align to 4-byte boundary
@@ -901,6 +914,13 @@ void redux::momfbd_write ( int argc, IDL_VPTR* argv, char* argk ) {
                 } else {
                     if( verbosity>1 ) cout << "Warning: Variable DATE is not defined." <<  endl;
                     infoPtr->dateString = "";
+                }
+            } else if ( contains ( "MODIFIED",tag,true ) ) {
+                if( stringPtr->slen ) {
+                    string modifiedString = replace_n(stringPtr->s,"T"," ",1);
+                    infoPtr->modifiedTime = bpx::time_from_string( modifiedString );
+                } else {
+                    if( verbosity>1 ) cout << "Warning: Variable MODIFIED is not defined." <<  endl;
                 }
             } else if ( contains ( "TIME",tag,true ) ) {
                 if( stringPtr->slen ) {

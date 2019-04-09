@@ -77,6 +77,7 @@ namespace redux {
 
             float version, pix2cf, cf2pix;
             std::string dateString, timeString, versionString;
+            bpx::ptime modifiedTime;
             std::vector<std::string> fileNames;
 
             std::shared_ptr<int16_t> clipStartX, clipEndX, clipStartY, clipEndY;
