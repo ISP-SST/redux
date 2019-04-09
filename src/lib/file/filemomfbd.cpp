@@ -739,7 +739,11 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
 
 void FileMomfbd::read ( const std::string& filename, bool onlyMeta ) {
     ifstream file ( filename );
-    read ( file, onlyMeta );
+    read( file, onlyMeta );
+    if( modifiedTime.is_not_a_date_time() ) {
+        modifiedTime = bpx::from_time_t( boost::filesystem::last_write_time( filename ) );
+    }
+
 }
 #include "redux/file/fileana.hpp"
 void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMask, int verbosity ) {

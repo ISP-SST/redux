@@ -741,15 +741,32 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 }
 
 
+namespace {
+
+    typedef struct {
+        IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
+        IDL_INT help;
+        IDL_VPTR hdr;
+        IDL_INT verbose;
+    } HDR_KW;
+
+    static IDL_KW_PAR hdr_kw_pars[] = {   IDL_KW_FAST_SCAN,       // NOTE:  The keywords MUST be listed in alphabetical order !!
+        { (char*)"HEADER",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO,    0, (char*)IDL_KW_OFFSETOF2( HDR_KW, hdr ) },
+        { (char*)"HELP",             IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, (char*)IDL_KW_OFFSETOF2( HDR_KW, help ) },
+        { (char*)"VERBOSE",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, (char*)IDL_KW_OFFSETOF2( HDR_KW, verbose ) },
+        { NULL }
+    };
+    
+}
+
 //
 // Routine to read the global/metadata part of .momfbd files.
 //
 IDL_VPTR redux::momfbd_header ( int argc, IDL_VPTR* argv, char* argk ) {
 
-    KW_RESULT kw;
-    kw.verbose = 0;
-    kw.help = 0;
-    int nPlainArgs = IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 255, &kw );
+    HDR_KW kw;
+
+    int nPlainArgs = IDL_KWProcessByOffset ( argc, argv, argk, hdr_kw_pars, (IDL_VPTR*) 0, 255, &kw );
 
     if ( nPlainArgs < 1 ) {
         cout << "MOMFBD_HEADER: takes exactly 1 argument." << endl;
@@ -789,15 +806,20 @@ IDL_VPTR redux::momfbd_header ( int argc, IDL_VPTR* argv, char* argk ) {
         cout << "File Version:       \"" << info->versionString << "\"" << endl;
     }
 
+    if( info->modifiedTime.is_not_a_date_time() ) {
+        info->modifiedTime = bpx::from_time_t( boost::filesystem::last_write_time( name ) );
+
+    }
     IDL_KW_FREE;
-    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+    
     vector<string> cards;
+    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
     Fits::insertCard( cards, Fits::makeCard( "SIMPLE", "Written by momfbd_header: "+to_iso_extended_string(now) ) );
     Fits::insertCard( cards, Fits::makeCard( "BITPIX", -32 ) );
     Fits::insertCard( cards, Fits::makeCard( "NAXIS", 2 ) );
     Fits::insertCard( cards, Fits::makeCard( "NAXIS1", (int)(info->region[1]-info->region[0]+1 - info->nPoints/4) ) );
     Fits::insertCard( cards, Fits::makeCard( "NAXIS2", (int)(info->region[3]-info->region[2]+1 - info->nPoints/4) ) );
-    Fits::insertCard( cards, Fits::makeCard( "DATE", to_iso_extended_string(now.date()), "Creation (CCCC-MM-DD) date of FITS header" ) );
+    Fits::insertCard( cards, Fits::makeCard( "DATE", to_iso_extended_string(info->modifiedTime), "Creation time of MOMFBD file (UTC)" ) );
     Fits::insertCard( cards, Fits::makeCard( "DATE-AVG", info->dateString+"T"+info->timeString, "Average time of observing raw data" ) );
     float version = atof ( info->versionString.c_str() );
     if( version > 20160525 ) {
@@ -805,6 +827,28 @@ IDL_VPTR redux::momfbd_header ( int argc, IDL_VPTR* argv, char* argk ) {
     } else {
         Fits::insertCard( cards, Fits::makeCard( "MOMFBD_V", info->versionString ) );
     }
+    
+    if( kw.hdr ) {
+        IDL_ENSURE_STRING( kw.hdr )
+        IDL_ENSURE_SIMPLE( kw.hdr );
+        if ( !(kw.hdr->flags & IDL_V_ARR) ) {
+            string tmpCard( kw.hdr->value.str.s );
+            if( tmpCard.length() != 80 ) {
+                tmpCard.resize( 80, ' ' );           // pad with spaces, or truncate, to 80 characters
+            }
+            Fits::addCard( cards, tmpCard );
+        } else {
+            IDL_STRING* strptr = reinterpret_cast<IDL_STRING*>(kw.hdr->value.arr->data);
+            for( int i=0; i<kw.hdr->value.arr->n_elts; ++i) {
+                string tmpCard( strptr[i].s );
+                if( tmpCard.length() != 80 ) {
+                    tmpCard.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+                }
+                Fits::addCard( cards, tmpCard );
+            }
+        }
+    }
+
 
     IDL_VPTR ret;
     IDL_MEMINT nCards = cards.size();
