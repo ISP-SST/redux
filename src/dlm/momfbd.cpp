@@ -814,7 +814,7 @@ IDL_VPTR redux::momfbd_header ( int argc, IDL_VPTR* argv, char* argk ) {
     
     vector<string> cards;
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-    Fits::insertCard( cards, Fits::makeCard( "SIMPLE", "Written by momfbd_header: "+to_iso_extended_string(now) ) );
+    Fits::insertCard( cards, Fits::makeCard( "SIMPLE", true, "Written by momfbd_header: "+to_iso_extended_string(now) ) );
     Fits::insertCard( cards, Fits::makeCard( "BITPIX", -32 ) );
     Fits::insertCard( cards, Fits::makeCard( "NAXIS", 2 ) );
     Fits::insertCard( cards, Fits::makeCard( "NAXIS1", (int)(info->region[1]-info->region[0]+1 - info->nPoints/4) ) );
