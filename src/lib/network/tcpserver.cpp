@@ -17,11 +17,17 @@ namespace {
 }
 
 
-TcpServer::TcpServer( uint16_t port, uint16_t threads ) : ioService(), acceptor( ioService, tcp::endpoint( tcp::v4(), port ) ),
-                onConnected(nullptr), minThreads(threads), nThreads(0), nConnections(0), running(true), do_handshake(true), do_auth(false) {
+TcpServer::TcpServer( uint16_t port, uint16_t threads ) : ioService(), acceptor( ioService ), endpoint( tcp::v4(), port ),
+                onConnected(nullptr), minThreads(threads), nThreads(0), nConnections(0), running(false), do_handshake(true), do_auth(false) {
         
     start();
-    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+
+}
+
+
+TcpServer::~TcpServer() {
+
+    stop();
 
 }
 
@@ -36,20 +42,56 @@ void TcpServer::accept(void) {
 
 void TcpServer::start(void) {
     
-    running = true;
-    workLoop.reset( new boost::asio::io_service::work(ioService) );
-    addThread( minThreads );
-    accept();
-    
+    try {
+        if( running ) {
+            stop();
+        }
+        running = true;
+        ioService.reset();
+        workLoop.reset( new boost::asio::io_service::work(ioService) );
+        addThread( minThreads );
+        acceptor.open(endpoint.protocol());
+        acceptor.set_option(tcp::acceptor::reuse_address(true));
+        acceptor.bind(endpoint);
+        acceptor.listen();
+        accept();
+    } catch ( const exception& ) {
+        stop();
+        throw;
+    }
+}
+
+
+void TcpServer::start( uint16_t port ) {
+
+    if( running && (port == endpoint.port()) ) {
+        return;
+    }
+    stop();
+    endpoint.port( port );
+    start();
 }
 
 
 void TcpServer::stop(void) {
     
-    running = false;
-    pool.interrupt_all();
-    workLoop.reset();
+    if( running ) {
+        running = false;
+        workLoop.reset();
+        ioService.stop();
+        acceptor.close();
+        pool.interrupt_all();
+        pool.join_all();
+    }
     cleanup();
+
+}
+
+
+unsigned short TcpServer::port(void) {
+    
+    lock_guard<mutex> lock(mtx);
+    return endpoint.port();
     
 }
 

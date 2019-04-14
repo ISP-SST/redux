@@ -20,11 +20,14 @@ namespace redux {
         public:
 
             TcpServer( uint16_t port, uint16_t threads );
+            ~TcpServer();
 
             void accept(void);
             void setCallback( TcpConnection::callback cb = nullptr ) { onConnected = cb; };
             void start(void);
+            void start( uint16_t port );
             void stop(void);
+            unsigned short port(void);
             void cleanup(void);
             void addThread(uint16_t n=1);
             void delThread(uint16_t n=1);
@@ -45,6 +48,7 @@ namespace redux {
             boost::asio::io_service ioService;
             std::shared_ptr<boost::asio::io_service::work> workLoop;
             tcp::acceptor acceptor;
+            tcp::endpoint endpoint;
             TcpConnection::callback onConnected;
             boost::thread_group pool;
             uint16_t minThreads;
