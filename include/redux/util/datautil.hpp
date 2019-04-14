@@ -129,7 +129,7 @@ namespace redux {
         template <class T, class U, class Comp, class Alloc>
         inline uint64_t size(const std::map<T,U,Comp,Alloc>& in) {
             uint64_t sz = sizeof(uint64_t);
-	    sz += (sizeof(T) + sizeof(U)) * in.size();
+            sz += (sizeof(T) + sizeof(U)) * in.size();
             return sz;
         }
        
@@ -146,7 +146,7 @@ namespace redux {
 
         inline uint64_t pack(char* ptr, const std::vector<std::string>& in) {
             uint64_t count = in.size();
-            *reinterpret_cast<uint64_t*>(ptr) = count;
+            memcpy( ptr, reinterpret_cast<const char*>(&count), sizeof(uint64_t) );
             uint64_t totalSize = sizeof(uint64_t);
             for ( auto &str: in ) {
                 strncpy( ptr+totalSize, str.c_str(), str.length() + 1 );
@@ -158,15 +158,17 @@ namespace redux {
         template <typename T>
         inline uint64_t pack(char* ptr, const std::vector<T>& in) {
             uint64_t sz = in.size();
-            *reinterpret_cast<uint64_t*>(ptr) = sz;
-            memcpy(ptr+sizeof(uint64_t),reinterpret_cast<const char*>(in.data()),sz*sizeof(T));
+            memcpy( ptr, reinterpret_cast<const char*>(&sz), sizeof(uint64_t) );
+            if( sz ) {
+                memcpy( ptr+sizeof(uint64_t), reinterpret_cast<const char*>(in.data()), sz*sizeof(T) );
+            }
             return sz*sizeof(T)+sizeof(uint64_t);
         }
         
         template <class T, class U, class Comp, class Alloc>
         inline uint64_t pack(char* ptr, const std::map<T,U,Comp,Alloc>& in) {
             uint64_t count = in.size();
-            *reinterpret_cast<uint64_t*>(ptr) = count;
+            memcpy( ptr, reinterpret_cast<const char*>(&count), sizeof(uint64_t) );
             uint64_t totalSize = sizeof(uint64_t);
             for (auto &element: in) {
                 *reinterpret_cast<T*>(ptr+totalSize) = element.first;
@@ -180,7 +182,7 @@ namespace redux {
         template <class T, class Comp, class Alloc>
         inline uint64_t pack(char* ptr, const std::set<T,Comp,Alloc>& in) {
             uint64_t count = in.size();
-            *reinterpret_cast<uint64_t*>(ptr) = count;
+            memcpy( ptr, reinterpret_cast<const char*>(&count), sizeof(uint64_t) );
             uint64_t totalSize = sizeof(uint64_t);
             for (auto &element: in) {
                 *reinterpret_cast<T*>(ptr+totalSize) = element;
@@ -198,7 +200,7 @@ namespace redux {
         
         template <typename T>
         inline uint64_t pack(char* ptr, const T& in) {
-            *reinterpret_cast<T*>(ptr) = in;
+            memcpy( ptr, reinterpret_cast<const char*>(&in), sizeof(T) );
             return sizeof(T);
         }
         
@@ -218,7 +220,8 @@ namespace redux {
          */
         //@{
         inline uint64_t unpack(const char* ptr, std::vector<std::string>& out, bool swap_endian) {
-            uint64_t count = *reinterpret_cast<const uint64_t*>(ptr);
+            uint64_t count(0);
+            memcpy( reinterpret_cast<char*>(&count), ptr, sizeof(uint64_t) );
             if(swap_endian) swapEndian(count);
             out.resize(count);
             uint64_t totalSize = sizeof(uint64_t);
@@ -231,25 +234,31 @@ namespace redux {
         
         template <typename T>
         inline uint64_t unpack(const char* ptr, std::vector<T>& out, bool swap_endian=false) {
-            uint64_t sz = *reinterpret_cast<const uint64_t*>(ptr);
+            uint64_t sz(0);
+            memcpy( reinterpret_cast<char*>(&sz), ptr, sizeof(uint64_t) );
             if(swap_endian) swapEndian(sz);
             out.resize(sz);
-            memcpy(reinterpret_cast<char*>(out.data()),ptr+sizeof(uint64_t),sz*sizeof(T));
-            if(swap_endian) {
-                swapEndian(&out[0],out.size());
+            if( sz ) {
+                memcpy(reinterpret_cast<char*>(out.data()),ptr+sizeof(uint64_t),sz*sizeof(T));
+                if(swap_endian) {
+                    swapEndian(&out[0],out.size());
+                }
             }
             return sz*sizeof(T)+sizeof(uint64_t);
         }
         
         template <class T, class U, class Comp, class Alloc>
         inline uint64_t unpack(const char* ptr, std::map<T,U,Comp,Alloc>& out, bool swap_endian=false) {
-            uint64_t count = *reinterpret_cast<const uint64_t*>(ptr);
+            uint64_t count(0);
+            memcpy( reinterpret_cast<char*>(&count), ptr, sizeof(uint64_t) );
             uint64_t totalSize = sizeof(uint64_t);
             if(swap_endian) swapEndian(count);
             for( uint64_t cnt=0; cnt<count; ++cnt) {
-                T tmpT = *reinterpret_cast<const T*>(ptr+totalSize);
+                T tmpT;
+                memcpy( reinterpret_cast<char*>(&tmpT), ptr+totalSize, sizeof(T) );
                 totalSize += sizeof(T);
-                U tmpU = *reinterpret_cast<const U*>(ptr+totalSize);
+                U tmpU;
+                memcpy( reinterpret_cast<char*>(&tmpU), ptr+totalSize, sizeof(U) );
                 totalSize += sizeof(U);
                 if(swap_endian) {
                     swapEndian(tmpT);
@@ -262,11 +271,13 @@ namespace redux {
         
         template <class T, class Comp, class Alloc>
         inline uint64_t unpack(const char* ptr, std::set<T,Comp,Alloc>& out, bool swap_endian=false) {
-            uint64_t count = *reinterpret_cast<const uint64_t*>(ptr);
+            uint64_t count(0);
+            memcpy( reinterpret_cast<char*>(&count), ptr, sizeof(uint64_t) );
             uint64_t totalSize = sizeof(uint64_t);
             if(swap_endian) swapEndian(count);
             for( uint64_t cnt=0; cnt<count; ++cnt) {
-                T tmpT = *reinterpret_cast<const T*>(ptr+totalSize);
+                T tmpT;
+                memcpy( reinterpret_cast<char*>(&tmpT), ptr+totalSize, sizeof(T) );
                 totalSize += sizeof(T);
                 if(swap_endian) {
                     swapEndian(tmpT);
@@ -288,7 +299,7 @@ namespace redux {
         
         template <typename T>
         inline uint64_t unpack(const char* ptr, T& out, bool swap_endian=false) {
-            out = *reinterpret_cast<const T*>(ptr);
+            memcpy( reinterpret_cast<char*>(&out), ptr, sizeof(T) );
             if(swap_endian) {
                 swapEndian(out);
             }

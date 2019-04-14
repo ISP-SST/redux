@@ -55,11 +55,12 @@ void TcpServer::stop(void) {
 
 
 void TcpServer::cleanup(void) {
-    
+
     lock_guard<mutex> lock(mtx);
     for( auto& t: old_threads ) {
         pool.remove_thread( thread_map[t] );
     }
+    old_threads.clear();
     
     for( auto it=connections.begin(); it != connections.end(); ) {
         if( it->first && !it->first->socket().is_open() ) {
@@ -255,7 +256,6 @@ void TcpServer::threadLoop( void ) {
         usleep(100000);
     }
     --nThreads;
-    
     lock_guard<mutex> lock(mtx);
     old_threads.insert( boost::this_thread::get_id() );
 

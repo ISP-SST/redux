@@ -91,7 +91,6 @@ void LogToStream::flushBuffer( void ) {
     }
     itemQueue.clear();
     itemCount = 0;
-    lock.unlock();
 
     for( LogItem& it: tmpQueue ) {
         writeFormatted( it );

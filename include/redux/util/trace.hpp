@@ -31,6 +31,7 @@ namespace redux {
         
         class Trace {
             
+        public:
             typedef std::function<std::string(void)> string_cb_t;
             typedef std::function<size_t(void)> size_cb_t;
             struct trace_t {
@@ -41,10 +42,6 @@ namespace redux {
                 size_cb_t count;
                 size_t totalCount;
             };
-            static std::map<size_t, trace_t> traces;
-            static std::mutex mtx;
-            
-        public:
             
             static std::string getBackTraces( void );
             static std::string getStats( void );
@@ -55,6 +52,9 @@ namespace redux {
             static int maxDepth( void ) { return trace::BT::max_depth; }
             static void setMaxDepth( const int& md ) { trace::BT::max_depth = std::max(0,md); }
 
+        private:
+            static std::map<size_t, trace_t> traces;
+            static std::mutex mtx;
 
         };
         

@@ -154,7 +154,9 @@ uint64_t WorkInProgress::packWork( char* ptr ) const {
     bool newJob = (job && job != pJob);
     count += pack( ptr+count, newJob );
     if(newJob) {
-        count += job->pack(ptr+count);
+        if( job ) {
+            count += job->pack(ptr+count);
+        } else throw invalid_argument( "Can't pack job without instance..." );
     }
     for( auto& part: parts ) {
         if( part ) {

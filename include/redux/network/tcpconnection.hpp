@@ -45,7 +45,7 @@ namespace redux {
         public:
 
             template <typename T>
-            void asyncWrite( const std::shared_ptr<T>& data, size_t sz ) {
+            void asyncWrite( const std::shared_ptr<T> data, size_t sz ) {
                 if( mySocket.is_open() ) {
                     boost::asio::async_write( mySocket, boost::asio::buffer( data.get(), sz ),
                                               boost::bind( &TcpConnection::writeCallback, sz,

@@ -139,6 +139,7 @@ string Trace::getStats(void) {
         totalCount += t.second.count();
     }
     if( totalCount ) ret += "Total traced items: " + to_string( totalCount ) + "  size: " + to_string( totalSize );
+    else ret = "";
     return ret;
     
 }

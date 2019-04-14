@@ -34,6 +34,8 @@ LogOutput::LogOutput( uint8_t m, unsigned int flushPeriod ) : flushPeriod(flushP
 
 
 LogOutput::~LogOutput( )  {
+    // obtain lock before destructing, to avoid ongoing logging.
+    unique_lock<mutex> lock(queueMutex);
     
 }
 

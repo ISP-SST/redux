@@ -20,7 +20,7 @@ namespace redux {
     }
 
     namespace network {
-        class Host;
+        struct Host;
     }
 
     namespace momfbd {
