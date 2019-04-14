@@ -69,7 +69,7 @@ namespace redux {
         void returnResults(void);
         std::string print(void);
         std::shared_ptr<Job> job;
-        std::weak_ptr<Job> previousJob;
+        uint32_t jobID;
         std::vector<Part::Ptr> parts;
         boost::posix_time::ptime workStarted;
         bool isRemote;

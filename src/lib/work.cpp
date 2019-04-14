@@ -73,14 +73,14 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-WorkInProgress::WorkInProgress(void) : job(nullptr), previousJob(job),
+WorkInProgress::WorkInProgress(void) : job(nullptr), jobID(0),
     workStarted(boost::posix_time::not_a_date_time), isRemote(false), hasResults(false), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif
 }
 
-WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), previousJob(rhs.previousJob), parts(rhs.parts), workStarted(rhs.workStarted),
+WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), jobID(rhs.jobID), parts(rhs.parts), workStarted(rhs.workStarted),
     isRemote(rhs.isRemote), hasResults(false), nParts(rhs.nParts), nCompleted(rhs.nCompleted) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
@@ -132,8 +132,7 @@ void WorkInProgress::resetParts( void ) {
 
 uint64_t WorkInProgress::workSize(void) {
     uint64_t sz = this->size() + 1; // + newJob
-    auto pJob = previousJob.lock();
-    if(job && job != pJob) {
+    if(job && (jobID != job->info.id)) {
         sz += job->size();
     }
     nParts = 0;
@@ -150,8 +149,10 @@ uint64_t WorkInProgress::workSize(void) {
 uint64_t WorkInProgress::packWork( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = this->pack( ptr );
-    auto pJob = previousJob.lock();
-    bool newJob = (job && job != pJob);
+    bool newJob(true);
+    if( job ) {
+        newJob = (jobID != job->info.id);
+    }
     count += pack( ptr+count, newJob );
     if(newJob) {
         if( job ) {
@@ -179,7 +180,7 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
         if( job ) {
             count += job->unpack( ptr+count, swap_endian );
         } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
-    } else job = previousJob.lock();
+    }
     if( job ) {
         count += job->unpackParts( ptr+count, shared_from_this(), swap_endian );
     } else throw invalid_argument( "Can't unpack parts without a job instance..." );

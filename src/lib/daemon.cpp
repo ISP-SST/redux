@@ -598,7 +598,7 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
                     wip->job->ungetWork( wip );
                 }
                 wip->parts.clear();
-                wip->previousJob.reset();
+                wip->jobID = 0;
                 removeWIP( host );
                 LOG_NOTICE << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
             }
@@ -683,7 +683,6 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
             }
         }
         wip->parts.clear();
-        wip->previousJob = wip->job;
         wip->job.reset();
         //it->second.job.reset();
     }
@@ -1339,7 +1338,7 @@ bool Daemon::getWork( WorkInProgress::Ptr wip, uint8_t nThreads ) {
     for( Job::JobPtr job: tmpJobs ) {
         if( job && job->getWork( wip, nThreads, activeCounts ) ) {
             THREAD_MARK;
-            newJob = (job.get() != wip->job.get());
+            newJob = (wip->jobID != job->info.id);
             wip->job = job;
             gotJob = true;
             break;
@@ -1374,7 +1373,9 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         
         THREAD_MARK;
         WorkInProgress::Ptr wip = getWIP( host );
-        
+        if( wip ) {
+            *conn >> wip->jobID;
+        }
         if( ss ) {
 
             if( wip->job && wip->parts.size() ) {   // parts should have been cleared when results returned.
@@ -1388,7 +1389,6 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
             uint64_t blockSize = 0;
             THREAD_MARK;
             wip->isRemote = true;
-            wip->job.reset();
             wip->parts.clear();
             wip->nParts = 0;
 
@@ -1415,7 +1415,7 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
                     }
                     THREAD_MARK;
                 }
-                wip->previousJob = wip->job;
+                wip->jobID = wip->job->info.id;
             }
             
         } else {
@@ -1434,7 +1434,6 @@ void Daemon::sendWork( TcpConnection::Ptr& conn ) {
         } else {
             THREAD_MARK;
             conn->syncWrite(count);
-            wip->previousJob.reset();
             host->idle();
             THREAD_MARK;
         }

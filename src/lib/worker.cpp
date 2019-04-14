@@ -63,6 +63,7 @@ bool Worker::fetchWork( void ) {
         if( (conn = daemon.getMaster()) ) {
 
             *conn << CMD_GET_WORK;
+            *conn << wip->jobID;
 
             size_t blockSize;
             shared_ptr<char> buf = conn->receiveBlock( blockSize );               // reply
@@ -143,7 +144,7 @@ bool Worker::getWork( void ) {
         boost::this_thread::interruption_point();
         if( running_ ) {
             if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
-                if( wip->previousJob.expired() ) {                                  // initialize if it is a new job.
+                if(wip->job && (wip->jobID != wip->job->info.id)) {                                  // initialize if it is a new job.
                     wip->job->logger.setLevel( wip->job->info.verbosity );
                     if( wip->isRemote ) {
                         if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
@@ -154,7 +155,7 @@ bool Worker::getWork( void ) {
                         wip->job->logger.addNetwork( daemon.ioService, daemon.myMaster.host, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
                     }
                     wip->job->init();
-                    wip->previousJob = wip->job;
+                    wip->jobID = wip->job->info.id;
                 }
                 THREAD_MARK;
                 for( auto& part: wip->parts ) {
@@ -177,6 +178,7 @@ bool Worker::getWork( void ) {
 
     wip->resetParts();
     wip->job.reset();
+    wip->jobID = 0;
     
     myInfo.idle();
     boost::this_thread::interruption_point();
@@ -210,7 +212,6 @@ void Worker::returnWork( void ) {
                 count += pack( ptr+count, blockSize );
                 if(blockSize) {
                     count += wip->packWork(ptr+count);
-
                 }
 
                 conn->asyncWrite( data, totalSize );

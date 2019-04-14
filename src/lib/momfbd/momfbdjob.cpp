@@ -68,19 +68,21 @@ MomfbdJob::~MomfbdJob( void ) {
 uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count(0);
-    if( wip->nParts ) {
-        try {
-            PatchData* tmpPD = new PatchData(*this);
-            wip->parts.assign(1,Part::Ptr(tmpPD));        // if size > 1 the old "wip" has a globalData appended to it, we don't need it anymore.
-            count += tmpPD->unpack( ptr+count, swap_endian );
-            if( wip->nParts > 1 ) {
-                globalData.reset( new GlobalData(*this) );
-                count += globalData->unpack( ptr+count, swap_endian );
+    try {
+        if( wip ) {
+            if( wip->nParts ) {
+                PatchData* tmpPD = new PatchData(*this);
+                wip->parts.assign(1,Part::Ptr(tmpPD));        // if size > 1 the old "wip" has a globalData appended to it, we don't need it anymore.
+                count += tmpPD->unpack( ptr+count, swap_endian );
+                if( wip->nParts > 1 ) {
+                    globalData.reset( new GlobalData(*this) );
+                    count += globalData->unpack( ptr+count, swap_endian );
+                }
             }
-        } catch( const std::exception& e ) {
-            wip->parts.clear();
-            throw;
-        }
+        } else throw job_error( info.name + ": Can not unpack parts without a valid WIP instance."  );
+    } catch( const std::exception& e ) {
+        if( wip ) wip->parts.clear();
+        throw;
     }
     return count;
 }
@@ -314,8 +316,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
                     THREAD_MARK;
                     patch->load();
                     wip->parts.push_back( patch );
-                    auto pJob = wip->previousJob.lock();
-                    if( pJob.get() != this ) {     // First time for this slave -> include global data
+                    if( !(wip->job) || (wip->jobID != info.id) ) {     // First time for this slave -> include global data
                         wip->parts.push_back( globalData );
                     }
                     ret = true;
