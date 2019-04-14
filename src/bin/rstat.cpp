@@ -5,6 +5,7 @@
 #include "redux/util/endian.hpp"
 
 #include <boost/date_time/posix_time/time_formatters.hpp>
+#include <boost/date_time/c_local_time_adjustor.hpp>
 #include <boost/program_options.hpp>
 
 using namespace redux::util;
@@ -12,7 +13,8 @@ using namespace redux::network;
 using namespace redux;
 
 using namespace std;
-using namespace boost::posix_time;
+namespace bpx=boost::posix_time;
+namespace bdt=boost::date_time;
 
 
 namespace {
@@ -56,6 +58,9 @@ namespace {
             return ci->second;
         }
     }
+    
+    typedef bdt::c_local_adjustor<bpx::ptime> local_adj;
+
 }
 
 void printJobList( TcpConnection::Ptr conn, int nj ) {
@@ -97,17 +102,20 @@ void printJobList( TcpConnection::Ptr conn, int nj ) {
         cout << alignRight("#", 4) << alignRight("ID", 5) << alignCenter("type", 10) << alignCenter("started", 20); // + alignCenter("started", 20);
         cout << alignCenter("name", maxLength[0]+4) + alignCenter("user", maxLength[1]+5) + alignCenter("priority", 8) + alignCenter("state", 8);
         cout << endl;
-        ptime now = boost::posix_time::second_clock::local_time();
         for( int i=0; i<nJobs; ++i ) {
             if( i == nJobs-1 ) {
                 i = infos.size()-1;
                 if (addComma) cout << "   :" << endl;
             }
-                
+
             string info = alignRight(std::to_string(infos[i]->id), 5) + alignCenter(infos[i]->typeString, 10);
             string startedString;
-            if ( infos[i]->startedTime < now ) startedString = to_iso_extended_string(infos[i]->startedTime);
-            else startedString = to_iso_extended_string(infos[i]->submitTime);
+            if( !infos[i]->startedTime.is_not_a_date_time() ) {
+                startedString = bpx::to_iso_extended_string(local_adj::utc_to_local(infos[i]->startedTime));
+                //startedString = to_string( infos[i]->startedTime.date().year() );
+            } else if ( !infos[i]->submitTime.is_not_a_date_time() ) {
+                startedString = bpx::to_iso_extended_string(local_adj::utc_to_local(infos[i]->submitTime));
+            }
             info += alignCenter(startedString, 20);
             info += alignCenter(infos[i]->name, maxLength[0]+4) + alignLeft(infos[i]->user + "@" + infos[i]->host, maxLength[1]+5);
             info += alignCenter(std::to_string(infos[i]->priority), 8);

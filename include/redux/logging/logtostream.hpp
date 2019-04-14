@@ -26,6 +26,7 @@ namespace redux {
             void writeFormatted( const LogItem& );
 
             std::ostream& out;
+            bool color,localtime;
 
         };
 

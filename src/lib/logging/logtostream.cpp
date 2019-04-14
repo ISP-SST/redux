@@ -3,11 +3,13 @@
 #include "redux/util/stringutil.hpp"
 
 #include <boost/date_time/posix_time/time_formatters.hpp>
+#include <boost/date_time/c_local_time_adjustor.hpp>
 
 using namespace redux::logging;
 using namespace redux::util;
 using namespace std;
 namespace bfs = boost::filesystem;
+namespace bpx = boost::posix_time;
 
 namespace {
 
@@ -38,7 +40,8 @@ namespace {
 }
 
 
-LogToStream::LogToStream( ostream &os, uint8_t m, unsigned int flushPeriod) : LogOutput(m,flushPeriod), out(os) {
+LogToStream::LogToStream( ostream &os, uint8_t m, unsigned int flushPeriod) : LogOutput(m,flushPeriod), out(os),
+    color(true), localtime(true) {
 
 }
 
@@ -54,10 +57,16 @@ LogToStream::~LogToStream() {
 
 void LogToStream::writeFormatted( const LogItem &i ) {
     
+    typedef boost::date_time::c_local_adjustor<bpx::ptime> local_adj;
+
     if( out.good() ) {
         boost::io::ios_all_saver settings(out);
-        out << to_iso_extended_string( i.entry.getTime() ) << " ";
-        if( true ) {   // FIXME: enable colors
+        if( localtime ) {
+            out << to_iso_extended_string( local_adj::utc_to_local(i.entry.getTime()) ) << " ";
+        } else {
+            out << to_iso_extended_string( i.entry.getTime() ) << " ";
+        }
+        if( color ) {
             out << color_level_tags[ i.entry.getMask() ];
         } else {
             out << level_tags[ i.entry.getMask() ];
