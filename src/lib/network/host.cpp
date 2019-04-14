@@ -59,7 +59,7 @@ Host::HostInfo::HostInfo( string username ) : peerType(0), connectPort(0), user(
     reduxVersion = getVersionNumber();
     pid = getpid();
     nCores = std::thread::hardware_concurrency();
-    startedAt = boost::posix_time::second_clock::local_time();
+    startedAt = boost::posix_time::second_clock::universal_time();
     name = boost::asio::ip::host_name();
     struct utsname nm;
     if( uname( &nm ) < 0 ) {
@@ -76,8 +76,8 @@ Host::HostInfo::HostInfo( string username ) : peerType(0), connectPort(0), user(
 Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
     progress( 0 ), statusString("idle") {
         
-    lastSeen = boost::posix_time::second_clock::local_time(); 
-    lastActive = boost::posix_time::second_clock::local_time();
+    lastSeen = boost::posix_time::second_clock::universal_time(); 
+    lastActive = boost::posix_time::second_clock::universal_time();
     nThreads = maxThreads;
     load[0] = load[1] = 0;
 }
@@ -128,14 +128,14 @@ uint64_t Host::unpack( const char* ptr, bool swap_endian ) {
 
 void Host::touch(void) {
 
-    status.lastSeen = boost::posix_time::second_clock::local_time();
+    status.lastSeen = boost::posix_time::second_clock::universal_time();
     
 }
 
 
 void Host::active(void) {
 
-    status.lastActive = boost::posix_time::second_clock::local_time();
+    status.lastActive = boost::posix_time::second_clock::universal_time();
     status.state = ST_ACTIVE;
     
 }
@@ -166,7 +166,7 @@ std::string Host::printHeader(void) {
 
 
 std::string Host::print(void) {
-    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+    boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
     boost::posix_time::time_duration elapsed = (now - status.lastActive);
     boost::posix_time::time_duration uptime = (now - info.startedAt);
     string elapsedString = "";

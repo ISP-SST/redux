@@ -241,7 +241,7 @@ void packTest( void ) {
         //             job->info.id = ++jobCounter;
         //             job->info.step.store( Job::JSTEP_PREPROCESS );
         //             job->info.name = "job_" + to_string( job->info.id );
-        //             job->info.submitTime = boost::posix_time::second_clock::local_time();
+        //             job->info.submitTime = boost::posix_time::second_clock::universal_time();
         //             ids.push_back( jobCounter );
         //             ids[0]++;
         //             jobs.push_back( job );

@@ -370,7 +370,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
                 return false;
             }
             startLog();
-            info.startedTime = boost::posix_time::second_clock::local_time();
+            info.startedTime = boost::posix_time::second_clock::universal_time();
         }
         THREAD_MARK;
         if( (step == JSTEP_WRITING) && !checkWriting() ) return false;
@@ -405,7 +405,7 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
     
     if( !wip->isRemote ) return;        // NOTE the manager doesn't return any results, but it seems to deadlock job-starting for a while
     
-    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+    boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
     boost::posix_time::time_duration elapsed = (now - wip->workStarted);
     
     {

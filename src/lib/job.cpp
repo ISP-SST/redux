@@ -153,9 +153,15 @@ string Job::stateTag(uint8_t state) {
 }
 
 
-Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0), priority(10), verbosity(0), maxPartRetries(5),
-         maxThreads(255), flags(0), step(JSTEP_NONE), state(JSTATE_NONE) {
+Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0),
+        priority(10), verbosity(0), maxPartRetries(5),
+        maxThreads(255), flags(0), step(JSTEP_NONE), state(JSTATE_NONE),
+        submitTime(bpx::not_a_date_time),
+        startedTime(bpx::not_a_date_time),
+        completedTime(bpx::not_a_date_time) {
+            
     memset( progressString, 0, RDX_JOB_PROGSTRING_LENGTH );
+    
 }
 
 
@@ -249,13 +255,21 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += RDX_JOB_PROGSTRING_LENGTH;
     count += unpack(ptr+count, logFile);
     count += unpack(ptr+count, outputDir);
+    submitTime = startedTime = completedTime = bpx::not_a_date_time;
+    time_t now = redux::util::to_time_t( bpx::second_clock::universal_time() );
     time_t timestamp;
     count += unpack(ptr+count, timestamp, swap_endian);
-    submitTime = bpx::from_time_t(timestamp);
+    if( timestamp <= now ) {
+        submitTime = bpx::from_time_t(timestamp);
+    }
     count += unpack(ptr+count, timestamp, swap_endian);
-    startedTime = bpx::from_time_t(timestamp);
+    if( timestamp <= now ) {
+        startedTime = bpx::from_time_t(timestamp);
+    }
     count += unpack(ptr+count, timestamp, swap_endian);
-    completedTime = bpx::from_time_t(timestamp);
+    if( timestamp <= now ) {
+        completedTime = bpx::from_time_t(timestamp);
+    }
     return count;
 }
 
@@ -470,7 +484,7 @@ void Job::moveTo( Job* job, uint16_t to ) {
     glock.unlock();
     THREAD_MARK;
     job->info.step = to;
-    bpx::ptime now = bpx::second_clock::local_time();
+    bpx::ptime now = bpx::second_clock::universal_time();
     auto it = job->info.times.emplace( to, now );
     if( !it.second ) {
         it.first->second = now;

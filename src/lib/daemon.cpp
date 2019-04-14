@@ -618,7 +618,7 @@ void Daemon::cleanup( void ) {
     vector<WorkInProgress::Ptr> timedOutWIPs;        // will clear/reset jobs when the vector goes out of scope.
     {
         unique_lock<mutex> lock( peerMutex );
-        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
         for( auto wipit=peerWIP.begin(); wipit != peerWIP.end(); ) {
             WorkInProgress::Ptr wip = wipit->second;
             if( wip ) {
@@ -805,7 +805,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                         Job::moveTo( job.get(), Job::JSTEP_SUBMIT );
                     }
 
-                    job->info.submitTime = boost::posix_time::second_clock::local_time();
+                    job->info.submitTime = bpx::second_clock::universal_time();
                     ids.push_back( job->info.id );
                     ids[0]++;
                     jobCounter++;
@@ -1348,7 +1348,7 @@ bool Daemon::getWork( WorkInProgress::Ptr wip, uint8_t nThreads ) {
     
     if( newJob ) {
         wip->job->info.state.store( Job::JSTATE_ACTIVE );
-        wip->workStarted = boost::posix_time::second_clock::local_time();
+        wip->workStarted = boost::posix_time::second_clock::universal_time();
         for( auto& part: wip->parts ) {
             part->partStarted = wip->workStarted;
         }

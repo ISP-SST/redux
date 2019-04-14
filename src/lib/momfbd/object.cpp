@@ -1209,7 +1209,7 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
         int blend =( patchSize-2*margin)/3;
         
         shared_ptr<redux::file::Ana> hdr( new redux::file::Ana() );
-        boost::posix_time::ptime now = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::ptime now = boost::posix_time::microsec_clock::universal_time();
 
         string timeString = "N/A";
         if( !startT.is_special( ) && !endT.is_special() ){

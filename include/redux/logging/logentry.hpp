@@ -73,8 +73,7 @@ namespace redux {
             }
             
             inline void now(void){
-                entryTime = boost::posix_time::microsec_clock::local_time();
-                //entryTime = boost::posix_time::microsec_clock::universal_time();
+                entryTime = boost::posix_time::microsec_clock::universal_time();
             }
             inline void setMask( LogMask m ) { mask = m; }
             inline uint8_t getMask(void) const { return mask; }
