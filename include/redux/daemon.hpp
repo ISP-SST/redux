@@ -31,13 +31,13 @@ namespace redux {
         
     private:
         
-        void serverInit( void );
+        void start_server( uint16_t );
+        void stop_server( void );
         void maintenance( void );
         void checkSwapSpace( void );
         void checkCurrentUsage( void );
-        void threadLoop( void );
+        void check_limits( void );
         bool doWork(void);
-        void setThreads( int nThreads );
         
         bool workerInit( void );
         void connect( network::Host::HostInfo& host, network::TcpConnection::Ptr& conn );
@@ -92,6 +92,12 @@ namespace redux {
 
         std::mutex peerMutex;
         network::Host& myInfo;
+        std::mutex threadMutex;
+        void addThread( uint16_t n );
+        void delThread( uint16_t n );
+        void cleanupThreads( void );
+        size_t nSysThreads( void );
+        void threadLoop( void );
         std::map<network::Host::Ptr, WorkInProgress::Ptr, network::Host::Compare> peerWIP;
         
         struct {

@@ -34,14 +34,22 @@ using namespace std;
 
 namespace {
     thread_local bool logPrint;
-    std::map<boost::thread::id,boost::thread*> tmap;
-    int nSysThreads;
+    std::map<boost::thread::id,boost::thread*> thread_map;
+    std::set<boost::thread::id> old_threads;
+
+
 }
 
-Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
-    hostTimeout(3600), inTransfers(-1), outTransfers(-1), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+#ifdef DEBUG_
+#define RDX_HOST_TIMEOUT 72000
+#else
+#define RDX_HOST_TIMEOUT 7200
+#endif
 
-        
+
+Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
+    hostTimeout(RDX_HOST_TIMEOUT), inTransfers(-1), outTransfers(-1), myInfo(Host::myInfo()), timer( ioService ), worker( *this ) {
+
     file::setErrorHandling( file::EH_THROW );   // we want to catch and print messages to the log.
 
     logger.setFlushPeriod( 100 );   // delay log-flushing until we have set local/remote logging in workerInit
@@ -63,25 +71,6 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
         c.setPath( params["cache-dir"].as<string>() );
     }
     
-    uint16_t port = params["port"].as<uint16_t>();
-    string master = params["master"].as<string>();
-    if( port < 1024 ) {
-        LOG_FATAL << "Daemon:  using a port < 1024 requires root permissions, which this program should *not* have." << ende;
-        stop();
-        return;
-    }
-        
-    if( master.empty() ) {
-        try {
-            server.reset( new TcpServer( port, 50 ) );
-        } catch ( const exception& e ) {
-            LOG_FATAL << "Daemon:  failed to start server: " << e.what() << ende;
-            server.reset();
-            stop();
-            return;
-        }
-    }
-    
 
 }
 
@@ -92,48 +81,66 @@ Daemon::~Daemon( void ) {
 }
 
 
-void Daemon::serverInit( void ) {
-
-#ifdef DEBUG_
-    LOG_TRACE << "serverInit()" << ende;
-#endif
-    if( server ) {
+void Daemon::start_server( uint16_t port ) {
+    
+    if( port < 1024 ) {
+        LOG_ERR << "Daemon: Listening on a port < 1024 requires root permissions, which this program should NOT have !!!" << ende;
+        return;
+    }
+        
+    try {
+        if( server ) {
+            server->start( port );
+        } else {
+            server.reset( new TcpServer( port, 10 ) );
+        }
         server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
         myInfo.info.peerType |= Host::TP_MASTER;
-        server->start();
-        LOG << "Starting server on port " << params["port"].as<uint16_t>() << "." << ende;
-        struct rlimit rl;   // FIXME: fugly hack until the FD usage is more streamlined.
-        if( getrlimit(RLIMIT_NOFILE, &rl) ) {
-            LOG_WARN << "Failed to get limit on file-descriptors. errno:" << strerror(errno) << ende;
-        } else if( rl.rlim_cur < rl.rlim_max ) {
-            LOG << "Raising max open files from " << rl.rlim_cur << " to " << rl.rlim_max << ende;
-            rl.rlim_cur = rl.rlim_max;
-            if( setrlimit(RLIMIT_NOFILE, &rl) ) {
-                LOG_ERR << "Failed to set limit on file-descriptors to max value. errno:" << strerror(errno) << ende;
-            }
-        }
-        if( getrlimit(RLIMIT_CORE, &rl) ) {
-            LOG_WARN << "Failed to get limit on coredumps. errno:" << strerror(errno) << ende;
-        } else {
-            LOG << "Coredump limit " << rl.rlim_cur << " max: " << rl.rlim_max << ende;
-//             rl.rlim_cur = rl.rlim_max;
-//             if( setrlimit(RLIMIT_CORE, &rl) ) {
-//                 LOG_ERR << "Failed to set limit on coredumps to max value. errno:" << strerror(errno) << ende;
-//             }
-        }
-        
+        LOG << "Started server on port " << server->port() << "." << ende;
+    } catch ( const exception& e ) {
+        LOG_TRACE << "Daemon: Failed to start server on port " << port << ": " << e.what() << ende;
+        server.reset();
+    }
+
+}
+
+
+void Daemon::stop_server( void ) {
+
+    if( server ) {
+        LOG_DEBUG << "Stopping server." << ende;
+        server->stop();
+        server.reset();
     }
 }
 
 
 void Daemon::reset( void ) {
-    runMode = RESET;
-    ioService.stop();
-    pool.interrupt_all();
+
+    LOG << "Resetting daemon." << ende;
+    std::thread( [this](){
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        stop_server();
+        worker.stop();
+        runMode = RESET;
+        logger.flushAll();
+        if( myMaster.conn && myMaster.conn->socket().is_open() ) {
+            *myMaster.conn << CMD_DISCONNECT;
+            myMaster.conn->socket().close();
+            myInfo.info.peerType &= ~Host::TP_WORKER;
+        }
+        ioService.stop();
+        pool.interrupt_all();
+    }).detach();
+    
 }
 
 
 void Daemon::stop( void ) {
+
+    LOG << "Stopping daemon." << ende;
+    stop_server();
+    worker.stop();
     runMode = EXIT;
     logger.flushAll();
     if( myMaster.conn && myMaster.conn->socket().is_open() ) {
@@ -143,6 +150,7 @@ void Daemon::stop( void ) {
     }
     ioService.stop();
     pool.interrupt_all();
+    
 }
 
 
@@ -199,30 +207,34 @@ void Daemon::checkCurrentUsage( void ) {
 }
 
 
-void Daemon::threadLoop( void ) {
+void Daemon::check_limits( void ) {
 
-
-    while( runMode == LOOP ) {
-        try {
-            THREAD_UNMARK;
-            boost::this_thread::interruption_point();
-            ioService.run();
-        } catch( const ThreadExit& e ) {
-            break;
-        } catch( job_error& e ) {
-            LOG_ERR<< "Job error: " << e.what() << ende;
-        } catch( const boost::thread_interrupted& ) {
-            LOG_TRACE << "Daemon: Thread interrupted." << ende;
-            break;
-        } catch( exception& e ) {
-            LOG_ERR << "Exception in thread: " << e.what() << ende;
-        } catch( ... ) {
-            LOG_ERR << "Unhandled exception in thread." << ende;
+    struct rlimit rl;   // FIXME: fugly hack until the FD usage is more streamlined.
+    if( getrlimit(RLIMIT_NOFILE, &rl) ) {
+        LOG_WARN << "Failed to get limit on file-descriptors. errno:" << strerror(errno) << ende;
+    } else if( rl.rlim_cur < rl.rlim_max ) {
+        LOG_DEBUG << "Raising max open files from " << rl.rlim_cur << " to " << rl.rlim_max << ende;
+        rl.rlim_cur = rl.rlim_max;
+        if( setrlimit(RLIMIT_NOFILE, &rl) ) {
+            LOG_ERR << "Failed to set limit on file-descriptors to max value. errno:" << strerror(errno) << ende;
         }
     }
-
-    // pool.remove_thread( tmap[boost::this_thread::get_id()] );
-
+    if( getrlimit(RLIMIT_CORE, &rl) ) {
+        LOG_WARN << "Failed to get limit on coredumps. errno:" << strerror(errno) << ende;
+    } else {
+        if( rl.rlim_cur < rl.rlim_max ) {
+            rlim_t orig = rl.rlim_cur;
+            rl.rlim_cur = rl.rlim_max;
+            if( setrlimit(RLIMIT_CORE, &rl) ) {
+                LOG_ERR << "Failed to set limit on coredumps to max value. errno:" << strerror(errno) << ende;
+            } else {
+                getrlimit(RLIMIT_CORE, &rl);
+                if( rl.rlim_cur != orig ) {
+                    LOG_DEBUG << "Coredump limit increased from " << orig << " to " << rl.rlim_cur << ende;
+                }
+            }
+        }
+    }
 
 }
 
@@ -231,18 +243,39 @@ bool Daemon::doWork( void ) {
 
 
     try {
-        // start the server
-        serverInit();
-        // start the maintenance loop
+        
+        // log version info
         LOG << "Version: " << reduxCommitMessage << ende;
+        
+        // start the server
+        uint16_t port = params["port"].as<uint16_t>();
+        string master = params["master"].as<string>();
+        bool dbg = params.count( "log-stdout" );    // check if -d was passed on command-line.
+        if( master.empty() ) {      // this is a manager instance
+            start_server( port );
+            if( !server ) {
+                LOG_FATAL << "Failed to start server on port " << port << ", exiting!" << ende;
+                die();
+            }
+            check_limits();
+        } else if( dbg ) {
+            int cnt(20);                            // avoid infinite failures
+            uint16_t oport=port;
+            while( !server && cnt-- ) {             // try increasing port numbers until successful
+                start_server( port++ );
+            }
+            if( !server ) {
+                LOG_WARN << "Failed to start debug-listener on ports " << oport << "-" << (port-1) << ", giving up!" << ende;
+            }
+        }
+        
+        // start the maintenance loop
         LOG_DEBUG << "Initializing maintenance timer." << ende;
         timer.expires_from_now( boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
         
         // Add some threads for the async work.
-        int nThreads = 10; // nSysThreads;   // always start with a fixed number?
-        nSysThreads = 0;
-        setThreads( nThreads );
+        addThread( thread::hardware_concurrency() );
         
         LOG_DEBUG << "Initializing worker." << ende;
         if( workerInit() ) {
@@ -264,28 +297,6 @@ bool Daemon::doWork( void ) {
 
     return true;
 
-}
-
-
-void Daemon::setThreads( int nThreads ) {
-    
-    if( nThreads < 5 ) nThreads = 5;        // daemon will not respond to connections if it doesn't have threads
-    int diff = nThreads - nSysThreads;
-    if( diff < -nSysThreads ) diff = -nSysThreads;
-    
-    // FIXME  dynamically changing the number of sys-threads will cause threads to get stuck on pool.create_thread/remove_thread
-    diff = 50-nSysThreads;  // force 50 threads until bug is fixed
-    
-    nSysThreads += diff;
-    if( diff > 0 ) {
-        for( int i=0; i < diff; ++i ) {
-            /*boost::thread* t =*/ pool.create_thread( std::bind( &Daemon::threadLoop, this ) );
-            //tmap[ t->get_id() ] = t;
-        }
-    } else while( diff++ < 0 ) {
-        ioService.post( [](){ throw ThreadExit(); } );
-    }
-    
 }
 
 
@@ -577,17 +588,19 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
 
 void Daemon::addConnection( TcpConnection::Ptr conn ) {
     
-    Host::Ptr host = server->getHost( conn );
-    if( host && (host->info.peerType & Host::TP_WORKER) ) {
-        getWIP( host );
+    if( conn && server ) {
+        Host::Ptr host = server->getHost( conn );
+        if( host && (host->info.peerType & Host::TP_WORKER) ) {
+            getWIP( host );
+        }
     }
-
+    
 }
 
 
 void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
-    if( conn ) {
+    if( conn && server ) {
         Host::Ptr host = server->getHost( conn );
         if( host ) {
             WorkInProgress::Ptr wip = getWIP( host );
@@ -692,8 +705,12 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
 void Daemon::die(void) {
 
     LOG_DEBUG << "Received exit command." << ende;
-    worker.stop();
-    stop();
+    std::thread(
+        [this](){
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            stop();
+        }).detach();
+
     
 }
 
@@ -705,7 +722,11 @@ void Daemon::die( TcpConnection::Ptr& conn, bool urgent ) {
         return;
     }
     
-    Host::Ptr host = server->getHost( conn );
+    Host::Ptr host = myMaster.host;
+    if( !host && server ) {
+        host = server->getHost( conn );
+    }
+    
     if( !host ) return;
     const Host::HostInfo& hi = host->info;
     
@@ -741,7 +762,11 @@ void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
         return;
     }
     
-    Host::Ptr host = server->getHost( conn );
+    Host::Ptr host = myMaster.host;
+    if( !host && server ) {
+        host = server->getHost( conn );
+    }
+    
     if( !host ) return;
     const Host::HostInfo& hi = host->info;
 
@@ -1075,7 +1100,6 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
             if( host && slaveSet.count( host->info.name ) ) {
                 TcpConnection::Ptr conn = server->getConnection( host );
                 if( conn ) {
-                    LOG << "Sending command \"" << msgStr << "\" to slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
                     slaveIdList.push_back(host->id);
                     conn->sendUrgent( cmd );
                 }
@@ -1533,7 +1557,7 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
     size_t blockSize;
     shared_ptr<char> buf = conn->receiveBlock( blockSize );
 
-    if( blockSize ) {
+    if( blockSize && server ) {
         try {
             Host::Ptr host = server->getHost( conn );
             if( host ) {
@@ -1671,3 +1695,70 @@ void Daemon::updateLoadAvg( void ) {
     sw.start();         // reset stopwatch so we measure usage of the last 5s only.
 
 }
+
+
+void Daemon::addThread( uint16_t n ) {
+    
+    lock_guard<mutex> lock(threadMutex);
+    while( n-- ) {
+        boost::thread* t = pool.create_thread( boost::bind( &Daemon::threadLoop, this ) );
+        thread_map[ t->get_id() ] = t;
+    }
+    
+}
+
+
+void Daemon::delThread( uint16_t n ) {
+    
+    while( n-- ) {
+        ioService.post( [](){ throw Application::ThreadExit(); } );
+    }
+
+}
+
+
+void Daemon::cleanupThreads(void) {
+
+    lock_guard<mutex> lock(threadMutex);
+    for( auto& t: old_threads ) {
+        pool.remove_thread( thread_map[t] );
+    }
+    old_threads.clear();
+
+}
+
+
+size_t Daemon::nSysThreads( void ) {
+    lock_guard<mutex> lock( threadMutex );
+    return pool.size();
+}
+
+
+void Daemon::threadLoop( void ) {
+
+    while( runMode == LOOP ) {
+        try {
+            THREAD_UNMARK
+            boost::this_thread::interruption_point();
+            ioService.run();
+        } catch( const ThreadExit& e ) {
+            break;
+        } catch( job_error& e ) {
+            LOG_ERR<< "Job error: " << e.what() << ende;
+        } catch( const boost::thread_interrupted& ) {
+            LOG_TRACE << "Daemon: Thread interrupted." << ende;
+            break;
+        } catch( exception& e ) {
+            LOG_ERR << "Exception in thread: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "Unhandled exception in thread." << ende;
+        }
+    }
+
+    lock_guard<mutex> lock(threadMutex);
+    old_threads.insert( boost::this_thread::get_id() );
+
+
+}
+
+
