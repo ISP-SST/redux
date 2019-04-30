@@ -411,7 +411,14 @@ uint64_t PatchData::size( void ) const {
 
 
 uint64_t PatchData::pack( char* ptr ) const {
+    
+    if( packed.packedSize ) {
+        memcpy( ptr, packed.data.get(), packed.packedSize );
+        return packed.packedSize;
+    }
+
     using redux::util::pack;
+    
     uint64_t count = Part::pack(ptr);
     count += index.pack(ptr+count);
     count += position.pack(ptr+count);
@@ -431,7 +438,9 @@ uint64_t PatchData::pack( char* ptr ) const {
             }
         }
     }
+
     return count;
+    
 }
 
 
@@ -594,6 +603,7 @@ bool GlobalData::verify( void ) const {
 
 
 uint64_t GlobalData::size( void ) const {
+    
     uint64_t sz = 2*sizeof(uint16_t); // nModes & nPupils
     for( auto& mode: modes ) {
         sz += mode.first.size();
@@ -604,6 +614,7 @@ uint64_t GlobalData::size( void ) const {
         sz += pupil.second->size();
     }
     sz += constraints.size();
+
     return sz;
     
 }
@@ -613,6 +624,12 @@ uint64_t GlobalData::pack( char* ptr ) const {
     
     unique_lock<mutex> lock(mtx);
     using redux::util::pack;
+    
+    if( packed.packedSize ) {
+        memcpy( ptr, packed.data.get(), packed.packedSize );
+        return packed.packedSize;
+    }
+
     uint64_t count = pack(ptr,(uint16_t)modes.size());
     for(auto& mode: modes) {
         count += mode.first.pack(ptr+count);
@@ -624,6 +641,7 @@ uint64_t GlobalData::pack( char* ptr ) const {
         count += pupil.second->pack(ptr+count);
     }
     count += constraints.pack(ptr+count);
+
     return count;
 }
 

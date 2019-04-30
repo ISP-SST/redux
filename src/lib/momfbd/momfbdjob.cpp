@@ -182,6 +182,7 @@ bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
 
 
 uint64_t MomfbdJob::size( void ) const {
+
     uint64_t sz = Job::size();
     sz += GlobalCfg::size();
     sz += roi.size();
@@ -192,12 +193,20 @@ uint64_t MomfbdJob::size( void ) const {
     for( const auto& tobj: trace_objects ) {
         sz += tobj->size();
     }
+
     return sz;
 }
 
 
 uint64_t MomfbdJob::pack( char* ptr ) const {
+    
+    if( packed.packedSize ) {
+        memcpy( ptr, packed.data.get(), packed.packedSize );
+        return packed.packedSize;
+    }
+    
     using redux::util::pack;
+
     uint64_t count = Job::pack( ptr );
     count += GlobalCfg::pack( ptr+count );
     count += roi.pack( ptr+count );
@@ -339,16 +348,17 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
             });
             startLog();
             THREAD_MARK;
+            prePack();
         }
         if( lock && (info.step == JSTEP_RUNNING) ) {                      // running
             THREAD_MARK;
+            wip->resetParts();
             for( auto & patch : patches ) {
                 if( patch && (patch->step == JSTEP_QUEUED) ) {
                     patch->step = JSTEP_RUNNING;
                     THREAD_MARK;
-                    patch->load();
                     wip->parts.push_back( patch );
-                    if( !(wip->job) || (wip->jobID != info.id) ) {     // First time for this slave -> include global data
+                    if( wip->jobID != info.id ) {     // First time for this slave -> include global data
                         wip->parts.push_back( globalData );
                     }
                     ret = true;
