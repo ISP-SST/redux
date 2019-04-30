@@ -1038,6 +1038,41 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 }
 
 
+void Daemon::pokeSlaves( size_t n ) {
+    
+    unique_lock<mutex> plock( peerMutex );
+    vector<Host::Ptr> tmpPeers;
+    std::copy( peers.begin(), peers.end(), std::back_inserter(tmpPeers) );
+    plock.unlock();
+
+    // remove slave that are already active
+    tmpPeers.erase( std::remove_if( tmpPeers.begin(), tmpPeers.end(),
+        []( const Host::Ptr& h ) {
+            if( !h ) return true;
+            if( h->status.load[1] <= 0.0 ) return true;
+            return (h->status.state != Host::ST_IDLE);
+    }), tmpPeers.end() );
+
+    if( tmpPeers.empty() ) return;
+    
+    // sort by current load -> select the most idle computers
+    std::sort( tmpPeers.begin(), tmpPeers.end(),
+        [&](const Host::Ptr& a, const Host::Ptr& b ) {
+        return (a->status.load[1] < b->status.load[1]);
+    });
+    
+    string ids;
+    for( auto& h: tmpPeers ) {
+        if( n-- == 0 ) break;
+        h->limbo();
+        ids += to_string( h->id ) + " ";
+    }
+    
+    sendToSlaves( CMD_WAKE, ids );
+    
+}
+
+
 void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
 
     boost::trim( slvString );
@@ -1203,6 +1238,13 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     worker.stop();
                 } else if( cmdStr == "poke" ) {
                     worker.start();
+                } else if( cmdStr == "poken" ) {
+                    string argStr = popword(line);
+                    size_t n(0);
+                    if( !argStr.empty() ) {
+                        n = boost::lexical_cast<int>(argStr);
+                    }
+                    if( n ) pokeSlaves(n);
                 } else if( cmdStr == "kill" ) {
                     if( !line.empty() ) {
                         sendToSlaves( CMD_DIE, line );

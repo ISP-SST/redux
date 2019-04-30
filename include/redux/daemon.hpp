@@ -65,6 +65,7 @@ namespace redux {
         void interactiveCB( network::TcpConnection::Ptr );
         void interactive( network::TcpConnection::Ptr& );
         void listen( void );
+        void pokeSlaves( size_t n );
         void sendToSlaves( uint8_t cmd, std::string slvString );
         void resetSlaves( network::TcpConnection::Ptr&, uint8_t );
         //Job::JobPtr selectJob(bool);
