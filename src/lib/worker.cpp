@@ -21,7 +21,7 @@ namespace {
     std::map<boost::thread::id,boost::thread*> tmap;
 }
 
-Worker::Worker( Daemon& d ) : runTimer( d.ioService ), running_(false), exitWhenDone_(false),
+Worker::Worker( Daemon& d ) : running_(false), stopped_(true), exitWhenDone_(false), resetWhenDone_(false),
     wip(nullptr), daemon( d ), myInfo(Host::myInfo()) {
 
 }
@@ -34,21 +34,70 @@ Worker::~Worker( void ) {
 
 void Worker::start( void ) {
 
-    running_ = true;
-    wip.reset( new WorkInProgress() );
-    runTimer.expires_from_now( boost::posix_time::seconds( 5 ) );
-    runTimer.async_wait( std::bind( &Worker::run, this, placeholders::_1 ) );
-    myInfo.touch();
+    if( !stopped_ ) return;
+    stopped_ = false;
 
+    if( !wip ) {
+        wip.reset( new WorkInProgress() );
+    } else {
+        wip->reset();
+    }
+    
+    daemon.ioService.post( std::bind(&Worker::run, this) );
+
+    myInfo.touch();
+    myInfo.active();
+    
 }
 
 
 void Worker::stop( void ) {
 
     running_ = false;
-    runTimer.cancel();
-    wip.reset();
 
+}
+
+
+void Worker::exitWhenDone( void ) {
+    
+    if( running_ ) {
+        exitWhenDone_ = true;
+        stop();
+    } else {
+        daemon.stop();
+    }
+    
+}
+
+
+void Worker::resetWhenDone( void ) {
+    
+    if( running_ ) {
+        resetWhenDone_ = true;
+        stop();
+    } else {
+        daemon.reset();
+    }
+    
+}
+
+
+void Worker::done( void ) {
+
+    running_ = false;
+    wip->reset();
+    myInfo.touch();
+    myInfo.idle();
+
+    if( exitWhenDone_ ) {
+        daemon.stop();
+    }
+
+    if( resetWhenDone_ ) {
+        daemon.reset();
+    }
+
+    stopped_ = true;
 }
 
 
@@ -115,41 +164,40 @@ bool Worker::fetchWork( void ) {
 
 bool Worker::getWork( void ) {
 
+    myInfo.active();
     if( wip->isRemote ) {            // remote work: return parts.
         returnWork();
         int count(0);
         while( wip->hasResults && count++ < 5 ) {
             LLOG_DEBUG(daemon.logger) << "Failed to return data, trying again in 5 seconds." << ende;
-            runTimer.expires_from_now(boost::posix_time::seconds(5));
-            runTimer.wait();
+            std::this_thread::sleep_for( std::chrono::seconds(5) );
             returnWork();
         }
-        myInfo.active();
-    } else if ( wip->hasResults ) {
-        wip->returnResults();
-        myInfo.active();
+    } else if( wip->job ) {
+        daemon.returnWork( wip );
     }
 
     if( wip->hasResults ) {
         LLOG_WARN(daemon.logger) << "Failed to return data, this part will be discarded." << ende;
     }
     
+    wip->isRemote = wip->hasResults = false;
+    wip->resetParts();
+    if( wip->job ) {
+        wip->job->logger.flushAll();
+        wip->jobID = wip->job->info.id;
+    }
+    
     try {
         
-        wip->isRemote = wip->hasResults = false;
-        if( wip->job ) {
-            wip->job->logger.flushAll();
-        }
-    
         boost::this_thread::interruption_point();
         if( running_ ) {
             if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
+                myInfo.active();
+                myInfo.status.statusString = "...";
                 if(wip->job && (wip->jobID != wip->job->info.id)) {                                  // initialize if it is a new job.
                     wip->job->logger.setLevel( wip->job->info.verbosity );
                     if( wip->isRemote ) {
-                        if( daemon.params.count( "log-stdout" ) ) { // -d flag was passed on cmd-line
-                            wip->job->logger.addLogger( daemon.logger );
-                        }
                         TcpConnection::Ptr logConn;
                         daemon.connect( daemon.myMaster.host->info, logConn );
                         wip->job->logger.addNetwork( daemon.ioService, daemon.myMaster.host, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
@@ -158,12 +206,11 @@ bool Worker::getWork( void ) {
                     wip->jobID = wip->job->info.id;
                 }
                 THREAD_MARK;
-                for( auto& part: wip->parts ) {
-                    part->cacheLoad(false);               // load data for local jobs, but don't delete the storage
+                if( !wip->isRemote ) {
+                    for( auto& part: wip->parts ) {
+                        part->cacheLoad(false);         // load data for local jobs, but don't delete the storage
+                    }
                 }
-                THREAD_MARK;
-                myInfo.active();
-                myInfo.status.statusString = "...";
                 THREAD_UNMARK;
                 return true;
             }
@@ -176,11 +223,6 @@ bool Worker::getWork( void ) {
     LLOG_TRACE(daemon.logger) << "No work available." << ende;
 #endif
 
-    wip->resetParts();
-    wip->job.reset();
-    wip->jobID = 0;
-    
-    myInfo.idle();
     boost::this_thread::interruption_point();
     THREAD_UNMARK;
     return false;
@@ -240,45 +282,30 @@ void Worker::returnWork( void ) {
 }
 
 
-void Worker::run( const boost::system::error_code& error ) {
+void Worker::run( void ) {
 
-    static int sleepS(1);
-    if( error == boost::asio::error::operation_aborted ) {
-        sleepS=1;
-        return;
-    }
- //   LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
-    THREAD_MARK;
-    while( getWork() ) {
-        sleepS = 1;
-        try {
-            THREAD_MARK;
-            while( wip->job && wip->job->run( wip, myInfo.status.nThreads ) ) ;
-            THREAD_MARK;
-            if( wip->job ) wip->job->logger.flushAll(); 
-            THREAD_MARK;
-        }
-        catch( const boost::thread_interrupted& ) {
-            LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;
-            throw;
-        }
-        catch( const exception& e ) {
-            LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;
-        }
-        catch( ... ) {
-            LLOG_ERR(daemon.logger) << "Worker: Unrecognized exception caught while processing job." << ende;
+    running_ = true;
+
+    if( wip ) {
+        // LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
+        while( getWork() ) {
+            try {
+                while( wip->job && wip->job->run( wip, myInfo.status.nThreads ) ) ;
+                if( wip->job ) wip->job->logger.flushAll(); 
+            }
+            catch( const boost::thread_interrupted& ) {
+                LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;
+                throw;
+            }
+            catch( const exception& e ) {
+                LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;
+            }
+            catch( ... ) {
+                LLOG_ERR(daemon.logger) << "Worker: Unrecognized exception caught while processing job." << ende;
+            }
         }
     }
-    THREAD_MARK;
-    if( running_ ) {
-        boost::this_thread::interruption_point();
-        runTimer.expires_from_now( boost::posix_time::seconds(sleepS) );
-        runTimer.async_wait( std::bind( &Worker::run, this, placeholders::_1 ) );
-        if( sleepS < 16 ) {
-            sleepS <<= 1;
-        }
-    } else if( exitWhenDone_ ) {
-        daemon.stop();
-    }
-    THREAD_UNMARK;
+
+    done();
+    
 }

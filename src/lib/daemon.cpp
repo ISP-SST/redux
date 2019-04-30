@@ -290,7 +290,10 @@ bool Daemon::doWork( void ) {
             worker.start();
         }
         LOG_DEBUG << "Running the asio service." << ende;
-        // the io_service will keep running/blocking until stop is called, then wait for the threads to make a clean exit.
+        // 
+        while( (runMode == LOOP) || preparing_local || preparing_remote ) {
+            std::this_thread::sleep_for( std::chrono::milliseconds(100) );
+        }
         pool.join_all();
         myInfo.info.peerType = 0;
         worker.stop();
@@ -554,6 +557,7 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
         switch( cmd ) {
             case CMD_EXIT: softExit(); break;
             case CMD_DIE: die( conn, urgent ); break;
+            case CMD_WAKE: worker.start(); break;
             case CMD_RESET: reset( conn, urgent ); break;
             case CMD_ADD_JOB: addJobs(conn); break;
             case CMD_DEL_JOB: removeJobs(conn); break;
@@ -765,7 +769,7 @@ void Daemon::softExit( void ) {
 void Daemon::reset( TcpConnection::Ptr& conn, bool urgent ) {
     
     if( urgent ) {  // received on a slave, just do it without replying
-        reset();
+        worker.resetWhenDone();
         return;
     }
     
@@ -1045,6 +1049,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
         case CMD_DIE:       msgStr = "die"; break;
         case CMD_EXIT:      msgStr = "exit"; break;
         case CMD_RESET:     msgStr = "reset"; break;
+        case CMD_WAKE:      msgStr = "wake"; break;
         default:            msgStr = to_string((int)cmd); break;
     }
     
@@ -1197,6 +1202,10 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     if( !argStr.empty() ) {
                         failJobs(argStr);
                     }
+                } else if( cmdStr == "idle" ) {
+                    worker.stop();
+                } else if( cmdStr == "poke" ) {
+                    worker.start();
                 } else if( cmdStr == "kill" ) {
                     if( !line.empty() ) {
                         sendToSlaves( CMD_DIE, line );

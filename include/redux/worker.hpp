@@ -27,7 +27,8 @@ namespace redux {
         void connect( void );
         void start( void );
         void stop( void );
-        void exitWhenDone( void ) { running_ = false; exitWhenDone_ = true; };
+        void exitWhenDone( void );
+        void resetWhenDone( void );
 
     private:
 
@@ -38,11 +39,13 @@ namespace redux {
         void returnJob(void);
         void returnResults(void);
         
-        void run( const boost::system::error_code& );
-        
-        boost::asio::deadline_timer runTimer;
-        bool running_;
-        bool exitWhenDone_;
+        void run( void );
+        void done( void );
+
+        std::atomic<bool> running_;
+        std::atomic<bool> stopped_;
+        std::atomic<bool> exitWhenDone_;
+        std::atomic<bool> resetWhenDone_;
         
         WorkInProgress::Ptr wip;
 
