@@ -1325,7 +1325,7 @@ bool MomfbdJob::check(void) {
             moveTo( this, JSTEP_CHECKING );
             updateProgressString();
             ret =  (cfgChecked || checkCfg());
-            ret &= (dataChecked || checkData(false));
+            if(ret) ret &= (dataChecked || checkData(false));
             if(ret) {
                 moveTo( this, JSTEP_CHECKED );
                 updateProgressString();
