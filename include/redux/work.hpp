@@ -19,6 +19,15 @@ namespace redux {
      */
 
     class Job;
+    
+    struct PackedData {
+        PackedData() : size(0), packedSize(0) {};
+        void clear(void) { data.reset(); size = packedSize = 0; };
+        std::unique_ptr<char[]> data;
+        uint64_t size;
+        uint64_t packedSize;
+    };
+
 
     struct Part : public redux::util::CacheItem
 #ifdef RDX_TRACE_PARTS
@@ -36,10 +45,14 @@ namespace redux {
         }
         virtual uint64_t pack( char* ) const;
         virtual uint64_t unpack( const char*, bool swap_endian=false );
+        virtual void load(void);
+        virtual void unload(void);
+        virtual void prePack( bool force=false ) {};
         size_t csize(void) const { return size(); };
         uint64_t cpack(char* p) const { return pack(p); };
         uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
+        bool operator<(const Part& rhs) const { return (id < rhs.id); }
         uint64_t id;
         boost::posix_time::ptime partStarted;
         uint16_t step;
@@ -47,6 +60,9 @@ namespace redux {
         uint16_t nThreads;
         float runtime_wall;
         float runtime_cpu;
+        
+        PackedData packed;
+        
     };
 
 
@@ -62,11 +78,13 @@ namespace redux {
         uint64_t size(void) const;
         uint64_t pack(char*) const;
         uint64_t unpack(const char*, bool swap_endian=false);
+        void reset(void);
         void resetParts(void);
         uint64_t workSize(void);
-        uint64_t packWork(char*) const;
+        uint64_t packWork(char*);
         uint64_t unpackWork(const char*, bool swap_endian=false);
         void returnResults(void);
+        bool operator<(const WorkInProgress& rhs) const;
         std::string print(void);
         std::shared_ptr<Job> job;
         uint32_t jobID;

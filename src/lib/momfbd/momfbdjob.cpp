@@ -65,26 +65,43 @@ MomfbdJob::~MomfbdJob( void ) {
 }
 
 
+uint64_t MomfbdJob::packParts( char* ptr, WorkInProgress::Ptr wip  ) const {
+    
+    using redux::util::pack;
+    if( !wip ) throw job_error( info.name + ": Can not pack parts without a valid WIP instance."  );
+    if( wip->parts.empty() ) throw job_error( info.name + ": Can not pack an empty list of parts."  );
+    wip->parts.resize(1);
+    uint64_t count = wip->parts[0]->pack( ptr );
+    if( wip->jobID != info.id ) {           // First part from this job, so we need to send the global info
+        if( globalData ) {
+            count += globalData->pack( ptr+count );
+            wip->parts.push_back( globalData );
+        } else throw job_error( info.name + ": No globalData defined."  );
+    }
+    wip->nParts = wip->parts.size();
+    return count;
+    
+}
+
+
 uint64_t MomfbdJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool swap_endian ) {
+    
     using redux::util::unpack;
+    if( !wip ) throw job_error( info.name + ": Can not unpack parts without a valid WIP instance."  );
+
+    wip->parts.clear();
     uint64_t count(0);
-    try {
-        if( wip ) {
-            if( wip->nParts ) {
-                PatchData* tmpPD = new PatchData(*this);
-                wip->parts.assign(1,Part::Ptr(tmpPD));        // if size > 1 the old "wip" has a globalData appended to it, we don't need it anymore.
-                count += tmpPD->unpack( ptr+count, swap_endian );
-                if( wip->nParts > 1 ) {
-                    globalData.reset( new GlobalData(*this) );
-                    count += globalData->unpack( ptr+count, swap_endian );
-                }
-            }
-        } else throw job_error( info.name + ": Can not unpack parts without a valid WIP instance."  );
-    } catch( const std::exception& e ) {
-        if( wip ) wip->parts.clear();
-        throw;
+    if( wip->nParts ) {
+        PatchData* tmpPD = new PatchData(*this);
+        count += tmpPD->unpack( ptr+count, swap_endian );
+        if( wip->nParts > 1 ) {
+            globalData.reset( new GlobalData(*this) );
+            count += globalData->unpack( ptr+count, swap_endian );
+        }
+        wip->parts.push_back( Part::Ptr(tmpPD) );
     }
     return count;
+    
 }
 
 
@@ -221,6 +238,21 @@ uint64_t MomfbdJob::unpack( const char* ptr, bool swap_endian ) {
         count += tobj->unpack( ptr+count, swap_endian );
     }
     return count;
+}
+
+
+void MomfbdJob::prePack( bool force ) {
+    
+    if( packed.packedSize && !force ) {
+        return;
+    }
+    packed.size = size();
+    if( !packed.size ) {
+        return;
+    }
+    packed.data.reset( new char[packed.size] );
+    packed.packedSize = pack( packed.data.get() );
+    
 }
 
 
@@ -812,6 +844,8 @@ void MomfbdJob::initCache(void) {
     for( shared_ptr<Object>& obj: objects ) {
         obj->initCache();
     }
+    
+    globalData->prePack();
     
 }
 

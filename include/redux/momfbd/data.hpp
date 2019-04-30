@@ -134,8 +134,10 @@ namespace redux {
             std::shared_ptr<ObjectData> getObjectData( uint16_t id ) const;
             void setPath(const std::string& path);
             void initPatch(void);
-            void clear(void);
             void load(void);
+            void unload(void);
+            void prePack( bool force=false );
+            void clear(void);
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -169,7 +171,7 @@ namespace redux {
        
         struct GlobalData : public Part {   // Used for sending e.g. modes/pupils to the slaves.
             typedef std::shared_ptr<GlobalData> Ptr;
-            std::mutex mtx;
+            mutable std::mutex mtx;
             std::map<ModeInfo, std::shared_ptr<ModeSet>> modes;
             std::map<redux::image::PupilInfo, std::shared_ptr<redux::image::Pupil>> pupils;
             Constraints constraints;
@@ -181,8 +183,10 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
+            void unload(void);
+            void prePack( bool force=false );
             void dump( std::string tag="gd" ) const;
-
+            
         };
 
 

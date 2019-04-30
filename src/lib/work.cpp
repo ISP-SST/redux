@@ -73,6 +73,20 @@ uint64_t Part::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
+void Part::load(void) {
+    
+    CacheItem::cacheLoad();
+    
+}
+
+
+void Part::unload(void) {
+    
+    CacheItem::cacheClear();
+    
+}
+
+
 WorkInProgress::WorkInProgress(void) : job(nullptr), jobID(0),
     workStarted(boost::posix_time::not_a_date_time), isRemote(false), hasResults(false), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
@@ -95,15 +109,16 @@ WorkInProgress::~WorkInProgress() {
 
 
 uint64_t WorkInProgress::size(void) const {
-    static uint64_t sz = 2*sizeof(uint16_t); // nParts + nCompleted
-    sz += sizeof(time_t);   // workStarted is converted and transferred as time_t
+    static uint64_t sz = 2*sizeof(uint16_t)+sizeof(uint32_t) // nParts + nCompleted + jobID
+                       + sizeof(time_t);                     // workStarted is converted and transferred as time_t
     return sz;
 }
 
 
 uint64_t WorkInProgress::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = pack( ptr, nParts );
+    uint64_t count = pack( ptr, jobID );
+    count += pack( ptr+count, nParts );
     count += pack( ptr+count, nCompleted );
     count += pack(ptr+count,redux::util::to_time_t( workStarted ));
     return count;
@@ -112,12 +127,23 @@ uint64_t WorkInProgress::pack( char* ptr ) const {
 
 uint64_t WorkInProgress::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = unpack( ptr, nParts, swap_endian );
+    uint64_t count = unpack( ptr, jobID, swap_endian );
+    count += unpack( ptr+count, nParts, swap_endian );
     count += unpack( ptr+count, nCompleted, swap_endian );
     time_t timestamp;
     count += unpack(ptr+count,timestamp,swap_endian);
     workStarted = boost::posix_time::from_time_t( timestamp );
     return count;
+}
+
+
+void WorkInProgress::reset( void ) {
+    
+    job.reset();
+    jobID = 0;
+    resetParts();
+    workStarted = boost::posix_time::not_a_date_time;
+    
 }
 
 
@@ -146,24 +172,20 @@ uint64_t WorkInProgress::workSize(void) {
 }
 
 
-uint64_t WorkInProgress::packWork( char* ptr ) const {
+uint64_t WorkInProgress::packWork( char* ptr ) {
+    
+    if( !job ) {
+        throw invalid_argument( "Can't pack WIP without a job instance..." );
+    }
     using redux::util::pack;
-    uint64_t count = this->pack( ptr );
-    bool newJob(true);
-    if( job ) {
-        newJob = (jobID != job->info.id);
-    }
+    uint64_t count = this->size();                                  // skip WIP info, it's packed below.
+    bool newJob = (jobID != job->info.id);
     count += pack( ptr+count, newJob );
-    if(newJob) {
-        if( job ) {
-            count += job->pack(ptr+count);
-        } else throw invalid_argument( "Can't pack job without instance..." );
+    if( newJob ) {
+        count += job->pack( ptr+count );                            // pack Job-info
     }
-    for( auto& part: parts ) {
-        if( part ) {
-            count += part->pack(ptr+count);
-        }
-    }
+    count += job->packParts( ptr+count, shared_from_this() );       // pack parts
+    this->pack( ptr );                                              // write WIP info, (done last, in case nParts changed).
     return count;
 }
 
@@ -194,6 +216,19 @@ void WorkInProgress::returnResults(void) {
         job->returnResults( shared_from_this() );
         resetParts();
     }
+}
+
+
+bool WorkInProgress::operator<( const WorkInProgress& rhs ) const {
+    
+    if( job != rhs.job ) return job < rhs.job;
+    size_t sz = std::min( parts.size(), rhs.parts.size() );
+    for( size_t i(0); i<sz; ++i ) {
+        if( parts[i] != rhs.parts[i] ) return job < rhs.job;
+    }
+    //return (parts.size() < rhs.parts.size());
+    return false;
+    
 }
 
 

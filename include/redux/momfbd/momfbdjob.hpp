@@ -57,6 +57,7 @@ namespace redux {
             static Job* create(void) { return new MomfbdJob(); }
 
             size_t getTypeID(void) { return Job::MOMFBDJOB; }
+            uint64_t packParts(char* ptr, WorkInProgress::Ptr) const;
             uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr, bool);
             
             void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& );
@@ -65,6 +66,7 @@ namespace redux {
             uint64_t size( void ) const;
             uint64_t pack( char* ) const;
             uint64_t unpack( const char*, bool );
+            void prePack( bool force=false );
 
             size_t nImages(void) const;
             

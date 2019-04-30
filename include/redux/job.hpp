@@ -148,7 +148,8 @@ namespace redux {
         } info;
         
         virtual size_t getTypeID(void) { return 0; };
-        virtual uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr wip, bool) { wip->parts.clear(); return 0; };
+        virtual uint64_t packParts( char* , WorkInProgress::Ptr ) const { return 0; };
+        virtual uint64_t unpackParts( const char* , WorkInProgress::Ptr wip, bool ) { wip->parts.clear(); return 0; };
         
         virtual void parsePropertyTree( bpo::variables_map&, bpt::ptree&, redux::logging::Logger&);
         /*! @brief Returns a boost::property_tree containing the settings for this job.
@@ -170,6 +171,7 @@ namespace redux {
         virtual uint64_t size(void) const;
         virtual uint64_t pack(char*) const;
         virtual uint64_t unpack(const char*, bool);
+        virtual void prePack( bool force=false ) {};
 
         virtual bool active(void) { return false; };
         virtual bool check(void) { return false; };         //! will be called several times during processing, should return true if all is ok.
@@ -224,6 +226,7 @@ namespace redux {
     
     protected:
        
+        mutable PackedData packed;
         std::mutex jobMutex;
         static std::mutex globalMutex;
         std::string cachePath;

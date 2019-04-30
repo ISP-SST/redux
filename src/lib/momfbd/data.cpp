@@ -350,19 +350,43 @@ void PatchData::initPatch(void) {
 }
 
 
-void PatchData::clear( void ) {
+void PatchData::load( void ) {
     
+    Part::load();
     for( auto& obj: objects ) {
-        if(obj) obj->clear();
+        if(obj) obj->load();
     }
     
 }
 
 
-void PatchData::load( void ) {
+void PatchData::unload( void ) {
     
+    Part::unload();
+    packed.clear();
+    
+}
+
+void PatchData::prePack( bool force ) {
+    
+    if( packed.packedSize && !force ) {
+        return;
+    }
+    packed.size = size();
+    if( !packed.size ) {
+        return;
+    }
+    packed.data.reset( new char[packed.size] );
+    packed.packedSize = pack( packed.data.get() );
+
+}
+
+
+void PatchData::clear( void ) {
+    
+    unload();
     for( auto& obj: objects ) {
-        if(obj) obj->load();
+        if(obj) obj->clear();
     }
     
 }
@@ -581,12 +605,14 @@ uint64_t GlobalData::size( void ) const {
     }
     sz += constraints.size();
     return sz;
+    
 }
 
 
 uint64_t GlobalData::pack( char* ptr ) const {
+    
+    unique_lock<mutex> lock(mtx);
     using redux::util::pack;
-    unique_lock<mutex> lock(const_cast<mutex&>(mtx));
     uint64_t count = pack(ptr,(uint16_t)modes.size());
     for(auto& mode: modes) {
         count += mode.first.pack(ptr+count);
@@ -633,6 +659,27 @@ uint64_t GlobalData::unpack( const char* ptr, bool swap_endian ) {
     count += constraints.unpack(ptr+count,swap_endian);
 
     return count;
+}
+
+
+void GlobalData::unload( void ) {
+    
+    Part::unload();
+    
+}
+
+void GlobalData::prePack( bool force ) {
+    
+    if( packed.packedSize && !force ) {
+        return;
+    }
+    packed.size = size();
+    if( !packed.size ) {
+        return;
+    }
+    packed.data.reset( new char[packed.size] );
+    packed.packedSize = pack( packed.data.get() );
+    
 }
 
 
