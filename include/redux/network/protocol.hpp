@@ -31,6 +31,7 @@ namespace redux {
                                  CMD_LOG_CONNECT,
                                  CMD_PUT_LOG,
                                  CMD_RESET,
+                                 CMD_FORCE_RESET,
                                  CMD_WAKE,
                                  CMD_DIE,
                                  CMD_EXIT,

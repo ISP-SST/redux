@@ -559,6 +559,7 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
             case CMD_DIE: die( conn, urgent ); break;
             case CMD_WAKE: worker.start(); break;
             case CMD_RESET: reset( conn, urgent ); break;
+            case CMD_FORCE_RESET: reset(); break;
             case CMD_ADD_JOB: addJobs(conn); break;
             case CMD_DEL_JOB: removeJobs(conn); break;
             case CMD_GET_WORK: sendWork(conn); break;
@@ -1083,6 +1084,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
     switch( cmd ) {
         case CMD_DIE:       msgStr = "die"; break;
         case CMD_EXIT:      msgStr = "exit"; break;
+        case CMD_FORCE_RESET:
         case CMD_RESET:     msgStr = "reset"; break;
         case CMD_WAKE:      msgStr = "wake"; break;
         default:            msgStr = to_string((int)cmd); break;
@@ -1278,6 +1280,13 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                 } else if( cmdStr == "reset" ) {
                     if( !line.empty() ) {
                         sendToSlaves( CMD_RESET, line );
+                    } else {
+                        reset();
+                        replyCmd = CMD_DISCONNECT;
+                    }
+                } else if( cmdStr == "freset" ) {
+                    if( !line.empty() ) {
+                        sendToSlaves( CMD_FORCE_RESET, line );
                     } else {
                         reset();
                         replyCmd = CMD_DISCONNECT;
