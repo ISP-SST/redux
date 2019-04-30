@@ -18,7 +18,7 @@ namespace {
 
 
 TcpServer::TcpServer( uint16_t port, uint16_t threads ) : ioService(), acceptor( ioService ), endpoint( tcp::v4(), port ),
-                onConnected(nullptr), minThreads(threads), nThreads(0), nConnections(0), running(false), do_handshake(true), do_auth(false) {
+                onConnected(nullptr), minThreads(threads), nThreads_(0), nConnections(0), running(false), do_handshake(true), do_auth(false) {
         
     start();
 
@@ -240,20 +240,28 @@ size_t TcpServer::size( void ) const {
 }
 
 
+size_t TcpServer::nThreads( void ) const {
+    
+    lock_guard<mutex> lock( mtx );
+    return pool.size();
+    
+}
+
+
 void TcpServer::onAccept( TcpConnection::Ptr conn,
                                const boost::system::error_code& error ) {
     accept();    // always start another accept
 
     if( !error ) {
         try {
-            Host remote_host;
+            Host::HostInfo rhi;
             if( do_handshake ) {
                 Host& hi = Host::myInfo();
                 Command cmd;
                 *conn >> cmd;
                 if( cmd != CMD_CONNECT ) return;    // The connection is terminated when going out of scope.
                 *conn << CMD_CFG;           // request handshake
-                *conn >> remote_host.info;
+                *conn >> rhi;
                 *conn << hi.info;
                 if( do_auth ) {                       // TODO simple authentication. (key exchange ?)
                     *conn << CMD_AUTH;
@@ -261,7 +269,7 @@ void TcpServer::onAccept( TcpConnection::Ptr conn,
                 }
                 *conn << CMD_OK;           // all ok
             }
-            addConnection( remote_host.info, conn );
+            addConnection( rhi, conn );
             if( onConnected ) {
                 onConnected(conn);
             }
@@ -281,7 +289,7 @@ void TcpServer::onAccept( TcpConnection::Ptr conn,
 
 void TcpServer::threadLoop( void ) {
 
-    ++nThreads;
+    ++nThreads_;
     while( running ) {
         try {
             boost::this_thread::interruption_point();
@@ -297,7 +305,7 @@ void TcpServer::threadLoop( void ) {
         }
         usleep(100000);
     }
-    --nThreads;
+    --nThreads_;
     lock_guard<mutex> lock(mtx);
     old_threads.insert( boost::this_thread::get_id() );
 

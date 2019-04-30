@@ -37,6 +37,7 @@ namespace redux {
             Host::Ptr getHost( const TcpConnection::Ptr ) const;
             TcpConnection::Ptr getConnection( Host::Ptr );
             size_t size( void ) const;
+            size_t nThreads( void ) const;
             
         private:
 
@@ -52,7 +53,7 @@ namespace redux {
             TcpConnection::callback onConnected;
             boost::thread_group pool;
             uint16_t minThreads;
-            std::atomic<uint16_t> nThreads, nConnections;
+            std::atomic<uint16_t> nThreads_, nConnections;
             bool running,do_handshake,do_auth;
 
         };
