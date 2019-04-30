@@ -7,6 +7,7 @@
 #include "redux/worker.hpp"
 #include "redux/network/host.hpp"
 #include "redux/network/tcpserver.hpp"
+#include "redux/util/datautil.hpp"
 #include "redux/util/semaphore.hpp"
 
 #include <mutex>
@@ -73,15 +74,30 @@ namespace redux {
         WorkInProgress::Ptr getWIP( const network::Host::Ptr& );
         void removeWIP( const network::Host::Ptr& );
         void updateWIP( const network::Host::Ptr&, WorkInProgress::Ptr& );
-        bool getWork( WorkInProgress::Ptr, uint8_t nThreads = 1);
-        void sendWork( network::TcpConnection::Ptr& );
-        void putParts( network::TcpConnection::Ptr& );
+        void sendWork( network::TcpConnection::Ptr );
+        void putParts( network::TcpConnection::Ptr );
         void sendJobList( network::TcpConnection::Ptr& );
         void updateHostStatus( network::TcpConnection::Ptr& );
         void sendJobStats( network::TcpConnection::Ptr& );
         void sendPeerList( network::TcpConnection::Ptr& );
         void addToLog( network::TcpConnection::Ptr& );
         void updateLoadAvg( void );
+        
+        void putActiveWIP( WorkInProgress::Ptr );
+        size_t countActiveWIP( WorkInProgress::Ptr );
+        size_t eraseActiveWIP( WorkInProgress::Ptr );
+        WorkInProgress::Ptr  getActiveWIP( WorkInProgress::Ptr );
+        void getIdleWIP( WorkInProgress::Ptr& );
+        WorkInProgress::Ptr getIdleWIP( void );
+        void putIdleWIP( WorkInProgress::Ptr );
+        WorkInProgress::Ptr getLocalWIP( void );
+        WorkInProgress::Ptr getRemoteWIP( void );
+        bool getWork( WorkInProgress::Ptr&, bool remote=false );
+        void returnWork( WorkInProgress::Ptr );
+        void prepareLocalWork( int n=1 );
+        void prepareRemoteWork( int n=1 );
+        void prepareWork( void );
+        std::string workStatus( bool details=false );
         
         const po::variables_map& params;
         
@@ -103,7 +119,15 @@ namespace redux {
         void cleanupThreads( void );
         size_t nSysThreads( void );
         void threadLoop( void );
+        
+        std::mutex wip_active_mtx, wip_idle_mtx, wip_queue_mtx, wip_lqueue_mtx, wip_completed_mtx;
+        std::atomic<uint16_t>  max_local, max_remote;
+        std::set<WorkInProgress::Ptr, redux::util::ObjCompare<WorkInProgress>> wip_active;
         std::map<network::Host::Ptr, WorkInProgress::Ptr, network::Host::Compare> peerWIP;
+        std::set<WorkInProgress::Ptr> wip_idle;
+        std::deque<WorkInProgress::Ptr> wip_queue;
+        std::deque<WorkInProgress::Ptr> wip_localqueue;
+        std::deque<WorkInProgress::Ptr> wip_completed;
         
         struct {
             network::TcpConnection::Ptr conn;

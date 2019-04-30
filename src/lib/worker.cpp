@@ -192,8 +192,8 @@ bool Worker::getWork( void ) {
     try {
         
         boost::this_thread::interruption_point();
-        if( running_ ) {
-            if( daemon.getWork( wip, myInfo.status.nThreads ) || fetchWork() ) {    // first check for local work, then remote
+        if( running_ && !exitWhenDone_ && !resetWhenDone_ ) {
+            if( daemon.getWork( wip, false ) || fetchWork() ) {    // first check for local work, then remote
                 myInfo.active();
                 myInfo.status.statusString = "...";
                 if(wip->job && (wip->jobID != wip->job->info.id)) {                                  // initialize if it is a new job.
