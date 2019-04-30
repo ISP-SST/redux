@@ -27,7 +27,7 @@ namespace redux {
             };
             typedef std::set<Ptr, Compare> Set;
              
-            enum State : uint8_t { ST_OFFLINE=0, ST_IDLE, ST_ACTIVE, ST_ERROR };
+            enum State : uint8_t { ST_OFFLINE=0, ST_LIMBO, ST_IDLE, ST_ACTIVE, ST_ERROR };
             enum Type : uint8_t { TP_WORKER=1, TP_MASTER, TP_UI=4 };
             static const std::string StateNames[4];
             static const std::string TypeNames[8];
@@ -51,6 +51,7 @@ namespace redux {
             struct HostStatus {     // volatile info, refreshed every now and then.
                 uint64_t currentJob;
                 uint16_t nThreads, maxThreads;
+                uint16_t listenPort;
                 State state;
                 float load[2];
                 float progress;
@@ -76,8 +77,8 @@ namespace redux {
             void active(void);
             
             static Host& myInfo(void);
-            static std::string printHeader(void);
-            std::string print(void);
+            static std::string printHeader( int verbosity=0 );
+            std::string print( int verbosity=0 );
             
             //Host& operator=( const Host& rhs );
 

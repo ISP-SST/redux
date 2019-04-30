@@ -31,7 +31,7 @@ namespace redux {
         
     private:
         
-        void start_server( uint16_t );
+        void start_server( uint16_t&, uint8_t tries=1 );
         void stop_server( void );
         void maintenance( void );
         void checkSwapSpace( void );
@@ -66,6 +66,7 @@ namespace redux {
         void removeJobs( network::TcpConnection::Ptr& );
         void interactiveCB( network::TcpConnection::Ptr );
         void interactive( network::TcpConnection::Ptr& );
+        void listen( void );
         void sendToSlaves( uint8_t cmd, std::string slvString );
         void resetSlaves( network::TcpConnection::Ptr&, uint8_t );
         //Job::JobPtr selectJob(bool);

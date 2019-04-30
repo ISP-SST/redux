@@ -73,8 +73,8 @@ Host::HostInfo::HostInfo( string username ) : peerType(0), connectPort(0), user(
 }
 
 
-Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread::hardware_concurrency() ), state( ST_IDLE ),
-    progress( 0 ), statusString("idle") {
+Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread::hardware_concurrency() ), listenPort(0),
+    state( ST_IDLE ), progress( 0 ), statusString("idle") {
         
     lastSeen = boost::posix_time::second_clock::universal_time(); 
     lastActive = boost::posix_time::second_clock::universal_time();
@@ -158,25 +158,32 @@ Host& Host::myInfo(void) {
 }
 
 
-std::string Host::printHeader(void) {
+std::string Host::printHeader( int verbosity ) {
     string hdr = alignRight("ID",5) + alignCenter("NAME",25) + alignCenter("PID",7) + alignCenter("THREADS",10);
-    hdr += alignLeft("VERSION",10) + alignLeft("Usage/Load",12) + alignCenter("Uptime",12) + alignCenter("Runtime",12) + "STATUS";
+    hdr += alignLeft("VERSION",10) + alignLeft("Usage/Load",12) + alignCenter("Uptime",12) + alignCenter("Runtime",12);
+    hdr += alignLeft("STATUS",18);
+    if( verbosity ) hdr +=  alignCenter("port",6);
     return hdr;
 }
 
 
-std::string Host::print(void) {
+std::string Host::print( int verbosity ) {
     boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
     boost::posix_time::time_duration elapsed = (now - status.lastActive);
     boost::posix_time::time_duration uptime = (now - info.startedAt);
     string elapsedString = "";
-    if( ! elapsed.is_not_a_date_time() ) elapsedString = to_simple_string(elapsed);
+    if( (status.state != ST_IDLE) && !elapsed.is_not_a_date_time() ) elapsedString = to_simple_string(elapsed);
     string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
     ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),10);
     ret += alignLeft(getVersionString(info.reduxVersion),10);
     ret += alignLeft(boost::str(boost::format("%.2f/%.2f") % status.load[0] % status.load[1]),12);
     ret += alignCenter(to_simple_string(uptime),12) + alignCenter(elapsedString,12);
-    ret += status.statusString; 
+    ret += alignLeft(status.statusString,18); 
+    if( verbosity ) {
+        if( id && status.listenPort ) {
+            ret += alignRight( to_string(status.listenPort), 6 );
+        }
+    }
     return ret;
 }
 
@@ -273,7 +280,7 @@ bool Host::HostInfo::operator==(const HostInfo& rhs) const {
 
 
 uint64_t Host::HostStatus::size(void) const {
-    uint64_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads);
+    uint64_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads) + sizeof(listenPort);
     sz += sizeof(state) + sizeof(load) + sizeof(progress) + 2*sizeof(time_t);
     sz += statusString.length() + 1;
     return sz;
@@ -286,6 +293,7 @@ uint64_t Host::HostStatus::pack( char* ptr ) const {
     
     uint64_t count = pack(ptr,nThreads);
     count += pack(ptr+count,maxThreads);
+    count += pack(ptr+count,listenPort);
     count += pack(ptr+count,state);
     count += pack(ptr+count,currentJob);
     count += pack(ptr+count,load,2);
@@ -312,6 +320,7 @@ uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
     
     uint64_t count = unpack(ptr,nThreads, swap_endian);
     count += unpack(ptr+count,maxThreads, swap_endian);
+    count += unpack(ptr+count,listenPort, swap_endian);
     count += unpack(ptr+count,state, swap_endian);
     count += unpack(ptr+count,currentJob, swap_endian);
     count += unpack(ptr+count,load, 2, swap_endian);

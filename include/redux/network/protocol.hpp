@@ -34,6 +34,7 @@ namespace redux {
                                  CMD_DIE,
                                  CMD_EXIT,
                                  CMD_INTERACTIVE,
+                                 CMD_LISTEN,
                                  CMD_ERR = 255
                                };
                                

@@ -10,6 +10,7 @@
 
 using namespace redux::util;
 using namespace redux::network;
+using namespace redux::logging;
 using namespace redux;
 
 using namespace std;
@@ -157,15 +158,17 @@ void printPeerList( TcpConnection::Ptr conn, int ns, int sorting ) {
     uint64_t count(0);
     try {
         vector<Host::Ptr> hosts;
-        cout << "    " << Host::printHeader();
-        int nIdle(0);
+        int verbosity = Logger::getDefaultLevel() - LOG_LEVEL_NORMAL;
+        cout << "    " << Host::printHeader(verbosity);
+        int nIdle(0), nLimbo(0);
         while( count < blockSize ) {
             Host::Ptr peer(new Host);
             count += peer->unpack( ptr+count, conn->getSwapEndian() );
-            if( peer->status.state == Host::ST_IDLE ) nIdle++;
+            if( (peer->status.state == Host::ST_IDLE) && (peer->id != 0)) nIdle++;
+            if( (peer->status.state == Host::ST_LIMBO) && (peer->id != 0)) nLimbo++;
             hosts.push_back(peer);
         }
-        if( nIdle ) cout << "   (idle:" << nIdle << ")";
+        if( nIdle || nLimbo ) cout << "   (idle: " << nIdle << "/" << nLimbo << ")";
         cout << endl;
         if( sorting == by_runtime ) std::sort( hosts.begin()+1, hosts.end(), host_by_runtime );
         int nHosts = hosts.size();
@@ -182,7 +185,7 @@ void printPeerList( TcpConnection::Ptr conn, int ns, int sorting ) {
                 if( addComma ) cout << "   :" << endl;
             }
             if ( i ) cout << alignRight(to_string(i),4);
-            cout << hosts[i]->print() << endl;
+            cout << hosts[i]->print(verbosity) << endl;
         }
     } catch ( const exception& e) {
         cerr << "printPeerList: Exception caught while parsing block: " << e.what() << endl;

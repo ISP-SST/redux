@@ -81,27 +81,31 @@ Daemon::~Daemon( void ) {
 }
 
 
-void Daemon::start_server( uint16_t port ) {
+void Daemon::start_server( uint16_t& port, uint8_t tries ) {
     
     if( port < 1024 ) {
         LOG_ERR << "Daemon: Listening on a port < 1024 requires root permissions, which this program should NOT have !!!" << ende;
         return;
     }
-        
-    try {
-        if( server ) {
-            server->start( port );
-        } else {
-            server.reset( new TcpServer( port, 10 ) );
+    
+    while( tries-- ) {
+        try {
+            if( server ) {
+                server->start( port );
+            } else {
+                server.reset( new TcpServer( port, thread::hardware_concurrency() ) );
+            }
+            server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
+            myInfo.info.peerType |= Host::TP_MASTER;
+            myInfo.status.listenPort = server->port();
+            LOG << "Started server on port " << server->port() << "." << ende;
+            return;
+        } catch ( const exception& e ) {
+            LOG_TRACE << "Daemon: Failed to start server on port " << port << ": " << e.what() << ende;
+            server.reset();
         }
-        server->setCallback( bind( &Daemon::connected, this, std::placeholders::_1 ) );
-        myInfo.info.peerType |= Host::TP_MASTER;
-        LOG << "Started server on port " << server->port() << "." << ende;
-    } catch ( const exception& e ) {
-        LOG_TRACE << "Daemon: Failed to start server on port " << port << ": " << e.what() << ende;
-        server.reset();
+        port++;
     }
-
 }
 
 
@@ -111,7 +115,9 @@ void Daemon::stop_server( void ) {
         LOG_DEBUG << "Stopping server." << ende;
         server->stop();
         server.reset();
+        myInfo.status.listenPort = 0;
     }
+    
 }
 
 
@@ -251,19 +257,21 @@ bool Daemon::doWork( void ) {
         uint16_t port = params["port"].as<uint16_t>();
         string master = params["master"].as<string>();
         bool dbg = params.count( "log-stdout" );    // check if -d was passed on command-line.
+        
         if( master.empty() ) {      // this is a manager instance
+            
             start_server( port );
             if( !server ) {
-                LOG_FATAL << "Failed to start server on port " << port << ", exiting!" << ende;
+                LOG_FATAL << "The manager has to be able to listen on a port, please try with another port-number!\n"
+                          << "Exiting!" << ende;
                 die();
             }
+            
             check_limits();
+            
         } else if( dbg ) {
-            int cnt(20);                            // avoid infinite failures
             uint16_t oport=port;
-            while( !server && cnt-- ) {             // try increasing port numbers until successful
-                start_server( port++ );
-            }
+            start_server( port, 20 );
             if( !server ) {
                 LOG_WARN << "Failed to start debug-listener on ports " << oport << "-" << (port-1) << ", giving up!" << ende;
             }
@@ -273,7 +281,7 @@ bool Daemon::doWork( void ) {
         LOG_DEBUG << "Initializing maintenance timer." << ende;
         timer.expires_from_now( boost::posix_time::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
-        
+
         // Add some threads for the async work.
         addThread( thread::hardware_concurrency() );
         
@@ -562,6 +570,7 @@ void Daemon::processCommand( TcpConnection::Ptr conn, uint8_t cmd, bool urgent )
             case CMD_PSTAT: sendPeerList(conn); break;
             case CMD_LOG_CONNECT: addToLog(conn); break;
             case CMD_DISCONNECT: removeConnection(conn); break;
+            case CMD_LISTEN: listen(); break;
             case CMD_DEL_SLV: ;
             case CMD_SLV_RES: resetSlaves(conn, cmd); break;
             case CMD_INTERACTIVE: interactive( conn ); break;
@@ -1194,6 +1203,11 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     if( !line.empty() ) {
                         sendToSlaves( CMD_DIE, line );
                     }
+                } else if( cmdStr == "listen" ) {
+                    if( !line.empty() ) {
+                        sendToSlaves( CMD_LISTEN, line );
+                    }
+                } else if( cmdStr == "max_local" ) {
                 } else if( cmdStr == "max-recv" ) {
                     string argStr = popword(line);
                     if( !argStr.empty() ) {
@@ -1228,10 +1242,16 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                 } else if( cmdStr == "sthreads" ) {
                     string argStr = popword(line);
                     if( !argStr.empty() ) {
-                        int nThreads = boost::lexical_cast<int>(argStr);
-                        setThreads(nThreads);
+                        int nThreads = boost::lexical_cast<int>(argStr) - server->nThreads();
+                        if( nThreads > 0 ) {
+                            server->addThread( nThreads );
+                        } else if( nThreads < 0 ) {
+                            server->delThread( std::abs(nThreads) );
+                        }
+                        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );         // small wait so threads are started.
+                        server->cleanup();
                     }
-                    replyStr = to_string( nSysThreads );
+                    replyStr = to_string( server->nThreads() );
                 } else if( cmdStr == "threads" ) {
                     string argStr = popword(line);
                     if( !argStr.empty() ) {
@@ -1301,6 +1321,17 @@ void Daemon::interactive( TcpConnection::Ptr& conn ) {
         conn->setCallback( bind( &Daemon::interactiveCB, this, std::placeholders::_1 ) );
     }
     
+}
+
+
+void Daemon::listen( void ) {
+    
+    if( myInfo.status.listenPort ) {
+        stop_server();
+    } else {
+        myInfo.status.listenPort = params["port"].as<uint16_t>();
+        start_server( myInfo.status.listenPort , 20 );
+    }
 }
 
 
