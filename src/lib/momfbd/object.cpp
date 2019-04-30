@@ -664,7 +664,12 @@ bool Object::checkCfg( void ){
         LOG_FATAL << "Each object must have at least 1 channel specified." << ende;
         return false;
     }
-
+    const float minWavelength = 1E-7;
+    const float maxWavelength = 3E-6;
+    if( wavelength < minWavelength || wavelength > maxWavelength ) {
+        LOG_FATAL << "The wavelength value (=" << wavelength << ") of Object #" << ID << " is out of bounds. [" << minWavelength << "," << maxWavelength << "]" << ende;
+        return false;
+    }
     if( !checkImageScale( telescopeF, arcSecsPerPixel, pixelSize, logChannel) ){
         return false;
     }
