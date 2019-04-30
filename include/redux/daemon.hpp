@@ -68,8 +68,10 @@ namespace redux {
         void sendToSlaves( uint8_t cmd, std::string slvString );
         void resetSlaves( network::TcpConnection::Ptr&, uint8_t );
         //Job::JobPtr selectJob(bool);
+        network::Host::Ptr getHost( network::TcpConnection::Ptr& );
         WorkInProgress::Ptr getWIP( const network::Host::Ptr& );
         void removeWIP( const network::Host::Ptr& );
+        void updateWIP( const network::Host::Ptr&, WorkInProgress::Ptr& );
         bool getWork( WorkInProgress::Ptr, uint8_t nThreads = 1);
         void sendWork( network::TcpConnection::Ptr& );
         void putParts( network::TcpConnection::Ptr& );
@@ -83,14 +85,17 @@ namespace redux {
         const po::variables_map& params;
         
         std::mutex jobsMutex;
-        size_t jobCounter;
         std::vector<Job::JobPtr> jobs;
+        size_t jobCounter;
         uint16_t nQueuedJobs;
         uint32_t hostTimeout;
         util::Semaphore inTransfers, outTransfers;
 
-        std::mutex peerMutex;
         network::Host& myInfo;
+        
+        std::mutex peerMutex;
+        std::set<network::Host::Ptr, network::Host::Compare> peers;     // list of slaves (i.e. will not include connections from e.g. rdx_stat)
+        
         std::mutex threadMutex;
         void addThread( uint16_t n );
         void delThread( uint16_t n );

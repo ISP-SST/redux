@@ -1056,10 +1056,9 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
     if( iequals( slvString, "all" ) ) {
         try {
             unique_lock<mutex> lock( peerMutex );
-            if( peerWIP.size() ) {
-                LOG << "Sending command \"" << msgStr << "\" to all " << peerWIP.size() << " slaves." << ende;
-                for( auto &pw: peerWIP ) {
-                    Host::Ptr host = pw.first;
+            if( peers.size() ) {
+                LOG_DETAIL << "Sending command \"" << msgStr << "\" to all " << peers.size() << " slaves." << ende;
+                for( auto &host: peers ) {
                     if( host ) {
                         TcpConnection::Ptr conn = server->getConnection( host );
                         if( conn ) {
@@ -1083,8 +1082,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
         std::set<uint64_t> slaveSet( slaveList.begin(), slaveList.end() );
         unique_lock<mutex> lock( peerMutex );
         slaveList.clear(); 
-        for( auto &pw: peerWIP ) {
-            Host::Ptr host = pw.first;
+        for( auto &host: peers ) {
             if( host && slaveSet.count( host->id ) ) {
                 TcpConnection::Ptr conn = server->getConnection( host );
                 if( conn ) {
@@ -1107,8 +1105,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
         std::set<string> slaveSet( slaveList.begin(), slaveList.end() );
         unique_lock<mutex> lock( peerMutex );
         vector<uint64_t> slaveIdList;
-        for( auto &pw: peerWIP ) {
-            Host::Ptr host = pw.first;
+        for( auto &host: peers ) {
             if( host && slaveSet.count( host->info.name ) ) {
                 TcpConnection::Ptr conn = server->getConnection( host );
                 if( conn ) {
@@ -1342,6 +1339,21 @@ void Daemon::listen( void ) {
 }
 
 
+network::Host::Ptr Daemon::getHost( network::TcpConnection::Ptr& conn ) {
+    unique_lock<mutex> lock( peerMutex );
+    Host::Ptr h = server->getHost( conn );
+    if( !h ) {
+        LOG_ERR << "Daemon::getHost: server returned a null-host, this should not happen!!" << ende;
+        return h;
+    }
+    auto ret = peers.insert( h );
+    if( !ret.second && (h->id != (*ret.first)->id) ) {     // re-connected host, fix the ID
+        (*ret.first)->id = h->id;
+    }
+    return *ret.first;
+}
+
+
 WorkInProgress::Ptr Daemon::getWIP( const network::Host::Ptr& host ) {
     
     if( !host ) {
@@ -1364,6 +1376,14 @@ void Daemon::removeWIP( const network::Host::Ptr& host ) {
 
 }
 
+
+void Daemon::updateWIP( const network::Host::Ptr& host, WorkInProgress::Ptr& wip ) {
+    if( host ) {
+        unique_lock<mutex> lock( peerMutex );
+        peerWIP[ host ] = wip;
+    }
+    
+}
 
 bool Daemon::getWork( WorkInProgress::Ptr wip, uint8_t nThreads ) {
 
@@ -1597,7 +1617,7 @@ void Daemon::updateHostStatus( TcpConnection::Ptr& conn ) {
 
     if( blockSize && server ) {
         try {
-            Host::Ptr host = server->getHost( conn );
+            Host::Ptr host = getHost( conn );
             if( host ) {
                 host->status.unpack( buf.get(), conn->getSwapEndian() );
                 host->touch();     // Note: lastSeen is copied over, so do a new "touch()" afterwards.
@@ -1651,8 +1671,7 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
     std::set<Host::Ptr, Host::Compare> hostList;
     {
         lock_guard<mutex> lock( peerMutex );
-        for( auto &wip : peerWIP ) {
-            Host::Ptr host = wip.first;
+        for( auto &host: peers ) {
             if( host && server->getConnection(host) ) { // only list hosts with an active connection
                 auto ret = hostList.emplace(  host );
                 if( ret.second ) {
