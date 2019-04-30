@@ -75,17 +75,27 @@ PupilInfo::operator string() const {
 
 
 void Pupil::calculatePupilSize (double &frequencyCutoff, double &pupilRadiusInPixels, uint16_t &nPupilPixels, double wavelength, uint32_t nPixels, double telescopeDiameter, double arcSecsPerPixel) {
-    static double radians_per_arcsec = M_PI / (180.0 * 3600.0);         // (2.0*PI)/(360.0*3600.0)
+    static double radians_per_arcsec = M_PI / (180.0 * 3600.0);     // (2.0*PI)/(360.0*3600.0)
+    static const vector<uint16_t> goodsizes = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
+    if( nPixels < 4 ) throw logic_error("calculatePupilSize: nPixels (="+to_string(nPixels)+") < 4, which doesn't make much sense.");
+    if( wavelength <= 0.0 ) throw logic_error("calculatePupilSize: wavelength (="+to_string(wavelength)+") <= 0.0, which doesn't make much sense.");
+    if( telescopeDiameter <= 0.0 ) throw logic_error("calculatePupilSize: telescopeDiameter (="+to_string(telescopeDiameter)+") <= 0.0, which doesn't make much sense.");
+    if( arcSecsPerPixel <= 0.0 ) throw logic_error("calculatePupilSize: arcSecsPerPixel (="+to_string(arcSecsPerPixel)+") <= 0.0, which doesn't make much sense.");
     double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
     double q_number = wavelength / (radians_per_pixel * telescopeDiameter);
     frequencyCutoff = (double) nPixels / q_number;
-    nPupilPixels = nPixels >> 2;
-    pupilRadiusInPixels = frequencyCutoff / 2.0;                   // telescope radius in pupil pixels...
-    if (nPupilPixels < pupilRadiusInPixels) {            // this should only be needed for oversampled images
-        uint16_t goodsizes[] = { 16, 18, 20, 24, 25, 27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 81, 90, 96, 100, 108, 120, 125, 128, 135, 144 };
-        for (int i = 0; (nPupilPixels = max (goodsizes[i], nPupilPixels)) < pupilRadiusInPixels; ++i);     // find right size
+    nPupilPixels = nPixels >> 2;                                    // Divide nPixels by 4 (the loop below actually works with half pupil-sizes).
+    pupilRadiusInPixels = frequencyCutoff / 2.0;                    // Telescope radius in pupil pixels.
+    if( nPupilPixels < pupilRadiusInPixels ) {                      // Only increase pupil-pixels for oversampled data
+        for( auto& gs: goodsizes ) {                                // Find a usable size in the list specified above
+            nPupilPixels = max( gs, nPupilPixels );
+            if( nPupilPixels >= pupilRadiusInPixels ) {             // Now the pupil fits -> break
+                break;
+            }
+        }
     }
     nPupilPixels <<= 1;
+
 }
 
 
