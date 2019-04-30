@@ -507,8 +507,6 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
             THREAD_MARK;
             *conn >> cmd;
             THREAD_MARK;
-            lock_guard<mutex> lock( peerMutex );
-            THREAD_MARK;
             Host::Ptr host = server->getHost( conn );
             if( !host ) throw std::runtime_error("handler(): Null host returned by server->getHost(conn)");
             host->touch();
@@ -521,12 +519,9 @@ void Daemon::handler( TcpConnection::Ptr conn ) {
         processCommand( conn, cmd );
         THREAD_MARK;
         conn->idle();
-        THREAD_UNMARK;
     } catch( const std::exception& e ) {      // disconnected -> close socket and return.
         LOG_ERR << "handler() Failed to process command Reason: " << e.what() << ende;
         server->removeConnection(conn);
-        THREAD_UNMARK;
-        return;
     }
 
 }
@@ -614,15 +609,15 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
         if( host ) {
             WorkInProgress::Ptr wip = getWIP( host );
             host->nConnections--;
-            if( wip && !host->nConnections ) {
+            if( wip ) {
                 if( wip->job && !wip->parts.empty() ) {
                     LOG_NOTICE << "Returning unfinished work to queue: " << wip->print() << ende;
                     wip->job->ungetWork( wip );
                 }
-                wip->parts.clear();
+                wip->reset();
                 wip->jobID = 0;
                 removeWIP( host );
-                LOG_NOTICE << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
+                LOG_DEBUG << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
             }
         }
         server->removeConnection( conn );
@@ -643,26 +638,26 @@ void Daemon::cleanup( void ) {
         boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
         for( auto wipit=peerWIP.begin(); wipit != peerWIP.end(); ) {
             WorkInProgress::Ptr wip = wipit->second;
-            if( wip ) {
+            Host::Ptr host = wipit->first;
+            if( wip && host ) {
                 Job::JobPtr job = wip->job;
-                Host::Ptr host = wipit->first;
                 boost::posix_time::time_duration elapsed = (now - wip->workStarted);
                 if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
                     LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << wip->print() << ende;
                     timedOutWIPs.push_back( std::move(wip) );
                 }
                 
-                if( wip && host ) {
+                if( host && job ) {
                     elapsed = (now - host->status.lastSeen);
                     if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
                         LOG_NOTICE << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << ende;
                         timedOutWIPs.push_back( std::move(wip) );
                     }
+                } else {
+                    wip.reset();
                 }
-            } else {
-                LOG_DEBUG << "Peer has an invalid WIP." << ende;
             }
-            if( !wip ) {
+            if( !wip || !host ) {
                 peerWIP.erase(wipit++);            // N.B iterator is invalidated on erase, so the postfix increment is necessary.
             } else ++wipit;
         }
@@ -686,6 +681,9 @@ void Daemon::cleanup( void ) {
         }
         // here deletedJobs will be destructed, and the jobs cleaned up. This might take a while, so we do it in a detached thread.
     }).detach();
+    
+    cleanupThreads();
+    
 }
 
 
@@ -1085,13 +1083,13 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
             if( host && slaveSet.count( host->id ) ) {
                 TcpConnection::Ptr conn = server->getConnection( host );
                 if( conn ) {
-                    LOG << "Sending command \"" << msgStr << "\" to slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
-                    slaveList.push_back(host->id);
+                    //LOG_DEBUG << "Sending command \"" << msgStr << "\" to slave #" << host->id << " (" << host->info.name << ":" << host->info.pid << ")" << ende;
+                    slaveList.push_back( host->id );
                     conn->sendUrgent( cmd );
                 }
             }
         }
-        if( !slaveList.empty() ) LOG << "Sending command \"" << msgStr << "\" to " << printArray(slaveList,"slaves") << ende;
+        if( !slaveList.empty() ) LOG_TRACE << "Sending command \"" << msgStr << "\" to " << printArray(slaveList,"slaves") << ende;
         return;
     }
     catch( const boost::bad_lexical_cast& e ) {
@@ -1114,7 +1112,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
                 }
             }
         }
-        if( !slaveIdList.empty() ) LOG << "Sending command \"" << msgStr << "\" to " << printArray(slaveIdList,"slaves") << ende;
+        if( !slaveIdList.empty() ) LOG_TRACE << "Sending command \"" << msgStr << "\" to " << printArray(slaveIdList,"slaves") << ende;
         return;
     }
     catch( const std::exception& e ) {

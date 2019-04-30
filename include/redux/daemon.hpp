@@ -17,8 +17,6 @@
 
 namespace redux {
 
-    struct WorkInProgress;
-
     class Daemon : public redux::Application {
 
     public:

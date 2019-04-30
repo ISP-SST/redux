@@ -45,7 +45,7 @@ namespace redux {
 
         template <typename T>
         struct ObjCompare {
-            bool operator()( const std::shared_ptr<T> &a, const std::shared_ptr<T> &b ) const {
+            bool operator() ( const std::shared_ptr<T> &a, const std::shared_ptr<T> &b ) const {
                 if( !a || !b ) return a < b;
                 return ( (*a) < (*b) ); }
         };

@@ -69,7 +69,7 @@ namespace redux {
         }
 
         class MomfbdJob;
-        class SubImage;
+        struct SubImage;
          /*! Container used during processing. Basically temporary arrays and reorganized references to original data.
          */
         struct Solver {
