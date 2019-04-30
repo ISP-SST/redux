@@ -141,9 +141,16 @@ void Host::active(void) {
 }
 
 
+void Host::limbo(void) {
+
+    status.lastActive = boost::posix_time::second_clock::universal_time();
+    status.state = ST_LIMBO;
+    
+}
+
+
 void Host::idle(void) {
 
-    status.lastActive = boost::posix_time::ptime(boost::posix_time::not_a_date_time);
     status.state = ST_IDLE;
     status.statusString = "idle";
 

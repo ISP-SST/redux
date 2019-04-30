@@ -75,6 +75,7 @@ namespace redux {
             void touch(void);
             void idle(void);
             void active(void);
+            void limbo(void);
             
             static Host& myInfo(void);
             static std::string printHeader( int verbosity=0 );

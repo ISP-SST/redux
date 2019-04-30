@@ -181,6 +181,7 @@ bool Worker::getWork( void ) {
         LLOG_WARN(daemon.logger) << "Failed to return data, this part will be discarded." << ende;
     }
     
+    myInfo.limbo();
     wip->isRemote = wip->hasResults = false;
     wip->resetParts();
     if( wip->job ) {
