@@ -220,10 +220,6 @@ bool Worker::getWork( void ) {
         LLOG_TRACE(daemon.logger) << "Failed to get new work: reson: " << e.what() << ende;
     }
     
-#ifdef DEBUG_
-    LLOG_TRACE(daemon.logger) << "No work available." << ende;
-#endif
-
     boost::this_thread::interruption_point();
     THREAD_UNMARK;
     return false;
@@ -243,7 +239,7 @@ void Worker::returnWork( void ) {
 
             if( conn && conn->socket().is_open() ) {
 
-                LLOG_DEBUG(daemon.logger) << "Returning result: " + wip->print() << ende;
+                LLOG_TRACE(daemon.logger) << "Returning result: " + wip->print() << ende;
 
                 uint64_t blockSize = wip->workSize();
                 size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd

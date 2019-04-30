@@ -88,9 +88,12 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
         otfSize2 = otfSize*otfSize;
         phi.resize( pupilSize, pupilSize );
         PF.resize( pupilSize, pupilSize );
-        vogel.resize( pupilSize, pupilSize );
         OTF.resize( otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX );
         imgFT.resize( otfSize, otfSize );
+        vogel.resize( pupilSize, pupilSize );
+        phi.zero();
+        PF.zero();
+        OTF.zero();
         imgFT.zero();
         vogel.zero();
     }
