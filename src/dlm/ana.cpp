@@ -77,7 +77,7 @@ IDL_VPTR redux::fzhead( int argc, IDL_VPTR* argv ) {
         vector<string> hdrTexts = header.getText();
         if( !hdrTexts.empty() ) hdrText = hdrTexts.front();
     } catch (exception& e) {
-        cout << "Failed to read ANA Header: " << e.what() << endl;
+        cout << "Failed to read ANA Header from file \"" << name << "\": " << e.what() << endl;
     }
 
     size_t textSize = hdrText.length();

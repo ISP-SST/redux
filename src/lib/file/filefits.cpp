@@ -1216,7 +1216,7 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
     }
     
     if ( ret ) {
-        throwStatusError( "Fits::read(hdr,data) data", status );
+        throwStatusError( "Fits::read(hdr,data) data (type=" + to_string(hdr->primaryHDU.dataType)+")", status );
     }
 
 }

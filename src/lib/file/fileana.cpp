@@ -385,24 +385,29 @@ void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nEleme
 
     uint8_t slice = hdr->m_CompressedHeader.slice_size;
 
+    int ret(0);
     switch( hdr->m_CompressedHeader.type ) {
         case( 0 ):
-            anadecrunch( tmp.get(), reinterpret_cast<int16_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
+            ret = anadecrunch( tmp.get(), reinterpret_cast<int16_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
             break;
         case( 1 ):
-            anadecrunch8( tmp.get(), reinterpret_cast<int8_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
+            ret = anadecrunch8( tmp.get(), reinterpret_cast<int8_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
             break;
         case( 2 ):
-            anadecrunchrun( tmp.get(), reinterpret_cast<int16_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
+            ret = anadecrunchrun( tmp.get(), reinterpret_cast<int16_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
             break;
         case( 3 ):
-            anadecrunchrun8( tmp.get(), reinterpret_cast<int8_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
+            ret = anadecrunchrun8( tmp.get(), reinterpret_cast<int8_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
             break;
         case( 4 ):
-            anadecrunch32( tmp.get(), reinterpret_cast<int32_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
+            ret = anadecrunch32( tmp.get(), reinterpret_cast<int32_t*>( data ), slice, blockSize, nBlocks, !system_is_big_endian );
             break;
         default:
             throw invalid_argument( "Ana::readCompressed(): unrecognized type of compressed data" );
+    }
+    
+    if( ret < 0 ) {
+        throw runtime_error( "Ana::readCompressed(): failed to decrunch data." );
     }
 
 }
