@@ -2049,8 +2049,6 @@ void Daemon::prepareRemoteWork( int count ) {
     vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     jlock.unlock();
 
-    tmpJobs.erase( std::remove_if( tmpJobs.begin(), tmpJobs.end(), []( const shared_ptr<Job>& j ) { return !j; }), tmpJobs.end() );
-
     WorkInProgress::Ptr wip(nullptr);
     
     try {
@@ -2076,8 +2074,10 @@ void Daemon::prepareRemoteWork( int count ) {
             std::thread( [this,wip](){
                 try {
                     for( auto& part: wip->parts ) {
-                        part->load();
-                        part->prePack();
+                        if( part ) {
+                            part->load();
+                            part->prePack();
+                        }
                     }
                     lock_guard<mutex> qlock( wip_queue_mtx );
                     wip_queue.push_back( std::move(wip) );

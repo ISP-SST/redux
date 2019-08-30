@@ -358,7 +358,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
                     patch->step = JSTEP_RUNNING;
                     THREAD_MARK;
                     wip->parts.push_back( patch );
-                    if( wip->jobID != info.id ) {     // First time for this slave -> include global data
+                    if( globalData && (wip->jobID != info.id) ) {     // First time for this slave -> include global data
                         wip->parts.push_back( globalData );
                     }
                     ret = true;
