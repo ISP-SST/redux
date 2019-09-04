@@ -15,6 +15,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/format.hpp>
 #include <boost/regex.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -126,6 +127,17 @@ bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
 
 bool redux::util::isRelative( const std::string &s ) {
     return (!s.empty() && s[0] != '/');
+}
+
+
+void redux::util::maybeCreateDir( const bfs::path& p ) {
+    
+    if( !p.empty() && !bfs::exists(p) ) {
+        if( !bfs::create_directories(p) ) {
+            cout << boost::format( "failed to create directory: %s" ) % p << endl;
+        }
+    }
+
 }
 
 

@@ -543,27 +543,33 @@ vector<string> Fits::getText( bool raw ) {
     return ret;
 }
 
+template <typename T>
+string redux::file::Fits::makeCard( string key, T value, const string& comment ) {
+    boost::to_upper(key);
+    string ret = key;
+    ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    ret += "= " + alignRight(to_string(value),20);
+    if( comment != "" ) {
+        ret += " / " + comment;
+    }
+    ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+    return ret;
+}
+
+
 namespace redux {
     namespace file {
 
-        template <typename T>
-        string Fits::makeCard( string key, T value, string comment ) {
-            string ret = key;
-            ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
-            ret += "= " + alignRight(to_string(value),20);
-            if( comment != "" ) {
-                ret += " / " + comment;
-            }
-            ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
-            return ret;
-        }
-        template string Fits::makeCard( string, int, string );
-
-
         template <>
-        string Fits::makeCard( string key, string value, string comment ) {
+        string Fits::makeCard( string key, string value, const string& comment ) {
+            boost::to_upper(key);
             string ret = key;
             ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+            if( boost::iequals( key, "COMMENT ") ) {
+                ret += value;
+                ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+                return ret;
+            }
             boost::replace_all( value, "'", "''" );
             ret += "= '" + value + "'";
             if( comment != "" ) {
@@ -573,15 +579,16 @@ namespace redux {
             return ret;
         }
         template <>
-        string Fits::makeCard( string key, const char* value, string comment ) {
+        string Fits::makeCard( string key, const char* value, const string& comment ) {
             return makeCard(key,string(value),comment);
         }
         template <>
-        string Fits::makeCard( string key, bpx::ptime date, string comment ) {
+        string Fits::makeCard( string key, bpx::ptime date, const string& comment ) {
             return makeCard(key,bpx::to_iso_extended_string(date),comment);
         }
         template <>
-        string Fits::makeCard( string key, bool value, string comment ) {
+        string Fits::makeCard( string key, bool value, const string& comment ) {
+            boost::to_upper(key);
             string ret = key;
             ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
             ret += "= ";
@@ -598,6 +605,29 @@ namespace redux {
         
     }
 }
+template string Fits::makeCard( string, int16_t, const string& );
+template string Fits::makeCard( string, uint16_t, const string& );
+template string Fits::makeCard( string, int32_t, const string& );
+template string Fits::makeCard( string, uint32_t, const string& );
+template string Fits::makeCard( string, int64_t, const string& );
+template string Fits::makeCard( string, uint64_t, const string& );
+template string Fits::makeCard( string, float, const string& );
+template string Fits::makeCard( string, double, const string& );
+
+
+string Fits::makeCard( string key, const string& comment ) {
+    boost::to_upper(key);
+    string ret = key;
+    ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    if( comment != "" ) {
+        if( !boost::iequals( key, "COMMENT ") ) {
+            ret += " / ";       // no slash needed for COMMENT keyword
+        }
+        ret += comment;
+    }
+    ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+    return ret;
+}
 
 
 void Fits::addCard( vector<string>& hdr, string card ) {
@@ -612,6 +642,17 @@ void Fits::addCard( vector<string>& hdr, string card ) {
     }
     hdr.push_back(card);
     
+}
+
+
+void Fits::removeCards( vector<string>& hdr, string key ) {
+    boost::to_upper(key);
+    key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    hdr.erase( std::remove_if( hdr.begin(), hdr.end(), [&](string a) {
+        return key.compare( a.substr(0,8) ) == 0;
+        //return boost::iequals( key, a.substr(0,8) );
+    } ),
+    hdr.end() );
 }
 
 
@@ -667,7 +708,7 @@ bool Fits::updateCard( vector<string>& hdr, string key, string card ) {
     
     key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
     size_t location = string::npos;
-    if( multiKeys.count(key) == 0 ) {   // never overwrite keywords which might have multiple entries
+    if( ! boost::iequals( "COMMENT ", key) ) {      // Always append comments instead of replacing
         for( size_t i=0; i<hdr.size(); ++i ) {
             if( boost::iequals( hdr[i].substr(0,8), key) ) {
                 location = i;
@@ -1136,6 +1177,8 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
             size_t imgSize = fptr->maxtilelen;
             size_t blockSize = fptr->rice_blocksize;
             vector<thread> threads;
+            mutex msgMtx;
+            set<string> msgs;
             for( LONGLONG i=1; i<=fptr->numrows; ++i ) {
                 LONGLONG rSize, rOffset;
                 if( fits_read_descriptll( hdr->fitsPtr_, fptr->cn_compressed, i, &rSize, &rOffset, &status ) ) {
@@ -1145,12 +1188,33 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                 if( fits_read_col( hdr->fitsPtr_, TBYTE, fptr->cn_compressed, i, 1, rSize, NULL, tmp.get(), NULL, &status ) ) {
                     throwStatusError( "Fits::read(hdr,data) reading row.", status );
                 }
-                threads.push_back( thread([ tmp, dataPtr, rSize, &imgSize, &blockSize ](){
-                    rice_decomp16( tmp.get(), rSize, reinterpret_cast<int16_t*>(dataPtr), imgSize, blockSize );
+                threads.push_back( thread([ tmp, dataPtr, rSize, i, &imgSize, &blockSize, &msgs, &msgMtx ](){
+                    string tmpMsg;
+                    try {
+                        rice_decomp16_fix( tmp.get(), rSize, reinterpret_cast<int16_t*>(dataPtr), imgSize, blockSize );
+                    } catch( std::exception& e ) {
+                        tmpMsg = string("Error during decompress: reason: ") + e.what();
+//                     }
+//                     try {
+//                         rice_decomp16_orig( tmp.get(), rSize, reinterpret_cast<int16_t*>(dataPtr), imgSize, blockSize );
+//                     } catch( std::exception& e ) {
+//                         if( !tmpMsg.empty() ) tmpMsg += "\n";
+//                         tmpMsg = string("Error during decompress: reason: ") + e.what();
+                        lock_guard<mutex> lock(msgMtx);
+                        msgs.insert( tmpMsg );
+                    }
                 }));
                dataPtr += imgSize * 2;
             }
             for( auto &t: threads ) t.join();
+            if( !msgs.empty() ) {
+                string tmpMsg;
+                for( auto& m: msgs ) {
+                    if( !tmpMsg.empty() ) tmpMsg +="\n";
+                    tmpMsg += m;
+                }
+                throw runtime_error( tmpMsg.c_str() );
+            }
         }
         return;
     }

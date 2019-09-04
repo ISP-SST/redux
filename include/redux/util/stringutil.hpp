@@ -47,6 +47,7 @@ namespace redux {
         
         bool isRelative( const std::string& );
         inline bool isRelative( const bfs::path &p ) { return isRelative( p.string() ); }
+        void maybeCreateDir( const boost::filesystem::path& );
         
         std::vector<std::set<std::string>> make_template( const std::vector<std::string>& list, std::string& out, std::string split_chars="." );
 

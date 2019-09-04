@@ -7,7 +7,6 @@
 #include <iostream>
 #include <immintrin.h>
 
-
 using namespace redux::util;
 using namespace std;
 
@@ -212,7 +211,31 @@ namespace {
 
     __attribute__ ((target ("default")))
     uint8_t* crunch_block( const uint32_t* __restrict__ block, size_t blockSize, uint8_t* __restrict__ ptr, uint8_t& __restrict__ offset, uint8_t split ) {
-        //cout << "." << flush;
+        const uint32_t unary1 = (1<<split);
+        const uint32_t fsmask = unary1 - 1;
+        const uint8_t sh = (31-split);
+        for ( size_t j=0; j<blockSize; j++ ) {
+            const uint32_t tmp1 = (block[j] >> split)+offset;
+            ptr += (tmp1>>3);
+            offset = (tmp1&7);
+            const upack_t tmp2 = ((block[j]&fsmask)|unary1)<<(sh-offset);
+            const uint32_t tmp3 = offset+split+1;       // we are setting the unary "1"-bit together with the entropy bits, hence +1
+            offset = tmp3&7;
+            //*reinterpret_cast<uint32_t*>(ptr) |= htobe32( tmp2.u32[0] );      // this is slower than the below byte-copy
+            *ptr |= tmp2.u8[3];
+            if( tmp3 > 7 ) {
+                *(++ptr) |= tmp2.u8[2];
+                if( tmp3 > 15 ) {
+                    *(++ptr) |= tmp2.u8[1];
+                }
+            }
+        }
+        return ptr;
+    }
+
+    
+    __attribute__ ((target ("default")))
+    uint8_t* crunch_block_bad( const uint32_t* __restrict__ block, size_t blockSize, uint8_t* __restrict__ ptr, uint8_t& __restrict__ offset, uint8_t split ) {
         const uint32_t unary1 = (1<<split);
         const uint32_t fsmask = unary1 - 1;
         const uint8_t sh = (31-split);
@@ -224,8 +247,12 @@ namespace {
             const uint32_t tmp3 = offset+split+1;       // we are setting the unary "1"-bit together with the entropy bits, hence +1
             //*reinterpret_cast<uint32_t*>(ptr) |= htobe32( tmp2.u32[0] );      // this is slower than the below byte-copy
             *ptr |= tmp2.u8[3];
-            *(ptr+1) |= tmp2.u8[2];     // needed when tmp3 > 7
-            //*(ptr+2) |= tmp2.u8[1];   // needed when tmp3 > 15
+            if( tmp3 > 7 ) {
+                *(++ptr) |= tmp2.u8[2];
+                if( tmp3 > 15 ) {
+                    *(++ptr) |= tmp2.u8[1];
+                }
+            }
             offset = tmp3&7;
             ptr += tmp3>>3;
         }
@@ -370,7 +397,91 @@ int redux::util::rice_comp16( const int16_t* in, size_t inSize, uint8_t* out, si
 }
 
 
-int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, size_t outSize, size_t blockSize ) {
+int redux::util::rice_comp16_bad( const int16_t* in, size_t inSize, uint8_t* out, size_t outSize, size_t blockSize ) {
+
+    // For 16-bit data we allow at most 14 bits of entropy, and encode the number of entropy-bits (split) using 4 bits.
+    const int max_entropy_bits = 14;
+  
+    const int16_t* __restrict__ inPtr = in;
+    uint8_t* __restrict__ outPtr = out;
+
+    uint32_t* __restrict__ diffPtr;
+    std::unique_ptr<int16_t[]> inTmp;
+    std::unique_ptr<uint32_t[]> diff;
+    try {
+        diffPtr = new uint32_t[ blockSize ];
+        diff.reset( diffPtr );
+        if( ((unsigned long)inPtr)%16 || blockSize%8 ) {
+            inTmp.reset( new int16_t[ blockSize ] );
+        }
+    } catch ( const std::bad_alloc& ) {
+        printf( "rice_comp16: bad_alloc." );
+        return(-1);
+    }
+
+    memset( outPtr, 0, outSize );
+    
+    uint8_t offset(0);
+    size_t thisBlockSize = blockSize;
+    int16_t refValue = inPtr[0];
+    
+    *outPtr++ = refValue>>8;     // high byte of first value
+    *outPtr++ = refValue&0xFF;   // low byte
+
+    for( size_t i=0; i<inSize; i += blockSize ) {
+
+        if( i+thisBlockSize >= inSize ) {
+            thisBlockSize = inSize - i;
+        }
+
+        int split(0);
+        if( ((unsigned long)inPtr)%16 ) {
+            memcpy( inTmp.get(), inPtr, thisBlockSize*sizeof(int16_t) );
+            split = preprocess_block( inTmp.get(), thisBlockSize, diffPtr, refValue );
+        } else {
+            split = preprocess_block( inPtr, thisBlockSize, diffPtr, refValue );
+        }
+
+        if( split >= max_entropy_bits ) {       // High entropy (hopefully rare): store data as-is without compression.
+            *reinterpret_cast<uint16_t*>(outPtr) |= split_map_4[max_entropy_bits][offset];
+            offset += 4;
+            if( offset > 7 ) {
+                outPtr += (offset>>3);
+                offset = offset&7;
+            }
+
+            outPtr = copy_block( diffPtr, thisBlockSize, outPtr, offset );
+        } else if( split == -1 ) {              // All values identical (rare): store split=0 (out is already zeroed, so just increment ptr & offset)
+            offset += 4;
+            if( offset > 7 ) {
+                outPtr += (offset>>3);
+                offset = offset&7;
+            }
+
+        } else {                                // This is the normal case, i.e. Golomb-Rice compression of the data.
+
+            // first store the split for this block
+            *reinterpret_cast<uint16_t*>(outPtr) |= split_map_4[split][offset];
+            offset += 4;
+            if( offset > 7 ) {
+                outPtr += (offset>>3);
+                offset = offset&7;
+            }
+
+            // do the bit-manipulations and store results in out-array
+            outPtr = crunch_block_bad( diffPtr, thisBlockSize, outPtr, offset, split );
+        }
+        inPtr += thisBlockSize;
+        refValue = inPtr[-1];    // reference value for next block is the last value of this block.
+
+    }
+
+    return(outPtr-out+(offset>0));
+    
+}
+
+
+int redux::util::rice_decomp16_orig( const uint8_t* in, size_t inSize, int16_t* out, size_t outSize, size_t blockSize ) {
     
     const int max_entropy_bits = 14;
   
@@ -383,13 +494,8 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
     uint32_t* __restrict__ diffPtr;
 
     std::unique_ptr<uint32_t[]> diff;
-    try {
-        diffPtr = new uint32_t[ blockSize ];
-        diff.reset( diffPtr );
-    } catch ( const std::bad_alloc& ) {
-        printf( "rice_comp16: bad_alloc." );
-        return(-1);
-    }
+    diffPtr = new uint32_t[ blockSize ];
+    diff.reset( diffPtr );
 
     memset( outPtr, 0, outSize*sizeof(int16_t) );
     const uint32_t* diffEnd = diffPtr+blockSize;
@@ -399,7 +505,7 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
     inPtr += 2;
 
     int offset(0);
-    
+   
     size_t thisBlockSize = blockSize;
     while( inPtr < inEnd && outPtr < outEnd ) {
         if( outPtr+blockSize >= outEnd ) {
@@ -407,11 +513,12 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
         }
 
         uint16_t split = ((inPtr[1] | (inPtr[0]<<8)) >> (12-offset)) & 0xF;
-
         offset += 4;
         inPtr += offset>>3;
         offset = offset&7;
 
+        if( inPtr >= inEnd ) throw std::runtime_error( "rice_decomp16: 1went out-of-bounds in the compressed array!" );
+        
         if( split == 0 ) {
             std::fill_n( outPtr, thisBlockSize, lastValue );
             outPtr += thisBlockSize;
@@ -425,11 +532,15 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
                     if( diffPtr >= diffEnd ) break;
                     if( diffPtr+nVals > diffEnd ) nVals = diffEnd-diffPtr;
                     if( nVals <= 0 ) break;
+                    if( inPtr+j+2*nVals+1 > inEnd ) throw std::runtime_error( "rice_decomp16: 2went out-of-bounds in the compressed array!" );
                     upack_t tmpU( inPtr+j, 2*nVals+1, sh );
                     j += nVals*sizeof(int16_t);
                     while(nVals--) *diffPtr++ = tmpU.u16[nVals];
                 }
             } else {
+                if( inPtr+thisBlockSize*sizeof(uint16_t) >= inEnd ) {
+                    throw std::runtime_error( "rice_decomp16: 3went out-of-bounds in the compressed array!" );
+                }
                 const uint16_t* ptr16 = reinterpret_cast<const uint16_t*>(inPtr);
                 std::transform( ptr16, ptr16+thisBlockSize, diffPtr, [](const uint16_t&a){
                     return be16toh(a);
@@ -445,12 +556,14 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
             for ( size_t j=0; j<thisBlockSize; j++ ) {
 
                 uint8_t val = *inPtr & (0xFF>>offset);
+
                 int leadingZeroes(0);
                 int cnt(0);
                 while( !val ) {
                     leadingZeroes += 8;
                     val = *(inPtr + ++cnt);
                 }
+
                 if( leadingZeroes ) {
                     leadingZeroes += nLeadingZeroes[val]-offset;
                     offset += leadingZeroes+1;
@@ -465,18 +578,21 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
                 const int nBytes = 1+(lastBit>>3);
 
                 const uint8_t rshift = ((nBytes<<3)-lastBit-1);
+                if( inPtr+nBytes > inEnd ) throw std::runtime_error( "rice_decomp16: 4went out-of-bounds in the compressed array! inEnd-inPtr=" + to_string(inEnd-inPtr)  );
                 const upack_t tmpU( inPtr, nBytes, rshift );
 
                 offset += split;
-
                 *diffPtr++ = (leadingZeroes<<split) | (tmpU.u16[0]&splitMask);
-                inPtr += offset>>3;
+                inPtr += (offset>>3);
 
                 offset = offset&7;
 
             }
         }
 
+        if( diffPtr != diffEnd ) {
+            throw std::runtime_error( "rice_decomp16: It seems not all values were unpacked: diffEnd-diffPtr=" + to_string(diffEnd-diffPtr) );
+        }
         // convert diff back to values.
         diffPtr = diff.get();
 
@@ -490,8 +606,293 @@ int redux::util::rice_decomp16( const uint8_t* in, size_t inSize, int16_t* out, 
             *outPtr = lastValue + d;
             lastValue = *outPtr++;
         }
+
     }
     
+    if( outPtr != outEnd ) {
+        throw std::runtime_error( "rice_decomp16: It seems not all values were unpacked: outEnd-outPtr=" + to_string(outEnd-outPtr) );
+    }
+
+    return 0;
+}
+
+int redux::util::rice_decomp16_dbg( const uint8_t* in, size_t inSize, int16_t* out, size_t outSize, size_t blockSize ) {
+
+    const int max_entropy_bits = 14;
+  
+    const uint8_t* __restrict__ inPtr = in;
+    int16_t* __restrict__ outPtr = out;
+    const uint8_t* __restrict__ inEnd = in+inSize;
+    const int16_t* __restrict__ outEnd = out+outSize;
+    
+
+    uint32_t* __restrict__ diffPtr;
+
+    std::unique_ptr<uint32_t[]> diff;
+    diffPtr = new uint32_t[ blockSize ];
+    diff.reset( diffPtr );
+
+
+    memset( outPtr, 0, outSize*sizeof(int16_t) );
+    const uint32_t* diffEnd = diffPtr+blockSize;
+    
+    if( inSize < 2 ) throw std::runtime_error( "rice_decomp16: insufficient input!" );
+    int32_t lastValue = inPtr[1] | (inPtr[0]<<8);
+    
+    inPtr += 2;
+
+    int offset(0);
+    size_t thisBlockSize = blockSize;
+    while( ((inPtr+1) < inEnd) && (outPtr < outEnd) ) {
+        
+        if( outPtr+blockSize >= outEnd ) {
+            thisBlockSize = outEnd-outPtr;
+        }
+        
+        uint16_t split = ((inPtr[1] | (inPtr[0]<<8)) >> (12-offset)) & 0xF;
+        offset += 4;
+        inPtr += offset>>3;
+        offset = offset&7;
+        
+        if( inPtr >= inEnd ) throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+
+        if( split == 0 ) {
+            std::fill_n( outPtr, thisBlockSize, lastValue );
+            outPtr += thisBlockSize;
+            continue;
+        } else if( split >= max_entropy_bits ) {
+            diffPtr = diff.get();
+            if( offset ) {
+                const uint8_t sh = (8-offset);
+                for ( size_t j=0; j<(thisBlockSize<<1); ) {
+                    int nVals = 3;
+                    if( diffPtr >= diffEnd ) break;
+                    if( diffPtr+nVals > diffEnd ) nVals = diffEnd-diffPtr;
+                    if( nVals <= 0 ) break;
+                    if( inPtr+j+2*nVals+1 > inEnd ) throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+                    upack_t tmpU( inPtr+j, 2*nVals+1, sh );
+                    j += nVals*sizeof(int16_t);
+                    while(nVals--) *diffPtr++ = tmpU.u16[nVals];
+                }
+            } else {
+                if( inPtr+thisBlockSize*sizeof(uint16_t) >= inEnd ) {
+                    throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+                }
+                const uint16_t* ptr16 = reinterpret_cast<const uint16_t*>(inPtr);
+                std::transform( ptr16, ptr16+thisBlockSize, diffPtr, [](const uint16_t&a){
+                    return be16toh(a);
+                });
+            }
+            inPtr += thisBlockSize * sizeof(int16_t);
+        } else {
+
+            diffPtr = diff.get();
+            split--;    // split+1 was stored.
+            const uint32_t splitMask = (1<<split) - 1;
+
+            for ( size_t j=0; j<thisBlockSize; j++ ) {
+
+                uint8_t val = *inPtr & (0xFF>>offset);
+
+
+                int leadingZeroes(0);
+                int cnt(0);
+                int oo(0);
+                while( !val ) {
+                    leadingZeroes += 8;
+                    val = *(inPtr + ++cnt);
+                }
+
+                leadingZeroes += nLeadingZeroes[val]-offset;
+                uint32_t unary1_pos = leadingZeroes+offset;
+                offset += leadingZeroes+1;
+
+
+                oo += unary1_pos>>3;
+                //inPtr += offset>>3;
+
+                offset = offset&7;
+                const int lastBit = unary1_pos%8+split;
+                const int nBytes = 1+(lastBit>>3);
+
+                const uint8_t rshift = ((nBytes<<3)-lastBit-1);
+                if( inPtr+oo+nBytes > inEnd ) throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+                const upack_t tmpU( inPtr+oo, nBytes, rshift );
+
+                offset += split;
+                oo += (lastBit>>3);
+                *diffPtr++ = (leadingZeroes<<split) | (tmpU.u16[0]&splitMask);
+                
+                int totalStep = (unary1_pos/8)+((unary1_pos%8+split+1)/8);
+                inPtr += totalStep;
+
+
+                offset = offset&7;
+            }
+        }
+
+        if( diffPtr != diffEnd ) {
+            throw std::runtime_error( "rice_decomp16: It seems not all values were unpacked: diffEnd-diffPtr=" + to_string(diffEnd-diffPtr) );
+        }
+        // convert diff back to values.
+        diffPtr = diff.get();
+
+        for ( size_t j=0; j<thisBlockSize; j++ ) {
+            int32_t d = *diffPtr++;
+            if( d & 1 ) {
+                d = ~(d>>1);
+            } else {
+                d >>= 1;
+            }
+            *outPtr = lastValue + d;
+            lastValue = *outPtr++;
+        }
+
+    }
+    
+    if( outPtr != outEnd ) {
+        throw std::runtime_error( "rice_decomp16: It seems not all values were unpacked: outEnd-outPtr=" + to_string(outEnd-outPtr) );
+    }
+
+    return 0;
+}
+
+int redux::util::rice_decomp16_fix( const uint8_t* in, size_t inSize, int16_t* out, size_t outSize, size_t blockSize ) {
+    
+    const int max_entropy_bits = 14;
+  
+    const uint8_t* __restrict__ inPtr = in;
+    int16_t* __restrict__ outPtr = out;
+    const uint8_t* __restrict__ inEnd = in+inSize;
+    const int16_t* __restrict__ outEnd = out+outSize;
+    
+    uint32_t* __restrict__ diffPtr;
+
+    std::unique_ptr<uint32_t[]> diff;
+    diffPtr = new uint32_t[ blockSize ];
+    diff.reset( diffPtr );
+
+    memset( outPtr, 0, outSize*sizeof(int16_t) );
+    const uint32_t* diffEnd = diffPtr+blockSize;
+    
+    int32_t lastValue = inPtr[1] | (inPtr[0]<<8);
+    
+    inPtr += 2;
+
+    int offset(0);
+
+    size_t thisBlockSize = blockSize;
+    while( inPtr+1 < inEnd && outPtr < outEnd ) {
+        
+        if( outPtr+blockSize >= outEnd ) {
+            thisBlockSize = outEnd-outPtr;
+        }
+
+        uint16_t split = (((inPtr[1]) | ((inPtr[0])<<8)) >> (12-offset)) & 0xF;
+
+        offset += 4;
+        inPtr += offset>>3;
+        offset = offset&7;
+        
+        if( inPtr >= inEnd ) throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+
+        if( split == 0 ) {
+            std::fill_n( outPtr, thisBlockSize, lastValue );
+            outPtr += thisBlockSize;
+            continue;
+        } else if( split >= max_entropy_bits ) {
+            diffPtr = diff.get();
+            if( offset ) {
+                const uint8_t sh = (8-offset);
+                for ( size_t j=0; j<(thisBlockSize<<1); ) {
+                    int nVals = 3;
+                    if( diffPtr >= diffEnd ) break;
+                    if( diffPtr+nVals > diffEnd ) nVals = diffEnd-diffPtr;
+                    if( nVals <= 0 ) break;
+                    if( inPtr+j+2*nVals+1 > inEnd ) throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+                    upack_t tmpU( inPtr+j, 2*nVals+1, sh );
+                    j += nVals*sizeof(int16_t);
+                    while(nVals--) *diffPtr++ = tmpU.u16[nVals];
+                }
+            } else {
+                if( inPtr+thisBlockSize*sizeof(uint16_t) >= inEnd ) {
+                    throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+                }
+                const uint16_t* ptr16 = reinterpret_cast<const uint16_t*>(inPtr);
+                std::transform( ptr16, ptr16+thisBlockSize, diffPtr, [](const uint16_t&a){
+                    return be16toh(a);
+                });
+            }
+            inPtr += thisBlockSize * sizeof(int16_t);
+        } else {
+
+            diffPtr = diff.get();
+            split--;    // split+1 was stored.
+            const uint32_t splitMask = (1<<split) - 1;
+
+            for ( size_t j=0; j<thisBlockSize; j++ ) {
+
+                uint8_t val = (*inPtr) & (0xFF>>offset);
+
+                int leadingZeroes(0);
+                int cnt(0);
+                int oo(0);
+                while( !val ) {
+                    leadingZeroes += 8;
+                    val = *(inPtr + ++cnt);
+                }
+
+                leadingZeroes += nLeadingZeroes[val]-offset;
+                uint32_t unary1_pos = leadingZeroes+offset;
+                offset += leadingZeroes+1;
+
+                oo += unary1_pos>>3;
+
+                offset = offset&7;
+                const int lastBit = unary1_pos%8+split;
+                const int nBytes = 1+(lastBit>>3);
+
+                const uint8_t rshift = ((nBytes<<3)-lastBit-1);
+                if( inPtr+oo+nBytes > inEnd ) throw std::runtime_error( "rice_decomp16: went out-of-bounds in the compressed array!" );
+                const upack_t tmpU( inPtr+oo, nBytes, rshift );
+
+                offset += split;
+                oo += (lastBit>>3);
+
+                *diffPtr++ = (leadingZeroes<<split) | (tmpU.u16[0]&splitMask);
+
+                int totalStep = (unary1_pos/8)+2*((unary1_pos%8+split+1)/8);
+                inPtr += totalStep;
+                
+                offset = offset&7;
+
+            }
+            
+        }
+        
+        if( diffPtr != diffEnd ) {
+            throw std::runtime_error( "rice_decomp16: It seems not all values were unpacked: diffEnd-diffPtr=" + to_string(diffEnd-diffPtr) );
+        }
+        // convert diff back to values.
+        diffPtr = diff.get();
+
+        for ( size_t j=0; j<thisBlockSize; j++ ) {
+            int32_t d = *diffPtr++;
+            if( d & 1 ) {
+                d = ~(d>>1);
+            } else {
+                d >>= 1;
+            }
+            *outPtr = lastValue + d;
+            lastValue = *outPtr++;
+        }
+        
+    }
+    
+    if( outPtr != outEnd ) {
+        throw std::runtime_error( "rice_decomp16: It seems not all values were unpacked: outEnd-outPtr=" + to_string(outEnd-outPtr) );
+    }
+
     return 0;
 }
 

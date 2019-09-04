@@ -19,6 +19,13 @@ RDX_ADD_EXECUTABLE( rdx_ctl rctl.cpp )
 
 RDX_ADD_EXECUTABLE( reduxd reduxd.cpp )
 
+if( RDX_WITH_FITS )
+    add_definitions(-DRDX_WITH_FITS)
+endif()
+
+RDX_ADD_EXECUTABLE( datatest datatest.cpp)
+RDX_ADD_EXECUTABLE( datafix datafix.cpp fitswriter.cpp )
+
 if( RDX_SKIP_GUI )
     return()
 endif()
