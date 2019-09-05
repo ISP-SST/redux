@@ -59,9 +59,9 @@ if( RDX_TRACE_PROC )
 endif()
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -fopenmp -pedantic -Wall -fstrict-aliasing")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O4")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -pg -DDEBUG_ -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -pg -fopenmp -DDEBUG_ -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -std=c99 -w -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -fopenmp -std=c99 -w -O3")
