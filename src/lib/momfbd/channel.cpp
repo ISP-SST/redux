@@ -50,9 +50,9 @@ Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : otfNormalization(0), I
 
 
 Channel::~Channel() {
-    THREAD_MARK;
+    THREAD_MARK
     cleanup();
-    THREAD_MARK;
+    THREAD_MARK
 }
 
 
@@ -77,7 +77,7 @@ bpt::ptree Channel::getPropertyTree( bpt::ptree& tree, bool showAll ) {
 
 void Channel::cleanup(void) {
     
-    THREAD_MARK;
+    THREAD_MARK
     imageStats.clear();
     images.clear();
     dark.clear();
@@ -92,7 +92,7 @@ void Channel::cleanup(void) {
     phi_fixed.clear();
     phi_channel.clear();
     
-    THREAD_MARK;
+    THREAD_MARK
     if( !cacheFile.empty() ) {
         bfs::path tmpP(cacheFile);
         if( bfs::exists(tmpP) ) {
@@ -103,7 +103,7 @@ void Channel::cleanup(void) {
             }
         }
     }
-    THREAD_MARK;
+    THREAD_MARK
 
 }
 

@@ -513,11 +513,11 @@ void Daemon::unlockMaster(void) {
 void Daemon::connected( TcpConnection::Ptr conn ) {
 
     try {
-        THREAD_MARK;
+        THREAD_MARK
         addConnection( conn );
         conn->setCallback( bind( &Daemon::handler, this, std::placeholders::_1 ) );
         conn->setErrorCallback( bind( &Daemon::removeConnection, this, std::placeholders::_1 ) );
-        THREAD_UNMARK;
+        THREAD_UNMARK
         return;
     } catch( const exception& e ) {
         LOG_ERR << "connected() Failed to process new connection. Reason: " << e.what() << ende;
@@ -530,29 +530,31 @@ void Daemon::connected( TcpConnection::Ptr conn ) {
 
 void Daemon::handler( TcpConnection::Ptr conn ) {
     
-    THREAD_MARK;
+    THREAD_MARK
     Command cmd = CMD_ERR;
     try {
         try {
-            THREAD_MARK;
+            THREAD_MARK
             *conn >> cmd;
-            THREAD_MARK;
+            THREAD_MARK
             Host::Ptr host = server->getHost( conn );
             if( !host ) throw std::runtime_error("handler(): Null host returned by server->getHost(conn)");
             host->touch();
         } catch( const exception& e ) {      // no data, disconnected or some other unrecoverable error -> close socket and return.
             server->removeConnection( conn );
-            THREAD_UNMARK;
+            THREAD_UNMARK
             return;
         }
-        THREAD_MARK;
+        THREAD_MARK
         processCommand( conn, cmd );
-        THREAD_MARK;
+        THREAD_MARK
         conn->idle();
+        THREAD_UNMARK
     } catch( const std::exception& e ) {      // disconnected -> close socket and return.
         LOG_ERR << "handler() Failed to process command Reason: " << e.what() << ende;
         server->removeConnection(conn);
     }
+    THREAD_UNMARK
 
 }
 
@@ -1492,8 +1494,11 @@ void Daemon::removeWIP( const network::Host::Ptr& host ) {
 
 
 void Daemon::updateWIP( const network::Host::Ptr& host, WorkInProgress::Ptr& wip ) {
+    THREAD_MARK
     if( host ) {
+        THREAD_MARK
         unique_lock<mutex> lock( peerMutex );
+        THREAD_MARK
         peerWIP[ host ] = wip;
     }
     
@@ -1505,11 +1510,15 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
     shared_ptr<char> data;
     uint64_t count(0); 
 
+    
+    THREAD_MARK
     uint32_t oldJobID(0);
     *conn >> oldJobID;
     
     WorkInProgress::Ptr wip(nullptr);
+    THREAD_MARK
     Host::Ptr host = getHost( conn );
+    THREAD_MARK
     if( host ) {
         host->limbo();
         Semaphore::Scope ss( outTransfers, 5 ); // if we 're not allowed a transfer-slot in 5 secs, idle slave & try later.
@@ -1538,6 +1547,7 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
             }
         }
     }
+    THREAD_MARK
         
     if( count ) {
         pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)
@@ -1548,23 +1558,28 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
         conn->syncWrite(count);
         host->idle();
     }
+    THREAD_UNMARK
 
 }
 
 
 void Daemon::putParts( TcpConnection::Ptr conn ) {
-
+    THREAD_MARK
     Host::Ptr host = server->getHost( conn );
+    THREAD_MARK
     if( host ) {
         bool endian = conn->getSwapEndian();
         string msg = "Received results from " + host->info.name + ":" + to_string(host->info.pid);
         size_t blockSize;
         shared_ptr<char> buf = conn->receiveBlock( blockSize );
+        THREAD_MARK
         if( blockSize ) {
             WorkInProgress::Ptr wip = getWIP( host );
             msg += "   " + wip->print();
             //std::thread([this,wip,buf,endian,msg](){
             ioService.post([this,wip,buf,endian,msg](){
+            THREAD_MARK
+                THREAD_MARK
                 WorkInProgress::Ptr tmpwip = getIdleWIP();
                 WorkInProgress::Ptr wip_bak = getIdleWIP();
                 std::shared_ptr<Job> tmpJob = wip->job.lock();
@@ -1573,6 +1588,7 @@ void Daemon::putParts( TcpConnection::Ptr conn ) {
                 wip_bak->job = tmpJob;
                 tmpwip->job = tmpJob;
                 wip->reset();
+                THREAD_MARK
                 try {
                     tmpwip->unpackWork( buf.get(), tmpJob, endian );
                     tmpwip->returnResults();   // TBD: should this step be async/by manager?
@@ -1586,14 +1602,16 @@ void Daemon::putParts( TcpConnection::Ptr conn ) {
                 putIdleWIP( wip_bak );
             });
             //}).detach();
+                THREAD_UNMARK
         } else {
             LOG_TRACE << "Received unexpected results. The Host/Job probably timed out." << ende;
             //throw logic_error("Received results from unexpected host. It probably timed out.");
         }
         host->idle();
     }
-
+    THREAD_MARK
     *conn << CMD_OK;
+    THREAD_UNMARK
     
 }
 
@@ -1812,6 +1830,7 @@ void Daemon::threadLoop( void ) {
 
     while( runMode == LOOP ) {
         try {
+            THREAD_UNMARK
             boost::this_thread::interruption_point();
             ioService.run();
         } catch( const ThreadExit& e ) {
@@ -1837,9 +1856,9 @@ void Daemon::threadLoop( void ) {
 
 void Daemon::putActiveWIP( WorkInProgress::Ptr wip ) {
     
-    THREAD_MARK;
+    THREAD_MARK
     lock_guard<mutex> alock( wip_active_mtx );
-    THREAD_MARK;
+    THREAD_MARK
     wip_active.insert( wip );
     
 }
@@ -1875,9 +1894,9 @@ WorkInProgress::Ptr  Daemon::getActiveWIP( WorkInProgress::Ptr wip ) {
 
 void Daemon::getIdleWIP( WorkInProgress::Ptr& wip ) {
 
-    THREAD_MARK;
+    THREAD_MARK
     lock_guard<mutex> ilock( wip_idle_mtx );
-    THREAD_MARK;
+    THREAD_MARK
     if( wip_idle.size() ) {
         wip = std::move( *wip_idle.begin() );
         wip_idle.erase( wip_idle.begin() );
@@ -1891,9 +1910,9 @@ void Daemon::getIdleWIP( WorkInProgress::Ptr& wip ) {
 
 WorkInProgress::Ptr Daemon::getIdleWIP( void ) {
     WorkInProgress::Ptr ret(nullptr);
-    THREAD_MARK;
+    THREAD_MARK
     getIdleWIP( ret );
-    THREAD_MARK;
+    THREAD_MARK
     return ret;
 }
 
@@ -1922,7 +1941,9 @@ WorkInProgress::Ptr Daemon::getLocalWIP( void ) {
 WorkInProgress::Ptr Daemon::getRemoteWIP( void ) {
     WorkInProgress::Ptr ret(nullptr);
     {
+        THREAD_MARK
         lock_guard<mutex> qlock( wip_queue_mtx );
+        THREAD_MARK
         if( wip_queue.size() ) {
             std::swap(ret, wip_queue.front());
             wip_queue.pop_front();
@@ -1933,16 +1954,20 @@ WorkInProgress::Ptr Daemon::getRemoteWIP( void ) {
 
 
 bool Daemon::getWork( WorkInProgress::Ptr& wip, bool remote ) {
-
+    THREAD_MARK
     WorkInProgress::Ptr tmp_wip;
     if( remote ) tmp_wip = getRemoteWIP();
     else tmp_wip = getLocalWIP();
+    THREAD_MARK
     
     if( !tmp_wip ) {
+        THREAD_MARK
         return false;
     }
 
+    THREAD_MARK
     if( !wip ) getIdleWIP( wip );
+    THREAD_MARK
     
     Job::JobPtr job = tmp_wip->job.lock();
     if( job ) {
@@ -1956,6 +1981,7 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, bool remote ) {
     *wip = *tmp_wip;                //  copy part to leave the job/part unmodified
     wip->job = job;
     putActiveWIP( tmp_wip );
+    THREAD_MARK
 
     return true;
     
@@ -1987,17 +2013,24 @@ void Daemon::returnWork( WorkInProgress::Ptr wip ) {
 
 
 void Daemon::prepareLocalWork( int count ) {
+    
+    THREAD_MARK
 
+
+    THREAD_MARK
     auto glock = Job::getGlobalLock();
     map<Job::StepID,Job::CountT> activeCounts = Job::counts;
     glock.unlock();
+    THREAD_MARK
 
     unique_lock<mutex> jlock( jobsMutex );
     vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
     jlock.unlock();
+    THREAD_MARK
 
     tmpJobs.erase( std::remove_if( tmpJobs.begin(), tmpJobs.end(), []( const shared_ptr<Job>& j ) { return !j; }), tmpJobs.end() );
     
+    THREAD_MARK
     std::sort( tmpJobs.begin(), tmpJobs.end(),[&](const Job::JobPtr& a, const Job::JobPtr& b ){
         if(a->info.step != b->info.step) return (a->info.step > b->info.step);
         if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
@@ -2009,11 +2042,14 @@ void Daemon::prepareLocalWork( int count ) {
     
     try {
         while( count > 0 ) {
+            THREAD_MARK
             getIdleWIP( wip );
             wip->isRemote = false;
             bool gotJob(false);
             try {
+                THREAD_MARK
                 for( Job::JobPtr job: tmpJobs ) {
+                THREAD_MARK
                     if( job && job->getWork( wip, myInfo.status.nThreads, activeCounts ) ) {
                         wip->job = job;
                         gotJob = true;
@@ -2021,33 +2057,42 @@ void Daemon::prepareLocalWork( int count ) {
                     }
                 }
             } catch ( ... ) { }
+            THREAD_MARK
 
             if( !gotJob ) {
                 putIdleWIP( wip );
                 break;
             }
+            THREAD_MARK
             
             std::thread( [this,wip](){
+                THREAD_MARK
                 try {
                     for( auto& part: wip->parts ) {
                         part->load();
                     }
+                    THREAD_MARK
                     lock_guard<mutex> qlock( wip_queue_mtx );
                     wip_localqueue.push_back( std::move(wip) );
+                    THREAD_MARK
                 } catch( ... ) {
                     if( wip ) {
                         Job::JobPtr job = wip->job.lock();
                         if( job ) job->ungetWork( wip );
                     }
+                    THREAD_MARK
                 }
                 --preparing_local;
+                THREAD_UNMARK
             }).detach();
+            THREAD_MARK
             --count;
         }
     } catch( ... ) { }
-    
+    THREAD_UNMARK
     preparing_local -= count;
 
+    
 }
 
 
@@ -2065,11 +2110,14 @@ void Daemon::prepareRemoteWork( int count ) {
     
     try {
         while( count > 0 ) {
+            THREAD_MARK
             getIdleWIP( wip );
             wip->isRemote = true;
             bool gotJob(false);
             try {
+                THREAD_MARK
                 for( Job::JobPtr job: tmpJobs ) {
+                THREAD_MARK
                     if( job && job->getWork( wip, 0, activeCounts ) ) {
                         wip->job = job;
                         gotJob = true;
@@ -2077,13 +2125,16 @@ void Daemon::prepareRemoteWork( int count ) {
                     }
                 }
             } catch ( ... ) { }
+            THREAD_MARK
 
             if( !gotJob || !wip ) {
                 putIdleWIP( wip );
                 break;
             }
+            THREAD_MARK
             
             std::thread( [this,wip](){
+                THREAD_MARK
                 try {
                     for( auto& part: wip->parts ) {
                         if( part ) {
@@ -2091,6 +2142,7 @@ void Daemon::prepareRemoteWork( int count ) {
                             part->prePack();
                         }
                     }
+                    THREAD_MARK
                     lock_guard<mutex> qlock( wip_queue_mtx );
                     wip_queue.push_back( wip );
                 } catch( ... ) {
@@ -2098,15 +2150,17 @@ void Daemon::prepareRemoteWork( int count ) {
                         Job::JobPtr job = wip->job.lock();
                         if( job ) job->ungetWork( wip );
                     }
+                    THREAD_MARK
                 }
                 --preparing_remote;
+                THREAD_UNMARK
             }).detach();
+            THREAD_MARK
             --count;
         }
     } catch( ... ) { }
-
+    THREAD_UNMARK
     preparing_remote -= count;
-    
 }
 
 
@@ -2114,7 +2168,9 @@ void Daemon::prepareWork( void ) {
 
     while( runMode == LOOP ) {
         try {
+            THREAD_UNMARK
             std::this_thread::sleep_for( std::chrono::milliseconds(100) );      // just to avoid a busy-loop.
+            THREAD_MARK
             {
                 lock_guard<mutex> lock( wip_lqueue_mtx );
                 int nToPrepare = 0;
@@ -2122,16 +2178,20 @@ void Daemon::prepareWork( void ) {
                     nToPrepare = 1;
                 }
                 if( nToPrepare > 0 ) {
+                    THREAD_MARK
                     preparing_local += nToPrepare;
                     std::thread( std::bind( &Daemon::prepareLocalWork, this, nToPrepare  ) ).detach();
                 }
             }
+            THREAD_MARK
             lock_guard<mutex> lock( wip_queue_mtx );
             int nToPrepare = max_remote - wip_queue.size() - preparing_remote ;
             if( nToPrepare > 0 ) {
+                THREAD_MARK
                 preparing_remote += nToPrepare;
                 std::thread( std::bind( &Daemon::prepareRemoteWork, this, nToPrepare ) ).detach();
             }
+            THREAD_MARK
         } catch(...){ }
     }
     

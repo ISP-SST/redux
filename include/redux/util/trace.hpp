@@ -169,8 +169,8 @@ namespace redux {
 }   // redux
 
 #ifdef TRACE_THREADS
-#define THREAD_MARK redux::util::thread_trace(__FILE__,__LINE__)
-#define THREAD_UNMARK redux::util::thread_untrace()
+#define THREAD_MARK redux::util::thread_trace(__FILE__,__LINE__);
+#define THREAD_UNMARK redux::util::thread_untrace();
 #else
 #define THREAD_MARK 
 #define THREAD_UNMARK 

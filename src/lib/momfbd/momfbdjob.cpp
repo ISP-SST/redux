@@ -62,7 +62,7 @@ MomfbdJob::~MomfbdJob( void ) {
     THREAD_MARK;
     MomfbdJob::cleanup();
     Job::moveTo( this, Job::JSTEP_NONE );
-    THREAD_MARK;
+    THREAD_MARK
 }
 
 
@@ -71,15 +71,23 @@ uint64_t MomfbdJob::packParts( char* ptr, WorkInProgress::Ptr wip  ) const {
     using redux::util::pack;
     if( !wip ) throw job_error( info.name + ": Can not pack parts without a valid WIP instance."  );
     if( wip->parts.empty() ) throw job_error( info.name + ": Can not pack an empty list of parts."  );
+    THREAD_MARK
     wip->parts.resize(1);
+    THREAD_MARK
     uint64_t count = wip->parts[0]->pack( ptr );
+    THREAD_MARK
     if( wip->jobID != info.id ) {           // First part from this job, so we need to send the global info
+        THREAD_MARK
         if( globalData ) {
+            THREAD_MARK
             count += globalData->pack( ptr+count );
+            THREAD_MARK
             wip->parts.push_back( globalData );
+            THREAD_MARK
         } else throw job_error( info.name + ": No globalData defined."  );
     }
     wip->nParts = wip->parts.size();
+    THREAD_MARK
     return count;
     
 }
@@ -279,13 +287,13 @@ void MomfbdJob::checkParts( void ) {
 
     uint16_t mask = 0;
 
-    THREAD_MARK;
+    THREAD_MARK
     auto lock = getLock( true );
     if( !lock.owns_lock() ) {
-        THREAD_UNMARK;
+        THREAD_UNMARK
         return;
     }
-
+    THREAD_MARK
     for( auto & patch : patches ) {
         if( (patch->step == JSTEP_RUNNING) && (patch.use_count() == 1) ) {  // no reference in any existing WIP, so it is in limbo.
             patch->step = JSTEP_ERR;
@@ -298,7 +306,7 @@ void MomfbdJob::checkParts( void ) {
         mask |= patch->step;
     }
     lock.unlock();
-    THREAD_MARK;
+    THREAD_MARK
     if( mask & JSTEP_ERR ) {
         moveTo( this, JSTEP_ERR );
         info.state.store( JSTATE_ERR );
@@ -307,7 +315,7 @@ void MomfbdJob::checkParts( void ) {
     } else if( countBits( mask ) == 1 ) {  // if all parts are "done", set the whole job to done.
          if(mask == JSTEP_DONE) moveTo( this, mask );
     }
-    
+    THREAD_UNMARK
 }
 
 
@@ -330,34 +338,35 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
 
         auto lock = getLock(true);
         if( lock && (info.step == JSTEP_QUEUED) ) {                            // preprocessing ready -> start
-            THREAD_MARK;
+            THREAD_MARK
             auto glock = Job::getGlobalLock();
             const CountT& limits = counts[StepID(jobType,JSTEP_RUNNING)];
             if( limits.active >= limits.max ) return ret;
             glock.unlock();
-            THREAD_MARK;
+            THREAD_MARK
             moveTo( this, JSTEP_RUNNING );
             updateProgressString();
             progWatch.clear();
             progWatch.set( patches.nElements() );
             progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
             progWatch.setHandler([this](){
-                THREAD_MARK;
+                THREAD_MARK
                 moveTo( this, JSTEP_DONE );
                 updateProgressString();
-                THREAD_UNMARK;
+                THREAD_UNMARK
             });
             startLog();
-            THREAD_MARK;
+            THREAD_MARK
             prePack();
+            THREAD_MARK
         }
         if( lock && (info.step == JSTEP_RUNNING) ) {                      // running
-            THREAD_MARK;
+            THREAD_MARK
             wip->resetParts();
             for( auto & patch : patches ) {
                 if( patch && (patch->step == JSTEP_QUEUED) ) {
                     patch->step = JSTEP_RUNNING;
-                    THREAD_MARK;
+                    THREAD_MARK
                     wip->parts.push_back( patch );
                     if( globalData && (wip->jobID != info.id) ) {     // First time for this slave -> include global data
                         wip->parts.push_back( globalData );
@@ -366,12 +375,12 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
                     break;// only 1 part at a time for MomfbdJob
                 }
             }
-            THREAD_MARK;
+            THREAD_MARK
         }
         wip->nParts = wip->parts.size();
         return ret;
     } else {    // local processing, i.e. on master.
-        THREAD_MARK;
+        THREAD_MARK
         uint16_t nextStep = getNextStep(step);
         switch( step ) {
             case JSTEP_NONE:                            // Minor jobs
@@ -390,23 +399,23 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
                 check();
                 return false;
         }
-        THREAD_MARK;
+        THREAD_MARK
         if( ret && !nThreads ) {    // don't start heavy/async jobs if nThreads=0.
             return false;
         }
-        THREAD_MARK;
+        THREAD_MARK
         auto lock = getGlobalLock();
         const CountT& limits = counts[StepID(jobType,nextStep)];
         if( limits.active >= limits.max ) {   // Not allowed to start until some jobs are done with this step
             return false;
         } else lock.unlock();
-        THREAD_MARK;
+        THREAD_MARK
         if( step == JSTEP_SUBMIT ) {    // No check done yet. It will now be run asynchronously, so return from here to avoid a race with moveTo() below.
             startLog();
             check();
             return false;
         }
-        THREAD_MARK;
+        THREAD_MARK
         if( step == JSTEP_CHECKED ) {
             // we are also restricted by nQueued.
             const CountT& limits2 = counts[StepID(jobType,JSTEP_QUEUED)];
@@ -416,9 +425,9 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
             startLog();
             info.startedTime = boost::posix_time::second_clock::universal_time();
         }
-        THREAD_MARK;
+        THREAD_MARK
         if( (step == JSTEP_WRITING) && !checkWriting() ) return false;
-        THREAD_MARK;
+        THREAD_MARK
         moveTo( this, nextStep );
         updateProgressString();
         
@@ -453,7 +462,7 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
     boost::posix_time::time_duration elapsed = (now - wip->workStarted);
     
     {
-        THREAD_MARK;
+        THREAD_MARK
         for( auto& part : wip->parts ) {
             auto tmpPatch = static_pointer_cast<PatchData>( part );
             PatchData::Ptr patch = patches( tmpPatch->index.y, tmpPatch->index.x );
@@ -470,7 +479,7 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
         }
     }
 
-    THREAD_MARK;
+    THREAD_MARK
 
 }
 
@@ -491,7 +500,7 @@ void MomfbdJob::cleanup(void) {
     progWatch.clear();
     solver.reset();
 
-    THREAD_MARK;
+    THREAD_MARK
     for( auto &o: objects ) {
         o->cleanup();
     }
@@ -499,7 +508,7 @@ void MomfbdJob::cleanup(void) {
     objects.clear();
     globalData.reset();
     
-    THREAD_MARK;
+    THREAD_MARK
 }
 
 
@@ -534,7 +543,7 @@ size_t MomfbdJob::procUsage(void) {
 
 bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
     
-    THREAD_MARK;
+    THREAD_MARK
     uint16_t jobStep = info.step.load();
     uint16_t patchStep = 0;
     uint16_t nThreads = std::min( maxThreads, info.maxThreads );
@@ -550,11 +559,11 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
     if(wip->parts.size() && wip->parts[0]) patchStep = wip->parts[0]->step;
 
     if( jobStep == JSTEP_PREPROCESS ) {
-        THREAD_MARK;
+        THREAD_MARK
         progWatch.set(0,0);
         progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
         preProcess();                           // preprocess on master: load, flatfield, split in patches
-        THREAD_MARK;
+        THREAD_MARK
     } else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
         if( patchStep == JSTEP_POSTPROCESS ) {      // patch-wise post-processing, do we need any for momfbd?  the filtering etc. is done on the slaves.
         } else {                                    // main processing
@@ -581,11 +590,11 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
             }
         }
     } else if( jobStep == JSTEP_VERIFY ) {
-        THREAD_MARK;
+        THREAD_MARK
         verifyPatches();
         updateProgressString();
     } else if( jobStep == JSTEP_POSTPROCESS ) {
-        THREAD_MARK;
+        THREAD_MARK
         writeOutput();
     } else {
         LOG << "MomfbdJob::run()  unrecognized step = " << ( int )info.step.load() << ende;
@@ -593,7 +602,7 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
         updateProgressString();
     }
     
-    THREAD_UNMARK;
+    THREAD_UNMARK
     return false;
     
 }
@@ -720,13 +729,13 @@ bool MomfbdJob::checkPatchPositions(void) {
 
 void MomfbdJob::unloadCalib( void ) {
 
-    THREAD_MARK;
+    THREAD_MARK
     for( shared_ptr<Object>& obj : objects ) {
         for( shared_ptr<Channel>& ch : obj->channels ) {
             ch->unloadCalib();
         }
     }
-    THREAD_MARK;
+    THREAD_MARK
     if( runFlags & RF_FLATFIELD ) {
         LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") flat-fielding completed." << ende;
         moveTo( this, JSTEP_COMPLETED );
@@ -742,7 +751,7 @@ void MomfbdJob::unloadCalib( void ) {
     }
     info.state.store( JSTATE_IDLE );
     updateProgressString();
-    THREAD_MARK;
+    THREAD_UNMARK
     
 }
 
@@ -773,7 +782,7 @@ void MomfbdJob::preProcess( void ) {
     progWatch.setTarget( nTotalImages );
     progWatch.setHandler( std::bind( &MomfbdJob::unloadCalib, this ) );
 
-    THREAD_MARK;
+    THREAD_MARK
     if( !(runFlags&RF_FLATFIELD) ) {    // Skip this if we are only doing flatfielding
         
         uint16_t halfPatchSize = patchSize/2;
@@ -817,21 +826,21 @@ void MomfbdJob::preProcess( void ) {
         }
 
         ioService.post( [this](){
-            THREAD_MARK;
+            THREAD_MARK
             initCache();
-            THREAD_MARK;
+            THREAD_MARK
             ++progWatch;
-            THREAD_MARK;
+            THREAD_UNMARK
         } );
         
     }       // end RF_FLATFIELD
 
-    THREAD_MARK;
+    THREAD_MARK
     for( shared_ptr<Object>& obj : objects ) {
         obj->loadData( ioService, patches );
     }
     
-    THREAD_MARK;
+    THREAD_MARK
     waveFronts.loadInit( ioService, patches );
     
 }
@@ -872,7 +881,7 @@ void MomfbdJob::initCache(void) {
 
 void MomfbdJob::clearPatches(void) {
 
-    THREAD_MARK;
+    THREAD_MARK
     auto lock = getLock();
     
     THREAD_MARK;
@@ -891,7 +900,7 @@ void MomfbdJob::clearPatches(void) {
  
 void MomfbdJob::verifyPatches( void ) {
 
-    THREAD_MARK;
+    THREAD_MARK
     moveTo( this, JSTEP_VERIFIED );
     return; // TODO fix patch verification & posTprocessing
 
@@ -963,10 +972,10 @@ cout << printArray( solver->alpha.get(), 20, "alphaB" ) << endl;
         LOG << "verifyPatches: " << nFailedPatches << " patches failed, returning them to queue with new initial values." << ende;
         progWatch.set( patches.nElements() );
         progWatch.setHandler([this](){
-            THREAD_MARK;
+            THREAD_MARK
             moveTo( this, JSTEP_DONE );
             updateProgressString();
-            THREAD_MARK;
+            THREAD_MARK
         });
         progWatch.step( patches.nElements()-nFailedPatches );
         moveTo( this, JSTEP_RUNNING );
@@ -982,7 +991,7 @@ cout << printArray( solver->alpha.get(), 20, "alphaB" ) << endl;
 
 void MomfbdJob::writeOutput( void ) {
     
-    THREAD_MARK;
+    THREAD_MARK
     moveTo( this, JSTEP_WRITING );
     
     progWatch.clear();
@@ -1071,23 +1080,23 @@ void MomfbdJob::writeOutput( void ) {
 
     }
     
-    THREAD_MARK;
+    THREAD_MARK
     for( auto obj : objects ) {
         ioService.post( [this,obj](){
-            THREAD_MARK;
+            THREAD_MARK
             obj->writeResults( patches );
-            THREAD_MARK;
+            THREAD_UNMARK
         });
     }
-    THREAD_MARK;
+    THREAD_MARK
     for( auto tobj : trace_objects ) {
         ioService.post( [this,tobj](){
-            THREAD_MARK;
+            THREAD_MARK
             tobj->writeResults( patches );
-            THREAD_MARK;
+            THREAD_UNMARK
         });
     }
-    THREAD_MARK;
+    THREAD_MARK
 
 }
 
@@ -1096,9 +1105,9 @@ void MomfbdJob::loadPatchResults( void ) {
 
     for( auto& patch: patches ) {
         ioService.post( [this,patch](){
-            THREAD_MARK;
+            THREAD_MARK
             ++progWatch;
-            THREAD_MARK;
+            THREAD_UNMARK
         });
     }
     
@@ -1402,7 +1411,7 @@ bool MomfbdJob::check(void) {
             moveTo( this, JSTEP_CHECKING );
             updateProgressString();
             std::thread([this]() {
-                THREAD_MARK;
+                THREAD_MARK
                 auto lock = getLock();
                 bool all_ok =  (cfgChecked || checkCfg());
                 all_ok &= (dataChecked || checkData(false));
@@ -1433,7 +1442,7 @@ bool MomfbdJob::check(void) {
         case JSTEP_WRITING: break; 
         default: LOG_ERR << "MomfbdJob::check(): No check defined for step = " << (int)info.step << ende;
     }
-    THREAD_MARK;
+    THREAD_MARK
     return ret;
     
 }

@@ -1,9 +1,14 @@
 #include "redux/work.hpp"
 
+#ifdef DEBUG_
+#   define TRACE_THREADS
+#endif
+
 #include "redux/job.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
+#include "redux/util/trace.hpp"
 
 using namespace redux::util;
 using namespace redux;
@@ -177,15 +182,18 @@ uint64_t WorkInProgress::packWork( char* ptr ) {
     if( !thisJob ) {
         throw invalid_argument( "Can't pack WIP without a job instance..." );
     }
+    THREAD_MARK
     using redux::util::pack;
     uint64_t count = this->size();                                  // skip WIP info, it's packed below.
     bool newJob = (jobID != thisJob->info.id);
     count += pack( ptr+count, newJob );
+    THREAD_MARK
     if( newJob ) {
         count += thisJob->pack( ptr+count );                            // pack Job-info
     }
     count += thisJob->packParts( ptr+count, shared_from_this() );       // pack parts
     this->pack( ptr );                                              // write WIP info, (done last, in case nParts changed).
+    THREAD_MARK
     return count;
 }
 

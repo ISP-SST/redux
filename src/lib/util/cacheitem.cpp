@@ -43,9 +43,9 @@ CacheItem::~CacheItem() {
 
 void CacheItem::cacheClear(void) {
 
-    THREAD_MARK;
+    THREAD_MARK
     unique_lock<mutex> lock(itemMutex);
-    THREAD_MARK;
+    THREAD_MARK
     try {
         cclear();
         isLoaded = false;
@@ -82,9 +82,9 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
 
     bool ret(false);
     try {
-        THREAD_MARK;
+        THREAD_MARK
         unique_lock<mutex> lock(itemMutex);
-        THREAD_MARK;
+        THREAD_MARK
         if( fullPath.empty() ) {
             return ret;
         }
@@ -107,7 +107,7 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                 }
             }
         }
-        THREAD_MARK;
+        THREAD_MARK
         if( isLoaded && removeAfterLoad ) {
             bfs::remove(fullPath);
         }
@@ -126,9 +126,9 @@ bool CacheItem::cacheStore(bool clearAfterStore){
 
     bool ret(false);
     try {
-        THREAD_MARK;
+        THREAD_MARK
         unique_lock<mutex> lock(itemMutex);
-        THREAD_MARK;
+        THREAD_MARK
         if(fullPath.empty()) {
             return ret;
         }
@@ -149,7 +149,7 @@ bool CacheItem::cacheStore(bool clearAfterStore){
                 }
             }
         }
-        THREAD_MARK;
+        THREAD_MARK
         if(ret && clearAfterStore) {
             cclear();
             isLoaded = false;

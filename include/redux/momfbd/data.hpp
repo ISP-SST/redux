@@ -88,7 +88,7 @@ namespace redux {
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
             
-            ObjectData(void) {};
+            ObjectData(void);
             explicit ObjectData( std::shared_ptr<Object> o );
             ~ObjectData();
             
@@ -122,6 +122,8 @@ namespace redux {
 #endif
         {
 
+            WavefrontData();
+            ~WavefrontData();
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -201,8 +203,9 @@ namespace redux {
             std::map<ScaledModeInfo, std::shared_ptr<ModeSet>> scaled_modes;
             std::map<redux::image::PupilInfo, std::shared_ptr<redux::image::Pupil>> pupils;
             Constraints constraints;
-            explicit GlobalData(MomfbdJob& j ) : constraints(j) { partType = PT_GLOBAL; };
             std::shared_ptr<ModeSet> get(const ModeInfo&, double scale, const std::shared_ptr<redux::image::Pupil>& pupil, const std::shared_ptr<ModeSet>& ms=nullptr);
+            explicit GlobalData( MomfbdJob& j );
+            ~GlobalData();
             std::shared_ptr<ModeSet> get(const ModeInfo&, const std::shared_ptr<ModeSet>& ms=nullptr);
             std::shared_ptr<redux::image::Pupil> get(const redux::image::PupilInfo&,
                                                      const std::shared_ptr<redux::image::Pupil>& ms=nullptr);

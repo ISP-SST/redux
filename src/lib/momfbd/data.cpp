@@ -17,12 +17,47 @@ using namespace redux;
 using namespace std;
 
 
+#ifdef DEBUG_
+//#   define DBG_PD_
+//#   define DBG_OD_
+//#   define DBG_CD_
+//#   define DBG_WFD_
+//#   define DBG_GD_
+#endif
+
+namespace {
+    
+#ifdef DBG_PD_
+    static atomic<int> pdCounter(0);
+#endif
+#ifdef DBG_OD_
+    static atomic<int> odCounter(0);
+#endif
+#ifdef DBG_CD_
+    static atomic<int> cdCounter(0);
+#endif
+#ifdef DBG_WFD_
+    static atomic<int> wfdCounter(0);
+#endif
+#ifdef DBG_GD_
+    static atomic<int> gdCounter(0);
+#endif
+    
+}
+
+
 ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
     if( !c ) throw logic_error("Cannot construct ChannelData from a null ChannelPtr.");
+#ifdef DBG_CD_
+    cout << "Constructing ChannelData: (" << hexString(this) << ") new instance count = " << (cdCounter.fetch_add(1)+1) << endl;
+#endif
 }
 
 
 ChannelData::~ChannelData() {
+#ifdef DBG_CD_
+    cout << "Destructing ChannelData: (" << hexString(this) << ") new instance count = " << (cdCounter.fetch_sub(1)-1) << endl;
+#endif
 }
 
 
@@ -113,8 +148,18 @@ void ChannelData::dump( string tag ) const {
 }
 
 
+ObjectData::ObjectData( void ) {
+#ifdef DBG_OD_
+    cout << "Constructing ObjectData: (" << hexString(this) << ") new instance count = " << (odCounter.fetch_add(1)+1) << endl;
+#endif
+}
+
+
 ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
     if( !o ) throw logic_error("Cannot construct ObjectData from a null ObjectPtr.");
+#ifdef DBG_OD_
+    cout << "Constructing ObjectData: (" << hexString(this) << ") new instance count = " << (odCounter.fetch_add(1)+1) << endl;
+#endif
     for( auto& c: o->getChannels() ) {
         channels.push_back( make_shared<ChannelData>(c) );
     }
@@ -123,7 +168,9 @@ ObjectData::ObjectData( std::shared_ptr<Object> o ) : myObject(o) {
 
 
 ObjectData::~ObjectData() {
-
+#ifdef DBG_OD_
+    cout << "Destructing ObjectData: (" << hexString(this) << ") new instance count = " << (odCounter.fetch_sub(1)-1) << endl;
+#endif
 }
 
 
@@ -271,6 +318,20 @@ void ObjectData::dump( string tag ) const {
 }
 
 
+WavefrontData::WavefrontData() {
+#ifdef DBG_WFD_
+    cout << "Constructing WavefrontData: (" << hexString(this) << ") new instance count = " << (wfdCounter.fetch_add(1)+1) << endl;
+#endif
+}
+
+
+WavefrontData::~WavefrontData() {
+#ifdef DBG_WFD_
+    cout << "Destructing WavefrontData: (" << hexString(this) << ") new instance count = " << (wfdCounter.fetch_sub(1)-1) << endl;
+#endif
+}
+
+
 uint64_t WavefrontData::size( void ) const {
     uint64_t sz = alpha.size();
     sz += ids.size()*sizeof(uint32_t) + sizeof(uint64_t);
@@ -324,6 +385,9 @@ void WavefrontData::dump( const string& tag ) const {
 
 PatchData::PatchData( MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), index(yid,xid), finalMetric(0.0) {
     vector<shared_ptr<Object>> objs = myJob.getObjects();
+#ifdef DBG_PD_
+    cout << "Constructing PatchData: (" << hexString(this) << ") new instance count = " << (pdCounter.fetch_add(1)+1) << endl;
+#endif
     for( auto& o: objs ) {
         if(o) objects.push_back( make_shared<ObjectData>(o) );
     }
@@ -331,7 +395,9 @@ PatchData::PatchData( MomfbdJob& j, uint16_t yid, uint16_t xid) : myJob(j), inde
 
 
 PatchData::~PatchData() {
-    
+#ifdef DBG_OD_
+    cout << "Destructing PatchData: (" << hexString(this) << ") new instance count = " << (pdCounter.fetch_sub(1)-1) << endl;
+#endif
 }
 
 
@@ -645,6 +711,22 @@ shared_ptr<Pupil> GlobalData::get(const PupilInfo& id, const shared_ptr<Pupil>& 
     }
     return it->second;
 
+}
+
+
+GlobalData::GlobalData(MomfbdJob& j ) : constraints(j) {
+     partType = PT_GLOBAL;
+#ifdef DBG_GD_
+    cout << "Constructing GlobalData: (" << hexString(this) << ") new instance count = " << (gdCounter.fetch_add(1)+1) << endl;
+#endif
+}
+
+
+GlobalData::~GlobalData() {
+    
+#ifdef DBG_GD_
+    cout << "Destructing GlobalData: (" << hexString(this) << ") new instance count = " << (gdCounter.fetch_sub(1)-1) << endl;
+#endif
 }
 
 

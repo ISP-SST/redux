@@ -346,7 +346,7 @@ Job::~Job(void) {
 #ifdef DBG_JOB_
     LOG_DEBUG << "Destructing Job#" << info.id << ": (" << hexString(this) << ") new instance count = " << (jobCounter.fetch_sub(1)-1) << ende;
 #endif
-    THREAD_MARK;
+    THREAD_MARK
     bfs::path cp(cachePath);
     if( !cp.empty() && bfs::exists(cp) ) {
         try {
@@ -356,9 +356,9 @@ Job::~Job(void) {
                  << "  reason: " << e.what() << endl;
         }
     }
-    THREAD_MARK;
+    THREAD_MARK
     cleanupThreads();
-    THREAD_MARK;
+    THREAD_MARK
 }
 
 
@@ -388,17 +388,17 @@ uint16_t Job::getNextStep( uint16_t step ) const {
 
         
 void Job::setFailed(void) {
-    THREAD_MARK;
+    THREAD_MARK
     lock_guard<mutex> lock(jobMutex);
     info.state |= JSTATE_ERR;
-    THREAD_MARK;
+    THREAD_MARK
 }
 
 
 bool Job::isOK(void) {
-    THREAD_MARK;
+    THREAD_MARK
     lock_guard<mutex> lock(jobMutex);
-    THREAD_MARK;
+    THREAD_MARK
     return !(info.state&JSTATE_ERR);
     
 }
@@ -415,7 +415,7 @@ string Job::cfg(void) {
 
 
 void Job::startLog( bool overwrite ) {
-    THREAD_MARK;
+    THREAD_MARK
     bfs::path logFilePath = bfs::path( info.logFile );
 
     string tmpChan = "job "+to_string( info.id );
@@ -428,7 +428,7 @@ void Job::startLog( bool overwrite ) {
         }
         logFilePath = bfs::path(info.outputDir) / logFilePath;
     }
-    THREAD_MARK;
+    THREAD_MARK
     logger.setLevel( info.verbosity );
     logger.setContext( "job "+to_string(info.id) );
     try {
@@ -437,7 +437,7 @@ void Job::startLog( bool overwrite ) {
         throw job_error( info.name + ": " + string(e.what()) );
     }
     
-    THREAD_MARK;
+    THREAD_MARK
     
 }
 
@@ -451,10 +451,10 @@ void Job::printJobInfo(void) {
 
 
 void Job::stopLog(void) {
-    THREAD_MARK;
+    THREAD_MARK
     logger.flushAll();
     logger.removeAllOutputs();
-    THREAD_MARK;
+    THREAD_MARK
     //jlog.reset();
 }
 
@@ -463,14 +463,14 @@ void Job::moveTo( Job* job, uint16_t to ) {
     if( !job ) return;
     uint16_t current = job->info.step;
     if( current == to ) return;
-    THREAD_MARK;
+    THREAD_MARK
     auto glock = getGlobalLock();
     CountT& c_old = counts[StepID(job->getTypeID(),current)];
     CountT& c_new = counts[StepID(job->getTypeID(),to)];
     c_old.active--;
     c_new.active++;
     glock.unlock();
-    THREAD_MARK;
+    THREAD_MARK
     job->info.step = to;
     bpx::ptime now = bpx::second_clock::universal_time();
     auto it = job->info.times.emplace( to, now );
@@ -542,7 +542,7 @@ void Job::threadLoop( void ) {
     
     lock_guard<mutex> lock(globalJobMutex);
     old_threads.insert( boost::this_thread::get_id() );
-    THREAD_UNMARK;
+    THREAD_UNMARK
     
 }
 

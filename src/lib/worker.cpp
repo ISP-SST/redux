@@ -206,13 +206,13 @@ bool Worker::getWork( void ) {
                     wip->jobID = thisJob->info.id;
                     currentJob = thisJob;
                 }
-                THREAD_MARK;
+                THREAD_MARK
                 if( !wip->isRemote ) {
                     for( auto& part: wip->parts ) {
                         part->cacheLoad(false);         // load data for local jobs, but don't delete the storage
                     }
                 }
-                THREAD_UNMARK;
+                THREAD_UNMARK
                 return true;
             }
         }

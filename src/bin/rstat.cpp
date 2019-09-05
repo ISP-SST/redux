@@ -135,7 +135,12 @@ namespace {
     
     enum{ by_name=1, by_runtime };
     
-    bool host_by_runtime( const Host::Ptr& a, const Host::Ptr& b ){
+    bool host_by_runtime( const Host::Ptr& a, const Host::Ptr& b ) {
+        if( a->status.state == Host::ST_IDLE ) {
+            return false;
+        } else if( b->status.state == Host::ST_IDLE ) {
+            return true;
+        }
         return (a->status.lastActive < b->status.lastActive);
     }
     

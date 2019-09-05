@@ -69,9 +69,9 @@ Object::Object( const Object& rhs, uint16_t id, int tid ) : ObjectCfg(rhs), myJo
 
 Object::~Object() {
 
-    THREAD_MARK;
+    THREAD_MARK
     cleanup( );
-    THREAD_MARK;
+    THREAD_MARK
 }
 
 
@@ -167,7 +167,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian ){
 
 void Object::cleanup(void ){
 
-    THREAD_MARK;
+    THREAD_MARK
     channels.clear( );
     ftSum.reset();
     Q.reset();
@@ -179,7 +179,7 @@ void Object::cleanup(void ){
     pupil.reset( );
     modes.reset( );
 
-    THREAD_MARK;
+    THREAD_MARK
     if( !cacheFile.empty() ) {
         bfs::path tmpP(cacheFile);
         if( bfs::exists(tmpP) ) {
@@ -190,7 +190,7 @@ void Object::cleanup(void ){
             }
         }
     }
-    THREAD_MARK;
+    THREAD_MARK
 
 }
 
