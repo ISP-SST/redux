@@ -540,13 +540,13 @@ void Job::threadLoop( void ) {
             ioService.run();
         } catch( const Application::ThreadExit& e ) {
             break;
-        } catch( job_error& e ) {
-            LOG_ERR << "Job: Error: " << e.what() << ende;
-        } catch( const boost::thread_interrupted& ) {
+        } catch( job_error& ex ) {
+            LOG_ERR << "Job: Error: " << ex.what() << ende;
+        } catch( const boost::thread_interrupted& ex) {
             LOG_TRACE << "Job: Thread interrupted." << ende;
             break;
-        } catch( exception& e ) {
-            LOG_ERR << "Job: Exception in thread: " << e.what() << ende;
+        } catch( exception& ex ) {
+            LOG_ERR << "Job: Exception in thread: " << ex.what() << ende;
         } catch( ... ) {
             LOG_ERR << "Job: Unhandled exception in thread." << ende;
         }

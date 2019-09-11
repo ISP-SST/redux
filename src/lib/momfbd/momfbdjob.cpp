@@ -561,7 +561,7 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
                 globalData.reset( new GlobalData(*this) );
             }
 
-            if( !solver ) solver.reset( new Solver(*this, ioService, nThreads) );
+            if( !solver ) solver.reset( new Solver(*this, ioService, maxThreads) );
             for( auto& part : wip->parts ) {      // momfbd jobs will only get 1 part at a time, this is just to keep things generic.
                 logger.setContext( "job "+to_string(info.id)+":"+to_string(part->id) );
                 // Run main processing

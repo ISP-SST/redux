@@ -56,7 +56,7 @@ namespace {
 }
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind)
-    : imgSize(0), pupilSize(0), nModes(0), oldRG(0), grad_step(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
+    : imgSize(0), pupilSize(0), nModes(0), blockStride(0), imgSize2(0), oldRG(0), grad_step(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
       window (wind), noiseWindow(nwind), shifted(false) {
 
 #ifdef USE_LUT
@@ -69,17 +69,16 @@ SubImage::~SubImage (void) {
 }
 
 
-void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOffs, uint16_t patchSize, uint16_t pupSz, uint16_t nM ) {
+void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOffs, uint16_t patchSize, size_t bStride, uint16_t pupSz, uint16_t nM ) {
 
     index = i;
     initialOffset = pos;
     channelResidualOffset = resOffs;
     imageShift = 0;
     adjustedTilts = 0;
-    
-    if( patchSize != imgSize ) {
-        imgSize = patchSize;
-    }
+    blockStride = bStride;
+    imgSize = patchSize;
+    imgSize2 = imgSize*imgSize;
     
     if( pupSz != pupilSize ) {
         pupilSize = pupSz;
@@ -105,38 +104,28 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
 }
 
 
-void SubImage::getWindowedImg( Array<double>& img, redux::util::Array<float>& surf, ArrayStats& imgStats, bool rescaled ) const {
-    
-    if( img.dimSize(0) < imgSize || img.dimSize(1) < imgSize  ) {
-        string msg = "SubImage::getWindowedImg: Output container is smaller than image! " +
-               printArray( dimensions(), "\n\timgdims" ) +
-               printArray( img.dimensions(), "\n\toutdims" );
-        throw std::logic_error(msg);
-    }
+void SubImage::getWindowedImg( double* out, float* plane, ArrayStats& imgStats, bool rescaled ) const {
 
-    double* imgPtr;
+    const float* rowPtr = ptr(0,0,0);
+    const double* winPtr = window.get();
+    
     for( size_t y=0; y<imgSize; ++y ) {
-        const float* rowPtr = ptr(0,y,0);
-        std::copy( rowPtr, rowPtr+imgSize, img.ptr(y,0) );
+        std::copy_n( rowPtr+y*blockStride, imgSize, out+y*imgSize );
     }
     
-    size_t nEl = img.nElements();
-    imgStats.getStats( img.get(), nEl, ST_VALUES );
+    imgStats.getStats( out, imgSize2, ST_VALUES );
     double avg = imgStats.mean;
     double newAvg(0);
-    imgPtr = img.get();
-    const double* winPtr = window.get();
-    if( surf.nElements() == nEl ) {
-        const float* surfPtr = surf.get();
-        for( size_t i=0; i<nEl; ++i) {
+    if( plane ) {
+        for( size_t i=0; i<imgSize2; ++i) {
             // Note: mean(plane) = 0, so subtracting it will not affect the mean value.
 //            imgPtr[i] = (imgPtr[i]-avg-surfPtr[i])*winPtr[i]+avg;
-            double tmp = (imgPtr[i]-avg-surfPtr[i])*winPtr[i]+avg;
+            double tmp = (out[i]-avg-plane[i])*winPtr[i]+avg;
             newAvg += tmp;
-            imgPtr[i] = tmp;
+            out[i] = tmp;
         }
     } else {
-        transform(imgPtr, imgPtr+nEl, window.get(), imgPtr,
+        transform(out, out+imgSize2, winPtr, out,
                 [avg,&newAvg](const double& a, const double& b) {
 //                    return (a-avg)*b+avg;
                     double tmp = (a-avg)*b+avg;
@@ -145,59 +134,46 @@ void SubImage::getWindowedImg( Array<double>& img, redux::util::Array<float>& su
                     
                 });
     }
-    newAvg /= nEl;
+    newAvg /= imgSize2;
     if( rescaled ) {
         avg = object.objMaxMean;
     } /*else {
         avg = 1.0/newAvg;
         s.mean = newAvg;
     }*/
-    imgStats.getStats( img.get(), imgSize*imgSize, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
+    imgStats.getStats( out, imgSize2, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
     
-    transpose( img.get(), imgSize, imgSize );                      // to match MvN
+    transpose( out, imgSize, imgSize );                      // to match MvN
     
 }
 
 
 void SubImage::getWindowedImg( Array<double>& im, redux::util::ArrayStats& s, bool rescaled ) const {
-    getWindowedImg( im, object.fittedPlane, s, rescaled);
+    getWindowedImg( im.get(), object.fittedPlane.get(), s, rescaled);
 }
 
 
 void SubImage::initialize( Object& o, bool doReset ) {
     
     if( doReset ) {
-        Solver::tmp->FT.zero();
+        Solver::tmp()->FT.zero();
     } else {
-        memcpy( Solver::tmp->FT.get(), imgFT.get(), otfSize*otfSize*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
+        memcpy( Solver::tmp()->FT.get(), imgFT.get(), otfSize2*sizeof(complex_t));                          // make a temporary copy to pass to addDifftoFT below
     }
     
-    getWindowedImg( Solver::tmp->D, o.fittedPlane, stats, false );
-    double* imgPtr = Solver::tmp->D.get();
-    
-    size_t noiseSize = noiseWindow.dimSize(0);
-    size_t nEl = Solver::tmp->D.nElements();
+    double* imgPtr = Solver::tmp()->D.get();
+    double* d2Ptr = Solver::tmp()->D2.get();
+    getWindowedImg( imgPtr, o.fittedPlane.get(), stats, false );
+
     string msg;
     if( doReset ) {
         msg = "Initializing image " + to_string(o.ID) + ":" + to_string(channel.ID) + ":" + to_string(index)
             + "   mean=" + to_string (stats.mean) + " stddev=" + to_string (stats.stddev);
-        if( imgSize == noiseSize ) {
-            transform( imgPtr, imgPtr+nEl, noiseWindow.get(), Solver::tmp->D2.get(),
-                    [&](const double& a, const double& b) { return (a-stats.mean)*b; }
-                    );
-            imgFT.reset( Solver::tmp->D2.get(), imgSize, imgSize, FT_FULLCOMPLEX);
-            stats.noise = imgFT.noise(-1,-1);
-        } else {
-            size_t offset = (imgSize-noiseSize) / 2;
-            Array<double> tmpD(Solver::tmp->D, offset, offset+noiseSize-1, offset ,offset+noiseSize-1);
-            tmpD.trim();
-            transform(tmpD.get(), tmpD.get()+tmpD.nElements(), noiseWindow.get(), tmpD.get(),
-                    [&](const double& a, const double& b) { return (a-stats.mean)*b; }
-                    );
-            imgFT.reset(tmpD.get(), imgSize, imgSize, FT_FULLCOMPLEX);
-            stats.noise = imgFT.noise(-1,-1);
-        }
 
+        transform( imgPtr, imgPtr+imgSize2, noiseWindow.get(), d2Ptr,
+                [&](const double& a, const double& b) { return (a-stats.mean)*b; });
+        imgFT.reset( d2Ptr, imgSize, imgSize, FT_FULLCOMPLEX);
+        stats.noise = imgFT.noise(-1,-1);
         stats.noise *= channel.noiseFudge;
         double rg = stats.noise/stats.stddev;
         msg += " noise=" + to_string (stats.noise) + " rg=" + to_string(rg);
@@ -210,13 +186,12 @@ void SubImage::initialize( Object& o, bool doReset ) {
         imgFT.reset( imgPtr, otfSize, otfSize, FT_FULLCOMPLEX ); //|FT_NORMALIZE );        // full-complex for now, perhaps half-complex later for performance
     } else {                                                                                    // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
         int offset = (otfSize - imgSize) / 2;
-        Array<double> tmpD (otfSize, otfSize);
-        tmpD = stats.mean;
-        double* tmpPtr = tmpD.get();
-        for (int i = 0; i < imgSize; ++i) {
-            memcpy (tmpPtr + offset * (otfSize + 1) + i * otfSize, imgPtr + i * imgSize, imgSize * sizeof (double));
+        std::fill_n( d2Ptr, otfSize2, stats.mean );
+        double* tmpPtr = d2Ptr + offset*(otfSize+1);
+        for( uint16_t i(0); i < imgSize; ++i) {
+            std::copy_n( imgPtr+i*imgSize, imgSize, tmpPtr+i*otfSize );
         }
-        imgFT.reset (tmpD.get(), otfSize, otfSize, FT_FULLCOMPLEX); //|FT_NORMALIZE );               // full-complex for now, perhaps half-complex later for performance
+        imgFT.reset(d2Ptr, otfSize, otfSize, FT_FULLCOMPLEX); //|FT_NORMALIZE );               // full-complex for now, perhaps half-complex later for performance
     }
     
     FourierTransform::reorder(imgFT);                                                          // keep FT in centered form
@@ -224,7 +199,7 @@ void SubImage::initialize( Object& o, bool doReset ) {
     if( doReset ) {
         o.addToFT( imgFT );
     } else {
-        o.addDiffToFT( imgFT, Solver::tmp->FT );
+        o.addDiffToFT( imgFT, Solver::tmp()->FT );
     }
     
 }
@@ -303,8 +278,8 @@ double SubImage::gradientFiniteDifference( uint16_t modeIndex ) {
 
     if( object.weight == 0 ) return 0;
         
-    complex_t* otfPtr = Solver::tmp->C.get();
-    double* phiPtr = Solver::tmp->D.get();
+    complex_t* otfPtr = Solver::tmp()->C.get();
+    double* phiPtr = Solver::tmp()->D.get();
     memcpy( phiPtr, phi.get(), pupilSize2*sizeof(double) );
     addToPhi( phiPtr, modes->modePointers[modeIndex], grad_step );
     calcOTF( otfPtr, phiPtr );
@@ -317,8 +292,8 @@ void SubImage::gradientFiniteDifference2( double* agrad, const bool* enabledMode
 
     if( object.weight == 0 ) return;
     
-    complex_t* otfPtr = Solver::tmp->C.get();
-    double* phiPtr = Solver::tmp->D.get();
+    complex_t* otfPtr = Solver::tmp()->C.get();
+    double* phiPtr = Solver::tmp()->D.get();
     for( uint16_t m=0; m<nModes; ++m ) {
         if( enabledModes[m] ) {
             memcpy( phiPtr, phi.get(), pupilSize2*sizeof(double) );
@@ -376,21 +351,21 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
     const complex_t* ftPtr = imgFT.get();
     const complex_t* pfPtr = PF.get();
     
-    complex_t* tmpOtfPtr = Solver::tmp->OTF.get();
-    complex_t* glPtr = Solver::tmp->C.get();
-    complex_t* hjPtr = Solver::tmp->C2.get();
+    complex_t* tmpOtfPtr = Solver::tmp()->OTF.get();
+    complex_t* glPtr = Solver::tmp()->C.get();
+    complex_t* hjPtr = Solver::tmp()->C2.get();
     
-    Solver::tmp->OTF.zero();
+    Solver::tmp()->OTF.zero();
     FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
 
-    Solver::tmp->OTF.getIFT(hjPtr);       // normalize by otfSize2 below
-    Solver::tmp->OTF.zero();
+    Solver::tmp()->OTF.getIFT(hjPtr);       // normalize by otfSize2 below
+    Solver::tmp()->OTF.zero();
     for( const size_t& ind: object.pupil->otfSupport ) {
         tmpOtfPtr[ind] = (pq[ind]*ftPtr[ind] - ps[ind]*otfPtr[ind]) / qs[ind];
     }
 
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
-    Solver::tmp->OTF.getIFT(glPtr);
+    Solver::tmp()->OTF.getIFT(glPtr);
     
     double normalization = 1.0/(otfSize2*otfSize2);
     transform( glPtr, glPtr+otfSize2, hjPtr, glPtr,
@@ -398,7 +373,7 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
                   return normalization * h * g.real();
               });
 
-    Solver::tmp->OTF.ft( glPtr );
+    Solver::tmp()->OTF.ft( glPtr );
 
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
 
@@ -435,16 +410,17 @@ void SubImage::alignAgainst( const Ptr& refIm ) {
     }
     const complex_t* ftPtr = imgFT.get();
     const complex_t* refPtr = refIm->imgFT.get();
-    complex_t* tmpPtr = Solver::tmp->FT.get();
-    std::transform( ftPtr, ftPtr+imgFT.nElements(), refPtr, tmpPtr,
+    complex_t* tmpPtrFT = Solver::tmp()->FT.get();
+    double* tmpPtrD = Solver::tmp()->D.get();
+    std::transform( ftPtr, ftPtr+imgFT.nElements(), refPtr, tmpPtrFT,
         []( const complex_t& a, const complex_t& b ){
             return b*std::conj(a);
     });
-    FourierTransform::reorder( Solver::tmp->FT );
-    Solver::tmp->FT.getIFT( Solver::tmp->D.get() );
-    FourierTransform::reorder( Solver::tmp->D.get(), imgSize, imgSize );
+    FourierTransform::reorder( Solver::tmp()->FT );
+    Solver::tmp()->FT.getIFT( tmpPtrD );
+    FourierTransform::reorder( tmpPtrD, imgSize, imgSize );
     
-    auto arr = reshapeArray( Solver::tmp->D.get(), imgSize, imgSize );
+    auto arr = reshapeArray( tmpPtrD, imgSize, imgSize );
     double** arrPtr = arr.get();
     int mid = imgSize/2;
     imageShift = 0;
@@ -586,9 +562,9 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale)
 #endif
     }
 
-    Solver::tmp->OTF.ft(otfPtr);
-    Solver::tmp->OTF.norm();
-    Solver::tmp->OTF.getIFT(otfPtr);
+    Solver::tmp()->OTF.ft(otfPtr);
+    Solver::tmp()->OTF.norm();
+    Solver::tmp()->OTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
 
 }
@@ -608,9 +584,9 @@ void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
 #endif
     }
     
-    Solver::tmp->OTF.ft(otfPtr);
-    Solver::tmp->OTF.norm();
-    Solver::tmp->OTF.getIFT(otfPtr);
+    Solver::tmp()->OTF.ft(otfPtr);
+    Solver::tmp()->OTF.norm();
+    Solver::tmp()->OTF.getIFT(otfPtr);
     FourierTransform::reorder(otfPtr, otfSize, otfSize);
 
 }
@@ -640,9 +616,9 @@ void SubImage::calcPFOTF(void) {
         otfPtr[ind.second] = channel.otfNormalization*pfPtr[ind.first];
     }
 
-    Solver::tmp->OTF.ft( otfPtr );
-    Solver::tmp->OTF.norm();
-    Solver::tmp->OTF.getIFT( otfPtr );
+    Solver::tmp()->OTF.ft( otfPtr );
+    Solver::tmp()->OTF.norm();
+    Solver::tmp()->OTF.getIFT( otfPtr );
     FourierTransform::reorder( otfPtr, otfSize, otfSize );
     
 }
@@ -650,7 +626,7 @@ void SubImage::calcPFOTF(void) {
 
 void SubImage::addPSF( double* outPSF ) const {
     
-    complex_t* cPtr = Solver::tmp->C.get();
+    complex_t* cPtr = Solver::tmp()->C.get();
     OTF.getIFT( cPtr );     // FIXME: Using forward transform to match MvN (who conjugates the transform)
     FourierTransform::reorder( cPtr, otfSize, otfSize );
 //    double normalization(0.0);        // TBD: should the PSF be auto-scaled or filtered ??

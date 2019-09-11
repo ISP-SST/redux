@@ -39,9 +39,9 @@ namespace redux {
                      uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);*/
             ~SubImage(void);
             
-            void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, uint16_t, uint16_t);
+            void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, size_t, uint16_t, uint16_t);
             void setData( const double* a ) { wfAlpha=a; };
-            void getWindowedImg( Array<double>&, redux::util::Array<float>& surf, redux::util::ArrayStats& s, bool rescaled ) const;
+            void getWindowedImg( double* out, float* plane, redux::util::ArrayStats& s, bool rescaled ) const;
             void getWindowedImg( Array<double>& im, redux::util::ArrayStats& s, bool rescaled ) const;
             void initialize( Object&, bool doReset=false );
             void initialize( bool doReset=false );
@@ -127,6 +127,7 @@ namespace redux {
             redux::util::PointI imageShift;            //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, nModes;
             uint32_t otfSize, pupilSize2, otfSize2;
+            size_t blockStride,imgSize2;
             double oldRG;
             double grad_step;
             const double* wfAlpha;

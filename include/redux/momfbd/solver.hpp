@@ -32,27 +32,35 @@ namespace redux {
         namespace thread {
         
             struct TmpStorage {
-                TmpStorage() : patchSize(0), pupilSize(0) {}
-                void resize( uint16_t patchSz, uint16_t pupSz ) {
-                    if( patchSz != patchSize ) {
-                        patchSize = patchSz;
+                TmpStorage() : m_patchSize(0), m_pupilSize(0) {}
+                TmpStorage( const TmpStorage& ) = delete;
+                TmpStorage( TmpStorage&& ) = delete;
+                ~TmpStorage() {}
+                static void setSize( uint16_t patchSz, uint16_t pupSz ) { patchSize=patchSz; pupilSize=pupSz; }
+                void resize( void ) {
+                    using namespace redux::util;
+                    using namespace std;
+                    size_t otfSize = 2*pupilSize;
+                    size_t tmpSize = max<size_t>(patchSize,otfSize);
+                    size_t tmpSize2 = tmpSize*tmpSize;
+                    if( m_patchSize != patchSize ) {
+                        m_patchSize = patchSize;
                         if( patchSize ) {
-                            D.resize( patchSize, patchSize );
+                            D.reset( new double[tmpSize2] );
                         } else {
-                            D.clear();
+                            D.reset();
                         }
                     }
-                    if( pupSz != pupilSize ) {
-                        pupilSize = pupSz;
-                        size_t otfSize = 2*pupilSize;
-                        if( otfSize ) {
-                            D2.resize( otfSize, otfSize );
-                            C.resize( otfSize, otfSize );
-                            C2.resize( otfSize, otfSize );
-                            OTF.resize( otfSize, otfSize, redux::image::FT_FULLCOMPLEX );
-                            FT.resize( otfSize, otfSize );
+                    if( m_pupilSize != pupilSize ) {
+                        m_pupilSize = pupilSize;
+                        if( tmpSize ) {
+                            D2.reset( new double[tmpSize2] );
+                            C.resize( tmpSize, tmpSize );
+                            C2.resize( tmpSize, tmpSize );
+                            OTF.resize( tmpSize, tmpSize, redux::image::FT_FULLCOMPLEX );
+                            FT.resize( tmpSize, tmpSize );
                         } else {
-                            D2.clear();
+                            D2.reset();
                             C.clear();
                             C2.clear();
                             OTF.clear();
@@ -60,8 +68,9 @@ namespace redux {
                         }
                     }
                 }
-                uint16_t patchSize, pupilSize;
-                redux::util::Array<double> D,D2;
+                uint16_t m_patchSize, m_pupilSize;
+                static uint16_t patchSize, pupilSize;
+                std::unique_ptr<double[]> D,D2;
                 redux::util::Array<complex_t> C,C2;
                 redux::image::FourierTransform FT,OTF;
             };
@@ -138,7 +147,7 @@ namespace redux {
             uint16_t patchSize;
             uint16_t pupilSize;
             uint16_t nModes;
-            uint16_t nThreads;
+            uint16_t maxThreads;
             uint32_t nParameters;
             uint32_t nFreeParameters;
             uint32_t nTotalImages;
@@ -159,8 +168,8 @@ namespace redux {
             redux::util::StopWatch timer;
             redux::util::ProgressWatch progWatch;
             
-            std::vector< thread::TmpStorage > tmps;
-            static thread_local thread::TmpStorage* tmp;
+            static thread::TmpStorage* tmp(void);
+            
             std::mutex mtx;
             
         };

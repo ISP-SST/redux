@@ -756,14 +756,14 @@ void Channel::initPatch (ChannelData& cd) {
 
     size_t blockSizeY = cd.images.dimSize(1);
     size_t blockSizeX = cd.images.dimSize(2);
+    size_t blockPixels = blockSizeY*blockSizeX;
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         float* dataPtr = cd.images.get();
-        size_t imgPixels = blockSizeY*blockSizeX;
         for( uint16_t i=0; i<nImages; ++i ) {
             double scale = myObject.objMaxMean/imageStats[i]->mean;
             //double scale = 1.0/imageStats[i]->mean;
-            transform(dataPtr, dataPtr+imgPixels, dataPtr, bind1st(multiplies<double>(),scale) );
-            dataPtr += imgPixels;
+            transform(dataPtr, dataPtr+blockPixels, dataPtr, bind1st(multiplies<double>(),scale) );
+            dataPtr += blockPixels;
         }
     }
     
@@ -788,9 +788,9 @@ void Channel::initPatch (ChannelData& cd) {
     localShift.x = firstX-cd.patchStart.x;
 
     for (uint16_t i=0; i < nImages; ++i) {
-        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, myObject.pupilPixels, myJob.modeNumbers.size() );
+        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, blockSizeX, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->wrap( cd.images, i, i, firstY, lastY, firstX, lastX );
-        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockSizeY*blockSizeX, ST_VALUES|ST_RMS );
+        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockPixels, ST_VALUES|ST_RMS );
     }
 
     phi_fixed.copy( phi_channel );
