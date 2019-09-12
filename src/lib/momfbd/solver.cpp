@@ -27,9 +27,9 @@ using namespace std;
 namespace sp=std::placeholders;
 
 
+size_t redux::momfbd::thread::TmpStorage::currentSize = 0;
 uint16_t redux::momfbd::thread::TmpStorage::patchSize = 0;
 uint16_t redux::momfbd::thread::TmpStorage::pupilSize = 0;
-
 
 //#define DEBUG_
 //#define MASSIVE_DEBUG_
@@ -53,7 +53,7 @@ redux::momfbd::thread::TmpStorage* Solver::tmp(void) {
 Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), myInfo( network::Host::myInfo() ),
     logger(j.logger), objects( j.getObjects() ), service(s), maxThreads(t), nFreeParameters(0), nTotalImages(0),
     beta(nullptr), grad_beta(nullptr), search_dir(nullptr), tmp_beta(nullptr),
-    regAlphaWeights(nullptr) {
+    regAlphaWeights(nullptr), patchSize2(0), pupilSize2(0), nTotalPixels(0), otfSize(0), otfSize2(0) {
 
     init();
 
@@ -76,10 +76,15 @@ void Solver::init( void ) {
 
     patchSize = job.patchSize;
     pupilSize = job.pupilPixels;
+    patchSize2 = patchSize*patchSize;
+    pupilSize2 = pupilSize*pupilSize;
+    otfSize = 2*pupilSize;
+    otfSize2 = otfSize*otfSize;
     nModes = job.modeNumbers.size();
     nParameters = job.globalData->constraints.nParameters;
     nFreeParameters = job.globalData->constraints.nFreeParameters;
     nTotalImages = job.nImages();
+    nTotalPixels = nTotalImages*patchSize2;
     
     if( job.globalData->constraints.ns_rows.size() != nParameters ||
         job.globalData->constraints.ns_cols.size() != nFreeParameters ||
@@ -97,7 +102,7 @@ void Solver::init( void ) {
     
     tmpPhi.resize( nTotalImages, pupilSize, pupilSize );
     tmpPhiGrad.resize( nTotalImages, pupilSize, pupilSize );
-    tmpOTF.resize( nTotalImages, 2*pupilSize, 2*pupilSize );
+    tmpOTF.resize( nTotalImages, otfSize, otfSize );
 
     enabledModes.reset( new bool[nModes], [](bool* p){ delete[] p; } );
 
@@ -113,7 +118,6 @@ void Solver::init( void ) {
     tmp_beta = new double[nFreeParameters];
 
     max_wavelength = 0;
-    nTotalPixels = nTotalImages*patchSize*patchSize;
     double* raPtr = regAlphaWeights;
     for( auto & object : objects ) {
         object->initProcessing( *this );
@@ -134,14 +138,14 @@ void Solver::init( void ) {
     }
     
     thread::TmpStorage::setSize( patchSize, pupilSize );
-    tmp()->resize();     // temp-storage for the main thread.
+    tmp()->init();     // temp-storage for the main thread.
     set<std::thread::id> initDone;
     while(true) {
         for( uint16_t i=0; i<2*maxThreads; ++i ) {
             service.post([&](){
                 unique_lock<mutex> lock(mtx);
                 if( initDone.count(std::this_thread::get_id()) ) return;
-                tmp()->resize();
+                tmp()->init();
                 initDone.insert(std::this_thread::get_id());
             });
         }
@@ -263,8 +267,6 @@ void Solver::my_precalc( const gsl_vector* beta, const gsl_vector* beta_grad ) {
 
 double Solver::metricAt( double step ) {
     
-    size_t pupilSize2 = pupilSize*pupilSize;
-    size_t otfSize2 = 4*pupilSize2;
     complex_t* otfPtr = tmpOTF.get();
     double* phiPtr = tmpPhi.get();
     double* phiGradPtr = tmpPhiGrad.get();
@@ -760,13 +762,14 @@ double Solver::metric(void) {
                     service.post( [o,c,begIndex,endIndex,this] {
                         const vector< shared_ptr<SubImage> >& imgs = c->getSubImages();
                         double* tmpD = tmp()->D.get();
-                        tmp()->C.zero();
-                        std::fill_n( tmpD, patchSize*patchSize, 0.0 );
+                        complex_t* tmpC = tmp()->C.get();
+                        std::fill_n( tmpD, otfSize2, 0.0 );
+                        std::fill_n( tmpC, otfSize2, complex_t(0) );
                         for( size_t i=begIndex; i<endIndex; ++i ) {
-                            imgs[i]->addPQ( tmp()->C.get(), tmpD );
+                            imgs[i]->addPQ( tmpC, tmpD );
                             ++o->progWatch;
                         }
-                        o->addToPQ( tmp()->C.get(), tmpD );
+                        o->addToPQ( tmpC, tmpD );
                         ++o->progWatch;
                     } );
                     begIndex = endIndex;
@@ -810,15 +813,16 @@ void Solver::calcPQ(void) {
                 service.post( [o,c,begIndex,endIndex,this] {
                     const vector< shared_ptr<SubImage> >& imgs = c->getSubImages();
                     double* tmpD = tmp()->D.get();
-                    std::fill_n( tmpD, patchSize*patchSize, 0.0 );
-                    tmp()->C.zero();
+                    complex_t* tmpC = tmp()->C.get();
+                    std::fill_n( tmpD, otfSize2, 0.0 );
+                    std::fill_n( tmpC, otfSize2, complex_t(0) );
                     int cnt(0);
                     for( size_t i=begIndex; i<endIndex; ++i ) {
                         cnt++;
-                        imgs[i]->addPQ( tmp()->C.get(), tmpD );
+                        imgs[i]->addPQ( tmpC, tmpD );
                         ++o->progWatch;
                     }
-                    o->addToPQ( tmp()->C.get(), tmpD );
+                    o->addToPQ( tmpC, tmpD );
                     ++o->progWatch;
                 } );
                 begIndex = endIndex;
@@ -892,9 +896,6 @@ void Solver::clear( void ) {
     alpha = grad_alpha = alpha_offset = nullptr;
     regAlphaWeights = nullptr;
     beta = grad_beta = search_dir = tmp_beta = nullptr;
-
-    thread::TmpStorage::setSize( 0, 0 );
-    tmp()->resize();
     
 }
 

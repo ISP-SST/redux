@@ -232,12 +232,15 @@ uint32_t Object::nImages( bool reCalc ) {
 void Object::initProcessing( Solver& ws ){
 
     if( patchSize && pupilPixels ){
-        P.resize(2*pupilPixels,2*pupilPixels );
-        Q.resize(2*pupilPixels,2*pupilPixels );
-        PQ.resize(2*pupilPixels,2*pupilPixels );
-        PS.resize(2*pupilPixels,2*pupilPixels );
-        QS.resize(2*pupilPixels,2*pupilPixels );
-        ftSum.resize( 2*pupilPixels, 2*pupilPixels );          // full-complex for now
+        patchSize2 = patchSize*patchSize;
+        otfSize = 2*pupilPixels;
+        otfSize2 = otfSize*otfSize;
+        P.resize(otfSize,otfSize );
+        Q.resize(otfSize,otfSize );
+        PQ.resize(otfSize,otfSize );
+        PS.resize(otfSize,otfSize );
+        QS.resize(otfSize,otfSize );
+        ftSum.resize( otfSize, otfSize );          // full-complex for now
         if( myJob.runFlags & RF_FIT_PLANE ){
             fittedPlane.resize( patchSize, patchSize );
         }
@@ -506,24 +509,22 @@ void Object::addRegGamma( double rg ){
 }
 
 
-void Object::addToFT( const redux::image::FourierTransform& ft ){
+void Object::addToFT( const complex_t* ft ){
     lock_guard<mutex> lock( mtx );
-    transform(ftSum.get(), ftSum.get()+ftSum.nElements(), ft.get(), ftSum.get(),
+    double* ftSumPtr = ftSum.get( );
+    transform(ftSumPtr, ftSumPtr+otfSize2, ft, ftSumPtr,
               [](const double& a, const complex_t& b ){ return a+norm(b ); }
              );
 
 }
 
 
-void Object::addDiffToFT( const Array<complex_t>& ft, const Array<complex_t>& oldft ){
+void Object::addDiffToFT( const complex_t* newFT, const complex_t* oldFT ){
     
     lock_guard<mutex> lock( mtx );
-    const complex_t* ftPtr = ft.get( );
-    const complex_t* oftPtr = oldft.get( );
     double* ftSumPtr = ftSum.get( );
-    size_t nElements = patchSize*patchSize;
-    for(size_t ind=0; ind<nElements; ++ind ){
-        ftSumPtr[ind] +=( norm(ftPtr[ind])-norm(oftPtr[ind]) );
+    for(size_t ind=0; ind<otfSize2; ++ind ){
+        ftSumPtr[ind] +=( norm(newFT[ind])-norm(oldFT[ind]) );
     }
     
 }

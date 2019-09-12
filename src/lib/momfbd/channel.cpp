@@ -788,8 +788,8 @@ void Channel::initPatch (ChannelData& cd) {
     localShift.x = firstX-cd.patchStart.x;
 
     for (uint16_t i=0; i < nImages; ++i) {
-        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, blockSizeX, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->wrap( cd.images, i, i, firstY, lastY, firstX, lastX );
+        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, blockSizeX, myObject.pupilPixels, myJob.modeNumbers.size() );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockPixels, ST_VALUES|ST_RMS );
     }
 
@@ -1332,22 +1332,22 @@ void Channel::dump (std::string tag) {
         Ana::write( tag + "_data.f0", wrap );
     }
     
-    float* tmpPtr = tmpF.get();
+    float* fPtr = tmpF.get();
     for( shared_ptr<SubImage>& im: subImages ) {
-        im->copyTo<float>(tmpPtr);
-        tmpPtr += blockSize;
+        im->copyTo<float>(fPtr);
+        fPtr += blockSize;
     }
     Ana::write( tag + "_imgs.f0", tmpF );
     
-    tmpPtr = tmpF.get();
-    complex_t* ftPtr = tmpC.get();
+    fPtr = tmpF.get();
+    complex_t* cPtr = tmpC.get();
     int idx(0);
     for( shared_ptr<SubImage>& im: subImages ) {
         im->getWindowedImg( tmpD, s, true );
         tmpFT.reset( tmpD.get(), patchSize, patchSize, FT_FULLCOMPLEX );
         FourierTransform::reorder(tmpFT);
-        tmpD.copyTo<float>(tmpPtr);
-        tmpFT.copyTo<complex_t>(ftPtr);
+        tmpD.copyTo<float>(fPtr);
+        tmpFT.copyTo<complex_t>(cPtr);
         const vector<int64_t>& first = im->first();
         shiftArr(idx,0) = first[1];
         shiftArr(idx,1) = first[2];
@@ -1355,8 +1355,8 @@ void Channel::dump (std::string tag) {
         statArr(idx,1) = s.max;
         statArr(idx,2) = s.mean;
         statArr(idx++,3) = s.stddev;
-        tmpPtr += blockSize;
-        ftPtr += blockSize;
+        fPtr += blockSize;
+        cPtr += blockSize;
     }
     Ana::write( tag + "_wimgs.f0", tmpF );
     Ana::write( tag + "_fts.f0", tmpC );
@@ -1367,11 +1367,11 @@ void Channel::dump (std::string tag) {
     tmpD.resize( otfSize, otfSize );
     tmpF.resize( subImages.size(), otfSize, otfSize );
     blockSize = otfSize*otfSize;
-    tmpPtr = tmpF.get();
+    fPtr = tmpF.get();
     for( shared_ptr<SubImage>& im: subImages ) {
         im->getPSF( tmpD.get() );
-        tmpD.copyTo<float>(tmpPtr);
-        tmpPtr += blockSize;
+        tmpD.copyTo<float>(fPtr);
+        fPtr += blockSize;
     }
     Ana::write( tag + "_psfs.f0", tmpF );
     tmpF.resize();      // free some memory

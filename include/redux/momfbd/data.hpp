@@ -35,6 +35,8 @@ namespace redux {
         struct ChannelData {
             
             explicit ChannelData( std::shared_ptr<Channel> c );
+            ChannelData( const ChannelData& ) = delete;
+            ChannelData( ChannelData&& ) = delete;
             ~ChannelData();
             
             /**** Local processing (slaves) ****/

@@ -10,6 +10,7 @@
 #include "redux/util/progresswatch.hpp"
 #include "redux/util/stopwatch.hpp"
 
+
 #include <memory>
 
 
@@ -32,46 +33,45 @@ namespace redux {
         namespace thread {
         
             struct TmpStorage {
-                TmpStorage() : m_patchSize(0), m_pupilSize(0) {}
+                TmpStorage() : thisSize(0) {}
                 TmpStorage( const TmpStorage& ) = delete;
                 TmpStorage( TmpStorage&& ) = delete;
-                ~TmpStorage() {}
-                static void setSize( uint16_t patchSz, uint16_t pupSz ) { patchSize=patchSz; pupilSize=pupSz; }
-                void resize( void ) {
-                    using namespace redux::util;
+                ~TmpStorage() { clear(); }
+                static void setSize( uint16_t patchSz, uint16_t pupSz ) {
+                    patchSize=patchSz; pupilSize=pupSz;
+                    currentSize = std::max<size_t>( patchSize, 2*pupilSize ); }
+                void init( void ) {
                     using namespace std;
-                    size_t otfSize = 2*pupilSize;
-                    size_t tmpSize = max<size_t>(patchSize,otfSize);
-                    size_t tmpSize2 = tmpSize*tmpSize;
-                    if( m_patchSize != patchSize ) {
-                        m_patchSize = patchSize;
-                        if( patchSize ) {
-                            D.reset( new double[tmpSize2] );
-                        } else {
-                            D.reset();
-                        }
+                    if( currentSize && (thisSize == currentSize) ) {
+                        return;
                     }
-                    if( m_pupilSize != pupilSize ) {
-                        m_pupilSize = pupilSize;
-                        if( tmpSize ) {
-                            D2.reset( new double[tmpSize2] );
-                            C.resize( tmpSize, tmpSize );
-                            C2.resize( tmpSize, tmpSize );
-                            OTF.resize( tmpSize, tmpSize, redux::image::FT_FULLCOMPLEX );
-                            FT.resize( tmpSize, tmpSize );
-                        } else {
-                            D2.reset();
-                            C.clear();
-                            C2.clear();
-                            OTF.clear();
-                            FT.clear();
-                        }
+
+                    size_t thisSize2 = currentSize*currentSize;
+                    if( currentSize ) {
+                        D.reset( new double[thisSize2] );
+                        D2.reset( new double[thisSize2] );
+                        C.reset( new complex_t[thisSize2] );
+                        C2.reset( new complex_t[thisSize2] );
+                        OTF.resize( 2*pupilSize, 2*pupilSize, redux::image::FT_FULLCOMPLEX );
+                        FT.resize( patchSize, patchSize, redux::image::FT_FULLCOMPLEX );
+                        thisSize = currentSize;
                     }
+                 }
+                void clear( void ) {
+                    using namespace std;
+                    D.reset();
+                    D2.reset();
+                    C.reset();
+                    C2.reset();
+                    OTF.clear();
+                    FT.clear();
+                    thisSize = 0;
                 }
-                uint16_t m_patchSize, m_pupilSize;
+                size_t thisSize;
+                static size_t currentSize;
                 static uint16_t patchSize, pupilSize;
                 std::unique_ptr<double[]> D,D2;
-                redux::util::Array<complex_t> C,C2;
+                std::unique_ptr<complex_t[]> C,C2;
                 redux::image::FourierTransform FT,OTF;
             };
     
@@ -161,7 +161,7 @@ namespace redux {
             double *regAlphaWeights;
             
             double max_wavelength;
-            size_t nTotalPixels;
+            size_t patchSize2,pupilSize2,nTotalPixels,otfSize,otfSize2;
             
             grad_t gradientMethod;
 

@@ -67,8 +67,8 @@ namespace redux {
             void initPQ(void);
             void addAllFT(void);
             void addRegGamma(double);
-            void addToFT(const redux::image::FourierTransform&);
-            void addDiffToFT( const redux::util::Array<complex_t>& ft, const redux::util::Array<complex_t>& oldft );
+            void addToFT(const complex_t*);
+            void addDiffToFT( const complex_t* newFT, const complex_t* oldFT );
             void addToPQ(const complex_t* pp, const double* qq);
             void addDiffToPQ(const redux::image::FourierTransform&, const redux::util::Array<complex_t>&, const redux::util::Array<complex_t>&);
             void addAllPQ(void);
@@ -125,6 +125,7 @@ namespace redux {
             double currentMetric;
             double reg_gamma;
             double frequencyCutoff, pupilRadiusInPixels;
+            size_t patchSize2, otfSize, otfSize2;
             std::string cacheFile;
             redux::util::Array<float> results;
             /*****************************************************/

@@ -23,7 +23,6 @@ ChannelData::ChannelData( std::shared_ptr<Channel> c ) : myChannel(c) {
 
 
 ChannelData::~ChannelData() {
-    
 }
 
 
@@ -334,10 +333,10 @@ void PatchData::setPath(const std::string& path) {
 
 shared_ptr<ObjectData> PatchData::getObjectData( uint16_t id ) const {
     for( auto& o: objects ) {
-        if( o && (o->myObject->ID == id) ) return o;
+        if( o && o->myObject && (o->myObject->ID == id) ) return o;
     }
     for( auto& o: trace_data ) {
-        if( o && (o->myObject->ID == id) ) return o;
+        if( o && o->myObject && (o->myObject->ID == id) ) return o;
     }
     return shared_ptr<ObjectData>();
 }

@@ -37,6 +37,8 @@ namespace redux {
             /*SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind,
                      const redux::util::Array<float>& stack,
                      uint32_t index, const PointI& offset, uint16_t patchSize, uint16_t pupilSize);*/
+            SubImage( const SubImage& ) = delete;
+            SubImage( SubImage&& ) = delete;
             ~SubImage(void);
             
             void setPatchInfo(uint32_t, const redux::util::PointI&, const redux::util::PointF&, uint16_t, size_t, uint16_t, uint16_t);
@@ -127,7 +129,7 @@ namespace redux {
             redux::util::PointI imageShift;            //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
             uint16_t imgSize, pupilSize, nModes;
             uint32_t otfSize, pupilSize2, otfSize2;
-            size_t blockStride,imgSize2;
+            size_t rowStride,imgSize2;
             double oldRG;
             double grad_step;
             const double* wfAlpha;
