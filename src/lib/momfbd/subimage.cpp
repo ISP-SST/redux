@@ -87,7 +87,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
         phi.resize( pupilSize, pupilSize );
         PF.resize( pupilSize, pupilSize );
         OTF.resize( otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX );
-        imgFT.resize( otfSize, otfSize );
+        imgFT.resize( otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX );
         vogel.resize( pupilSize, pupilSize );
         phi.zero();
         PF.zero();
@@ -158,6 +158,7 @@ void SubImage::initialize( Object& o, bool doReset ) {
     double* imgPtr = tmp->D.get();
     double* d2Ptr = tmp->D2.get();
     complex_t* oldFT = tmp->C.get();
+    complex_t* c2Ptr = tmp->C2.get();
     FourierTransform& tmpFT = tmp->FT;
     
     if( doReset ) {
@@ -185,19 +186,20 @@ void SubImage::initialize( Object& o, bool doReset ) {
         o.addRegGamma( rg );
     }
     
-    if( imgSize == otfSize ) {                                                                   // imgSize = 2*pupilSize
-        imgFT.reset( imgPtr, otfSize, otfSize, FT_FULLCOMPLEX ); //|FT_NORMALIZE );        // full-complex for now, perhaps half-complex later for performance
-    } else {                                                                                    // imgSize > 2*pupilSize should never happen (cf. calculatePupilSize)
+    if( imgSize != otfSize ) {                      // Generate an image padded to the size of the OTF.
         int offset = (otfSize - imgSize) / 2;
-        std::fill_n( d2Ptr, otfSize2, stats.mean );
-        double* tmpPtr = d2Ptr + offset*(otfSize+1);
+        std::fill_n( c2Ptr, otfSize2, complex_t(stats.mean) );
+        complex_t* tmpPtr = c2Ptr + offset*(otfSize+1);
         for( uint16_t i(0); i < imgSize; ++i) {
             std::copy_n( imgPtr+i*imgSize, imgSize, tmpPtr+i*otfSize );
         }
-        imgFT.reset(d2Ptr, otfSize, otfSize, FT_FULLCOMPLEX); //|FT_NORMALIZE );               // full-complex for now, perhaps half-complex later for performance
+    } else {
+        d2Ptr = imgPtr;
+        std::copy_n( imgPtr, otfSize2, c2Ptr );
     }
     
-    FourierTransform::reorder(imgFT);                                                          // keep FT in centered form
+    imgFT.ft( c2Ptr );
+    FourierTransform::reorder( imgFT.get(), otfSize, otfSize );       // keep FT in centered form
     
     if( doReset ) {
         o.addToFT( imgFT.get() );
