@@ -523,7 +523,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
 
     if( !gainFile.empty() ) {
         CachedFile::load<float>( gain, gainFile );
-        gainMask.reset( new uint8_t[imgSize.y*imgSize.x], []( uint8_t* p ){ delete[] p; } );
+        gainMask = rdx_get_shared<uint8_t>(imgSize.y*imgSize.x);
         make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
     }
 

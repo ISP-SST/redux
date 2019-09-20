@@ -17,8 +17,8 @@ namespace redux {
          *  @{
          */
 
-        std::unique_ptr<Bytef[]> compress(const Bytef* inData, uint64_t uncompressedSz, uint64_t& compressedSz, int compressionLevel=Z_DEFAULT_COMPRESSION);
-        std::unique_ptr<Bytef[]> decompress( const Bytef* inData, uint64_t compressedSz, uint64_t& uncompressedSz, bool swap_endian );
+        std::shared_ptr<Bytef> compress(const Bytef* inData, uint64_t uncompressedSz, uint64_t& compressedSz, int compressionLevel=Z_DEFAULT_COMPRESSION);
+        std::shared_ptr<Bytef> decompress( const Bytef* inData, uint64_t compressedSz, uint64_t& uncompressedSz, bool swap_endian );
         
         template <class T, int LVL=Z_DEFAULT_COMPRESSION>
         class Compressed : public T
@@ -39,7 +39,7 @@ namespace redux {
                 uint64_t count = metaSize();      // skip space for meta
                 uncompressedSize = T::pack(ptr+count);
                 compressedSize = compressBound(uncompressedSize);
-                std::unique_ptr<Bytef[]> buf( new Bytef[compressedSize] );
+                std::shared_ptr<Bytef> buf = rdx_get_shared<Bytef>(compressedSize);
                 int ret = compress2( buf.get(), &compressedSize, reinterpret_cast<Bytef*>(ptr)+count, uncompressedSize, compressionLevel );
                 if( ret == Z_OK && compressedSize < uncompressedSize ) {
                     isCompressed = true;
@@ -59,7 +59,7 @@ namespace redux {
                 uint64_t count = unpackMeta( ptr, swap_endian );
                 if ( isCompressed ) {
                     uLongf tmpSize = uncompressedSize;
-                    std::unique_ptr<Bytef[]> buf( new Bytef[ uncompressedSize ] );
+                    std::shared_ptr<Bytef> buf  = rdx_get_shared<Bytef>(uncompressedSize);
                     int ret = uncompress( buf.get(), &tmpSize, reinterpret_cast<const Bytef*>(ptr)+count, compressedSize );
                     if( ret != Z_OK ){
                         // TODO error handling

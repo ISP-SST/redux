@@ -1,17 +1,16 @@
 #include "redux/util/compress.hpp"
 
-#include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
 using namespace redux::util;
 using namespace std;
 
-unique_ptr<Bytef[]> redux::util::compress( const Bytef* inData, uint64_t uncompressedSz, uint64_t& compressedSz, int compressionLevel ) {
+shared_ptr<Bytef> redux::util::compress( const Bytef* inData, uint64_t uncompressedSz, uint64_t& compressedSz, int compressionLevel ) {
     
     uLongf tmpSz = compressBound(uncompressedSz);
     compressedSz = uncompressedSz;
 
-    unique_ptr<Bytef[]> buf( new Bytef[ tmpSz + sizeof(uncompressedSz)] );
+    shared_ptr<Bytef> buf = rdx_get_shared<Bytef>(tmpSz + sizeof(uncompressedSz));
     int ret = compress2( buf.get()+sizeof(uncompressedSz), &tmpSz, inData, uncompressedSz, compressionLevel );
     switch(ret){
         case(Z_OK): compressedSz = tmpSz; break;
@@ -26,11 +25,11 @@ unique_ptr<Bytef[]> redux::util::compress( const Bytef* inData, uint64_t uncompr
 }
 
 
-unique_ptr<Bytef[]> redux::util::decompress( const Bytef* inData, uint64_t compressedSz, uint64_t& uncompressedSz, bool swap_endian ) {
+shared_ptr<Bytef> redux::util::decompress( const Bytef* inData, uint64_t compressedSz, uint64_t& uncompressedSz, bool swap_endian ) {
     
     unpack( reinterpret_cast<const char*>(inData), uncompressedSz, swap_endian );
     uLongf tmpSz = uncompressedSz+sizeof(uncompressedSz);
-    unique_ptr<Bytef[]> buf( new Bytef[ tmpSz ] );
+    shared_ptr<Bytef> buf = rdx_get_shared<Bytef>(tmpSz + sizeof(tmpSz));
     int ret = uncompress( buf.get(), &tmpSz, inData+sizeof(uncompressedSz), compressedSz );
     
     switch(ret){

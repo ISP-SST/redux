@@ -27,7 +27,7 @@ namespace redux {
     {
         PackedData() : size(0), packedSize(0) {};
         void clear(void) { data.reset(); size = packedSize = 0; };
-        std::unique_ptr<char[]> data;
+        std::shared_ptr<char> data;
         uint64_t size;
         uint64_t packedSize;
     };

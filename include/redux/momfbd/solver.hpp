@@ -52,14 +52,14 @@ namespace redux {
 
                     size_t thisSize2 = currentSize*currentSize;
                     if( currentSize ) {
-                        D.reset( new double[thisSize2] );
-                        D2.reset( new double[thisSize2] );
-                        C.reset( new complex_t[thisSize2] );
-                        C2.reset( new complex_t[thisSize2] );
                         OTF.resize( 2*pupilSize, 2*pupilSize, redux::image::FT_FULLCOMPLEX );
                         FT.resize( patchSize, patchSize, redux::image::FT_FULLCOMPLEX );
-                        thisSize = currentSize;
+                        D = redux::util::rdx_get_shared<double>( thisSize2 );
+                        D2 = redux::util::rdx_get_shared<double>( thisSize2 );
+                        C = redux::util::rdx_get_shared<complex_t>( thisSize2 );
+                        C2 = redux::util::rdx_get_shared<complex_t>( thisSize2 );
                     }
+                    thisSize = currentSize;
                  }
                 void clear( void ) {
                     using namespace std;
@@ -74,8 +74,8 @@ namespace redux {
                 size_t thisSize;
                 static size_t currentSize;
                 static uint16_t patchSize, pupilSize;
-                std::unique_ptr<double[]> D,D2;
-                std::unique_ptr<complex_t[]> C,C2;
+                std::shared_ptr<double> D,D2;
+                std::shared_ptr<complex_t> C,C2;
                 redux::image::FourierTransform FT,OTF;
             };
     
@@ -161,12 +161,10 @@ namespace redux {
             uint32_t nTotalImages;
             
             std::shared_ptr<bool> enabledModes;
-            std::shared_ptr<double> alpha, alpha_offset, grad_alpha;
+            std::shared_ptr<double> alpha, alpha_offset, grad_alpha, tmp_alpha;
 
-            double *tmp_alpha;
-            double *beta, *grad_beta, *search_dir, *tmp_beta;
+            std::shared_ptr<double> beta, grad_beta, search_dir, tmp_beta, regAlphaWeights;
             double grad_beta_norm;
-            double *regAlphaWeights;
             
             double max_wavelength;
             size_t patchSize2,pupilSize2,nTotalPixels,otfSize,otfSize2;

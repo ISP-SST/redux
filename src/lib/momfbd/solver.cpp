@@ -104,21 +104,20 @@ void Solver::init( void ) {
     tmpPhiGrad.resize( nTotalImages, pupilSize, pupilSize );
     tmpOTF.resize( nTotalImages, otfSize, otfSize );
 
-    enabledModes.reset( new bool[nModes], [](bool* p){ delete[] p; } );
-
-    alpha.reset( new double[nParameters], [](double* p){ delete[] p; } );
-    alpha_offset.reset( new double[nParameters], [](double* p){ delete[] p; } );
-    grad_alpha.reset( new double[nParameters], [](double* p){ delete[] p; } );
-
-    regAlphaWeights = new double[nParameters];
+    enabledModes = rdx_get_shared<bool>(nModes);
     
-    beta = new double[nFreeParameters];
-    grad_beta = new double[nFreeParameters];
-    search_dir = new double[nFreeParameters];
-    tmp_beta = new double[nFreeParameters];
+    alpha = rdx_get_shared<double>(nParameters);
+    alpha_offset = rdx_get_shared<double>(nParameters);
+    grad_alpha = rdx_get_shared<double>(nParameters);
+
+    regAlphaWeights = rdx_get_shared<double>(nParameters);
+    beta = rdx_get_shared<double>(nFreeParameters);
+    grad_beta = rdx_get_shared<double>(nFreeParameters);
+    search_dir = rdx_get_shared<double>(nFreeParameters);
+    tmp_beta = rdx_get_shared<double>(nFreeParameters);
 
     max_wavelength = 0;
-    double* raPtr = regAlphaWeights;
+    double* raPtr = regAlphaWeights.get();
     for( auto & object : objects ) {
         object->initProcessing( *this );
         double scale = job.reg_alpha/object->wavelength;
@@ -636,17 +635,17 @@ template void Solver::applyAlpha( double* a );
 template void Solver::applyAlpha( float* a );
 
 
-void Solver::applyBeta( const gsl_vector* beta ) {
+void Solver::applyBeta( const gsl_vector* b ) {
 
-    job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset.get(), alpha.get() );
+    job.globalData->constraints.reverseAndAdd( b->data, alpha_offset.get(), alpha.get() );
     applyAlpha();
 
 }
 
 
-void Solver::applyBeta( const gsl_vector* beta, double scale ) {
+void Solver::applyBeta( const gsl_vector* b, double scale ) {
 
-    job.globalData->constraints.reverse( beta->data, alpha.get(), scale );
+    job.globalData->constraints.reverse( b->data, alpha.get(), scale );
     applyAlpha();
 
 }
@@ -654,7 +653,7 @@ void Solver::applyBeta( const gsl_vector* beta, double scale ) {
 
 void Solver::applyBeta( double scale ) {
 
-    job.globalData->constraints.reverse( beta, alpha.get(), scale );
+    job.globalData->constraints.reverse( beta.get(), alpha.get(), scale );
     applyAlpha();
     
 }
@@ -781,8 +780,9 @@ double Solver::metric(void) {
     if( job.reg_alpha > 0 ) {
         lock_guard<mutex> lock(mtx);
         double* alphaPtr = alpha.get();
+        double* rawPtr = regAlphaWeights.get();
         for( size_t i=0; i<nParameters; ++i ) {
-            sum += 0.5*alphaPtr[i]*alphaPtr[i]*regAlphaWeights[i];
+            sum += 0.5*alphaPtr[i]*alphaPtr[i]*rawPtr[i];
         }
     }
     
@@ -838,7 +838,7 @@ void Solver::gradient(void) {
     double* alphaPtr = alpha.get();
     double* gAlphaPtr = grad_alpha.get();
     if( job.reg_alpha > 0 ) {
-        std::transform( alphaPtr, alphaPtr+nParameters, regAlphaWeights, gAlphaPtr,
+        std::transform( alphaPtr, alphaPtr+nParameters, regAlphaWeights.get(), gAlphaPtr,
             std::multiplies<double>() );
     } else {
         memset( gAlphaPtr, 0, nParameters*sizeof(double) );
@@ -885,15 +885,11 @@ void Solver::clear( void ) {
     grad_alpha.reset();
     alpha_offset.reset();
 
-    delete[] regAlphaWeights;
-    delete[] beta;
-    delete[] grad_beta;
-    delete[] search_dir;
-    delete[] tmp_beta;
-
-    alpha = grad_alpha = alpha_offset = nullptr;
-    regAlphaWeights = nullptr;
-    beta = grad_beta = search_dir = tmp_beta = nullptr;
+    regAlphaWeights.reset();
+    beta.reset();
+    grad_beta.reset();
+    search_dir.reset();
+    tmp_beta.reset();
     
 }
 

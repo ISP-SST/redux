@@ -82,7 +82,7 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
     unpack( sz, blockSize, swapEndian_ );
     if( blockSize == 0 ) return buf;
 
-    buf.reset( new char[ blockSize ], []( char * p ) { delete[] p; } );
+    buf = rdx_get_shared<char>(blockSize);
 
     int64_t remain = blockSize;
     while( remain > 0 ) {
@@ -310,7 +310,7 @@ TcpConnection& TcpConnection::operator<<( const std::vector<std::string>& in ) {
     if( in.size() ) {
         uint64_t messagesSize = redux::util::size( in );
         size_t totSize = messagesSize+sizeof(uint64_t);
-        shared_ptr<char> tmp( new char[totSize], []( char* p ){ delete[] p; } );
+        shared_ptr<char> tmp = rdx_get_shared<char>(totSize);
         char* ptr = tmp.get();
         ptr += redux::util::pack( ptr, messagesSize );
         redux::util::pack( ptr, in );
@@ -328,7 +328,7 @@ TcpConnection& TcpConnection::operator>>( std::vector<std::string>& out ) {
     if( received == sizeof(uint64_t) ) {
         if( swapEndian_ ) swapEndian( blockSize );
         if( blockSize ) {
-            shared_ptr<char> buf( new char[blockSize+1], []( char* p ){ delete[] p; } );
+            shared_ptr<char> buf = rdx_get_shared<char>(blockSize+1);
             char* ptr = buf.get();
             memset( ptr, 0, blockSize+1 );
             received = boost::asio::read( mySocket, boost::asio::buffer( ptr, blockSize ) );

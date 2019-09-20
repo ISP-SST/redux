@@ -195,12 +195,12 @@ void Object::cleanup(void ){
 
     THREAD_MARK;
     channels.clear( );
-    ftSum.clear( );
-    Q.clear( );
-    P.clear( );
-    PQ.clear( );
-    PS.clear( );
-    QS.clear( );
+    ftSum.reset();
+    Q.reset();
+    P.reset();
+    PQ.reset();
+    PS.reset();
+    QS.reset();
     fittedPlane.clear( );
     pupil.reset( );
     modes.reset( );
@@ -235,12 +235,12 @@ void Object::initProcessing( Solver& ws ){
         patchSize2 = patchSize*patchSize;
         otfSize = 2*pupilPixels;
         otfSize2 = otfSize*otfSize;
-        P.resize(otfSize,otfSize );
-        Q.resize(otfSize,otfSize );
-        PQ.resize(otfSize,otfSize );
-        PS.resize(otfSize,otfSize );
-        QS.resize(otfSize,otfSize );
-        ftSum.resize( otfSize, otfSize );          // full-complex for now
+        P = rdx_get_shared<complex_t>(otfSize2);
+        Q = rdx_get_shared<double>(otfSize2);
+        PQ = rdx_get_shared<complex_t>(otfSize2);
+        PS = rdx_get_shared<double>(otfSize2);
+        QS = rdx_get_shared<double>(otfSize2);
+        ftSum = rdx_get_shared<double>(otfSize2);
         if( myJob.runFlags & RF_FIT_PLANE ){
             fittedPlane.resize( patchSize, patchSize );
         }
@@ -308,7 +308,7 @@ void Object::initProcessing( Solver& ws ){
 void Object::initPatch( void ){
     unique_lock<mutex> lock( mtx );
     reg_gamma = 0;
-    ftSum.zero( );
+    std::fill_n( ftSum.get(), otfSize2, 0.0 );
 }
 
 
@@ -498,8 +498,8 @@ void Object::getInit(ObjectData& od, double* alpha ){
 
 
 void Object::initPQ( void ){
-    P.zero( );
-    Q = reg_gamma;
+    std::fill_n( P.get(), otfSize2, complex_t(0) );
+    std::fill_n( Q.get(), otfSize2, reg_gamma );
 }
 
 
@@ -572,9 +572,9 @@ void Object::addAllPQ(void ){
 void Object::calcHelpers(void ){
     
     lock_guard<mutex> lock( mtx );
-    PQ.zero( );
-    PS.zero( );
-    QS.zero( );
+    std::fill_n( PQ.get(), otfSize2, complex_t(0) );
+    std::fill_n( PS.get(), otfSize2, 0.0 );
+    std::fill_n( QS.get(), otfSize2, 0.0 );
     
     const double *qPtr = Q.get( );
     const complex_t *pPtr = P.get( );
@@ -1031,7 +1031,7 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
         }
 
         LOG << "Loading initialization from file: " << tmpFile << ende;
-        unique_ptr<char[]> tmpData( new char[patchSize] );
+        shared_ptr<char> tmpData = rdx_get_shared<char>(patchSize);
         for( size_t y=0; y<nPatchesY; ++y ){
             for( size_t x=0; x<nPatchesX; ++x ){
                 info->patches(y,x).load( file, tmpData.get(), info->swapNeeded, info->version, MOMFBD_ALPHA );
@@ -1610,9 +1610,9 @@ void Object::dump( std::string tag ){
     
     tag += "_"+to_string(ID );
 
-    Ana::write( tag + "_ftsum.f0", ftSum );
-    Ana::write( tag + "_q.f0", Q );
-    Ana::write( tag + "_p.f0", P );
+    Ana::write( tag + "_ftsum.f0", Array<double>( ftSum.get(), otfSize, otfSize ) );
+    Ana::write( tag + "_q.f0", Array<double>( Q.get(), otfSize, otfSize ) );
+    Ana::write( tag + "_p.f0", Array<complex_t>(P.get(), otfSize, otfSize) );
     Ana::write( tag + "_fittedplane.f0", fittedPlane );
     if( pupil ) Ana::write( tag + "_pupil.f0", *pupil );
     if( modes ) Ana::write( tag + "_modes.f0", *modes );

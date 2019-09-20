@@ -347,7 +347,7 @@ uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
 TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostInfo& out) {
     
     uint64_t sz = out.size() + sizeof(uint64_t) + 1;
-    shared_ptr<char> buf( new char[sz], []( char* p ){ delete[] p; } );
+    shared_ptr<char> buf = rdx_get_shared<char>(sz);
     char* ptr = buf.get();
     memset(ptr,0,sz);
     
@@ -369,7 +369,7 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostI
 TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& in) {
     
     uint64_t sz = sizeof(uint64_t)+1;
-    shared_ptr<char> buf( new char[sz], []( char* p ){ delete[] p; } );
+    shared_ptr<char> buf = rdx_get_shared<char>(sz);
 
     size_t readBytes = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( readBytes != sz ) {
@@ -382,7 +382,7 @@ TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& i
     
     uint64_t count = unpack(ptr+1,sz,swap_endian);
     
-    buf.reset( new char[sz], []( char* p ){ delete[] p; } );
+    buf = rdx_get_shared<char>(sz);
 
     count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( count != sz ) {

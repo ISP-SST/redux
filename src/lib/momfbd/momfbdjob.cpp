@@ -259,7 +259,7 @@ void MomfbdJob::prePack( bool force ) {
     if( !packed.size ) {
         return;
     }
-    packed.data.reset( new char[packed.size] );
+    packed.data = rdx_get_shared<char>(packed.size);
     packed.packedSize = pack( packed.data.get() );
     
 }
@@ -926,11 +926,11 @@ void MomfbdJob::verifyPatches( void ) {
     size_t nModes = modeNumbers.size();
     size_t nAlpha = nModes*nImages();
     
-    unique_ptr<double[]> bestFit( new double[ nAlpha ] );
+    shared_ptr<double> bestFit = rdx_get_shared<double>(nAlpha);
     double* bPtr = bestFit.get();
-    unique_ptr<double[]> tmp( new double[ nAlpha ] );
+    shared_ptr<double> tmp = rdx_get_shared<double>(nAlpha);
     //double* tmpPtr = tmp.get();
-    unique_ptr<double[]> tmp2( new double[ nAlpha ] );
+    shared_ptr<double> tmp2 = rdx_get_shared<double>(nAlpha);
     //double* tmp2Ptr = tmp2.get();
 static int bla(1);    
     for( int y=0; y<nPatchesY; ++y ) {

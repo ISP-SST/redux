@@ -94,7 +94,7 @@ bool CacheItem::cacheLoad(bool removeAfterLoad) {
                 ifstream in(fullPath.string().c_str(), ofstream::binary|ios_base::ate);
                 if( in.good() ) {
                     size_t sz = in.tellg();
-                    unique_ptr<char[]> buf( new char[sz] );
+                    shared_ptr<char> buf = rdx_get_shared<char>(sz);
                     memset( buf.get(), 0, sz);
                     in.seekg(0, ios_base::beg);
                     in.clear();
@@ -139,7 +139,7 @@ bool CacheItem::cacheStore(bool clearAfterStore){
                 bfs::create_directories( fullPath.parent_path() );
             }
             cachedSize = csize();
-            unique_ptr<char[]> buf( new char[cachedSize] );
+            shared_ptr<char> buf = rdx_get_shared<char>(cachedSize);
             size_t psz = cpack( buf.get() );
             if( psz <= cachedSize ) {
                 ofstream out( fullPath.string().c_str(), ofstream::binary );

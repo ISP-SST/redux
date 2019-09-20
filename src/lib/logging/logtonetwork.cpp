@@ -87,7 +87,7 @@ void LogToNetwork::flushBuffer( void ) {
 
     Command cmd = CMD_PUT_LOG;
     size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + CMD_PUT_LOG
-    shared_ptr<char> data( new char[totalSize], []( char* p ){ delete[] p; } );
+    shared_ptr<char> data = rdx_get_shared<char>(totalSize);
     char* ptr = data.get();
     uint64_t count = pack( ptr, cmd );
     count += pack( ptr+count, blockSize );

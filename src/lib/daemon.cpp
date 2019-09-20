@@ -449,7 +449,7 @@ void Daemon::updateStatus( void ) {
 #endif
             size_t blockSize = myInfo.status.size();
             size_t totSize = blockSize + sizeof( size_t ) + 1;
-            shared_ptr<char> buf( new char[totSize], []( char* p ){ delete[] p; } );
+            shared_ptr<char> buf = rdx_get_shared<char>( totSize );
             char* ptr = buf.get();
             memset( ptr, 0, totSize );
 
@@ -1403,7 +1403,7 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
             uint64_t replySize = replyStr.length() + 1;
             uint64_t totalSize = replySize + sizeof(uint64_t);
             if( blockSize <= totalSize ) {
-                buf.reset( new char[totalSize], []( char* p ){ delete[] p; } );
+                buf = rdx_get_shared<char>(totalSize);
             }
             char* ptr = buf.get();
             ptr += pack( ptr, replySize );
@@ -1521,7 +1521,7 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
                 blockSize += wip->workSize();
                 host->status.statusString = alignLeft(to_string(wip->job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
                 host->active();
-                data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
+                data = rdx_get_shared<char>(blockSize+sizeof(uint64_t));
                 char* ptr = data.get()+sizeof(uint64_t);
                 count += wip->packWork( ptr+count );
                 std::thread([wip](){
@@ -1603,7 +1603,7 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
         if(job) blockSize += job->size();
     }
     uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
-    shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
+    shared_ptr<char> buf = rdx_get_shared<char>(totalSize);
     char* ptr = buf.get()+sizeof( uint64_t );
     uint64_t packedSize(0);
     for( auto& job : tmpJobs ) {
@@ -1654,7 +1654,7 @@ void Daemon::sendJobStats( TcpConnection::Ptr& conn ) {
         if( job ) blockSize += job->info.size();
     }
     uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
-    shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
+    shared_ptr<char> buf = rdx_get_shared<char>(totalSize);
     char* ptr = buf.get()+sizeof( uint64_t );
     uint64_t packedSize(0);                                                      // store real blockSize
     for( auto& job : tmpJobs ) {
@@ -1694,7 +1694,7 @@ void Daemon::sendPeerList( TcpConnection::Ptr& conn ) {
     }
     
     uint64_t totalSize = 2*blockSize + sizeof( uint64_t );                    // status updates might change packed size slightly, so add some margin
-    shared_ptr<char> buf( new char[totalSize], []( char* p ){ delete[] p; } );
+    shared_ptr<char> buf = rdx_get_shared<char>(totalSize);
     char* ptr =  buf.get()+sizeof( uint64_t );
     uint64_t packedSize = myInfo.pack( ptr );
     for( auto &host : hostList ) {

@@ -159,7 +159,7 @@ namespace redux {
             
             std::vector<double> localAlpha;
             redux::util::Array<double> phi;         //!< Array containing the phase of this OTF               size = pupilsize
-            redux::image::FourierTransform PF;      //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
+            std::shared_ptr<complex_t> PF;          //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
             redux::image::FourierTransform OTF;     //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize
             redux::image::FourierTransform imgFT;   //!< Fourier transform of img.                            size = 2*pupilsize
             redux::util::Array<double> vogel;       //!< used for the Vogel-method of gradient computaion     size = pupilsize

@@ -125,9 +125,9 @@ namespace redux {
             std::mutex mtx;
             std::atomic<int> imgShifted;
             redux::util::ProgressWatch progWatch;
-            redux::util::Array<double>  ftSum;                              //! Sum of the norm of all images' fourier-transforms
-            redux::util::Array<double> Q,PS,QS;
-            redux::util::Array<complex_t> P,PQ;
+            std::shared_ptr<double>  ftSum;                                 //! Sum of the norm of all images' fourier-transforms
+            std::shared_ptr<double> Q,PS,QS;
+            std::shared_ptr<complex_t> P,PQ;
             redux::util::Array<float> fittedPlane;
             std::shared_ptr<redux::image::Pupil> pupil;
             std::shared_ptr<ModeSet> modes;                                 //!< modes used in this object

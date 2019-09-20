@@ -1251,7 +1251,11 @@ namespace redux {
             void create( void ) {
                 if( dataSize ) {
                     try {
-                        datablock.reset( new T[dataSize], [](T*& p){ delete[] p; p = nullptr; } );
+                        if( std::is_pod<T>::value && std::is_trivial<T>::value ) {
+                            datablock = rdx_get_shared<T>(dataSize);
+                        } else {
+                            datablock.reset( new T[dataSize], [](T*& p){ delete[] p; p = nullptr; } );
+                        }
                     } catch( const std::bad_alloc& ba ) {
                         datablock.reset();
                     }

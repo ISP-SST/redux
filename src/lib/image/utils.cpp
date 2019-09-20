@@ -151,14 +151,17 @@ void redux::image::makeZernike( double** modePtr, int modeNumber, uint32_t nPoin
     auto angle2D = grid->angle2D();
     float** distPtr = dist2D.get();      // distance(i,j) is the distance from the centre of the pupil, to the center of pixel (i,j)
     float** aPtr = angle2D.get();
+    
     memset (*modePtr, 0, nPoints * nPoints * sizeof (double));
 
-    double** pupPtr = makePointers (pupil.ptr(), nPoints, nPoints);
+    double** pupPtr = makePointers(pupil.ptr(), nPoints, nPoints);
 
-    shared_ptr<double*> r = sharedArray<double> (nPoints, nPoints);     // normalized distance ^{some order}
-    shared_ptr<double*> r2 = sharedArray<double> (nPoints, nPoints);    // normalized distance squared
-    double** rPtr = r.get();
-    double** r2Ptr = r2.get();
+    shared_ptr<double> r = rdx_get_shared<double>(nPoints*nPoints);    // normalized distance ^{some order}
+    shared_ptr<double> r2 = rdx_get_shared<double>(nPoints*nPoints);   // normalized distance squared
+    auto r2D = reshapeArray( r.get(), nPoints, nPoints );
+    auto r22D = reshapeArray( r2.get(), nPoints, nPoints );
+    double** rPtr = r2D.get();
+    double** r2Ptr = r22D.get();
     double normalization (0);
 
     for (unsigned int y = 0; y < nPoints; ++y) {
