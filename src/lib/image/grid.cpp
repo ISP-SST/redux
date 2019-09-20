@@ -44,10 +44,12 @@ bool Grid::ID::operator<( const Grid::ID& rhs ) const {
 
 void Grid::init (void) {
 
-    distance = sharedArray<float> (id.size.y, id.size.x);
-    angle = sharedArray<float> (id.size.y, id.size.x);
-    float** distPtr = distance.get();
-    float** anglePtr = angle.get();
+    distance = rdx_get_shared<float>( id.size.y*id.size.x );
+    angle = rdx_get_shared<float>( id.size.y*id.size.x );
+    auto d2D = dist2D();
+    auto a2D = angle2D();
+    float** distPtr = d2D.get();
+    float** anglePtr = a2D.get();
     PointF shiftedOrigin = id.origin - 0.5;                // (0,0) means cetered in the lower left corner, (0.5,0.5) means on the first pixel
     for (unsigned int y = 0; y < id.size.y; ++y) {
         double yDist = y - shiftedOrigin.y;
