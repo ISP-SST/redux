@@ -2,6 +2,7 @@
 #define REDUX_UTIL_COMPRESS_HPP
 
 #include "redux/util/datautil.hpp"
+#include "redux/util/trace.hpp"
 
 #include <memory>
 #include <zlib.h>
@@ -20,7 +21,11 @@ namespace redux {
         std::unique_ptr<Bytef[]> decompress( const Bytef* inData, uint64_t compressedSz, uint64_t& uncompressedSz, bool swap_endian );
         
         template <class T, int LVL=Z_DEFAULT_COMPRESSION>
-        class Compressed : public T {
+        class Compressed : public T
+#ifdef RDX_TRACE_MEM
+            , public redux::util::TraceObject<Compressed<T,LVL>>
+#endif
+        {
             
         public:
             template <class... S>

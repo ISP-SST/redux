@@ -3,6 +3,7 @@
 
 #include <redux/logging/logger.hpp>
 #include <redux/util/stringutil.hpp>
+#include <redux/util/trace.hpp>
 
 #include <map>
 #include <ostream>
@@ -53,7 +54,11 @@ namespace redux {
         /*!
          * Settings with channel scope
          */
-        struct ChannelCfg {
+        struct ChannelCfg
+#ifdef RDX_TRACE_PROC
+            : public redux::util::TraceObject<ChannelCfg>
+#endif
+        {
 
             ChannelCfg();
             virtual ~ChannelCfg();

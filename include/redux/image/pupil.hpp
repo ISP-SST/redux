@@ -29,7 +29,13 @@ namespace redux {
         };
 
 
-        struct Pupil : public redux::util::Array<double> {
+        struct Pupil : public redux::util::Array<double>
+#ifdef RDX_TRACE_MEM
+#ifndef RDX_TRACE_ARRAY
+            , public redux::util::TraceObject<Pupil>
+#endif
+#endif
+        {
             
             static void calculatePupilSize(double &, double &, uint16_t&, double, uint32_t, double, double );
             

@@ -9,6 +9,10 @@
 #include <redux/util/progresswatch.hpp>
 #include <redux/util/region.hpp>
 
+#ifdef RDX_TRACE_JOB
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <future>
 
 #include <boost/asio.hpp>
@@ -39,7 +43,13 @@ namespace redux {
         /*! @brief Class containing the channel-specific configuration for a MomfbdJob/Object
          * 
          */
-        class Channel : public ChannelCfg {
+        class Channel : public ChannelCfg
+#ifdef RDX_TRACE_JOB
+#ifndef RDX_TRACE_PROC
+            , public redux::util::TraceObject<Channel>
+#endif
+#endif
+        {
 
         public:
 

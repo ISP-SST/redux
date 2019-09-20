@@ -29,7 +29,11 @@ namespace redux {
             };
 
         public:
-            struct Plan {
+            struct Plan
+#ifdef RDX_TRACE_MEM
+            : public redux::util::TraceObject<Plan>
+#endif
+            {
                 typedef std::shared_ptr<const Plan> Ptr;
                 enum TYPE { R2C=1, C2C };
                 struct Index {

@@ -10,6 +10,10 @@
 #include "redux/util/progresswatch.hpp"
 #include "redux/work.hpp"
 
+#ifdef RDX_TRACE_JOB
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/property_tree/ptree.hpp>
 namespace bpt = boost::property_tree;
@@ -33,7 +37,13 @@ namespace redux {
         /*! @brief Class containing the object-specific configuration a MOMFBD job
          * 
          */
-        class Object : public ObjectCfg {
+        class Object : public ObjectCfg
+#ifdef RDX_TRACE_JOB
+#ifndef RDX_TRACE_PROC
+    , public redux::util::TraceObject<Object>
+#endif
+#endif
+        {
 
         public:
 

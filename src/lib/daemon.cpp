@@ -1265,6 +1265,10 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     }
                 } else if( cmdStr == "idle" ) {
                     worker.stop();
+                } else if( cmdStr == "info" ) {
+                    replyStr = getLongVersionString();
+                    string tmpS = Trace::getInfo();
+                    if( ! tmpS.empty() ) replyStr += "\n" + tmpS;
                 } else if( cmdStr == "poke" ) {
                     worker.start();
                 } else if( cmdStr == "poken" ) {

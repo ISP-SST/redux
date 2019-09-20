@@ -5,6 +5,7 @@
 #include "redux/util/array.hpp"
 #include "redux/util/cacheitem.hpp"
 #include "redux/util/point.hpp"
+#include "redux/util/trace.hpp"
 
 #include <cstdint>
 #include <string>
@@ -32,7 +33,11 @@ namespace redux {
         /*! @brief Container for Linear Equality Constraints.
          *
          */
-        struct Constraints {
+        struct Constraints
+#ifdef RDX_TRACE_PROC
+            : public redux::util::TraceObject<Constraints>
+#endif
+        {
 
             enum ConstraintType { CT_UNDEF = 0, CT_CALIB, CT_OLD, CT_NEW };
             const std::string ConstraintTag[4] = {"", "CALIB", "MOJPDSF", "MOMFBD"};

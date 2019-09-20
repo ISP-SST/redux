@@ -32,7 +32,11 @@ namespace redux {
         
         namespace thread {
         
-            struct TmpStorage {
+            struct TmpStorage
+#ifdef RDX_TRACE_PROC
+            : public redux::util::TraceObject<TmpStorage>
+#endif
+            {
                 TmpStorage() : thisSize(0) {}
                 TmpStorage( const TmpStorage& ) = delete;
                 TmpStorage( TmpStorage&& ) = delete;
@@ -81,7 +85,11 @@ namespace redux {
         struct SubImage;
          /*! Container used during processing. Basically temporary arrays and reorganized references to original data.
          */
-        struct Solver {
+        struct Solver
+#ifdef RDX_TRACE_PROC
+            : public redux::util::TraceObject<Solver>
+#endif
+        {
             
             typedef std::shared_ptr<Solver> Ptr;
             

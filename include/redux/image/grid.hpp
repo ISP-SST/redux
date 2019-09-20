@@ -1,7 +1,9 @@
 #ifndef REDUX_IMAGE_GRID_HPP
 #define REDUX_IMAGE_GRID_HPP
 
+#include "redux/util/arrayutil.hpp"
 #include "redux/util/point.hpp"
+#include "redux/util/trace.hpp"
 
 #include <memory>
 
@@ -13,7 +15,11 @@ namespace redux {
         /*! Container for an equidistant grid. Distances to origin (in pixels) and angles (in radians) are stored in
          *  shared arrays. By default the origin is centered in the grid (between points for a grid with even points).
          */
-        struct Grid {
+        struct Grid
+#ifdef RDX_TRACE_MEM
+            : public redux::util::TraceObject<Grid>
+#endif
+        {
             struct ID {
                 explicit ID( uint32_t nPoints );
                 ID( uint32_t nPoints, float originY, float originX );

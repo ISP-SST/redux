@@ -11,6 +11,10 @@
 #include "redux/work.hpp"
 #include "redux/util/compress.hpp"
 
+#ifdef RDX_TRACE_PARTS
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <memory>
 #include <mutex>
 
@@ -32,7 +36,11 @@ namespace redux {
                 
         class Channel;
         struct PatchData;
-        struct ChannelData {
+        struct ChannelData
+#ifdef RDX_TRACE_PARTS
+            : public redux::util::TraceObject<ChannelData>
+#endif
+        {
             
             explicit ChannelData( std::shared_ptr<Channel> c );
             ChannelData( const ChannelData& ) = delete;
@@ -67,7 +75,11 @@ namespace redux {
 
         
         class Object;
-        struct ObjectData {
+        struct ObjectData
+#ifdef RDX_TRACE_PARTS
+            : public redux::util::TraceObject<ObjectData>
+#endif
+         {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
@@ -99,7 +111,11 @@ namespace redux {
             
         };
 
-        struct WavefrontData {
+        struct WavefrontData
+#ifdef RDX_TRACE_PARTS
+            : public redux::util::TraceObject<WavefrontData>
+#endif
+        {
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;

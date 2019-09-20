@@ -4,9 +4,7 @@
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 
-#ifdef RDX_TRACE_NET
-#   include "redux/util/trace.hpp"
-#endif
+#include "redux/util/trace.hpp"
 
 #include <iostream>
 #include <memory>

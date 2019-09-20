@@ -6,10 +6,7 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
-
-#ifdef RDX_TRACE_ARRAY
-#   include "redux/util/trace.hpp"
-#endif
+#include "redux/util/trace.hpp"
 
 #include <algorithm>
 #include <stdexcept>

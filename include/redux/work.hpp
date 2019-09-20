@@ -20,7 +20,11 @@ namespace redux {
 
     class Job;
     
-    struct PackedData {
+    struct PackedData
+#ifdef RDX_TRACE_PARTS
+            : public redux::util::TraceObject<PackedData>
+#endif
+    {
         PackedData() : size(0), packedSize(0) {};
         void clear(void) { data.reset(); size = packedSize = 0; };
         std::unique_ptr<char[]> data;
@@ -31,7 +35,9 @@ namespace redux {
 
     struct Part : public redux::util::CacheItem
 #ifdef RDX_TRACE_PARTS
+#ifndef RDX_TRACE_CACHE
             ,public redux::util::TraceObject<Part>
+#endif
 #endif
     {
         typedef std::shared_ptr<Part> Ptr;

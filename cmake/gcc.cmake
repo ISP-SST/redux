@@ -34,6 +34,11 @@ if( RDX_TRACE_FILE )
     message(STATUS "  Tracing FileMeta/CachedFile objects")
 endif()
 
+if( RDX_TRACE_MEM )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_MEM")
+    message(STATUS "  Tracing shared_ptr (de-)allocations")
+endif()
+
 if( RDX_TRACE_NET )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_NET")
     message(STATUS "  Tracing TcpConnection objects")
@@ -48,6 +53,11 @@ if( RDX_TRACE_PARTS )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_PARTS")
     message(STATUS "  Tracing Part objects")
 endif()
+if( RDX_TRACE_PROC )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRDX_TRACE_PROC")
+    message(STATUS "  Tracing Processing objects")
+endif()
+
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pedantic -Wall -fstrict-aliasing")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -ggdb3 -fvar-tracking -fvar-tracking-assignments")

@@ -9,6 +9,10 @@
 #include "redux/util/array.hpp"
 #include "redux/work.hpp"
 
+#ifdef RDX_TRACE_PROC
+#   include "redux/util/trace.hpp"
+#endif
+
 #include <functional>
 #include <memory>
 #include <map>
@@ -30,7 +34,13 @@ namespace redux {
         class Object;
         class Channel;
 
-        struct SubImage : public redux::util::Array<float> {
+        struct SubImage : public redux::util::Array<float>
+#ifdef RDX_TRACE_PROC
+#ifndef RDX_TRACE_ARRAY
+            , public redux::util::TraceObject<SubImage>
+#endif
+#endif
+        {
             typedef std::shared_ptr<SubImage> Ptr;
             
             SubImage(Object&, const Channel&, const redux::util::Array<double>& wind, const redux::util::Array<double>& nwind);

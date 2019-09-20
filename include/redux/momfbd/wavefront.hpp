@@ -20,7 +20,11 @@ namespace redux {
         /*! @brief Structure representing a wavefront. I.e. a parametrization of the atmospheric seeing sampled by
          *         one or more (co-temporal) images.
          */
-        struct WaveFront {
+        struct WaveFront
+#ifdef RDX_TRACE_PROC
+            : public redux::util::TraceObject<WaveFront>
+#endif
+        {
             
             explicit WaveFront( uint32_t );
             void setData( double* a, double* g, size_t n );
@@ -48,7 +52,11 @@ namespace redux {
         /*! @brief Class containing the collection of wavefronts. Basically just a container for alphas.
          * 
          */
-        class WaveFronts {
+        class WaveFronts
+#ifdef RDX_TRACE_PROC
+            : public redux::util::TraceObject<WaveFronts>
+#endif
+        {
 
         public:
 
