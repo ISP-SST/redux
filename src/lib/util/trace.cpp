@@ -25,6 +25,52 @@ int redux::util::trace::BT::max_depth = 5;
 std::map<size_t, Trace::trace_t> Trace::traces;
 std::mutex Trace::mtx;
 
+namespace {
+    
+    string make_info_string(void) {
+    
+#ifndef RDX_TRACE
+    return "";
+#endif
+
+    static const string traced[] = {
+#ifdef RDX_TRACE_ARRAY
+    "ARRAY",
+#endif
+#ifdef RDX_TRACE_CACHE
+    "CACHE",
+#endif
+#ifdef RDX_TRACE_FILE
+    "FILE",
+#endif
+#ifdef RDX_TRACE_NET
+    "NET",
+#endif
+#ifdef RDX_TRACE_JOB
+    "JOB",
+#endif
+#ifdef RDX_TRACE_PARTS
+    "PARTS",
+#endif
+#ifdef RDX_TRACE_PROC
+    "PROC",
+#endif
+    ""};
+    
+    string ret;
+    for( size_t i(0); ; ++i ) {
+        if( traced[i] == "" ) break;
+        if( !ret.empty() ) ret += "|";
+        ret += traced[i];
+    }
+
+    return "Trace enabled (with symbol demangling) for the following objects: (" + ret + ")";
+    
+}
+
+
+}
+
 void redux::util::thread_trace( const char* file, int line ) {
     string mark = string(file) + ":" + to_string(line);
     std::thread::id thread_id = std::this_thread::get_id();
@@ -119,7 +165,7 @@ string Trace::getBackTraces(void) {
     
     string ret;
     lock_guard<mutex> lock(mtx);
-    for( auto t: traces ) {
+    for( auto& t: traces ) {
         ret += t.second.backtraces() + "\n";
     }
     return ret;
@@ -133,13 +179,20 @@ string Trace::getStats(void) {
     lock_guard<mutex> lock(mtx);
     size_t totalCount(0);
     size_t totalSize(0);
-    for( auto t: traces ) {
+    for( auto& t: traces ) {
         ret += t.second.stats() + "\n";
         totalSize += t.second.size();
         totalCount += t.second.count();
     }
     if( totalCount ) ret += "Total traced items: " + to_string( totalCount ) + "  size: " + to_string( totalSize );
     else ret = "";
+    return ret;
+    
+}
+
+string Trace::getInfo(void) {
+    
+    static string ret = make_info_string();
     return ret;
     
 }

@@ -45,6 +45,7 @@ namespace redux {
             
             static std::string getBackTraces( void );
             static std::string getStats( void );
+            static std::string getInfo( void );
             
             static trace_t& addTraceObject( size_t id, string_cb_t stats, string_cb_t bt, size_cb_t cnt, size_cb_t sz );
             static void removeTraceObject( size_t id );
@@ -63,7 +64,7 @@ namespace redux {
         class TraceObject {
             
             typedef std::function<size_t(T*)> size_cb_t;
-            typedef const std::pair<const T*,Trace*> cache_arg_t;
+            typedef const std::pair<const T*,trace::BT> cache_arg_t;
             typedef std::function<void(cache_arg_t&)> cache_func_t;
 
             trace::BT bt;
@@ -72,44 +73,43 @@ namespace redux {
             
             
             TraceObject() {
-                Cache::get<T*,Trace*>(reinterpret_cast<T*>(this));
-                static Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,Trace*>(),
+                Cache::get<T*,trace::BT>(reinterpret_cast<T*>(this));
+                static Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
                                       std::bind(TraceObject<T>::getStats),
                                       std::bind(TraceObject<T>::printBackTraces),
-                                      std::bind(TraceObject<T>::count),
+                                      std::bind(TraceObject<T>::t_count),
                                       std::bind(TraceObject<T>::getTotalSize)
                 );
                 tt.totalCount++;
             }
-
-            virtual ~TraceObject() { stopTrace(); Trace::removeTraceObject( Cache::getID1<T*,Trace*>()); }
-            void stopTrace( void ) { Cache::erase<T*,Trace*>(reinterpret_cast<T*>(this)); }
-            static size_t count( void ) { return Cache::size<T*,Trace*>(); }
+            virtual ~TraceObject() { stopTrace(); Trace::removeTraceObject( Cache::getID1<T*,trace::BT>()); }
+            void stopTrace( void ) { Cache::erase<T*,trace::BT>(reinterpret_cast<T*>(this)); }
+            static size_t t_count( void ) { return Cache::size<T*,trace::BT>(); }
             static size_t getTotalSize( void ) {
                 size_t sz(0);
-                cache_func_t func = [&](cache_arg_t& p) { if(p.first) sz += p.first->size(); };
-                Cache::get().for_each<T*,Trace*>( func );
+                cache_func_t func = [&](cache_arg_t& p) { if(p.first) sz += sizeof(T); };
+                Cache::get().for_each<T*,trace::BT>( func );
+
                 return sz;
             }
 
             //virtual std::string trace_info( void ) const;
             
-            static std::string getStats( void ) { return Cache::get().stats<T*,Trace*>(); }
-            std::string printBackTrace( size_t indent=5 ) const { return bt.printBackTrace(indent); }
+            static std::string getStats( void ) { return Cache::get().stats<T*,trace::BT>(); }
             static std::string printBackTraces( void ) {
-                std::string nm = "  " + Cache::getName<T*,Trace*>() + "\n";
+                std::string nm = "  " + Cache::getName<T*,trace::BT>() + "\n";
                 std::string ret;
                 //auto btfunc = std::bind(TraceObject<T>::printBackTrace, std::placeholders::_1);
                 cache_func_t func = [&](cache_arg_t& p) {
                     if( p.first ) {
-                        ret += hexString(p.first) + nm + p.first->bt.printBackTrace(5);
+                        ret += hexString(p.first) + nm + p.second.printBackTrace(5);
                     }
                 };
-                Cache::get().for_each<T*,Trace*>( func );
+                Cache::get().for_each<T*,trace::BT>( func );
                 return ret;
             }
 
-            virtual inline size_t size( void ) const { return sizeof(T); }
+            virtual inline size_t t_size( void ) const { return sizeof(T); }
                    
         protected:
 
@@ -118,6 +118,29 @@ namespace redux {
             } trace_d;
 
         };
+        
+        template <class T>
+        std::shared_ptr<T> rdx_get_shared( size_t n ) {
+#ifdef RDX_TRACE_MEM
+            T* tmp = new T[n];
+            Cache::get<T*,trace::BT>(tmp);
+            static Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
+                                    std::bind(TraceObject<T>::getStats),
+                                    std::bind(TraceObject<T>::printBackTraces),
+                                    std::bind(TraceObject<T>::t_count),
+                                    std::bind(TraceObject<T>::getTotalSize)
+            );
+            tt.totalCount++;
+            return std::shared_ptr<T>( tmp, []( T*& p ){
+                Cache::erase<T*,trace::BT>(p);
+                Trace::removeTraceObject( Cache::getID1<T*,trace::BT>());
+                delete[] p;
+                p=nullptr;
+            });
+#else
+            return std::shared_ptr<T>( new T[n], []( T*& p ){ delete[] p; p=nullptr; } );
+#endif
+        }
 
     }   // util
 
