@@ -189,39 +189,39 @@ void Solver::dumpImages( boost::asio::io_service& service, string tag ) {
 }
 
 
-double Solver::my_f( const gsl_vector* beta, void* params ) {
+double Solver::my_f( const gsl_vector* b, void* params ) {
 
-    applyBeta( beta );
+    applyBeta( b );
     
     return metric();
 
 }
 
 
-void Solver::my_df( const gsl_vector* beta, void* params, gsl_vector* df ) {
+void Solver::my_df( const gsl_vector* b, void* params, gsl_vector* df ) {
 
-    applyBeta( beta );
+    applyBeta( b );
     calcPQ();
     gradient( df );
 
 }
 
 
-void Solver::my_fdf( const gsl_vector* beta, void* params, double* f, gsl_vector* df ) {
+void Solver::my_fdf( const gsl_vector* b, void* params, double* f, gsl_vector* df ) {
     
-    applyBeta( beta );
+    applyBeta( b );
     *f = metric();
     gradient( df );
     
 }
 
 
-void Solver::my_precalc( const gsl_vector* beta, const gsl_vector* beta_grad ) {
+void Solver::my_precalc( const gsl_vector* b, const gsl_vector* b_grad ) {
     
     progWatch.set(3);
     service.post( [this] { tmpPhiGrad.zero(); ++progWatch; } );
-    service.post ([this, beta] { job.globalData->constraints.reverseAndAdd( beta->data, alpha_offset.get(), alpha.get() ); ++progWatch; });
-    service.post ([this, beta_grad] { job.globalData->constraints.reverse( beta_grad->data, grad_alpha.get() ); ++progWatch; });
+    service.post ([this, b] { job.globalData->constraints.reverseAndAdd( b->data, alpha_offset.get(), alpha.get() ); ++progWatch; });
+    service.post ([this, b_grad] { job.globalData->constraints.reverse( b_grad->data, grad_alpha.get() ); ++progWatch; });
     progWatch.wait();
 
     size_t nElements = pupilSize*pupilSize;
@@ -274,8 +274,8 @@ double Solver::metricAt( double step ) {
         //if( o->weight > 0 ) {
             double normalization = sqrt(1.0 / (o->pupil->area*otfSize2));
             for( const auto& c: o->getChannels() ) {
-                for( const auto& im: c->getSubImages() ) {
-                    service.post( [this, &im, &o, normalization, step, otfPtr, phiPtr, phiGradPtr] {
+                for( const auto& im RDX_UNUSED: c->getSubImages() ) {
+                    service.post( [this, &o, normalization, step, otfPtr, phiPtr, phiGradPtr] {
                         const double* pupilPtr = o->pupil->get();
                         for( const auto& ind: o->pupil->pupilInOTF ) {
                             otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+step*phiGradPtr[ind.first]);
@@ -382,7 +382,6 @@ void Solver::run( PatchData::Ptr data ) {
 
     timer.start();
     logger.flushAll();
-    
     loadInit( data, alpha_offset.get() );
     shiftAndInit( alpha_offset.get(), true );     // force initialization
     

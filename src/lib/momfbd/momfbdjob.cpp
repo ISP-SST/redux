@@ -477,6 +477,9 @@ void MomfbdJob::returnResults( WorkInProgress::Ptr wip ) {
 void MomfbdJob::cleanup(void) {
     
     THREAD_MARK;
+    clearPatches();
+    
+    THREAD_MARK;
     auto lock = getLock();
     
     pool.interrupt_all();
@@ -493,7 +496,6 @@ void MomfbdJob::cleanup(void) {
     }
 
     objects.clear();
-    patches.clear();
     globalData.reset();
     
     THREAD_MARK;
@@ -625,9 +627,11 @@ bool MomfbdJob::checkPatchPositions(void) {
     posLimits.shrink( halfPatchSize );
     posLimits -= roi.first;         // patch coordinates are given relative to the ROI
     
-    bool xOutside(false);
-    bool yOutside(false);
     if( subImagePosXY.empty() ) {
+        
+        bool xOutside(false);
+        bool yOutside(false);
+        
         uint16_t totalOverlap = minimumOverlap+patchSize/4;     // from MvN: always overlap 25% + 16 pixels.
         // TODO: do split per channel instead, to allow for different image-scales and/or hardware
         // NOTE:  subImagePosX/Y are kept 1-based, so offset by 1 during cut-out.
@@ -866,48 +870,16 @@ void MomfbdJob::clearPatches(void) {
 
     THREAD_MARK;
     auto lock = getLock();
-    uint64_t nTotalThreads(0);
-    double cpu_sum(0.0);
-    for( const PatchData::Ptr& p: patches ) {
-        nTotalThreads += p->nThreads;
-        cpu_sum += p->runtime_cpu;
-        p->clear();
-    }
+    
     THREAD_MARK;
-    size_t nPatches = patches.nElements();
+    for( const PatchData::Ptr& p: patches ) {
+        THREAD_MARK;
+        if( p ) p->clear();
+    }
+    
+    THREAD_MARK;
     patches.clear();
-    moveTo( this, JSTEP_COMPLETED );
-    
-    boost::posix_time::time_duration elapsed = getElapsed( JSTEP_CHECKING, JSTEP_CHECKED );
-    boost::posix_time::time_duration total;
-    string timings = "\nTiming details:\n";
-    if( ! elapsed.is_not_a_date_time() ) {
-        timings += "       Checking: " + to_simple_string(elapsed) +"\n";
-        total += elapsed;
-    }
-    elapsed = getElapsed( JSTEP_PREPROCESS, JSTEP_QUEUED );
-    if( ! elapsed.is_not_a_date_time() ) {
-        timings += "  PreProcessing: " + to_simple_string(elapsed) +"\n";
-        total += elapsed;
-    }
-    elapsed = getElapsed( JSTEP_RUNNING, JSTEP_DONE );
-    if( ! elapsed.is_not_a_date_time() ) {
-        timings += "        Running: " + to_simple_string(elapsed) +"\n";
-        total += elapsed;
-    }
-    elapsed = getElapsed( JSTEP_WRITING, JSTEP_COMPLETED );
-    if( ! elapsed.is_not_a_date_time() ) {
-        timings += "        Writing: " + to_simple_string(elapsed) +"\n";
-        total += elapsed;
-    }
-    if( ! total.is_not_a_date_time() ) {
-        timings += "          TOTAL: " + to_simple_string(total) +"\n";
-    }
-    
-    LOG << nPatches << " patches, processed in: " << to_simple_string(total)
-        << ".  CPU-time: " << (cpu_sum/3600) << " hours." << ende;
-    
-    LOG_DETAIL << timings << ende;
+
     THREAD_MARK;
     
 }
@@ -1013,7 +985,57 @@ void MomfbdJob::writeOutput( void ) {
     progWatch.clear();
     progWatch.set( objects.size()+trace_objects.size() );
     progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
-    progWatch.setHandler( std::bind( &MomfbdJob::clearPatches, this) );
+
+    progWatch.setHandler( [this](){
+        
+        THREAD_MARK;
+        size_t nPatches = patches.nElements();
+        uint64_t nTotalThreads(0);
+        double cpu_sum(0.0);
+        for( const PatchData::Ptr& p: patches ) {
+            nTotalThreads += p->nThreads;
+            cpu_sum += p->runtime_cpu;
+        }
+        
+        clearPatches();
+        
+        boost::posix_time::time_duration elapsed = getElapsed( JSTEP_CHECKING, JSTEP_CHECKED );
+        boost::posix_time::time_duration total;
+        string timings = "\nTiming details:\n";
+        if( ! elapsed.is_not_a_date_time() ) {
+            timings += "       Checking: " + to_simple_string(elapsed) +"\n";
+            total += elapsed;
+        }
+        elapsed = getElapsed( JSTEP_PREPROCESS, JSTEP_QUEUED );
+        if( ! elapsed.is_not_a_date_time() ) {
+            timings += "  PreProcessing: " + to_simple_string(elapsed) +"\n";
+            total += elapsed;
+        }
+        elapsed = getElapsed( JSTEP_RUNNING, JSTEP_DONE );
+        if( ! elapsed.is_not_a_date_time() ) {
+            timings += "        Running: " + to_simple_string(elapsed) +"\n";
+            total += elapsed;
+        }
+        elapsed = getElapsed( JSTEP_WRITING, JSTEP_COMPLETED );
+        if( ! elapsed.is_not_a_date_time() ) {
+            timings += "        Writing: " + to_simple_string(elapsed) +"\n";
+            total += elapsed;
+        }
+        if( ! total.is_not_a_date_time() ) {
+            timings += "          TOTAL: " + to_simple_string(total) +"\n";
+        }
+        
+        LOG << nPatches << " patches, processed in: " << to_simple_string(total)
+            << ".  CPU-time: " << (cpu_sum/3600) << " hours." << ende;
+        
+        LOG_DETAIL << timings << ende;
+        
+        THREAD_MARK;
+
+        moveTo( this, JSTEP_COMPLETED );
+        updateProgressString();
+        
+    });
     
     updateProgressString();
     

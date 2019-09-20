@@ -382,13 +382,13 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         tmpD.zero( );
         if( nPSF > 1 ){
             for( shared_ptr<SubImage>& si: images ) {
-                    si->getPSF( tmpD.get( ) );
-                    view.assign( tmpD );
-                    view.shift( 0, 1 );
+                si->getPSF( tmpD.get( ) );
+                view.assign( tmpD );
+                view.shift( 0, 1 );
             }
         } else if( nPSF == 1 ){
             for( shared_ptr<SubImage>& si: images ) {
-                    si->addPSF( tmpD.get( ) );
+                si->addPSF( tmpD.get( ) );
             }
             view.assign( tmpD );
             od.psf *=( 1.0/imgCount );
@@ -403,8 +403,8 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         od.cobj.zero( );
         Array<float> view(od.cobj,0,0,0,otfSize-1,0,otfSize-1 );
         for( shared_ptr<SubImage>& si: images ) {
-                view.assign(si->convolveImage(od.img) );
-                view.shift(0,1 );
+            view.assign( si->convolveImage( od.img) );
+            view.shift(0,1 );
         }
     } else {
         od.cobj.clear( );
@@ -432,14 +432,14 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         if( od.cobj.sameSizes(od.res ) ){
             Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
             for( shared_ptr<SubImage>& si: images ) {
-                    view.assign( si->convolvedResidual(cview) );
-                    view.shift( 0, 1 );
-                    cview.shift( 0, 1 );
+                view.assign( si->convolvedResidual(cview) );
+                view.shift( 0, 1 );
+                cview.shift( 0, 1 );
             }
         } else {
             for( shared_ptr<SubImage>& si: images ) {
-                    view.assign(si->residual(od.img) );
-                    view.shift(0,1 );
+                view.assign(si->residual(od.img) );
+                view.shift(0,1 );
             }
         }
     } else {
@@ -1162,7 +1162,7 @@ void Object::getStorage( PatchData& pData, shared_ptr<ObjectData> oData ) {
     int nCh = objChannels.size();
     if( nCh && (saveMask & SF_SAVE_DIVERSITY) ){
         oData->div.wrap( resPtr, nCh, pupilPixels, pupilPixels );
-        resPtr += nCh*pupilPixels*pupilPixels;
+        //resPtr += nCh*pupilPixels*pupilPixels; // resPtr is not used again
     }
 
 }

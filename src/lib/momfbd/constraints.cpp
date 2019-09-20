@@ -299,7 +299,7 @@ void Constraints::Group::addConnectedConstraints( vector<shared_ptr<Constraint>>
  *  Swap column order so that this group has all entries in consecutive columns
  *  This makes the constraint matrix block-diagonal.
  */
-void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, int32_t& cOffset ) {
+void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& cOffset, int32_t& rOffset ) {
 
     groupOffset.y = rOffset;    // store the offset of this group (in the nullspace matrix).
     groupOffset.x = cOffset;
@@ -564,7 +564,7 @@ void Constraints::init( void ) {
                         for( auto& wf : ch->waveFrontList ) {
                             auto ret = wfCons.insert( make_pair( wf, Constraint( logger, parameterOffset + modeIndex, 1 ) ) );
                             if( !ret.second ) { // wavefront already existed in wfCons => constrain this image/mode coefficient
-                                shared_ptr<Constraint> thisConstraint( new Constraint( logger, ret.first->second ) );
+                                thisConstraint.reset( new Constraint( logger, ret.first->second ) );
                                 thisConstraint->addEntry( parameterOffset + modeIndex, -1 );
                                 constraints.push_back( thisConstraint );
                             }

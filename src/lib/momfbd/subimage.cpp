@@ -118,7 +118,6 @@ void SubImage::getWindowedImg( double* out, float* plane, ArrayStats& imgStats, 
     if( plane ) {
         for( size_t i=0; i<imgSize2; ++i) {
             // Note: mean(plane) = 0, so subtracting it will not affect the mean value.
-//            imgPtr[i] = (imgPtr[i]-avg-surfPtr[i])*winPtr[i]+avg;
             double tmp = (out[i]-avg-plane[i])*winPtr[i]+avg;
             newAvg += tmp;
             out[i] = tmp;
@@ -126,7 +125,6 @@ void SubImage::getWindowedImg( double* out, float* plane, ArrayStats& imgStats, 
     } else {
         transform(out, out+imgSize2, winPtr, out,
                 [avg,&newAvg](const double& a, const double& b) {
-//                    return (a-avg)*b+avg;
                     double tmp = (a-avg)*b+avg;
                     newAvg += tmp;
                     return tmp;
@@ -321,7 +319,7 @@ double SubImage::gradientVogel(uint16_t modeIndex ) {
     for( auto & ind : object.pupil->pupilSupport ) {
         ret += scale * vogPtr[ind] * modePtr[ind];
     }
-    
+
     return ret*object.weight;
     
 }
@@ -355,12 +353,12 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
     const complex_t* otfPtr = OTF.get();
     const complex_t* ftPtr = imgFT.get();
     const complex_t* pfPtr = PF.get();
-    
+
     auto tmp = Solver::tmp();
     complex_t* tmpOtfPtr = tmp->OTF.get();
     complex_t* glPtr = tmp->C.get();
     complex_t* hjPtr = tmp->C2.get();
-    
+
     tmp->OTF.zero();
     FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
 
@@ -478,14 +476,10 @@ bool SubImage::adjustShifts( const T* alpha ) {
     }
 
     if( oldShift != imageShift ) {
-        //LOG_DEBUG << "SubImage Shifting:  pix2cf=" << object.shiftToAlpha << "   tiltMode=" << object.modes->tiltMode << printArray(alpha,2,"  tilts") << ende;
         LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                   << ":  cutout was shifted, from " << oldShift << " to " << imageShift
                   << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << ende;
-        //newCutout();
         ret = shifted = true;
-        //LOG_TRACE << "SubImage Shifting:  " << printArray(first(),"\nfirst") << printArray(last(),"\nlast") << ende;
-//LOG << printArray(localAlpha,"newLocalAlpha") << ende;
     }
     return ret;
 }
@@ -634,7 +628,7 @@ void SubImage::calcPFOTF(void) {
 void SubImage::addPSF( double* outPSF ) const {
     
     complex_t* cPtr = Solver::tmp()->C.get();
-    OTF.getIFT( cPtr );     // FIXME: Using forward transform to match MvN (who conjugates the transform)
+    OTF.ift( cPtr );
     FourierTransform::reorder( cPtr, otfSize, otfSize );
 //    double normalization(0.0);        // TBD: should the PSF be auto-scaled or filtered ??
 //     std::for_each( tmp.get(), tmp.get()+otfSize2,
@@ -678,8 +672,7 @@ string SubImage::idString( void ) const {
 void SubImage::dump( std::string tag ) const {
 
     tag += "_" + idString();
- //   cout << "    dumping image:  this=" << hexString(this) << " with tag=" << tag << endl;
- //   cout << "                  phiPtr=" << hexString(phi.get()) << endl;
+
     Array<double> img( imgSize, imgSize );
     Array<complex_t> tmp;
     ArrayStats s;
