@@ -607,7 +607,7 @@ void Object::fitAvgPlane( redux::util::Array<float>& plane, const vector<uint32_
     if( (myJob.runFlags & RF_FIT_PLANE) && !images.empty() ){
         size_t count(0);
         plane.zero();
-        for( const shared_ptr<SubImage> im: images ){
+        for( const shared_ptr<SubImage>& im: images ){
             if( !im )continue;
             if( !im->sameSize(plane) ){
                 LOG_ERR << "Size mismatch when fitting average plane for object #" << ID
@@ -684,13 +684,9 @@ bool Object::checkCfg( void ){
         size_t p = tpl.find_first_of( '%' );
         if( p != string::npos ){
             string tmpString = boost::str( boost::format( tpl )% 1 );
-            auto it = tmpString.begin( );
-            auto it2 = tpl.begin( );
             p = 0;
             size_t i = std::min( tmpString.length(), tpl.length() );
             while( p < i && tmpString[p] == tpl[p] )p++;
-            it = tmpString.end( );
-            it2 = tpl.end( );
             size_t ii = tmpString.length( )- 1;
             i = tpl.length( )- 1;
             while( ii && i && tmpString[ii] == tpl[i] ){

@@ -311,7 +311,6 @@ void Constraints::Group::blockify( int32_t* columnOrdering, int32_t& rOffset, in
     std::iota( newIndices.begin(), newIndices.end(), rOffset );         // newIndices is a dense range starting at rOffset
     
     vector<int32_t> entry_count( nParameters, 0 );
-    map<int32_t, int32_t> entryCount;
     struct my_comp {
         bool operator() ( const PointI& lhs, const PointI& rhs ) const {
             if( lhs.y != rhs.y ) return lhs.y>rhs.y;
@@ -416,7 +415,8 @@ void Constraints::Group::mapNullspace(void) {
 }
 
 
-Constraints::Constraints( MomfbdJob& j ) : job( j ), logger(j.logger), blockified(false), loaded(false) {
+Constraints::Constraints( MomfbdJob& j ) : type(CT_UNDEF), job( j ), logger(j.logger),
+    blockified(false), loaded(false), nParameters(0), nFreeParameters(0) {
 
 }
 
@@ -853,7 +853,7 @@ void Constraints::write( void ) {
 }
 
 
-void Constraints::dump( string tag ) const {
+void Constraints::dump( const string& tag ) const {
 
     LOG_DEBUG << "Dumping constraints." << ende;
     if( parameterOrder ) { // if we have an ordering-list (only when the constraints were generated, not after sending or loading)

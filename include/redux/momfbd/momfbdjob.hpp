@@ -139,7 +139,7 @@ namespace redux {
             friend class WaveFronts;
             friend class Object;
             friend class Channel;
-            friend class Solver;
+            friend struct Solver;
             friend struct SubImage;
             friend struct PatchData;
             friend struct ModeSet;

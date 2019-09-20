@@ -90,16 +90,16 @@ namespace redux {
                 int64_t pos( void ) const { return pos_; }
                 template <typename U>
                 const Array<T> neighbourhood(const std::vector<U>& maxDistance) {
-                    std::vector<int64_t> first = m_ConstArrayPtr->indexFromPos(pos_);
-                    if( first.size() != maxDistance.size() ) {
+                    std::vector<int64_t> firstv = m_ConstArrayPtr->indexFromPos(pos_);
+                    if( firstv.size() != maxDistance.size() ) {
                         throw std::logic_error("Array::iterator::neighbourhood() Dimension mismatch:  " + printArray(maxDistance,"maxDistance"));
                     }
-                    std::vector<int64_t> last = first;
-                    for (size_t i=0; i<first.size(); ++i) {
-                        first[i] -= maxDistance[i];
-                        last[i]  += maxDistance[i];
+                    std::vector<int64_t> lastv = firstv;
+                    for (size_t i=0; i< firstv.size(); ++i) {
+                        firstv[i] -= maxDistance[i];
+                        lastv[i]  += maxDistance[i];
                     }
-                    return Array<T>(*const_cast<Array<T>*>(m_ConstArrayPtr),first,last);
+                    return Array<T>(*const_cast<Array<T>*>(m_ConstArrayPtr), firstv, lastv );
                 }
                 template <typename ...S> const Array<T> neighbourhood( S ...s ) { return neighbourhood<int64_t>({static_cast<int64_t>(s)...}); }
 
@@ -435,12 +435,12 @@ namespace redux {
             const std::vector<size_t> dimensions( bool skipTrivialDims ) const {
                 if(skipTrivialDims) {
                     std::vector<size_t> newDimSizes;
-                    for( auto & size : currentSizes ) {
-                        if( size > 1 || !skipTrivialDims) {
-                            newDimSizes.push_back( size );
+                    for( auto & sz : currentSizes ) {
+                        if( sz > 1 || !skipTrivialDims) {
+                            newDimSizes.push_back( sz );
                         }
                     }
-                    return std::move(newDimSizes);
+                    return newDimSizes;
                 }
                 return currentSizes;
             }
@@ -454,14 +454,14 @@ namespace redux {
                 else return 0;
             }
 
-            T* cloneData( void ) {
+            T* cloneData( void ) const {
                 T* dptr = nullptr;
                 if( nElements_ ) {
                     dptr = new T[nElements_];
                     if( dense_ ) {
                         std::copy( get()+begin_, get()+end_, dptr );
                     } else {
-                        std::transform( begin(), end(), dptr, dptr, [](const T& a, const T& b) { return a; } );
+                        std::transform( begin(), end(), dptr, [](const T& a) { return a; } );
                     }
                 }
                 return dptr;
@@ -497,7 +497,7 @@ namespace redux {
                 if(newDimSizes.empty()) return Array<U>();
                 Array<U> tmp( newDimSizes );
                 tmp.assign(*this);
-                return std::move(tmp);
+                return tmp;
             }
 
 
@@ -736,7 +736,7 @@ namespace redux {
             Array<T> operator+( const T& rhs ) {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp+=rhs);
+                return tmp+=rhs;
             }
             const Array<T>& operator+=( T rhs ) {
                 if(dense_) {
@@ -750,7 +750,7 @@ namespace redux {
             Array<T> operator-( const T& rhs ) {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp-=rhs);
+                return tmp-=rhs;
             }
             const Array<T>& operator-=( T rhs ) {
                 if(dense_) {
@@ -764,7 +764,7 @@ namespace redux {
             Array<T> operator*( const T& rhs ) {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp*=rhs);
+                return tmp*=rhs;
             }
             const Array<T>& operator*=( const T& rhs ) {
                 if(dense_) {
@@ -778,7 +778,7 @@ namespace redux {
             Array<T> operator/( const T& rhs ) {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp/=rhs);
+                return tmp/=rhs;
             }
             const Array<T>& operator/=( const T& rhs ) {
                 if(dense_) {
@@ -797,7 +797,7 @@ namespace redux {
             Array<T> operator+( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp+=rhs);
+                return tmp+=rhs;
             }
             template <typename U>
             const Array<T>& operator+=( const Array<U>& rhs ) {
@@ -819,7 +819,7 @@ namespace redux {
             Array<T> operator-( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp-=rhs);
+                return tmp-=rhs;
             }
             template <typename U>
             const Array<T>& operator-=( const Array<U>& rhs ) {
@@ -841,7 +841,7 @@ namespace redux {
             Array<T> operator*( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp*=rhs);
+                return tmp*=rhs;
             }
             template <typename U>
             const Array<T>& operator*=( const Array<U>& rhs ) {
@@ -863,7 +863,7 @@ namespace redux {
             Array<T> operator/( const Array<U>& rhs ) const {
                 Array<T> tmp;
                 this->copy(tmp);
-                return std::move(tmp/=rhs);
+                return tmp/=rhs;
             }
             template <typename U>
             const Array<T>& operator/=( const Array<U>& rhs ) {
@@ -1078,22 +1078,22 @@ namespace redux {
             
             template <typename U>
             void setLimits( const std::vector<U>& limits ) {
-                std::vector<U> first(nDims_);
-                std::vector<U> last(nDims_);
+                std::vector<U> firstv (nDims_);
+                std::vector<U> lastv (nDims_);
                 if( limits.size() == nDims_ ) {
                     for( size_t i = 0; i < nDims_; ++i ) {
-                        last[i] = dimFirst[i]+limits[i]-1;
-                        first[i] = dimFirst[i];
+                        lastv[i] = dimFirst[i]+limits[i]-1;
+                        firstv[i] = dimFirst[i];
                     }
                 } else if (limits.size() == 2*nDims_) {
                     for( size_t i = 0; i < nDims_; ++i ) {
-                        last[i] = limits[2 * i + 1];
-                        first[i] = limits[2 * i];
+                        lastv[i] = limits[2 * i + 1];
+                        firstv[i] = limits[2 * i];
                     }
                 } else {  // odd number of indices, or too many indices
                     throw std::logic_error("Array::setLimits: Dimensions does not match.");
                 }
-                setLimits(first,last);
+                setLimits( firstv, lastv );
             }
             template <typename ...S> void setLimits( S ...s ) { setLimits<int64_t>({static_cast<int64_t>(s)...}); }
             

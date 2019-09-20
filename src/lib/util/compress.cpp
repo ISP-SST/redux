@@ -21,7 +21,7 @@ unique_ptr<Bytef[]> redux::util::compress( const Bytef* inData, uint64_t uncompr
     }
     pack( reinterpret_cast<char*>(buf.get()), uncompressedSz );
 
-    return std::move(buf);
+    return buf;
     
 }
 
@@ -41,7 +41,7 @@ unique_ptr<Bytef[]> redux::util::decompress( const Bytef* inData, uint64_t compr
         default: cout << "decompressing data: unknown reason. ret=" << ret << endl; break;
     }
     
-    return std::move(buf);
+    return buf;
 
 }
 

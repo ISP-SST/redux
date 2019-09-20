@@ -263,7 +263,7 @@ namespace {
                 helio.x += 2 * M_PI;
         }
 
-        return std::move(helio);
+        return helio;
     }
 
 

@@ -159,7 +159,7 @@ namespace {
             }
         }
 
-        return std::move (ret);
+        return ret;
 
     }
 
@@ -172,7 +172,7 @@ namespace {
         size_t nTP = target.size();
         
         if( nRP < 3 || nTP < 3 ) {    // not enough input keypoints
-            return std::move(initializations);
+            return initializations;
         }
         
         double minScale = approximateScale/maxScaleDiff;
@@ -224,7 +224,7 @@ namespace {
         
         for( auto &it: maps ) initializations.push_back( it.second );
 
-        return std::move (initializations);
+        return initializations;
 
     }
 
@@ -298,7 +298,7 @@ namespace {
                             return false;
                         }), matches.end() );
         
-        return std::move (matches);
+        return matches;
 
     }
 #endif

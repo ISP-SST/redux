@@ -50,8 +50,8 @@ namespace redux {
             std::string path(void) const { return itemPath.string(); };
 
             std::unique_lock<std::mutex> getLock(bool trylock=false) {
-                if(trylock) return std::move( std::unique_lock<std::mutex>(itemMutex,std::try_to_lock) );
-                return std::move( std::unique_lock<std::mutex>(itemMutex) );
+                if(trylock) return std::unique_lock<std::mutex>(itemMutex,std::try_to_lock);
+                return std::unique_lock<std::mutex>(itemMutex);
             }
 
         protected:

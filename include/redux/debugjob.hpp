@@ -52,9 +52,9 @@ namespace redux {
         bool check(void);
         
         size_t getTypeID(void) { return Job::DEBUGJOB; }
-        bool getWork(WorkInProgress::Ptr, uint16_t, bool);
         void ungetWork(WorkInProgress::Ptr);
         void returnResults(WorkInProgress::Ptr);
+        bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<Job::StepID,Job::CountT>& );
         
         bool run( WorkInProgress::Ptr, uint16_t );
 

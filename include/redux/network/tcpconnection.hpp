@@ -79,7 +79,7 @@ namespace redux {
             void asyncWrite( const std::vector<T>& data ) {
                 size_t sz = data.size();
                 if (!sz) return;
-                std::shared_ptr<T> tmp( new T[sz], [](T* p){ delete[] p;} );
+                std::shared_ptr<T> tmp = redux::util::rdx_get_shared<T>(sz);
                 memcpy(tmp.get(),data.data(),sz*sizeof(T));
                 asyncWrite(tmp, sz*sizeof(T));
             }
@@ -106,11 +106,11 @@ namespace redux {
 
             void connect( std::string host, std::string service );
             void close( void );
-            callback getCallback( void ) { std::unique_lock<std::mutex> lock(mtx); return activityCallback; };
+            callback getCallback( void ) { std::lock_guard<std::mutex> g(mtx); return activityCallback; };
             bool hasUrgentCallback( void ) const { return (urgentCallback != nullptr); };
-            void setCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); activityCallback = cb; };
-            void setUrgentCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); urgentCallback = cb; };
-            void setErrorCallback( callback cb = nullptr ) { std::unique_lock<std::mutex> lock(mtx); errorCallback = cb; };
+            void setCallback( callback cb = nullptr ) { std::lock_guard<std::mutex> g(mtx); activityCallback = cb; };
+            void setUrgentCallback( callback cb = nullptr ) { std::lock_guard<std::mutex> g(mtx); urgentCallback = cb; };
+            void setErrorCallback( callback cb = nullptr ) { std::lock_guard<std::mutex> g(mtx); errorCallback = cb; };
             void uIdle( void );
             void urgentHandler( const boost::system::error_code& error, size_t transferred );
             void idle( void );

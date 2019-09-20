@@ -143,7 +143,7 @@ ProjectivePoints ProjectiveMap::operator*(const ProjectivePoints& rhs) const {
             w = 1;
         }
     }
-    return std::move(ret);
+    return ret;
 }
 
 

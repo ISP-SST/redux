@@ -42,7 +42,7 @@ namespace redux {
             Image<U> copy(void) const {
                 Image<U> tmp;
                 redux::util::Array<T>::copy(tmp);
-                return std::move(tmp);
+                return tmp;
             }
 
 

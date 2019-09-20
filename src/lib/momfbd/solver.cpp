@@ -132,7 +132,7 @@ void Solver::init( void ) {
     }
 
     size_t offset(0);
-    for( auto it: wavefronts ) {
+    for( auto& it: wavefronts ) {
         it.second->setData( alpha.get()+offset, grad_alpha.get()+offset, nModes );
         offset += nModes;
     }
@@ -355,7 +355,7 @@ void Solver::run( PatchData::Ptr data ) {
             minimizerType = multimin_fdfminimizer_conjugate_rdx;
     }
 
-    gradientMethod = gradientMethods[job.gradientMethod];
+    //gradientMethod = gradientMethods[job.gradientMethod];
     gradientMethod = gradientMethods[GM_DIFF];   // FIXME: old code just uses the cfg-setting the first iteration, then switches to Vogel.
     
     gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc( minimizerType, nFreeParameters );
@@ -538,7 +538,7 @@ void Solver::run( PatchData::Ptr data ) {
     data->waveFronts.ids.clear();
     data->waveFronts.alpha.resize( wavefronts.size(), nModes );
     data->storeAlpha(alpha.get());
-    for( auto it: wavefronts ) {
+    for( auto& it: wavefronts ) {
         data->waveFronts.ids.push_back(it.first);
     }
     
@@ -816,9 +816,7 @@ void Solver::calcPQ(void) {
                     complex_t* tmpC = tmp()->C.get();
                     std::fill_n( tmpD, otfSize2, 0.0 );
                     std::fill_n( tmpC, otfSize2, complex_t(0) );
-                    int cnt(0);
                     for( size_t i=begIndex; i<endIndex; ++i ) {
-                        cnt++;
                         imgs[i]->addPQ( tmpC, tmpD );
                         ++o->progWatch;
                     }
@@ -852,7 +850,7 @@ void Solver::gradient(void) {
         //if( o->weight > 0 ) {
             for( const shared_ptr<Channel>& c: o->getChannels() ) {
                 for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                    service.post ([this, eM, o, im, alphaPtr, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
+                    service.post ([this, eM, o, im, gAlphaPtr] {    // use a lambda to ensure these calls are sequential
                         im->calcVogelWeight( o->PQ.get(), o->PS.get(), o->QS.get() );
                         for ( uint16_t m=0; m<nModes; ++m ) {
                             if( eM[m] ) {

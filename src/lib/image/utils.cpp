@@ -79,14 +79,14 @@ static __inline T sqr (T x) {
 }
 
 
-double redux::image::makePupil( double** pupil, uint32_t nPoints, PointF center, double outerRadius, double innerRadius ) {
+double redux::image::makePupil( double** pupil, uint32_t pupilPixels, PointF center, double outerRadius, double innerRadius ) {
 
     double area = 0.0;
-    size_t nPixels = nPoints*nPoints;
-    memset( *pupil, 0, nPixels*sizeof(double) );
+    size_t pupilPixels2 = pupilPixels * pupilPixels;
+    memset( *pupil, 0, pupilPixels2 *sizeof(double) );
 
     struct Grid grid;
-    grid.id.size = nPoints;
+    grid.id.size = pupilPixels;
     grid.id.origin = center;
     grid.init();
     
@@ -94,8 +94,8 @@ double redux::image::makePupil( double** pupil, uint32_t nPoints, PointF center,
     float** anglePtr = grid.angle.get();
     bool hasInner = (innerRadius > 0.0);
 
-    for( unsigned int x=0; x<nPoints; ++x ) {
-        for( unsigned int y=0; y<nPoints; ++y ) {
+    for( unsigned int x=0; x< pupilPixels; ++x ) {
+        for( unsigned int y=0; y< pupilPixels; ++y ) {
             const double D = distPtr[y][x];
             const double absangle = abs(anglePtr[y][x]);
             double d;

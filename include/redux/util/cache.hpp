@@ -54,6 +54,7 @@ namespace redux {
                 mutable size_t totalSize;
                 mutable void_cb clear;
                 mutable void_cb info;
+                mutable void_cb maintenance;
             };
 
             static void cleanup(void);
@@ -177,18 +178,18 @@ namespace redux {
             template<class KeyT, class T>
             std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> getMap(void) {
                 static std::map<KeyT,T>& m = initMap<KeyT,T>();
-                static const Info& info RDX_UNUSED = getMapInfo<KeyT,T>();
-                static std::mutex mtx;
-                std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> ret(std::unique_lock<std::mutex>(mtx),m);
-                return std::move(ret);
+                getMapInfo<KeyT,T>();
+                static std::mutex thisMtx;
+                std::pair<std::unique_lock<std::mutex>,std::map<KeyT,T>&> ret(std::unique_lock<std::mutex>(thisMtx),m);
+                return ret;
             }
             template<class T, class U=std::less<T>>
             std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> getSet(void) {
                 static std::set<T,U>& s = initSet<T,U>();
-                static const Info& info RDX_UNUSED = getSetInfo<T,U>();
-                static std::mutex mtx;
-                std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> ret(std::unique_lock<std::mutex>(mtx),s);
-                return std::move(ret);
+                getSetInfo<T,U>();
+                static std::mutex thisMtx;
+                std::pair<std::unique_lock<std::mutex>,std::set<T,U>&> ret(std::unique_lock<std::mutex>(thisMtx),s);
+                return ret;
             }
             template<class KeyT, class T>
             void for_each( std::function<void(std::pair<const KeyT,T>&)> func ) {
@@ -225,6 +226,7 @@ namespace redux {
                     std::function<std::string(void)> sfunc = std::bind(&Cache::stats<KeyT,T>);
                     it.first->clear = cfunc;
                     it.first->info = sfunc;
+                    it.first->maintenance = func;
                 }
                 return *(it.first);
             }
@@ -242,6 +244,7 @@ namespace redux {
                     std::function<std::string(void)> sfunc = std::bind(&Cache::stats<T>);
                     it.first->clear = cfunc;
                     it.first->info = sfunc;
+                    it.first->maintenance = func;
                 }
                 return *(it.first);
             }
@@ -277,7 +280,7 @@ namespace redux {
             std::vector<std::function<void(void)>> funcs;
             std::vector<std::function<void(void)>> cleanup_funcs;
             std::vector<std::function<std::string(void)>> stats_funcs;
-            int pollTime;
+
         };
         
         /*! @} */

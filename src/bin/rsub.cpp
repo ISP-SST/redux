@@ -136,12 +136,12 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
         boost::asio::read(conn->socket(),boost::asio::buffer(&cmd,1));
 
         bool swap_endian = (me.info.littleEndian != master.littleEndian);
-        uint64_t count, received;
         ptr = buf.get();
 
         if( cmd == CMD_OK ) {
-            received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(uint64_t) ) );
+            uint64_t received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, sizeof(uint64_t) ) );
             if( received == sizeof(uint64_t) ) {
+                uint64_t count;
                 unpack(ptr, count, swap_endian);
                 size_t thisSize = count*sizeof(uint64_t);
                 received = boost::asio::read( conn->socket(), boost::asio::buffer( ptr, thisSize ) );
@@ -187,7 +187,7 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 }
 
 
-string filterOldCfg(string filename, string jobname, string logfile, string outputDir ) {
+string filterOldCfg( const string& filename, const string& jobname, const string& logfile, const string& outputDir ) {
     
     std::ifstream in(filename, std::ios::in | std::ios::binary);
     if (!in) {

@@ -78,7 +78,7 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-const ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
+ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
 
     cutout = rhs.cutout;
     channelOffset = rhs.channelOffset;
@@ -197,7 +197,7 @@ uint64_t ObjectData::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-const ObjectData& ObjectData::operator=( const ObjectData& rhs ) {
+ObjectData& ObjectData::operator=( const ObjectData& rhs ) {
     
     if( channels.size() != rhs.channels.size() ) {
         throw runtime_error("Can not copy ObjectData if they contain different number of channels.");
@@ -284,7 +284,7 @@ uint64_t WavefrontData::unpack( const char* ptr, bool swap_endian ) {
 }
 
 
-const WavefrontData& WavefrontData::operator=( const WavefrontData& rhs ) {
+WavefrontData& WavefrontData::operator=( const WavefrontData& rhs ) {
 
     ids = rhs.ids;
     alpha = rhs.alpha;
@@ -301,7 +301,7 @@ void WavefrontData::copyResults( const WavefrontData& rhs ) {
 }
 
 
-void WavefrontData::dump( string tag ) const {
+void WavefrontData::dump( const string& tag ) const {
 
     if( !ids.empty() ) {
         vector<int32_t> tmp( ids.begin(), ids.end() );
@@ -490,7 +490,7 @@ bool PatchData::operator==(const PatchData& rhs) {
 }
 
 
-const PatchData& PatchData::operator=( const PatchData& rhs ) {
+PatchData& PatchData::operator=( const PatchData& rhs ) {
     
     if( objects.size() != rhs.objects.size() ) {
         throw runtime_error("Can not copy PatchData if they contain different number of objects.");
@@ -700,7 +700,7 @@ void GlobalData::prePack( bool force ) {
 }
 
 
-void GlobalData::dump( string tag ) const {
+void GlobalData::dump( const string& tag ) const {
 
     for( auto& m: modes ) {
         if( m.second->nElements() ) {

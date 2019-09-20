@@ -68,8 +68,8 @@ namespace redux {
                 void calculateNullspace( logging::Logger&, bool store=true, bool nc=false );
                 bool verify( logging::Logger&,const std::map<int32_t, int8_t>&, int32_t, int32_t );
                 std::unique_lock<std::mutex> getLock( bool trylock=false ) {
-                    if(trylock) return std::move( std::unique_lock<std::mutex>(nsMtx,std::try_to_lock) );
-                    return std::move( std::unique_lock<std::mutex>(nsMtx) );
+                    if(trylock) return std::unique_lock<std::mutex>(nsMtx,std::try_to_lock);
+                    return std::unique_lock<std::mutex>(nsMtx);
                 }
         
                 
@@ -172,7 +172,7 @@ namespace redux {
             void write (void);
             inline bool verify (void) const { return loaded; }
 
-            void dump( std::string tag="constraints" ) const;
+            void dump( const std::string& tag="constraints" ) const;
 
             std::vector<std::shared_ptr<Constraint>> constraints;
             std::vector<Group> groups;

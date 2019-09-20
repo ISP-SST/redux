@@ -144,7 +144,7 @@ namespace redux {
                 }
             }
         }
-        return std::move(ret);
+        return ret;
     }
 
     double getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min=nullptr, double* Max=nullptr, bool* hasInf=nullptr );

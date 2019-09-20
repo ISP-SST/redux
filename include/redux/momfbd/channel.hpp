@@ -35,7 +35,7 @@ namespace redux {
 
         class MomfbdJob;
         class Object;
-        class Solver;
+        struct Solver;
         struct ChannelData;
         struct SubImage;
         struct Tilts;
@@ -142,7 +142,7 @@ namespace redux {
             friend class Object;
             friend class MomfbdJob;
             friend struct ModeSet;
-            friend class Solver;
+            friend struct Solver;
             friend struct SubImage;
             
         };

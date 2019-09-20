@@ -64,7 +64,7 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;                         //!< Pack channel data to char-array (for sending/storing)
             uint64_t unpack(const char*, bool);
-            const ChannelData& operator=(const ChannelData&);
+            ChannelData& operator=(const ChannelData&);
 
             void copyResults( const ChannelData& rhs );
             void dump( std::string ) const;
@@ -93,7 +93,7 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
-            const ObjectData& operator=(const ObjectData&);
+            ObjectData& operator=(const ObjectData&);
             
             void copyResults( const ObjectData& rhs );
             void dump( std::string ) const;
@@ -120,9 +120,9 @@ namespace redux {
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
-            const WavefrontData& operator=(const WavefrontData&);
+            WavefrontData& operator=(const WavefrontData&);
             void copyResults( const WavefrontData& rhs );
-            void dump( std::string ) const;
+            void dump( const std::string& ) const;
             
             /********* Results ********/
             std::vector<uint32_t> ids;                  //!< Wavefront indices   (nWf)
@@ -167,7 +167,7 @@ namespace redux {
             bool cacheStore(bool clearAfterStore=false);
 
             bool operator==(const PatchData&);
-            const PatchData& operator=(const PatchData&);
+            PatchData& operator=(const PatchData&);
             
             template <typename T>
             void loadAlpha( T* a ) const {
@@ -203,7 +203,7 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             void unload(void);
             void prePack( bool force=false );
-            void dump( std::string tag="gd" ) const;
+            void dump( const std::string& tag="gd" ) const;
             
         };
 

@@ -425,7 +425,7 @@ shared_ptr<T> redux::castOrCopy( IDL_VPTR array ) {
         }
     }
         
-    return std::move(ret);
+    return ret;
 
 }
 template shared_ptr<uint8_t> redux::castOrCopy<uint8_t>(IDL_VPTR array);

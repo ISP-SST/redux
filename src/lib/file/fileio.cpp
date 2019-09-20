@@ -21,9 +21,6 @@ namespace {
 
     mutex fileMutex;
 
-
-
-
     template <typename T>
     map<string, shared_ptr<T>>& getFileCache( void ) {
         static map<string, shared_ptr<T>> cache;
@@ -161,7 +158,7 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
         }
     }
     
-    return move(meta);
+    return meta;
     
 }
 

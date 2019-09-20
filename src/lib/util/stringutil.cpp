@@ -164,7 +164,7 @@ vector<set<string>> redux::util::make_template( const vector<string>& list, stri
         if( j < n_segments-1 ) out += split_chars[0];       // separator    TBD: should this be a parameter
     }
 
-    return std::move(seg_list);
+    return seg_list;
     
 }
 

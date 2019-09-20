@@ -48,7 +48,7 @@ namespace {
     inline complex_t getPolar(double magnitude, double phase) {
         double idxD = phase - pi_x_2 * floor( phase / pi_x_2 );
         size_t idx = static_cast<size_t> (idxD*angular_step_inv);
-        return std::move( complex_t(magnitude*CosineLUT[idx], magnitude*SineLUT[idx]) );
+        return complex_t(magnitude*CosineLUT[idx], magnitude*SineLUT[idx]);
     }
 #undef QUADRANT_SAMPLES
 #endif
@@ -267,12 +267,12 @@ double SubImage::metricChange( const complex_t* newOTF ) const {
     const double* q = object.Q.get();
     
     complex_t dp, dsj;
-    double dl = 0.0, dq, dn;
+    double dl(0.0);
     for( size_t& ind: object.pupil->otfSupport ) {
         dsj = newOTF[ind] - oldOTF[ind];            // change in sj
         dp = conj(ftPtr[ind]) * dsj;                // change p and q
-        dq = 2.0 * (oldOTF[ind].real() * dsj.real() + oldOTF[ind].imag() * dsj.imag()) + norm (dsj);
-        dn = 2.0 * (dp.real() * p[ind].real() + dp.imag() * p[ind].imag()) + norm (dp);
+        double dq = 2.0 * (oldOTF[ind].real() * dsj.real() + oldOTF[ind].imag() * dsj.imag()) + norm (dsj);
+        double dn = 2.0 * (dp.real() * p[ind].real() + dp.imag() * p[ind].imag()) + norm (dp);
         dl -= (q[ind] * dn - dq * (norm (p[ind]))) / (q[ind] * (q[ind]+dq));
     }
     return dl / otfSize2;

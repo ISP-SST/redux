@@ -68,7 +68,7 @@ namespace redux {
             virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ChannelCfg() );
             virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
             
-            void setLogChannel(std::string channel) { logChannel = channel; };
+            void setLogChannel( const std::string& channel ) { logChannel = channel; };
 
             uint64_t size(void) const;
             uint64_t pack(char*) const;

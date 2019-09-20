@@ -86,6 +86,8 @@ namespace redux {
             int getFormat(void) { return FMT_FITS; };
 
             struct hdu {
+                hdu(){}
+                virtual ~hdu() {}
                 int bitpix;
                 int nDims;
                 int dataType;               // data type as defined in cfitsio

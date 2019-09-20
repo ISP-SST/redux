@@ -111,7 +111,7 @@ namespace redux {
                 using namespace redux::image;
                 redux::util::Array<T> tmp = im.copy();
                 OTF.convolveInPlace( tmp, FT_FULLCOMPLEX );
-                return std::move( tmp );
+                return tmp;
             }
             
             template <typename T>
@@ -121,13 +121,13 @@ namespace redux {
                 redux::util::ArrayStats s;
                 getWindowedImg(img,s,true);
                 cim -= img;
-                return std::move(cim);
+                return cim;
             }
             template <typename T>
             redux::util::Array<T> convolvedResidual( const redux::util::Array<T>& cim ) {
                 redux::util::Array<double> img(imgSize,imgSize);
                 getWindowedImg(img,stats,true);
-                return std::move(cim-img);
+                return (cim-img);
             }
             
             std::string idString( void ) const;

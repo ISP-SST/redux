@@ -1214,10 +1214,10 @@ loopend: ;
 
     if( !refTag.empty() ) {
         for( shared_ptr<Object>& obj: trace_objects ) {
-            size_t found =  obj->outputFileName.find_first_of("_.");
+            size_t separator_found =  obj->outputFileName.find_first_of("_.");
             string objTag;
-            if( found != string::npos ) {
-                objTag = obj->outputFileName.substr( 0, found );
+            if( separator_found != string::npos ) {
+                objTag = obj->outputFileName.substr( 0, separator_found );
             }
             if( !objTag.empty() && (objTag != refTag) ) {
                 obj->outputFileName = replace_n( obj->outputFileName, objTag, refTag );
@@ -1300,7 +1300,7 @@ void MomfbdJob::updateProgressString(void) {
     memset( info.progressString, 0, RDX_JOB_PROGSTRING_LENGTH );
     float prog = (100.0*progWatch.progress());
     if( !isnormal(prog) ) prog = 0;
-    switch( info.step ) {
+    switch( static_cast<int>(info.step) ) {
         case JSTEP_CHECKING:    snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Checking" ); break;
         case JSTEP_PREPROCESS:  snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Pre: (%03.1f%%)", prog ); break;
         case JSTEP_VERIFY:      snprintf( info.progressString, RDX_JOB_PROGSTRING_LENGTH, "Verifying: (%03.1f%%)", prog ); break;
@@ -1318,7 +1318,7 @@ void MomfbdJob::updateProgressString(void) {
 
 
 bool MomfbdJob::active(void) {
-    switch (info.step) {
+    switch( static_cast<int>(info.step) ) {
         //case JSTEP_PREPROCESS: ;
         case JSTEP_QUEUED:  return true;
         //case JSTEP_RUNNING: return true;
@@ -1332,7 +1332,7 @@ bool MomfbdJob::check(void) {
   
     bool ret(false);
     THREAD_MARK;
-    switch (info.step) {
+    switch( static_cast<int>(info.step) ) {
         case JSTEP_NONE: {   // rdx_sub will check with a default-value (from constructor) of JSTEP_NONE
             moveTo( this, JSTEP_CHECKING );
             updateProgressString();
@@ -1351,9 +1351,9 @@ bool MomfbdJob::check(void) {
             std::thread([this]() {
                 THREAD_MARK;
                 auto lock = getLock();
-                bool ret =  (cfgChecked || checkCfg());
-                ret &= (dataChecked || checkData(false));
-                if(ret) {
+                bool all_ok =  (cfgChecked || checkCfg());
+                all_ok &= (dataChecked || checkData(false));
+                if( all_ok ) {
                     moveTo( this, JSTEP_CHECKED );
                     updateProgressString();
                 } else {

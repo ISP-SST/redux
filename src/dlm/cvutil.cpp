@@ -34,7 +34,7 @@ Mat redux::arrayToMat (const IDL_VPTR& in, int verbose) {
 
         Mat img (nDims, dims.data(), CV_MAKETYPE (type, 1), in->value.arr->data);
 
-        return std::move (img);
+        return img;
 
 
     } catch (cv::Exception& e) {
@@ -58,7 +58,7 @@ Mat redux::getImgAsGrayFloat (const IDL_VPTR& in, int verbose) {
         cv::minMaxLoc (img2, &minValue, &maxValue);
         if (verbose > 1) std::cout << "getImgAsGrayFloat:  minValue = " << minValue <<  "  maxValue = " << maxValue << std::endl;
         img2 = (img2 - minValue) / (maxValue - minValue);
-        return std::move (img2);
+        return img2;
     } catch (cv::Exception& e) {
         if (verbose) std::cerr << "OpenCV error: " << e.msg << std::endl;
     }

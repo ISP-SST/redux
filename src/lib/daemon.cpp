@@ -1237,12 +1237,12 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     if( logPrint ) replyStr = "Printing interactive output to log.";
                 } else if( cmdStr == "cf" ) {
                     auto mf = redux::util::Cache::get().getMap< redux::image::CachedFile, redux::image::Image<float> >();
-                    for( auto it: mf.second ) {
+                    for( auto& it: mf.second ) {
                         replyStr += it.first.filename;
                         replyStr += ": " + to_string(it.second.size()) + "\n";
                     }
                     auto mi = redux::util::Cache::get().getMap< redux::image::CachedFile, redux::image::Image<int16_t> >();
-                    for( auto it: mi.second ) {
+                    for( auto& it: mi.second ) {
                         replyStr += it.first.filename;
                         replyStr += "; " + to_string(it.second.size()) + "\n";
                     }

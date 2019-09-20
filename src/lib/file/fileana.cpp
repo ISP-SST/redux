@@ -740,6 +740,7 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
 template void redux::file::Ana::write( const string&, const redux::util::Array<uint8_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<int16_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<int32_t>&, shared_ptr<redux::file::Ana>, int );
+template void redux::file::Ana::write( const string&, const redux::util::Array<uint32_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<int64_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<float  >&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<double >&, shared_ptr<redux::file::Ana>, int );

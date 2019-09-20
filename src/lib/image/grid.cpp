@@ -65,7 +65,12 @@ void Grid::init (void) {
 }
 
 
-shared_ptr<Grid> Grid::get(const Grid::ID& id) {
+shared_ptr<Grid> Grid::get( const Grid::ID& id ) {
+    
+    if( (id.size.x == 0) || (id.size.y == 0) ) {
+        throw logic_error("Grid::ID::size can not be 0!");
+    }
+    
     shared_ptr<Grid>& grid = Cache::get<ID,shared_ptr<Grid>>( id, nullptr );
     unique_lock<mutex> lock(mtx);
     if( !grid ) grid.reset( new Grid() );

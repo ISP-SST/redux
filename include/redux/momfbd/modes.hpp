@@ -22,10 +22,10 @@ namespace redux {
             std::vector<uint16_t> modeNumbers;
             double pupilRadius, angle, cutoff;
             std::string filename;
-            ModeInfo ( std::string, uint16_t nPixels=0 );
+            ModeInfo ( const std::string&, uint16_t nPixels=0 );
             ModeInfo ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
             ModeInfo ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
-            ModeInfo ( uint16_t firstMode, uint16_t lastMode, std::vector<uint16_t> modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
+            ModeInfo ( uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -50,7 +50,6 @@ namespace redux {
             PupilMode ( uint16_t modeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0 ); // Zernike
             PupilMode ( uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0, double cutoff=0.0 ); // KL
 
-            operator const redux::util::Array<double>&() const { return reinterpret_cast<const redux::util::Array<double>&>(*this); }
             double atm_rms;                         //!< = sqrt(covariance), used in metric computations.
 
         };

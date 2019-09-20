@@ -23,7 +23,7 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 
-ModeInfo::ModeInfo( string filename, uint16_t nPixels )
+ModeInfo::ModeInfo( const string& filename, uint16_t nPixels )
     : firstMode(0), lastMode(0), modeNumber(0), nPupilPixels(nPixels),
       pupilRadius(0), angle(0), cutoff(0), filename(filename) {
 
@@ -44,7 +44,7 @@ ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, u
 }
 
 
-ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, std::vector<uint16_t> modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
+ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
     : firstMode(firstMode), lastMode(lastMode), modeNumber(0), nPupilPixels(nPoints), modeNumbers(modeNumbers),
       pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename("") {
           
@@ -150,11 +150,11 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
     zero();
         
     const Zernike::KLPtr& kle = Zernike::karhunenLoeveExpansion(firstMode, lastMode).at(klModeNumber);
-    double c;
     
     ModeInfo z_info(0, 0, 0, nPoints, r_c, angle, cutoff);
     for(auto & weight : kle->zernikeWeights) {
-        if(fabs(c = weight.second) >= cutoff) {
+        double c = weight.second;
+        if(fabs(c) >= cutoff) {
             z_info.modeNumber = weight.first;
             auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( z_info, PupilMode::Ptr() );
             if( !mode ) {
@@ -249,7 +249,7 @@ ModeSet ModeSet::clone( void ) const {
     for(unsigned int i=0; i<tmp.dimSize(0); ++i) {
         tmp.modePointers.push_back( tmp.ptr(i,0,0) );
     }
-    return std::move(tmp);
+    return tmp;
     
 }
 

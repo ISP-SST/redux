@@ -36,15 +36,13 @@ namespace redux {
          */
         template <class T> void swapEndian(T& x) {
 
-            size_t size = sizeof(T);
-
-            if(size > 1) {
-                size_t mid = size >> 1;
-                size--;
+            size_t nBytes = sizeof(T);
+            if(nBytes > 1) {
+                size_t mid = nBytes >> 1;
+                nBytes--;
                 char* p = reinterpret_cast<char*>(&x);
-
                 for(size_t j = 0; j < mid; ++j) {
-                    std::swap(p[j], p[size - j]);
+                    std::swap(p[j], p[nBytes - j]);
                 }
             }
 
@@ -56,14 +54,12 @@ namespace redux {
          *  @param n number of elements to iterate over.
          */
         template <class T> void swapEndian(T* x, size_t n = 1) {
-
-            size_t size = sizeof(T);
-            if(size > 1) {
+            size_t nBytes = sizeof(T);
+            if(nBytes > 1) {
                 while(n--) {
                     swapEndian(*x++);
                 }
             }
-
         }
 
 

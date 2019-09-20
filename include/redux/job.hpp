@@ -200,14 +200,14 @@ namespace redux {
         void stopLog(void);
         
         std::unique_lock<std::mutex> getLock(bool trylock=false) {
-            if(trylock) return std::move( std::unique_lock<std::mutex>(jobMutex,std::try_to_lock) );
-            return std::move( std::unique_lock<std::mutex>(jobMutex) );
+            if(trylock) return std::unique_lock<std::mutex>(jobMutex,std::try_to_lock);
+            return std::unique_lock<std::mutex>(jobMutex);
         }
         
         static void moveTo( Job* job, uint16_t to );
         static std::unique_lock<std::mutex> getGlobalLock(bool trylock=false) {
-            if(trylock) return std::move( std::unique_lock<std::mutex>(globalMutex,std::try_to_lock) );
-            return std::move( std::unique_lock<std::mutex>(globalMutex) );
+            if(trylock) return std::unique_lock<std::mutex>(globalMutex,std::try_to_lock);
+            return std::unique_lock<std::mutex>(globalMutex);
         }
         
         virtual bool mayBeDeleted(void) { return true; }

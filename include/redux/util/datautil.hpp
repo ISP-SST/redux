@@ -618,7 +618,7 @@ namespace redux {
         template <typename T>
         std::vector<T> segment( T first, T last, int segmentLength, int minimumOverlap=0 ) {
             int nSegments=2;
-            if( first == last ) return std::move(std::vector<T>());
+            if( first == last ) return std::vector<T>();
             if( first > last ) std::swap( first, last );
             double separation = (last-first)/static_cast<double>(nSegments-1);
             double overlap = segmentLength-separation;
@@ -631,7 +631,7 @@ namespace redux {
             for(int i = 0; i < nSegments; ++i) {
                 ret.push_back(static_cast<T>(i*separation+first) );
             }
-            return std::move(ret);
+            return ret;
         }
 
         

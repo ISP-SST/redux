@@ -194,7 +194,7 @@ bool DebugJob::check(void) {
     return ret;
 }
 
-bool DebugJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, bool ) {
+bool DebugJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const std::map<Job::StepID,Job::CountT>& ) {
 
 #ifdef DEBUG_
     LOG_TRACE << "DebugJob::getWork("<<(int)nThreads<<")" << ende;

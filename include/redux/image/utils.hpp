@@ -25,11 +25,11 @@ namespace redux {
 
     namespace image {
         
-        double makePupil( double** pupil, uint32_t nPoints, redux::util::PointF center, double outerRadius, double innerRadius=0.0 );
-        inline double makePupil( double** pupil, uint32_t nPoints, double outerRadius, double innerRadius=0.0 ) {
-            float midPlusHalf = nPoints/2.0 + 0.5;  // The default center is on the (nPoints,nPoints)/2 pixel.
+        double makePupil( double** pupil, uint32_t pupilPixels, redux::util::PointF center, double outerRadius, double innerRadius=0.0 );
+        inline double makePupil( double** pupil, uint32_t pupilPixels, double outerRadius, double innerRadius=0.0 ) {
+            float midPlusHalf = pupilPixels /2.0 + 0.5;  // The default center is on the (nPoints,nPoints)/2 pixel.
             redux::util::PointF cent( midPlusHalf, midPlusHalf );
-            return makePupil( pupil, nPoints, cent, outerRadius, innerRadius );
+            return makePupil( pupil, pupilPixels, cent, outerRadius, innerRadius );
         }
 
         void makeZernike( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
@@ -180,7 +180,7 @@ namespace redux {
         }
 
         template <typename T>
-        void clipImage( redux::util::Array<T>& img, const std::vector<int16_t> clip, bool symmetricClip=false )  {
+        void clipImage( redux::util::Array<T>& img, const std::vector<int16_t>& clip, bool symmetricClip=false )  {
             size_t nDims = img.nDimensions();
             if( nDims < 2 ) return;
             std::vector<size_t> finalClip;
@@ -243,7 +243,7 @@ namespace redux {
         }
         
         template <typename T>
-        void clipImage( redux::image::Image<T>& arr, const std::vector<int16_t> clip, bool symmetricClip=false )  {
+        void clipImage( redux::image::Image<T>& arr, const std::vector<int16_t>& clip, bool symmetricClip=false )  {
             clipImage( reinterpret_cast<redux::util::Array<T>&>(arr), clip, symmetricClip );
         }
 
@@ -362,7 +362,7 @@ namespace redux {
             redux::util::Array<T> array;
             in.copy( array );
             apodizeInPlace( array, blendRegion, margin );
-            return std::move(array);
+            return array;
         }
         template <typename T>
         redux::util::Array<T> apodize( const redux::util::Array<T>& in, size_t rowBlend, size_t colBlend, size_t rowMargin, size_t colMargin ) {
@@ -370,7 +370,7 @@ namespace redux {
             redux::util::Array<T> array;
             in.copy( array );
             apodizeInPlace( array, rowBlend, colBlend, rowMargin, colMargin );
-            return std::move(array);
+            return array;
         }
         
         template <typename T, typename U>

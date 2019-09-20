@@ -56,7 +56,7 @@ namespace redux {
                 for( size_t i=0; i<nPoints; ++i ) {
                     ret.push_back(PointType<T>((*this)( 1, i ),(*this)( 0, i )));
                 }
-                return std::move(ret);
+                return ret;
             }
 
             template <typename T> operator PointType<T>() {

@@ -277,7 +277,7 @@ vector<float> ZernikeData::init (const string& filename, uint32_t Imax, float co
     
     init(eff,Imax,cov_cutoff);
     
-    return std::move(eff);
+    return eff;
     
 }
 
@@ -297,7 +297,7 @@ vector<float> ZernikeData::load (const string& filename) {
         }
     }
     
-    return std::move(eff);
+    return eff;
     
 }
 
