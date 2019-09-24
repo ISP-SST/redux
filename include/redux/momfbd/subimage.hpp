@@ -108,9 +108,8 @@ namespace redux {
             
             template <typename T>
             redux::util::Array<T> convolveImage( const redux::util::Array<T>& im ) const {
-                using namespace redux::image;
                 redux::util::Array<T> tmp = im.copy();
-                OTF.convolveInPlace( tmp, FT_FULLCOMPLEX );
+                OTF.convolveInPlace( tmp );
                 return tmp;
             }
             

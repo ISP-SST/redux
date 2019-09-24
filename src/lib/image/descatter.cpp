@@ -117,7 +117,7 @@ void redux::image::descatter (Array<T>& data, const Array<U>& gain, const Array<
     Array<double> dgain;
     gain.copy(dgain);
 
-    redux::image::FourierTransform otf (psf, FT_REORDER | FT_NORMALIZE);
+    redux::image::FourierTransform otf (psf, REORDER_FT | NORMALIZE_FT);
 
     Array<double>::const_iterator itg = dgain.begin();
     for (auto & value : img_center) {

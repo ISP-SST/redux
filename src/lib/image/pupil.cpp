@@ -250,7 +250,7 @@ void Pupil::generateSupport(double threshold){
         cnt++;
     }
     
-    FourierTransform::autocorrelate(OTF);                               // auto-correlate the pupil to generate the support of the OTF.
+    FourierTransform::autocorrelate(OTF,true);                           // auto-correlate the pupil to generate the support of the OTF.
 
     double* tmpPtr = OTF.get();
     for (size_t index = 0; index < OTF.nElements(); ++index) {           // map indices where the OTF-mask (auto-correlated pupil-mask) is non-zero.

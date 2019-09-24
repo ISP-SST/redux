@@ -332,7 +332,7 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
     
     size_t otfSize = pupilPixels<<1;
     
-    FourierTransform avgObjFT(otfSize, otfSize, FT_FULLCOMPLEX|FT_REORDER); //|FT_NORMALIZE );
+    FourierTransform avgObjFT(otfSize, otfSize, FULLCOMPLEX|REORDER_FT); //|NORMALIZE_FT );
     Array<complex_t> tmpC(otfSize, otfSize);
     Array<double> tmpD(otfSize, otfSize);
     avgObjFT.zero();
@@ -363,14 +363,8 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         ScharmerFilter( aoPtr, dPtr, otfSize, otfSize, avgNoiseVariance, 0.90 * frequencyCutoff);
     }
 
-    avgObjFT.getIFT( tmpC.get( ) );
     od.img.resize( otfSize, otfSize );
-    size_t nEl = avgObjFT.nElements( );
-    double normalization = 1.0 / nEl;
-    std::transform( tmpC.get(), tmpC.get()+nEl, od.img.get(),
-                [normalization]( const complex_t& a ){
-                    return std::real(a)*normalization;
-                } );
+    avgObjFT.ift( od.img.get( ) );
     
     // PSF
     uint16_t nPSF = 0;

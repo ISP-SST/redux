@@ -86,8 +86,9 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
         otfSize2 = otfSize*otfSize;
         phi.resize( pupilSize, pupilSize );
         PF = redux::util::rdx_get_shared<complex_t>(pupilSize2);
-        OTF.resize( otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX );
-        imgFT.resize( otfSize, otfSize, FT_REORDER|FT_FULLCOMPLEX );
+        OTF.init( otfSize, otfSize, REORDER_IMG|REORDER_FT|FULLCOMPLEX|NORMALIZE_FT );
+        OTF.setCentered();  // OTF is nat called through "ft", so we need to set "centered" manually.
+        imgFT.init( otfSize, otfSize, REORDER_FT|FULLCOMPLEX );
         vogel.resize( pupilSize, pupilSize );
         phi.zero();
         std::fill_n( PF.get(), pupilSize2, complex_t(0) );
@@ -157,7 +158,6 @@ void SubImage::initialize( Object& o, bool doReset ) {
     double* d2Ptr = tmp->D2.get();
     complex_t* oldFT = tmp->C.get();
     complex_t* c2Ptr = tmp->C2.get();
-    FourierTransform& tmpFT = tmp->FT;
     
     if( doReset ) {
         std::fill_n( oldFT, otfSize2, complex_t(0) );
@@ -174,7 +174,8 @@ void SubImage::initialize( Object& o, bool doReset ) {
 
         transform( imgPtr, imgPtr+imgSize2, noiseWindow.get(), d2Ptr,
                 [&](const double& a, const double& b) { return (a-stats.mean)*b; });
-        tmpFT.reset( d2Ptr, imgSize, imgSize, FT_FULLCOMPLEX);
+        FourierTransform& tmpFT = tmp->FT;
+        tmpFT.init( d2Ptr, imgSize, imgSize, FULLCOMPLEX );
         stats.noise = tmpFT.noise(-1,-1);
         stats.noise *= channel.noiseFudge;
         double rg = stats.noise/stats.stddev;
@@ -195,16 +196,15 @@ void SubImage::initialize( Object& o, bool doReset ) {
         d2Ptr = imgPtr;
         std::copy_n( imgPtr, otfSize2, c2Ptr );
     }
-    
+
     imgFT.ft( c2Ptr );
-    FourierTransform::reorder( imgFT.get(), otfSize, otfSize );       // keep FT in centered form
-    
+
     if( doReset ) {
         o.addToFT( imgFT.get() );
     } else {
         o.addDiffToFT( imgFT.get(), oldFT );
     }
-    
+
 }
 
 
@@ -362,19 +362,18 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
     tmp->OTF.zero();
     FourierTransform::reorderInto( pfPtr, pupilSize, pupilSize, tmpOtfPtr, otfSize, otfSize );
 
-    tmp->OTF.getIFT(hjPtr);       // normalize by otfSize2 below
+    tmp->OTF.ift(hjPtr);       // normalize by otfSize2 below
     tmp->OTF.zero();
     for( const size_t& ind: object.pupil->otfSupport ) {
         tmpOtfPtr[ind] = (pq[ind]*ftPtr[ind] - ps[ind]*otfPtr[ind]) / qs[ind];
     }
 
     FourierTransform::reorder( tmpOtfPtr, otfSize, otfSize );
-    tmp->OTF.getIFT(glPtr);
+    tmp->OTF.ift(glPtr);
     
-    double normalization = 1.0/(otfSize2*otfSize2);
     transform( glPtr, glPtr+otfSize2, hjPtr, glPtr,
-              [normalization](const complex_t& g,const complex_t& h) {
-                  return normalization * h * g.real();
+              [](const complex_t& g,const complex_t& h) {
+                  return h * g.real();
               });
 
     tmp->OTF.ft( glPtr );
@@ -386,7 +385,6 @@ void SubImage::calcVogelWeight( complex_t* pq, double* ps, double* qs ) {
     for( auto & ind : object.pupil->pupilInOTF ) {
         vogPtr[ind.first] = imag(conj(pfPtr[ind.first])*tmpOtfPtr[ind.second])*pupilPtr[ind.first];
     }
-
 
 }
 
@@ -421,7 +419,7 @@ void SubImage::alignAgainst( const Ptr& refIm ) {
             return b*std::conj(a);
     });
     FourierTransform::reorder( Solver::tmp()->FT );
-    Solver::tmp()->FT.getIFT( tmpPtrD );
+    Solver::tmp()->FT.ift( tmpPtrD );
     FourierTransform::reorder( tmpPtrD, imgSize, imgSize );
     
     auto arr = reshapeArray( tmpPtrD, imgSize, imgSize );
@@ -562,10 +560,7 @@ void SubImage::calcOTF(complex_t* otfPtr, const double* phiOffset, double scale)
 #endif
     }
 
-    Solver::tmp()->OTF.ft(otfPtr);
-    Solver::tmp()->OTF.norm();
-    Solver::tmp()->OTF.getIFT(otfPtr);
-    FourierTransform::reorder(otfPtr, otfSize, otfSize);
+   Solver::tmp()->OTF.autocorrelate( otfPtr, true );
 
 }
 
@@ -583,11 +578,8 @@ void SubImage::calcOTF( complex_t* otfPtr, const double* phiPtr ) const {
         otfPtr[ind.second] = polar(pupilPtr[ind.first]*channel.otfNormalization, phiPtr[ind.first]);
 #endif
     }
-    
-    Solver::tmp()->OTF.ft(otfPtr);
-    Solver::tmp()->OTF.norm();
-    Solver::tmp()->OTF.getIFT(otfPtr);
-    FourierTransform::reorder(otfPtr, otfSize, otfSize);
+
+    Solver::tmp()->OTF.autocorrelate( otfPtr, true );
 
 }
 
@@ -616,12 +608,8 @@ void SubImage::calcPFOTF(void) {
         otfPtr[ind.second] = channel.otfNormalization*pfPtr[ind.first];
     }
 
-    auto& otf = Solver::tmp()->OTF;
-    otf.ft( otfPtr );
-    otf.norm();
-    otf.getIFT( otfPtr );
-    FourierTransform::reorder( otfPtr, otfSize, otfSize );
-    
+    Solver::tmp()->OTF.autocorrelate( otfPtr, true );
+
 }
 
 
@@ -629,23 +617,12 @@ void SubImage::addPSF( double* outPSF ) const {
     
     complex_t* cPtr = Solver::tmp()->C.get();
     OTF.ift( cPtr );
-    FourierTransform::reorder( cPtr, otfSize, otfSize );
-//    double normalization(0.0);        // TBD: should the PSF be auto-scaled or filtered ??
-//     std::for_each( tmp.get(), tmp.get()+otfSize2,
-//         [&normalization]( const complex_t& c ) {
-//             normalization += std::abs(std::real(c));
-//         });
-    double normalization = 1.0 / otfSize2;
-    if( normalization > 0.0 ) {
-//         normalization = 1.0/normalization;
-        std::transform( outPSF, outPSF+otfSize2, cPtr, outPSF,
-            [normalization]( const double& p, const complex_t& c ) {
-                //double val = std::max( std::real(c), 0.0 );
-                //double val = std::abs( std::real(c) );
-                //double val = std::real(c);
-                return p+normalization*std::real(c);
-            });
-    }
+
+    std::transform( outPSF, outPSF+otfSize2, cPtr, outPSF,
+        []( const double& p, const complex_t& c ) {
+            return p+std::real(c);
+        });
+
 
 }
 

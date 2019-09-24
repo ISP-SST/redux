@@ -52,12 +52,12 @@ namespace redux {
 
                     size_t thisSize2 = currentSize*currentSize;
                     if( currentSize ) {
-                        OTF.resize( 2*pupilSize, 2*pupilSize, redux::image::FT_FULLCOMPLEX );
-                        FT.resize( patchSize, patchSize, redux::image::FT_FULLCOMPLEX );
                         D = redux::util::rdx_get_shared<double>( thisSize2 );
                         D2 = redux::util::rdx_get_shared<double>( thisSize2 );
                         C = redux::util::rdx_get_shared<complex_t>( thisSize2 );
                         C2 = redux::util::rdx_get_shared<complex_t>( thisSize2 );
+                        OTF.init( 2*pupilSize, 2*pupilSize, redux::image::FULLCOMPLEX );
+                        FT.init( patchSize, patchSize, redux::image::FULLCOMPLEX );
                     }
                     thisSize = currentSize;
                  }
@@ -67,8 +67,8 @@ namespace redux {
                     D2.reset();
                     C.reset();
                     C2.reset();
-                    OTF.clear();
-                    FT.clear();
+                    OTF.init(0,0);
+                    FT.init(0,0);
                     thisSize = 0;
                 }
                 size_t thisSize;
