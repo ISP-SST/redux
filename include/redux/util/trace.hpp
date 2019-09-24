@@ -1,6 +1,7 @@
 #ifndef REDUX_UTIL_TRACE_HPP
 #define REDUX_UTIL_TRACE_HPP
 
+#include "redux/types.hpp"
 #include "redux/util/cache.hpp"
 
 #include <typeinfo>
@@ -122,7 +123,11 @@ namespace redux {
         template <class T>
         std::shared_ptr<T> rdx_get_shared( size_t n ) {
 #ifdef RDX_TRACE_MEM
+#ifdef RDX_WITH_FFTW3
+            T* tmp = (T*)fftw_malloc(n*sizeof(T));
+#else
             T* tmp = new T[n];
+#endif
             Cache::get<T*,trace::BT>(tmp);
             static Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
                                     std::bind(TraceObject<T>::getStats),
@@ -134,11 +139,28 @@ namespace redux {
             return std::shared_ptr<T>( tmp, []( T*& p ){
                 Cache::erase<T*,trace::BT>(p);
                 Trace::removeTraceObject( Cache::getID1<T*,trace::BT>());
+#ifdef RDX_WITH_FFTW3
+                fftw_free(p);
+#else
                 delete[] p;
+#endif
                 p=nullptr;
             });
 #else
-            return std::shared_ptr<T>( new T[n], []( T*& p ){ delete[] p; p=nullptr; } );
+            return std::shared_ptr<T>(
+#ifdef RDX_WITH_FFTW3
+                (T*)fftw_malloc(n*sizeof(T)),
+#else
+                new T[n],
+#endif
+                []( T*& p ){
+#ifdef RDX_WITH_FFTW3
+                    fftw_free(p);
+#else
+                    delete[] p;
+#endif
+                    p=nullptr; }
+            );
 #endif
         }
 
