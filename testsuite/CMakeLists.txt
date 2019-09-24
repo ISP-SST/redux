@@ -5,16 +5,26 @@ set(TEST_NAME "testsuite" CACHE INTERNAL "Name of test application")
 
 USE_REDUX(redux)
 
+enable_testing()
+
 if( RDX_WITH_FFTW3 )
     add_definitions(-DRDX_WITH_FFTW3)
 endif()
 
 # Code for test module
-file(GLOB RDX_TEST_SRC RELATIVE ${CMAKE_CURRENT_LIST_DIR} "*.cpp")
+#file(GLOB RDX_TEST_SRC RELATIVE ${CMAKE_CURRENT_LIST_DIR} "*.cpp")
+set( RDX_TEST_SRC
+        "testsuite.cpp"
+        "filetest.cpp"
+        "imagetest.cpp"
+)
+
 file(GLOB RDX_TEST_HPP RELATIVE ${CMAKE_CURRENT_LIST_DIR} "include/*.hpp")
 
 set(RDX_TESTDATA_DIR "${CMAKE_CURRENT_LIST_DIR}/testdata/")
 add_definitions(-DRDX_TESTDATA_DIR="${RDX_TESTDATA_DIR}")
+add_definitions(-DBOOST_TEST_DYN_LINK)
+
 
 # Turn on support for SEH exceptions to let test catch a exe crash
 if(WIN32)

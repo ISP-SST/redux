@@ -1,17 +1,19 @@
-#include <boost/test/unit_test.hpp>
-
 #include "redux/file/fileio.hpp"
 #include "redux/file/fileana.hpp"
 #include "redux/image/image.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/stringutil.hpp"
 
+//#include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test.hpp>
+
 using namespace redux::file;
 using namespace redux::image;
 using namespace redux::util;
 
 using namespace std;
-using namespace boost::unit_test_framework;
+
+using namespace boost::unit_test;
 
 #ifndef RDX_TESTDATA_DIR
 #error RDX_TESTDATA_DIR not set
@@ -38,12 +40,12 @@ namespace {
         T data;
         for( size_t i = 0; i < 5; ++i ) {
             readFile( RDX_TESTDATA_DIR + anaFiles[i], data );
-            BOOST_CHECK_EQUAL( data.nDimensions(), 2 );
-            BOOST_CHECK_EQUAL( data.dimSize( 0 ), 4 );
-            BOOST_CHECK_EQUAL( data.dimSize( 1 ), 5 );
+            BOOST_TEST( data.nDimensions() == 2 );
+            BOOST_TEST( data.dimSize( 0 ) == 4 );
+            BOOST_TEST( data.dimSize( 1 ) == 5 );
             for( size_t j = 0; j < data.dimSize( 0 ); ++j ) {
                 for( size_t k = 0; k < data.dimSize( 1 ); ++k ) {
-                    BOOST_CHECK_EQUAL( data( j, k ), j + k );
+                    BOOST_TEST( data( j, k ) == j + k );
                 }
             }
         }
@@ -54,12 +56,12 @@ namespace {
         redux::file::Ana::write(testFileAna,indata);
         T data;
         readFile( testFileAna, data );
-        BOOST_CHECK_EQUAL( data.nDimensions(), indata.nDimensions() );
-        BOOST_CHECK_EQUAL( data.dimSize( 0 ), indata.dimSize( 0 ) );
-        BOOST_CHECK_EQUAL( data.dimSize( 1 ), indata.dimSize( 1 ) );
+        BOOST_TEST( data.nDimensions() == indata.nDimensions() );
+        BOOST_TEST( data.dimSize( 0 ) == indata.dimSize( 0 ) );
+        BOOST_TEST( data.dimSize( 1 ) == indata.dimSize( 1 ) );
         for( size_t j = 0; j < data.dimSize( 0 ); ++j ) {
             for( size_t k = 0; k < data.dimSize( 1 ); ++k ) {
-                BOOST_CHECK_EQUAL( data( j, k ), indata( j, k ) );
+                BOOST_TEST( data( j, k ) == indata( j, k ) );
             }
         }
     }
@@ -72,14 +74,14 @@ namespace {
             readFile( testFileAna, data );
             auto hdr = static_pointer_cast<redux::file::Ana>(data.meta);
             if( hdr->m_Header.subf&1 ) {
-                BOOST_CHECK_EQUAL( hdr->m_CompressedHeader.slice_size, sliceSize );
+                BOOST_TEST( hdr->m_CompressedHeader.slice_size == sliceSize );
             }
-            BOOST_CHECK_EQUAL( data.nDimensions(), indata.nDimensions() );
-            BOOST_CHECK_EQUAL( data.dimSize( 0 ), indata.dimSize( 0 ) );
-            BOOST_CHECK_EQUAL( data.dimSize( 1 ), indata.dimSize( 1 ) );
+            BOOST_TEST( data.nDimensions() == indata.nDimensions() );
+            BOOST_TEST( data.dimSize( 0 ) == indata.dimSize( 0 ) );
+            BOOST_TEST( data.dimSize( 1 ) == indata.dimSize( 1 ) );
             for( size_t j = 0; j < data.dimSize( 0 ); ++j ) {
                 for( size_t k = 0; k < data.dimSize( 1 ); ++k ) {
-                    BOOST_CHECK_EQUAL( data( j, k ), indata( j, k ) );
+                    BOOST_TEST( data( j, k ) == indata( j, k ) );
                 }
             }
         }
@@ -88,7 +90,7 @@ namespace {
 
 }
 
-void anaTest( void ) {
+void ana_test( void ) {
 
     // test reading/casting to various types.
     readAnaAs<Array<uint8_t>>();
@@ -108,47 +110,47 @@ void anaTest( void ) {
     // test reading file saved on little-endian machine:
     Array<int32_t> array;
     readFile( RDX_TESTDATA_DIR + anaFiles[5], array );
-    BOOST_CHECK_EQUAL( array.nDimensions(), 2 );
-    BOOST_CHECK_EQUAL( array.dimSize( 0 ), 40 );
-    BOOST_CHECK_EQUAL( array.dimSize( 1 ), 50 );
+    BOOST_TEST( array.nDimensions() == 2 );
+    BOOST_TEST( array.dimSize( 0 ) == 40 );
+    BOOST_TEST( array.dimSize( 1 ) == 50 );
     for( size_t j = 0; j < array.dimSize( 0 ); ++j ) {
         for( size_t k = 0; k < array.dimSize( 1 ); ++k ) {
-            BOOST_CHECK_EQUAL( array( j, k ), j + k );
+            BOOST_TEST( array( j, k ) == j + k );
         }
     }
 
     // test reading file saved on big-endian machine:
     readFile( RDX_TESTDATA_DIR + anaFiles[6], array );
-    BOOST_CHECK_EQUAL( array.nDimensions(), 2 );
-    BOOST_CHECK_EQUAL( array.dimSize( 0 ), 40 );
-    BOOST_CHECK_EQUAL( array.dimSize( 1 ), 50 );
+    BOOST_TEST( array.nDimensions() == 2 );
+    BOOST_TEST( array.dimSize( 0 ) == 40 );
+    BOOST_TEST( array.dimSize( 1 ) == 50 );
     for( size_t j = 0; j < array.dimSize( 0 ); ++j ) {
         for( size_t k = 0; k < array.dimSize( 1 ); ++k ) {
-            BOOST_CHECK_EQUAL( array( j, k ), j + k );
+            BOOST_TEST( array( j, k ) == j + k );
         }
     }
 
     // test reading compressed file saved on little-endian machine:
     Image<int32_t> image;
     readFile( RDX_TESTDATA_DIR + anaFiles[7], image );
-    BOOST_CHECK_EQUAL( image.nDimensions(), 2 );
-    BOOST_CHECK_EQUAL( image.dimSize( 0 ), 40 );
-    BOOST_CHECK_EQUAL( image.dimSize( 1 ), 50 );
+    BOOST_TEST( image.nDimensions(), 2 );
+    BOOST_TEST( image.dimSize( 0 ) == 40 );
+    BOOST_TEST( image.dimSize( 1 ) == 50 );
     for( size_t j = 0; j < image.dimSize( 0 ); ++j ) {
         for( size_t k = 0; k < image.dimSize( 1 ); ++k ) {
-            BOOST_CHECK_EQUAL( image( j, k ), j + k );
+            BOOST_TEST( image( j, k ) == j + k );
         }
     }
 
     // test reading compressed file saved on big-endian machine:
     // TODO: this test-file is broken, fix it.
 //     readFile( RDX_TESTDATA_DIR + anaFiles[8], array );
-//     BOOST_CHECK_EQUAL( array.nDimensions(), 2 );
-//     BOOST_CHECK_EQUAL( array.dimSize( 0 ), 40 );
-//     BOOST_CHECK_EQUAL( array.dimSize( 1 ), 50 );
+//     BOOST_TEST( array.nDimensions(), 2 );
+//     BOOST_TEST( array.dimSize( 0 ), 40 );
+//     BOOST_TEST( array.dimSize( 1 ), 50 );
 //     for( size_t j = 0; j < array.dimSize( 0 ); ++j ) {
 //         for( size_t k = 0; k < array.dimSize( 1 ); ++k ) {
-//             BOOST_CHECK_EQUAL( array( j, k ), j + k );
+//             BOOST_TEST( array( j, k ), j + k );
 //         }
 //     }
 
@@ -191,20 +193,16 @@ void anaTest( void ) {
     
 }
 
+
 namespace testsuite {
-
     namespace file {
-
-        void fileTest( void ) {
-
-            test_suite* ts = BOOST_TEST_SUITE( "FILE" );
-
-            ts->add( BOOST_TEST_CASE( &anaTest ) );
-
-            framework::master_test_suite().add( ts );
+        
+        void add_tests( test_suite* ts ) {
+            
+            test_unit* tmp = BOOST_TEST_CASE( &ana_test );
+            tmp->p_name.set( "ANA");
+            ts->add( tmp );
 
         }
-
     }
-
 }

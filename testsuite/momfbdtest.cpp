@@ -21,6 +21,7 @@
 namespace bpo = boost::program_options;
 namespace bpt = boost::property_tree;
 
+using namespace redux;
 using namespace redux::momfbd;
 using namespace redux::math;
 using namespace redux::util;
@@ -30,10 +31,31 @@ using namespace std;
 using namespace boost::unit_test_framework;
 
 namespace {
+    
+    MomfbdJob mjob;     // unit-wide job for testing.
+    
+    int logInit(void) {
+        redux::logging::Logger& lg = mjob.getLogger();
+        lg.setLevel( 5 );
+        lg.setContext( "testsuite" );
+        lg.addStream( cout, 0, 1 );
+        return 1;
+    }
+
+    int initOnce(void) {
+        static int init_done = logInit();
+        return init_done;
+    }
+
+
 
 void cfgTest( void ) {
+    
+    cout << "bla  " << __LINE__ << endl;
+    int dummy RDX_UNUSED = initOnce();
 
     bpt::ptree tree;
+
     
     ChannelCfg ccfg;
     {
@@ -60,7 +82,7 @@ void cfgTest( void ) {
         ccfg.xOffsetFile = "xOffsetFile.ext";
         ccfg.yOffsetFile = "yOffsetFile.ext";
         ccfg.fileNumbers = {23,45};
-        ccfg.waveFronts = {2,4,6};
+        ccfg.waveFrontList = {2,4,6};
         ccfg.darkNumbers = {145,88};
         ccfg.stokesWeights = {0.99,0.11,0.12,0.13};
         // export settings as config file and parse/compare
@@ -71,7 +93,7 @@ void cfgTest( void ) {
         bpt::read_info( cfg, tree );
         ChannelCfg tmp;                 // default values
         BOOST_CHECK( !(ccfg == tmp) );
-        tmp.parseProperties( tree );
+        tmp.parseProperties( tree, mjob.getLogger() );
         BOOST_CHECK( ccfg == tmp );
         // pack/unpack and compare
         auto buf = sharedArray<char>( ccfg.size() );
@@ -109,7 +131,7 @@ void cfgTest( void ) {
         bpt::read_info( cfg, tree );
         ObjectCfg tmp;                  // default values
         BOOST_CHECK( !(ocfg == tmp) );
-        tmp.parseProperties( tree );
+        tmp.parseProperties( tree, mjob.getLogger() );
         BOOST_CHECK( ocfg == tmp );
         // pack/unpack and compare
         auto buf = sharedArray<char>( ocfg.size() );
@@ -156,7 +178,7 @@ void cfgTest( void ) {
         bpt::read_info( cfg, tree );
         GlobalCfg tmp;                  // default values
         BOOST_CHECK( !(gcfg == tmp) );
-        tmp.parseProperties( tree );
+        tmp.parseProperties( tree, mjob.getLogger() );
         BOOST_CHECK( gcfg == tmp );
         // pack/unpack and compare
         auto buf = sharedArray<char>( gcfg.size() );
@@ -191,7 +213,7 @@ void cfgTest( void ) {
     gcfg = ocfg;
     BOOST_CHECK( ocfg == gcfg );        // now they are equal
 
-    MomfbdJob mjob;
+//    MomfbdJob mjob;
     mjob = gcfg;                        // assign cfg to job-class
     BOOST_CHECK( gcfg == mjob );        // using GlobalCfg::operator==()  ->  should be equal
 
@@ -210,7 +232,7 @@ void cfgTest( void ) {
 //         //vm.at("verbosity") = bpo::variable_value(0);
 //        redux::Logger logger( vm );
 //        logger.addNullLog();
-
+// logger.addStream( cerr, redux::Logger::getDefaultMask() );
     /*
             stringstream cfg;
             cfg << "object { }";
@@ -226,7 +248,10 @@ void cfgTest( void ) {
 
 void packTest( void ) {
     //return;
-    MomfbdJob mjob;
+//    MomfbdJob mjob;
+    cout << "bla  " << __LINE__ << endl;
+    int dummy RDX_UNUSED = initOnce();
+    
     {   // default-constructed job
         auto buf = sharedArray<char>( mjob.size() );
         char* ptr = buf.get();
@@ -304,12 +329,13 @@ void modeTest(void) {
     int last_mode = 50;
     int nModes = last_mode - first_mode + 1;
 
-    const redux::image::Grid& grid = redux::image::Grid::get(nPixels);
+    shared_ptr<Grid> grid = Grid::get(nPixels);
+
     Pupil pupil(nPixels,rc);
-    float** aPtr = grid.angle.get();
+    float** aPtr = grid->angle.get();
     Array<float> awrapper(*aPtr, nPixels, nPixels);
     redux::file::Ana::write("modetest_angle.f0", awrapper);
-    awrapper.wrap(*grid.distance.get(),nPixels, nPixels);
+    awrapper.wrap(*grid->distance.get(),nPixels, nPixels);
     redux::file::Ana::write("grid_distance.f0", awrapper);
     redux::file::Ana::write("modetest_pupil.f0", pupil);
     
@@ -757,10 +783,10 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
 //         }
 //        // img /= 9999.0;
 //
-//         redux::image::FourierTransform ft(img);
-//         redux::image::FourierTransform cft(cimg);
-//         redux::image::FourierTransform cftr(cimg,FT_REORDER);
-//         redux::image::FourierTransform psfft(psf,FT_REORDER);
+//         FourierTransform ft(img);
+//         FourierTransform cft(cimg);
+//         FourierTransform cftr(cimg,REORDER_FT);
+//         FourierTransform psfft(psf,REORDER_FT);
 //
 //         redux::file::Ana::write("img.f0", img);
 //         redux::file::Ana::write("img2.f0", img2);
@@ -777,7 +803,7 @@ Area = 13198.1  Area_mvn  = 13121.6   r^2*PI = 13197.8   ->  Area error:   T=+0.
 //         //ft.inv(img);
 //         //redux::file::Ana::write("ftinv.f0", img);
 //         redux::file::Ana::write("ftcorr.f0", ft.correlate(img2));
-//         //redux::file::Ana::write("psff.f0", ft.convolve(cimg,FT_REORDER));
+//         //redux::file::Ana::write("psff.f0", ft.convolve(cimg,REORDER_FT));
 //         redux::file::Ana::write("fpsf.f0", psfft.convolve(img+img2));
 //         //redux::file::Ana::write("fpsf.f0", ft.convolve(psf));
 //         redux::file::Ana::write("cpsf.f0", cft.convolve(psf));
