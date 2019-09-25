@@ -108,24 +108,24 @@ namespace redux {
             
             template <typename T>
             redux::util::Array<T> convolveImage( const redux::util::Array<T>& im ) const {
-                redux::util::Array<T> tmp = im.copy();
-                OTF.convolveInPlace( tmp );
-                return tmp;
+                if( im.dimSize(0) != otfSize || im.dimSize(1) != otfSize ) {
+                    throw std::logic_error("convolveImage: image size must bt otfSize x otfSize."+redux::util::printArray(im.dimensions(),"  dims") );
+                }
+                return OTF.convolve( im );
             }
             
             template <typename T>
             redux::util::Array<T> residual( const redux::util::Array<T>& im ) const {
                 redux::util::Array<T> cim = convolveImage(im);
-                redux::util::Array<double> img(imgSize,imgSize);
-                redux::util::ArrayStats s;
-                getWindowedImg(img,s,true);
+                redux::util::Array<double> img;
+                imgFT.ift(img);
                 cim -= img;
                 return cim;
             }
             template <typename T>
             redux::util::Array<T> convolvedResidual( const redux::util::Array<T>& cim ) {
-                redux::util::Array<double> img(imgSize,imgSize);
-                getWindowedImg(img,stats,true);
+                redux::util::Array<double> img;
+                imgFT.ift(img);
                 return (cim-img);
             }
             

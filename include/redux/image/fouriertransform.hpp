@@ -333,8 +333,8 @@ namespace redux {
             
             template <typename T>
             redux::util::Array<T> convolve( const redux::util::Array<T>& in ) const {
-                redux::util::Array<double> tmp( in.dimensions() );
-                convolve( in.get(), tmp.get() );
+                redux::util::Array<double> tmp( in.dimensions( true ) );
+                convolve( in.ptr(), tmp.get() );
                 return tmp.copy<T>();
             }
 

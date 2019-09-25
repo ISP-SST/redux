@@ -404,6 +404,28 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         od.cobj.clear( );
     }
 
+    // Residuals
+    if( saveMask & SF_SAVE_RESIDUAL ){
+        od.res.resize( imgCount, otfSize, otfSize );
+        od.res.zero( );
+        Array<float> view( od.res, 0, 0, 0, otfSize-1, 0, otfSize-1 );
+        if( od.cobj.sameSizes(od.res ) ){
+            Array<float> cview(od.cobj,0,0,0,otfSize-1,0,otfSize-1 );
+            for( shared_ptr<SubImage>& si: images ) {
+                view.assign( si->convolvedResidual(cview) );
+                view.shift( 0, 1 );
+                cview.shift( 0, 1 );
+            }
+        } else {
+            for( shared_ptr<SubImage>& si: images ) {
+                view.assign( si->residual(od.img) );
+                view.shift( 0, 1 );
+            }
+        }
+    } else {
+        od.res.clear( );
+    }
+    
     if( otfSize > patchSize ) {
         size_t offset = (otfSize - patchSize)/2;
         od.img.setLimits( offset, offset+patchSize-1, offset, offset+patchSize-1 );
@@ -416,28 +438,10 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
             od.cobj.setLimits( 0, imgCount-1, offset, offset+patchSize-1, offset, offset+patchSize-1 );
             od.cobj.trim(false);
         }
-    }
-    
-    // Residuals
-    if( saveMask & SF_SAVE_RESIDUAL ){
-        od.res.resize( imgCount, patchSize, patchSize );
-        od.res.zero( );
-        Array<float> view( od.res, 0, 0, 0, patchSize-1, 0,patchSize-1 );
-        if( od.cobj.sameSizes(od.res ) ){
-            Array<float> cview(od.cobj,0,0,0,patchSize-1,0,patchSize-1 );
-            for( shared_ptr<SubImage>& si: images ) {
-                view.assign( si->convolvedResidual(cview) );
-                view.shift( 0, 1 );
-                cview.shift( 0, 1 );
-            }
-        } else {
-            for( shared_ptr<SubImage>& si: images ) {
-                view.assign(si->residual(od.img) );
-                view.shift(0,1 );
-            }
+        if( saveMask & SF_SAVE_RESIDUAL ) {
+            od.res.setLimits( 0, imgCount-1, offset, offset+patchSize-1, offset, offset+patchSize-1 );
+            od.res.trim(false);
         }
-    } else {
-        od.res.clear( );
     }
 
     // Note: re-adding the plane has to be done *after* calculating the convolved objects and residuals

@@ -636,8 +636,7 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
                             fn = bfs::path( fn.string() + ".ext" );
                         }
                         fn.replace_extension(".cor.f0");
-                        LOG_DEBUG << boost::format ("Saving dark/flat corrected file %s.") % fn.string() << ende;
-                        LOG_DEBUG << "Saving dark/flat corrected file " << printArray(images.dimensions(),"  imgdims") << ende;
+                        LOG_DEBUG << boost::format("Saving dark/flat corrected data (%d:%d:%d) as %s.") % myObject.ID % ID % i % fn.string() << ende;
                         Image<float> view( images, nPreviousFrames, nPreviousFrames+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
                         redux::file::Ana::write( fn.string(), view.copy() );   // TODO: other formats
                     } catch ( const std::exception& e ) {
@@ -995,8 +994,8 @@ void Channel::preprocessImage( size_t i ) {
 
             if (ccdScattering.valid() && psf.valid()) {           // apply backscatter correction
                 if (tmpImg.sameSize (ccdScattering) && tmpImg.sameSize (psf)) {
-                    LOG_DEBUG << "Applying correction for CCD transparency." << ende;
-                    redux::image::descatter (tmpImg, ccdScattering, psf);
+                    LOG_DEBUG << boost::format("Applying correction for CCD transparency for image (%d:%d:%d)") % myObject.ID % ID % i << ende;
+                    redux::image::descatter( tmpImg, ccdScattering, psf );
                 } else {
                     LOG_ERR << boost::format ("Dimensions of ccdScattering (%s) or psf (%s) does not match this image (%s), skipping flatfielding !!")
                             % printArray (ccdScattering.dimensions(), "") % printArray (psf.dimensions(), "") % printArray (tmpImg.dimensions(), "") << ende;
