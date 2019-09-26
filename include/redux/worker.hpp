@@ -48,6 +48,7 @@ namespace redux {
         std::atomic<bool> resetWhenDone_;
         
         WorkInProgress::Ptr wip;
+        std::shared_ptr<Job> currentJob;
 
         Daemon& daemon;
         network::Host& myInfo;

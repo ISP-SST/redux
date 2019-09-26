@@ -88,11 +88,11 @@ namespace redux {
         void resetParts(void);
         uint64_t workSize(void);
         uint64_t packWork(char*);
-        uint64_t unpackWork(const char*, bool swap_endian=false);
+        uint64_t unpackWork(const char*, std::shared_ptr<Job>& tmpJob, bool swap_endian=false );
         void returnResults(void);
         bool operator<(const WorkInProgress& rhs) const;
         std::string print(void);
-        std::shared_ptr<Job> job;
+        std::weak_ptr<Job> job;
         uint32_t jobID;
         std::vector<Part::Ptr> parts;
         boost::posix_time::ptime workStarted;

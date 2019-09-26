@@ -120,7 +120,7 @@ bool Worker::fetchWork( void ) {
             if( blockSize ) {
 
                 const char* ptr = buf.get();
-                uint64_t count = wip->unpackWork( ptr, conn->getSwapEndian() );
+                uint64_t count = wip->unpackWork( ptr, currentJob, conn->getSwapEndian() );
 
                 if( count != blockSize ) {
                     throw invalid_argument( "Failed to unpack data, blockSize=" + to_string( blockSize ) + "  unpacked=" + to_string( count ) );
@@ -165,6 +165,7 @@ bool Worker::fetchWork( void ) {
 bool Worker::getWork( void ) {
 
     myInfo.active();
+    Job::JobPtr thisJob = wip->job.lock();
     if( wip->isRemote ) {            // remote work: return parts.
         returnWork();
         int count(0);
@@ -173,7 +174,7 @@ bool Worker::getWork( void ) {
             std::this_thread::sleep_for( std::chrono::seconds(5) );
             returnWork();
         }
-    } else if( wip->job ) {
+    } else if( thisJob ) {
         daemon.returnWork( wip );
     }
 
@@ -184,9 +185,9 @@ bool Worker::getWork( void ) {
     myInfo.limbo();
     wip->isRemote = wip->hasResults = false;
     wip->resetParts();
-    if( wip->job ) {
-        wip->job->logger.flushAll();
-        wip->jobID = wip->job->info.id;
+    if( thisJob ) {
+        thisJob->logger.flushAll();
+        wip->jobID = thisJob->info.id;
     }
     
     try {
@@ -196,15 +197,16 @@ bool Worker::getWork( void ) {
             if( daemon.getWork( wip, false ) || fetchWork() ) {    // first check for local work, then remote
                 myInfo.active();
                 myInfo.status.statusString = "...";
-                if(wip->job && (wip->jobID != wip->job->info.id)) {                                  // initialize if it is a new job.
-                    wip->job->logger.setLevel( wip->job->info.verbosity );
+                Job::JobPtr thisJob = wip->job.lock();
+                if(thisJob && (wip->jobID != thisJob->info.id)) {                                  // initialize if it is a new job.
+                    thisJob->logger.setLevel( thisJob->info.verbosity );
                     if( wip->isRemote ) {
                         TcpConnection::Ptr logConn;
                         daemon.connect( daemon.myMaster.host->info, logConn );
-                        wip->job->logger.addNetwork( daemon.ioService, daemon.myMaster.host, wip->job->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
+                        thisJob->logger.addNetwork( daemon.ioService, daemon.myMaster.host, thisJob->info.id, 0, 5 );   // TODO make flushPeriod a config setting.
                     }
-                    wip->job->init();
-                    wip->jobID = wip->job->info.id;
+                    thisJob->init();
+                    wip->jobID = thisJob->info.id;
                 }
                 THREAD_MARK;
                 if( !wip->isRemote ) {
@@ -287,8 +289,9 @@ void Worker::run( void ) {
         // LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
         while( getWork() ) {
             try {
-                while( wip->job && wip->job->run( wip, myInfo.status.nThreads ) ) ;
-                if( wip->job ) wip->job->logger.flushAll(); 
+                Job::JobPtr thisJob = wip->job.lock();
+                while( thisJob && thisJob->run( wip, myInfo.status.nThreads ) ) ;
+                if( thisJob ) thisJob->logger.flushAll(); 
             }
             catch( const boost::thread_interrupted& ) {
                 LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;

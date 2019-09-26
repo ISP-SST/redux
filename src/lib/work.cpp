@@ -87,14 +87,14 @@ void Part::unload(void) {
 }
 
 
-WorkInProgress::WorkInProgress(void) : job(nullptr), jobID(0),
+WorkInProgress::WorkInProgress(void) : job(), jobID(0),
     workStarted(boost::posix_time::not_a_date_time), isRemote(false), hasResults(false), nParts(0), nCompleted(0) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
 #endif
 }
 
-WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(rhs.job), jobID(rhs.jobID), parts(rhs.parts), workStarted(rhs.workStarted),
+WorkInProgress::WorkInProgress(const WorkInProgress& rhs) :  job(), jobID(rhs.jobID), parts(rhs.parts), workStarted(rhs.workStarted),
     isRemote(rhs.isRemote), hasResults(false), nParts(rhs.nParts), nCompleted(rhs.nCompleted) {
 #ifdef DBG_WIP_
     LOG_DEBUG << "Constructing WIP: (" << hexString(this) << ") new instance count = " << (wipCounter.fetch_add(1)+1);
@@ -158,8 +158,9 @@ void WorkInProgress::resetParts( void ) {
 
 uint64_t WorkInProgress::workSize(void) {
     uint64_t sz = this->size() + 1; // + newJob
-    if(job && (jobID != job->info.id)) {
-        sz += job->size();
+    Job::JobPtr thisJob = job.lock();
+    if( thisJob && (jobID != thisJob->info.id)) {
+        sz += thisJob->size();
     }
     nParts = 0;
     for( const auto& part: parts ) {
@@ -174,23 +175,24 @@ uint64_t WorkInProgress::workSize(void) {
 
 uint64_t WorkInProgress::packWork( char* ptr ) {
     
-    if( !job ) {
+    Job::JobPtr thisJob = job.lock();
+    if( !thisJob ) {
         throw invalid_argument( "Can't pack WIP without a job instance..." );
     }
     using redux::util::pack;
     uint64_t count = this->size();                                  // skip WIP info, it's packed below.
-    bool newJob = (jobID != job->info.id);
+    bool newJob = (jobID != thisJob->info.id);
     count += pack( ptr+count, newJob );
     if( newJob ) {
-        count += job->pack( ptr+count );                            // pack Job-info
+        count += thisJob->pack( ptr+count );                            // pack Job-info
     }
-    count += job->packParts( ptr+count, shared_from_this() );       // pack parts
+    count += thisJob->packParts( ptr+count, shared_from_this() );       // pack parts
     this->pack( ptr );                                              // write WIP info, (done last, in case nParts changed).
     return count;
 }
 
 
-uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
+uint64_t WorkInProgress::unpackWork( const char* ptr, std::shared_ptr<Job>& tmpJob, bool swap_endian ) {
 
     using redux::util::unpack;
     uint64_t count = this->unpack( ptr, swap_endian );
@@ -198,13 +200,17 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, newJob );
     if( newJob ) {
         string tmpS = string( ptr+count );
-        job = Job::newJob( tmpS );
-        if( job ) {
-            count += job->unpack( ptr+count, swap_endian );
+        tmpJob = Job::newJob( tmpS );
+        job = tmpJob;
+        if( tmpJob ) {
+            count += tmpJob->unpack( ptr+count, swap_endian );
         } else throw invalid_argument( "Unrecognized Job tag: \"" + tmpS + "\"" );
+    } else {
+        tmpJob = job.lock();
     }
-    if( job ) {
-        count += job->unpackParts( ptr+count, shared_from_this(), swap_endian );
+    
+    if( tmpJob ) {
+        count += tmpJob->unpackParts( ptr+count, shared_from_this(), swap_endian );
     } else throw invalid_argument( "Can't unpack parts without a job instance..." );
     
     return count;
@@ -212,19 +218,21 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, bool swap_endian ) {
 
 
 void WorkInProgress::returnResults(void) {
-    if( job ) {
-        job->returnResults( shared_from_this() );
+    Job::JobPtr thisJob = job.lock();
+    if( thisJob ) {
+        thisJob->returnResults( shared_from_this() );
         resetParts();
     }
 }
 
 
 bool WorkInProgress::operator<( const WorkInProgress& rhs ) const {
-    
-    if( job != rhs.job ) return job < rhs.job;
+    Job::JobPtr thisJob = job.lock();
+    Job::JobPtr rhsJob = rhs.job.lock();
+    if( thisJob != rhsJob ) return thisJob < rhsJob;
     size_t sz = std::min( parts.size(), rhs.parts.size() );
     for( size_t i(0); i<sz; ++i ) {
-        if( parts[i] != rhs.parts[i] ) return job < rhs.job;
+        if( parts[i] != rhs.parts[i] ) return thisJob < rhsJob;
     }
     //return (parts.size() < rhs.parts.size());
     return false;
@@ -233,10 +241,10 @@ bool WorkInProgress::operator<( const WorkInProgress& rhs ) const {
 
 
 std::string WorkInProgress::print( void ) {
-    
-    string ret = "\"" + ( job ? job->info.name : string( "undefined" ) ) + "\"";
+    Job::JobPtr thisJob = job.lock();
+    string ret = "\"" + ( thisJob ? thisJob->info.name : string( "undefined" ) ) + "\"";
     if( parts.size() ) {
-        ret += " (job: #" + (job ? to_string(job->info.id) : "0" ) + " part(s):";
+        ret += " (job: #" + (thisJob ? to_string(thisJob->info.id) : "0" ) + " part(s):";
         for( auto & part : parts ) {
             if( part ) {
                 ret += " " + to_string( part->id );

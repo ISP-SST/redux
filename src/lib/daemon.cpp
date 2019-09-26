@@ -672,7 +672,7 @@ void Daemon::cleanup( void ) {
             WorkInProgress::Ptr wip = wipit->second;
             Host::Ptr host = wipit->first;
             if( wip && host ) {
-                Job::JobPtr job = wip->job;
+                Job::JobPtr job = wip->job.lock();
                 boost::posix_time::time_duration elapsed = (now - wip->workStarted);
                 if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
                     LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << wip->print() << ende;
@@ -722,9 +722,10 @@ void Daemon::cleanup( void ) {
 void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
     
     if( wip ) {
-        if( wip->job ) {
+        Job::JobPtr job = wip->job.lock();
+        if( job ) {
             LOG_NOTICE << "Returning failed/unfinished part to queue: " << wip->print() << ende;
-            wip->job->failWork( wip );
+            job->failWork( wip );
             for( auto& part: wip->parts ) {
                 if( part ) {
                     ioService.post( [part](){
@@ -1047,8 +1048,9 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
                     if( !j ) continue;
                     lock_guard<mutex> plock( peerMutex );
                     for( auto &pw: peerWIP ) {
-                        if( !pw.second || !pw.second->job ) continue;
-                        if( j != pw.second->job ) continue;
+                        if( !pw.second ) continue;
+                        Job::JobPtr job = pw.second->job.lock();
+                        if( !job || (j != job) ) continue;
                         Host::Ptr host = pw.first;
                         if( host ) {
                             TcpConnection::Ptr conn = server->getConnection( host );
@@ -1516,20 +1518,23 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
             host->active();
             updateWIP( host, wip );
             uint64_t blockSize(0);
-            if( wip && wip->job ) {
-                wip->jobID = oldJobID;
-                blockSize += wip->workSize();
-                host->status.statusString = alignLeft(to_string(wip->job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
-                host->active();
-                data = rdx_get_shared<char>(blockSize+sizeof(uint64_t));
-                char* ptr = data.get()+sizeof(uint64_t);
-                count += wip->packWork( ptr+count );
-                std::thread([wip](){
-                    for( auto& part: wip->parts ) {
-                        part->unload();
-                    }
-                }).detach();
-                wip->jobID = wip->job->info.id;
+            if( wip ) {
+                Job::JobPtr job = wip->job.lock();
+                if( job ) {
+                    wip->jobID = oldJobID;
+                    blockSize += wip->workSize();
+                    host->status.statusString = alignLeft(to_string(job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
+                    host->active();
+                    data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
+                    char* ptr = data.get()+sizeof(uint64_t);
+                    count += wip->packWork( ptr+count );
+                    std::thread([wip](){
+                        for( auto& part: wip->parts ) {
+                            part->unload();
+                        }
+                    }).detach();
+                    wip->jobID = job->info.id;
+                }
             } else {
                 LOG_DETAIL << "sendWork: wip/job is NULL. This should NOT happen !!" << ende;
             }
@@ -1564,11 +1569,14 @@ void Daemon::putParts( TcpConnection::Ptr conn ) {
             ioService.post([this,wip,buf,endian,msg](){
                 WorkInProgress::Ptr tmpwip = getIdleWIP();
                 WorkInProgress::Ptr wip_bak = getIdleWIP();
+                std::shared_ptr<Job> tmpJob = wip->job.lock();
                 *wip_bak = *wip;
                 *tmpwip = *wip;
+                wip_bak->job = tmpJob;
+                tmpwip->job = tmpJob;
                 wip->reset();
                 try {
-                    tmpwip->unpackWork( buf.get(), endian );
+                    tmpwip->unpackWork( buf.get(), tmpJob, endian );
                     tmpwip->returnResults();   // TBD: should this step be async/by manager?
                     returnWork( tmpwip );
                     LOG_DETAIL << msg << ende;
@@ -1938,8 +1946,9 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, bool remote ) {
 
     if( !wip ) getIdleWIP( wip );
     
-    if( tmp_wip->job ) {
-        tmp_wip->job->info.state.store( Job::JSTATE_ACTIVE );
+    Job::JobPtr job = tmp_wip->job.lock();
+    if( job ) {
+        job->info.state.store( Job::JSTATE_ACTIVE );
     }
     tmp_wip->workStarted = boost::posix_time::second_clock::universal_time();
     for( auto& part: tmp_wip->parts ) {
@@ -1947,7 +1956,7 @@ bool Daemon::getWork( WorkInProgress::Ptr& wip, bool remote ) {
     }
     
     *wip = *tmp_wip;                //  copy part to leave the job/part unmodified
-    
+    wip->job = job;
     putActiveWIP( tmp_wip );
 
     return true;
@@ -2028,8 +2037,9 @@ void Daemon::prepareLocalWork( int count ) {
                     lock_guard<mutex> qlock( wip_queue_mtx );
                     wip_localqueue.push_back( std::move(wip) );
                 } catch( ... ) {
-                    if( wip && wip->job ){
-                        wip->job->ungetWork( wip );
+                    if( wip ) {
+                        Job::JobPtr job = wip->job.lock();
+                        if( job ) job->ungetWork( wip );
                     }
                 }
                 --preparing_local;
@@ -2070,7 +2080,7 @@ void Daemon::prepareRemoteWork( int count ) {
                 }
             } catch ( ... ) { }
 
-            if( !gotJob ) {
+            if( !gotJob || !wip ) {
                 putIdleWIP( wip );
                 break;
             }
@@ -2084,10 +2094,11 @@ void Daemon::prepareRemoteWork( int count ) {
                         }
                     }
                     lock_guard<mutex> qlock( wip_queue_mtx );
-                    wip_queue.push_back( std::move(wip) );
+                    wip_queue.push_back( wip );
                 } catch( ... ) {
-                    if( wip && wip->job ){
-                        wip->job->ungetWork( wip );
+                    if( wip ) {
+                        Job::JobPtr job = wip->job.lock();
+                        if( job ) job->ungetWork( wip );
                     }
                 }
                 --preparing_remote;
