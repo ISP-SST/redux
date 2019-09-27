@@ -183,8 +183,9 @@ void TcpServer::removeConnection( TcpConnection::Ptr conn ) {       //  remove f
     
     conn->setErrorCallback(nullptr);
     conn->setCallback(nullptr);
-    conn->socket().close();
-
+    if( conn->socket().is_open() ) {
+        conn->socket().close();
+    }
 }
 
 

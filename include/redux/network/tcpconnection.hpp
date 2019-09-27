@@ -114,7 +114,7 @@ namespace redux {
             void uIdle( void );
             void urgentHandler( const boost::system::error_code& error, size_t transferred );
             void idle( void );
-            void onActivity( const boost::system::error_code& error );
+            void onActivity( const boost::system::error_code& error, size_t transferred );
             void setSwapEndian(bool se) { swapEndian_ = se; };
             bool getSwapEndian(void) { return swapEndian_; };
             
@@ -141,7 +141,7 @@ namespace redux {
 
             template <typename T>
             TcpConnection& operator>>( T& out ) {
-                if( boost::asio::read( mySocket, boost::asio::buffer( &out, sizeof(T) ) ) < sizeof(T) ) {
+                if( !mySocket.is_open() || boost::asio::read( mySocket, boost::asio::buffer( &out, sizeof(T) ) ) < sizeof(T) ) {
                     out = T();
                     throw std::ios_base::failure( std::string("TcpConnection: Failed to receive ")+typeid(T).name() );
                 }
