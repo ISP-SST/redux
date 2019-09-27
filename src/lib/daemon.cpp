@@ -636,22 +636,13 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
     if( conn && server ) {
         Host::Ptr host = server->getHost( conn );
-        if( host ) {
-            WorkInProgress::Ptr wip = getWIP( host );
-            host->nConnections--;
-            if( wip ) {
-                if( wip->job && !wip->parts.empty() ) {
-                    LOG_NOTICE << "Returning unfinished work to queue: " << wip->print() << ende;
-                    wip->job->ungetWork( wip );
-                }
-                wip->reset();
-                wip->jobID = 0;
-                removeWIP( host );
+        if( host && (host->info.peerType & Host::TP_WORKER) ) {
+            if( host->nConnections == 1 ) {
                 LOG_DEBUG << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
             }
-            lock_guard<mutex> lock( peerMutex );
-            peers.erase( host );
         }
+        unique_lock<mutex> lock( peerMutex );
+        peers.erase( host );
         server->removeConnection( conn );
     }
 
@@ -1731,7 +1722,6 @@ void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
         if( host ) {
             if( logid == 0 ) {
                 logger.addConnection( conn, host );
-                host->nConnections--;
                 ret = CMD_OK;
             } else {
                 //unique_lock<mutex> lock( jobsMutex );
@@ -1884,9 +1874,10 @@ void Daemon::getIdleWIP( WorkInProgress::Ptr& wip ) {
     if( wip_idle.size() ) {
         wip = std::move( *wip_idle.begin() );
         wip_idle.erase( wip_idle.begin() );
-    } else {
-        wip = std::make_shared<WorkInProgress>();
+        if( wip ) return;
     }
+    
+    wip = std::make_shared<WorkInProgress>();
     
 }
 

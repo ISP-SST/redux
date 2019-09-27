@@ -121,15 +121,18 @@ Logger::~Logger() {
     
     unique_lock<mutex> lock( outputMutex );
     for( auto& c: connections ) {
-        c.first->setErrorCallback(nullptr);
-        c.first->setCallback(nullptr);
+        if( c.first ) {
+            c.first->setErrorCallback(nullptr);
+            c.first->setCallback(nullptr);
+            c.first->socket().close();
+        }
     }
+    connections.clear();
     lock.unlock();
     
     this->flushAll();
     
     // clear them now so that the flushBuffer call from the LogOutput destructor does not attempt to access deleted items.
-    connections.clear();
     outputs.clear();
 
 }
