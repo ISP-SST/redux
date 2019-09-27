@@ -248,7 +248,7 @@ void Object::initProcessing( Solver& ws ){
             ch->initProcessing(ws );
         }
 
-        initCache( );            // load global pupil/modes
+        initObject( );            // load global pupil/modes
         
         double mode_scale = 1.0/wavelength;
         ModeInfo info(myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
@@ -791,7 +791,7 @@ bool Object::checkData( bool verbose ) {
 }
 
 
-void Object::initCache( void ){
+void Object::initObject( void ){
     
     Pupil::calculatePupilSize( frequencyCutoff, pupilRadiusInPixels, pupilPixels, wavelength, patchSize, myJob.telescopeD, arcSecsPerPixel );
     
@@ -918,7 +918,7 @@ void Object::initCache( void ){
     LOG_TRACE << "Tilt-to-pixels conversion: " << alphaToPixels << ende;
 
     for( shared_ptr<Channel>& ch: channels ){
-        ch->initCache( );
+        ch->initChannel( );
     }
     
 }
@@ -1291,7 +1291,18 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         fn = bfs::path(myJob.info.outputDir )/ fn;
     }
     LOG << "Writing output to file: " << fn << ende;
-
+    
+    uint16_t oID = ID;
+    if( traceID >= 0 ) {    // for trace-objects, update settings from the reference object (was modified in pre-processing)
+        oID = traceID;
+        shared_ptr<Object> myCfg = myJob.getObject(oID);
+        if( myCfg ) {
+            channels = myCfg->getChannels();
+            modes = myCfg->modes;
+            pupil = myCfg->pupil;
+        }
+    }
+    
     try {
         
         std::shared_ptr<FileMomfbd> info( new FileMomfbd() );
@@ -1305,24 +1316,15 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         info->version = atof( info->versionString.c_str( ) );
 
         info->dateString = myJob.observationDate;
-        if(startT.is_special( )&& endT.is_special() ){
+        if( startT.is_special() && endT.is_special() ){
             info->timeString = "N/A";
-        } else if(startT.is_special() ){
-            info->timeString = bpx::to_simple_string(endT.time_of_day() );
-        } else if(endT.is_special() ){
-            info->timeString = bpx::to_simple_string(startT.time_of_day() );
+        } else if( startT.is_special() ){
+            info->timeString = bpx::to_simple_string( endT.time_of_day() );
+        } else if( endT.is_special() ){
+            info->timeString = bpx::to_simple_string( startT.time_of_day() );
         } else {
             bpx::time_duration obs_interval =( endT - startT );
             info->timeString = bpx::to_simple_string((startT+obs_interval/2).time_of_day() );
-        }
-        
-        if( traceID >= 0 ) {     // this is a trace-object, copy some stuff...
-            shared_ptr<Object> ref = myJob.getObject(traceID);
-            if( ref ) {
-                channels = ref->getChannels();
-                modes = ref->modes;
-                pupil = ref->pupil;
-            }
         }
 
         int32_t nChannels = info->nChannels = channels.size( );
@@ -1346,12 +1348,11 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                 info->clipEndY.get()[i] = channels[i]->alignClip[3];
             }
         }
-        
-        info->nPH = pupilPixels;
 
+        info->nPH = pupilPixels;
         uint8_t writeMask = MOMFBD_IMG;                                                 // always output image
         int64_t imgSize = patchSize*patchSize*sizeof(float );
-        
+   
         if( info->fileNames.size( ) ) writeMask |= MOMFBD_NAMES;
         if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) writeMask |= MOMFBD_PSF;
         if( saveMask & SF_SAVE_MODES && (info->nPH > 0) ) writeMask |= MOMFBD_MODES;
@@ -1359,7 +1360,7 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         if( saveMask & SF_SAVE_RESIDUAL ) writeMask |= MOMFBD_RES;
         if( saveMask & SF_SAVE_ALPHA ) writeMask |= MOMFBD_ALPHA;
         if( nChannels && (saveMask & SF_SAVE_DIVERSITY) ) writeMask |= MOMFBD_DIV;
-        
+       
         Array<float> tmpModes;
         if( writeMask&MOMFBD_MODES ){     // copy modes from local cache
             //double pupilRadiusInPixels = pupilPixels / 2.0;
@@ -1402,11 +1403,10 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                 PatchData::Ptr thisPatch = patchesData(y,x);
                 if( thisPatch ){
                     getStorage( *thisPatch, oData );
-                    shared_ptr<ObjectData> refData = thisPatch->getObjectData( ID );
-                    if( traceID >= 0 ) {
-                        refData = thisPatch->getObjectData(traceID);
+                    shared_ptr<ObjectData> refData = thisPatch->getObjectData( oID );
+                    if( refData ) {
+                        oData->channels = refData->channels;
                     }
-                    if( refData ) oData->channels = refData->channels;
                     info->region[0] = std::min( info->region[0], thisPatch->roi.first.x+1 );
                     info->region[1] = std::max( info->region[1], thisPatch->roi.last.x+1 );
                     info->region[2] = std::min( info->region[2], thisPatch->roi.first.y+1 );
@@ -1417,6 +1417,7 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                     info->patches(x,y).region[2] = thisPatch->roi.first.y+1;
                     info->patches(x,y).region[3] = thisPatch->roi.last.y+1;
                     info->patches(x,y).nChannels = nChannels;
+      
                     info->patches(x,y).nim = sharedArray<int32_t>( nChannels );
                     info->patches(x,y).dx = sharedArray<int32_t>( nChannels );
                     info->patches(x,y).dy = sharedArray<int32_t>( nChannels );
@@ -1487,9 +1488,9 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                 }
             }
         }
-
-        info->write( fn.string(), reinterpret_cast<char*>( tmp.get()), writeMask );
         
+        info->write( fn.string(), reinterpret_cast<char*>( tmp.get()), writeMask );
+
     } catch( const exception& e ) {
         LOG_ERR << "Error when writing output to file: " << fn << " what: " << e.what() << ende;
         myJob.setFailed();

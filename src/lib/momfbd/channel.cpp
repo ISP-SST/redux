@@ -454,7 +454,7 @@ bool Channel::checkData( bool verbose ) {
 //#define INDEX_THRESHOLD  0
 #define INDEX_THRESHOLD  1E-12      // cutoff to get rid of some fft noise
 // TBD: this should be a parameter somewhere...
-void Channel::initCache (void) {
+void Channel::initChannel (void) {
 
 
     ModeInfo mi(myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);

@@ -100,7 +100,7 @@ namespace redux {
             bool checkCfg(void);
             bool checkData(bool verbose=false);
 
-            void initCache(void);
+            void initObject(void);
             void reInitialize(boost::asio::io_service&, redux::util::ProgressWatch& pw, bool reset=false);
             void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);
             void loadInit(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);

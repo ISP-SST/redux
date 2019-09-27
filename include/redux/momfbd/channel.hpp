@@ -89,7 +89,7 @@ namespace redux {
             bool checkCfg(void);
             bool checkData( bool verbose=false );
             
-            void initCache(void);
+            void initChannel(void);
             
             void loadCalib(boost::asio::io_service&);
             void loadData(boost::asio::io_service&, redux::util::Array<PatchData::Ptr>&);

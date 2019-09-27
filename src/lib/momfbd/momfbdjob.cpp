@@ -755,9 +755,6 @@ void MomfbdJob::preProcess( void ) {
     LOG_TRACE << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processing..." << ende;
 
     THREAD_MARK;
-    generateTraceObjects();
-    
-    THREAD_MARK;
     uint32_t nTotalImages = 0;
     uint32_t nTotalChannels(0);
     Point16 imageSizes;
@@ -822,14 +819,6 @@ void MomfbdJob::preProcess( void ) {
             bfs::create_directories( tmpP );
         }
 
-        if( use_swap ) {
-            for( shared_ptr<Object>& obj: objects ) {
-                obj->cacheFile = cachePath + "results_" + to_string(obj->ID);
-            }
-            for( shared_ptr<Object>& obj: trace_objects ) {
-                obj->cacheFile = cachePath + "trace_" + to_string(obj->ID) + "_" + uIntsToString( obj->waveFrontList );
-            }
-        }
         ioService.post( [this](){
             THREAD_MARK;
             initCache();
@@ -852,17 +841,32 @@ void MomfbdJob::preProcess( void ) {
 
 void MomfbdJob::initCache(void) {
     
+    THREAD_MARK;
     if( !globalData ) {
         globalData.reset(new GlobalData(*this));
     }
     globalData->constraints.init();
     
+    THREAD_MARK;
     for( shared_ptr<Object>& obj: objects ) {
-        obj->initCache();
+        obj->initObject();
     }
     
-    globalData->prePack();
+    THREAD_MARK;
+    generateTraceObjects();
+
+    if( !(runFlags&RF_NOSWAP) ) {
+        for( shared_ptr<Object>& obj: objects ) {
+            obj->cacheFile = cachePath + "results_" + to_string(obj->ID);
+        }
+        for( shared_ptr<Object>& obj: trace_objects ) {
+            obj->cacheFile = cachePath + "trace_" + to_string(obj->ID) + "_" + uIntsToString( obj->waveFrontList );
+        }
+    }
     
+    THREAD_MARK;
+    globalData->prePack();
+
 }
 
 
