@@ -12,8 +12,6 @@
 
 namespace po = boost::program_options;
 
-using boost::asio::ip::tcp;
-
 namespace redux {
     
     class Daemon;

@@ -7,8 +7,8 @@
 
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <boost/noncopyable.hpp>
 
-using boost::asio::ip::tcp;
 
 namespace redux {
 

@@ -45,7 +45,6 @@ namespace redux {
                     patchSize=patchSz; pupilSize=pupSz;
                     currentSize = std::max<size_t>( patchSize, 2*pupilSize ); }
                 void init( void ) {
-                    using namespace std;
                     if( currentSize && (thisSize == currentSize) ) {
                         return;
                     }
@@ -62,7 +61,6 @@ namespace redux {
                     thisSize = currentSize;
                  }
                 void clear( void ) {
-                    using namespace std;
                     D.reset();
                     D2.reset();
                     C.reset();
