@@ -1181,6 +1181,9 @@ void MomfbdJob::generateTraceObjects( void ) {
     for( shared_ptr<Object>& obj: objects ) {
         if ( obj && (obj->ID != refID) && (obj->weight == 0) ) {
             set<uint32_t> thisWf( obj->waveFrontList.begin(), obj->waveFrontList.end() );
+            if( thisWf == refWaveFronts ) {    // matches the total reference -> no need to generate a subset
+                continue;
+            }
             for( auto& wf: thisWf ) {
                 if( refWaveFronts.count(wf) == 0 ) {    // not present in reference -> can't be traced.
                     goto loopend;
