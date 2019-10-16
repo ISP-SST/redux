@@ -35,7 +35,7 @@ namespace redux {
                        
             struct PatchInfo {
                 
-                PatchInfo( int dummy=0 ) : /*region({0,0,0,0}),*/ nChannels(0), offx(0), offy(0), nPixelsX(0), nPixelsY(0), npsf(0), nobj(0), nres(0), nalpha(0), nm(0),
+                explicit PatchInfo( int dummy=0 ) : /*region({0,0,0,0}),*/ nChannels(0), offx(0), offy(0), nPixelsX(0), nPixelsY(0), npsf(0), nobj(0), nres(0), nalpha(0), nm(0),
                      ndiv(0), nphx(0), nphy(0), offset(0), imgPos(0), psfPos(0), objPos(0), resPos(0), alphaPos(0), diversityPos(0) {};
 
                 int32_t region[4];         //!< FirstX, LastX, FirstY, LastY
@@ -57,7 +57,7 @@ namespace redux {
             };
 
             FileMomfbd( void );
-            FileMomfbd( const std::string& );
+            explicit FileMomfbd( const std::string& );
             
             static size_t getPatchSize(const FileMomfbd* const info, uint8_t loadMask, const float& version, size_t alignTo=4);
             size_t getPatchSize( uint8_t loadMask, size_t alignTo=4 ) const { return getPatchSize( this, loadMask, version, alignTo ); };
@@ -72,8 +72,8 @@ namespace redux {
             
             size_t load ( std::ifstream& file, char* data, uint8_t loadMask, int verbosity=0, uint8_t alignTo=4 );
             
-            std::vector<std::string> getText( bool ) { return std::vector<std::string>(1,""); }
-            int getFormat(void) { return FMT_MOMFBD; };
+            std::vector<std::string> getText( bool ) override { return std::vector<std::string>(1,""); }
+            int getFormat(void) override { return FMT_MOMFBD; };
 
             float version, pix2cf, cf2pix;
             std::string dateString, timeString, versionString;

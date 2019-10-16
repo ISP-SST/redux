@@ -5,7 +5,7 @@
 
 #include <boost/filesystem.hpp>
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 
 namespace redux {
 
@@ -28,16 +28,16 @@ namespace redux {
          */
         class RecursePath  {
             
-            typedef bool (*functype)( const fs::path& );
+            typedef bool (*functype)( const bfs::path& );
 
         public:
 
-            RecursePath( boost::filesystem::path& p, functype f, int nSubs=std::numeric_limits<int>::max() );
+            RecursePath( bfs::path& p, functype f, int nSubs=std::numeric_limits<int>::max() );
             RecursePath( const RecursePath& rhs, int sublevels );
             RecursePath( const RecursePath& rhs );
 
-            void operator()( fs::directory_entry& p ) const;
-            void operator()( const fs::path& p ) const;
+            void operator()( bfs::directory_entry& p ) const;
+            void operator()( const bfs::path& p ) const;
 
         private:
 

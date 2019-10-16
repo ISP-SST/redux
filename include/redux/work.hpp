@@ -54,9 +54,9 @@ namespace redux {
         virtual void load(void);
         virtual void unload(void);
         virtual void prePack( bool force=false ) {};
-        size_t csize(void) const { return size(); };
-        uint64_t cpack(char* p) const { return pack(p); };
-        uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
+        size_t csize(void) const override { return size(); };
+        uint64_t cpack(char* p) const override { return pack(p); };
+        uint64_t cunpack(const char* p, bool e) override { return unpack(p,e); };
         bool operator==(const Part& rhs) const { return (id == rhs.id); }
         bool operator<(const Part& rhs) const { return (id < rhs.id); }
         uint64_t id;

@@ -108,7 +108,7 @@ namespace redux {
         };
         struct CountT {
             CountT( void ) : min(0), max(std::numeric_limits<int64_t>::max()), active(0) {}
-            CountT( int64_t a ) : min(0), max(a), active(0) {}
+            explicit CountT( int64_t a ) : min(0), max(a), active(0) {}
             CountT( int64_t a, int64_t b ) : min(a), max(b), active(0) {}
             int64_t min, max;
             int64_t active;

@@ -150,21 +150,21 @@ namespace redux {
             ~PatchData();
 
             std::shared_ptr<ObjectData> getObjectData( uint16_t id ) const;
-            void setPath(const std::string& path);
+            void setPath(const std::string& path) override;
             void initPatch(void);
-            void load(void);
-            void unload(void);
-            void prePack( bool force=false );
+            void load(void) override;
+            void unload(void) override;
+            void prePack( bool force=false ) override;
             void clear(void);
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
-            size_t csize(void) const { return size(); };
-            uint64_t cpack(char* p) const { return pack(p); };
-            uint64_t cunpack(const char* p, bool e) { return unpack(p,e); };
-            void cclear(void);
-            bool cacheLoad(bool removeAfterLoad=false);
-            bool cacheStore(bool clearAfterStore=false);
+            uint64_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
+            size_t csize(void) const override { return size(); };
+            uint64_t cpack(char* p) const override { return pack(p); };
+            uint64_t cunpack(const char* p, bool e) override { return unpack(p,e); };
+            void cclear(void) override;
+            bool cacheLoad(bool removeAfterLoad=false) override;
+            bool cacheStore(bool clearAfterStore=false) override;
 
             bool operator==(const PatchData&);
             PatchData& operator=(const PatchData&);
@@ -198,11 +198,11 @@ namespace redux {
             std::shared_ptr<redux::image::Pupil> get(const redux::image::PupilInfo&,
                                                      const std::shared_ptr<redux::image::Pupil>& ms=nullptr);
             bool verify(void) const;
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
-            void unload(void);
-            void prePack( bool force=false );
+            uint64_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
+            void unload(void) override;
+            void prePack( bool force=false ) override;
             void dump( const std::string& tag="gd" ) const;
             
         };

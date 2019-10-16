@@ -4,10 +4,9 @@
 
 using namespace redux::util;
 using namespace std;
-namespace fs = boost::filesystem;
 
 
-RecursePath::RecursePath( boost::filesystem::path& p, functype f, int sublevels ) : nSubLevels( sublevels ), callBack(f) {
+RecursePath::RecursePath( bfs::path& p, functype f, int sublevels ) : nSubLevels( sublevels ), callBack(f) {
     this->operator()( p );
 }
 
@@ -27,23 +26,23 @@ RecursePath::RecursePath( const RecursePath& rhs ) {
 }
 
 
-void RecursePath::operator()( fs::directory_entry& p ) const {
+void RecursePath::operator()( bfs::directory_entry& p ) const {
     this->operator()( p.path() );
 }
 
 
-void RecursePath::operator()( const fs::path& p ) const {
+void RecursePath::operator()( const bfs::path& p ) const {
 
     if( !callBack( p ) || ( nSubLevels < 0 ) ) {
         return;
     }
 
     try {
-        fs::directory_iterator it( p );
-        fs::directory_iterator end;
+        bfs::directory_iterator it( p );
+        bfs::directory_iterator end;
         for_each( it, end, RecursePath( *this, nSubLevels - 1 ) );
     }
-    catch( fs::filesystem_error& fex ) {
+    catch( bfs::filesystem_error& fex ) {
         cerr << "Error in RecursePath at path \"" << p.string() << "\"" << endl;
         cerr << fex.what() << endl;
     }

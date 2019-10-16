@@ -27,7 +27,7 @@ namespace redux {
 
         public:
 
-            ProjectivePoints( size_t nPoints=1 );
+            explicit ProjectivePoints( size_t nPoints=1 );
             ProjectivePoints( double x, double y, size_t nPoints=1 );
             template <typename T> ProjectivePoints( const PointType<T>& pt, size_t nPoints=1 ) : matrix<double>(3, nPoints) {
                 for (size_t i=0; i<nPoints; ++ i) {
@@ -79,7 +79,7 @@ namespace redux {
 
         public:
             ProjectiveMap(void);
-            ProjectiveMap(const bnu::matrix<double>&);
+            explicit ProjectiveMap(const bnu::matrix<double>&);
             template <typename T> ProjectiveMap( const std::vector<T>& in ) : matrix<double>(bnu::identity_matrix<double>(3)) {
                 size_t n = std::min<size_t>( in.size(), 9 );
                 std::copy( in.begin(), in.begin()+n, data().begin() );

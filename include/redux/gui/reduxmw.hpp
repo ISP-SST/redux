@@ -31,7 +31,7 @@ namespace redux {
             Q_OBJECT
 
         public:
-            ReduxMW(QWidget* cw=nullptr);
+            explicit ReduxMW(QWidget* cw=nullptr);
             ~ReduxMW() { };
 
 

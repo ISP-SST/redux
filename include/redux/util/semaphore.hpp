@@ -13,7 +13,7 @@ namespace redux {
         class Semaphore {
             
         public:
-            Semaphore( unsigned int );
+            explicit Semaphore( unsigned int );
 
             void get( void );
             void release( void );

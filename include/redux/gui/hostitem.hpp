@@ -22,7 +22,7 @@ namespace redux {
                 return Ptr( new HostItem( h, parent, hi ) );
             }
 
-            HostItem( const QList<QVariant> &data);
+            explicit HostItem( const QList<QVariant> &data);
             ~HostItem();
 
             void reset( Host::Ptr h=0 );

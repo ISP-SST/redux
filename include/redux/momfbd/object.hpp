@@ -55,9 +55,9 @@ namespace redux {
             bpt::ptree getPropertyTree( bpt::ptree& );
 
             uint16_t id(void) const { return ID; };
-            size_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            size_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
             
             void cleanup(void);
             uint32_t nImages(bool reCalc=false);

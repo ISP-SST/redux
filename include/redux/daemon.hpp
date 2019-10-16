@@ -25,8 +25,8 @@ namespace redux {
         explicit Daemon ( po::variables_map& vm );
         virtual ~Daemon ( void );
         
-        void reset(void);
-        void stop(void);
+        void reset(void) override;
+        void stop(void) override;
         
     private:
         
@@ -36,7 +36,7 @@ namespace redux {
         void checkSwapSpace( void );
         void checkCurrentUsage( void );
         void check_limits( void );
-        bool doWork(void);
+        bool doWork(void) override;
         
         bool workerInit( void );
         void connect( network::Host::HostInfo& host, network::TcpConnection::Ptr& conn );

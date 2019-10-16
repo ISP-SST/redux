@@ -21,7 +21,7 @@ namespace redux {
                 return Ptr( new JobItem( j, parent, ji ) );
             }
             
-            JobItem( const QList<QVariant> &data );
+            explicit JobItem( const QList<QVariant> &data );
             ~JobItem();
 
             void reset( Job::JobPtr j=0 );

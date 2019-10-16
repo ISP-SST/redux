@@ -36,7 +36,7 @@ namespace redux {
             typedef std::shared_ptr<Ana> Ptr;
             
             Ana( void );
-            Ana( const std::string& );
+            explicit Ana( const std::string& );
             ~Ana();
 
             void read( std::ifstream& );
@@ -44,7 +44,7 @@ namespace redux {
 
             void write( std::ofstream& );
 
-            std::vector<std::string> getText( bool raw=false ) {
+            std::vector<std::string> getText( bool raw=false ) override {
                 std::string hdr = m_Header.txt + m_ExtendedHeader;
                 if( raw ) return std::vector<std::string>( 1, hdr );
                 return makeFitsHeader(hdr);
@@ -52,20 +52,20 @@ namespace redux {
             
             std::vector<std::string> makeFitsHeader( const std::string& );
             
-            size_t getNumberOfFrames(void);
-            bpx::ptime getStartTime(void);
-            bpx::ptime getEndTime(void);
-            bpx::ptime getAverageTime(void);
-            bpx::time_duration getExposureTime(void);
-            std::vector<bpx::ptime> getStartTimes(void);
+            size_t getNumberOfFrames(void) override;
+            bpx::ptime getStartTime(void) override;
+            bpx::ptime getEndTime(void) override;
+            bpx::ptime getAverageTime(void) override;
+            bpx::time_duration getExposureTime(void) override;
+            std::vector<bpx::ptime> getStartTimes(void) override;
             
-            size_t dataSize(void);
-            size_t dimSize(size_t);
-            uint8_t elementSize(void);
-            uint8_t nDims(void) { return m_Header.ndim; }
-            size_t nElements(void);
-            int getIDLType(void);
-            int getFormat(void) { return FMT_ANA; };
+            size_t dataSize(void) override;
+            size_t dimSize(size_t) override;
+            uint8_t elementSize(void) override;
+            uint8_t nDims(void) override { return m_Header.ndim; }
+            size_t nElements(void) override;
+            int getIDLType(void) override;
+            int getFormat(void) override { return FMT_ANA; };
             
             struct raw_header {                    // first block for ana files
                 uint32_t synch_pattern;

@@ -60,7 +60,7 @@ namespace redux {
             void moveJobDown( void );
 
         public:
-            JobTreeView( QWidget *parent = 0 );
+            explicit JobTreeView( QWidget *parent = 0 );
             ~JobTreeView() { for( int i = 0; i < addJobActs.size(); ++i ) delete addJobActs[i]; };
 
             QModelIndexList selectedIndexes( void ) const { return QTreeView::selectedIndexes(); };

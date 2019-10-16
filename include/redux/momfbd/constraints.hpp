@@ -73,10 +73,10 @@ namespace redux {
                 }
         
                 
-                size_t csize(void) const;
-                uint64_t cpack(char*) const;
-                uint64_t cunpack(const char*, bool);
-                void cclear(void);
+                size_t csize(void) const override;
+                uint64_t cpack(char*) const override;
+                uint64_t cunpack(const char*, bool) override;
+                void cclear(void) override;
                 bool operator<( const NullSpace& ) const;
 
                 std::map<int32_t, int8_t> c_entries;                       //!< Index and value of (non-zero) constraint-matrix elements

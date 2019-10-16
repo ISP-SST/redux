@@ -26,13 +26,13 @@ namespace redux {
             double beginX, endX, beginY, endY;
             size_t sortedID;
             redux::util::Array<int64_t> result;      // use int64_t as temporary storage, cast to int16_t in post-processing
-            size_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            size_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
         };
         typedef std::shared_ptr<DebugPart> PartPtr;
         
-        uint64_t unpackParts(const char*, WorkInProgress::Ptr, bool);
+        uint64_t unpackParts(const char*, WorkInProgress::Ptr, bool) override;
 
     public:
 
@@ -42,21 +42,21 @@ namespace redux {
         
         static Job* create(void) { return new DebugJob(); }
 
-        void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& );
-        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
+        void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& ) override;
+        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) override;
         
-        size_t size(void) const;
-        uint64_t pack(char*) const;
-        uint64_t unpack(const char*, bool);
+        size_t size(void) const override;
+        uint64_t pack(char*) const override;
+        uint64_t unpack(const char*, bool) override;
         
-        bool check(void);
+        bool check(void) override;
         
-        size_t getTypeID(void) { return Job::DEBUGJOB; }
-        void ungetWork(WorkInProgress::Ptr);
-        void returnResults(WorkInProgress::Ptr);
-        bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<Job::StepID,Job::CountT>& );
+        size_t getTypeID(void) override { return Job::DEBUGJOB; }
+        bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<Job::StepID,Job::CountT>& ) override;
+        void ungetWork(WorkInProgress::Ptr) override;
+        void returnResults(WorkInProgress::Ptr) override;
         
-        bool run( WorkInProgress::Ptr, uint16_t );
+        bool run( WorkInProgress::Ptr, uint16_t ) override;
 
     private:
 

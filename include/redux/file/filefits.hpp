@@ -100,12 +100,12 @@ namespace redux {
             
             struct image_hdu : public hdu {
                 image_hdu() : dHDU(0) {}
-                void dummy(void){};
+                void dummy(void) override {};
                 int dHDU;       // index to hdu containing data, e.g. compressed tile image.
             };
             
             struct ascii_hdu : public hdu {
-                void dummy(void){};
+                void dummy(void) override {};
                 struct table_info_t {
                     int columnStart;            // = TBCOL, offset where this column starts
                     std::string columnName;     // = TTYPEn, name of this data-column
@@ -118,7 +118,7 @@ namespace redux {
             };
             
             struct binary_hdu : public hdu {
-                void dummy(void){};
+                void dummy(void) override {};
                 std::vector<std::string> data;
             };
             

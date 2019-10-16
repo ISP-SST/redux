@@ -9,7 +9,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 using namespace redux::logging;
 using namespace redux;
 using namespace std;
@@ -56,7 +56,7 @@ bpo::options_description& Application::parseCmdLine( int argc, char* argv[],  bp
             all.add( *programOptions );
         }
 
-        fs::path tmpPath = fs::path(string(argv[0])).filename();
+        bfs::path tmpPath = bfs::path(string(argv[0])).filename();
         Application::executableName = tmpPath.string();
         getOptions( all, Application::executableName );
         
@@ -126,7 +126,7 @@ Application::Application( bpo::variables_map& vm, RunMode rm ) : runMode(rm), re
 
     if( vm.count("settings") ) {
         settingsFile = vm["settings"].as<string>();
-        if( fs::is_regular(settingsFile) ) {
+        if( bfs::is_regular(settingsFile) ) {
             LOG_DETAIL << "Loading file \"" <<  settingsFile << "\"" << ende;
             bpt::read_info( settingsFile, propTree );
         } else {

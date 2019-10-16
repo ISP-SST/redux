@@ -33,7 +33,7 @@ namespace redux {
             void killHost( void );
 
         public:
-            HostTreeView( QWidget *parent = 0 );
+            explicit HostTreeView( QWidget *parent = 0 );
             ~HostTreeView() {};
 
             QModelIndexList selectedIndexes( void ) const { return QTreeView::selectedIndexes(); };

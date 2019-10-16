@@ -70,9 +70,9 @@ namespace redux {
             
             void setLogChannel( const std::string& channel ) { logChannel = channel; };
 
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            virtual uint64_t size(void) const;
+            virtual uint64_t pack(char*) const;
+            virtual uint64_t unpack(const char*, bool);
             
             bool operator==(const ChannelCfg&) const;
             
@@ -142,12 +142,12 @@ namespace redux {
             ObjectCfg();
             virtual ~ObjectCfg();
             
-            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ObjectCfg() );
-            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() ) const;
+            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ObjectCfg() ) override;
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() ) const override;
 
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            uint64_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
             
             const ObjectCfg& operator=(const ChannelCfg&);
             bool operator==(const ObjectCfg&) const;
@@ -185,12 +185,12 @@ namespace redux {
             GlobalCfg();
             ~GlobalCfg();
 
-            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=GlobalCfg() );
-            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() ) const;
+            virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=GlobalCfg() ) override;
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() ) const override;
 
-            uint64_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            uint64_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
             
             const GlobalCfg& operator=(const ObjectCfg&);
             const GlobalCfg& operator=(const ChannelCfg&);

@@ -88,6 +88,11 @@ Host::Host() : id(getID()), nConnections(0) {
 }
 
 
+Host::Host(const std::string& name) : info(name), id(getID()), nConnections(0) {
+
+}
+
+
 Host::Host(const HostInfo& hi, uint64_t i) : info(hi), id(getID()), nConnections(0) {
 
 }

@@ -273,7 +273,7 @@ namespace redux {
              *  @details Construct an array from an array of different type.
              */
             //@{
-            template <typename U> Array( const Array<U>& rhs) { rhs.copy(*this); }
+            template <typename U> explicit Array( const Array<U>& rhs) { rhs.copy(*this); }
             template <typename U, typename V> Array( const Array<U>& rhs, const std::vector<V>& indices ) : Array<T>(rhs) { setLimits(indices); }
             template <typename U, typename ...S> Array( const Array<U>& rhs, S ...s ) : Array( rhs, std::vector<int64_t>({static_cast<int64_t>( s )...}) ) {}
             //@}

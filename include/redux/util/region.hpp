@@ -26,7 +26,7 @@ namespace redux {
             RegionType ( void ) : first(0,0), last(0,0) {}
             RegionType ( RegionType<T>&& rhs ) : first(std::move(rhs.first)), last(std::move(rhs.last)) {}
             RegionType ( const RegionType<T>& rhs ) : first(rhs.first), last(rhs.last) {}
-            template <typename U> RegionType ( const RegionType<U>& rhs ) : first(rhs.first), last(rhs.last) {}
+            template <typename U> explicit RegionType ( const RegionType<U>& rhs ) : first(rhs.first), last(rhs.last) {}
             static inline uint64_t size(void) { return 4*sizeof(T); };
             uint64_t pack(char* ptr) const {
                 uint64_t count = first.pack(ptr);

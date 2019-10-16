@@ -56,38 +56,38 @@ namespace redux {
 
             static Job* create(void) { return new MomfbdJob(); }
 
-            size_t getTypeID(void) { return Job::MOMFBDJOB; }
-            uint64_t packParts(char* ptr, WorkInProgress::Ptr) const;
-            uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr, bool);
+            size_t getTypeID(void) override { return Job::MOMFBDJOB; }
+            uint64_t packParts(char* ptr, WorkInProgress::Ptr) const override;
+            uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr, bool) override;
             
-            void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& );
-            bpt::ptree getPropertyTree( bpt::ptree* root = nullptr );
+            void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& ) override;
+            bpt::ptree getPropertyTree( bpt::ptree* root = nullptr ) override;
 
-            uint64_t size( void ) const;
-            uint64_t pack( char* ) const;
-            uint64_t unpack( const char*, bool );
-            void prePack( bool force=false );
+            uint64_t size( void ) const override;
+            uint64_t pack( char* ) const override;
+            uint64_t unpack( const char*, bool ) override;
+            void prePack( bool force=false ) override;
 
             size_t nImages(void) const;
             
-            bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<Job::StepID,Job::CountT>& );
-            void ungetWork( WorkInProgress::Ptr );
-            void failWork( WorkInProgress::Ptr );
-            void returnResults( WorkInProgress::Ptr );
+            bool getWork( WorkInProgress::Ptr, uint16_t, const std::map<Job::StepID,Job::CountT>& ) override;
+            void ungetWork( WorkInProgress::Ptr ) override;
+            void failWork( WorkInProgress::Ptr ) override;
+            void returnResults( WorkInProgress::Ptr ) override;
 
-            void cleanup(void);
-            bool run( WorkInProgress::Ptr, uint16_t );
+            void cleanup(void) override;
+            bool run( WorkInProgress::Ptr, uint16_t ) override;
             
-            void setLogChannel(std::string channel);
+            void setLogChannel(std::string channel) override;
             
-            bool mayBeDeleted(void);
+            bool mayBeDeleted(void) override;
             
-            size_t memUsage(void);       //!< Approximate current memory usage of this job
-            size_t diskUsage(void);      //!< Approximate current disk usage of this job
-            size_t procUsage(void);      //!< Approximate memory usage for processing 1 part
+            size_t memUsage(void) override;       //!< Approximate current memory usage of this job
+            size_t diskUsage(void) override;      //!< Approximate current disk usage of this job
+            size_t procUsage(void) override;      //!< Approximate memory usage for processing 1 part
         
-            bool active(void);
-            bool check(void);
+            bool active(void) override;
+            bool check(void) override;
             bool checkCacheUsage(void);
             bool checkOutputUsage(void);
             bool checkCfg(void);
@@ -95,7 +95,7 @@ namespace redux {
             bool checkPre(void);
             bool checkPost(void);
             bool checkWriting(void);
-            uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const;
+            uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const override;
             const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
             const std::shared_ptr<Object> getObject( uint16_t id ) const;
             const std::vector<std::shared_ptr<Channel>>& getChannels(uint16_t objID) const;

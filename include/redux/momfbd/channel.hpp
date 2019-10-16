@@ -61,9 +61,9 @@ namespace redux {
 
             uint16_t id(void) const { return ID; };
             void cleanup(void);
-            size_t size(void) const;
-            uint64_t pack(char*) const;
-            uint64_t unpack(const char*, bool);
+            size_t size(void) const override;
+            uint64_t pack(char*) const override;
+            uint64_t unpack(const char*, bool) override;
             double getMaxMean(void);
             void getFileNames(std::vector<std::string>&, const std::vector<uint32_t>&) const;
             void getFileNames(std::vector<std::string>& list) const { getFileNames( list, waveFrontList ); };

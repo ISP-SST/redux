@@ -41,7 +41,7 @@ namespace redux {
                 uint16_t connectPort;
                 boost::posix_time::ptime startedAt;
                 std::string name, os, arch, connectName, user;
-                HostInfo( std::string username="" );
+                explicit HostInfo( std::string username="" );
                 uint64_t size(void) const;
                 uint64_t pack( char* ) const;
                 uint64_t unpack( const char*, bool );
@@ -65,6 +65,7 @@ namespace redux {
             } status;
             
             Host(void);
+            explicit Host(const std::string& name);
             Host(const HostInfo&, uint64_t i=0);
             ~Host();
 

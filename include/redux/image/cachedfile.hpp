@@ -31,7 +31,7 @@ namespace redux {
 #ifdef RDX_TRACE_FILE
             inline size_t size( void ) const { return sizeof(CachedFile)+filename.size(); }
 #endif
-            CachedFile( const std::string& fn ) : filename(fn) {
+            explicit CachedFile( const std::string& fn ) : filename(fn) {
                 filename = redux::util::cleanPath( filename ) ;
             }
             
