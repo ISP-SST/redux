@@ -510,7 +510,8 @@ void redux::image::apodizeInPlace( T** data, size_t nRows, size_t nCols, size_t 
     }
     
     size_t sz = std::max( rowBlend+rowMargin, colBlend+colMargin ) + 2;
-    double* tmp = new double[ sz ];
+    shared_ptr<double> tmpD = rdx_get_shared<double>( sz );
+    double* tmp = tmpD.get();
     
     memset( tmp, 0, sz*sizeof(T) );
     redux::math::apodize( tmp+rowMargin, rowBlend+2, 1.0 );
@@ -528,7 +529,6 @@ void redux::image::apodizeInPlace( T** data, size_t nRows, size_t nCols, size_t 
             data[rr][nCols-c-1] *= tmp[c+1];
         }
     }
-    delete[] tmp;
 
 }
 template void redux::image::apodizeInPlace(int16_t**, size_t, size_t, size_t, size_t, size_t, size_t);

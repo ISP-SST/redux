@@ -42,7 +42,7 @@ namespace {
 }
 
 
-TcpConnection::TcpConnection( boost::asio::io_service& io_service )
+TcpConnection::TcpConnection( ba::io_service& io_service )
     : activityCallback( nullptr ), urgentCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ),
     myService( io_service ), swapEndian_(false), urgentActive(false), id( getID() ) {
 #ifdef DBG_NET_
@@ -122,8 +122,8 @@ size_t TcpConnection::readline( string& line ) {
     line.clear();
 
     try {
-        boost::asio::streambuf streambuf;
-        size_t bytes_transferred = boost::asio::read_until( socket(), streambuf, delimiter );
+        ba::streambuf streambuf;
+        size_t bytes_transferred = ba::read_until( socket(), streambuf, delimiter );
         auto data_begin = buffers_begin( streambuf.data() );
         line = string( data_begin, data_begin + bytes_transferred - delimiter.size() );
     } catch( const exception& e ) {
@@ -138,7 +138,7 @@ size_t TcpConnection::readline( string& line ) {
 void TcpConnection::writeline( const string& line ) {
 
     try {
-        boost::asio::write( mySocket, boost::asio::buffer(line + delimiter) );
+        ba::write( mySocket, ba::buffer(line + delimiter) );
     } catch( const exception& e ) {
         //cout << "TcpConnection::writeline  e = " << e.what() << endl;
     }
@@ -200,7 +200,7 @@ void TcpConnection::uIdle( void ) {
     if( mySocket.is_open() ) {
         lock.unlock();
                 
-        mySocket.async_receive( boost::asio::buffer( &urgentData, 1 ), ba::socket_base::message_out_of_band,
+        mySocket.async_receive( ba::buffer( &urgentData, 1 ), ba::socket_base::message_out_of_band,
                                   boost::bind( &TcpConnection::urgentHandler, this,
                                                ba::placeholders::error, ba::placeholders::bytes_transferred) );
 //         mySocket.async_read_some( ba::null_buffers(),
@@ -307,14 +307,14 @@ void TcpConnection::onActivity( const boost::system::error_code& ec, size_t tran
 
 void TcpConnection::sendUrgent( uint8_t c ) {
     if( mySocket.is_open() ) {
-        mySocket.send( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+        mySocket.send( ba::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
     }
 }
 
  
 void TcpConnection::receiveUrgent( uint8_t& c ) {
     if( mySocket.is_open() && mySocket.at_mark() ) {
-        mySocket.receive( boost::asio::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
+        mySocket.receive( ba::buffer( &c, 1 ), ba::socket_base::message_out_of_band );
     }
 }
 
@@ -354,14 +354,14 @@ TcpConnection& TcpConnection::operator<<( const std::vector<std::string>& in ) {
 TcpConnection& TcpConnection::operator>>( std::vector<std::string>& out ) {
     uint64_t blockSize, received;
     if( mySocket.is_open() ) {
-        received = boost::asio::read( mySocket, boost::asio::buffer( &blockSize, sizeof(uint64_t) ) );
+        received = ba::read( mySocket, ba::buffer( &blockSize, sizeof(uint64_t) ) );
         if( received == sizeof(uint64_t) ) {
             if( swapEndian_ ) swapEndian( blockSize );
             if( blockSize ) {
-                shared_ptr<char> buf( new char[blockSize+1], []( char* p ){ delete[] p; } );
+                shared_ptr<char> buf = rdx_get_shared<char>(blockSize+1);
                 char* ptr = buf.get();
                 memset( ptr, 0, blockSize+1 );
-                received = boost::asio::read( mySocket, boost::asio::buffer( ptr, blockSize ) );
+                received = ba::read( mySocket, ba::buffer( ptr, blockSize ) );
                 if( received ) {
                     unpack( ptr, out, swapEndian_ );
                 }

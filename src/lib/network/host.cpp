@@ -349,12 +349,12 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostI
     uint64_t sz = out.size() + sizeof(uint64_t) + 1;
     shared_ptr<char> buf = rdx_get_shared<char>(sz);
     char* ptr = buf.get();
-    memset(ptr,0,sz);
+    memset( ptr, 0, sz );
     
-    uint64_t count = pack(ptr,out.littleEndian);
-    count += pack(ptr+count,out.size());
+    uint64_t count = pack( ptr, out.littleEndian );
+    count += pack( ptr+count, out.size() );
     
-    out.pack(ptr+count);
+    out.pack( ptr+count );
     
     size_t written = boost::asio::write( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( written != sz ) {
@@ -366,30 +366,31 @@ TcpConnection& redux::network::operator<<(TcpConnection& conn, const Host::HostI
 }
 
 
-TcpConnection& redux::network::operator>>(TcpConnection& conn, Host::HostInfo& in) {
+TcpConnection& redux::network::operator>>( TcpConnection& conn, Host::HostInfo& in ) {
     
-    uint64_t sz = sizeof(uint64_t)+1;
-    shared_ptr<char> buf = rdx_get_shared<char>(sz);
+    constexpr size_t hdrSize = sizeof(uint64_t)+1;
+    std::array<char,hdrSize> hdr;
 
-    size_t readBytes = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
-    if( readBytes != sz ) {
+    size_t readBytes = boost::asio::read( conn.socket(), boost::asio::buffer(hdr.data(), hdrSize) );
+    if( readBytes != hdrSize ) {
         //LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
     int one = 1;
-    char* ptr = buf.get();
+    char* ptr = hdr.data();
     bool swap_endian = *((char*)&one) != *ptr;
     
-    uint64_t count = unpack(ptr+1,sz,swap_endian);
+    uint64_t sz(0);
+    uint64_t count = unpack( ptr+1, sz, swap_endian );
     
-    buf = rdx_get_shared<char>(sz);
+    shared_ptr<char> buf = rdx_get_shared<char>(sz);
 
     count = boost::asio::read( conn.socket(), boost::asio::buffer(buf.get(), sz) );
     if( count != sz ) {
         //LOG_ERR << "TcpConnection >> HostInfo: Failed to read buffer.";
     }
     
-    in.unpack(buf.get(), swap_endian);
+    in.unpack( buf.get(), swap_endian );
 
     return conn;
     

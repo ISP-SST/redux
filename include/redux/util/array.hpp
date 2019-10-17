@@ -313,11 +313,11 @@ namespace redux {
                     if(dense_) {
                         count += pack( dataPtr+count, get()+begin_, nElements_ );
                     } else {
-                        T* dptr = new T[nElements_];
+                        std::shared_ptr<T> tmpD = rdx_get_shared<T>(nElements_);
+                        T* dptr = tmpD.get();
                         std::transform(begin(), end(), dptr, [](const T& a) { return a; });
                         //std::copy(begin(), end(), dptr);
                         count += pack( dataPtr+count, dptr, nElements_ );
-                        delete[] dptr;
                     }
                 }
                 return count;

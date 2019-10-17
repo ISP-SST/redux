@@ -375,7 +375,7 @@ void PatchData::prePack( bool force ) {
     if( !packed.size ) {
         return;
     }
-    packed.data.reset( new char[packed.size] );
+    packed.data = rdx_get_shared<char>(packed.size);
     packed.packedSize = pack( packed.data.get() );
 
 }

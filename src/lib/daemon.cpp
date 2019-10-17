@@ -1516,7 +1516,7 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
                     blockSize += wip->workSize();
                     host->status.statusString = alignLeft(to_string(job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
                     host->active();
-                    data.reset( new char[blockSize+sizeof(uint64_t)], []( char* p ){ delete[] p; } );
+                    data = rdx_get_shared<char>( blockSize+sizeof(uint64_t) );
                     char* ptr = data.get()+sizeof(uint64_t);
                     count += wip->packWork( ptr+count );
                     std::thread([wip](){
