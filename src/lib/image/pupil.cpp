@@ -224,6 +224,12 @@ void Pupil::generate( uint16_t pixels, double pupilRadius, double coRadius ) {
     nPixels = pixels;
     radius = pupilRadius;
     co_radius = coRadius;
+    generate();
+
+}
+
+void Pupil::generate( void ) {
+
     resize( nPixels, nPixels );
     auto ptr = reshape( nPixels, nPixels );        // returns a 2D shared_ptr
     area = makePupil( ptr.get(), nPixels, radius, co_radius );

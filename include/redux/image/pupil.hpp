@@ -50,7 +50,8 @@ namespace redux {
             
             bool load( const std::string& filename, uint16_t pupilPixels, double pupilRadius );
             
-            void generate( uint16_t pixels, double pupilRadius, double coRadius=0.0 );
+            void generate( uint16_t pupilPixels, double pupilRadius, double coRadius=0.0 );
+            void generate( void );
             void generateSupport(double threshold=0);                           //!< Gets the indices of elements in the pupil/otf which are >threshold
             void normalize( void );                                             //!< Scale pupil to the interval [0,1]
             void dump( std::string tag="pupil" ) const;
@@ -61,10 +62,10 @@ namespace redux {
             bool operator<(const Pupil& rhs) const;                             //!< So that the Pupil-struct can be stored in comparative containers (set/map)
 
             PupilInfo info;
-            uint16_t nPixels;
-            double radius;
-            double co_radius;
-            double area;
+            uint16_t nPixels;                                                   //!< Size of the pupil-space
+            double radius;                                                      //!< Radius of the pupil-image, in pixels
+            double co_radius;                                                   //!< Radius of central obscuration in the pupil (if present)
+            double area;                                                        //!> Area of the pupil (for normalization purposes)
             
             std::vector<size_t> pupilSupport, otfSupport;                       //!< The indices to the support of the pupil/otf (i.e. elements greater than some threshold)
             std::vector<std::pair<size_t,size_t>> pupilInOTF;                   //!< Maps the pupil-support into OTF-space (which is (2*nPixels,2*nPixels))
