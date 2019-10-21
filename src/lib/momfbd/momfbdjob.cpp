@@ -569,11 +569,9 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
                 // Run main processing
                 auto data = static_pointer_cast<PatchData>(part);
                 StopWatch timer;
-                Solver::tmp()->init();
                 data->initPatch();
                 solver->run( data );
                 generateTraceData( data );
-                Solver::tmp()->clear();
                 part->nThreads = nThreads;
                 part->runtime_wall = timer.getSeconds();
                 part->runtime_cpu = timer.getCPUSeconds();

@@ -197,7 +197,7 @@ bool Worker::getWork( void ) {
             if( daemon.getWork( wip, false ) || fetchWork() ) {    // first check for local work, then remote
                 myInfo.active();
                 myInfo.status.statusString = "...";
-                Job::JobPtr thisJob = wip->job.lock();
+                thisJob = wip->job.lock();
                 if(thisJob && (wip->jobID != thisJob->info.id)) {                                  // initialize if it is a new job.
                     thisJob->logger.setLevel( thisJob->info.verbosity );
                     if( wip->isRemote ) {
@@ -207,6 +207,7 @@ bool Worker::getWork( void ) {
                     }
                     thisJob->init();
                     wip->jobID = thisJob->info.id;
+                    currentJob = thisJob;
                 }
                 THREAD_MARK;
                 if( !wip->isRemote ) {
@@ -223,6 +224,7 @@ bool Worker::getWork( void ) {
     }
     
     boost::this_thread::interruption_point();
+    currentJob.reset();
     THREAD_UNMARK;
     return false;
 
@@ -243,19 +245,19 @@ void Worker::returnWork( void ) {
 
                 LLOG_TRACE(daemon.logger) << "Returning result: " + wip->print() << ende;
 
-                uint64_t blockSize = wip->workSize();
+                uint64_t blockSize = wip->workSize();       // might be slightly bigger than needed due to compression.
                 size_t totalSize = blockSize + sizeof( uint64_t ) + 1;        // + blocksize + cmd
                 
                 shared_ptr<char> data = rdx_get_shared<char>(totalSize);
-                char* ptr = data.get();
-                
-                uint64_t count = pack( ptr, CMD_PUT_PARTS );
-                count += pack( ptr+count, blockSize );
-                if(blockSize) {
-                    count += wip->packWork(ptr+count);
+                char* ptr = data.get() + sizeof( uint64_t ) + 1;
+                uint64_t count(0);
+                if( blockSize ) {
+                    count = wip->packWork( ptr );
                 }
+                count += pack( data.get()+1, count );
+                count += pack( data.get(), CMD_PUT_PARTS );
 
-                conn->asyncWrite( data, totalSize );
+                conn->asyncWrite( data, count );
 
                 Command cmd = CMD_ERR;
                 *(conn) >> cmd;

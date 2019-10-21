@@ -42,12 +42,23 @@ namespace {
         std::bind(&SubImage::gradientVogel, sp::_1, sp::_2)
     };
     
-    thread_local shared_ptr<redux::momfbd::thread::TmpStorage> TS( new redux::momfbd::thread::TmpStorage() );
-    
+    mutex ts_mtx;
+    std::map< std::thread::id, shared_ptr<redux::momfbd::thread::TmpStorage> > ts_container;
+    redux::momfbd::thread::TmpStorage* getTmpStorage(void) {
+        lock_guard<mutex> lock(ts_mtx);
+        auto ret = ts_container.emplace( this_thread::get_id(), make_shared<redux::momfbd::thread::TmpStorage>() );
+        if( ret.second ) {
+            ret.first->second->init();
+        }
+        return ret.first->second.get();
+    }
+
 }
 
-redux::momfbd::thread::TmpStorage* Solver::tmp(void) {
-    return TS.get();
+redux::momfbd::thread::TmpStorage* Solver::tmp( bool force ) {
+    static thread_local thread::TmpStorage* TS = getTmpStorage();
+    if( force ) TS = getTmpStorage();
+    return TS;
 }
 
 Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j), myInfo( network::Host::myInfo() ),
@@ -63,6 +74,8 @@ Solver::Solver( MomfbdJob& j, boost::asio::io_service& s, uint16_t t ) : job(j),
 Solver::~Solver() {
     
     clear();
+    lock_guard<mutex> lock(ts_mtx);
+    ts_container.clear();
     
 }
 
@@ -137,14 +150,14 @@ void Solver::init( void ) {
     }
     
     thread::TmpStorage::setSize( patchSize, pupilSize );
-    tmp()->init();     // temp-storage for the main thread.
+    tmp(true)->init();     // temp-storage for the main thread.
     set<std::thread::id> initDone;
     while(true) {
         for( uint16_t i=0; i<2*maxThreads; ++i ) {
             service.post([&](){
                 unique_lock<mutex> lock(mtx);
                 if( initDone.count(std::this_thread::get_id()) ) return;
-                tmp()->init();
+                tmp(true)->init();
                 initDone.insert(std::this_thread::get_id());
             });
         }

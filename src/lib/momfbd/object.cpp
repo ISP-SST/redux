@@ -241,8 +241,18 @@ void Object::initProcessing( Solver& ws ){
         PS = rdx_get_shared<double>(otfSize2);
         QS = rdx_get_shared<double>(otfSize2);
         ftSum = rdx_get_shared<double>(otfSize2);
+        
+        // basically just to shut valgrind up about "uninitialized values"
+        std::fill_n( P.get(), otfSize2, complex_t(0) );
+        std::fill_n( Q.get(), otfSize2, double(0) );
+        std::fill_n( PQ.get(), otfSize2, complex_t(0) );
+        std::fill_n( PS.get(), otfSize2, double(0) );
+        std::fill_n( QS.get(), otfSize2, double(0) );
+        std::fill_n( ftSum.get(), otfSize2, double(0) );
+        
         if( myJob.runFlags & RF_FIT_PLANE ){
             fittedPlane.resize( patchSize, patchSize );
+            fittedPlane.zero();
         }
         for( auto& ch : channels ){
             ch->initProcessing(ws );
