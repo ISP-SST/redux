@@ -237,7 +237,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         }
     }
     
-    ModeInfo mi(kw.firstZernike, kw.lastZernike, 0, nPixels, radius, kw.angle, kw.cutoff);
+    ModeInfo mi(kw.firstZernike, kw.lastZernike, modeNumbers, nPixels, radius, kw.angle, kw.cutoff);
     if( kw.verbose ) {
         string msg = "Generating modes: " + (string)mi+ ".";
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );

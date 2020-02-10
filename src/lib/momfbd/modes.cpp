@@ -111,9 +111,20 @@ bool ModeInfo::operator<(const ModeInfo& rhs) const {
 
 
 ModeInfo::operator string() const {
-    string ret = to_string(nPupilPixels)+":"+to_string(pupilRadius)+":"+to_string(modeNumber);
-    ret += "[" + to_string(firstMode) + "," +to_string(lastMode)+ "]:";
-    if( !modeNumbers.empty() ) ret += "("+ printArray(modeNumbers,"modes") + ")";
+    string ret = to_string(nPupilPixels)+":"+to_string(pupilRadius)+":";
+    if( firstMode == lastMode ) {
+        ret += "Z";
+    } else {
+        ret += "KL";
+    }
+    if( !modeNumbers.empty() ) {
+        ret += printArray( modeNumbers, "" );
+    } else  {
+        ret += "("+ to_string(modeNumber) + ")";
+    }
+    if( firstMode != lastMode ) {
+        ret += ":(Z-basis=[" + to_string(firstMode) + "," +to_string(lastMode)+ "])";
+    }
     return ret;
 }
 
