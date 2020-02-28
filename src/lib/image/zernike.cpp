@@ -443,6 +443,7 @@ const std::map<uint16_t, Zernike::KLPtr>& Zernike::karhunenLoeveExpansion(uint16
         for(uint16_t i = first_mode; i <= last_mode; ++i) {
             KLPtr &cfg = kle[i];      // will insert a new element and return a reference if it doesn't exist
             if(!cfg) cfg.reset(new KL);
+            cfg->id = i;
             int im = reverse_mapping.at(i), s;
             for(s = 0; (first_in_block[s] > im) || (last_in_block[s] < im); ++s);
             int n = last_in_block[s] - first_in_block[s] + 1;

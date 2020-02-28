@@ -139,6 +139,7 @@ namespace {
         float cutoff;
         IDL_VPTR pupil;
         IDL_VPTR variance;
+        IDL_INT sort_modes;
         IDL_INT verbose;
         IDL_INT zernike;
     } MODE_KW;
@@ -158,6 +159,7 @@ namespace {
         { (char*) "OLD",       IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,old) },
         { (char*) "PUPIL",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,pupil) },
         { (char*) "RADIAL",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,radial) },
+        { (char*) "SORT_MODES",IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,sort_modes) },
         { (char*) "VARIANCE",  IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,variance) },
         { (char*) "VERBOSE",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,verbose) },
         { (char*) "ZERNIKE",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,zernike) },
@@ -184,6 +186,7 @@ namespace {
                         "      OLD                 Use old calculation method.\n"
                         "      PUPIL               (input/output) Use pupil, or keep the generated pupil.\n"
                         "      RADIAL              Return only the radial part.\n"
+                        "      SORT_MODES          The requested modes should be interpreted as indices in variance order.\n"
                         "      VARIANCE            (output) Mode variances.\n"
                         "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                         "      ZERNIKE             Use Zernike modes (default is KL).\n";
@@ -235,6 +238,28 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         } else {
             modeNumbers.push_back( IDL_LongScalar(index) );
         }
+    }
+    
+    
+    if( kw.sort_modes && !kw.zernike ) {
+        const std::map<uint16_t, Zernike::KLPtr>& kle = Zernike::karhunenLoeveExpansion( kw.firstZernike, kw.lastZernike );
+        vector<uint16_t> tmpM;
+        vector<Zernike::KLPtr> tmp;
+        for( auto kl: kle  ) tmp.push_back( kl.second );
+        std::sort( tmp.begin(), tmp.end(), [](const Zernike::KLPtr& a, const Zernike::KLPtr& b){
+            if( a->covariance == b->covariance ) return a->id < b->id;
+            return a->covariance > b->covariance;
+            
+        });
+        for( auto& i: modeNumbers ) {
+            if( i<kw.firstZernike || i >= tmp.size() ) continue;
+            if( i < kw.firstZernike ) {                 // the KL-expansion does not include these
+                tmpM.push_back( i );
+            } else {
+                tmpM.push_back( tmp[i-kw.firstZernike]->id );
+            }
+        }
+        std::swap( tmpM, modeNumbers );
     }
     
     IDL_LONG nPixels = IDL_LongScalar(argv[1]);
@@ -300,7 +325,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         modes.getNorms( pupil );
         modes.normalize( 1.0 );
     }
-    
+        
     vector<IDL_LONG64> dimss;
     std::copy( modes.dimensions().begin(), modes.dimensions().end(), back_inserter(dimss) );
     std::reverse( dimss.begin(), dimss.end() );

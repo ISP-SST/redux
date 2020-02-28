@@ -48,6 +48,7 @@ namespace redux {
             
             // Karhunen-Loeve mode
             struct KL {
+                int id;     // index corresponding to the Noll-index for Zernikes
                 std::vector< std::pair<unsigned int, double> > zernikeWeights; //< zernike mode numbers and corresponding weights
                 double covariance;
             };

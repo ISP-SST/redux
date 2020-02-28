@@ -3,6 +3,7 @@
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/constants.hpp"
+#include "redux/image/zernike.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/translators.hpp"
 
@@ -18,6 +19,7 @@ namespace bpt = boost::property_tree;
 namespace bfs = boost::filesystem;
 
 using namespace redux::momfbd;
+using namespace redux::image;
 using namespace redux::logging;
 using namespace redux::util;
 using namespace std;
@@ -658,7 +660,8 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     if( getValue<bool>( tree, "OVERWRITE", false ) )            runFlags |= RF_FORCE_WRITE;
     if( getValue<bool>( tree, "NOSWAP", false ) )               runFlags |= RF_NOSWAP;
     if( getValue<bool>( tree, "OLD_NS", false ) )               runFlags |= RF_OLD_NS;
-
+    if( getValue<bool>( tree, "SORT_MODES", false ) )           runFlags |= RF_SORT_MODES;
+    
     trace = tree.get<bool>( "TRACE", defaults.trace );
     
 /*    if( ( runFlags & RF_CALIBRATE ) && ( runFlags & RF_FLATFIELD ) ) {
@@ -691,6 +694,28 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     nInitialModes  = getValue( tree, "MODE_START", defaults.nInitialModes );
     nModeIncrement  = getValue( tree, "MODE_STEP", defaults.nModeIncrement );
     modeNumbers = getValue( tree, "MODES", defaults.modeNumbers );
+    
+    if( (runFlags&RF_SORT_MODES) && (modeBasis == KARHUNEN_LOEVE) ) {
+        const std::map<uint16_t, Zernike::KLPtr>& kle = Zernike::karhunenLoeveExpansion( klMinMode, klMaxMode );
+        vector<uint16_t> tmpM;
+        vector<Zernike::KLPtr> tmp;
+        for( auto kl: kle  ) tmp.push_back( kl.second );
+        std::sort( tmp.begin(), tmp.end(), [](const Zernike::KLPtr& a, const Zernike::KLPtr& b){
+            if( a->covariance == b->covariance ) return a->id < b->id;
+            return a->covariance > b->covariance;
+            
+        });
+        for( auto& i: modeNumbers  ) {
+            if( i<klMinMode || i >= tmp.size() ) continue;
+            if( i < klMinMode ) {                 // the KL-expansion does not include these
+                tmpM.push_back( i );
+            } else {
+                tmpM.push_back( tmp[i-klMinMode]->id );
+            }
+        }
+        std::swap( modeNumbers, tmpM );
+    }
+
     
     nModes = modeNumbers.size();
 
@@ -804,6 +829,8 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( diff & RF_NO_FILTER ) tree.put( "NO_FILTER", bool( runFlags & RF_NO_FILTER ) );
     if( diff & RF_FORCE_WRITE ) tree.put( "OVERWRITE", bool( runFlags & RF_FORCE_WRITE ) );
     if( diff & RF_NOSWAP ) tree.put( "NOSWAP", bool( runFlags & RF_NOSWAP ) );
+    if( diff & RF_OLD_NS ) tree.put( "OLD_NS", bool( runFlags & RF_OLD_NS ) );
+    if( diff & RF_SORT_MODES ) tree.put( "SORT_MODES", bool( runFlags & RF_SORT_MODES ) );
 
     if( trace != defaults.trace ) tree.put( "TRACE", trace );
     

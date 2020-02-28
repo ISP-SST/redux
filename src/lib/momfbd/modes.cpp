@@ -435,7 +435,7 @@ void ModeSet::getNorms( const redux::image::Pupil& pup ) {
                 }
             }
         }
-        norms[i] = sqrt( norm/pup.area );
+        norms[i] = sqrtl( norm/pup.area );
 
         if( i == tiltMode.x ) {
             shiftToAlpha.x = 2 * M_PI / (mx-mn); // * norms[i];     // A shift of 1 pixel corresponds to an introduced phase-shift across the pupil of 1 period.
