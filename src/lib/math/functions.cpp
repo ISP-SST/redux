@@ -6,6 +6,8 @@
 #include <complex>
 #include <vector>
 
+#include <boost/multiprecision/cpp_int.hpp>
+
 using namespace redux::math;
 using namespace redux;
 
@@ -375,13 +377,15 @@ void redux::math::faraday_voigt(double* vgt, double* far, double offset, double 
 }
 
 
-unsigned long redux::math::n_choose_k( int n, int k ) {
-
+uint64_t redux::math::n_choose_k( uint32_t n, uint32_t k ) {
+    
+    using boost::multiprecision::uint128_t;
+    
     if( k > n ) return 0;
     if( k == n ) return 1;
 
-    unsigned long temp = 1;
-    int imax, base;
+    uint128_t temp(1);
+    uint128_t imax, base;
     if( n < (k<<1) ) {
         imax = k + 1;
         base = n - k;
@@ -394,6 +398,6 @@ unsigned long redux::math::n_choose_k( int n, int k ) {
         temp /= i;
     }
 
-    return temp;
+    return static_cast<uint64_t>(temp);
 }
 

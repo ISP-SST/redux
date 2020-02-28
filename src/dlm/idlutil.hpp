@@ -138,6 +138,7 @@ namespace redux {
                     case IDL_TYP_BYTE: ret[0] = v->value.c; break;
                     case IDL_TYP_INT: ret[0] = v->value.i; break;
                     case IDL_TYP_LONG: ret[0] = v->value.l; break;
+                    case IDL_TYP_ULONG: ret[0] = v->value.ul; break;
                     case IDL_TYP_FLOAT: ret[0] = v->value.f; break;
                     case IDL_TYP_DOUBLE: ret[0] = v->value.d; break;
                     default: std::cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << std::endl;

@@ -497,6 +497,11 @@ void redux::copyFromIDL(const UCHAR* in, T* out, size_t nElements, UCHAR IDLtype
             std::copy(cin, cin+nElements, out);
             break;
         }
+        case( IDL_TYP_ULONG ): {
+            const IDL_ULONG* cin = reinterpret_cast<const IDL_ULONG*>( in );
+            std::copy(cin, cin+nElements, out);
+            break;
+        }
         case( IDL_TYP_FLOAT ): {
             const float* cin = reinterpret_cast<const float*>( in );
             std::copy(cin, cin+nElements, out);
@@ -513,7 +518,8 @@ void redux::copyFromIDL(const UCHAR* in, T* out, size_t nElements, UCHAR IDLtype
 }
 template void redux::copyFromIDL<UCHAR>(const UCHAR*, UCHAR*, size_t, UCHAR);
 template void redux::copyFromIDL<int16_t>(const UCHAR*, int16_t*, size_t, UCHAR);
-template void redux::copyFromIDL<int32_t>(const UCHAR*, int32_t*, size_t, UCHAR);
+template void redux::copyFromIDL<int>(const UCHAR*, int*, size_t, UCHAR);
+template void redux::copyFromIDL<unsigned int>(const UCHAR*, unsigned int*, size_t, UCHAR);
 template void redux::copyFromIDL<float>(const UCHAR*, float*, size_t, UCHAR);
 template void redux::copyFromIDL<double>(const UCHAR*, double*, size_t, UCHAR);
 

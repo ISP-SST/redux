@@ -190,7 +190,7 @@ namespace redux {
         //@}
 
 
-        /*!  @fn unsigned long n_choose_k( int n, int k )
+        /*!  @fn uint64_t n_choose_k( uint32_t n, uint32_t k )
          *   @brief     Calculate the binomial coefficient, i.e. the number of ways to select \c k out of \c n objects.
          *   @code
          *      #include "redux/math/functions.hpp"
@@ -200,7 +200,7 @@ namespace redux {
          *   @param k         Selection size
          *   @author          Tomas Hillberg <hillberg@astro.su.se>
          */
-        unsigned long n_choose_k( int n, int k );
+        uint64_t n_choose_k( uint32_t n, uint32_t k );
 
 
         /*! @} */

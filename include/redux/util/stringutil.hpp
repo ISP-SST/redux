@@ -415,8 +415,8 @@ namespace redux {
          *  foo = [-0.433, 0.881, -0.293, -0.433, -0.493, -0.729, -0.764, -0.175, 0.627]
          *  @endcode
          */
-        template <typename T, typename U>
-        inline std::string printArray( const std::map<T,U>& data, const std::string& name = "vector", int d = 3 ) {
+        template <typename T, typename U, typename V>
+        inline std::string printArray( const std::map<T,U,V>& data, const std::string& name = "vector", int d = 3 ) {
 
             std::ostringstream oss;
             oss << std::setprecision( d );
