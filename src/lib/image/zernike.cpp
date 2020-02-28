@@ -85,8 +85,8 @@ unsigned int Zernike::NMToNoll( const uint16_t ZernikeN, const int16_t ZernikeM 
     // TODO: proper calculation instead of retarded trial and error loop!
     // note: the line below does not return corret results:
     //    return (ZernikeN*(ZernikeN+2)+ZernikeM)/2;
-    
-    if( (ZernikeN-abs(ZernikeM))%2 ) return 0;
+    int delta = static_cast<int>(ZernikeN)-abs(ZernikeM);
+    if( delta%2 ) return 0;
     
     unsigned int j(0);
     uint16_t n(0);
