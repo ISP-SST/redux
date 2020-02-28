@@ -12,6 +12,7 @@
 #include "redux/file/fileana.hpp"
 #include "redux/file/filemomfbd.hpp"
 #include "redux/image/utils.hpp"
+#include "redux/image/zernike.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/cache.hpp"
@@ -886,9 +887,9 @@ void Object::initObject( void ){
         lock_guard<mutex> lock(ret->mtx );
         if( ret->empty( ) ){    // this set was inserted, so it is not generated yet.
             if(myJob.modeBasis == ZERNIKE ){
-                ret->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+                ret->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers, Zernike::NORMALIZE );
             } else {
-                ret->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+                ret->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff, Zernike::NORMALIZE );
             }
             if( ret->nDimensions( )!= 3 || ret->dimSize(1 )!= pupilPixels || ret->dimSize(2 )!= pupilPixels ){    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;

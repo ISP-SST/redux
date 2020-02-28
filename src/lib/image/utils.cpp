@@ -45,20 +45,6 @@ namespace {
     }
 
 
-    /*! For Zernike polynomials: convert Noll's sequential index to m,n form
-    * @note: does not return the sign for negative m values (odd j).
-    */
-    void noll_to_mn (int j, int& m, int& n) {
-        n = 0;
-        int len = 1;
-        for (int i = 1; len < j; ++i) {
-            len += (n = i) + 1;
-        }
-        int dl = n + 1 - len + j;
-        m = 2 * ( (dl + (n % 2)) / 2) + ! (n % 2) - 1;
-    }
-
-
     template <typename T>
     void maskConnected(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int yy, unsigned int xx, unsigned int y_start, unsigned int x_start, T threshold) {
         if (yy >= sizeY || xx >= sizeX) return;
@@ -135,105 +121,6 @@ double redux::image::makePupil( double** pupil, uint32_t pupilPixels, PointF cen
     return area;
 
 
-}
-
-
-void redux::image::makeZernike( double** modePtr, int modeNumber, uint32_t nPoints, double r_c, double angle ) {
-
-    redux::image::Pupil pupil( nPoints, r_c );
-
-    int m, n;
-    noll_to_mn (modeNumber, m, n);
-    float midPlusHalf = nPoints/2.0 + 0.5;
-    const vector<double>& coeff = Zernike::radialPolynomial (m, n);
-    const shared_ptr<Grid> grid = Grid::get( nPoints, midPlusHalf, midPlusHalf );
-    auto dist2D = grid->dist2D();
-    auto angle2D = grid->angle2D();
-    float** distPtr = dist2D.get();      // distance(i,j) is the distance from the centre of the pupil, to the center of pixel (i,j)
-    float** aPtr = angle2D.get();
-    
-    memset (*modePtr, 0, nPoints * nPoints * sizeof (double));
-
-    double** pupPtr = makePointers(pupil.ptr(), nPoints, nPoints);
-
-    shared_ptr<double> r = rdx_get_shared<double>(nPoints*nPoints);    // normalized distance ^{some order}
-    shared_ptr<double> r2 = rdx_get_shared<double>(nPoints*nPoints);   // normalized distance squared
-    auto r2D = reshapeArray( r.get(), nPoints, nPoints );
-    auto r22D = reshapeArray( r2.get(), nPoints, nPoints );
-    double** rPtr = r2D.get();
-    double** r2Ptr = r22D.get();
-    double normalization (0);
-
-    for (unsigned int y = 0; y < nPoints; ++y) {
-        for (unsigned int x = 0; x < nPoints; ++x) {
-            //if(pupPtr[y][x]>0) {
-            double tmp = distPtr[y][x] / r_c;                       // normalize radial distance
-            //if(tmp>1) continue;
-            r2Ptr[y][x] = tmp * tmp;
-            if (m == 0) rPtr[y][x] = 1;
-            else if (m == 1) rPtr[y][x] = tmp;
-            else rPtr[y][x] = pow (tmp, m);                         // lowest order term ~ r^{m}
-            modePtr[y][x] = rPtr[y][x] * coeff[0];                  // add lowest order to mode
-            //}
-        }
-    }
-
-    // generate polynomial part
-    for (auto it = coeff.begin() + 1; it != coeff.end(); it++) {
-        for (unsigned int y = 0; y < nPoints; ++y) {
-            for (unsigned int x = 0; x < nPoints; ++x) {
-                //if(pupPtr[y][x]>0) {
-                rPtr[y][x] *= r2Ptr[y][x];                          //  next term ~ r^{m+2}
-                modePtr[y][x] += rPtr[y][x] * *it;
-                //}
-            }
-        }
-    }
-
-    // Angular component
-    if (m == 0) {
-        double sf = sqrt (n + 1);
-        for (unsigned int y = 0; y < nPoints; ++y) {
-            for (unsigned int x = 0; x < nPoints; ++x) {
-                modePtr[y][x] *= sf; // * pupPtr[y][x];
-                if (pupPtr[y][x] > 0) {
-                    normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
-                }
-            }
-        }
-    } else if (modeNumber % 2) {
-        double sf = sqrt ( (double) 2 * (n + 1));
-        for (unsigned int y = 0; y < nPoints; ++y) {
-            for (unsigned int x = 0; x < nPoints; ++x) {
-                modePtr[y][x] *= sf * sin (m * (aPtr[y][x] - angle)); //* pupPtr[y][x]
-                if (pupPtr[y][x] > 0) {
-                    normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
-                }
-            }
-        }
-    } else {
-        double sf = sqrt ( (double) 2 * (n + 1));
-        for (unsigned int y = 0; y < nPoints; ++y) {
-            for (unsigned int x = 0; x < nPoints; ++x) {
-                modePtr[y][x] *= sf * cos (m * (aPtr[y][x] - angle)); //* pupPtr[y][x]
-                if (pupPtr[y][x] > 0) {
-                    normalization +=  modePtr[y][x] * modePtr[y][x] * pupPtr[y][x];
-                }
-            }
-        }
-    }
-
-    // normalize
-    normalization = sqrt(pupil.area/normalization);
-    for (unsigned int y = 0; y < nPoints; ++y) {
-        for (unsigned int x = 0; x < nPoints; ++x) {
-            //if(pupPtr[y][x]>0) {
-            modePtr[y][x] *= normalization;
-            //}
-        }
-    }
-
-    delPointers (pupPtr);
 
 }
 

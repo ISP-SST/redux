@@ -16,6 +16,7 @@
 #include "redux/image/fouriertransform.hpp"
 #include "redux/image/descatter.hpp"
 #include "redux/image/utils.hpp"
+#include "redux/image/zernike.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/translators.hpp"
 #include "redux/util/stringutil.hpp"
@@ -469,9 +470,9 @@ void Channel::initChannel (void) {
         unique_lock<mutex> lock(ret->mtx);
         if( ret->empty() ) {    // this set was inserted, so it is not generated yet.
             if(diversityTypes[i] == ZERNIKE) {
-                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes );
+                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes, Zernike::NORMALIZE );
             } else {
-                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff );
+                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff, Zernike::NORMALIZE );
             }
             if( ret->nDimensions() != 3 || ret->dimSize(1) != myObject.pupilPixels || ret->dimSize(2) != myObject.pupilPixels ) {    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
@@ -853,9 +854,9 @@ void Channel::initPhiFixed(void) {
 
         if( ms->empty() ) {    // generate
             if( diversityTypes[i] == ZERNIKE ) {
-                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers );
+                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers, Zernike::NORMALIZE );
             } else {
-                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff );
+                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff, Zernike::NORMALIZE );
             }
             if( ms->nDimensions() != 3 || ms->dimSize(1) != myObject.pupilPixels || ms->dimSize(2) != myObject.pupilPixels ) {    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;

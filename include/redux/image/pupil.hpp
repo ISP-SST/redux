@@ -55,6 +55,8 @@ namespace redux {
             void normalize( void );                                             //!< Scale pupil to the interval [0,1]
             void dump( std::string tag="pupil" ) const;
             
+            static Pupil& fetch( uint16_t pupilPixels, double pupilRadius, double coRadius=0.0 );
+            
             Pupil& operator=( const Pupil& rhs );
             bool operator<(const Pupil& rhs) const;                             //!< So that the Pupil-struct can be stored in comparative containers (set/map)
 

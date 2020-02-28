@@ -89,18 +89,3 @@ void Grid::clear(void) {
     Cache::clear<ID,shared_ptr<Grid>>();
     
 }
-
-/*
-double Zernike::covariance( int32_t i, int32_t j ) {
-    
-    if(i > j) std::swap(i, j);      // it's symmetric, so only store 1
-    
-    double& cov = Cache::get<PairID,double>( PairID(i,j), std::numeric_limits<double>::infinity() );
-    unique_lock<mutex> lock(get().mtx);
-    if( ! isfinite(cov) ) { // not calulated yet
-        cov = calcZernikeCovariance(i, j);
-    }
-    return cov;
-
-}
-*/

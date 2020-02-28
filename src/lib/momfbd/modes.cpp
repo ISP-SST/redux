@@ -118,7 +118,7 @@ ModeInfo::operator string() const {
         ret += "KL";
     }
     if( !modeNumbers.empty() ) {
-        ret += printArray( modeNumbers, "" );
+        ret += "["+uIntsToString( modeNumbers )+"]";
     } else  {
         ret += "("+ to_string(modeNumber) + ")";
     }
@@ -129,39 +129,38 @@ ModeInfo::operator string() const {
 }
 
 
-PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double angle) :
+PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double angle, int flags ) :
     Array<double> (nPoints, nPoints), atm_rms(0)  {      // Zernike
 
-    if(modeNumber == 1) {
-        Array<double>::operator=(1.0);
+    if( modeNumber < 2 ) {
+        Array<double>::operator=(modeNumber);
     } else {
-        double** modePtr = makePointers(get(), nPoints, nPoints);
-        makeZernike(modePtr,modeNumber,nPoints,r_c,angle);   //FIXME: using MvN's Zernike-generator for comparisons
-        //makeZernike_mvn(modePtr,modeNumber,nPoints,r_c,angle);
-        delPointers(modePtr);
+        Zernike::getZernike( get(), nPoints, r_c, angle, modeNumber, flags );
     }
 
-    atm_rms = sqrt(Zernike::covariance(modeNumber,modeNumber));
+    atm_rms = sqrt(Zernike::getCovariance (modeNumber,modeNumber));
 
 
 }
 
 
-PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c, double angle, double cutoff) :
+PupilMode::PupilMode(uint16_t firstZernike, uint16_t lastZernike, uint16_t klModeNumber,
+                     uint16_t nPoints, double r_c, double angle, double cutoff, int flags ) :
      Array<double> (nPoints, nPoints), atm_rms(0) {
 
-    if(firstMode > lastMode) swap(firstMode, lastMode);
+    if( firstZernike > lastZernike ) swap( firstZernike, lastZernike );
 
-    if(klModeNumber < firstMode || klModeNumber > lastMode) {
+    if(klModeNumber < firstZernike || klModeNumber > lastZernike ) {
         throw invalid_argument("klModeNumber (" + to_string(klModeNumber) +
-                               ") is not in the range [ firstMode (" + to_string(firstMode) +
-                               "), lastMode (" + to_string(lastMode) + ")]");
+                               ") is not in the range [ firstMode (" + to_string( firstZernike ) +
+                               "), lastMode (" + to_string( lastZernike ) + ")]");
     }
 
     zero();
-        
-    const Zernike::KLPtr& kle = Zernike::karhunenLoeveExpansion(firstMode, lastMode).at(klModeNumber);
     
+        
+    const Zernike::KLPtr& kle = Zernike::karhunenLoeveExpansion( firstZernike, lastZernike ).at(klModeNumber);
+
     ModeInfo z_info(0, 0, 0, nPoints, r_c, angle, cutoff);
     for(auto & weight : kle->zernikeWeights) {
         double c = weight.second;
@@ -169,7 +168,7 @@ PupilMode::PupilMode(uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumbe
             z_info.modeNumber = weight.first;
             auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( z_info, PupilMode::Ptr() );
             if( !mode ) {
-                mode.reset( new PupilMode( weight.first, nPoints, r_c, angle ) );    // generate Zernike
+                mode.reset( new PupilMode( weight.first, nPoints, r_c, angle, flags ) );    // generate Zernike
             }
             this->add(*mode, c);
         }
@@ -290,7 +289,7 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
 }
 
 
-void ModeSet::generate( uint16_t pixels, double radius, double angle, const vector<uint16_t>& modes ) {
+void ModeSet::generate( uint16_t pixels, double radius, double angle, const vector<uint16_t>& modes, int flags ) {
     
     resize();   // clear
     modeNumbers.clear();
@@ -307,8 +306,11 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
     resize( modes.size(), pixels, pixels );
     
     Array<double> view( reinterpret_cast<const redux::util::Array<double>&>(*this), 0, 0, 0, pixels-1, 0, pixels-1 );
-    
+    set<Point16> forced;
+    uint16_t n;
+    int16_t m;
     for( auto& it : modes ) {
+        int tmp_flags = flags;
         ModeInfo minfo = base_info;
         if ( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
             minfo.firstMode = minfo.lastMode = 0;
@@ -316,9 +318,16 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
             else tiltMode.y = modeNumbers.size();
         }
         minfo.modeNumber = it;
+        Zernike::NollToNM( it, n, m );
+        Point16 nm(n,abs(m));
+        if( forced.count(nm) ) {  // already forced.
+            tmp_flags &= ~Zernike::FORCE;
+        } else {
+            forced.insert(nm);
+        }
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( minfo );
-        if( !mode ) {
-            mode.reset( new PupilMode( it, pixels, radius, angle ) );    // Zernike
+        if( !mode || (tmp_flags&Zernike::FORCE) ) {
+            mode.reset( new PupilMode( it, pixels, radius, angle, tmp_flags ) );    // Zernike
         }
 
         view.assign( reinterpret_cast<const redux::util::Array<double>&>(*mode) );
@@ -331,7 +340,7 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const vect
 }
 
 
-void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t firstZernike, uint16_t lastZernike, const vector<uint16_t>& modes, double cutoff ) {
+void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t firstZernike, uint16_t lastZernike, const vector<uint16_t>& modes, double cutoff, int flags ) {
     
     resize();       // clear
     modeNumbers.clear();
@@ -358,11 +367,11 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         }
         info.modeNumber = it;
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
-        if( !mode ) {
+        if( !mode || (flags&Zernike::FORCE) ) {
             if( it == 2 || it == 3 ) {     // force use of Zernike modes for all tilts
-                mode.reset( new PupilMode( it, pixels, radius, angle ) );    // Zernike
+                mode.reset( new PupilMode( it, pixels, radius, angle, flags ) );    // Zernike
             } else {
-                mode.reset( new PupilMode( firstZernike, lastZernike, it, pixels, radius, angle, cutoff ) );    // K-L
+                mode.reset( new PupilMode( firstZernike, lastZernike, it, pixels, radius, angle, cutoff, flags ) );    // K-L
             }
         }
 
@@ -385,22 +394,27 @@ void ModeSet::getNorms( const redux::image::Pupil& pup ) {
     norms.resize(modePointers.size());
     for ( uint16_t i=0; i<modePointers.size(); ++i ) {
         double* ptr = modePointers[i];
-        if(!ptr) continue;
+        if( !ptr ) continue;
         double norm(0);
-        double mx(ptr[0]);
-        double mn(ptr[0]);
+        double mx = std::numeric_limits<double>::min();
+        double mn = std::numeric_limits<double>::max();
+        bool isTilt = (i == tiltMode.x) || (i == tiltMode.y);
         for( size_t ind=0; ind<nPixels; ++ind) {
-            double tmp = ptr[ind];
-            if( pupPtr[ind] > 0 ) norm += tmp*tmp*pupPtr[ind];
-            mx = std::max(mx,tmp);
-            mn = std::min(mn,tmp);
+            if( pupPtr[ind] > 0 ) {
+                double tmp = ptr[ind]*pupPtr[ind];
+                norm += tmp*ptr[ind];               // i.e. = mode² * pupil
+                if( isTilt ) {
+                    mx = std::max( mx,tmp );
+                    mn = std::min( mn,tmp );
+                }
+            }
         }
-        norms[i] = sqrt(norm/pup.area);
-        norm = sqrt(pup.area/norm);
+        norms[i] = sqrt( norm/pup.area );
+
         if( i == tiltMode.x ) {
-            shiftToAlpha.x = 2 * M_PI / (mx-mn); // / norm;     // A shift of 1 pixel corresponds to an introduced phase-shift across the pupil of 1 period.
-        } else if (i == tiltMode.y) {
-            shiftToAlpha.y = 2 * M_PI / (mx-mn); // / norm;
+            shiftToAlpha.x = 2 * M_PI / (mx-mn); // * norms[i];     // A shift of 1 pixel corresponds to an introduced phase-shift across the pupil of 1 period.
+        } else if ( i == tiltMode.y ) {
+            shiftToAlpha.y = 2 * M_PI / (mx-mn); // * norms[i];
         }
 
     }

@@ -32,16 +32,6 @@ namespace redux {
             return makePupil( pupil, pupilPixels, cent, outerRadius, innerRadius );
         }
 
-        void makeZernike( double** mode, int j, uint32_t nPoints, double radius, double angle=0 );
-
-        template <typename T>
-        void makeZernike( util::Array<T>& mode, int j, uint32_t nPoints, double radius, double angle=0) {
-            mode.resize(nPoints,nPoints);
-            T **ptr = redux::util::makePointers(mode.get(),nPoints,nPoints);
-            makeZernike(ptr,nPoints,radius,angle); // FIXME: temporarily using MvN Z-maker for easier debugging.
-            redux::util::delPointers(ptr);
-        }
-
         
         template <typename T>
         redux::util::Array<T> fitPlane( const redux::util::Array<T>& in, bool subtract_mean=false, double* coeffs=nullptr );

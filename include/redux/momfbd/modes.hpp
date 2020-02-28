@@ -47,8 +47,8 @@ namespace redux {
             typedef std::shared_ptr<KL> KLPtr;
 
             PupilMode() : atm_rms(0) {};
-            PupilMode ( uint16_t modeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0 ); // Zernike
-            PupilMode ( uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0, double cutoff=0.0 ); // KL
+            PupilMode ( uint16_t modeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0, int flags=0 ); // Zernike
+            PupilMode ( uint16_t firstMode, uint16_t lastMode, uint16_t klModeNumber, uint16_t nPoints, double r_c = 1.0, double angle = 0.0, double cutoff=0.0, int flags=0 ); // KL
 
             double atm_rms;                         //!< = sqrt(covariance), used in metric computations.
 
@@ -69,9 +69,11 @@ namespace redux {
             ModeSet clone( void ) const;
             
             bool load( const std::string& filename, uint16_t pixels );
-            void generate( uint16_t pixels, double radius, double angle, const std::vector<uint16_t>& modes );  // Zernike
-            void generate( uint16_t pixels, double radius, double angle, uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modes, double cutoff ); // Karhunen-Loeve
-            void getNorms(const redux::image::Pupil&);         //!< Normalize modes so that sum(|mode*pupil|) = pupilArea
+            void generate( uint16_t pixels, double radius, double angle, const std::vector<uint16_t>& modes, int flags );  // Zernike
+            void generate( uint16_t pixels, double radius, double angle, uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modes, double cutoff, int flags ); // Karhunen-Loeve
+            
+            void getNorms(const redux::image::Pupil&);         //!< Calculate the normalization factors so that sum(|mode*pupil|) = pupilArea
+            void getNorms( void ) { getNorms( redux::image::Pupil::fetch( info.nPupilPixels, info.pupilRadius ) ); };
             
             void setPupilSize( uint16_t nPixels, double radiusInPixels, double rotation );
             

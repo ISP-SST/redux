@@ -4,6 +4,7 @@
 #include "redux/constants.hpp"
 #include "redux/momfbd/modes.hpp"
 #include "redux/image/utils.hpp"
+#include "redux/image/zernike.hpp"
 #include "redux/util/cache.hpp"
 
 using namespace redux::image;
@@ -228,6 +229,9 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     if( kw.zernike ) {
         kw.firstZernike = kw.lastZernike = 0;
     }
+    
+    int flags(Zernike::GET_RADIAL|Zernike::GET_ANGULAR);
+
     Pupil pupil;
     if( kw.pupil || kw.normalize ) {  // undefined has type=0
         PupilInfo pi(nPixels, radius);
@@ -239,6 +243,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     
     ModeInfo mi(kw.firstZernike, kw.lastZernike, modeNumbers, nPixels, radius, kw.angle, kw.cutoff);
     if( kw.verbose ) {
+        flags |= Zernike::VERBOSE;
         string msg = "Generating modes: " + (string)mi+ ".";
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
@@ -247,10 +252,10 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     if( ! modesRef ) modesRef.reset(new ModeSet());
     if( modesRef->empty() ) {
         if( kw.firstZernike && kw.lastZernike ) {
-            modesRef->generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff );
+            modesRef->generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff, flags );
         } else {    // first=last=0  =>  Zernike
             kw.firstZernike = kw.lastZernike = 0;   // in case only one was 0.
-            modesRef->generate( nPixels, radius, kw.angle, modeNumbers );
+            modesRef->generate( nPixels, radius, kw.angle, modeNumbers, flags );
         }
     }
     

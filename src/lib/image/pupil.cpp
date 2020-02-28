@@ -316,6 +316,19 @@ void Pupil::dump( string tag ) const {
 }
 
 
+Pupil& Pupil::fetch( uint16_t pupilPixels, double pupilRadius, double coRadius ) {
+    
+    PupilInfo pi( pupilPixels, pupilRadius, coRadius );
+    Pupil& pupil = redux::util::Cache::get<PupilInfo,Pupil>(pi);
+    if( pupil.empty() ) {    // pupil does not exist in the cache, so it has to be generated
+        pupil.generate( pupilPixels, pupilRadius, coRadius );
+    }
+    
+    return pupil;
+    
+}
+
+
 Pupil& Pupil::operator=( const Pupil& rhs ) {
     redux::util::Array<double>::operator=( reinterpret_cast<const redux::util::Array<double>&>(rhs) );
     nPixels = rhs.nPixels;
