@@ -346,7 +346,7 @@ long double Zernike::RadialPolynomial::eval( long double r ) {
                 sum *= rr2*p.second;
                 sum += 1;
             }
-            if( m ) sum *= poly[m]*pow( rr, m );
+            if( poly.count(m) ) sum *= poly[m]*pow( rr, m );
         } else {
             for( auto& p: poly ) {
                 mp_float tmp = pow( rr, p.first );
