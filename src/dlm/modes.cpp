@@ -216,7 +216,11 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
             IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
         }
     } else {
-        modeNumbers.push_back( IDL_LongScalar(index) );
+        if( index->type == IDL_TYP_STRING ) {
+            modeNumbers = stringToUInts<uint16_t>( IDL_VarGetString(index) );
+        } else {
+            modeNumbers.push_back( IDL_LongScalar(index) );
+        }
     }
     
     IDL_LONG nPixels = IDL_LongScalar(argv[1]);
@@ -263,28 +267,35 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     if( kw.normalize ) {
         modes.getNorms( pupil );
         modes.normalize( 1.0 );
-        // TODO: do the actual normalization of the local copy of the modes below
-        string msg = "Normalizing not fully implemented/tested yet.";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
     }
-        
-    IDL_MEMINT dims[] = { (int)modes.dimSize(2), (int)modes.dimSize(1), (int)modes.dimSize(0) };
+    
+    vector<IDL_LONG64> dimss;
+    std::copy( modes.dimensions().begin(), modes.dimensions().end(), back_inserter(dimss) );
+    std::reverse( dimss.begin(), dimss.end() );
+    if( *(dimss.rbegin()) == 1 ) dimss.pop_back();      // trivial dimensions should be removed in the cloning step, so this should not be needed.
+    
+    int nDims = dimss.size();
+    IDL_MEMINT nModes = 1;
+    if( nDims == 3 ) {
+        nModes = dimss[2];
+    }
     if( kw.variance ) {
         IDL_VPTR tmpVar;
-        float* tmpData = (float*)IDL_MakeTempArray(IDL_TYP_FLOAT,1,dims+2,IDL_ARR_INI_NOP,&tmpVar);
-        for( int i=0; i<dims[2]; ++i ) tmpData[i] = modes.atm_rms[i]*modes.atm_rms[i];
+        double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 1, &nModes, IDL_ARR_INI_NOP, &tmpVar );
+        for( int i=0; i<nModes; ++i ) tmpData[i] = modes.atm_rms[i]*modes.atm_rms[i];
         IDL_VarCopy( tmpVar, kw.variance );
     }
     
     if( kw.pupil ) {
         IDL_VPTR tmpPup; // = IDL_Gettmp();
-        float* tmpData =(float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_NOP, &tmpPup );
-        pupil.copyTo<float>(tmpData);
+        double* tmpData =(double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dimss.data(), IDL_ARR_INI_NOP, &tmpPup );
+        pupil.copyTo<double>(tmpData);
         IDL_VarCopy( tmpPup, kw.pupil );
     }
+
     
-    float* tmpData = (float*)IDL_MakeTempArray(IDL_TYP_FLOAT,3,dims,IDL_ARR_INI_NOP,&tmp);
-    modes.copyTo<float>(tmpData);
+    double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, nDims, dimss.data(), IDL_ARR_INI_NOP, &tmp );
+    modes.copyTo<double>(tmpData);
     
     return tmp;
 

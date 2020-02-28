@@ -255,10 +255,16 @@ ModeSet ModeSet::clone( void ) const {
 
     ModeSet tmp(*this);
     copy( reinterpret_cast<redux::util::Array<double>&>(tmp) );
+
     tmp.modePointers.clear();
-    for(unsigned int i=0; i<tmp.dimSize(0); ++i) {
-        tmp.modePointers.push_back( tmp.ptr(i,0,0) );
+    if( tmp.nDimensions() == 2 ) {
+        tmp.modePointers.push_back( tmp.ptr(0,0) );
+    } else {
+        for(unsigned int i=0; i<tmp.dimSize(0); ++i) {
+            tmp.modePointers.push_back( tmp.ptr(i,0,0) );
+        }
     }
+
     return tmp;
     
 }
