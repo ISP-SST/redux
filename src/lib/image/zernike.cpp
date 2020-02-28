@@ -167,7 +167,7 @@ shared_ptr<double> Zernike::getRadial( unsigned int nPixels, float radius, uint1
         float midPlusHalf = nPixels/2.0 + 0.5;
         const shared_ptr<Grid> grid = Grid::get( nPixels, midPlusHalf, midPlusHalf );
 
-        float* distPtr = grid->distance.get();
+        double* distPtr = grid->distance.get();
         shared_ptr<long double> r = rdx_get_shared<long double>( blockSize );
         shared_ptr<long double> r2 = rdx_get_shared<long double>( blockSize );
         shared_ptr<long double> tmpPoly = rdx_get_shared<long double>( blockSize );
@@ -217,7 +217,7 @@ shared_ptr<double> Zernike::getAngular( unsigned int nPixels, float angle, int16
         double* angPtr = ang.get();
         float midPlusHalf = nPixels/2.0 + 0.5;
         const shared_ptr<Grid> grid = Grid::get( nPixels, midPlusHalf, midPlusHalf );
-        float* aPtr = grid->angle.get();
+        double* aPtr = grid->angle.get();
         if( m < 0 ) {
             m = abs(m);
             std::transform( aPtr, aPtr+blockSize, angPtr, [&](const double& a){ return sinl(m*(a-angle)); });

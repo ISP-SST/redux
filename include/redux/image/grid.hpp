@@ -29,12 +29,12 @@ namespace redux {
                 redux::util::PointF origin;
                 bool operator<( const ID& rhs ) const;
             } id;
-            std::shared_ptr<float> distance;
-            std::shared_ptr<float> angle;
+            std::shared_ptr<double> distance;
+            std::shared_ptr<double> angle;
             Grid(void) : id(0) { };
             void init(void);
-            std::shared_ptr<float*> dist2D(void) { return redux::util::reshapeArray( distance.get(), id.size.y, id.size.x ); }
-            std::shared_ptr<float*> angle2D(void) { return redux::util::reshapeArray( angle.get(), id.size.y, id.size.x ); }
+            std::shared_ptr<double*> dist2D(void) { return redux::util::reshapeArray( distance.get(), id.size.y, id.size.x ); }
+            std::shared_ptr<double*> angle2D(void) { return redux::util::reshapeArray( angle.get(), id.size.y, id.size.x ); }
             bool operator<( const Grid& rhs ) const { return ( id < rhs.id ); }
             static std::shared_ptr<Grid> get(const ID&);
             static std::shared_ptr<Grid> get(uint32_t n) { return get( ID(n) ); };

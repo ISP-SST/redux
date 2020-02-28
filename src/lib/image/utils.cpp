@@ -23,6 +23,7 @@
 #ifdef RDX_WITH_OPENCV
 //#       include <opencv2/photo/photo.hpp>
 #endif
+
 using namespace redux::image;
 //using namespace redux::momfbd;
 using namespace redux::util;
@@ -67,7 +68,7 @@ static __inline T sqr (T x) {
 
 double redux::image::makePupil( double** pupil, uint32_t pupilPixels, PointF center, double outerRadius, double innerRadius ) {
 
-    double area = 0.0;
+    long double area = 0.0;
     size_t pupilPixels2 = pupilPixels * pupilPixels;
     memset( *pupil, 0, pupilPixels2 *sizeof(double) );
 
@@ -78,25 +79,25 @@ double redux::image::makePupil( double** pupil, uint32_t pupilPixels, PointF cen
     
     auto dist2D = grid.dist2D();
     auto angle2D = grid.angle2D();
-    float** distPtr = dist2D.get();      // distance(i,j) is the distance from the centre of the pupil, to the center of pixel (i,j)
-    float** anglePtr = angle2D.get();
+    double** distPtr = dist2D.get();      // distance(i,j) is the distance from the centre of the pupil, to the center of pixel (i,j)
+    double** anglePtr = angle2D.get();
     bool hasInner = (innerRadius > 0.0);
 
     for( unsigned int x=0; x< pupilPixels; ++x ) {
         for( unsigned int y=0; y< pupilPixels; ++y ) {
-            const double D = distPtr[y][x];
-            const double absangle = abs(anglePtr[y][x]);
-            double d;
+            const long double D = distPtr[y][x];
+            const long double absangle = fabs(anglePtr[y][x]);
+            long double d;
             if( absangle > M_PI/4 && absangle < 3*M_PI/4 ) {
-                d = abs(1/sin(absangle));
+                d = fabsl(1.0/sinl(absangle));
             } else {
-                d = abs(1/cos(absangle));
+                d = fabsl(1.0/cosl(absangle));
             }
-            double dir = (D-innerRadius);
+            long double dir = (D-innerRadius);
             if( hasInner && (dir < -d) ) {                  // Entire pixel inside innerRadius
                 continue;
             }
-            double dor = (D-outerRadius);
+            long double dor = (D-outerRadius);
             if( dor > d ) {                                 // Entire pixel outside outerRadius
                 continue;
             }
@@ -105,21 +106,20 @@ double redux::image::makePupil( double** pupil, uint32_t pupilPixels, PointF cen
                 area += 1;
                 continue;
             }
-            double R = dor;
+            long double R = dor;
             d *= 2;
             if( hasInner && (dor < -d) ) {    
                 R = dir;
                 d = -d;
             }
-            double val = 0.5 - R/d;
+            long double val = 0.5 - R/d;
             pupil[y][x] = val;
             area += val;
 
         }
     }
     
-    return area;
-
+    return static_cast<double>(area);
 
 
 }

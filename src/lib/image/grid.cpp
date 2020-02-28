@@ -44,22 +44,22 @@ bool Grid::ID::operator<( const Grid::ID& rhs ) const {
 
 void Grid::init (void) {
 
-    distance = rdx_get_shared<float>( id.size.y*id.size.x );
-    angle = rdx_get_shared<float>( id.size.y*id.size.x );
+    distance = rdx_get_shared<double>( id.size.y*id.size.x );
+    angle = rdx_get_shared<double>( id.size.y*id.size.x );
     auto d2D = dist2D();
     auto a2D = angle2D();
-    float** distPtr = d2D.get();
-    float** anglePtr = a2D.get();
+    double** distPtr = d2D.get();
+    double** anglePtr = a2D.get();
     PointF shiftedOrigin = id.origin - 0.5;                // (0,0) means cetered in the lower left corner, (0.5,0.5) means on the first pixel
     for (unsigned int y = 0; y < id.size.y; ++y) {
-        double yDist = y - shiftedOrigin.y;
-        double y2 = yDist*yDist;
+        long double yDist = y - shiftedOrigin.y;
+        long double y2 = yDist*yDist;
         for (unsigned int x = 0; x < id.size.x; ++x) {
-            double xDist = x - shiftedOrigin.x;
+            long double xDist = x - shiftedOrigin.x;
             if (yDist || xDist) {
-                double x2 = xDist*xDist;
-                distPtr[y][x] = sqrt (y2 + x2);
-                anglePtr[y][x] = atan2 (yDist, xDist);      // note: slow index is Y, fast is X
+                long double x2 = xDist*xDist;
+                distPtr[y][x] = sqrtl( y2 + x2 );
+                anglePtr[y][x] = atan2l( yDist, xDist );      // note: slow index is Y, fast is X
             } else distPtr[y][x] = anglePtr[y][x] = 0;      // this pixel is at the origin -> set the angle to 0.
         }
     }

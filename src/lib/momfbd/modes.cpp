@@ -202,8 +202,8 @@ uint64_t ModeSet::size( void ) const {
     uint64_t sz = Array<double>::size();
     sz += info.size() + tiltMode.size() + shiftToAlpha.size();
     sz += modeNumbers.size()*sizeof(uint16_t) + sizeof(uint64_t);
-    sz += atm_rms.size()*sizeof(float) + sizeof(uint64_t);
-    sz += norms.size()*sizeof(float) + sizeof(uint64_t);
+    sz += atm_rms.size()*sizeof(double) + sizeof(uint64_t);
+    sz += norms.size()*sizeof(double) + sizeof(uint64_t);
     return sz;
 }
 

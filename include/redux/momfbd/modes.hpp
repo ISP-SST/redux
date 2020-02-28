@@ -86,8 +86,8 @@ namespace redux {
             
             std::vector<uint16_t> modeNumbers;
             std::vector<double*> modePointers;
-            std::vector<float> atm_rms;
-            std::vector<float> norms;                       //!< (square of) L_{2,2} norms for the modes over the pupil
+            std::vector<double> atm_rms;
+            std::vector<double> norms;                      //!< (square of) L_{2,2} norms for the modes over the pupil
             std::mutex mtx;
 
             
