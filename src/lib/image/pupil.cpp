@@ -219,8 +219,9 @@ void Pupil::generate( uint16_t pixels, double pupilRadius, double coRadius ) {
     resize( nPixels, nPixels );
     auto ptr = reshape( nPixels, nPixels );        // returns a 2D shared_ptr
     area = makePupil( ptr.get(), nPixels, radius, co_radius );
-    
+
     normalize();
+
     generateSupport(1E-9);                         // TODO: tweak or make into a config parameter?
     
 }
@@ -272,10 +273,10 @@ void Pupil::normalize( void ) {
     }
 
     // FIXME:  decide better normalization scheme to allow max values < 1 and min values > 0 (i.e. realistic transmission of an aperture)
-    *this -= stats.min;
     if( stats.min == stats.max ) {
         //cerr << "The pupil is a constant value.\n";
     } else {
+        *this -= stats.min;
         *this *= 1.0/(stats.max-stats.min);
     }
     
