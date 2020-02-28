@@ -173,7 +173,22 @@ PupilMode::PupilMode(uint16_t firstZernike, uint16_t lastZernike, uint16_t klMod
             this->add(*mode, c);
         }
     }
+    
+    if( flags&Zernike::NORMALIZE ) {     // numerical normalization
+        size_t blockSize = nPoints*nPoints;
+        long double normalization(0.0);
+        redux::image::Pupil pupil = Pupil::fetch( nPoints, r_c );
+        double* pupPtr = pupil.ptr();
+        double* mPtr = ptr();
+        for( size_t i(0); i<blockSize; ++i ) {
+            if( pupPtr[i] > 0 ) {
+                normalization += mPtr[i]*mPtr[i]*pupPtr[i];
+            }
+        }
+        normalization = sqrtl( pupil.area/normalization );
+        std::transform( mPtr, mPtr+blockSize, mPtr, std::bind(std::multiplies<long double>(), std::placeholders::_1, normalization));
 
+    }
     atm_rms = sqrt(kle->covariance);
 
 }
