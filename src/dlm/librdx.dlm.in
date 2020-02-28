@@ -22,6 +22,8 @@ FUNCTION        RDX_FIND_SHIFT    2       2          KEYWORDS
 FUNCTION        RDX_INTS2STR      1       1          KEYWORDS
 FUNCTION        RDX_LOADFILES     1       1          KEYWORDS
 FUNCTION        RDX_MAKE_MASK     0       1          KEYWORDS
+FUNCTION        RDX_MN_TO_NOLL    1       1          KEYWORDS
+FUNCTION        RDX_NOLL_TO_MN    1       1          KEYWORDS
 FUNCTION        RDX_MAKE_MODES    3       3          KEYWORDS
 FUNCTION        RDX_MAKE_PUPIL    2       3          KEYWORDS
 FUNCTION        RDX_MAKE_TEMPLATE 1       1          KEYWORDS

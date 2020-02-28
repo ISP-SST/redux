@@ -7,6 +7,8 @@
 #include "redux/image/zernike.hpp"
 #include "redux/util/cache.hpp"
 
+#include <numeric>      // std::accumulate
+
 using namespace redux::image;
 using namespace redux::momfbd;
 using namespace redux::util;
@@ -129,6 +131,10 @@ namespace {
         IDL_INT firstZernike;
         IDL_INT lastZernike;
         IDL_INT normalize;
+        IDL_INT force;
+        IDL_INT angular;
+        IDL_INT old;
+        IDL_INT radial;
         float angle;
         float cutoff;
         IDL_VPTR pupil;
@@ -142,14 +148,18 @@ namespace {
     static IDL_KW_PAR mode_kw_pars[] = {
         IDL_KW_FAST_SCAN,
         { (char*) "ANGLE",     IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,angle) },
-        { (char*) "CUTOFF",    IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,cutoff) },
+        { (char*) "ANGULAR",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,angular) },
+        { (char*) "CUTOFF",    IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,cutoff) },
         { (char*) "FIRST",     IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,firstZernike) },
+        { (char*) "FORCE",     IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,force) },
         { (char*) "HELP",      IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,help) },
         { (char*) "LAST",      IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,lastZernike) },
         { (char*) "NORMALIZE", IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,normalize) },
+        { (char*) "OLD",       IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,old) },
         { (char*) "PUPIL",     IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,pupil) },
+        { (char*) "RADIAL",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,radial) },
         { (char*) "VARIANCE",  IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(MODE_KW,variance) },
-        { (char*) "VERBOSE",   IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(MODE_KW,verbose) },
+        { (char*) "VERBOSE",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,verbose) },
         { (char*) "ZERNIKE",   IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(MODE_KW,zernike) },
         { NULL }
     };
@@ -165,11 +175,15 @@ namespace {
                 ret +=  "   Accepted Keywords:\n"
                         "      HELP                Display this info.\n"
                         "      ANGLE               Rotate the modes (degrees).\n"
+                        "      ANGULAR             Return only the angluar part.\n"
                         "      CUTOFF              Smallest coefficient to consider for the Karhunen-Loeve expansion. (0.001)\n"
                         "      FIRST               First Zernike-mode to use for the Karhunen-Loeve expansion. (2)\n"
+                        "      FORCE               Re-generate modes (and update the cache)\n"
                         "      LAST                Last Zernike-mode to use for the Karhunen-Loeve expansion.(2000)\n"
                         "      NORMALIZE           Normalize the modes.\n"
+                        "      OLD                 Use old calculation method.\n"
                         "      PUPIL               (input/output) Use pupil, or keep the generated pupil.\n"
+                        "      RADIAL              Return only the radial part.\n"
                         "      VARIANCE            (output) Mode variances.\n"
                         "      VERBOSE             Verbosity, default is 0 (only error output).\n"
                         "      ZERNIKE             Use Zernike modes (default is KL).\n";
@@ -236,6 +250,22 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     
     int flags(Zernike::GET_RADIAL|Zernike::GET_ANGULAR);
 
+    if( kw.angular && !kw.radial ) {
+        flags &= ~(Zernike::GET_RADIAL);
+    }
+    
+    if( !kw.angular && kw.radial ) {
+        flags &= ~(Zernike::GET_ANGULAR);
+    }
+    
+    if( kw.force ) {
+        flags |= Zernike::FORCE;
+    }
+    
+    if( kw.old ) {
+        flags |= Zernike::OLD_METHOD;
+    }
+    
     Pupil pupil;
     if( kw.pupil || kw.normalize ) {  // undefined has type=0
         PupilInfo pi(nPixels, radius);
@@ -253,8 +283,10 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     }
 
     shared_ptr<ModeSet>& modesRef = Cache::get<ModeInfo,shared_ptr<ModeSet>>(mi );
-    if( ! modesRef ) modesRef.reset(new ModeSet());
-    if( modesRef->empty() ) {
+    if( ! modesRef ) {
+        modesRef.reset(new ModeSet());
+    }
+    if( modesRef->empty() || kw.force ) {
         if( kw.firstZernike && kw.lastZernike ) {
             modesRef->generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff, flags );
         } else {    // first=last=0  =>  Zernike
@@ -262,7 +294,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
             modesRef->generate( nPixels, radius, kw.angle, modeNumbers, flags );
         }
     }
-    
+
     ModeSet modes = modesRef->clone();
     if( kw.normalize ) {
         modes.getNorms( pupil );
@@ -302,6 +334,122 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
 }
 
 
+
+
+IDL_VPTR noll_to_mn( int argc, IDL_VPTR* argv, char* argk ) {
+
+    IDL_VPTR jj = argv[0];
+    IDL_ENSURE_SIMPLE( jj );
+    IDL_VPTR ret;
+    
+    uint16_t tmpN;
+    int16_t tmpM;
+            
+    if( jj->flags & IDL_V_ARR ) {
+        if( jj->value.arr->n_dim == 1 ) { // array
+            IDL_MEMINT dims[] = { jj->value.arr->dim[0], 2 };
+            IDL_LONG* mPtr = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 2, dims, IDL_ARR_INI_ZERO, &ret );
+            IDL_LONG* nPtr = mPtr + jj->value.arr->dim[0];
+            vector<unsigned int> tmpI = getAsVector<unsigned int>( jj );
+            for( auto& i: tmpI ){
+                Zernike::NollToNM( i, tmpN, tmpM );
+                *nPtr++ = tmpN;
+                *mPtr++ = tmpM;
+            }
+        } else if ( jj->value.arr->n_dim == 2 && jj->value.arr->dim[0]==1 ) { // array
+            IDL_MEMINT dims[] = { 2, jj->value.arr->dim[1]  };
+            IDL_LONG* retData = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 2, dims, IDL_ARR_INI_ZERO, &ret );
+            vector<unsigned int> tmpI = getAsVector<unsigned int>( jj );
+            for( auto&i: tmpI ){
+                Zernike::NollToNM( i, tmpN, tmpM );
+                retData[0] = tmpM;
+                retData[1] = tmpN;
+                retData += 2;
+            }
+        } else { // 2D or more, not implemented.
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Input can only be scalar or 1D array!" );
+        }
+    } else {
+        IDL_ULONG i = IDL_ULongScalar( argv[0] );
+        IDL_MEMINT dims[] = { 2 };
+        IDL_LONG* retData = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_ZERO, &ret );
+        Zernike::NollToNM( i, tmpN, tmpM );
+        retData[0] = tmpM;
+        retData[1] = tmpN;
+    }
+    
+    return ret;
+
+}
+
+
+IDL_VPTR mn_to_noll( int argc, IDL_VPTR* argv, char* argk ) {
+    
+    IDL_VPTR mn = argv[0];
+    IDL_ENSURE_SIMPLE( mn );
+    IDL_ENSURE_ARRAY( mn );
+    IDL_VPTR ret;
+
+    static const char err_msg[] = "Input can only be a 2xN (or Nx2) matrix, or an array with an even muber of entries.";
+    if( mn->value.arr->n_dim == 1 ) { // array
+        vector<int16_t> tmpI = getAsVector<int16_t>( mn );
+        IDL_LONG64 N = tmpI.size();
+        if( !N || N%2 ) {
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, err_msg );
+        }
+        IDL_MEMINT dims[] = { N/2 };
+        IDL_LONG* retData = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_ZERO, &ret );
+        for( IDL_LONG64 n(0); n<N; n+=2 ){
+            int16_t zm = tmpI[n];
+            uint16_t zn = tmpI[n+1];
+            *retData++ = Zernike::NMToNoll( zn, zm );
+        }
+    } else if ( mn->value.arr->n_dim == 2 ) {
+        IDL_LONG64 N = mn->value.arr->dim[0];
+        if( N==1 ) { // array
+            vector<int16_t> tmpI = getAsVector<int16_t>( mn );
+            N = tmpI.size();
+            if( !N || N%2 ) {
+                IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, err_msg );
+            }
+            IDL_MEMINT dims[] = { 1, N/2 };
+            IDL_LONG* retData = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_ZERO, &ret );
+            for( IDL_LONG64 n(0); n<N; n+=2 ){
+                int16_t zm = tmpI[n];
+                uint16_t zn = tmpI[n+1];
+                *retData++ = Zernike::NMToNoll( zn, zm );
+            }
+        } else if( N==2 ) {                         // 2xN matrix
+            N = mn->value.arr->dim[1];
+            IDL_MEMINT dims[] = { 1, N };
+            IDL_LONG* retData = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 2, dims, IDL_ARR_INI_ZERO, &ret );
+            vector<int> tmpI = getAsVector<int>( mn );
+            for( size_t n(0); n<tmpI.size(); n+=2 ){
+                int16_t zm = tmpI[n];
+                uint16_t zn = tmpI[n+1];
+                *retData++ = Zernike::NMToNoll( zn, zm );
+            }
+        } else if( mn->value.arr->dim[1]==2 ) {     // Nx2 matrix
+            IDL_MEMINT dims[] = { N };
+            IDL_LONG* retData = (IDL_LONG*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_ZERO, &ret );
+            vector<int16_t> tmpI = getAsVector<int16_t>( mn );
+            for( IDL_LONG64 n(0); n<N; n++ ){
+                int16_t zm = tmpI[n];
+                uint16_t zn = tmpI[N+n];
+                *retData++ = Zernike::NMToNoll( zn, zm );
+            }
+        } else { // 2D or more, not implemented.
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, err_msg );
+        }
+    } else { // 2D or more, not implemented.
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, err_msg );
+    }
+
+
+    return ret;
+
+}
+
 void clear_modes(void) {
     Cache::clear<ModeInfo,ModeSet>();
     Cache::clear<PupilInfo,Pupil>();
@@ -331,6 +479,8 @@ namespace {
     static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_pupil}, (char*)"RDX_MAKE_PUPIL", 2, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_pupil_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)make_modes}, (char*)"RDX_MAKE_MODES", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_modes_info, clear_modes ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)mn_to_noll}, (char*)"RDX_MN_TO_NOLL", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1  ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)noll_to_mn}, (char*)"RDX_NOLL_TO_MN", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1  ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)clear_modecache}, (char*)"RDX_CLEAR_MODES", 0, 0, 0, 0 }, 0 , clear_modecache_info);
 }
 
