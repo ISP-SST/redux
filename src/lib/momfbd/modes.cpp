@@ -125,6 +125,9 @@ ModeInfo::operator string() const {
     if( firstMode != lastMode ) {
         ret += ":(Z-basis=[" + to_string(firstMode) + "," +to_string(lastMode)+ "])";
     }
+    if( !filename.empty() ) {
+        ret += ":\"" + filename + "\"";
+    }
     return ret;
 }
 
@@ -298,7 +301,9 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
             modeNumbers.resize( dimSize(0) );
             std::iota(modeNumbers.begin(), modeNumbers.end(), 0);
             modePointers.clear();
-            for(unsigned int i=0; i<dimSize(0); ++i) modePointers.push_back( ptr(i,0,0) );
+            for( unsigned int i=0; i<dimSize(0); ++i) {
+                modePointers.push_back( ptr(i,0,0) );
+            }
             // FIXME  properly detect tilts, this is hardcoded for the mode-files with tilts as the old MOMFBD code !!!
             tiltMode.x = 1;
             tiltMode.y = 0;
@@ -425,8 +430,8 @@ void ModeSet::getNorms( const redux::image::Pupil& pup ) {
                 double tmp = ptr[ind]*pupPtr[ind];
                 norm += tmp*ptr[ind];               // i.e. = mode² * pupil
                 if( isTilt ) {
-                    mx = std::max( mx,tmp );
-                    mn = std::min( mn,tmp );
+                    mx = std::max( mx, tmp );
+                    mn = std::min( mn, tmp );
                 }
             }
         }

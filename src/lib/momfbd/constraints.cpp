@@ -535,8 +535,7 @@ uint64_t Constraints::unpack( const char* ptr, bool swap_endian ) {
 
 void Constraints::init( void ) {
     
-    int32_t nModes = job.modeNumbers.size();
-//cout << "Constraints::init() " << __LINE__ << "  job.nImages = " << job.nImages() << "  nModes = " << nModes << endl;
+    int32_t nModes = job.nModes;
     nParameters = job.nImages() * nModes;
 
     parameterOrder.reset( new int32_t[nParameters] );
@@ -545,10 +544,9 @@ void Constraints::init( void ) {
     auto &objects = job.getObjects();
     if( nParameters && objects.size() ) {
         
-        for( unsigned int modeIndex = 0; modeIndex < job.modeNumbers.size(); ++modeIndex ) {
-            uint16_t modeNumber = job.modeNumbers[modeIndex];
+        for( unsigned int modeIndex = 0; modeIndex < job.nModes; ++modeIndex ) {
             int32_t imageCount = 0;
-            if( modeNumber == 2 || modeNumber == 3 ) {      // tilts
+            if( modeIndex == 0 || modeIndex == 1 ) {      // tilts
                 shared_ptr<Constraint> thisConstraint( new Constraint( logger, imageCount * nModes + modeIndex, 1 ) );
                 for( size_t count=objects[0]->getChannels()[0]->nImages(); count; --count ) {  // only for first object and channel
                     thisConstraint->addEntry( imageCount * nModes + modeIndex, 1.0 );

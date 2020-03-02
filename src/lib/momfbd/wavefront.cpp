@@ -121,7 +121,7 @@ void WaveFronts::maybeInitializeStorage( void ) {
     
     size_t nPatchesX = myJob.subImagePosX.size();
     size_t nPatchesY = myJob.subImagePosY.size();
-    nModes = myJob.modeNumbers.size();
+    nModes = myJob.nModes;
     nWaveFronts = myJob.waveFrontList.size();
     
     if( !(myJob.runFlags&RF_NOSWAP) ) {     // should we mmap?

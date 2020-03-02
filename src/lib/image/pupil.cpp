@@ -21,7 +21,7 @@ namespace bfs = boost::filesystem;
 
 
 PupilInfo::PupilInfo( string filename, double pupilRadius, uint16_t pixels )
-    : nPixels(pixels), pupilRadius(pupilRadius), filename(filename) {
+    : nPixels(pixels), pupilRadius(pupilRadius), coRadius(0.0), filename(filename) {
 
 }
 
@@ -68,8 +68,9 @@ bool PupilInfo::operator<(const PupilInfo& rhs) const {
 
 
 PupilInfo::operator string() const {
-    string ret = to_string(nPixels)+":"+to_string(pupilRadius)+":";
-    if( coRadius > 0 ) ret += to_string(coRadius)+":";
+    string ret = to_string(nPixels)+":"+to_string(pupilRadius);
+    if( coRadius > 0 ) ret +=  ":" + bitString(coRadius);
+    if( !filename.empty() ) ret += ":\"" + filename + "\"";
     return ret;
 }
 
@@ -100,14 +101,14 @@ void Pupil::calculatePupilSize (double &frequencyCutoff, double &pupilRadiusInPi
 
 
 Pupil::Pupil( uint16_t pixels, double pupilRadius )
-    : nPixels(pixels), radius(pupilRadius), area(0) {
+    : info( pixels, pupilRadius, 0 ), nPixels(pixels), radius(pupilRadius), area(0) {
 
     generate(pixels,pupilRadius);
     
 }
 
 Pupil::Pupil(Pupil&& rhs) : redux::util::Array<double>(std::move(reinterpret_cast<redux::util::Array<double>&>(rhs))),
-    nPixels(std::move(rhs.nPixels)), radius(std::move(rhs.radius)),
+    info( std::move(rhs.info) ), nPixels(std::move(rhs.nPixels)), radius(std::move(rhs.radius)),
     area(std::move(rhs.area)), pupilSupport(std::move(rhs.pupilSupport)),
     otfSupport(std::move(rhs.otfSupport)), pupilInOTF(std::move(rhs.pupilInOTF)) {
 
@@ -115,7 +116,7 @@ Pupil::Pupil(Pupil&& rhs) : redux::util::Array<double>(std::move(reinterpret_cas
 
 
 Pupil::Pupil(const Pupil& rhs) : redux::util::Array<double>(reinterpret_cast<const redux::util::Array<double>&>(rhs)),
-    nPixels(rhs.nPixels), radius(rhs.radius), area(rhs.area),
+    info(rhs.info), nPixels(rhs.nPixels), radius(rhs.radius), area(rhs.area),
     pupilSupport(rhs.pupilSupport), otfSupport(rhs.otfSupport), pupilInOTF(rhs.pupilInOTF)  {
     
 }
@@ -123,6 +124,7 @@ Pupil::Pupil(const Pupil& rhs) : redux::util::Array<double>(reinterpret_cast<con
 
 uint64_t Pupil::size( void ) const {
     uint64_t sz = Array<double>::size();
+    sz += info.size();
     sz += sizeof(nPixels) + sizeof(radius) + sizeof(area);
     sz += pupilSupport.size()*sizeof(size_t) + sizeof(uint64_t);
     sz += otfSupport.size()*sizeof(size_t) + sizeof(uint64_t);
@@ -134,6 +136,7 @@ uint64_t Pupil::size( void ) const {
 uint64_t Pupil::pack( char* data ) const {
     using redux::util::pack;
     uint64_t count = Array<double>::pack(data);
+    count += info.pack(data+count);
     count += pack(data+count,nPixels);
     count += pack(data+count,radius);
     count += pack(data+count,area);
@@ -151,6 +154,7 @@ uint64_t Pupil::pack( char* data ) const {
 uint64_t Pupil::unpack( const char* data, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = Array<double>::unpack(data,swap_endian);
+    count += info.unpack(data+count,swap_endian);
     count += unpack(data+count,nPixels,swap_endian);
     count += unpack(data+count,radius,swap_endian);
     count += unpack(data+count,area,swap_endian);
@@ -199,6 +203,9 @@ bool Pupil::load( const string& filename, uint16_t pixels, double pupilRadius ) 
                 cv::Size dsize = dst.size();
                 cv::warpAffine( src, dst, map, dsize, flags, borderMode, borderValue );
             }
+            info.filename = filename;
+            info.nPixels = pixels;
+            info.pupilRadius = pupilRadius;
             nPixels = pixels;
             radius = pupilRadius;
             normalize();
@@ -213,6 +220,7 @@ bool Pupil::load( const string& filename, uint16_t pixels, double pupilRadius ) 
 
 void Pupil::generate( uint16_t pixels, double pupilRadius, double coRadius ) {
     
+    info = PupilInfo( pixels, pupilRadius, coRadius );
     nPixels = pixels;
     radius = pupilRadius;
     co_radius = coRadius;

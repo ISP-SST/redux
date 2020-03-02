@@ -789,7 +789,7 @@ void Channel::initPatch (ChannelData& cd) {
 
     for (uint16_t i=0; i < nImages; ++i) {
         subImages[i]->wrap( cd.images, i, i, firstY, lastY, firstX, lastX );
-        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, blockSizeX, myObject.pupilPixels, myJob.modeNumbers.size() );
+        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, blockSizeX, myObject.pupilPixels, myJob.nModes );
         subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockPixels, ST_VALUES|ST_RMS );
     }
 

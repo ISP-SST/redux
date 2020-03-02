@@ -564,6 +564,37 @@ void PatchData::dump( string tag ) const {
 }
 
 
+shared_ptr<ModeSet> GlobalData::get( const ModeInfo& mi, double scale, const shared_ptr<redux::image::Pupil>& pupil, const shared_ptr<ModeSet>& ms ) {
+
+    
+    unique_lock<mutex> lock(mtx);
+   
+    ScaledModeInfo id( mi, scale );
+    auto sit = scaled_modes.find(id);
+    if( sit == scaled_modes.end() ) {        
+        auto it = modes.find( mi );     // get the unscalled ModeSet
+        if( it == modes.end() ) {
+            shared_ptr<ModeSet>& ret = redux::util::Cache::get<ModeInfo,shared_ptr<ModeSet>>( mi, ms );
+            if( !ret ) {
+                ret.reset( new ModeSet() );
+             }
+            ret->info = mi;
+            it = modes.emplace(mi, ret).first;
+        }
+        shared_ptr<ModeSet>& ret = redux::util::Cache::get< ScaledModeInfo, shared_ptr<ModeSet>>( id, it->second );
+        if( ret ) {       // First use of this ModeSet/scale, so copy/rescale it
+            sit = scaled_modes.emplace(id, ret).first;
+            ret->info = id.first;
+            if( pupil ) ret->getNorms( *pupil );
+            ret->normalize( scale );
+        }
+    }
+    
+    return sit->second;
+
+}
+
+
 shared_ptr<ModeSet> GlobalData::get(const ModeInfo& id, const shared_ptr<ModeSet>& ms) {
 
     unique_lock<mutex> lock(mtx);

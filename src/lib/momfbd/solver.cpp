@@ -93,7 +93,7 @@ void Solver::init( void ) {
     pupilSize2 = pupilSize*pupilSize;
     otfSize = 2*pupilSize;
     otfSize2 = otfSize*otfSize;
-    nModes = job.modeNumbers.size();
+    nModes = job.nModes;
     nParameters = job.globalData->constraints.nParameters;
     nFreeParameters = job.globalData->constraints.nFreeParameters;
     nTotalImages = job.nImages();
@@ -408,12 +408,12 @@ void Solver::run( PatchData::Ptr data ) {
     
     string patchString = alignLeft(to_string(job.info.id) + ":" + to_string(data->id),8);
 
+    bool exitLoop(false);
 
-    for( uint16_t modeCount=job.nInitialModes; modeCount; ) {
+    for( uint16_t modeCount=job.nInitialModes; !exitLoop; modeCount += job.nModeIncrement ) {
         
         modeCount = min<uint16_t>(modeCount,nModes);
-        std::set<uint16_t> activeModes(job.modeNumbers.begin(),job.modeNumbers.begin()+modeCount);
-        
+
         string progressString = boost::str( boost::format(" (%03.1f%%)") %
                                 ((modeCount-min(job.nInitialModes,nModes))*100.0/nModes));
         myInfo.status.statusString = patchString + progressString;
@@ -421,11 +421,10 @@ void Solver::run( PatchData::Ptr data ) {
         std::fill( enabledModes.get(), enabledModes.get()+modeCount, true );
 
         if( modeCount == nModes ) {   // final loop, use proper FTOL and maxIterations
-            modeCount = 0;            // we use modeCount=0 to exit the external loop
+            exitLoop = true;                // exit outer loop.
             tol = job.FTOL;
             maxIterations = job.maxIterations;
         } else {
-            modeCount += job.nModeIncrement;
             //failCount = 0;           // TODO: fix/test fail-reporting before using
         }
 
@@ -457,7 +456,7 @@ void Solver::run( PatchData::Ptr data ) {
             if( failCount > maxFails ) {
                 LOG_ERR << "Giving up after " << failCount << " failures for patch#" << data->id << " (index=" << data->index << " region=" << data->roi << ")" << ende;
                 status = GSL_FAILURE;
-                modeCount = 0;                  // exit outer loop.
+                exitLoop = true;                // exit outer loop.
                 done = true;                    // exit inner loop.
                 break;
             }
@@ -486,7 +485,7 @@ void Solver::run( PatchData::Ptr data ) {
             }
             if( gradNorm < job.FTOL ) {
                 LOG_DETAIL << "Norm(grad) is below threshold." << ende;
-                modeCount = 0;                  // exit outer loop.
+                exitLoop = true;                // exit outer loop.
                 done = true;                    // exit inner loop.
                 break;
             }
@@ -509,16 +508,15 @@ void Solver::run( PatchData::Ptr data ) {
         GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
         totalIterations += iter;
         if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
-            size_t nActiveModes = activeModes.size();
-            if( modeCount ) {
-                if( nActiveModes )  gradNorm /= nActiveModes;
+            if( !exitLoop ) {
+                if( modeCount )  gradNorm /= modeCount;
                 LOG_DETAIL << "Patch" << (string)data->index << ":  After " << totalIterations << " iteration" << (totalIterations>1?"s":" ")
                  << "  metric=" << thisMetric << "  rmetric=" << (thisMetric/initialMetric)
-                 << " norm(grad)=" << gradNorm << " using " << nActiveModes << "/" << nModes << " modes." << ende;
+                 << " norm(grad)=" << gradNorm << " using " << modeCount << "/" << nModes << " modes." << ende;
             }
         }
 
-        if( modeCount ) {
+        if( !exitLoop ) {
             shiftAndInit();
             memcpy( alpha_offset.get(), alpha.get(), nParameters*sizeof(double) );          // store current solution
         }

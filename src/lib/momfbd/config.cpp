@@ -625,9 +625,7 @@ bool ObjectCfg::operator==( const ObjectCfg& rhs ) const {
 /********************   Global   ********************/
 
 GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis( ZERNIKE), klMinMode( 2), klMaxMode( 2000), klCutoff( 1E-3),
-    nInitialModes( 5), nModeIncrement( 5),
-    modeNumbers( { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-                 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 }),
+    nInitialModes( 5), nModeIncrement(5), nModes(0), modeNumbers(),
     telescopeD(0), telescopeCO(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2), trace(false),
@@ -693,6 +691,8 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logge
     nInitialModes  = getValue( tree, "MODE_START", defaults.nInitialModes );
     nModeIncrement  = getValue( tree, "MODE_STEP", defaults.nModeIncrement );
     modeNumbers = getValue( tree, "MODES", defaults.modeNumbers );
+    
+    nModes = modeNumbers.size();
 
     telescopeD = getValue( tree, "TELESCOPE_D", defaults.telescopeD );
     telescopeCO = getValue( tree, "TELESCOPE_CO", defaults.telescopeCO );
@@ -847,8 +847,8 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
 uint64_t GlobalCfg::size( void ) const {
     uint64_t sz = ObjectCfg::size();
     sz += 7*sizeof( uint8_t );                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType, trace
-    sz += 9*sizeof( uint16_t );                // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
-    sz += modeNumbers.size()*sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += 10*sizeof( uint16_t );               // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
+    sz += nModes*sizeof( uint16_t ) + sizeof( uint64_t );
     sz += 6*sizeof( float );                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma, graddiff_step
     sz += 2*sizeof( double );                  // telescopeD, telescopeCO
     sz += sizeof( uint32_t );                  // sequenceNumber
@@ -872,6 +872,7 @@ uint64_t GlobalCfg::pack( char* ptr ) const {
     count += pack( ptr+count, klCutoff );
     count += pack( ptr+count, nInitialModes );
     count += pack( ptr+count, nModeIncrement );
+    count += pack( ptr+count, nModes );
     count += pack( ptr+count, modeNumbers );
     count += pack( ptr+count, telescopeD );
     count += pack( ptr+count, telescopeCO );
@@ -913,6 +914,7 @@ uint64_t GlobalCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, klCutoff, swap_endian );
     count += unpack( ptr+count, nInitialModes, swap_endian );
     count += unpack( ptr+count, nModeIncrement, swap_endian );
+    count += unpack( ptr+count, nModes, swap_endian );
     count += unpack( ptr+count, modeNumbers, swap_endian );
     count += unpack( ptr+count, telescopeD, swap_endian );
     count += unpack( ptr+count, telescopeCO, swap_endian );

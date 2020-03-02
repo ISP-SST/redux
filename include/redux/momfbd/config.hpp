@@ -205,6 +205,7 @@ namespace redux {
             float klCutoff;             //!< If the expansion-coefficient is smaller than this, it will be ignored.
             uint16_t nInitialModes;     //!< How many modes to use in the first iteration
             uint16_t nModeIncrement;    //!< How many modes to add in each iteration
+            uint16_t nModes;
             std::vector<uint16_t> modeNumbers;  //!< Which modes to use
             /*****************************/
             

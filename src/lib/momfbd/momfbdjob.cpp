@@ -843,12 +843,15 @@ void MomfbdJob::initCache(void) {
     if( !globalData ) {
         globalData.reset(new GlobalData(*this));
     }
-    globalData->constraints.init();
     
     THREAD_MARK;
     for( shared_ptr<Object>& obj: objects ) {
-        obj->initObject();
+        if( obj ) {
+            obj->initObject();
+            nModes = obj->modes->dimSize(0);     // FIXME: Now we are assuming all objects have the same number of modes, and that #2/3 are tilts, this should be checked!!
+        }
     }
+    globalData->constraints.init();
     
     THREAD_MARK;
     generateTraceObjects();
@@ -1505,9 +1508,13 @@ bool MomfbdJob::checkCfg(void) {
             }
             if( !objects[i]->checkCfg() ) return false;
         } else {
-            LOG_ERR << "Object #" << i << " is invalid." << ende;
+            LOG_ERR << "Object #" << i << " is null." << ende;
             return false;
         }
+    }
+    
+    if( modeNumbers.size() < 2 ) {
+        // FIXME: sanity check: either file(s) specified or MODES, same number of modes has to exist in all objects AND the tilts has to be the first 2 modes. 
     }
 
     boost::system::error_code ec;
@@ -1548,6 +1555,7 @@ bool MomfbdJob::checkData(bool verbose) {
     set<uint32_t> wfs;
     for( shared_ptr<Object>& obj: objects ) {
         if( !obj->checkData(verbose) ) return false;
+        //if( nModes && nModes != obj->modes.dimSize(0) ) return false;     // FIXME: implement testing nModes
         wfs.insert( obj->waveFrontList.begin(), obj->waveFrontList.end() );
     }
     

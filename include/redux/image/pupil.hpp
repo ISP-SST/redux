@@ -39,7 +39,7 @@ namespace redux {
             
             static void calculatePupilSize(double &, double &, uint16_t&, double, uint32_t, double, double );
             
-            Pupil(void) {};
+            Pupil(void) : info(0,0,0) {};
             Pupil( uint16_t pixels, double pupilRadius );
             Pupil(Pupil&& rhs);
             Pupil(const Pupil& rhs);
@@ -60,6 +60,7 @@ namespace redux {
             Pupil& operator=( const Pupil& rhs );
             bool operator<(const Pupil& rhs) const;                             //!< So that the Pupil-struct can be stored in comparative containers (set/map)
 
+            PupilInfo info;
             uint16_t nPixels;
             double radius;
             double co_radius;
