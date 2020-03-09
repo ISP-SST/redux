@@ -255,20 +255,19 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     count += RDX_JOB_PROGSTRING_LENGTH;
     count += unpack(ptr+count, logFile);
     count += unpack(ptr+count, outputDir);
-    submitTime = startedTime = completedTime = bpx::not_a_date_time;
     time_t now = redux::util::to_time_t( bpx::second_clock::universal_time() );
     time_t timestamp;
     submitTime = startedTime = completedTime = bpx::not_a_date_time;
     count += unpack(ptr+count, timestamp, swap_endian);
-    if( timestamp <= now ) {
+    if( (timestamp > 0) && (timestamp <= now) ) {
         submitTime = bpx::from_time_t(timestamp);
     }
     count += unpack(ptr+count, timestamp, swap_endian);
-    if( timestamp <= now ) {
+    if( (timestamp > 0) && (timestamp <= now) ) {
         startedTime = bpx::from_time_t(timestamp);
     }
     count += unpack(ptr+count, timestamp, swap_endian);
-    if( timestamp <= now ) {
+    if( (timestamp > 0) && (timestamp <= now) ) {
         completedTime = bpx::from_time_t(timestamp);
     }
     return count;
