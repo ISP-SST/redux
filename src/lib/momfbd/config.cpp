@@ -166,7 +166,7 @@ ChannelCfg::operator std::string() const {
 }
 
 
-void ChannelCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& defaults ) {
+void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const ChannelCfg& defaults ) {
     
     rotationAngle = getValue( tree, "ANGLE", defaults.rotationAngle );
 
@@ -470,7 +470,7 @@ ObjectCfg::~ObjectCfg() {
 }
 
 
-void ObjectCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& def ) {
+void ObjectCfg::parseProperties( bpt::ptree& tree, Logger& logger, const ChannelCfg& def ) {
     
     const ObjectCfg& defaults = reinterpret_cast<const ObjectCfg&>( def );
 
@@ -641,7 +641,7 @@ GlobalCfg::~GlobalCfg() {
 }
 
 
-void GlobalCfg::parseProperties( bpt::ptree& tree, redux::logging::Logger& logger, const ChannelCfg& def ) {
+void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const ChannelCfg& def ) {
     
     const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
 

@@ -134,6 +134,7 @@ namespace redux {
                 boost::split(tokens, str, boost::is_any_of(", "));
                 if(std::numeric_limits<T>::is_integer && !std::numeric_limits<T>::is_signed) {    // only expand '-' & ':' for unsigned integers
                     for(auto & token : tokens) {
+                        if( token.empty() ) continue;
                         external_type res;
                         parseSegment( res, token );
                         result.insert( result.end(), res.begin(), res.end() );

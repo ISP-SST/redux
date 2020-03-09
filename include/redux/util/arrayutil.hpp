@@ -28,7 +28,7 @@ namespace redux {
         template <class T> void delArray( T*& p ) { delete[] p; p = nullptr; }
         template <class T>
         void delArray( T**& p ) {
-            delArray( *p );              // Call delArray() for the next pointer-level.
+            if( p ) delArray( *p );      // Call delArray() for the next pointer-level.
             delete[] p;                  // Delete current pointer-level.
             p = nullptr;
         }

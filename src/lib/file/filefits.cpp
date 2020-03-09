@@ -11,10 +11,12 @@
 #include <fstream>
 #include <numeric>
 
+#include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
+namespace bfs = boost::filesystem;
 using namespace redux::file;
 using namespace redux::util;
 using namespace redux;
@@ -72,44 +74,58 @@ namespace {
     }
     
     
-    int getDataType( fitsfile* ff, int bitpix ) {
+    template <typename T> int getBitpix(void) { return 0; }
+    template<> int getBitpix<uint8_t>(void) { return 8; }
+    template<> int getBitpix<int16_t>(void) { return 16; }
+    template<> int getBitpix<uint16_t>(void) { return 16; }
+    template<> int getBitpix<int32_t>(void) { return 32; }
+    template<> int getBitpix<uint32_t>(void) { return 32; }
+    template<> int getBitpix<int64_t>(void) { return 64; }
+    template<> int getBitpix<uint64_t>(void) { return 64; }
+    template<> int getBitpix<float>(void)   { return -32; }
+    template<> int getBitpix<double>(void)  { return -64; }
+    
+    
+    int getDataType( int bitpix, fitsfile* ff=nullptr ) {
         
         int status(0);
         long bzero(0);
         float bscale(0);
-        if( fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status ) ) {
-            if( status != KEY_NO_EXIST ) {
-                throwStatusError( "Fits::getDataType() BSCALE", status );
-            } else status = 0;
-        }
-    
-        if ( bscale == 1.0 ) {
-            if( fits_read_key_lng( ff, "BZERO", &bzero, nullptr, &status ) ) {
+        if( ff ) {
+            if( fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status ) ) {
                 if( status != KEY_NO_EXIST ) {
-                    throwStatusError( "Fits::getDataType() BZERO", status );
+                    throwStatusError( "Fits::getDataType() BSCALE", status );
                 } else status = 0;
+            }
+        
+            if ( bscale == 1.0 ) {
+                if( fits_read_key_lng( ff, "BZERO", &bzero, nullptr, &status ) ) {
+                    if( status != KEY_NO_EXIST ) {
+                        throwStatusError( "Fits::getDataType() BZERO", status );
+                    } else status = 0;
+                }
             }
         }
         
         switch( bitpix ) {
-            case( 8 ): {
+            case( BYTE_IMG ): {
                 if( bzero == -(1L<<7) ) return TSBYTE;
                 return TBYTE;
             }
-            case( 16 ): {
+            case( SHORT_IMG ): {
                 if( bzero == (1L<<15) ) return TUSHORT;
                 return TSHORT;
             }
-            case( 32 ): {
+            case( LONG_IMG ): {
                 if( bzero == (1L<<31)) return TUINT;
                 return TINT;
             }
-            case( 64 ): {
+            case( LONGLONG_IMG ): {
                 if( bzero == (1L<<63) ) return TULONG;
                 return TLONG;
             }
-            case( -32 ): return TFLOAT;
-            case( -64 ): return TDOUBLE;
+            case( FLOAT_IMG ): return TFLOAT;
+            case( DOUBLE_IMG ): return TDOUBLE;
             default: return 0;
         }
     }
@@ -248,7 +264,7 @@ namespace {
             throwStatusError( "primaryHDU:BITPIX:"+fn, status );
         }
         
-        hdu.dataType = getDataType( ff, hdu.bitpix );
+        hdu.dataType = getDataType( hdu.bitpix, ff );
         hdu.elementSize = getElementSize( hdu.dataType );
         
         if( fits_read_key( ff, TINT, "NAXIS", &hdu.nDims, NULL, &status ) ) {
@@ -612,6 +628,16 @@ void Fits::addCard( vector<string>& hdr, string card ) {
     }
     hdr.push_back(card);
     
+}
+
+
+void Fits::removeCards( vector<string>& hdr, string key ) {
+    key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    hdr.erase( std::remove_if( hdr.begin(), hdr.end(), [&](string a) {
+        return key.compare( a.substr(0,8) ) == 0;
+        //return boost::iequals( key, a.substr(0,8) );
+    } ),
+    hdr.end() );
 }
 
 
@@ -1308,20 +1334,110 @@ template void Fits::read( const string & filename, redux::image::Image<complex_t
 
 
 template <typename T>
-void Fits::write( const string & filename, const redux::util::Array<T>& data, shared_ptr<redux::file::Fits> hdr, int sliceSize ) {
-
-    // TODO
+void Fits::write( const string& filename, const redux::util::Array<T>& data, shared_ptr<redux::file::Fits> hdr, int sliceSize ) {
     
-//    if( !hdr.get() ) {
-//        hdr.reset( new Fits() );
-//    }
+    if( !hdr.get() ) {
+        hdr.reset( new Fits() );
+    }
+    
+
+    if( sliceSize ) {   // compression
+        
+        // TODO
+        
+    } else {
+        
+        // FIXME: fugly hack since cfitsio doesn't have a clear way to overwrite files.
+        bfs::path fn(filename);
+        if( bfs::exists( bfs::path(filename) ) ) {
+            bfs::remove(fn);
+        }
+    
+        if( !hdr->fitsPtr_ ) {
+            fits_create_file( &hdr->fitsPtr_, filename.c_str() , &hdr->status_ );
+            if( hdr->status_ ) {
+                throwStatusError( "Fits::write() create_file", hdr->status_ );
+            }
+        }
+        
+        
+        int bitpix = getBitpix<T>();
+        int datatype = getDataType( bitpix );
+        int nDims = data.nDimensions();
+        if( nDims > 9 ) {
+            cerr << "Fits::write()  Array has > 9 dimensions !!" << endl;
+        }
+        long naxes[9] = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+        copy_n( data.dimensions().rbegin(), nDims, naxes );
+
+        fits_create_img( hdr->fitsPtr_, bitpix, nDims, naxes, &hdr->status_ );
+        if( hdr->status_ ) {
+            throwStatusError( "Fits::write() create_img", hdr->status_ );
+        }
+    
+        Fits::removeCards( hdr->primaryHDU.cards, "END" );    // just in case it is not the last card, or if there are multiple.
+        for( auto& c: hdr->primaryHDU.cards ) {
+            fits_update_card( hdr->fitsPtr_, c.substr(0,8).c_str(), c.c_str(), &hdr->status_ ); 
+            if( hdr->status_ ) {
+                throwStatusError( "Fits::write() card: "+c, hdr->status_ );
+            }
+        }
+        
+        fits_write_img( hdr->fitsPtr_, datatype, 1, data.nElements(), (void*)data.get(), &hdr->status_);
+        if( hdr->status_ ) {
+            throwStatusError( "Fits::write() write_img: ", hdr->status_ );
+        }
+        
+        for( auto& eh: hdr->extHDUs ) {
+            shared_ptr<ascii_hdu> ahdu = dynamic_pointer_cast<ascii_hdu>(eh);
+            if( ahdu ) {
+                int tfields = 0;
+                const char* extname = ahdu->name.empty()?nullptr:ahdu->name.c_str();
+                vector<const char*> ttype, tform, tunit;
+                for( auto& ti: ahdu->table_info ) {
+                    tfields++;
+                    ttype.push_back( ti.columnName.empty()?nullptr:ti.columnName.c_str() );
+                    tform.push_back( ti.columnFormat.empty()?nullptr:ti.columnFormat.c_str() );
+                    tunit.push_back( ti.columnUnit.empty()?nullptr:ti.columnUnit.c_str() );
+                }
+                fits_create_tbl( hdr->fitsPtr_, ASCII_TBL, 0, tfields, const_cast<char**>(ttype.data()),
+                                 const_cast<char**>(tform.data()), const_cast<char**>(tunit.data()), extname, &hdr->status_ );
+                if( hdr->status_ ) {
+                    throwStatusError( "Fits::write() create_ascii_tbl: ", hdr->status_ );
+                }
+                
+                if( ahdu->data.nDimensions() == 2 ) {   // TODO: fix for generic case, this is hardcoded for timestamps @ SST
+                    size_t nRows = ahdu->data.dimSize(0);
+                    vector<char*> ptrs;
+                    for( size_t i(0); i<nRows; ++i ) {
+                        ptrs.push_back( ahdu->data.ptr(i,0) );
+                    }
+                    fits_write_col( hdr->fitsPtr_, TSTRING, 1, 1, 1, nRows, ptrs.data(), &hdr->status_ );
+                    if( hdr->status_ ) {
+                        throwStatusError( "Fits::write() write_ascii_tbl: ", hdr->status_ );
+                    }
+
+                }
+                
+            }
+            shared_ptr<binary_hdu> bhdu = dynamic_pointer_cast<binary_hdu>(eh);
+            if( bhdu ) {
+                // TODO
+            }
+        }
+        
+    }
+    
     
 
 }
 template void Fits::write( const string&, const redux::util::Array<uint8_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<int16_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<uint16_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<int32_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<uint32_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<int64_t>&, shared_ptr<redux::file::Fits>, int );
+template void Fits::write( const string&, const redux::util::Array<uint64_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<float  >&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<double >&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<complex_t >&, shared_ptr<redux::file::Fits>, int );

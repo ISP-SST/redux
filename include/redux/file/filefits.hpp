@@ -54,6 +54,7 @@ namespace redux {
             template <typename T>
             static std::string makeCard( std::string key, T value, std::string comment="" );
             static void addCard( std::vector<std::string>& hdr, std::string card );
+            static void removeCards( std::vector<std::string>& hdr, std::string key );
             static void insertCard( std::vector<std::string>& hdr, std::string card, size_t location=std::string::npos );
             static void insertCardAfter( std::vector<std::string>& hdr, std::string card, std::string after );
             static void insertCardBefore( std::vector<std::string>& hdr, std::string card, std::string before );
@@ -113,6 +114,7 @@ namespace redux {
                     std::string columnUnit;     // = TUNIT, physical unit of the data
                 };
                 uint16_t nColumns;              // = TFIELDS, number of columns in this table
+                std::string name;               // = EXTNAME
                 std::vector<table_info_t> table_info;
                 redux::util::Array<char> data;
             };

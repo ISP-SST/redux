@@ -10,6 +10,7 @@
 #endif
 
 #include "redux/file/fileana.hpp"
+#include "redux/file/filefits.hpp"
 #include "redux/file/filemomfbd.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/image/zernike.hpp"
@@ -873,7 +874,6 @@ void Object::initObject( void ){
         modes->getNorms( *pupil );
         modes->normalize();
     }
-
     
     pixelsToAlpha =  alphaToPixels = 0;
     //double pixelsToAlpha2(0 );
@@ -1142,6 +1142,52 @@ void Object::getStorage( PatchData& pData, shared_ptr<ObjectData> oData ) {
 }
 
 
+void Object::doMozaic( float**& img, size_t& imgRows, size_t& imgCols, const redux::util::Array<PatchData::Ptr>& patches ) {
+
+    size_t nPatches = patches.nElements( );
+    vector<shared_ptr<float*>> patchPtrs;
+    vector<float**> patchData;
+    vector<int32_t> xpos,ypos;
+    uint16_t maxPosX(0);
+    uint16_t minPosX( std::numeric_limits<uint16_t >::max() );
+    uint16_t maxPosY = maxPosX;
+    uint16_t minPosY = minPosX;
+
+    for( unsigned int y = 0; y < patches.dimSize(0 ); ++y ){
+        for( unsigned int x = 0; x < patches.dimSize(1 ); ++x ){
+            const Point16& first = patches(y,x)->roi.first;
+            if( first.x > maxPosX ) maxPosX = first.x;
+            if( first.x < minPosX ) minPosX = first.x;
+            if( first.y > maxPosY ) maxPosY = first.y;
+            if( first.y < minPosY ) minPosY = first.y;
+            auto oData = patches(y,x)->getObjectData(ID);
+            if( !oData ) throw runtime_error("patches(y,x)->getObject(ID) returned a null pointer !");
+            auto pPtr = oData->img.reshape(patchSize,patchSize );
+            patchPtrs.push_back( pPtr );
+            patchData.push_back( pPtr.get( ) );
+            xpos.push_back( first.x );
+            ypos.push_back( first.y );
+        }
+    }
+
+    imgCols = maxPosX+patchSize+1;
+    imgRows = maxPosY+patchSize+1;
+    
+    delArray( img );
+    img = newArray<float>( imgRows, imgCols );
+    int margin = patchSize/8;
+    int blend = (patchSize-2*margin)/3;
+
+    mozaic( img, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
+
+    if( !(myJob.runFlags&RF_NO_CLIP) ) {
+        img_trim( img, imgRows, imgCols, 1E-15 );
+    }
+
+
+}
+
+
 void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
 
     bfs::path fn = bfs::path(outputFileName + ".f0" );
@@ -1152,64 +1198,30 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
     
     try {
 
-        size_t nPatches = patches.nElements( );
-        vector<shared_ptr<float*>> patchPtrs;
-        vector<float**> patchData;
-        vector<int32_t> xpos,ypos;
-        uint16_t maxPosX(0 );
-        uint16_t minPosX( std::numeric_limits<uint16_t >::max( ) );
-        uint16_t maxPosY = maxPosX;
-        uint16_t minPosY = minPosX;
-
-        for( unsigned int y = 0; y < patches.dimSize(0 ); ++y ){
-            for( unsigned int x = 0; x < patches.dimSize(1 ); ++x ){
-                const Point16& first = patches(y,x)->roi.first;
-                if( first.x > maxPosX ) maxPosX = first.x;
-                if( first.x < minPosX ) minPosX = first.x;
-                if( first.y > maxPosY ) maxPosY = first.y;
-                if( first.y < minPosY ) minPosY = first.y;
-                auto oData = patches(y,x)->getObjectData(ID);
-                if( !oData ) throw runtime_error("patches(y,x)->getObject(ID) returned a null pointer !");
-                auto pPtr = oData->img.reshape(patchSize,patchSize );
-                patchPtrs.push_back( pPtr );
-                patchData.push_back( pPtr.get( ) );
-                xpos.push_back( first.x );
-                ypos.push_back( first.y );
-            }
-        }
-    
-        size_t imgCols = maxPosX+patchSize+1;
-        size_t imgRows = maxPosY+patchSize+1;
-        float** tmpImg = newArray<float>( imgRows, imgCols );
-        int margin = patchSize/8;
-        int blend =( patchSize-2*margin)/3;
+        size_t imgCols;
+        size_t imgRows;
+        float** tmpImg = nullptr;
+        doMozaic( tmpImg, imgRows, imgCols, patches );
         
         shared_ptr<redux::file::Ana> hdr( new redux::file::Ana() );
         boost::posix_time::ptime now = boost::posix_time::microsec_clock::universal_time();
 
         string timeString = "N/A";
         if( !startT.is_special( ) && !endT.is_special() ){
-            cout << "using avgT." << endl;
             bpx::time_duration obs_interval = ( endT - startT );
             boost::posix_time::ptime avgtime = (startT+obs_interval/2);
             if( !avgtime.is_special() ) {
                 timeString = bpx::to_simple_string( avgtime.time_of_day() );
-            } else cout << "avgtime is special." << endl;
+            }
         } else if( !endT.is_special() ){
-            cout << "using endT." << endl;
             timeString = bpx::to_simple_string( endT.time_of_day() );
         } else if( !startT.is_special() ){
-            cout << "using startT." << endl;
+
             timeString = bpx::to_simple_string( startT.time_of_day() );
         }
         hdr->m_ExtendedHeader = "TIME_OBS=" + timeString + " DATE_OBS=" + myJob.observationDate
                             + " NX=" + to_string(imgCols) + " NY=" + to_string(imgRows) + " DATE=" + to_iso_extended_string( now );
 
-        mozaic( tmpImg, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
-
-        if( !(myJob.runFlags&RF_NO_CLIP) ) {
-            img_trim( tmpImg, imgRows, imgCols, 1E-15 );
-        }
         
         if( myJob.outputDataType == DT_F32T ){
             Array<float> wrap(*tmpImg, imgRows, imgCols );
@@ -1249,14 +1261,55 @@ void Object::writeAna( const redux::util::Array<PatchData::Ptr>& patches ) {
 
 
 void Object::writeFits( const redux::util::Array<PatchData::Ptr>& patches ) {
+    
     bfs::path fn = bfs::path( outputFileName + ".fits" );
     if( isRelative( fn ) ) {
         fn = bfs::path( myJob.info.outputDir ) / fn;
     }
-    LOG << "NOT writing output to file: " << fn << ende;
-    LOG_ERR << "Writing to FITS still not implemented..." << ende;
+    LOG << "Writing output to file: " << fn << ende;
+    
+    try {
+
+        size_t imgCols;
+        size_t imgRows;
+        float** tmpImg = nullptr;
+        doMozaic( tmpImg, imgRows, imgCols, patches );
+  
+        if( myJob.outputDataType == DT_F32T ){
+            Array<float> wrap(*tmpImg, imgRows, imgCols );
+            Fits::write( fn.string(), wrap );
+        } else {
+            Array<int16_t> wrap(imgRows, imgCols );
+            wrap.copyFrom<float>( *tmpImg );
+            Fits::write( fn.string(), wrap );
+        }
+
+        delArray( tmpImg );
+        
+        if( saveMask & SF_SAVE_ALPHA ){
+            bfs::path fn = bfs::path(outputFileName + ".alpha.fits" );
+            if( isRelative(fn ) ){
+                fn = bfs::path(myJob.info.outputDir ) / fn;
+            }
+            LOG << "Saving alpha-coefficients to: " << fn << ende;
+            Array<float> alpha(patches.dimSize(0), patches.dimSize(1), nObjectImages, myJob.nModes );
+            for( auto& patch: patches ){
+                Array<float> subalpha(alpha, patch->index.y, patch->index.y, patch->index.x, patch->index.x, 0, nObjectImages-1, 0, myJob.nModes-1 );
+                auto oData = patch->getObjectData(ID);
+                if( !oData ) throw runtime_error("patches(y,x)->getObject() returned a null pointer !");
+                oData->alpha.copy( subalpha );
+            }
+            Fits::write( fn.string(), alpha );
+        }
+        
+    } catch( const exception& e ) {
+        LOG_ERR << "Error when writing output to file: " << fn << " what: " << e.what() << ende;
+        myJob.setFailed();
+    }
+
     ++progWatch;
 }
+
 
 
 void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData ) {

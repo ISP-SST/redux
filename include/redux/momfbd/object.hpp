@@ -107,6 +107,7 @@ namespace redux {
             size_t getResultSize( void );
             void maybeInitializeStorage( void );          
             void getStorage( PatchData&, std::shared_ptr<ObjectData> );          
+            void doMozaic(float**& img, size_t& imgRows, size_t& imgCols, const redux::util::Array<PatchData::Ptr>&);
             void writeAna(const redux::util::Array<PatchData::Ptr>&);
             void writeFits(const redux::util::Array<PatchData::Ptr>&);
             void writeMomfbd(const redux::util::Array<PatchData::Ptr>&);

@@ -258,6 +258,7 @@ uint64_t Job::Info::unpack(const char* ptr, bool swap_endian) {
     submitTime = startedTime = completedTime = bpx::not_a_date_time;
     time_t now = redux::util::to_time_t( bpx::second_clock::universal_time() );
     time_t timestamp;
+    submitTime = startedTime = completedTime = bpx::not_a_date_time;
     count += unpack(ptr+count, timestamp, swap_endian);
     if( timestamp <= now ) {
         submitTime = bpx::from_time_t(timestamp);
