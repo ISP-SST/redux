@@ -33,13 +33,7 @@ endif()
 
 RDX_ADD_EXECUTABLE(${TEST_NAME} ${RDX_TEST_SRC} ${RDX_TEST_HPP})
 
-if("${CMAKE_BUILD_TYPE}" MATCHES "^([Dd][Ee][Bb][Uu][Gg])$")
-	get_target_property(TEST_LOCATION ${TEST_NAME} DEBUG_LOCATION)
-else()
-	get_target_property(TEST_LOCATION ${TEST_NAME} LOCATION)
-endif()
-
-set(TEST_CMD ${TEST_LOCATION} --log_sink=test_log.xml
+set(TEST_CMD $<TARGET_FILE:${TEST_NAME}> --log_sink=test_log.xml
                               --log_format=XML
 #                              --log_level=all 
                               --log_level=warning 

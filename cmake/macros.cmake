@@ -120,15 +120,13 @@ endmacro()
 #  use static linking (i.e. include specific header and compile for a specific cpu)
 # -----------------------------------------------------------------------------
 macro(INSTALL_DEPS TGT)
-    get_target_property(TARGET_LOCATION ${TGT} LOCATION)
-    get_target_property(TARGET_DEBUG_LOCATION ${TGT} DEBUG_LOCATION)
     get_property(TARGET_LINK_DIRECTORIES DIRECTORY PROPERTY LINK_DIRECTORIES)
     # Note: Seems like CMAKE_SYSTEM_PREFIX_PATH is not in cmake_path format by default
     # which causes some "unknown escape character" errors later. So clean it now.
     file(TO_CMAKE_PATH "${CMAKE_SYSTEM_PREFIX_PATH}" CMAKE_SYSTEM_PREFIX_PATH)
     # Replace VS variable $(OutDir) with CMake counterpart
     #get_filename_component(TMP_TARGET_PATH ${TARGET_LOCATION} REALPATH)
-    string(REPLACE "$(OutDir)" "$${}{CMAKE_INSTALL_CONFIG_NAME}" TARGET_LOCATION ${TARGET_LOCATION})
+    string(REPLACE "$(OutDir)" "$${}{CMAKE_INSTALL_CONFIG_NAME}" TARGET_LOCATION $<TARGET_FILE:${TEST_NAME}>)
     string(REPLACE "$(Configuration)" "$${}{CMAKE_INSTALL_CONFIG_NAME}" TARGET_LOCATION ${TARGET_LOCATION})
     # Ordinary install of the binary
     install(TARGETS ${TGT}
@@ -233,8 +231,6 @@ macro(RDX_ADD_EXECUTABLE target)
         target_link_libraries(${target} delayimp)
     endif()
     set_target_properties(${target} PROPERTIES DEBUG_POSTFIX "-d")
-    # install_deps needs some more tweaking...
-    install_deps(${target})
 endmacro()
 
 

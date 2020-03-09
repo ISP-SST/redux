@@ -1,12 +1,5 @@
 cmake_minimum_required(VERSION  2.8)
 
-IF(POLICY CMP0048)  # The ``project()`` command manages VERSION variables. cf. cmake --help-policy CMP0048
-    CMAKE_POLICY(SET CMP0048 OLD)   # We manage versions manually
-ENDIF()
-IF(POLICY CMP0026)  # Disallow use of the LOCATION target property. cf. cmake --help-policy CMP0026
-    CMAKE_POLICY(SET CMP0026 OLD)   # Some macros use this, should be updated to use the "$<TARGET_FILE:tgt>" syntax instead
-ENDIF()
-
 project(REDUX)
 
 if(NOT RDX_PROJECT)

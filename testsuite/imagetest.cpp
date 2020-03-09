@@ -1044,8 +1044,8 @@ namespace {
         
         if( ySize == 0 ) ySize = xSize;
         
-        float originX(0);       // if origin is integer, the generated dist/angle will be centered on the border between the specified pixels.
-        float originY(0);       // if origin is integer+0.5, the generated dist/angle will be centered at the middle of the specified pixel.
+        double originX(0);      // if origin is integer, the generated dist/angle will be centered on the border between the specified pixels.
+        double originY(0);      // if origin is integer+0.5, the generated dist/angle will be centered at the middle of the specified pixel.
                                 // The generated dist/angle values are calculated for the middle of the pixels.
 
         if( randomOrigin ) {
@@ -1055,16 +1055,16 @@ namespace {
         shared_ptr<Grid> grid = Grid::get( ySize, xSize, originY, originX );
         auto dist2D = grid->dist2D();
         auto angle2D = grid->angle2D();
-        float** distPtr = dist2D.get();
-        float** anglePtr = angle2D.get();
+        double** distPtr = dist2D.get();
+        double** anglePtr = angle2D.get();
 
         for( int y(0); y < ySize; ++y ) {
             double yDist = y + 0.5 - originY;           // where the origin "should" be, by the design of the Grid-class
             for( int x(0); x < xSize; ++x ) {
                 double xDist = x + 0.5 - originX;       // where the origin "should" be, by the design of the Grid-class
-                BOOST_TEST( abs(distPtr[y][x] - (float)sqrt(yDist*yDist+xDist*xDist)) < 0.0001 );
+                BOOST_TEST( abs(distPtr[y][x] - (double)sqrt(yDist*yDist+xDist*xDist)) < 0.0001 );
                 if( yDist || xDist ) {
-                    BOOST_TEST( abs(anglePtr[y][x] - (float)atan2(yDist, xDist)) < 0.0001 );
+                    BOOST_TEST( abs(anglePtr[y][x] - (double)atan2(yDist, xDist)) < 0.0001 );
                 } else {
                     BOOST_TEST( anglePtr[y][x] == 0.0 );
                 }
