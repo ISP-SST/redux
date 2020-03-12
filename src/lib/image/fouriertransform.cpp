@@ -570,7 +570,7 @@ FourierTransform& FourierTransform::operator*= (const FourierTransform& rhs) {
                 complex_t val = rhsPtr2D[y][x];
                 thisPtr2D[y][x] *= val;
                 if( x ) {
-                    val = ::conj(val);
+                    val = std::conj(val);
                     if( y ) thisPtr2D[ftSize.y-y][ftSize.x-x] *= val;
                     else thisPtr2D[0][ftSize.x-x] *= val;
                 }
