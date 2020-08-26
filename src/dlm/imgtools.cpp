@@ -24,14 +24,16 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem.hpp>
 
-#define DEBUG_DLM_
-
 #ifdef RDX_WITH_OPENCV
 #    include "cvutil.hpp"
 #    include <redux/util/opencv.hpp>
 #    include <opencv2/core/core.hpp>
+#    include <opencv2/core/version.hpp>
 #    include <opencv2/features2d/features2d.hpp>
 #    include <opencv2/calib3d/calib3d.hpp>
+#if defined(CV_MAJOR_VERSION) && (CV_MAJOR_VERSION > 3)
+#    include <opencv2/calib3d/calib3d_c.h>
+#endif
 #    include <opencv2/imgproc/imgproc.hpp>
 using namespace cv;
 #endif
@@ -455,10 +457,6 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
         Mat tmp1( imgSize1, CV_8UC1 );
         Mat tmp2( imgSize2, CV_8UC1 );
         Mat H, H_init;
-
-#ifdef DEBUG_DLM_
-        Mat result( imgSize, CV_8UC3 );
-#endif
 
         imgIn1.convertTo( imgByte1, CV_8UC1, 255 );
         imgIn2.convertTo( imgByte2, CV_8UC1, 255 );
