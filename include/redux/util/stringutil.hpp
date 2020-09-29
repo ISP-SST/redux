@@ -79,6 +79,9 @@ namespace redux {
         
         void printProgress(const std::string& text, float progress);
         
+        template <typename T>
+        T stringTo( const std::string& v );
+        
         template <typename T=uint32_t>
         std::vector<T> stringToUInts(const std::string& str);
         template <typename T>

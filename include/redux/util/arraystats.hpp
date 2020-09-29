@@ -23,31 +23,38 @@ namespace redux {
 
             ArrayStats() : clip(-1), cutoff(-1), min(0), max(0), median(0), sum(0), sqr_sum(0), norm(0),
                            mean(0), rms(0), stddev(0), noise(0), noiseRMS(0), hasInfinity(false) {}
-            template <typename T> void getMinMaxMean(const T* data, size_t count);
-            template <typename T> void getMinMaxMean(const redux::util::Array<T>& data) {
-                if (data.dense()) getMinMaxMean(data.ptr(),data.nElements());
+            template <typename T> void getMinMaxMean( const T* data, size_t count );
+            template <typename T> void getMinMaxMean( const redux::util::Array<T>& data ) {
+                size_t nEl = data.nElements();
+                if( data.dense() ) getMinMaxMean( data.ptr(), nEl );
                 else {
-                    redux::util::Array<T> tmp;
-                    data.copy(tmp);
-                    getMinMaxMean(tmp.get(),data.nElements());
+                    if( nEl ) {
+                        std::unique_ptr<T[]> tmp( new T[ data.nElements() ]);
+                        data.template copyTo<T>( tmp.get() );
+                        getMinMaxMean( tmp.get(), data.nElements() );
+                    }
                 }
             }
 
-            template <typename T> void getRmsStddev(const T* data, size_t count);
-            template <typename T> void getRmsStddev(const redux::util::Array<T>& data) {
-                if (data.dense()) getRmsStddev(data.ptr(),data.nElements());
+            template <typename T> void getRmsStddev( const T* data, size_t count );
+            template <typename T> void getRmsStddev( const redux::util::Array<T>& data ) {
+                size_t nEl = data.nElements();
+                if( data.dense() ) getRmsStddev( data.ptr(), nEl );
                 else {
-                    redux::util::Array<T> tmp;
-                    data.copy(tmp);
-                    getRmsStddev(tmp.get(),data.nElements());
+                    if( nEl ) {
+                        std::unique_ptr<T[]> tmp( new T[ data.nElements() ]);
+                        data.template copyTo<T>( tmp.get() );
+                        getRmsStddev( tmp.get(), nEl );
+                    }
                 }
             }
-            template <typename T> void getNoise(const redux::util::Array<T>& data, int smooth=0);
-            void getNoise(const redux::image::FourierTransform& ft);
             
-            template <typename T> void getStats(const T* data, size_t count, int flags=ST_ALL);
-            template <typename T> void getStats(const redux::util::Array<T>& data, int flags=ST_ALL);
-            template <typename T> void getStats(uint32_t borderClip, const redux::util::Array<T>& data, int flags=ST_ALL);
+            template <typename T> void getNoise( const redux::util::Array<T>& data, int smooth=0 );
+            void getNoise( const redux::image::FourierTransform& ft );
+            
+            template <typename T> void getStats( const T* data, size_t count, int flags=ST_ALL );
+            template <typename T> void getStats( const redux::util::Array<T>& data, int flags=ST_ALL );
+            template <typename T> void getStats( uint32_t borderClip, const redux::util::Array<T>& data, int flags=ST_ALL );
             
             size_t size( void ) const;
             uint64_t pack( char* ) const;

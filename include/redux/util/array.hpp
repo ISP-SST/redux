@@ -212,6 +212,7 @@ namespace redux {
                 T* data;
             };
 
+            template <typename ...S> Array( void ) : dense_(true), begin_(0), end_(0) { clear(); }
             template <typename ...S>
             Array( T* data, S ...sizes ) : dense_(true), begin_(0), end_(0) {
                 wrap( data, sizes... );
@@ -511,6 +512,7 @@ namespace redux {
                 }
             }
 
+            
             template <typename U>
             void copy( Array<U>& out ) const {
                 if( !sameSizes( out ) ) out.resize(dimensions(true));
@@ -521,7 +523,6 @@ namespace redux {
                     std::transform(out.begin(), out.end(), begin(), out.begin(), redux::math::assign<U,T>());
                 }
             }
-
 
 
             Array<T>& trim( bool skipTrivialDims=true ) {
@@ -568,7 +569,7 @@ namespace redux {
                     return *datablock.get();
                 }
                 for( size_t i = 0; i < sz; ++i ) {
-                    if( tmp[i] < 0 || abs(tmp[i]) >= currentSizes[nDims_ - i - 1] ) {
+                    if( tmp[i] < 0 || static_cast<size_t>(tmp[i]) >= currentSizes[nDims_ - i - 1] ) {
                         throw std::out_of_range( "Array::at() Index out of range." );
                     }
                 }
@@ -975,17 +976,18 @@ namespace redux {
                 if( ! sameSize( rhs ) ) {
                     return false;
                 }
-                if( get() == rhs.get() ) {      // shared data, check if it is the same sub-array.
-                    if( dimFirst == rhs.dimFirst ) {
-                        return true;
-                    }
+                if( ptr() == rhs.ptr() ) {      // shared data, check if it is the same sub-array.
+                    return sameSizes(rhs);
                 }
                 // compare data.
-                const_iterator rhsit = rhs.begin();
-                for( const auto & value : *this ) {
-                    if( value != *rhsit++ ) return false;
+                if( dense_ && rhs.dense_ ) {
+                    return !std::memcmp( ptr(), rhs.ptr(), sizeof(T)*nElements_ );
+                } else {
+                    const_iterator rhsit = rhs.begin();
+                    for( const auto & value : *this ) {
+                        if( value != *rhsit++ ) return false;
+                    }
                 }
-
                 return true;
             }
             bool operator!=( const Array<T>& rhs ) const { return !( *this == rhs ); }
@@ -1041,15 +1043,12 @@ namespace redux {
 
             template <typename U>
             bool sameSizes( const Array<U>& rhs ) const {
-                if( nDims_ != rhs.nDims_ ) {
-                    return false;
-                }
-                for( size_t i = 0; i < nDims_; ++i ) {
-                    if( ( currentSizes[i] ) != ( rhs.currentSizes[i] ) ) {
-                        return false;
-                    }
-                }
-                return true;
+                std::vector<size_t> cS, rhsCS;
+                std::back_insert_iterator< std::vector<size_t> > back_it(cS);
+                std::back_insert_iterator< std::vector<size_t> > rhs_back_it(rhsCS);
+                std::copy_if( currentSizes.begin(), currentSizes.end(), back_it, [](const size_t& d) { return d>1; });
+                std::copy_if( rhs.currentSizes.begin(), rhs.currentSizes.end(), rhs_back_it, [](const size_t& d) { return d>1; });
+                return (cS == rhsCS);
             }
             
             template <typename U>

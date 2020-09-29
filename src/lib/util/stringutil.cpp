@@ -15,13 +15,16 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/multiprecision/cpp_int.hpp> 
 #include <boost/regex.hpp>
+#include <boost/date_time/posix_time/time_parsers.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/version.hpp>
-
+ 
 namespace bf = boost::filesystem;
 namespace bpt = boost::property_tree;
+namespace bpx = boost::posix_time;
 
 
 using namespace redux::util;
@@ -307,6 +310,68 @@ void redux::util::printProgress( const string& text, float progress ) {
     } else printf( "\r%s", text.c_str() );
     fflush(stdout);
 }
+
+
+namespace redux {
+    namespace util {
+        
+        template <typename T>       // the defaul template should work for all integer types
+        T stringTo( const std::string& v ) {
+            
+            if( !std::is_signed<T>::value && (v.find('-') != string::npos) ) {
+                throw boost::numeric::negative_overflow();
+            }
+
+            using boost::multiprecision::int128_t;
+            int128_t tmp = boost::lexical_cast<int128_t>( boost::trim_copy(v) );
+            
+            if( tmp > std::numeric_limits<T>::max() ) {
+                throw boost::numeric::positive_overflow();
+            }
+            if( tmp < std::numeric_limits<T>::min() ) {
+                throw boost::numeric::negative_overflow();
+            }
+
+            return boost::numeric_cast<T>( tmp );
+            
+        }
+        template <>
+        double stringTo( const std::string& v ) {
+            double val = boost::lexical_cast<double>( boost::trim_copy(v) );
+            /*if( std::isfinite(val) ) {
+                val = boost::numeric_cast<double>( val );   // TODO: how to properly test if we are casting too large (but valid) floats?
+            }*/
+            return val;
+        }
+        template <>
+        float stringTo( const std::string& v ) {
+            return  boost::lexical_cast<float>( boost::trim_copy(v) );
+        }
+        template <>
+        bool stringTo( const std::string& v ) {
+            string tmp = boost::trim_copy( v );
+            if( boost::iequals( tmp, "T") || boost::iequals( tmp, "true") || boost::iequals( tmp, "yes") ) return true;
+            if( boost::iequals( tmp, "F") || boost::iequals( tmp, "false") || boost::iequals( tmp, "no") ) return false;
+            return stringTo<int>(tmp);  // else interpret non-zero numerical values as true, 0 as false, or throw if not convertible to int.
+        }
+        template <>
+        bpx::ptime stringTo( const string& s ) {
+            if( s.find('T') == string::npos ) {
+                return bpx::from_iso_extended_string( s+"T00:00:00" );
+            }
+            return bpx::from_iso_extended_string( s );
+        }
+    }
+}
+template int8_t redux::util::stringTo<int8_t>( const string& );
+template uint8_t redux::util::stringTo<uint8_t>( const string& );
+template int16_t redux::util::stringTo<int16_t>( const string& );
+template uint16_t redux::util::stringTo<uint16_t>( const string& );
+template int32_t redux::util::stringTo<int32_t>( const string& );
+template uint32_t redux::util::stringTo<uint32_t>( const string& );
+template int64_t redux::util::stringTo<int64_t>( const string& );
+template uint64_t redux::util::stringTo<uint64_t>( const string& );
+
 
 
 template <typename T>

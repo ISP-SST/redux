@@ -108,8 +108,10 @@ namespace redux {
             return true;
         }
 
+        template <typename T> T Abs( const T& v );
         
-         /*! @name size
+        
+        /*! @name size
          *  @brief Return the proper size needed for packing/unpacking certain types/structures.
          */
         //@{

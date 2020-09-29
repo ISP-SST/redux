@@ -12,7 +12,7 @@ using namespace redux::util;
 using namespace std;
 
 template <typename T>
-void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
+void redux::util::ArrayStats::getMinMaxMean( const T* data, size_t n ) {
     
     min = std::numeric_limits<double>::max();
     max = std::numeric_limits<double>::lowest();
@@ -41,9 +41,14 @@ void redux::util::ArrayStats::getMinMaxMean(const T* data, size_t n) {
     
 }
 template void redux::util::ArrayStats::getMinMaxMean( const char*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const int8_t*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const uint8_t*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const int16_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const uint16_t*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const int32_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const uint32_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const int64_t*, size_t );
+template void redux::util::ArrayStats::getMinMaxMean( const uint64_t*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const float*, size_t );
 template void redux::util::ArrayStats::getMinMaxMean( const double*, size_t );
 
@@ -72,10 +77,17 @@ void redux::util::ArrayStats::getRmsStddev(const T* data, size_t n) {
         stddev = 0;
     }
 }
+template void redux::util::ArrayStats::getRmsStddev( const char*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const int8_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const uint8_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const int16_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const uint16_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const int32_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const uint32_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const int64_t*, size_t );
+template void redux::util::ArrayStats::getRmsStddev( const uint64_t*, size_t );
 template void redux::util::ArrayStats::getRmsStddev( const float*, size_t );
 template void redux::util::ArrayStats::getRmsStddev( const double*, size_t );
-template void redux::util::ArrayStats::getRmsStddev( const int16_t*, size_t );
-template void redux::util::ArrayStats::getRmsStddev( const int32_t*, size_t );
 
 
 void redux::util::ArrayStats::getNoise(const redux::image::FourierTransform& ft) {

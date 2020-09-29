@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <limits>
+#include <numeric>
 #include <utility>      // std::swap
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -32,9 +33,10 @@ namespace redux {
         template <typename T> T min(const T* data, size_t n=2) { if (n<1) return T(0); T ret = *data; while(--n) ret = std::min(*++data,ret); return ret; }
         template <typename T> T max(const T* data, size_t n=2) { if (n<1) return T(0); T ret = *data; while(--n) ret = std::max(*++data,ret); return ret; }
         template <typename T> double mean(const T* data, size_t n=2) {
-            if (n<1) return NAN;
-            double ret(static_cast<double>( *data ));
-            for( unsigned int i=1; i<n; ++i ) ret += static_cast<double>( *++data );
+            if( n<1 ) return NAN;
+            double ret( static_cast<double>( *data ) );
+            for( size_t i=1; i<n; ++i ) ret += static_cast<double>( *++data );
+            //ret = std::accumulate( data+1, data+n, 0.0 );
             return ret/n;
         }
         template <typename T> void minMaxMean(const T* data, size_t n, T& min, T& max, double& mean) {
@@ -53,14 +55,13 @@ namespace redux {
         }
         
         template <typename T>
-        void rmsStddev(const T* data, size_t n, double mean, double& rms, double& stddev) {
+        void rmsStddev( const T* data, size_t n, double mean, double& rms, double& stddev ) {
             if ( n > 1 ) {
                 rms = stddev = 0;
-                for( unsigned int i=0; i<n; ++i ) {
+                for( size_t i(0); i<n; ++i ) {
                     rms += static_cast<double>( *data * *data );
-                    double tmp = ( static_cast<double>( *data ) - mean );
+                    double tmp = ( static_cast<double>( *data++ ) - mean );
                     stddev += tmp * tmp;
-                    data++;
                 }
                 rms = sqrt( rms / n );
                 stddev = sqrt( stddev / (n-1) );
@@ -71,21 +72,20 @@ namespace redux {
         }
 
         template <typename T>
-        double rmsStddev(const T* data, size_t n, double& rms, double& stddev) {
-            if ( n > 1 ) {
+        double rmsStddev( const T* data, size_t n, double& rms, double& stddev ) {
+            if( n > 1 ) {
                 rms = stddev = 0;
-                double mn = mean(data,n);
-                for( unsigned int i=0; i<n; ++i ) {
-                    double tmp = static_cast<double>( *data );
+                double mn = mean( data, n );
+                for( size_t i(0); i<n; ++i ) {
+                    double tmp = static_cast<double>( *data++ );
                     rms += tmp * tmp;
                     tmp -= mn;
                     stddev += tmp * tmp;
-                    data++;
                 }
                 rms = sqrt( rms / n );
                 stddev = sqrt( stddev / (n-1) );
                 return mn;
-            } else if (n == 1) {
+            } else if( n == 1 ) {
                 rms = *data;
                 stddev = 0;
                 return rms;

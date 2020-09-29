@@ -11,14 +11,25 @@ if( RDX_WITH_FFTW3 )
     add_definitions(-DRDX_WITH_FFTW3)
 endif()
 
+if( RDX_WITH_FITS )
+    add_definitions(-DRDX_WITH_FITS)
+endif()
+
+include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
+
+# Common utilities
+file(GLOB RDX_TEST_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "include/*.cpp")
+#file(GLOB RDX_TEST_HPP RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "include/*.hpp")
+
 # Code for test modules
 file(GLOB RDX_TEST_FILE_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "file/*.cpp")
 file(GLOB RDX_TEST_IMAGE_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "image/*.cpp")
-#file(GLOB RDX_TEST_MATH_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "math/*.cpp")
+file(GLOB RDX_TEST_MATH_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "math/*.cpp")
 #file(GLOB RDX_TEST_MOMFBD_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "momfbd/*.cpp")
-#file(GLOB RDX_TEST_UTIL_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "util/*.cpp")
+file(GLOB RDX_TEST_UTIL_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "util/*.cpp")
 set( RDX_TEST_SRC
         "testsuite.cpp"
+        ${RDX_TEST_SRC}
         ${RDX_TEST_FILE_SRC}
         ${RDX_TEST_IMAGE_SRC}
         ${RDX_TEST_MATH_SRC}
@@ -26,7 +37,6 @@ set( RDX_TEST_SRC
         ${RDX_TEST_UTIL_SRC}
 )
 
-file(GLOB RDX_TEST_HPP RELATIVE ${CMAKE_CURRENT_LIST_DIR} "include/*.hpp")
 
 set(RDX_TESTDATA_DIR "${CMAKE_CURRENT_LIST_DIR}/testdata/")
 add_definitions(-DRDX_TESTDATA_DIR="${RDX_TESTDATA_DIR}")
@@ -38,7 +48,7 @@ if(WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHa")
 endif()
 
-RDX_ADD_EXECUTABLE(${TEST_NAME} ${RDX_TEST_SRC} ${RDX_TEST_HPP})
+RDX_ADD_EXECUTABLE( ${TEST_NAME} ${RDX_TEST_SRC} )
 
 set(TEST_CMD $<TARGET_FILE:${TEST_NAME}> --log_sink=test_log.xml
                               --log_format=XML
