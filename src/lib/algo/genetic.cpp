@@ -15,7 +15,10 @@ GeneticBase::GeneticBase ( unsigned int nParameters, unsigned int popSize ) : cr
     totalEffort ( 0 ),
     crossoverProbability ( 0.85 ),
     mutationProbability ( 0.1 ),
+    bPDF(),
     breedingProbability ( nullptr ),
+    allowPopFork( false ),
+    allowCrossBreed( false ),
     rng ( ::rand() ) {
 
 //    setFitnessFunction ( defaultMerit );

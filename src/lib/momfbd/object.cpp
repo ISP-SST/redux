@@ -47,49 +47,22 @@ using boost::algorithm::iequals;
 
 namespace {
     
-    bool checkImageScale( double& F, double& A, double& P, const string& logChannel ){
-
-        double rad2asec = 180.0 * 3600.0 / M_PI;
-        size_t count = F > 0 ? 1 : 0;
-        count += A > 0 ? 1 : 0;
-        count += P > 0 ? 1 : 0;
-        if( count > 2 ){
-//             LOG_WARN << "Too many parameters specified: replacing telescope focal length( " << F
-//                      << " )with computed value( " <<( P * rad2asec / A )<< ")" << ende;
-            F = P * rad2asec / A;
-            return true;
-        } else if( count < 2 ){
-//             LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided." << ende;
-        } else {    // count == 2
-            if( F <= 0 ){
-                F = P * rad2asec / A;
-            } else if( A <= 0 ){
-                A = P * rad2asec / F;
-            } else if( P <= 0 ){
-                P = F * A / rad2asec;
-            }
-            return true;
-        }
-        return false;
-    }
-
-
 }
 
 Object::Object( MomfbdJob& j, uint16_t id ): ObjectCfg(j), myJob(j), logger(j.logger), currentMetric(0), reg_gamma(0),
-    frequencyCutoff(0),pupilRadiusInPixels(0), ID(id), traceID(-1), objMaxMean(0), imgSize(0), nObjectImages(0 ){
-
-    setLogChannel(myJob.getLogChannel() );
+    frequencyCutoff(0),pupilRadiusInPixels(0), patchSize2(0), otfSize(0), otfSize2(0),
+    ID(id), traceID(-1), objMaxMean(0), imgSize(0), nObjectImages(0),
+    startT(bpx::not_a_date_time), endT(bpx::not_a_date_time) {
 
 }
 
 
-Object::Object( const Object& rhs, uint16_t id, int tid ) : ObjectCfg(rhs), myJob(rhs.myJob), logger(rhs.logger), channels(rhs.channels), currentMetric(rhs.currentMetric),
-                                reg_gamma(rhs.reg_gamma), frequencyCutoff(rhs.frequencyCutoff), pupilRadiusInPixels(rhs.pupilRadiusInPixels),
-                                ID (id), traceID(tid), objMaxMean(rhs.objMaxMean), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
-                                startT(rhs.startT), endT(rhs.endT) {
-
-    setLogChannel(myJob.getLogChannel());
+Object::Object( const Object& rhs, uint16_t id, int tid ) : ObjectCfg(rhs), myJob(rhs.myJob), logger(rhs.logger),
+    channels(rhs.channels), currentMetric(rhs.currentMetric), reg_gamma(rhs.reg_gamma),
+    frequencyCutoff(rhs.frequencyCutoff), pupilRadiusInPixels(rhs.pupilRadiusInPixels),
+    patchSize2(rhs.patchSize2), otfSize(rhs.otfSize), otfSize2(rhs.otfSize2),
+    ID (id), traceID(tid), objMaxMean(rhs.objMaxMean), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
+    startT(rhs.startT), endT(rhs.endT) {
 
 }
 
@@ -660,6 +633,33 @@ void Object::calcMetric( void ){
 }
 
 
+bool Object::checkImageScale( double& F, double& A, double& P ) {
+
+    double rad2asec = 180.0 * 3600.0 / M_PI;
+    size_t count = F > 0 ? 1 : 0;
+    count += A > 0 ? 1 : 0;
+    count += P > 0 ? 1 : 0;
+    if( count > 2 ){
+        LOG_WARN << "Too many parameters specified: replacing telescope focal length( " << F
+                    << " )with computed value( " <<( P * rad2asec / A )<< ")" << ende;
+        F = P * rad2asec / A;
+        return true;
+    } else if( count < 2 ){
+        LOG_ERR << "At least two of the parameters \"TELESCOPE_F\", \"ARCSECPERPIX\" and \"PIXELSIZE\" has to be provided." << ende;
+    } else {    // count == 2
+        if( F <= 0 ){
+            F = P * rad2asec / A;
+        } else if( A <= 0 ){
+            A = P * rad2asec / F;
+        } else if( P <= 0 ){
+            P = F * A / rad2asec;
+        }
+        return true;
+    }
+    return false;
+}
+
+
 bool Object::checkCfg( void ){
 
     if( ( saveMask & SF_SAVE_PSF )&&( saveMask & SF_SAVE_PSF_AVG) ){
@@ -675,7 +675,7 @@ bool Object::checkCfg( void ){
         LOG_FATAL << "The wavelength value (=" << wavelength << ") of Object #" << ID << " is out of bounds. [" << minWavelength << "," << maxWavelength << "]" << ende;
         return false;
     }
-    if( !checkImageScale( telescopeF, arcSecsPerPixel, pixelSize, logChannel) ){
+    if( !checkImageScale( telescopeF, arcSecsPerPixel, pixelSize ) ){
         return false;
     }
 

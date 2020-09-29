@@ -18,7 +18,7 @@ LogToNetwork::LogToNetwork( boost::asio::io_service& s, const network::Host::Ptr
 LogToNetwork::~LogToNetwork() {
     
     if( !itemQueue.empty() ) {
-        flushBuffer();
+        LogToNetwork::flushBuffer();
     }
 
 }

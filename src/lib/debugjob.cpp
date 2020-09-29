@@ -20,8 +20,6 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "debugjob";
-
     int64_t mandelbrot( const complex<double>& p, int maxIterations = 100 ) {
 
         complex<double> Z( 0, 0 );
@@ -56,7 +54,7 @@ uint64_t DebugJob::unpackParts( const char* ptr, WorkInProgress::Ptr wip, bool s
 }
 
 
-DebugJob::DebugJob( void ) : maxIterations( 1000 ), gamma( 1 ), xSize( 1920 ), ySize( 1080 ), coordinates { -1.9, 1.9, -0.9, 0.9 } {
+DebugJob::DebugJob( void ) : maxIterations( 1000 ), patchSize(0), gamma( 1 ), xSize( 1920 ), ySize( 1080 ), coordinates { -1.9, 1.9, -0.9, 0.9 } {
     info.typeString = "debugjob";
 }
 
@@ -182,8 +180,8 @@ bool DebugJob::check(void) {
     auto lock = getLock();
     int val = info.step;
     switch (val) {
-        case 0:                 ret = true; if(ret) info.step = JSTEP_SUBMIT; break;
-        case JSTEP_SUBMIT:      ret = true; if(ret) info.step = JSTEP_PREPROCESS; break;
+        case 0:                 ret = true; info.step = JSTEP_SUBMIT; break;
+        case JSTEP_SUBMIT:      ret = true; info.step = JSTEP_PREPROCESS; break;
         case JSTEP_PREPROCESS: ;                  // no checks at these steps, just fall through and return true
         case JSTEP_QUEUED: ;
         case JSTEP_RUNNING: ;

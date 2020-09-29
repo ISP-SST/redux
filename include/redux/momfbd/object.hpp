@@ -47,7 +47,7 @@ namespace redux {
 
         public:
 
-            Object( MomfbdJob&, uint16_t id=0 );
+            explicit Object( MomfbdJob&, uint16_t id=0 );
             Object( const Object&, uint16_t id=0, int tid=-1 );
             ~Object();
 
@@ -96,7 +96,7 @@ namespace redux {
             void dump( std::string tag );
         //private:
 
-            
+            bool checkImageScale( double&, double&, double& );
             bool checkCfg(void);
             bool checkData(bool verbose=false);
 

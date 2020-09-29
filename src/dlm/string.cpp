@@ -223,7 +223,6 @@ IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
     MT_KW kw;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, mt_kw_pars, (IDL_VPTR*)0, 255, &kw);
     
-    string ret;
     if (nPlainArgs < 1) {
         return IDL_StrToSTRING( (char*)"" );
     }

@@ -59,7 +59,7 @@ MomfbdJob::MomfbdJob( void ) : waveFronts(*this), cfgChecked(false), dataChecked
 
 MomfbdJob::~MomfbdJob( void ) {
     THREAD_MARK;
-    cleanup();
+    MomfbdJob::cleanup();
     Job::moveTo( this, Job::JSTEP_NONE );
     THREAD_MARK;
 }
@@ -595,19 +595,6 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
     THREAD_UNMARK;
     return false;
     
-}
-
-
-void MomfbdJob::setLogChannel(std::string channel) {
-    Job::setLogChannel(channel);
-    GlobalCfg::setLogChannel(channel);
-    waveFronts.setLogChannel(channel);
-    for( auto& obj : objects ) {
-        obj->setLogChannel(channel);
-        for (auto& ch : obj->channels) {
-            ch->setLogChannel(channel);
-        }
-    }
 }
 
 

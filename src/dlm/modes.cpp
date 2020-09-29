@@ -245,7 +245,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         const std::map<uint16_t, Zernike::KLPtr>& kle = Zernike::karhunenLoeveExpansion( kw.firstZernike, kw.lastZernike );
         vector<uint16_t> tmpM;
         vector<Zernike::KLPtr> tmp;
-        for( auto kl: kle  ) tmp.push_back( kl.second );
+        for( const auto& kl: kle ) tmp.push_back( kl.second );
         std::sort( tmp.begin(), tmp.end(), [](const Zernike::KLPtr& a, const Zernike::KLPtr& b){
             if( a->covariance == b->covariance ) return a->id < b->id;
             return a->covariance > b->covariance;

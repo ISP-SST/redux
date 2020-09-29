@@ -127,7 +127,7 @@ namespace {
         uint8_t u8[8];
     };
 
-    int preprocess_block( const int16_t* block, size_t blockSize, uint32_t* diff, int16_t refValue ) RDX_UNUSED;
+    int preprocess_block( const int16_t* block, size_t blockSize, uint32_t* diff, int16_t refValue );
 
     __attribute__ ((target ("default")))
     int preprocess_block( const int16_t* __restrict__ block, size_t blockSize, uint32_t* __restrict__ diff, int16_t refValue ) {

@@ -36,7 +36,7 @@ namespace {
     double julday(struct tm tm) {
         
         static const long IGREG = 15 + 31L * (10 + 12L * 152);
-        long jul, ja, jm;
+        long jul, jm;
 
         tm.tm_year += 1900;
 
@@ -54,7 +54,7 @@ namespace {
         jul = (long)(floor(365.25 * tm.tm_year) + floor(30.6001 * jm) + tm.tm_mday + 1 + 1720995);
 
         if( tm.tm_mday + 1 + 31L * (tm.tm_mon + 1 + 13L * tm.tm_year) >= IGREG ) {
-            ja = (long)(0.01* tm.tm_year);
+            long ja = (long)(0.01* tm.tm_year);
             jul += 2 - ja + (long)(0.25*ja);
         }
 
@@ -756,7 +756,6 @@ void convertlog_proc( int argc, IDL_VPTR* argv, char* argk ) {
             in.seekg( 0, std::ios::beg );
             in.read( &content[0], content.size() );
             in.close();
-            content.data();
         } else {
             throw std::ios_base::failure( "Failed to open file: " + infile );
         }

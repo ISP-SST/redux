@@ -72,7 +72,6 @@ namespace {
             IDL_StructDefPtr structDef = data->value.s.sdef;
             //uint8_t *buf = data->value.s.arr->data;
             int nTags = IDL_StructNumTags ( structDef );
-            int count;
 
             for ( int t = 0; t < nTags; ++t ) {
 
@@ -80,7 +79,7 @@ namespace {
                 IDL_VPTR v;
                 IDL_MEMINT offset = IDL_StructTagInfoByIndex ( structDef, t, 0, &v );
                 string type = string ( var_names[v->type] );
-                count = 1;
+                int count = 1;
                 if ( v->flags & IDL_V_ARR ) {
                     type.append ( "(" );
                     for ( int d = 0; d < v->value.arr->n_dim; ++d ) {
@@ -429,7 +428,6 @@ namespace {
 
         IDL_STRING *strPtr = reinterpret_cast<IDL_STRING*> ( data+count );
         IDL_INT* intPtr;
-        float* fPtr;
 
         // Version string
         // strPtr[0].stype = 0; //IDL_V_DYNAMIC;    // flag as dynamic (container will be deleted when destructed)
@@ -476,7 +474,7 @@ namespace {
         while ( count % 4 ) count++;                // align to 4-byte boundary
         
         if ( ( loadMask & MOMFBD_MODES ) && info->version >= 20110714.0 ) {
-            fPtr = reinterpret_cast<float*> ( data+count );
+            float* fPtr = reinterpret_cast<float*> ( data+count );
             fPtr[0] = info->pix2cf;
             fPtr[1] = info->cf2pix;
             count += 2 * sizeof ( float );

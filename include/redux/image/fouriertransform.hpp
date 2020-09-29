@@ -69,7 +69,8 @@ namespace redux {
             FourierTransform( const FourierTransform& );
             FourierTransform( FourierTransform&& );
             FourierTransform( size_t ySize, size_t xSize, int flags=0, uint8_t nThreads=1 );
-            template <typename T> FourierTransform( const Array<T>& rhs, int flags=0, uint8_t nT=1 ) :
+            template <typename T>
+            explicit FourierTransform( const Array<T>& rhs, int flags=0, uint8_t nT=1 ) :
                 centered (false), normalized (false), currentFlags(flags), nThreads(nT),
                 inputSize(0), ftSize(0), inPixels(0), ftPixels(0), currentBlockSize(0) {
                     const auto& dims = rhs.dimensions(true);
@@ -290,20 +291,20 @@ namespace redux {
             }
             template <typename T>
             static void autocorrelate( redux::util::Array<T>& inout, bool center=false ) {
-                FourierTransform ft( inout, FULLCOMPLEX );
-                ft.norm();
-                ft.ift( inout.get(), NORMALIZE_FT|FULLCOMPLEX );
-                if( center ) reorder( inout.get(), ft.inputSize.y, ft.inputSize.x );
+                FourierTransform tmpFT( inout, FULLCOMPLEX );
+                tmpFT.norm();
+                tmpFT.ift( inout.get(), NORMALIZE_FT|FULLCOMPLEX );
+                if( center ) reorder( inout.get(), tmpFT.inputSize.y, tmpFT.inputSize.x );
             }
             template <typename T, typename U>
             static void autocorrelate( const redux::util::Array<T>& in, redux::util::Array<T>& out, bool center=false ) {
-                FourierTransform ft( in, FULLCOMPLEX );
-                ft.autocorrelate( in.get(), out.get(), center );
+                FourierTransform tmpFT( in, FULLCOMPLEX );
+                tmpFT.autocorrelate( in.get(), out.get(), center );
             }
             template <typename T>
             static void autocorrelate( T* inout, size_t nY, size_t nX, bool center=false ) {
-                FourierTransform ft( inout, nY, nX, FULLCOMPLEX );
-                ft.autocorrelate( inout, inout, center );
+                FourierTransform tmpFT( inout, nY, nX, FULLCOMPLEX );
+                tmpFT.autocorrelate( inout, inout, center );
             }
 
             template <typename T, typename U>

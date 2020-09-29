@@ -23,7 +23,7 @@ CacheItem::CacheItem(void) : itemPath(""), fullPath(""), isLoaded(true), cachedS
 
 
 CacheItem::CacheItem(const string& path) : itemPath(""), fullPath(""), isLoaded(true), cachedSize(0) {
-    setPath(path);
+    CacheItem::setPath(path);
     unique_lock<mutex> lock(itemMutex);
     if ( bfs::exists(fullPath) ) {
         bfs::remove(fullPath);      // HACK  for now we just delete pre-existing file, later we want to recover after crash...

@@ -525,7 +525,6 @@ void redux::file::Ana::write( const string& filename, const char* data, const sh
     }
 
     size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
-    size_t compressedSize = totalSize;
 
     hdr->m_Header.synch_pattern = MAGIC_ANA;
     hdr->m_Header.subf = 0;
@@ -534,7 +533,7 @@ void redux::file::Ana::write( const string& filename, const char* data, const sh
     shared_ptr<uint8_t> cData;
     if( compress ) {
         if( hdr->m_Header.ndim == 2 ) {
-            compressedSize = compressData( cData, data, nElements, hdr, slice );
+            size_t compressedSize = compressData( cData, data, nElements, hdr, slice );
             if( compressedSize < totalSize ) {
                 int tmp = static_cast<int>( compressedSize );
                 hdr->m_Header.subf |= 1;
@@ -694,11 +693,9 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
         throw ios_base::failure( "Failed to open file: " + filename );
     }
 
-    hdr->m_Header.datyp = getDatyp<T>();
 
     size_t textSize = hdr->m_ExtendedHeader.length();
     size_t totalSize = nElements * typeSizes[hdr->m_Header.datyp];
-    size_t compressedSize = totalSize;
 
     hdr->m_Header.synch_pattern = MAGIC_ANA;
     hdr->m_Header.subf = 0;
@@ -708,10 +705,10 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
     shared_ptr<uint8_t> cData;
     if( sliceSize > 0 ) {
         if( hdr->m_Header.ndim == 2 ) {
+            size_t compressedSize = totalSize;
             if( data.dense() ) {
                 compressedSize = compressData( cData, reinterpret_cast<const char*>( data.get() ), nElements, hdr, sliceSize );
-            }
-            else {
+            } else {
                 compressedSize = compressData( cData, reinterpret_cast<const char*>( data.copy().get() ), nElements, hdr, sliceSize );
             }
             if( compressedSize < totalSize ) {
@@ -801,6 +798,10 @@ void redux::file::Ana::write( const string & filename, const T* data, size_t n )
     tmpHdr.m_Header.subf = 0;
     tmpHdr.m_Header.nhb = 1;
 
+    if( tmpHdr.m_Header.datyp == ANA_UNDEF ) {
+        throw ios_base::failure( "Ana::write is not implemented for type: "+to_string(tmpHdr.m_Header.datyp) );
+    }
+    
     tmpHdr.write( file );
 
     file.write( reinterpret_cast<const char*>( data ), tmpHdr.m_Header.dim[0]*typeSizes[tmpHdr.m_Header.datyp] );

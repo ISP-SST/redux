@@ -107,9 +107,8 @@ void WaveFront::dump( std::string tag, bool dumpImages ) const {
     
 }
 
-WaveFronts::WaveFronts( MomfbdJob& j ) : myJob(j), logger(j.logger) {
+WaveFronts::WaveFronts( MomfbdJob& j ) : myJob(j), logger(j.logger), nModes(0), nWaveFronts(0), coefficients() {
 
-   logChannel = myJob.getLogChannel();
 
 }
 

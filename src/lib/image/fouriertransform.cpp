@@ -356,14 +356,16 @@ template void FourierTransform::init( const double*, size_t, size_t, int, uint8_
 
 
 FourierTransform::FourierTransform() : centered(false), normalized(true),
-    currentFlags(0), nThreads(1), inputSize(0), ftSize(0), inPixels(0), ftPixels(0), currentBlockSize(0) {
+    currentFlags(0), nThreads(1), inputSize(0), ftSize(0), inPixels(0), ftPixels(0), currentBlockSize(0),
+    ftPtr(nullptr), tmpPtr(nullptr), tmpPtr2(nullptr) {
 
 }
 
 
 FourierTransform::FourierTransform( size_t ySize, size_t xSize, int flags, uint8_t nT ) :
     centered(false), normalized(false), currentFlags(flags), nThreads(nT),
-    inputSize(0), ftSize(0), inPixels(0), ftPixels(0), currentBlockSize(0) {
+    inputSize(0), ftSize(0), inPixels(0), ftPixels(0), currentBlockSize(0),
+    ftPtr(nullptr), tmpPtr(nullptr), tmpPtr2(nullptr) {
 
     init( ySize, xSize, flags, nT );
     
@@ -378,7 +380,8 @@ FourierTransform::FourierTransform( size_t ySize, size_t xSize, int flags, uint8
 FourierTransform::FourierTransform( const FourierTransform& rhs ) : plan_full(rhs.plan_full), plan_half(rhs.plan_half),
     centered(rhs.centered), normalized(rhs.normalized),
     currentFlags(rhs.currentFlags), nThreads(rhs.nThreads), inputSize(rhs.inputSize), ftSize(rhs.ftSize),
-    inPixels(rhs.inPixels), ftPixels(rhs.ftPixels), currentBlockSize(0) {
+    inPixels(rhs.inPixels), ftPixels(rhs.ftPixels), currentBlockSize(0),
+    ftPtr(rhs.ftPtr), tmpPtr(rhs.tmpPtr), tmpPtr2(rhs.tmpPtr2) {
         
     resize( inPixels );
     std::copy_n( rhs.ftPtr, ftPixels, ftPtr );
@@ -388,9 +391,9 @@ FourierTransform::FourierTransform( const FourierTransform& rhs ) : plan_full(rh
 
 
 FourierTransform::FourierTransform( FourierTransform&& rhs ) : plan_full(rhs.plan_full), plan_half(rhs.plan_half),
-    centered(rhs.centered), normalized(rhs.normalized),
-    nThreads(rhs.nThreads), inputSize(rhs.inputSize), ftSize(rhs.ftSize), inPixels(rhs.inPixels), ftPixels(rhs.ftPixels), currentBlockSize(0),
-    ftData(rhs.ftData) {
+    centered(rhs.centered), normalized(rhs.normalized), nThreads(rhs.nThreads), inputSize(rhs.inputSize),
+    ftSize(rhs.ftSize), inPixels(rhs.inPixels), ftPixels(rhs.ftPixels), currentBlockSize(0),
+    ftData(rhs.ftData), ftPtr(rhs.ftPtr), tmpPtr(rhs.tmpPtr), tmpPtr2(rhs.tmpPtr2) {
 
     wrap();
 

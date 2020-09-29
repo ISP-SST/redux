@@ -22,7 +22,7 @@ namespace redux {
             std::vector<uint16_t> modeNumbers;
             double pupilRadius, angle, cutoff;
             std::string filename;
-            ModeInfo ( const std::string&, uint16_t nPixels=0 );
+            explicit ModeInfo ( const std::string&, uint16_t nPixels=0 );
             ModeInfo ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
             ModeInfo ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
             ModeInfo ( uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff );

@@ -475,16 +475,17 @@ void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const floa
 }
 
 
-FileMomfbd::FileMomfbd ( void ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), modifiedTime(bpx::not_a_date_time),
-    nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( 0 ),
-    modesOffset ( 0 ), filenameOffset ( 0 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false )  {
+FileMomfbd::FileMomfbd( void ) : version(0), pix2cf(NAN), cf2pix(NAN), modifiedTime(bpx::not_a_date_time), region{0,0,0,0},
+    nChannels(0), nFileNames(0), nPH(0), nModes(0), nPatchesX(0), nPatchesY(0), nPoints(0), phOffset(0),
+    modesOffset(0), filenameOffset(0), patchDataSize(0), headerSize(0), dataMask(0), swapNeeded(false), patches()  {
 
 }
 
 
-FileMomfbd::FileMomfbd ( const std::string& filename ) : version ( 0 ), pix2cf(NAN), cf2pix(NAN), modifiedTime(bpx::not_a_date_time),
-    nChannels ( 0 ), nFileNames ( 0 ), nPH ( 0 ), nModes ( 0 ), nPatchesX( 0 ), nPatchesY( 0 ), nPoints(0), phOffset ( -1 ),
-    modesOffset ( -1 ), filenameOffset ( -1 ), patchDataSize ( 0 ), headerSize ( 0 ), dataMask(0), swapNeeded ( false ) {
+FileMomfbd::FileMomfbd( const std::string& filename ) : version(0), pix2cf(NAN), cf2pix(NAN),
+    modifiedTime(bpx::not_a_date_time), region{0,0,0,0}, nChannels(0), nFileNames(0), nPH(0),
+    nModes(0), nPatchesX(0), nPatchesY(0), nPoints(0), phOffset(-1), modesOffset(-1), 
+    filenameOffset(-1), patchDataSize(0), headerSize(0), dataMask(0), swapNeeded(false), patches() {
 
     read ( filename );
     

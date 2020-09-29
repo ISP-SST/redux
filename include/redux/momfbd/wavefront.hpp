@@ -68,13 +68,11 @@ namespace redux {
             void maybeInitializeStorage( void );          
             void getStorage( PatchData& );          
             void loadInit( boost::asio::io_service& service, redux::util::Array<PatchData::Ptr>& patches );
-            void setLogChannel( const std::string& channel ) { logChannel = channel; };
 
             size_t nModes;
             size_t nWaveFronts;
             redux::util::Array<float> coefficients;
             std::string cacheFile;
-            std::string logChannel;
             std::mutex mtx;
 
         };

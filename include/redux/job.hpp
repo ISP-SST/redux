@@ -192,8 +192,6 @@ namespace redux {
         
         std::string cfg(void);
         
-        virtual void setLogChannel(std::string channel) { jobLogChannel = channel; };
-        std::string getLogChannel(void) { return jobLogChannel; }
         redux::logging::Logger& getLogger(void) { return logger; }
         void startLog(bool overwrite=false);
         void printJobInfo(void);
@@ -230,7 +228,6 @@ namespace redux {
         std::mutex jobMutex;
         static std::mutex globalMutex;
         std::string cachePath;
-        std::string jobLogChannel;
         redux::logging::Logger logger;
         
         boost::asio::io_service ioService;

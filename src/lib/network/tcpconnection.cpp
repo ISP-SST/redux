@@ -44,7 +44,7 @@ namespace {
 
 TcpConnection::TcpConnection( ba::io_service& io_service )
     : activityCallback( nullptr ), urgentCallback( nullptr ), errorCallback( nullptr ), mySocket( io_service ),
-    myService( io_service ), swapEndian_(false), urgentActive(false), id( getID() ) {
+    myService( io_service ), swapEndian_(false), urgentData(0), urgentActive(false), id( getID() ) {
 #ifdef DBG_NET_
     LOG_DEBUG << "Constructing TcpConnection: (" << hexString(this) << ")  ID: " << id << "/" << idCount() << ende;
 #endif

@@ -101,7 +101,7 @@ void Pupil::calculatePupilSize (double &frequencyCutoff, double &pupilRadiusInPi
 
 
 Pupil::Pupil( uint16_t pixels, double pupilRadius )
-    : info( pixels, pupilRadius, 0 ), nPixels(pixels), radius(pupilRadius), area(0) {
+    : info( pixels, pupilRadius, 0 ), nPixels(pixels), radius(pupilRadius), co_radius(0), area(0) {
 
     generate(pixels,pupilRadius);
     
@@ -109,14 +109,14 @@ Pupil::Pupil( uint16_t pixels, double pupilRadius )
 
 Pupil::Pupil(Pupil&& rhs) : redux::util::Array<double>(std::move(reinterpret_cast<redux::util::Array<double>&>(rhs))),
     info( std::move(rhs.info) ), nPixels(std::move(rhs.nPixels)), radius(std::move(rhs.radius)),
-    area(std::move(rhs.area)), pupilSupport(std::move(rhs.pupilSupport)),
+    co_radius(std::move(rhs.co_radius)), area(std::move(rhs.area)), pupilSupport(std::move(rhs.pupilSupport)),
     otfSupport(std::move(rhs.otfSupport)), pupilInOTF(std::move(rhs.pupilInOTF)) {
 
 }
 
 
 Pupil::Pupil(const Pupil& rhs) : redux::util::Array<double>(reinterpret_cast<const redux::util::Array<double>&>(rhs)),
-    info(rhs.info), nPixels(rhs.nPixels), radius(rhs.radius), area(rhs.area),
+    info(rhs.info), nPixels(rhs.nPixels), radius(rhs.radius), co_radius(rhs.co_radius), area(rhs.area),
     pupilSupport(rhs.pupilSupport), otfSupport(rhs.otfSupport), pupilInOTF(rhs.pupilInOTF)  {
     
 }

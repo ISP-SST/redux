@@ -25,11 +25,11 @@ namespace redux {
         public:
 
             Logger(void);
-            Logger( bpo::variables_map& );
+            explicit Logger( bpo::variables_map& );
             ~Logger();
             
             void append( LogItem& );
-            void flushBuffer( void );
+            void flushBuffer( void ) override;
             void flushAll( void );
 
             void addLogger( Logger& );      // forward output to another Logger instance.

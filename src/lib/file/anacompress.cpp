@@ -30,7 +30,7 @@ uint32_t redux::file::anacrunchrun8(uint8_t* x, const uint8_t* array, int slice,
 
     /* begin execution */
     if(limit < 25) {
-        fprintf(stderr, "limit (%d) too small in crunchrun8\n", limit);
+        fprintf(stderr, "limit (%u) too small in crunchrun8\n", limit);
         return -1;
     }
     limit = limit - 24; /* need 14 for header and some margin since
@@ -306,7 +306,7 @@ uint32_t redux::file::anacrunch8(uint8_t* x, const uint8_t* array, int slice, in
 
     /* begin execution */
     if(limit < 25) {
-        fprintf(stderr, "limit (%d) too small in crunch8\n", limit);
+        fprintf(stderr, "limit (%u) too small in crunch8\n", limit);
         return -1;
     }
     limit = limit - 24; /* need 14 for header and some margin since
@@ -482,7 +482,7 @@ uint32_t redux::file::anacrunchrun(uint8_t* x, const int16_t* array, int slice, 
 
     /* begin execution */
     if(limit < 25) {
-        fprintf(stderr, "limit (%d) too small in crunchrun\n", limit);
+        fprintf(stderr, "limit (%u) too small in crunchrun\n", limit);
         return -1;
     }
     limit = limit - 24; /* need 14 for header and some margin since
@@ -768,7 +768,7 @@ uint32_t redux::file::anacrunch(uint8_t* x, const int16_t* array, int slice, int
     } y;
 
     if(limit < 25) {
-        fprintf(stderr, "limit (%d) too small in crunch\n", limit);
+        fprintf(stderr, "limit (%u) too small in crunch\n", limit);
         return -1;
     }
     limit -= 24;        // need 14 for header and some margin since we don't check all times
@@ -941,7 +941,7 @@ uint32_t redux::file::anacrunch32(uint8_t* x, const int32_t* array, int slice, i
 
     /* begin execution */
     if(limit < 25) {
-        fprintf(stderr, "limit (%d) too small in crunch32\n", limit);
+        fprintf(stderr, "limit (%u) too small in crunch32\n", limit);
         return -1;
     }
     limit = limit - 24; /* need 14 for header and some margin since
@@ -991,7 +991,7 @@ uint32_t redux::file::anacrunch32(uint8_t* x, const int32_t* array, int slice, i
             outBytes = outBits >> 3;
             j = outBits % 8;
             if(outBytes > limit) {
-                fprintf(stderr, "went to far: limit (%d) in crunch32\n", limit);
+                fprintf(stderr, "went to far: limit (%u) in crunch32\n", limit);
                 return -1;  /* bad news, went too far */
             }
             /* now load nb bytes into x */

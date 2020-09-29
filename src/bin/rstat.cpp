@@ -20,8 +20,6 @@ namespace bdt=boost::date_time;
 
 namespace {
 
-    const string logChannel = "rdx_stat";
-
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
 

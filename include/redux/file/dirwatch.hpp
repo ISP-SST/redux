@@ -35,7 +35,7 @@ namespace redux {
             
         public:
             DirWatch();
-            DirWatch( const std::string &dirname, uint32_t mask=IN_CREATE|IN_DELETE|IN_MOVED_FROM|IN_MOVED_TO );
+            explicit DirWatch( const std::string &dirname, uint32_t mask=IN_CREATE|IN_DELETE|IN_MOVED_FROM|IN_MOVED_TO );
             
             void start(void);
             void stop(void);

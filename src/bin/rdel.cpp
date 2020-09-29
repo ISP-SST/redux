@@ -28,8 +28,6 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "rdx_del";
-
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
 

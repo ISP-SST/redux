@@ -39,7 +39,7 @@ namespace redux {
             
             static void calculatePupilSize(double &, double &, uint16_t&, double, uint32_t, double, double );
             
-            Pupil(void) : info(0,0,0) {};
+            Pupil(void) : info(0,0,0), nPixels(0), radius(0), co_radius(0), area(0) {};
             Pupil( uint16_t pixels, double pupilRadius );
             Pupil(Pupil&& rhs);
             Pupil(const Pupil& rhs);

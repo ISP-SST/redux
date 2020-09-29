@@ -753,8 +753,8 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
         
         if( kw.verbose > 1 ) {
             vector<double> cc;
-            for (auto r : results) cc.push_back (r.first);
-            std::sort(cc.rbegin(),cc.rend());
+            for( const auto& r : results ) cc.push_back( r.first );
+            std::sort( cc.rbegin(), cc.rend() );
             cout << printArray (cc, "correlations") << endl;
             cout << matches.size() << " pairs matched using a maximum distance of " << (medianNN1/3) << " for pairing." << endl;
         }
@@ -1962,11 +1962,11 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         if( kw.pinh_align && kw.xyc ) {
-            IDL_VPTR tmp;
-            IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nImages) }; 
-            float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmp ); //IDL_ARR_INI_ZERO
+            IDL_VPTR tmpXYC;
+            IDL_MEMINT dimsXYC[] = { 2, static_cast<IDL_MEMINT>(nImages) }; 
+            float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dimsXYC, IDL_ARR_INI_ZERO, &tmpXYC ); //IDL_ARR_INI_ZERO
             memcpy( tmpData, *shifts, 2*nImages*sizeof(float));
-            IDL_VarCopy( tmp, kw.xyc );
+            IDL_VarCopy( tmpXYC, kw.xyc );
         }
         
         
@@ -2643,28 +2643,28 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         if( kw.summed ) {
-            IDL_VPTR tmp;
-            double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &tmp );
+            IDL_VPTR tmpSummed;
+            double* tmpData = (double*)IDL_MakeTempArray( IDL_TYP_DOUBLE, 2, dims, IDL_ARR_INI_NOP, &tmpSummed );
             memcpy( tmpData, summedData, nPixels*sizeof(double));
-            IDL_VarCopy( tmp, kw.summed );
+            IDL_VarCopy( tmpSummed, kw.summed );
         }
 
         if( nDiscarded && kw.discarded ) {
-            IDL_VPTR tmp;
+            IDL_VPTR tmpDiscarded;
             IDL_MEMINT nD = discarded.size();
             IDL_MEMINT dims[] = { nD }; 
-            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmp );
+            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmpDiscarded );
             memcpy( tmpData, discarded.data(), nD*sizeof(int32_t));
-            IDL_VarCopy( tmp, kw.discarded );
+            IDL_VarCopy( tmpDiscarded, kw.discarded );
         }
         
         if( kw.framenumbers ) {
-            IDL_VPTR tmp;
+            IDL_VPTR tmpFN;
             IDL_MEMINT nFN = frameNumbers.size();
             IDL_MEMINT dims[] = { nFN }; 
-            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmp );
+            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmpFN );
             memcpy( tmpData, frameNumbers.data(), nFN*sizeof(int32_t));
-            IDL_VarCopy( tmp, kw.framenumbers );
+            IDL_VarCopy( tmpFN, kw.framenumbers );
         }
 
         if( kw.nsummed ) {
@@ -2673,11 +2673,11 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         if( kw.pinh_align && kw.xyc ) {
-            IDL_VPTR tmp;
+            IDL_VPTR tmpXYC;
             IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nTotalFrames) }; 
-            float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmp ); //IDL_ARR_INI_ZERO
+            float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmpXYC ); //IDL_ARR_INI_ZERO
             memcpy( tmpData, *shifts, 2*nTotalFrames*sizeof(float));
-            IDL_VarCopy( tmp, kw.xyc );
+            IDL_VarCopy( tmpXYC, kw.xyc );
         }
         
         if( !time_beg.empty() ) {

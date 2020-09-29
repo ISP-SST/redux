@@ -124,7 +124,7 @@ namespace redux {
         std::shared_ptr<T> rdx_get_shared( size_t n ) {
 #ifdef RDX_TRACE_MEM
 #ifdef RDX_WITH_FFTW3
-            T* tmp = (T*)fftw_malloc(n*sizeof(T));
+            T* tmp = reinterpret_cast<T*>(fftw_malloc(n*sizeof(T)));
 #else
             T* tmp = new T[n];
 #endif
@@ -149,7 +149,7 @@ namespace redux {
 #else
             return std::shared_ptr<T>(
 #ifdef RDX_WITH_FFTW3
-                (T*)fftw_malloc(n*sizeof(T)),
+                reinterpret_cast<T*>(fftw_malloc(n*sizeof(T))),
 #else
                 new T[n],
 #endif

@@ -145,7 +145,7 @@ namespace redux {
             redux::util::Region16 roi;                       //! Region/position of this patch in the full image
             float finalMetric;
             std::vector<float> metrics;
-            PatchData( MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
+            explicit PatchData( MomfbdJob& j, uint16_t yid=0, uint16_t xid=0);
             PatchData( const PatchData& ) = delete;
             ~PatchData();
 

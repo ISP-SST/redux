@@ -28,15 +28,13 @@ using boost::algorithm::iequals;
 
 namespace {
 
-    boost::system::error_code ec;
-    /*const*/ GlobalCfg globalDefaults;
-    const string basisTags[] = {"","Zernike","Karhunen-Loeve"};
-    const string fpmTags[] = {"","median","invdistweight","horint"};
-    const string gmTags[] = {"","gradient_diff","gradient_Vogel"};
-    const string gsmTags[] = {"","getstep_steepest_descent","getstep_conjugate_gradient","getstep_BFGS","getstep_BFGS_inv"};
-    const string ftTags[] = {"","ANA","FITS","ANA,FITS","MOMFBD", "ANA,MOMFBD", "FITS,MOMFBD", "ANA,FITS,MOMFBD"};
-    const string ftExt[] = {"","f0","fits","","momfbd"};
-    const string dtTags[] = {"byte","short","int","int64","float","double"};
+    const char* basisTags[] = { "", "Zernike", "Karhunen-Loeve" };
+    const char* fpmTags[] = { "", "median", "invdistweight", "horint" };
+    const char* gmTags[] = { "", "gradient_diff", "gradient_Vogel" };
+    const char* gsmTags[] = { "", "getstep_steepest_descent", "getstep_conjugate_gradient", "getstep_BFGS", "getstep_BFGS_inv" };
+    const char* ftTags[] = { "", "ANA", "FITS", "ANA,FITS", "MOMFBD", "ANA,MOMFBD", "FITS,MOMFBD", "ANA,FITS,MOMFBD" };
+    const char* ftExt[] = { "", "f0", "fits", "", "momfbd" };
+    const char* dtTags[] = { "byte", "short", "int", "int64", "float", "double" };
 
     template <typename T>
     int getFromMap( const string& str, const map<string, int, T>& m ) {
@@ -149,7 +147,7 @@ const map<string, int, cicomp> redux::momfbd::getstepMap = {
 
 ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), physicalDefocusDistance(false), noRestore(false),
         borderClip(100), incomplete(0), discard(2,0),
-        mmRow(0), mmWidth(0), imageNumberOffset(0), logChannel("config") {
+        mmRow(0), mmWidth(0), imageNumberOffset(0) {
 
 }
 
@@ -678,14 +676,16 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     if( tmpString.length() ) {
         if( iequals(tmpString, "Karhunen-Loeve") || iequals(tmpString, "KL") ) {
             modeBasis = KARHUNEN_LOEVE;
-        } else
-            if( iequals(tmpString, "Zernike") || iequals(tmpString, "Z") ) {
-                modeBasis = ZERNIKE;
-            } else {
-                LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \""
-                        << basisTags[globalDefaults.modeBasis] << "\"" << ende;
-                modeBasis = defaults.modeBasis;
-            }
+            LOG_DETAIL << "Using Karhunen-Loeve basis modes." << ende;
+        } else if( iequals(tmpString, "Zernike") || iequals(tmpString, "Z") ) {
+            modeBasis = ZERNIKE;
+            LOG_DETAIL << "Using Zernike basis modes." << ende;
+        } else {
+            LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \""
+                    << basisTags[defaults.modeBasis] << "\"" << ende;
+        }
+    } else {
+        LOG_DETAIL << "No BASIS specified, using default: \"" << basisTags[defaults.modeBasis] << "\"" << ende;
     }
 
     klMinMode  = getValue( tree, "KL_MIN_MODE", defaults.klMinMode );
@@ -699,13 +699,13 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
         const std::map<uint16_t, Zernike::KLPtr>& kle = Zernike::karhunenLoeveExpansion( klMinMode, klMaxMode );
         vector<uint16_t> tmpM;
         vector<Zernike::KLPtr> tmp;
-        for( auto kl: kle  ) tmp.push_back( kl.second );
+        for( const auto& kl: kle  ) tmp.push_back( kl.second );
         std::sort( tmp.begin(), tmp.end(), [](const Zernike::KLPtr& a, const Zernike::KLPtr& b){
             if( a->covariance == b->covariance ) return a->id < b->id;
             return a->covariance > b->covariance;
             
         });
-        for( auto& i: modeNumbers  ) {
+        for( const auto& i: modeNumbers  ) {
             if( i<klMinMode || i >= tmp.size() ) continue;
             if( i < klMinMode ) {                 // the KL-expansion does not include these
                 tmpM.push_back( i );
@@ -780,7 +780,8 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     if( iequals( tmpString, "FLOAT") ) outputDataType = DT_F32T;
     else if( iequals( tmpString, "SHORT") ) outputDataType = DT_I16T;
     else {
-        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString << "\", using default ( " +dtTags[outputDataType]+ ")" << ende;
+        LOG_WARN << "\"DATA_TYPE\" unrecognized data type \"" << tmpString
+                 << "\", using default ( "  << dtTags[outputDataType] << ")" << ende;
     }
 
     sequenceNumber = getValue( tree, "SEQUENCE_NUM", defaults.sequenceNumber );

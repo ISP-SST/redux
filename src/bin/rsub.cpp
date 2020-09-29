@@ -26,8 +26,6 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "rdx_sub";
-
     // define options specific to this binary
     bpo::options_description getOptions( void ) {
 
@@ -86,7 +84,7 @@ namespace {
 
 void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Logger& logger) {
     
-    Host& me = Host::myInfo();
+    const Host& me = Host::myInfo();
     Host::HostInfo master;
     uint8_t cmd = CMD_CONNECT;
     try {

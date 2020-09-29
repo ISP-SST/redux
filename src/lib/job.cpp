@@ -165,27 +165,13 @@ Job::Info::Info(void) : id(0), timeout(36000), maxProcessingTime(0),
 }
 
 
-Job::Info::Info(const Info& rhs) {
+Job::Info::Info(const Info& rhs) : id(rhs.id), timeout(rhs.timeout), maxProcessingTime(rhs.maxProcessingTime),
+        priority(rhs.priority), verbosity(rhs.verbosity), maxPartRetries(rhs.maxPartRetries),
+        maxThreads(rhs.maxThreads), flags(rhs.flags), step(rhs.step.load()), state(rhs.state.load()),
+        typeString(rhs.typeString), name(rhs.name), user(rhs.user), host(rhs.host), logFile(rhs.logFile), outputDir(rhs.outputDir),
+        submitTime(rhs.submitTime), startedTime(rhs.startedTime), completedTime(rhs.completedTime) {
 
-    id = rhs.id;
-    timeout = rhs.timeout;
-    maxProcessingTime = rhs.maxProcessingTime;
-    priority = rhs.priority;
-    verbosity = rhs.verbosity;
-    maxPartRetries = rhs.maxPartRetries;
-    maxThreads = rhs.maxThreads;
-    step = rhs.step.load();
-    state = rhs.state.load();
-    typeString = rhs.typeString;
-    name = rhs.name;
-    user = rhs.user;
-    host = rhs.host;
-    logFile = rhs.logFile;
-    outputDir = rhs.outputDir;
-    memset( progressString, 0, RDX_JOB_PROGSTRING_LENGTH );
-    submitTime = rhs.submitTime;
-    startedTime = rhs.startedTime;
-    completedTime = rhs.completedTime;
+    stpncpy( progressString, rhs.progressString, RDX_JOB_PROGSTRING_LENGTH );
 
 }
 

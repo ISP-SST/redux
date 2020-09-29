@@ -80,7 +80,7 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
 
 Daemon::~Daemon( void ) {
     cleanup();
-    stop();
+    Daemon::stop();
 }
 
 
@@ -667,14 +667,16 @@ void Daemon::cleanup( void ) {
                 boost::posix_time::time_duration elapsed = (now - wip->workStarted);
                 if( job && (elapsed > boost::posix_time::seconds( job->info.timeout )) ) {
                     LOG_DETAIL << "Work has not been completed in " << to_simple_string(elapsed) << ": " << wip->print() << ende;
-                    timedOutWIPs.push_back( std::move(wip) );
+                    timedOutWIPs.push_back( wip );
+                    wip.reset();
                 }
                 
                 if( host && job ) {
                     elapsed = (now - host->status.lastSeen);
                     if( elapsed > boost::posix_time::seconds( hostTimeout ) ) {
                         LOG_NOTICE << "Peer has not been active in " << to_simple_string(elapsed) << ":  " << host->info.name << ":" << host->info.pid << ende;
-                        timedOutWIPs.push_back( std::move(wip) );
+                        timedOutWIPs.push_back( wip );
+                        wip.reset();
                     }
                 } else {
                     wip.reset();
@@ -886,6 +888,10 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
 
     if( count == blockSize ) {
         if( ids[0] ) LOG << "Received " << ids[0] << " jobs." << printArray(ids.data()+1,ids[0],"  IDs") << ende;
+        if( nJobs > ids[0] ) {
+            nJobs -= ids[0];
+            LOG_WARN << "Feiled to parse " << nJobs << " jobs." << ende;
+        }
         *conn << CMD_OK;           // all ok, return IDs
         conn->syncWrite(ids);
     } else {
@@ -903,7 +909,7 @@ void Daemon::failJobs( const vector<size_t>& jobList ) {
 
     std::set<size_t> jobSet( jobList.begin(), jobList.end() );
     unique_lock<mutex> lock( jobsMutex );
-    for( auto job: jobs ) {
+    for( const auto& job: jobs ) {
         if( job && jobSet.count( job->info.id ) ) Job::moveTo( job.get(), Job::JSTATE_ERR );
     }
             
@@ -1029,7 +1035,7 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
             }
             catch( const std::exception& e ) {
                 LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
-                throw e;
+                throw;
             }
         }
 
@@ -1127,7 +1133,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
         }
         catch( const std::exception& e ) {
             LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
-            throw e;
+            throw;
         }
         return;
     }
@@ -1176,7 +1182,7 @@ void Daemon::sendToSlaves( uint8_t cmd, string slvString ) {
     }
     catch( const std::exception& e ) {
         LOG_ERR << "Exception caught when parsing list of jobs to remove: " << e.what() << ende;
-        throw e;
+        throw;
     }
 
 }
@@ -1508,15 +1514,14 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
         if( ss && getWork( wip, true ) ) {
             host->active();
             updateWIP( host, wip );
-            uint64_t blockSize(0);
             if( wip ) {
                 Job::JobPtr job = wip->job.lock();
                 if( job ) {
                     wip->jobID = oldJobID;
-                    blockSize += wip->workSize();
+                    uint64_t blockSize = wip->workSize() + sizeof(uint64_t);
                     host->status.statusString = alignLeft(to_string(job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
                     host->active();
-                    data = rdx_get_shared<char>( blockSize+sizeof(uint64_t) );
+                    data = rdx_get_shared<char>( blockSize );
                     char* ptr = data.get()+sizeof(uint64_t);
                     count += wip->packWork( ptr+count );
                     std::thread([wip](){

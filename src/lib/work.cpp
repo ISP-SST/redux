@@ -16,8 +16,6 @@ using namespace std;
 
 namespace {
 
-    const string logChannel = "work";
-    
 #ifdef DBG_PART_
     static atomic<int> partCounter(0);
 #endif
@@ -196,7 +194,7 @@ uint64_t WorkInProgress::unpackWork( const char* ptr, std::shared_ptr<Job>& tmpJ
 
     using redux::util::unpack;
     uint64_t count = this->unpack( ptr, swap_endian );
-    bool newJob;
+    bool newJob(false);
     count += unpack( ptr+count, newJob );
     if( newJob ) {
         string tmpS = string( ptr+count );

@@ -41,7 +41,7 @@ namespace redux {
         };
 
 
-        Application( bpo::variables_map& vm, RunMode=EXIT );
+        explicit Application( bpo::variables_map& vm, RunMode=EXIT );
         virtual ~Application( void );
 
         static void getOptions( bpo::options_description& options, const std::string& );
@@ -55,7 +55,7 @@ namespace redux {
                                                       bpo::positional_options_description * positionalOptions = nullptr,
                                                       parserFunction customParser = nullptr );
 
-        static void checkGeneralOptions( bpo::options_description& desc, bpo::variables_map& vm );
+        static void checkGeneralOptions( const bpo::options_description& desc, bpo::variables_map& vm );
 
         int run( void );                    //!< application entry-point, basically just a loop that calls \c doWork()
         

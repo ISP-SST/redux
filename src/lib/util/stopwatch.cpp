@@ -5,7 +5,7 @@
 using namespace redux::util;
 using namespace std;
 
-StopWatch::StopWatch() {
+StopWatch::StopWatch( void ) : lapsedT(0), lapsedRS(0), lapsedRU(0), lapsedTot(0) {
     
     start();
 

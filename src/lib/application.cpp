@@ -90,7 +90,7 @@ bpo::options_description& Application::parseCmdLine( int argc, char* argv[],  bp
 }
 
 
-void Application::checkGeneralOptions( bpo::options_description& desc, bpo::variables_map& vm ) {
+void Application::checkGeneralOptions( const bpo::options_description& desc, bpo::variables_map& vm ) {
 
     if( vm.count( "help" ) ) {
         cout << desc << endl;

@@ -78,8 +78,6 @@ namespace redux {
             void cleanup(void) override;
             bool run( WorkInProgress::Ptr, uint16_t ) override;
             
-            void setLogChannel(std::string channel) override;
-            
             bool mayBeDeleted(void) override;
             
             size_t memUsage(void) override;       //!< Approximate current memory usage of this job

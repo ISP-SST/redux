@@ -10,7 +10,7 @@ using namespace redux::gui;
 using namespace redux;
 using namespace std;
 
-StatusThread::StatusThread( Job::JobSet& j ) : isRunning( false ), isConnected( false ), jobs(j) {
+StatusThread::StatusThread( Job::JobSet& j ) : isRunning( false ), isConnected( false ), jobs(j), conn(nullptr) {
 
 }
 

@@ -17,7 +17,8 @@ using namespace std;
   * @param low Lower limit of range
   * @param init Initial value
   */
-Counter::Counter( int64_t high, int64_t low, int64_t init, string nm ) : m_CallBack( NULL ), m_Value( init ), m_StartValue( init ) { //, m_Name(nm) {
+Counter::Counter( int64_t high, int64_t low, int64_t init, string nm ) : m_CallBack( NULL ), m_Value( init ), 
+    m_StartValue( init ), m_Settings(0) { //, m_Name(nm) {
 
 ////    setFlag( TRIGGER_OUTSIDE_RANGE | TRIGGER_RELEASES_ALL | RESET_ON_TRIGGER );
 

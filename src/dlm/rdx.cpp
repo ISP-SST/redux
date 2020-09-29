@@ -228,7 +228,7 @@ double *bezier3 (int n, T *xin, U *yin, int np, double *xp) {
 }
 
 
-IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
+IDL_VPTR cbezier2( int argc, IDL_VPTR* argv, char* argk ) {
     
     KW_RESULT kw;
     kw.help = 0;
@@ -237,9 +237,9 @@ IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
     kw.padding = 0;
     kw.niter = 1;
     kw.nthreads = 1;
-    int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw );
 
-    if (nPlainArgs < 3) {
+    if( nPlainArgs < 3 ) {
         cout << "cbezier2: needs 3 arguments. " << endl;
         return IDL_GettmpInt (-1);
     }
@@ -248,7 +248,7 @@ IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
     IDL_VPTR y = argv[1];
     IDL_VPTR xp_in = argv[2];
 
-    if (kw.help) {
+    if( kw.help ) {
         cout << "cbezier2: no help available yet..." << endl;
         return IDL_GettmpInt (-1);
     }
@@ -264,49 +264,49 @@ IDL_VPTR cbezier2 (int argc, IDL_VPTR* argv, char* argk) {
 
     int nDims = x->value.arr->n_dim;
 
-    if (nDims != 1 || nDims != xp_in->value.arr->n_dim || nDims != y->value.arr->n_dim) {
+    if( nDims != 1 || nDims != xp_in->value.arr->n_dim || nDims != y->value.arr->n_dim ) {
         cout << "cbezier2: input must be 1-dimensional arrays." << endl;
         return IDL_GettmpInt (-1);
     }
     
-    if (x->type < 4 || y->type < 4 || xp_in->type < 4 ||
-        x->type > 5 || y->type > 5 || xp_in->type > 5) {
+    if( x->type < 4 || y->type < 4 || xp_in->type < 4 ||
+        x->type > 5 || y->type > 5 || xp_in->type > 5 ) {
         cout << "cbezier2: ERROR, input data must be double or float!" << endl;
         return IDL_GettmpInt (-1);
     }
 
-    int n =      x->value.s.arr->dim[0];
+    int n = x->value.s.arr->dim[0];
     int np = xp_in->value.s.arr->dim[0];
     double *res;
     double *xp;
     unique_ptr<double> tmpXP;
     
-    if (xp_in->type == IDL_TYP_FLOAT) {
-        float* ptr = reinterpret_cast<float*>(xp_in->value.arr->data);
-        tmpXP.reset(new double[np]);
+    if( xp_in->type == IDL_TYP_FLOAT ) {
+        float* ptr = reinterpret_cast<float*>( xp_in->value.arr->data );
+        tmpXP.reset( new double[np] );
         xp = tmpXP.get();
-        for (int k = 0; k < np; k++) xp[k] = ptr[k];
+        for( int k(0); k < np; k++ ) xp[k] = ptr[k];
     } else {
-        xp = reinterpret_cast<double*>(xp_in->value.arr->data);
+        xp = reinterpret_cast<double*>( xp_in->value.arr->data );
     }
     
-    if (x->type == IDL_TYP_FLOAT) {
-        float* xPtr = reinterpret_cast<float*>(x->value.arr->data);
-        if (x->type == IDL_TYP_FLOAT) {
-            float* yPtr = reinterpret_cast<float*>(y->value.arr->data);
-            res = bezier2(n, xPtr, yPtr, np, xp);
+    if( x->type == IDL_TYP_FLOAT ) {
+        float* xPtr = reinterpret_cast<float*>( x->value.arr->data );
+        if( y->type == IDL_TYP_FLOAT ) {
+            float* yPtr = reinterpret_cast<float*>( y->value.arr->data );
+            res = bezier2( n, xPtr, yPtr, np, xp );
         } else {
-            double* yPtr = reinterpret_cast<double*>(y->value.arr->data);
-            res = bezier2(n, xPtr, yPtr, np, xp);
+            double* yPtr = reinterpret_cast<double*>( y->value.arr->data );
+            res = bezier2( n, xPtr, yPtr, np, xp );
         }
     } else {
-        double* xPtr = reinterpret_cast<double*>(x->value.arr->data);
-        if (x->type == IDL_TYP_FLOAT) {
-            float* yPtr = reinterpret_cast<float*>(y->value.arr->data);
-            res = bezier2(n, xPtr, yPtr, np, xp);
+        double* xPtr = reinterpret_cast<double*>( x->value.arr->data );
+        if( y->type == IDL_TYP_FLOAT ) {
+            float* yPtr = reinterpret_cast<float*>( y->value.arr->data );
+            res = bezier2( n, xPtr, yPtr, np, xp );
         } else {
-            double* yPtr = reinterpret_cast<double*>(y->value.arr->data);
-            res = bezier2(n, xPtr, yPtr, np, xp);
+            double* yPtr = reinterpret_cast<double*>( y->value.arr->data );
+            res = bezier2( n, xPtr, yPtr, np, xp );
         }
     }
     
@@ -369,32 +369,32 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
     double *xp;
     unique_ptr<double> tmpXP;
     
-    if (xp_in->type == IDL_TYP_FLOAT) {
+    if( xp_in->type == IDL_TYP_FLOAT ) {
         float* ptr = reinterpret_cast<float*>(xp_in->value.arr->data);
         tmpXP.reset(new double[np]);
         xp = tmpXP.get();
-        for (int k = 0; k < np; k++) xp[k] = ptr[k];
+        for( int k(0); k < np; k++) xp[k] = ptr[k];
     } else {
-        xp = reinterpret_cast<double*>(xp_in->value.arr->data);
+        xp = reinterpret_cast<double*>( xp_in->value.arr->data );
     }
     
-    if (x->type == IDL_TYP_FLOAT) {
-        float* xPtr = reinterpret_cast<float*>(x->value.arr->data);
-        if (x->type == IDL_TYP_FLOAT) {
-            float* yPtr = reinterpret_cast<float*>(y->value.arr->data);
-            res = bezier3(n, xPtr, yPtr, np, xp);
+    if( x->type == IDL_TYP_FLOAT ) {
+        float* xPtr = reinterpret_cast<float*>( x->value.arr->data );
+        if( y->type == IDL_TYP_FLOAT ) {
+            float* yPtr = reinterpret_cast<float*>( y->value.arr->data );
+            res = bezier3( n, xPtr, yPtr, np, xp );
         } else {
-            double* yPtr = reinterpret_cast<double*>(y->value.arr->data);
-            res = bezier3(n, xPtr, yPtr, np, xp);
+            double* yPtr = reinterpret_cast<double*>( y->value.arr->data );
+            res = bezier3( n, xPtr, yPtr, np, xp );
         }
     } else {
-        double* xPtr = reinterpret_cast<double*>(x->value.arr->data);
-        if (x->type == IDL_TYP_FLOAT) {
-            float* yPtr = reinterpret_cast<float*>(y->value.arr->data);
-            res = bezier3(n, xPtr, yPtr, np, xp);
+        double* xPtr = reinterpret_cast<double*>( x->value.arr->data );
+        if( y->type == IDL_TYP_FLOAT ) {
+            float* yPtr = reinterpret_cast<float*>( y->value.arr->data );
+            res = bezier3( n, xPtr, yPtr, np, xp );
         } else {
-            double* yPtr = reinterpret_cast<double*>(y->value.arr->data);
-            res = bezier3(n, xPtr, yPtr, np, xp);
+            double* yPtr = reinterpret_cast<double*>( y->value.arr->data );
+            res = bezier3( n, xPtr, yPtr, np, xp );
         }
     }
     
@@ -741,7 +741,7 @@ void cache( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_VarCopy( val, tmp );
     if( temporary ) val = IDL_GettmpInt(-1);        // to prevent auto-cleanup & segfault
     auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
-    map.second[tagS].reset( tmp, [tagS]( IDL_VPTR& p ){
+    map.second[tagS].reset( tmp, [tagS]( const IDL_VPTR& p ){
         IDL_VPTR b = IDL_Gettmp();
         memcpy( b, p, sizeof(IDL_VARIABLE) );
         IDL_Deltmp(b);
@@ -1024,14 +1024,13 @@ void cacheload( int argc, IDL_VPTR* argv, char* argk ) {
             string tmpS;
             unpackCount += unpack( tmpPtr+unpackCount, tmpS );
             unpackCount += unpackVar( tmpPtr+unpackCount, tmpVar );
-            map.second[tmpS].reset( tmpVar, []( IDL_VPTR& p ){
+            map.second[tmpS].reset( tmpVar, []( const IDL_VPTR& p ){
                 IDL_VPTR b = IDL_Gettmp();
                 memcpy( b, p, sizeof(IDL_VARIABLE) );
                 IDL_Deltmp(b);
                 delete p;
             });
         }
-        //cout << "unpackCount = " << unpackCount << endl;
 
     } catch( exception& e ){
         cerr << "Failed to read \"" << fn << "\"  reason:" << e.what() << endl;

@@ -66,7 +66,7 @@ namespace redux {
             
             Host(void);
             explicit Host(const std::string& name);
-            Host(const HostInfo&, uint64_t i=0);
+            explicit Host(const HostInfo&, uint64_t i=0);
             ~Host();
 
             uint64_t size(void) const;

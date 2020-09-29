@@ -54,11 +54,9 @@ namespace {
 }
 
 
-Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : ID (id), flipX(false), flipY(false), nTotalFrames(0), myObject(o),
-    myJob(j), logger(j.logger) {
+Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : otfNormalization(0), ID (id),
+    flipX(false), flipY(false), nTotalFrames(0), myObject(o), myJob(j), logger(j.logger) {
 
-    setLogChannel(myJob.getLogChannel());
-    
 }
 
 

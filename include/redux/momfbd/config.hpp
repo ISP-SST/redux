@@ -68,8 +68,6 @@ namespace redux {
             virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ChannelCfg() );
             virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
             
-            void setLogChannel( const std::string& channel ) { logChannel = channel; };
-
             virtual uint64_t size(void) const;
             virtual uint64_t pack(char*) const;
             virtual uint64_t unpack(const char*, bool);
@@ -123,7 +121,6 @@ namespace redux {
             std::vector<float> stokesWeights;
             /*****************************/
             
-            std::string logChannel;
             
         };
         

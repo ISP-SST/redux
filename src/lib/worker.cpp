@@ -17,9 +17,6 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
-namespace {
-    std::map<boost::thread::id,boost::thread*> tmap;
-}
 
 Worker::Worker( Daemon& d ) : running_(false), stopped_(true), exitWhenDone_(false), resetWhenDone_(false),
     wip(nullptr), daemon( d ), myInfo(Host::myInfo()) {
@@ -106,7 +103,7 @@ bool Worker::fetchWork( void ) {
     bool ret = false;
     network::TcpConnection::Ptr conn;
     string msg;
-    
+
     try {
 
         if( (conn = daemon.getMaster()) ) {
@@ -130,7 +127,7 @@ bool Worker::fetchWork( void ) {
                 LLOG_TRACE(daemon.logger) << "Received work: " << wip->print() << ende;
                 
                 ret = true;
-                
+
             } else {
                 // This just means there is no work available at the moment.
             }
