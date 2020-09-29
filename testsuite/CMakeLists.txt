@@ -11,12 +11,19 @@ if( RDX_WITH_FFTW3 )
     add_definitions(-DRDX_WITH_FFTW3)
 endif()
 
-# Code for test module
-#file(GLOB RDX_TEST_SRC RELATIVE ${CMAKE_CURRENT_LIST_DIR} "*.cpp")
+# Code for test modules
+file(GLOB RDX_TEST_FILE_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "file/*.cpp")
+file(GLOB RDX_TEST_IMAGE_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "image/*.cpp")
+#file(GLOB RDX_TEST_MATH_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "math/*.cpp")
+#file(GLOB RDX_TEST_MOMFBD_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "momfbd/*.cpp")
+#file(GLOB RDX_TEST_UTIL_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "util/*.cpp")
 set( RDX_TEST_SRC
         "testsuite.cpp"
-        "filetest.cpp"
-        "imagetest.cpp"
+        ${RDX_TEST_FILE_SRC}
+        ${RDX_TEST_IMAGE_SRC}
+        ${RDX_TEST_MATH_SRC}
+        ${RDX_TEST_MOMFBD_SRC}
+        ${RDX_TEST_UTIL_SRC}
 )
 
 file(GLOB RDX_TEST_HPP RELATIVE ${CMAKE_CURRENT_LIST_DIR} "include/*.hpp")
