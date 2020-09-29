@@ -26,8 +26,8 @@ namespace redux {
                               };
 
 
-        Format readFmt(const std::string& );
-        Format guessFmt(const std::string& );
+        Format readFmt( const std::string& );
+        Format guessFmt( const std::string& );
 
         template <typename T>
         void getOrRead( const std::string& fn, std::shared_ptr<T>& data );
@@ -44,9 +44,9 @@ namespace redux {
         void readFile( const std::string& fn, redux::image::Image<T>& data, bool metaOnly=false );
 
         template <typename T>
-        void writeFile( const std::string& fn, redux::util::Array<T>& data );
+        void writeFile( const std::string& fn, const redux::util::Array<T>& data );
         template <typename T>
-        void writeFile( const std::string& fn, redux::image::Image<T>& data );
+        void writeFile( const std::string& fn, const redux::image::Image<T>& data );
 
         typedef std::function<void(char*,size_t,std::shared_ptr<redux::file::FileMeta>&)> postLoadCallback;
         typedef std::function<void(char*,size_t,std::shared_ptr<redux::file::FileMeta>&)> preSumCallback;

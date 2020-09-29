@@ -41,7 +41,7 @@ namespace redux {
             static const uint8_t typeSizes[];   // = { 0, 1, 2, 4, 4, 8, 8, 0, 0, 16 };
             
             Fits( void );
-            Fits( const std::string& );
+            explicit Fits( const std::string& );
             ~Fits();
 
             void close( void );
@@ -49,45 +49,64 @@ namespace redux {
 
             void write( std::ofstream& );
 
-            std::vector<std::string> getText( bool );
+            std::vector<std::string> getText( bool ) override;
             
             template <typename T>
-            static std::string makeCard( std::string key, T value, std::string comment="" );
-            static void addCard( std::vector<std::string>& hdr, std::string card );
-            static void removeCards( std::vector<std::string>& hdr, std::string key );
-            static void insertCard( std::vector<std::string>& hdr, std::string card, size_t location=std::string::npos );
-            static void insertCardAfter( std::vector<std::string>& hdr, std::string card, std::string after );
-            static void insertCardBefore( std::vector<std::string>& hdr, std::string card, std::string before );
-            static bool updateCard( std::vector<std::string>& hdr, size_t location, std::string card );
-            static bool updateCard( std::vector<std::string>& hdr, std::string key, std::string card );
-            static bool updateCard( std::vector<std::string>& hdr, std::string card );
-            static bool emplaceCard( std::vector<std::string>& hdr, std::string key, std::string card );
-            static bool emplaceCard( std::vector<std::string>& hdr, std::string card );
+            static std::string makeValue( const T& t, bool quote=true );
+            static std::string makeValue( const char* s, bool quote=true );
             template <typename T>
-            static T getValue( const std::vector<std::string>& hdr, std::string key);
+            static T getValue( const std::string& v );
+            
+            
+            template <typename T>
+            static std::string makeCard( const std::string& key, const T& value=T(), const std::string& comment="", bool allowLong=false );
+            static std::string makeCard( const std::string& key, const char* value, const std::string& comment="", bool allowLong=false );
+            static std::string makeCard( const std::string& key, const std::string& comment="", bool allowLong=false );   // version for cards without value, i.e. "END", or comments.
+            static std::string getCard( const std::vector<std::string>& hdr, std::string key );
+            static void addCard( std::vector<std::string>& hdr, const std::string& card );
+            static void removeCards( std::vector<std::string>& hdr, std::string key );
+            static void insertCard( std::vector<std::string>& hdr, const std::string& card, size_t location=std::string::npos );
+            static void insertCardAfter( std::vector<std::string>& hdr, const std::string& card, std::string after );
+            static void insertCardBefore( std::vector<std::string>& hdr, const std::string& card, std::string before );
+            static bool updateCard( std::vector<std::string>& hdr, size_t location, const std::string& card );
+            static bool updateCard( std::vector<std::string>& hdr, std::string key, const std::string& card );
+            static bool updateCard( std::vector<std::string>& hdr, const std::string& card );
+            static bool emplaceCard( std::vector<std::string>& hdr, const std::string& key, const std::string& card );
+            static bool emplaceCard( std::vector<std::string>& hdr, const std::string& card );
+            
+            static void splitCard( const std::string& card, std::string& key, std::string& value, std::string& comment );
+            
+            static std::vector<std::string> splitLongString( const std::string& card );
+            static std::string mergeLongString( std::vector<std::string> cards );
+            static void splitLongStrings( std::vector<std::string>& cards );
+            static void mergeLongStrings( std::vector<std::string>& cards );
+
+            
+            template <typename T>
+            static T getValue( const std::vector<std::string>& hdr, std::string key );
             template <typename T>
             std::vector<T> getTableArray( std::string key );
             
-            size_t getNumberOfFrames(void);
-            bpx::ptime getStartTime(void);
-            bpx::ptime getEndTime(void);
-            bpx::ptime getAverageTime(void);
-            bpx::time_duration getExposureTime(void);
-            std::vector<bpx::ptime> getStartTimes(void);
-            std::vector<size_t> getFrameNumbers(void);
+            size_t getNumberOfFrames(void) override;
+            bpx::ptime getStartTime(void) override;
+            bpx::ptime getEndTime(void) override;
+            bpx::ptime getAverageTime(void) override;
+            bpx::time_duration getExposureTime(void) override;
+            std::vector<bpx::ptime> getStartTimes(void) override;
+            std::vector<size_t> getFrameNumbers(void) override;
            
-            size_t dataSize(void);
-            size_t dimSize(size_t);
-            uint8_t elementSize(void);
-            uint8_t nDims(void) { return primaryHDU.nDims; }
-            size_t nElements(void);
-            int getIDLType(void);
+            size_t dataSize(void) override;
+            size_t dimSize(size_t) override;
+            uint8_t elementSize(void) override;
+            uint8_t nDims(void) override { return primaryHDU.nDims; }
+            size_t nElements(void) override;
+            int getIDLType(void) override;
             
             double getMinMaxMean( const char* data, double* Min=nullptr, double* Max=nullptr );
-            int getFormat(void) { return FMT_FITS; };
+            int getFormat(void) override { return FMT_FITS; };
 
             struct hdu {
-                hdu(){}
+                hdu( void ) : bitpix(0), nDims(0), dataType(0), elementSize(0), nElements(0) {}
                 virtual ~hdu() {}
                 int bitpix;
                 int nDims;

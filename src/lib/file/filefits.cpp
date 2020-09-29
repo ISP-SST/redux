@@ -14,6 +14,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 #include <boost/lexical_cast.hpp>
 
 namespace bfs = boost::filesystem;
@@ -33,6 +34,18 @@ static const int system_is_big_endian = 1;
 const uint8_t Fits::typeSizes[] = { 1, 2, 4, 4, 8, 8, 0, 0, 16 };
 
 namespace {
+    
+    // TODO add direct read/write for compilation without cfitsio
+    
+    string generate_avc( void ) {
+        string ret;
+        for( char i(32); i<127; ++i ) ret.push_back(i);
+        return ret;
+    }
+    const string allowed_value_chars = generate_avc();
+    const string allowed_key_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ01923456789-_";
+    
+    const char end_card[] = "END                                                                             ";
     
     /* not used at the moment, so commented out to avoid compiler warnings about it
     template <typename T> Fits::TypeIndex getDatyp( void )  { return Fits::FITS_NOTYPE; }
@@ -67,10 +80,10 @@ namespace {
     }
     
     
-    void throwStatusError( string filename, int status ) {
+    void throwStatusError( const string& filename, int status ) {
        char err_text[80];
        fits_get_errstatus( status, err_text );
-       throw ios_base::failure("Failed to read fits: " + filename + "  cfitsio reports: " + string(err_text) );
+       throw ios_base::failure("Failed to read fits: " + filename + "  cfitsio reports("+to_string(status)+"): " + string(err_text) );
     }
     
     
@@ -86,27 +99,34 @@ namespace {
     template<> int getBitpix<double>(void)  { return -64; }
     
     
-    int getDataType( int bitpix, fitsfile* ff=nullptr ) {
-        
-        int status(0);
+    template <typename T> long getBzero(void) { return 0; }
+    template<> long getBzero<int8_t>(void) { return -(1L<<7); }
+    template<> long getBzero<uint16_t>(void) { return 1L<<15; }
+    template<> long getBzero<uint32_t>(void) { return 1L<<31; }
+    template<> long getBzero<uint64_t>(void) { return 1L<<63; }
+    
+    
+    long getBzero( fitsfile* ff=nullptr ) {
         long bzero(0);
-        float bscale(0);
         if( ff ) {
-            if( fits_read_key_flt( ff, "BSCALE", &bscale, nullptr, &status ) ) {
+            char card[ FLEN_VALUE ];
+            memset( card, 0, FLEN_VALUE );
+            int status(0);
+            if( fits_read_keyword( ff, "BZERO", card, nullptr, &status ) ) {
                 if( status != KEY_NO_EXIST ) {
-                    throwStatusError( "Fits::getDataType() BSCALE", status );
-                } else status = 0;
-            }
-        
-            if ( bscale == 1.0 ) {
-                if( fits_read_key_lng( ff, "BZERO", &bzero, nullptr, &status ) ) {
-                    if( status != KEY_NO_EXIST ) {
-                        throwStatusError( "Fits::getDataType() BZERO", status );
-                    } else status = 0;
+                    throwStatusError( "Fits::getDataType() BZERO", status );
+                }
+                if( strlen(card) ) {
+                    bzero = stringTo<uint64_t>(card);
                 }
             }
         }
-        
+        return bzero;
+    }
+    
+    
+    int getDataType( int bitpix, long bzero=0 ) {
+                
         switch( bitpix ) {
             case( BYTE_IMG ): {
                 if( bzero == -(1L<<7) ) return TSBYTE;
@@ -130,6 +150,7 @@ namespace {
         }
     }
     
+    
     string trimStringValue( string str ) {
         boost::trim( str );
         size_t first = str.find_first_of("'");
@@ -140,6 +161,19 @@ namespace {
         boost::replace_all( str, "''",  "'" );
         return str;
     }
+    
+    
+    string makeKey( string key ) {  // return an 8-character string which is permitted a keyword in a FITS header.
+        boost::trim( key );                                                 // reamove leading/trailing spaces
+        boost::to_upper( key );                                             // make uppercase
+        size_t found = key.find_first_not_of( allowed_key_chars );          // look for illegal characters
+        if( (found != string::npos) && (found < 8) ) {
+            throw std::domain_error("makeKey: \""+key+"\" contains illegal characters.");
+        }
+        key.resize( 8, ' ' );                                               // pad with spaces, or truncate, to 8 characters
+        return key;
+    }
+    
     
     struct cicomp {  // case-insensitive comparator for the maps below.
         bool operator() ( const std::string& a, const std::string& b ) const { return redux::util::nocaseLess(a,b); }
@@ -163,7 +197,11 @@ Fits::Fits( const string& filename ) : fitsPtr_(nullptr), status_(0) {
 
 Fits::~Fits() {
     
-    close();
+    try {
+        close();
+    } catch( const std::exception& e ) {
+        cerr << "Exception caught in Fits destructor: " << e.what() << endl;
+    }
     
 }
 
@@ -264,7 +302,8 @@ namespace {
             throwStatusError( "primaryHDU:BITPIX:"+fn, status );
         }
         
-        hdu.dataType = getDataType( hdu.bitpix, ff );
+        long bzero = getBzero( ff );
+        hdu.dataType = getDataType( hdu.bitpix, bzero );
         hdu.elementSize = getElementSize( hdu.dataType );
         
         if( fits_read_key( ff, TINT, "NAXIS", &hdu.nDims, NULL, &status ) ) {
@@ -395,12 +434,7 @@ void Fits::read( const string& filename ) {
     memset( data, 0, FLEN_VALUE );
     memset( card, 0, FLEN_CARD );
 
-    if( fitsPtr_ ) {
-        close();
-    }
-
     status_ = 0;
-
     if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
         throwStatusError( "read:open:"+filename, status_ );
     }
@@ -527,7 +561,7 @@ vector<string> Fits::getText( bool raw ) {
         for( auto& k: primaryHDU.cards ) {
             hduText += k;
         }
-        hduText += "END" + string(77, ' ') ;
+        hduText += end_card;
         ret.push_back(hduText);
         for( size_t i=0; i<extHDUs.size(); ++i ) {
             if( ((int)i != (primaryHDU.dHDU-2)) && extHDUs[i] ) {
@@ -535,7 +569,7 @@ vector<string> Fits::getText( bool raw ) {
                 for( auto& k: extHDUs[i]->cards ) {
                     hduText += k;
                 }
-                hduText += "END" + string(77, ' ') ;
+                hduText += end_card;
                 ret.push_back(hduText);
             }
         }
@@ -543,7 +577,7 @@ vector<string> Fits::getText( bool raw ) {
         for( auto& k: primaryHDU.cards ) {
             hduText += k;
         }
-        hduText += "END" + string(77, ' ') ;
+        hduText += end_card;
         ret.push_back(hduText);
         for( size_t i=0; i<extHDUs.size(); ++i ) {
             if( extHDUs[i] ) {
@@ -551,7 +585,7 @@ vector<string> Fits::getText( bool raw ) {
                 for( auto& k: extHDUs[i]->cards ) {
                     hduText += k;
                 }
-                hduText += "END" + string(77, ' ') ;
+                hduText += end_card;
                 ret.push_back(hduText);
             }
         }
@@ -559,69 +593,192 @@ vector<string> Fits::getText( bool raw ) {
     return ret;
 }
 
+
 namespace redux {
     namespace file {
 
         template <typename T>
-        string Fits::makeCard( string key, T value, string comment ) {
-            string ret = key;
-            ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
-            ret += "= " + alignRight(to_string(value),20);
+        string Fits::makeValue ( const T& t, bool ) {
+            return alignRight( to_string(t), 20 );
+        }
+        template <>
+        string Fits::makeValue( const string& str, bool quote ) {
+            string ret = boost::trim_right_copy( str );                         // reamove trailing spaces
+            size_t found = ret.find_first_not_of( allowed_value_chars );        // look for illegal characters
+            if( found != string::npos ) {
+                throw std::domain_error("Fits::makeValue: \""+ret+"\" contains illegal characters.");
+            }
+            if( quote ) ret = "'" + boost::replace_all_copy( ret, "'", "''" ) + "'";
+            return ret;
+        }
+        template <>
+        string Fits::makeValue( const bpx::ptime& pt, bool quote ) {
+            string ret;
+            if( pt.time_of_day() == bpx::time_duration() ) {     // Time is 00:00:00 (i.e. unset), so just print the date.
+                ret = to_iso_extended_string( pt.date() );
+            } else {
+                ret = bpx::to_iso_extended_string(pt);
+            }
+            if( quote ) ret = "'" + ret + "'";
+            return ret;
+        }
+        template <>
+        string Fits::makeValue( const bool& b, bool ) {
+            return alignRight( (b?"T":"F"), 20 );
+        }
+        
+        string Fits::makeValue( const char* s, bool quote ) {
+            return makeValue( string(s), quote );
+        }
+
+        template <typename T>
+        T Fits::getValue( const std::string& v ) {
+            return redux::util::stringTo<T>( boost::trim_copy( v ) );
+        }
+        template <>
+        bpx::ptime Fits::getValue( const std::string& v ) {
+            return stringTo<bpx::ptime>( boost::replace_all_copy( v, "'",  "" ) );
+        }
+        template <>
+        string Fits::getValue( const std::string& v ) {
+            string ret = boost::trim_copy( v );
+            size_t first = ret.find_first_of("'");
+            if( first != string::npos ) {
+                string::const_iterator vBeg = v.cbegin()+first;
+                string::const_iterator vEnd = vBeg;
+                while( ++vEnd != v.cend() ) {
+                    if( *vEnd == '\'' ) {
+                        if( ((vEnd+1) != v.cend()) && *(vEnd+1) == '\'' ) {
+                            vEnd++;
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                // if string is enclosed by single quotes, exclude them.
+                if( (vBeg != vEnd) && (*vBeg == '\'') && (*vEnd == '\'') ) {
+                    vBeg++;
+                    vEnd--;
+                }
+                ret = string( vBeg, vEnd+1 );
+                
+            }
+            boost::replace_all( ret, "''",  "'" );  // replace double occurances with single ones
+            return ret;
+        }
+
+        template <typename T>
+        string Fits::makeCard( const string& key, const T& v, const string& comment, bool ) {
+            string ret = makeKey(key) + "= " + makeValue ( v );
             if( comment != "" ) {
-                ret += " / " + comment;
+                ret += " / " + makeValue( comment, false );
             }
             ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
             return ret;
         }
-        template string Fits::makeCard( string, int, string );
-
-
         template <>
-        string Fits::makeCard( string key, string value, string comment ) {
-            string ret = key;
-            ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
-            boost::replace_all( value, "'", "''" );
-            ret += "= '" + value + "'";
-            if( comment != "" ) {
-                ret += " / " + comment;
+        string Fits::makeCard( const string& key, const string& v, const string& comment, bool allowLong ) {
+            string ret = makeKey(key);
+            string comment_separator = " / ";
+            if( !v.empty() ) {
+                ret += "= " + makeValue( v );
+                if( !allowLong && (ret.size() > 80) ) ret[79] = '\'';               // if the string is too long, we need to add the end-quote before character 80.
+                if( ret.size() < 30 ) ret.resize( 30, ' ' );                        // pad with spaces
+            } else {
+                comment_separator = "";
             }
-            ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+            if( comment != "" ) {
+                ret += comment_separator + makeValue( comment, false );
+            }
+            if( !allowLong || ret.size()<80 ) ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
             return ret;
         }
         template <>
-        string Fits::makeCard( string key, const char* value, string comment ) {
-            return makeCard(key,string(value),comment);
+        string Fits::makeCard( const string& key, const bpx::ptime& date, const string& comment, bool allowLong ) {
+            return makeCard( key, bpx::to_iso_extended_string(date), comment, allowLong );
         }
         template <>
-        string Fits::makeCard( string key, bpx::ptime date, string comment ) {
-            return makeCard(key,bpx::to_iso_extended_string(date),comment);
-        }
-        template <>
-        string Fits::makeCard( string key, bool value, string comment ) {
-            string ret = key;
-            ret.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
-            ret += "= ";
-            ret.resize( 29, ' ' );       // pad with spaces, or truncate, to 8 characters
-            if( value ) {
-                ret += "T";
-            } else ret += "F";
+        string Fits::makeCard( const string& key, const bool& v, const string& comment, bool ) {
+            string ret = makeKey(key) + "= " + makeValue(v);
             if( comment != "" ) {
-                ret += " / " + comment;
+                ret += " / " + makeValue( comment, false );
             }
             ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
             return ret;
         }
         
+
+
     }
+}
+template string Fits::makeValue<int8_t>( const int8_t&, bool );
+template string Fits::makeValue<uint8_t>( const uint8_t&, bool );
+template string Fits::makeValue<int16_t>( const int16_t&, bool );
+template string Fits::makeValue<uint16_t>( const uint16_t&, bool );
+template string Fits::makeValue<int32_t>( const int32_t&, bool );
+template string Fits::makeValue<uint32_t>( const uint32_t&, bool );
+template string Fits::makeValue<int64_t>( const int64_t&, bool );
+template string Fits::makeValue<uint64_t>( const uint64_t&, bool );
+template string Fits::makeValue<float>( const float&, bool );
+template string Fits::makeValue<double>( const double&, bool );
+
+template bool Fits::getValue<bool>( const string& );
+template int8_t Fits::getValue<int8_t>( const string& );
+template uint8_t Fits::getValue<uint8_t>( const string& );
+template int16_t Fits::getValue<int16_t>( const string& );
+template uint16_t Fits::getValue<uint16_t>( const string& );
+template int32_t Fits::getValue<int32_t>( const string& );
+template uint32_t Fits::getValue<uint32_t>( const string& );
+template int64_t Fits::getValue<int64_t>( const string& );
+template uint64_t Fits::getValue<uint64_t>( const string& );
+template float Fits::getValue<float>( const string& );
+template double Fits::getValue<double>( const string& );
+
+template string Fits::makeCard( const string&, const int8_t&, const string&, bool );
+template string Fits::makeCard( const string&, const uint8_t&, const string&, bool );
+template string Fits::makeCard( const string&, const int16_t&, const string&, bool );
+template string Fits::makeCard( const string&, const uint16_t&, const string&, bool );
+template string Fits::makeCard( const string&, const int32_t&, const string&, bool );
+template string Fits::makeCard( const string&, const uint32_t&, const string&, bool );
+template string Fits::makeCard( const string&, const int64_t&, const string&, bool );
+template string Fits::makeCard( const string&, const uint64_t&, const string&, bool );
+template string Fits::makeCard( const string&, const float&, const string&, bool );
+template string Fits::makeCard( const string&, const double&, const string&, bool );
+
+
+
+
+string Fits::makeCard( const string& key, const char* v, const string& comment, bool allowLong ) {
+    return makeCard( key, string(v), comment, allowLong );
+}
+
+string Fits::makeCard( const string& key, const string& comment, bool allowLong ) {
+    string ret = makeKey(key);
+    if( comment != "" ) {
+        ret += makeValue( comment, false );
+    }
+    if( !allowLong || ret.size()<80 ) ret.resize( 80, ' ' );       // pad with spaces, or truncate, to 80 characters
+    return ret;
 }
 
 
-void Fits::addCard( vector<string>& hdr, string card ) {
+string Fits::getCard( const vector<string>& cards, string key ) {
+    key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    for( const auto& c: cards ) {
+        if( boost::iequals( c.substr( 0, key.length() ), key ) ) {
+            return c;
+        }
+    }
+    return "";
+}
+
+
+void Fits::addCard( vector<string>& hdr, const string& card ) {
     
-    string key = card.substr(0,8);
+    string key = makeKey( card.substr(0,8) );
     if( multiKeys.count(key) == 0 ) {   // only allow single occurrances for non-multikeys
         for( auto& k: hdr ) {
-            if( boost::iequals( k.substr(0,8), key) ) {
+            if( key.compare( k.substr(0,8) ) == 0 ) {
                 return;
             }
         }
@@ -632,16 +789,12 @@ void Fits::addCard( vector<string>& hdr, string card ) {
 
 
 void Fits::removeCards( vector<string>& hdr, string key ) {
-    key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
-    hdr.erase( std::remove_if( hdr.begin(), hdr.end(), [&](string a) {
-        return key.compare( a.substr(0,8) ) == 0;
-        //return boost::iequals( key, a.substr(0,8) );
-    } ),
-    hdr.end() );
+    key = makeKey( key );
+    hdr.erase( std::remove_if( hdr.begin(), hdr.end(), [&](string a) { return key.compare( a.substr(0,8) ) == 0; }), hdr.end() );
 }
 
 
-void Fits::insertCard( vector<string>& hdr, string card, size_t location ) {
+void Fits::insertCard( vector<string>& hdr, const string& card, size_t location ) {
     
     if( location < hdr.size() ) {
         hdr.insert( hdr.begin()+location, card );
@@ -652,36 +805,36 @@ void Fits::insertCard( vector<string>& hdr, string card, size_t location ) {
 }
 
 
-void Fits::insertCardAfter( vector<string>& hdr, string card, string after ) {
-    after.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+void Fits::insertCardAfter( vector<string>& cards, const string& card, string after ) {
+    string akey = makeKey( after );
     size_t location = string::npos;
-    for( size_t i=0; i<hdr.size(); ++i ) {
-        if( boost::iequals( hdr[i].substr(0,8), after) ) {
+    for( size_t i=0; i<cards.size(); ++i ) {
+        if( akey.compare( cards[i].substr(0,8) ) == 0 ) {
             location = i+1;
         }
     }
-    insertCard( hdr, card, location );
+    insertCard( cards, card, location );
 }
 
 
-void Fits::insertCardBefore( vector<string>& hdr, string card, string before ) {
-    before.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+void Fits::insertCardBefore( vector<string>& cards, const string& card, string before ) {
+    string bkey = makeKey( before );
     size_t location = string::npos;
-    for( size_t i=0; i<hdr.size(); ++i ) {
-        if( boost::iequals( hdr[i].substr(0,8), before) ) {
+    for( size_t i=0; i<cards.size(); ++i ) {
+        if( bkey.compare( cards[i].substr(0,8) ) == 0 ) {
             location = i;
             break;
         }
     }
-    insertCard( hdr, card, location );
+    insertCard( cards, card, location );
     
 }
 
 
-bool Fits::updateCard( vector<string>& hdr, size_t location, string card ) {
+bool Fits::updateCard( vector<string>& cards, size_t location, const string& card ) {
     
-    if( location < hdr.size() ) {
-        hdr[location] = card;
+    if( location < cards.size() ) {
+        cards[location] = card;
         return true;
     }
     return false;
@@ -689,46 +842,202 @@ bool Fits::updateCard( vector<string>& hdr, size_t location, string card ) {
 }
 
 
-bool Fits::updateCard( vector<string>& hdr, string key, string card ) {
+bool Fits::updateCard( vector<string>& cards, string key, const string& card ) {
     
-    key.resize( 8, ' ' );       // pad with spaces, or truncate, to 8 characters
+    key = makeKey( key );
     size_t location = string::npos;
     if( multiKeys.count(key) == 0 ) {   // never overwrite keywords which might have multiple entries
-        for( size_t i=0; i<hdr.size(); ++i ) {
-            if( boost::iequals( hdr[i].substr(0,8), key) ) {
+        for( size_t i=0; i<cards.size(); ++i ) {
+            if( key.compare( cards[i].substr(0,8) ) == 0 ) {
                 location = i;
                 break;
             }
         }
     }
-    return updateCard( hdr, location, card );
+    return updateCard( cards, location, card );
 
 }
 
 
-bool Fits::updateCard( vector<string>& hdr, string card ) {
+bool Fits::updateCard( vector<string>& cards, const string& card ) {
     
-    string key = card.substr(0,8);
-    return updateCard( hdr, key, card );
+    string key = makeKey( card.substr(0,8) );
+    return updateCard( cards, key, card );
 
 }
 
 
-bool Fits::emplaceCard( vector<string>& hdr, string key, string card ) {
+bool Fits::emplaceCard( vector<string>& hdr, const string& key, const string& card ) {
     
-    bool inserted = !updateCard( hdr, key, card );
-    if( inserted ) insertCard( hdr, card );
-    return inserted;
+    bool updated = updateCard( hdr, key, card );
+    if( !updated ) insertCard( hdr, card );
+    return !updated;
 
 }
 
 
-bool Fits::emplaceCard( vector<string>& hdr, string card ) {
+bool Fits::emplaceCard( vector<string>& hdr, const string& card ) {
     
-    bool inserted = !updateCard( hdr, card );
-    if( inserted ) insertCard( hdr, card );
-    return inserted;
+    bool updated = updateCard( hdr, card );
+    if( !updated ) insertCard( hdr, card );
+    return !updated;
 
+}
+
+
+void Fits::splitCard( const std::string& card, std::string& key, std::string& value, std::string& comment ) {
+    
+    key = card.substr( 0, 8 );
+    
+    if( (card[8] == '=') || (card[9] == ' ') ) { // Value field exists
+        size_t pos = card.find_first_not_of( " ", 9 );
+        if( (pos != string::npos) && (card[pos] == '\'') ) {    // it's a string value, find beginning & end
+            string::const_iterator vBeg = card.cbegin()+pos;
+            string::const_iterator vEnd = vBeg;
+            while( ++vEnd != card.cend() ) {
+                if( *vEnd == '\'' ) {
+                    if( ((vEnd+1) != card.cend()) && *(vEnd+1) == '\'' ) {
+                        vEnd++;
+                        continue;
+                    }
+                    break;
+                }
+            }
+            if( vEnd >= card.cend() ) {                         // end of string not located, assume it's the entire card.
+
+            }
+            vEnd++;
+            value = string( vBeg, vEnd );
+            comment = string( vEnd, card.cend() );
+        } else {
+            value = card.substr( 10, 20 );
+            comment = card.substr( 30 );
+        }
+    } else {    // all after the key is comment
+        value.clear();
+        comment = card.substr( 8 );
+    }
+    
+    size_t pos = comment.find_first_not_of( " /" );
+    if( pos != string::npos ) comment = comment.substr(pos);
+    
+    boost::trim( key );
+    boost::trim( value );
+    boost::trim( comment );
+    
+}
+
+
+vector<string> Fits::splitLongString( const string& card ) {
+    
+    vector<string> ret;
+
+    if( (card.size() <= 80) || (card[8] != '=') || (card[9] != ' ') ) { // Nothing to do, either too short or does not have a value field
+    cout <<"splitLongString: " << __LINE__ << "  cS=" << card.size() << "  C8=\"" << card[8] << "\"  C9=\"" << card[9] << "\"" << endl;
+        ret.push_back( card );
+        ret[0].resize( 80, ' ' );
+        return ret;
+    }
+    
+    size_t pos = card.find_first_not_of( " ", 9 );
+    if( (pos == string::npos) || (card[pos] != '\'') ) {                // does not meet the FITS standard, truncate and return
+    cout <<"splitLongString: " << __LINE__ << "  pos=" << pos << "  CP=\"" << card[pos] << "\"" << endl;
+        ret.push_back( card );
+        ret[0].resize( 80, ' ' );
+        return ret;
+    }
+    
+    string::const_iterator vBeg = card.cbegin()+pos;
+    string::const_iterator vEnd = vBeg;
+    while( ++vEnd != card.cend() ) {
+        if( *vEnd == '\'' ) {
+            if( ((vEnd+1) != card.cend()) && *(vEnd+1) == '\'' ) {
+                vEnd++;
+                continue;
+            }
+            break;
+        }
+    }
+    
+    if( vEnd >= card.cend() ) {                                         // end of string not located.
+    cout <<"splitLongString: " << __LINE__ << "  vEnd=" << (vEnd-card.cbegin()) << "  cEnd=" << (card.cend()-card.cbegin()) << endl;
+        ret.push_back( card );
+        ret[0].resize( 80, ' ' );
+        return ret;
+       
+    }
+    
+    string key = card.substr( 0, 8 );
+    string value( vBeg, vEnd+1 );
+    string tmpCard( card.cbegin(), vEnd+1 );
+    const string cs = "&'CONTINUE  '";
+    while( tmpCard.size() > 80 ) {
+    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl;
+        tmpCard.insert( 78, cs );
+    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl<<endl;
+        ret.push_back( tmpCard.substr(0,80) );
+        tmpCard.erase( 0, 80 );
+    }
+    
+    const string cs2 = " / ";
+    string comment( vEnd+1, card.cend() );
+    pos = comment.find_first_not_of( " /" );
+    if( pos != string::npos ) comment = comment.substr(pos);
+    cout <<"splitLongString: " << __LINE__ << "  N_tc=" << tmpCard.size() << "  N_c=" << comment.size() << endl;
+    while( (tmpCard.size()+comment.size()) > 0 ) {
+        size_t N_tc = tmpCard.size();
+        size_t N_c = comment.size();
+        if( (N_tc + N_c) < 78 ) {
+            if( tmpCard == "CONTINUE  ''" ) tmpCard.append(" ");    // just to prettify by aligning the slashes for multi-line comments
+            ret.push_back( tmpCard + " / " + comment );
+            break;
+        }
+    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl;
+        tmpCard.insert( N_tc-1, "&" );
+        size_t remainder = 80-tmpCard.size();
+    cout <<"splitLongString: " << __LINE__ << "  N_tc=" << N_tc << "  N_c=" << N_c << "  remainder=" << remainder << endl;
+        if( remainder > 5 ) {   // else don't bother appending the comment here
+            remainder -= 3;
+            tmpCard.append( cs2+comment.substr( 0, remainder ) );
+    cout <<"splitLongString: " << __LINE__ << "  remainder=" << remainder << "  tmpcSz=" << tmpCard.size() << endl;
+    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl;
+            comment.erase( 0, remainder );
+        }
+        tmpCard.resize( 80, ' ' );
+        tmpCard.append( "CONTINUE  ''" );
+    cout <<"splitLongString: " << __LINE__ << "  N=" << N_tc << "  N0=" << tmpCard.size() << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl<<endl;
+        ret.push_back( tmpCard.substr(0,80) );
+        tmpCard.erase( 0, 80 );
+    }
+
+    for( auto& r: ret ) {
+        r.resize( 80, ' ' );    // pad any too short cards to 80
+    }
+
+
+    cout <<"Key=\"" << key << "\"  Value=\"" << value << "\"  Comment=\"" << comment << "\"" << endl;
+
+    return ret;
+}
+
+
+string Fits::mergeLongString( vector<string> cards ) {
+cout << "mergeLongString: " << __LINE__ << "  nC = " << cards.size() << endl;
+    mergeLongStrings( cards );
+cout << "mergeLongString: " << __LINE__ << "  nC = " << cards.size() << endl;
+    string ret;
+    if( cards.size() ) ret = cards[0];
+    return ret;
+}
+
+
+void Fits::splitLongStrings( vector<string>& cards ) {
+    
+}
+
+
+void Fits::mergeLongStrings( vector<string>& cards ) {
+    
 }
 
 
@@ -1001,7 +1310,7 @@ vector<bpx::ptime> Fits::getStartTimes(void){
     
 }
 
-std::vector<size_t> Fits::getFrameNumbers(void) {
+vector<size_t> Fits::getFrameNumbers(void) {
     
     string fnstr = getValue<string>( primaryHDU.cards, "FRAMENUM" );
     size_t found = fnstr.find_first_of("-,");   // check if it is a range.
@@ -1017,7 +1326,7 @@ std::vector<size_t> Fits::getFrameNumbers(void) {
     }
 
     size_t nFrames = getNumberOfFrames();
-    std::vector<size_t> ret(nFrames);
+    vector<size_t> ret(nFrames);
     std::iota( ret.begin(), ret.end(), firstFrame );
     return ret;
     
@@ -1294,6 +1603,8 @@ void Fits::read( const string& filename, redux::util::Array<T>& data, shared_ptr
             case( TUSHORT ): data.template copyFrom<uint16_t>( tmp.get() ); break;
             case( TINT ):    data.template copyFrom<int32_t>( tmp.get() ); break;
             case( TUINT ):   data.template copyFrom<uint32_t>( tmp.get() ); break;
+            case( TLONG ):   data.template copyFrom<int64_t>( tmp.get() ); break;
+            case( TULONG ):  data.template copyFrom<uint64_t>( tmp.get() ); break;
             case( TFLOAT ):  data.template copyFrom<float>( tmp.get() ); break;
             case( TDOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
             default: string msg = "Fits::read: unsupported data type: "  + to_string(hdr->primaryHDU.dataType);
@@ -1301,10 +1612,14 @@ void Fits::read( const string& filename, redux::util::Array<T>& data, shared_ptr
         }
     }
 }
+template void Fits::read( const string& filename, redux::util::Array<int8_t>& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<uint8_t>& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<int16_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<uint16_t>& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<int32_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<uint32_t>& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<int64_t>& data, shared_ptr<redux::file::Fits>& hdr );
+template void Fits::read( const string& filename, redux::util::Array<uint64_t>& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<float  >& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<double >& data, shared_ptr<redux::file::Fits>& hdr );
 template void Fits::read( const string& filename, redux::util::Array<complex_t >& data, shared_ptr<redux::file::Fits>& hdr );
@@ -1324,10 +1639,14 @@ void Fits::read( const string& filename, redux::image::Image<T>& image, bool met
     }
     hdr->close();
 }
+template void Fits::read( const string & filename, redux::image::Image<int8_t>& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<uint8_t>& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<int16_t>& image, bool );
+template void Fits::read( const string & filename, redux::image::Image<uint16_t>& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<int32_t>& image, bool );
+template void Fits::read( const string & filename, redux::image::Image<uint32_t>& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<int64_t>& image, bool );
+template void Fits::read( const string & filename, redux::image::Image<uint64_t>& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<float  >& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<double >& image, bool );
 template void Fits::read( const string & filename, redux::image::Image<complex_t >& image, bool );
@@ -1343,7 +1662,7 @@ void Fits::write( const string& filename, const redux::util::Array<T>& data, sha
 
     if( sliceSize ) {   // compression
         
-        // TODO
+        // TODO  add compression
         
     } else {
         
@@ -1362,7 +1681,8 @@ void Fits::write( const string& filename, const redux::util::Array<T>& data, sha
         
         
         int bitpix = getBitpix<T>();
-        int datatype = getDataType( bitpix );
+        long long bzero = getBzero<T>();
+        int datatype = getDataType( bitpix, bzero );
         int nDims = data.nDimensions();
         if( nDims > 9 ) {
             cerr << "Fits::write()  Array has > 9 dimensions !!" << endl;
@@ -1374,7 +1694,17 @@ void Fits::write( const string& filename, const redux::util::Array<T>& data, sha
         if( hdr->status_ ) {
             throwStatusError( "Fits::write() create_img", hdr->status_ );
         }
-    
+        
+        if( bzero ) {
+            string card;
+            if( bzero == -128 ) {    // for signed 8-bit data
+                card = Fits::makeCard( "BZERO", bzero, "Data is signed integer" );
+            } else {
+                card = Fits::makeCard( "BZERO", static_cast<uint64_t>(bzero), "Data is unsigned integer" );
+            }
+            Fits::addCard( hdr->primaryHDU.cards, card );
+        }
+        
         Fits::removeCards( hdr->primaryHDU.cards, "END" );    // just in case it is not the last card, or if there are multiple.
         for( auto& c: hdr->primaryHDU.cards ) {
             fits_update_card( hdr->fitsPtr_, c.substr(0,8).c_str(), c.c_str(), &hdr->status_ ); 
@@ -1428,9 +1758,10 @@ void Fits::write( const string& filename, const redux::util::Array<T>& data, sha
         
     }
     
-    
+    hdr->close();
 
 }
+template void Fits::write( const string&, const redux::util::Array<int8_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<uint8_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<int16_t>&, shared_ptr<redux::file::Fits>, int );
 template void Fits::write( const string&, const redux::util::Array<uint16_t>&, shared_ptr<redux::file::Fits>, int );
@@ -1447,10 +1778,14 @@ template <typename T>
 void Fits::write( const string & filename, const redux::image::Image<T>& image, int sliceSize ) {
     write( filename, image, static_pointer_cast<redux::file::Fits>( image.meta ), sliceSize );
 }
+template void Fits::write( const string&, const redux::image::Image<int8_t>&, int );
 template void Fits::write( const string&, const redux::image::Image<uint8_t>&, int );
 template void Fits::write( const string&, const redux::image::Image<int16_t>&, int );
+template void Fits::write( const string&, const redux::image::Image<uint16_t>&, int );
 template void Fits::write( const string&, const redux::image::Image<int32_t>&, int );
+template void Fits::write( const string&, const redux::image::Image<uint32_t>&, int );
 template void Fits::write( const string&, const redux::image::Image<int64_t>&, int );
+template void Fits::write( const string&, const redux::image::Image<uint64_t>&, int );
 template void Fits::write( const string&, const redux::image::Image<float  >&, int );
 template void Fits::write( const string&, const redux::image::Image<double >&, int );
 template void Fits::write( const string&, const redux::image::Image<complex_t >&, int );
@@ -1459,13 +1794,17 @@ template void Fits::write( const string&, const redux::image::Image<complex_t >&
 template <typename T>
 void Fits::write( const string & filename, const T* data, size_t n ) {
     
-    // TODO
+    // TODO add wrapper for POD
 
 }
+template void Fits::write( const string&, const int8_t*, size_t n );
 template void Fits::write( const string&, const uint8_t*, size_t n );
 template void Fits::write( const string&, const int16_t*, size_t n );
+template void Fits::write( const string&, const uint16_t*, size_t n );
 template void Fits::write( const string&, const int32_t*, size_t n );
+template void Fits::write( const string&, const uint32_t*, size_t n );
 template void Fits::write( const string&, const int64_t*, size_t n );
+template void Fits::write( const string&, const uint64_t*, size_t n );
 template void Fits::write( const string&, const float*, size_t n );
 template void Fits::write( const string&, const double*, size_t n );
 template void Fits::write( const string&, const complex_t*, size_t n );

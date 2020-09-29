@@ -245,10 +245,14 @@ void redux::file::readFile( const string& filename, redux::util::Array<T>& data 
     }
 
 }
+template void redux::file::readFile( const string& filename, redux::util::Array<int8_t>& data );
 template void redux::file::readFile( const string& filename, redux::util::Array<uint8_t>& data );
 template void redux::file::readFile( const string& filename, redux::util::Array<int16_t>& data );
+template void redux::file::readFile( const string& filename, redux::util::Array<uint16_t>& data );
 template void redux::file::readFile( const string& filename, redux::util::Array<int32_t>& data );
+template void redux::file::readFile( const string& filename, redux::util::Array<uint32_t>& data );
 template void redux::file::readFile( const string& filename, redux::util::Array<int64_t>& data );
+template void redux::file::readFile( const string& filename, redux::util::Array<uint64_t>& data );
 template void redux::file::readFile( const string& filename, redux::util::Array<float>& data );
 template void redux::file::readFile( const string& filename, redux::util::Array<double>& data );
 
@@ -277,16 +281,20 @@ void redux::file::readFile( const string& filename, redux::image::Image<T>& imag
     }
 
 }
+template void redux::file::readFile( const string& filename, redux::image::Image<int8_t>& data, bool );
 template void redux::file::readFile( const string& filename, redux::image::Image<uint8_t>& data, bool );
 template void redux::file::readFile( const string& filename, redux::image::Image<int16_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<uint16_t>& data, bool );
 template void redux::file::readFile( const string& filename, redux::image::Image<int32_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<uint32_t>& data, bool );
 template void redux::file::readFile( const string& filename, redux::image::Image<int64_t>& data, bool );
+template void redux::file::readFile( const string& filename, redux::image::Image<uint64_t>& data, bool );
 template void redux::file::readFile( const string& filename, redux::image::Image<float>& data, bool );
 template void redux::file::readFile( const string& filename, redux::image::Image<double>& data, bool );
 
 
 template <typename T>
-void redux::file::writeFile( const string& filename, redux::util::Array<T>& data ) {
+void redux::file::writeFile( const string& filename, const redux::util::Array<T>& data ) {
     
     try {
         Format fmt = guessFmt(filename);
@@ -310,16 +318,20 @@ void redux::file::writeFile( const string& filename, redux::util::Array<T>& data
 
 
 }
-template void redux::file::writeFile( const string& filename, redux::util::Array<uint8_t>& data );
-template void redux::file::writeFile( const string& filename, redux::util::Array<int16_t>& data );
-template void redux::file::writeFile( const string& filename, redux::util::Array<int32_t>& data );
-template void redux::file::writeFile( const string& filename, redux::util::Array<int64_t>& data );
-template void redux::file::writeFile( const string& filename, redux::util::Array<float>& data );
-template void redux::file::writeFile( const string& filename, redux::util::Array<double>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<int8_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<uint8_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<int16_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<uint16_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<int32_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<uint32_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<int64_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<uint64_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<float>& data );
+template void redux::file::writeFile( const string& filename, const redux::util::Array<double>& data );
 
 
 template <typename T>
-void redux::file::writeFile( const string& filename, redux::image::Image<T>& image ) {
+void redux::file::writeFile( const string& filename, const redux::image::Image<T>& image ) {
     
     try {
         Format fmt = guessFmt(filename);
@@ -343,12 +355,16 @@ void redux::file::writeFile( const string& filename, redux::image::Image<T>& ima
 
 
 }
-template void redux::file::writeFile( const string& filename, redux::image::Image<uint8_t>& data );
-template void redux::file::writeFile( const string& filename, redux::image::Image<int16_t>& data );
-template void redux::file::writeFile( const string& filename, redux::image::Image<int32_t>& data );
-template void redux::file::writeFile( const string& filename, redux::image::Image<int64_t>& data );
-template void redux::file::writeFile( const string& filename, redux::image::Image<float>& data );
-template void redux::file::writeFile( const string& filename, redux::image::Image<double>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<int8_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<uint8_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<int16_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<uint16_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<int32_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<uint32_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<int64_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<uint64_t>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<float>& data );
+template void redux::file::writeFile( const string& filename, const redux::image::Image<double>& data );
 
 
 /*void redux::file::loadFiles( const vector<string>& filenames, char* out, size_t frameSize, uint8_t nThreads,

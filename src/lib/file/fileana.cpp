@@ -615,14 +615,18 @@ void redux::file::Ana::read( const string& filename, redux::util::Array<T>& data
         case( ANA_LONG ):   data.template copyFrom<int32_t>( tmp.get() ); break;
         case( ANA_FLOAT ):  data.template copyFrom<float>( tmp.get() ); break;
         case( ANA_DOUBLE ): data.template copyFrom<double>( tmp.get() ); break;
-        default: ;
+        default: throw ios_base::failure( "Ana::read is not implemented for type: "+to_string(hdr->m_Header.datyp) );
     }
 
 }
+template void redux::file::Ana::read( const string& filename, redux::util::Array<int8_t>& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<uint8_t>& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<int16_t>& data, shared_ptr<redux::file::Ana>& hdr );
+template void redux::file::Ana::read( const string& filename, redux::util::Array<uint16_t>& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<int32_t>& data, shared_ptr<redux::file::Ana>& hdr );
+template void redux::file::Ana::read( const string& filename, redux::util::Array<uint32_t>& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<int64_t>& data, shared_ptr<redux::file::Ana>& hdr );
+template void redux::file::Ana::read( const string& filename, redux::util::Array<uint64_t>& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<float  >& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<double >& data, shared_ptr<redux::file::Ana>& hdr );
 template void redux::file::Ana::read( const string& filename, redux::util::Array<complex_t >& data, shared_ptr<redux::file::Ana>& hdr );
@@ -641,10 +645,14 @@ void redux::file::Ana::read( const string& filename, redux::image::Image<T>& ima
         read( filename, image, hdr );
     }
 }
+template void redux::file::Ana::read( const string & filename, redux::image::Image<int8_t>& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<uint8_t>& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<int16_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<uint16_t>& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<int32_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<uint32_t>& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<int64_t>& image, bool );
+template void redux::file::Ana::read( const string & filename, redux::image::Image<uint64_t>& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<float  >& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<double >& image, bool );
 template void redux::file::Ana::read( const string & filename, redux::image::Image<complex_t >& image, bool );
@@ -655,6 +663,11 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
 
     if( !hdr.get() ) {
         hdr.reset( new Ana() );
+    }
+    
+    hdr->m_Header.datyp = getDatyp<T>();
+    if( hdr->m_Header.datyp == ANA_UNDEF ) {
+        throw ios_base::failure( "Ana::write is not implemented for type: "+to_string(hdr->m_Header.datyp) );
     }
     
     auto tmpDims = data.dimensions(true);    // TBD: should we always discard dimensions of size 1, or leave it to the user ??
@@ -737,11 +750,14 @@ void redux::file::Ana::write( const string & filename, const redux::util::Array<
 
 
 }
+template void redux::file::Ana::write( const string&, const redux::util::Array<int8_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<uint8_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<int16_t>&, shared_ptr<redux::file::Ana>, int );
+template void redux::file::Ana::write( const string&, const redux::util::Array<uint16_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<int32_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<uint32_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<int64_t>&, shared_ptr<redux::file::Ana>, int );
+template void redux::file::Ana::write( const string&, const redux::util::Array<uint64_t>&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<float  >&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<double >&, shared_ptr<redux::file::Ana>, int );
 template void redux::file::Ana::write( const string&, const redux::util::Array<complex_t >&, shared_ptr<redux::file::Ana>, int );
@@ -751,10 +767,14 @@ template <typename T>
 void redux::file::Ana::write( const string & filename, const redux::image::Image<T>& image, int sliceSize ) {
     write( filename, image, static_pointer_cast<redux::file::Ana>( image.meta ), sliceSize );
 }
+template void redux::file::Ana::write( const string&, const redux::image::Image<int8_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<uint8_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<int16_t>&, int );
+template void redux::file::Ana::write( const string&, const redux::image::Image<uint16_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<int32_t>&, int );
+template void redux::file::Ana::write( const string&, const redux::image::Image<uint32_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<int64_t>&, int );
+template void redux::file::Ana::write( const string&, const redux::image::Image<uint64_t>&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<float  >&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<double >&, int );
 template void redux::file::Ana::write( const string&, const redux::image::Image<complex_t >&, int );
@@ -790,10 +810,14 @@ void redux::file::Ana::write( const string & filename, const T* data, size_t n )
 
 
 }
+template void redux::file::Ana::write( const string&, const int8_t*, size_t n );
 template void redux::file::Ana::write( const string&, const uint8_t*, size_t n );
 template void redux::file::Ana::write( const string&, const int16_t*, size_t n );
+template void redux::file::Ana::write( const string&, const uint16_t*, size_t n );
 template void redux::file::Ana::write( const string&, const int32_t*, size_t n );
+template void redux::file::Ana::write( const string&, const uint32_t*, size_t n );
 template void redux::file::Ana::write( const string&, const int64_t*, size_t n );
+template void redux::file::Ana::write( const string&, const uint64_t*, size_t n );
 template void redux::file::Ana::write( const string&, const float*, size_t n );
 template void redux::file::Ana::write( const string&, const double*, size_t n );
 template void redux::file::Ana::write( const string&, const complex_t*, size_t n );
