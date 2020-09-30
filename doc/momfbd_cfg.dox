@@ -1,0 +1,162 @@
+/**
+@page momfbd_cfg MOMFBD/reduxd configuration files.
+
+
+@section momfbd_cfg_TOC Table of contents
+\ref cfg_ov \n 
+\ref cfg_ch \n 
+\ref cfg_obj \n 
+\ref cfg_glob \n 
+
+
+@section cfg_ov The general structure of the configuration file.
+@code
+momfbd {
+    object {
+        channel { 
+            ; Channel-level configuration settings
+        }
+        ; Object-level configuration settings
+    }
+    ; Global configuration settings
+}
+@endcode
+The available configuration settings are hierarchical, meaning that settings for the channel-level
+can also be specified on object/global leve, and will then be inherited by all channels below that point.
+
+@section cfg_ch Channel settings
+<table>
+    <tr><th>Keyword                 <th>Type                    <th>Description                                                <th>Default Value (if any)    
+    <tr><td>ALIGN_MAP               <td>float(9) (3x3 matrix)   <td>Projection map describing the relative alignment between two cameras <br>
+                                                                    (i.e. this one and the reference/anchor channel).           <td>Identity(3)
+    <tr><td>ALIGN_CLIP              <td>int(4)                  <td>Specifies border area to be clipped from this channel. Format is "x1, x2, y1, y2"<br>
+                                                                    Only used together with old style offset-files. If ALIGN_MAP is used, ALIGN_CLIP will be ignored <td>
+    <tr><td>ANGLE                   <td>float                   <td>Angle describing the rotation of this channel (i.e camera) w.r.t. the reference/anchor channel. <td>
+    <tr><td>BACK_GAIN               <td>path/filename           <td>Path to a gain file to use for backscatter correction (only tested for SST/Sarnoff cameras).   <td>
+    <tr><td>BORDER_CLIP             <td>int                     <td>Disregard this many pixels at the edge of images when calculating noise statistics <td>10
+    <tr><td>CAL_X/CAL_Y             <td>int(N)                  <td>The same as SIM_X/SIM_Y, but with the extra requirement that CAL_X/CAL_Y are forced to have the same number of entries <td>                 
+    <tr><td>CCD_RESPONSE            <td>string                  <td>Path to a file with CCD response/gain. Will be applied *before* backscatter correction.  <td> 
+    <tr><td>DARK_NUM                <td>int(N)                  <td>List of numbers to use with DARK_TEMPLATE to generate filenames. <td>
+    <tr><td>DARK_TEMPLATE           <td>string                  <td>Filename template to be used with sprintf (and DARK_NUM), to generate the filename(s) to be used as dark image(s) <td>
+    <tr><td>DISCARD                 <td>int(1-2)                <td>Specifies number of frames to skip in the beginning (and end) of multi-frame files.<br>
+    This is useful if e.g. the first frame of each burst is untrusted because of instrument oscillation after tuning <td>
+    <tr><td>DIVERSITY               <td>float(N)                <td>List of weights/values for the fixed aberrations (specified in DIV_ORDERS) <td>
+    <tr><td>DIV_ORDERS              <td>int(N)                  <td>List of mode indices to use as fixed aberrations for this channel <td>
+    <tr><td>DT                      <td>int                     <td>Image number offset to be added to all IMAGE_NUMs in this channel <td>
+    <tr><td>FILENAME_TEMPLATE       <td>string                  <td>Filename template to be used with sprintf (and IMAGE_NUM), to generate the filename(s) to be used as input<td> 
+    <tr><td>GAIN_FILE               <td>path/filename           <td>Path to a file with a gain table. Will be applied *after* backscatter correction.     <td> 
+    <tr><td>IMAGE_DATA_DIR          <td>path                    <td>Location of input data. IMAGE_DATA_DIR/FILENAME_TEMPLATE should specify the full filenames to be used as input. <td> 
+    <tr><td>IMAGE_NUM/IMAGE_NUMS    <td>int(N)                  <td>List of numbers to use with FILENAME_TEMPLATE to generate filenames for the input data <td> 
+    <tr><td>INCOMPLETE              <td>bool                    <td>Flag to indicate that some files might be missing.<br>
+    Without this flag, there will be an error if some combination of FILENAME_TEMPLATE and IMAGE_NUM does not exist  <td>
+    <tr><td style="background-color:#ffdddd">
+            MODMAT                  <td>string                  <td>File containing a demodulation matrix <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td style="background-color:#ffdddd">
+            MMROW                   <td>int                     <td>Number of rows in MODMAT <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td style="background-color:#ffdddd">
+            MMWIDTH                 <td>int                     <td>Number of columns in MODMAT <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td>NF                      <td>float                   <td>"Noise fudge" parameter. The noise of the data is used as a regularization term in the MOMFBD processing,<br>
+    by tweaking this value you can sometimes get better results for medichre data.            <td>1.0
+    <tr><td>NO_RESTORE              <td>bool                    <td>Exclude this channel in the reconstruction/deconvolution step (i.e. only use it during the fitting) <td>
+    <tr><td>PSF                     <td>path/filename           <td>Path to a PSF file to use for backscatter correction (only tested for SST/Sarnoff cameras).   <td>
+    <tr><td>SIM_X                   <td>int(N)                  <td>List of x-coordinates for the patches to be used in the processing.            <td>
+    <tr><td>SIM_Y                   <td>int(M)                  <td>List of y-coordinates for the patches to be used in the processing. SIM_X & SIM_Y will define a grid for<br>
+    the patches. <td>
+    <tr><td>SIM_XY                  <td>int(2N)                 <td>List of alternating x/y-coordinates for the patches. This way you can place the patches freely, not just<br>
+    in a grid pattern. <td> 
+    <tr><td style="background-color:#ffdddd">
+            VECTOR                  <td>float(N)                <td>Weights to be used together with MODMAT, must be MMWIDTH long <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td>WEIGHT                  <td>float                   <td>Weight of this channel in the metric computation <td>1.0
+    <tr><td>WFINDEX                 <td>int(N)                  <td>Wavefront indices of the images. The length of this array must match the number of images/frames in this channel <td>
+    <tr><td>XOFFSET                 <td>path/filename           <td>File containing the alignment offset (in the x direction) of this channel relative to the referecene/anchor channel <td>
+    <tr><td>YOFFSET                 <td>path/filename           <td>File containing the alignment offset (in the y direction) of this channel relative to the referecene/anchor channel <td>
+</table>
+
+@section cfg_obj Object settings
+On the object level, all the channel-keywords above can be specified, and also the following:
+<table>
+    <tr><th>Keyword                 <th>Type                    <th>Description                                                 <th>Default Value (if any)    
+    <tr><td>ARCSECPERPIX            <td>float                   <td>Image scale                                                 <td><b>Has to be specified</b>
+    <tr><td>GET_ALPHA               <td>bool                    <td>Save alpha (mode) coefficients                              <td>
+    <tr><td>GET_COBJ                <td>bool                    <td>Save convolved objects                                      <td>
+    <tr><td>GET_DIVERSITY           <td>bool                    <td>Save phase diversity information                            <td>
+    <tr><td>GET_METRIC              <td>bool                    <td>Save the metric                                             <td>
+    <tr><td>GET_MODES               <td>bool                    <td>Save modes (and pupil) that was used                        <td>
+    <tr><td>GET_PSF                 <td>bool                    <td>Save the PSF for each image                                 <td>
+    <tr><td>GET_PSF_AVG             <td>bool                    <td>Save the average PSF                                        <td>
+    <tr><td>GET_RESIDUAL            <td>bool                    <td>Save the residuals                                          <td>
+    <tr><td>INIT_FILE               <td>path/filename           <td>File with initial values.                                   <td>
+    <tr><td>MAX_LOCAL_SHIFT         <td>int                     <td>How much are the patches allowed to be shifted.             <td>5
+    <tr><td>MINIMUM_OVERLAP         <td>int                     <td>Smallest allowed overlap between patches (used when auto-positioning patches) <td>16
+    <tr><td>MODE_FILE               <td>path/filename           <td>Filename containing modes to use                            <td>
+    <tr><td>NUM_POINTS              <td>int                     <td>Patch size                                                  <td>64
+    <tr><td>OUTPUT_FILE             <td>path/filename           <td>Where to save the results.                                  <td><b>Has to be specified</b>
+    <tr><td>PIXELSIZE               <td>float                   <td>Physical pixel-size for the camera (in meters)              <td><b>Has to be specified</b>
+    <tr><td>PUPIL                   <td>path/filename           <td>File containing pupil shape/mask. It is assumed to be the same size as the image (i.e. precisely touching the edges) <td>
+    <tr><td>PUPIL_POINTS            <td>int                     <td>Pupil size in pixels    <td>NUM_POINTS/2 (might be auto-increased to a value that fits the whole pupil)
+    <tr><td>SAVE_FFDATA             <td>bool                    <td>Save calibrated images                                      <td>
+    <tr><td>TELESCOPE_F             <td>float                   <td>Telescope focal length  <td>Calculated from ARCSECPERPIX and PIXELSIZE
+    <tr><td>TRACE_REF               <td>bool                    <td>Use this object as reference for tracing                    <td>
+</table>
+
+@section cfg_glob Global settings
+On the global level, all the channel, and object, keywords above can be specified, and also the following:
+<table>
+    <tr><th>Keyword                 <th>Type                    <th>Description                                                 <th>Default Value (if any)    
+    <tr><td>BADPIXEL                <td>float                   <td>Threshold for marking a pixel as bad                        <td>1E-5
+    <tr><td>BASIS                   <td>string                  <td>Type of modes (Zernike/Karhunen-Loeve)                      <td>Zernike
+    <tr><td>CALIBRATE               <td>bool                    <td>Run in calibration mode (to determine fixed aberrations between channels) <td>
+    <tr><td>DATA_TYPE               <td>string                  <td>Output type (FLOAT/SHORT)             <td>SHORT (FLOAT for MOMFBD file type)
+    <tr><td>DATE_OBS                <td>string                  <td>Date of observations. Will be entered in the header/metadata of the output files. <td>N/A
+    <tr><td>DONT_MATCH_IMAGE_NUMS   <td>bool                    <td>                            <td>
+    <tr><td>EPS                     <td>float                   <td>Precision/step length for finite differences calculations   <td>1E-10
+    <tr><td>FAST_QR                 <td>bool                    <td>                            <td>
+    <tr><td>FILE_TYPE               <td>string                  <td>Output file format (ANA/FITS/MOMFBD)             <td>FITS (ANA for calibration runs)
+    <tr><td>FIT_PLANE               <td>bool                    <td>                            <td>
+    <tr><td>FLATFIELD               <td>bool                    <td>                            <td>
+    <tr><td>FPMETHOD                <td>string                  <td>Method to use for filling in bad pixels ("median"/"invdistweight"/"horint")<td>"invdistweight"
+    <tr><td>FTOL                    <td>float                   <td>Tolerance/exit condition for the fitting                    <td>1E-3
+    <tr><td>GETSTEP                 <td>string                  <td>Method to use for calculating the gradient <br>
+    ("getstep_steepest_descent"/"getstep_conjugate_gradient"/"getstep_BFGS"/"getstep_BFGS_inv")<td><b>Has to be specified</b><br> Note: The BFGS methods are not fully tested
+    <tr><td>GLOBAL_NOISE            <td>bool                    <td>                            <td>
+    <tr><td>GRADDIFF_STEP           <td>float                   <td>Step length                                                 <td>1E-2
+    <tr><td>GRADIENT                <td>string                  <td>Method to use for calculating the gradient ("gradient_diff"/"gradient_Vogel")<td>"invdistweight"
+    <tr><td>INIT_FILES              <td>string                  <td>List of files to use as starting values. Should either be nObjects long, or empty (i.e. just a keyword).<br>
+    In the latter case it will use the output-filenames as input and continue the processing from there. <td>
+    <tr><td>KL_MAX_MODE             <td>int                     <td>Last KL mode to use in expansion                            <td>2000
+    <tr><td>KL_MIN_MODE             <td>int                     <td>First KL mode to use in expansion                           <td>2
+    <tr><td>MAX_ITER                <td>int                     <td>Force exit after this many iterations                       <td>500
+    <tr><td>MIN_ITER                <td>int                     <td>Run for *at least* this many iterations                     <td>5
+    <tr><td>MODE_START              <td>int                     <td>How many modes to use in the first iteration                <td>5
+    <tr><td>MODE_STEP               <td>int                     <td>How many modes to add in each iteration                     <td>5
+    <tr><td>MODES                   <td>list(int)               <td>Modes to use (from the selected BASIS)                      <td><b>Has to be specified</b>
+    <tr><td>N_DONE_ITER             <td>int                     <td>How many iterations before adding more modes (not applied to last step, when all modes are active) <td>3
+    <tr><td>NEW_CONSTRAINTS         <td>bool                    <td>                            <td>
+    <tr><td>NOSWAP                  <td>bool                    <td>                            <td>
+    <tr><td>NO_CLIP                 <td>bool                    <td>                            <td>
+    <tr><td>NO_CONSTRAINTS          <td>bool                    <td>                            <td>
+    <tr><td>NO_FILTER               <td>bool                    <td>                            <td>
+    <tr><td>OLD_NS                  <td>bool                    <td>                            <td>
+    <tr><td>OUTPUT_FILES            <td>string                  <td>Alternative way to specify output filenames. Must be a list of filenames that is nObjects long <td>
+    <tr><td>OVERWRITE               <td>bool                    <td>Overwrite existing output files                             <td>
+    <tr><td style="background-color:#ffdddd">
+            PROG_DATA_DIR           <td>string                  <td>Directory where to store temporary files                    <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td>REG_ALPHA               <td>float                   <td>Adds a regularization term to the metric which serves to keep alphas small <td>
+    <tr><td style="background-color:#ffdddd">
+            SEQUENCE_NUM            <td>string                  <td>Sequence number                    <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td>SORT_MODES              <td>bool                    <td>Tells reduxd that the mode list should be sorted<td>
+    <tr><td>SVD_REG                 <td>float                   <td>Cutoff for the KL expansion                                 <td>1E-3
+    <tr><td>TELESCOPE_D             <td>float                   <td>Telescope diameter                                          <td><b>Has to be specified</b>
+    <tr><td style="background-color:#ffdddd">
+            TELESCOPE_CO            <td>float                   <td>Telescope central obscuration (if applicable)               <td>Note: not fully implemented/tested!
+    <tr><td style="background-color:#ffdddd">
+            TIME_OBS                <td>string                  <td>Time of observations.       <td>Note: not used by reduxd, keyword only supported for backwards compatibility
+    <tr><td>TRACE                   <td>bool                    <td>                            <td>
+</table>
+
+
+
+
+
+ */
+ 

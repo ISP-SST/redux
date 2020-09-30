@@ -84,7 +84,7 @@ void Pupil::calculatePupilSize (double &frequencyCutoff, double &pupilRadiusInPi
     if( arcSecsPerPixel <= 0.0 ) throw logic_error("calculatePupilSize: arcSecsPerPixel (="+to_string(arcSecsPerPixel)+") <= 0.0, which doesn't make much sense.");
     double radians_per_pixel = arcSecsPerPixel * radians_per_arcsec;
     double q_number = wavelength / (radians_per_pixel * telescopeDiameter);
-    frequencyCutoff = (double) nPixels / q_number;
+    frequencyCutoff = (double) nPixels / q_number;                  // Diffraction limit (radius) in Fourier space.
     nPupilPixels = nPixels >> 2;                                    // Divide nPixels by 4 (the loop below actually works with half pupil-sizes).
     pupilRadiusInPixels = frequencyCutoff / 2.0;                    // Telescope radius in pupil pixels.
     if( nPupilPixels < pupilRadiusInPixels ) {                      // Only increase pupil-pixels for oversampled data

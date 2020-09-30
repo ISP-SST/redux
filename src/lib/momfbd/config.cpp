@@ -646,18 +646,18 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
 
     if( getValue<bool>( tree, "CALIBRATE", false ) )            runFlags |= RF_CALIBRATE;
-    if( getValue<bool>( tree, "DONT_MATCH_IMAGE_NUMS", false ) ) runFlags |= RF_DONT_MATCH_IMAGE_NUMS;
+    if( getValue<bool>( tree, "DONT_MATCH_IMAGE_NUMS", false )) runFlags |= RF_DONT_MATCH_IMAGE_NUMS;
     if( getValue<bool>( tree, "FAST_QR", false ) )              runFlags |= RF_FAST_QR;
     if( getValue<bool>( tree, "FIT_PLANE", false ) )            runFlags |= RF_FIT_PLANE;
     if( getValue<bool>( tree, "FLATFIELD", false ) )            runFlags |= RF_FLATFIELD;
     if( getValue<bool>( tree, "GLOBAL_NOISE", false ) )         runFlags |= RF_GLOBAL_NOISE;
     if( getValue<bool>( tree, "NEW_CONSTRAINTS", false ) )      runFlags |= RF_NEW_CONSTRAINTS;
+    if( getValue<bool>( tree, "NOSWAP", false ) )               runFlags |= RF_NOSWAP;
     if( getValue<bool>( tree, "NO_CLIP", false ) )              runFlags |= RF_NO_CLIP;
     if( getValue<bool>( tree, "NO_CONSTRAINTS", false ) )       runFlags |= RF_NO_CONSTRAINTS;
     if( getValue<bool>( tree, "NO_FILTER", false ) )            runFlags |= RF_NO_FILTER;
-    if( getValue<bool>( tree, "OVERWRITE", false ) )            runFlags |= RF_FORCE_WRITE;
-    if( getValue<bool>( tree, "NOSWAP", false ) )               runFlags |= RF_NOSWAP;
     if( getValue<bool>( tree, "OLD_NS", false ) )               runFlags |= RF_OLD_NS;
+    if( getValue<bool>( tree, "OVERWRITE", false ) )            runFlags |= RF_FORCE_WRITE;
     if( getValue<bool>( tree, "SORT_MODES", false ) )           runFlags |= RF_SORT_MODES;
     
     trace = tree.get<bool>( "TRACE", defaults.trace );

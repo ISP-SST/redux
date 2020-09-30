@@ -1,0 +1,24 @@
+/**
+ * @page momfbd_doc MOMFBD/reduxd documentation
+ *
+ * This page is for describing the general workings of the MOMFBD/reduxd program.
+ *
+ * @section momfbd_TOC Table of contents
+ * \ref momfbd_1 \n 
+ * \ref momfbd_1a \n 
+ * \ref momfbd_1aa \n 
+ * \ref momfbd_1ab \n 
+ * \ref momfbd_1ac \n 
+ * \ref momfbd_1ad \n 
+ * \ref momfbd_cfg \n 
+ *
+ * @section momfbd_1 1. Overview
+ * 
+ * @subsection momfbd_1a 1a. Binaries
+ * This package provides several binaries
+ * @subsubsection momfbd_1aa 1a. reduxd
+ * @subsubsection momfbd_1ab 1b. rdx_sub
+ * @subsubsection momfbd_1ac 1c. rdx_stat
+ * @subsubsection momfbd_1ad 1d. rdx_del
+ *
+ */

@@ -640,8 +640,8 @@ bool Object::checkImageScale( double& F, double& A, double& P ) {
     count += A > 0 ? 1 : 0;
     count += P > 0 ? 1 : 0;
     if( count > 2 ){
-        LOG_WARN << "Too many parameters specified: replacing telescope focal length( " << F
-                    << " )with computed value( " <<( P * rad2asec / A )<< ")" << ende;
+        LOG_WARN << "Too many parameters specified: replacing telescope focal length (=" << F
+                    << ") with computed value (=" <<( P * rad2asec / A )<< ")" << ende;
         F = P * rad2asec / A;
         return true;
     } else if( count < 2 ){

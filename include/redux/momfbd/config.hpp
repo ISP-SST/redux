@@ -76,41 +76,41 @@ namespace redux {
             
             
             /********* Hardware **********/
-            double rotationAngle;                    //!< Tilt of this camera relative to "anchor channel" (default: 0)
+            double rotationAngle;                   //!< Rotation of this camera relative to "anchor channel" (default: 0)
             /*****************************/
             
             /**** Numerical settings *****/
-            double noiseFudge;                       //!< Noise weight (default: 1)
-            double weight;                           //!< Weight for this channel in calculations (default: 1)
+            double noiseFudge;                      //!< Noise weight (default: 1)
+            double weight;                          //!< Weight for this channel in calculations (default: 1)
             /*****************************/
 
             /********  Diversity  ********/
             // TODO: reorganize
-            std::vector<double> diversity;
-            std::vector<uint16_t> diversityModes;    //!< mode numbers
-            std::vector<uint16_t> diversityTypes;    //!< mode types (Zernike/KL)
+            std::vector<double> diversity;          //!< List of weights/values for the diversity modes. 
+            std::vector<uint16_t> diversityModes;   //!< List of diversity mode numbers
+            std::vector<uint16_t> diversityTypes;   //!< List of diversity mode types (Zernike/KL)
             bool physicalDefocusDistance;
-            bool noRestore;
+            bool noRestore;                         //!< Exclude this channel in the final reconstruction/deconvolution step (i.e. only use it during the fitting)
             /*****************************/
             
             /******* Data settings *******/
             std::vector<float> alignMap;            //!< Coefficients for the projective transformation (from reference channel) into this channel (default: none)
             std::vector<int16_t> alignClip;         //!< Crop images to this region {firstX,lastX,firstY,lastY}, (default: none, has to be specified)
-            uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 10)
+            uint16_t borderClip;                    //!< Disregard this many pixels at the edge when calculating statistics (default: 100)
             uint8_t incomplete;                     //!< Some files might not exist, just skip those.
-            std::vector<uint16_t> subImagePosXY, subImagePosX, subImagePosY;
-            std::vector<uint16_t> discard;           //!< Skip this many frames in the beginning/end of datacubes
+            std::vector<uint16_t> subImagePosXY, subImagePosX, subImagePosY;    //!< Patch coordinates
+            std::vector<uint16_t> discard;          //!< Skip this many frames in the beginning/end of input data files.
             /*****************************/
 
             /************ Input **********/
             std::string imageDataDir;               //!< Where the data is located
-            std::string imageTemplate;
-            std::string darkTemplate;
-            std::string gainFile;
-            std::string responseFile;
-            std::string backgainFile;
-            std::string psfFile;
-            std::string mmFile;                     //!< Modulation matrix
+            std::string imageTemplate;              //!< Filename template for the images, IMAGE_NUM(S) will be inserted into this template to generate filenames.
+            std::string darkTemplate;               //!< Filename template for the darks, DARK_NUM will be inserted into this template to generate filenames.
+            std::string gainFile;                   //!< Gain file to use.      (will be applied *after* backscatter correction)
+            std::string responseFile;               //!< File with CCD response (will be applied *before* backscatter correction)
+            std::string backgainFile;               //!< File with the back-gain to use for the backscatter correction.
+            std::string psfFile;                    //!< File with the PSF to use for the backscatter correction.
+            std::string mmFile;                     //!< Modulation matrix  (for including Stokes demodulation in the fitting. **N.B. Not fully implemented/tested!**)
             uint8_t mmRow;                          //!< Number of rows in modulation matrix
             uint8_t mmWidth;                        //!< Number of cols in modulation matrix
             std::string xOffsetFile,yOffsetFile;    //!< Alignment offsets (from pinhole-calibration)
@@ -118,7 +118,7 @@ namespace redux {
             std::vector<uint32_t> fileNumbers;      //!< Use these numbers together with the template to generate file-list
             std::vector<uint32_t> waveFrontList;    //!< Identify wavefront, used to group/constrain simultaneous images if image-numbers can't be used.
             std::vector<uint32_t> darkNumbers;      //!< Use these numbers together with the template to generate file-list
-            std::vector<float> stokesWeights;
+            std::vector<float> stokesWeights;       //!< Weights to use for the different Stokes components if .
             /*****************************/
             
             
@@ -150,7 +150,7 @@ namespace redux {
             bool operator==(const ObjectCfg&) const;
             
             /********* Hardware **********/
-            double telescopeF;                       //!< Telescope focal length  (or Ratio?)
+            double telescopeF;                       //!< Telescope focal length
             double arcSecsPerPixel;                  //!< Image scale   (default: 0, has to be specified)
             double pixelSize;                        //!< Physical size of pixels (default: 10\f$\mu\f$)
             double alphaToPixels,pixelsToAlpha;      //!< Conversion factors for the tilt-modes. Derived from arcSecsPerPixel & telescopeD.
@@ -229,9 +229,9 @@ namespace redux {
             /******* Data settings *******/
             uint8_t outputFileType;
             uint8_t outputDataType;
-            uint32_t sequenceNumber;
-            std::string observationTime;
-            std::string observationDate;
+            uint32_t sequenceNumber;        //!< Not used
+            std::string observationTime;    //!< Not used
+            std::string observationDate;    //!< Date-tag to be placed in the header of the ooutput files.
             std::string tmpDataDir;
             std::vector<std::string> outputFiles;
             std::vector<std::string> initFiles;

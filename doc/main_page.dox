@@ -3,8 +3,9 @@
  *
  * Welcome to the documentation for REDUX!
  *
+ * @li @ref momfbd_doc
  *
- * @section mainpage_admin_sec Software structure
+ * @section mainpage_admin_sec Library structure
  *
  * @li @ref com_prot Communication protocol
  *
@@ -17,7 +18,7 @@
  *
  *  To be written...
  *
- * @section mainpage_admin_sec Compiling and Source Code Management
+ * @section compiling Compiling and Source Code Management
  *
  * \li @ref release_notes "Release notes for REDUX" \n
  * \li @ref cmake_faq "CMake FAQ" \n
