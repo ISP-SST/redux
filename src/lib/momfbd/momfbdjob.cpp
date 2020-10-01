@@ -609,9 +609,20 @@ bool MomfbdJob::checkPatchPositions(void) {
     
     uint16_t halfPatchSize = patchSize/2;
     Region16 posLimits = roi+1;     // local, 1-based copy of ROI
+    
     posLimits.shrink( halfPatchSize );
     posLimits -= roi.first;         // patch coordinates are given relative to the ROI
     
+    Point roi_span = roi.span();
+    if( roi_span.x <= patchSize ) {     // only 1 patch possible 
+        uint16_t pos =  roi.first.x + halfPatchSize + 1;
+        posLimits.first.x = posLimits.last.x = pos;
+    }
+    if( roi_span.y <= patchSize ) {     // only 1 patch possible 
+        uint16_t pos =  roi.first.y + halfPatchSize + 1;
+        posLimits.first.y = posLimits.last.y = pos;
+    }
+
     if( subImagePosXY.empty() ) {
         
         bool xOutside(false);
