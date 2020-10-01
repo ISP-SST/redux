@@ -619,12 +619,12 @@ namespace redux {
         */
         template <typename T>
         std::vector<T> segment( T first, T last, int segmentLength, int minimumOverlap=0 ) {
-            int nSegments=2;
-            if( first == last ) return std::vector<T>();
+            if( first == last ) return std::vector<T>( 1, first );
             if( first > last ) std::swap( first, last );
+            int nSegments(2);
             double separation = (last-first)/static_cast<double>(nSegments-1);
             double overlap = segmentLength-separation;
-            while(overlap < minimumOverlap) {
+            while( overlap < minimumOverlap ) {
                 ++nSegments;
                 separation = (last-first)/static_cast<double>(nSegments-1);
                 overlap = segmentLength-separation;

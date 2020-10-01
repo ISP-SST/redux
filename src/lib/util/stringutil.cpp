@@ -266,12 +266,20 @@ string expandTilde(string in) {
 
 string redux::util::cleanPath(string in, string base) {
 
-    if(in.empty()) return in;
-    bf::path fn, result, ain(in);
-    if(!base.empty() && base[0] == '~') base = expandTilde(base);
-    if(!base.empty() && base[0] != '/') result = bf::current_path() / bf::path(base);
-    if(in[0] == '~') in = expandTilde(in);
-
+    if( in.empty() ) return in;
+    bf::path fn, result;
+    
+    if( !base.empty() && base[0] == '~' ) base = expandTilde(base);
+    else if( !base.empty() && base[0] != '/' ) result = bf::current_path() / bf::path(base);
+    
+    if( in[0] == '~' ) {
+        in = expandTilde(in);
+    } else if( in.substr(0,2) == "./" ) {     // relative path
+        in.replace( 0, 1, bf::current_path().string() );
+    }
+    
+    bf::path ain(in);
+    
     if(bf::is_regular_file(ain)) {
         fn = ain.filename();
         ain = ain.parent_path();
