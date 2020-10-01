@@ -283,6 +283,16 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
         stokesWeights.resize( 1, 1.0 );
     }
 
+    // Resolve relative paths etc.
+    if( imageDataDir.empty() ) imageDataDir = "./";
+    imageDataDir = cleanPath( imageDataDir );
+    if( !gainFile.empty() ) gainFile = cleanPath( gainFile );
+    if( !responseFile.empty() ) responseFile = cleanPath( responseFile );
+    if( !backgainFile.empty() ) backgainFile = cleanPath( backgainFile );
+    if( !psfFile.empty() ) psfFile = cleanPath( psfFile );
+    if( !mmFile.empty() ) mmFile = cleanPath( mmFile );
+    if( !xOffsetFile.empty() ) xOffsetFile = cleanPath( xOffsetFile );
+    if( !yOffsetFile.empty() ) yOffsetFile = cleanPath( yOffsetFile );
 
 }
 
@@ -505,6 +515,11 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
         //LOG_WARN << "both GET_PSF and GET_PSF_AVG mode requested" << ende;
     }
 
+    // Resolve relative paths etc.
+    if( !initFile.empty() ) initFile = cleanPath( initFile );
+    if( !modeFile.empty() ) modeFile = cleanPath( modeFile );
+    if( !pupilFile.empty() ) pupilFile = cleanPath( pupilFile );
+    
     ChannelCfg::parseProperties( tree, logger, defaults );
 
 }
@@ -807,6 +822,11 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
         //saveMask |= SF_SAVE_ALPHA; // necessary for calibration runs.
         outputFileType |= FT_ANA;
     }
+    
+    // Resolve relative paths etc.
+    if( !tmpDataDir.empty() ) tmpDataDir = cleanPath( tmpDataDir );
+    for( auto& f: outputFiles ) if( !f.empty() ) f = cleanPath( f );
+    for( auto& f: initFiles ) if( !f.empty() ) f = cleanPath( f );
     
     ObjectCfg::parseProperties( tree, logger, defaults );
 
