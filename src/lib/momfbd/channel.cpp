@@ -1286,6 +1286,15 @@ Point16 Channel::getImageSize(void) {
                 LOG_ERR << boost::format ("Input-file %s not found!") % thisFile << ende;
             }
 //        }
+            if( imgSize.x && imgSize.y ) { 
+                uint16_t old_clip = borderClip;
+                borderClip = min<uint16_t>( borderClip, imgSize.x/8 );     // ensure we are clipping too much.
+                borderClip = min<uint16_t>( borderClip, imgSize.y/8 );
+                if( borderClip != old_clip ) {
+                    LOG_WARN << "BORDER_CLIP has been reduced from " << old_clip << " to " << borderClip << " to avoid clipping too much of the images." << ende;
+                }
+            }
+
     }
 
     return imgSize;
