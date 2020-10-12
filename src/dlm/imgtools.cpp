@@ -9,6 +9,7 @@
 #include <redux/image/fouriertransform.hpp>
 #include <redux/image/utils.hpp>
 #include <redux/util/array.hpp>
+#include <redux/util/datautil.hpp>
 #include <redux/util/stringutil.hpp>
 #include <redux/util/arraystats.hpp>
 #include <redux/util/progresswatch.hpp>
@@ -850,6 +851,7 @@ namespace {
             IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
             IDL_VPTR center;
             IDL_INT  help;
+            IDL_INT  interpol;
             IDL_INT  preserve;
             IDL_VPTR size;
             IDL_INT  verbose;
@@ -860,7 +862,8 @@ namespace {
             IDL_KW_FAST_SCAN,
             { (char*) "CENTER",        IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, center ) },
             { (char*) "HELP",          IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, help) },
-            { (char*) "PRESERVE_SIZE", IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, preserve) },
+            { (char*) "INTERPOL",      IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, interpol) },
+            { (char*) "PRESERVE_SIZE", IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, preserve) },
             { (char*) "SIZE",          IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, size ) },
             { (char*) "VERBOSE",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2( kw_img_trans, verbose) },
             { NULL }
@@ -877,8 +880,24 @@ namespace {
                 ret +=  "   Accepted Keywords:\n"
                         "      CENTER              Map the center of the input to the center of the output, or specified point (float, 1-2 elements).\n"
                         "      HELP                Display this info.\n"
+                        "      INTERPOL            Interpolation method: nearest(0), linear(1), cubic(2), area(3), lanczos(4), linear_exact(5) (default=2).\n"
                         "      PRESERVE_SIZE       Make the output the same size as the input (default is to resize so the whole mapping fits).\n"
                         "      SIZE                Specify size of output image (integer, 1-2 elements).\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+            }
+        } else ret += "\n";
+        return ret;
+    }
+
+    string point_transform_info( int lvl ) {
+        string ret = "RDX_POINT_TRANSFORM";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"        ");          // newline if lvl>1
+            ret += "   Syntax:   mapped_points = rdx_point_transform( map, point(_list), /KEYWORDS )\n";
+            if( lvl > 1 ) {
+                ret +=  "   where map is a 3x3 or 2x3 transformation matrix.\n";
+                ret +=  "   Accepted Keywords:\n"
+                        "      HELP                Display this info.\n"
                         "      VERBOSE             Verbosity, default is 0 (only error output).\n";
             }
         } else ret += "\n";
@@ -978,7 +997,7 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
             }
         }
         
-        IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_NOP, &out);
+        IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_ZERO, &out);
 
         if( kw.center ) {
             vector<float> cent = getAsVector<float>( kw.center );
@@ -999,7 +1018,10 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
         Mat outImg = arrayToMat(out);
         Size dsize = outImg.size();
 
-        int flags = INTER_CUBIC;                  // INTER_LINEAR, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4
+        int flags = INTER_CUBIC;    // nearest(0), linear(1), cubic(2), area(3), lanczos(4), linear_exact(5)
+        if( kw.interpol ) {
+            flags = kw.interpol;
+        }
         int borderMode = BORDER_CONSTANT;
         const Scalar borderValue = Scalar();
 
@@ -1014,6 +1036,103 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
             }
             warpAffine (img, outImg, H, dsize, flags, borderMode, borderValue);
         }
+    } catch( const cv::Exception& e ) {
+        string msg = "OpenCV error: " + e.msg;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+    }
+
+    return out;
+    
+#endif
+
+}
+
+IDL_VPTR point_transform( int argc, IDL_VPTR* argv, char* argk ) {
+
+#ifndef RDX_WITH_OPENCV
+    IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "The rdx DLM has to be re-compiled with OpenCV enabled to be able to use this function." );
+#else
+
+    kw_img_trans kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_img_trans_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if (nPlainArgs != 2) {
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Two arguments needed. A 3x3 or 2x3 transformation matrix, and an array with (x,y) points." );
+    }
+    
+    if( kw.help ) {
+        int lvl = 1;
+        if( kw.verbose ) lvl++;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, point_transform_info(lvl).c_str() );
+        return IDL_GettmpInt(0);
+    }
+
+    IDL_VPTR H_in = argv[0];
+    IDL_ENSURE_SIMPLE (H_in);
+    IDL_ENSURE_ARRAY (H_in);
+    IDL_VPTR points_in = argv[1];
+    IDL_ENSURE_SIMPLE ( points_in );
+    IDL_ENSURE_ARRAY ( points_in );
+
+    IDL_VPTR out;
+    if( points_in->value.arr->n_elts % 2 ) {
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "point-array has to have an even number of elements!" );
+    }
+    
+    size_t nPoints = points_in->value.arr->n_elts/2;
+    
+    try {
+        
+        Mat H = arrayToMat(H_in);
+        int trans_type(0);  // 0 = undefined, +1 = perspective, -1 = affine
+        if( H.cols == 3 ) {
+            if ( H.rows == 3 ) {
+                trans_type = 1;
+            } else if ( H.rows == 2 ) {
+                trans_type = -1;
+            }
+        }
+        if( trans_type == 0 ) {
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Transformation matrix has to be 2x3 or 3x3." );
+        }
+        UCHAR nDim = points_in->value.arr->n_dim;
+        
+        vector<Point2f> in_points(nPoints), out_points;
+        // = redux::castOrCopy<float>( points_in );
+        shared_ptr<float> inFlt( new float[ 2*nPoints ], [](float* p){ delete[] p; } );
+        float* ptr = inFlt.get();
+        
+        redux::copyToRaw<float>( points_in, inFlt.get() );
+        
+        bool doTranspose(false);
+        if( nDim == 2 && points_in->value.arr->dim[0] != 2 ) {
+            doTranspose = true;
+            redux::util::transpose( ptr, points_in->value.arr->dim[1], points_in->value.arr->dim[0] );
+        }
+        for( auto& p: in_points ) {
+            p = Point2f(ptr[0],ptr[1]);
+            ptr += 2;
+        }
+        
+        if ( trans_type > 0 ) {
+            perspectiveTransform( in_points, out_points, H );
+        } else { // affine
+            transform( in_points, out_points, H );
+        }
+        
+        IDL_MakeTempArray ( IDL_TYP_FLOAT, points_in->value.arr->n_dim, points_in->value.arr->dim, IDL_ARR_INI_NOP, &out );
+        Mat outImg = arrayToMat(out);
+        ptr = reinterpret_cast<float*>(out->value.arr->data);
+        for( auto& p: out_points ) {
+            ptr[0] = p.x;
+            ptr[1] = p.y;
+            ptr += 2;
+        }
+        ptr = reinterpret_cast<float*>(out->value.arr->data);
+        if( doTranspose ) {
+           redux::util::transpose( ptr, points_in->value.arr->dim[0], points_in->value.arr->dim[1] );
+        }
+
     } catch( const cv::Exception& e ) {
         string msg = "OpenCV error: " + e.msg;
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
@@ -3121,6 +3240,7 @@ namespace {
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_fillpix}, (char*)"RDX_FILLPIX", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, rdx_fillpix_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_align}, (char*)"RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_align_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_transform}, (char*)"RDX_IMG_TRANSFORM", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_transform_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)point_transform}, (char*)"RDX_POINT_TRANSFORM", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, point_transform_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_transform}, (char*)"RDX_IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_make_mask},  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_make_win},  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +

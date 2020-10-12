@@ -46,6 +46,7 @@ FUNCTION        RDX_CBEZIER2      3       3          KEYWORDS
 FUNCTION        RDX_CBEZIER3      3       3          KEYWORDS
 FUNCTION        RDX_IMG_ALIGN     2       2          KEYWORDS
 FUNCTION        RDX_IMG_TRANSFORM 2       2          KEYWORDS
+FUNCTION        RDX_POINT_TRANSFORM 2     2          KEYWORDS
 FUNCTION        RDX_IMG_PROJECT   2       2          KEYWORDS
 FUNCTION        RDX_IMG_REMAP     3       3          KEYWORDS
 FUNCTION        RDX_INPAINT       2       2          KEYWORDS
