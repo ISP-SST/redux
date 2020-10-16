@@ -10,6 +10,8 @@
 #include <list>
 #include <map>
 #include <mutex>
+#include <pwd.h>
+#include <unistd.h>
 
 using namespace redux::file;
 using namespace redux::util;
@@ -478,3 +480,119 @@ void redux::file::sumFiles( const std::vector<std::string>& filenames, double* o
     for (auto& th : threads) th.join();
 */
 }
+
+
+bool redux::file::isRelative( const bfs::path &p ) {
+    string s = p.string();
+    return (!s.empty() && s[0] != '/');
+}
+
+
+string expandTilde( string p ) {
+
+    if( !p.empty() && p[0] == '~' ) {
+        string home_path;
+        string subpath = p.substr( 1 );                 // drop the '~'
+        if( subpath.empty() || subpath[0] == '/' ) {    // resolve own home-directory
+            home_path = getHome();
+        } else {                                        // resolve home-directory of named user
+            string user = subpath;
+            size_t pos = subpath.find_first_of('/');
+            if( pos != string::npos ) {
+                user = subpath.substr( 0, pos );
+                subpath = subpath.substr( pos );
+            }
+            home_path = getHome(user);
+        }
+        if( !home_path.empty() ) {                      // if we found something, return it, else return input
+            if( *home_path.rbegin() != '/' ) home_path.push_back('/');
+            return home_path + subpath;
+        }
+    }
+    return p;
+}
+
+
+string redux::file::cleanPath( string in, string base ) {
+
+    if( in.empty() ) return in;
+    
+    in = expandTilde( in );       // returns unmodified if no '~'
+
+    if( (in.length() > 1) && (in.substr(0,2) == "./") ) { // local path
+        in.replace( 0, 1, bfs::current_path().string() );
+    }
+    
+    if( in[0] != '/' ) {                                       // relative path, resolve and apply "base"
+        base = expandTilde(base);
+        if( !base.empty() ) {
+            bfs::path base_path(base);
+            if( base[0] != '/' ) base_path = bfs::current_path() / bfs::path(base);     // prepend current dir if base is relative
+            in.insert( 0, base_path.string() + "/");
+        }
+    }
+    
+
+    bfs::path in_path(in);
+    bfs::path in_filename = in_path.filename();
+    if( in_filename.filename_is_dot() ) {
+        in_path = in_path.parent_path();
+    }
+    
+    return in_path.lexically_normal().string();
+
+}
+
+
+string redux::file::getHome( const string& username ) {
+    
+    string tmp;
+    struct passwd pwent;
+    struct passwd *pwentp;
+    char buf[1024];
+    if( username.empty() ) {    // resolve own home-directory
+        tmp = getenv("HOME");
+        if( tmp.empty() ) { // No HOME in env, try looking with pwuid
+            if( !getpwuid_r( geteuid(), &pwent, buf, sizeof buf, &pwentp ) ) {
+                tmp = pwent.pw_dir;
+            }
+        }
+    } else {                // resolve home-directory of named user
+        if( !getpwnam_r( username.c_str(), &pwent, buf, sizeof buf, &pwentp ) ) {
+            if( username == pwent.pw_name ) {   // NOTE: non-existant user can return weird results if this is not verified
+                tmp = pwent.pw_dir;
+            }
+        }
+    }
+
+    if( !tmp.empty() ) {    // append slash
+        if( *tmp.rbegin() != '/' ) tmp.push_back('/');
+    }
+
+    return tmp;
+}
+
+
+bfs::path redux::file::weaklyCanonical( bfs::path p ) {
+    p = expandTilde( p.string() );
+    try {
+#if BOOST_VERSION > 106000
+        p = bfs::weakly_canonical( p );
+#elif BOOST_VERSION > 104800
+        bfs::path tmp = p;
+        while( !tmp.empty() && !exists( tmp ) ) {
+            tmp = tmp.parent_path();
+        }
+        if( !tmp.empty() ) {
+            p = bfs::relative( p, tmp );
+            p = bfs::canonical( tmp ) / p;
+        }
+#endif
+    } catch( ... ) {};
+    if( p.filename_is_dot() ) {
+        p = p.parent_path();
+    }
+    return p.lexically_normal();
+}
+
+

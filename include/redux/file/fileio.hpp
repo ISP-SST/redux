@@ -9,6 +9,9 @@
 #include <thread>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+namespace bfs = boost::filesystem;
+
 namespace redux {
 
     namespace file {
@@ -62,8 +65,12 @@ namespace redux {
         extern ErrorHandling errorHandling;         //<! Specify if routines should throw or print errors. Default is EH_PRINT;
         inline void setErrorHandling( ErrorHandling eh ) { errorHandling = eh; }
 
-
-//std::shared_ptr<Image>
+        bool isRelative( const bfs::path& );
+        std::string cleanPath( std::string path, std::string base = "" );
+        std::string getHome( const std::string& username="" );
+        bfs::path weaklyCanonical( bfs::path );
+        
+        
         /*! @} */
 
     }

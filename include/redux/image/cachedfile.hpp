@@ -32,7 +32,7 @@ namespace redux {
             inline size_t size( void ) const { return sizeof(CachedFile)+filename.size(); }
 #endif
             explicit CachedFile( const std::string& fn ) : filename(fn) {
-                filename = redux::util::cleanPath( filename ) ;
+                filename = redux::file::cleanPath( filename ) ;
             }
             
             std::string filename;

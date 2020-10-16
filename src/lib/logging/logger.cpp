@@ -1,5 +1,6 @@
 #include <redux/logging/logger.hpp>
 
+#include <redux/file/fileio.hpp>
 #include <redux/logging/logtofile.hpp>
 #include <redux/logging/logtostream.hpp>
 #include <redux/logging/logtonetwork.hpp>
@@ -11,6 +12,7 @@
 
 namespace bfs = boost::filesystem;
 
+using namespace redux::file;
 using namespace redux::logging;
 using namespace redux::network;
 using namespace redux::util;

@@ -1,4 +1,5 @@
 #include "redux/application.hpp"
+#include "redux/file/fileio.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/debugjob.hpp"
 #include "redux/momfbd/momfbdjob.hpp"
@@ -16,6 +17,7 @@
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/program_options.hpp>
 
+using namespace redux::file;
 using namespace redux::logging;
 using namespace redux::util;
 using namespace redux::network;

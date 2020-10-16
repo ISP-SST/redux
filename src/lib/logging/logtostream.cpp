@@ -8,7 +8,7 @@
 using namespace redux::logging;
 using namespace redux::util;
 using namespace std;
-namespace bfs = boost::filesystem;
+
 namespace bpx = boost::posix_time;
 
 namespace {

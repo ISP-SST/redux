@@ -7,6 +7,7 @@
 #   define TRACE_THREADS
 #endif
 
+#include "redux/file/fileio.hpp"
 #include "redux/util/cache.hpp"
 #include "redux/util/convert.hpp"
 #include "redux/util/datautil.hpp"
@@ -23,6 +24,7 @@
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
+using namespace redux::file;
 using namespace redux::logging;
 using namespace redux::util;
 using namespace redux;

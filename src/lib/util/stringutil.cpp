@@ -6,15 +6,12 @@
 #include <cstdlib>
 #include <mutex>
 #include <pwd.h>
-#include <unistd.h>
 
 #ifdef __GNUG__
 #   include <cxxabi.h>
 #endif
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/multiprecision/cpp_int.hpp> 
 #include <boost/regex.hpp>
 #include <boost/date_time/posix_time/time_parsers.hpp>
@@ -22,7 +19,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/version.hpp>
  
-namespace bf = boost::filesystem;
 namespace bpt = boost::property_tree;
 namespace bpx = boost::posix_time;
 
@@ -124,11 +120,6 @@ bool redux::util::nocaseLess(const string& lhs, const string& rhs) {
                                                [] ( char ch1, char ch2 ) { return std::toupper( ch1 ) < std::toupper( ch2 ); }
                                              );
 
-}
-
-
-bool redux::util::isRelative( const std::string &s ) {
-    return (!s.empty() && s[0] != '/');
 }
 
 
@@ -235,80 +226,6 @@ string redux::util::getUname(__uid_t id) {
     return tmp;
 }
 
-
-string expandTilde(string in) {
-    if(in.empty() || in[0] != '~') return in;
-    string tmp;
-    size_t cut;
-    struct passwd pwent;
-    struct passwd *pwentp;
-    char buf[1024];
-    if(in.length() == 1 || in[1] == '/') {
-        cut = 1;
-        tmp = getenv("HOME");
-        if(tmp.empty()) {
-            if( !getpwuid_r( geteuid(), &pwent, buf, 1024, &pwentp ) ) {
-                tmp = pwent.pw_dir;
-            }
-        }
-    }
-    else {
-        cut = in.find_first_of('/');
-        string user = in.substr(1, cut - 1);
-        if( !getpwnam_r(user.c_str(), &pwent, buf, 1024, &pwentp) ) {
-            tmp = pwent.pw_dir;
-        }
-    }
-    if(tmp.empty()) return in;
-    else return tmp + in.substr(cut);
-}
-
-
-string redux::util::cleanPath(string in, string base) {
-
-    if( in.empty() ) return in;
-    bf::path fn, result;
-    
-    if( !base.empty() && base[0] == '~' ) base = expandTilde(base);
-    else if( !base.empty() && base[0] != '/' ) result = bf::current_path() / bf::path(base);
-    
-    if( in[0] == '~' ) {
-        in = expandTilde(in);
-    } else if( in.substr(0,2) == "./" ) {     // relative path
-        in.replace( 0, 1, bf::current_path().string() );
-    }
-    
-    bf::path ain(in);
-    
-    if(bf::is_regular_file(ain)) {
-        fn = ain.filename();
-        ain = ain.parent_path();
-    }
-    auto it = ain.begin();
-    if(in[0] != '/' && !base.empty()) {
-        if(!bf::is_directory(result)) return in;
-    }
-    else result = *it++;
-
-    bool docanonical RDX_UNUSED = (result.string()[0] == '/');         // don't canonicalize relative paths
-    for(; it != ain.end(); ++it) {
-        if(*it == "..") result = result.parent_path();
-        else if(*it != ".") {
-#if BOOST_VERSION > 104800
-            if(!exists(result / *it) && docanonical) {      // canonicalize the existing part (boost >= 1.48)
-                result = canonical(result);
-                docanonical = false;
-            }
-#else
-            docanonical = false;
-#endif
-            result /= *it;
-        }
-    }
-
-    return (result / fn).string();
-
-}
 
 void redux::util::printProgress( const string& text, float progress ) {
     static mutex mtx;

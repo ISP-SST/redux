@@ -1,5 +1,6 @@
 #include "redux/momfbd/config.hpp"
 
+#include "redux/file/fileio.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 #include "redux/constants.hpp"
@@ -18,6 +19,7 @@ namespace bpo = boost::program_options;
 namespace bpt = boost::property_tree;
 namespace bfs = boost::filesystem;
 
+using namespace redux::file;
 using namespace redux::momfbd;
 using namespace redux::image;
 using namespace redux::logging;
