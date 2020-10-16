@@ -965,6 +965,10 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
             transform( corners, mappedCorners, H );
         }
 
+        if ( mappedCorners.size() != corners.size() ) {
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Corner-mapping failed, OpenCV returned something weird." );
+        }
+        
         int maxX = mappedCorners[0].x;
         int minX = maxX;
         int maxY = mappedCorners[0].y;
@@ -996,7 +1000,11 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
                 IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
             }
         }
-        
+
+        if( kw.verbose > 1 ) {
+            string msg = "Allocating result array: " + printArray( outDims, 2, "dim" );
+            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+        }
         IDL_MakeTempArray (img_in->type, img_in->value.arr->n_dim, outDims, IDL_ARR_INI_ZERO, &out);
 
         if( kw.center ) {
@@ -1021,6 +1029,10 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
         int flags = INTER_CUBIC;    // nearest(0), linear(1), cubic(2), area(3), lanczos(4), linear_exact(5)
         if( kw.interpol ) {
             flags = kw.interpol;
+            if( kw.verbose > 1 ) {
+                string msg = "Using interpolation method: " + to_string(flags);
+                IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+            }
         }
         int borderMode = BORDER_CONSTANT;
         const Scalar borderValue = Scalar();
@@ -1041,6 +1053,11 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
     }
 
+    if( kw.verbose > 1 ) {
+        string msg = "Done";
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+    }
+    
     return out;
     
 #endif
