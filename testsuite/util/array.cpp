@@ -417,6 +417,7 @@ namespace testsuite {
             
             const size_t range(20);
             const size_t offset(100-range/2);
+            const double tiny(1E-15);
             
             std::vector<size_t> dims({static_cast<size_t>(s)...});
             size_t nDims = dims.size();
@@ -452,13 +453,13 @@ namespace testsuite {
             
             ArrayStats stats;
             stats.getMinMaxMean( array );
-            BOOST_CHECK_CLOSE( stats.min, mn, 1E-20 );
-            BOOST_CHECK_CLOSE( stats.max, mx, 1E-20 );
-            BOOST_CHECK_CLOSE( stats.mean, avg, 1E-20 );
+            BOOST_CHECK_CLOSE( stats.min, double(mn), tiny );
+            BOOST_CHECK_CLOSE( stats.max, double(mx), tiny );
+            BOOST_CHECK_CLOSE( stats.mean, avg, tiny );
             
             stats.getRmsStddev( array );
-            BOOST_CHECK_CLOSE( stats.rms, rms, 1E-20 );
-            BOOST_CHECK_CLOSE( stats.stddev, stddev, 1E-20 );
+            BOOST_CHECK_CLOSE( stats.rms, rms, tiny );
+            BOOST_CHECK_CLOSE( stats.stddev, stddev, tiny );
 
         }
 
