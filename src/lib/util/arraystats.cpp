@@ -80,6 +80,17 @@ namespace redux {
                 stddev = 0;
             }
         }
+        template void ArrayStats::getRmsStddev( const char*, size_t );
+        template void ArrayStats::getRmsStddev( const int8_t*, size_t );
+        template void ArrayStats::getRmsStddev( const uint8_t*, size_t );
+        template void ArrayStats::getRmsStddev( const int16_t*, size_t );
+        template void ArrayStats::getRmsStddev( const uint16_t*, size_t );
+        template void ArrayStats::getRmsStddev( const int32_t*, size_t );
+        template void ArrayStats::getRmsStddev( const uint32_t*, size_t );
+        template void ArrayStats::getRmsStddev( const int64_t*, size_t );
+        template void ArrayStats::getRmsStddev( const uint64_t*, size_t );
+        template void ArrayStats::getRmsStddev( const float*, size_t );
+        template void ArrayStats::getRmsStddev( const double*, size_t );
 
 
         void ArrayStats::getNoise( const redux::image::FourierTransform& ft ) {
