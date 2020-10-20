@@ -5,7 +5,6 @@
 #include "redux/math/functions.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
-#include "redux/util/stringutil.hpp"
 #include "redux/util/trace.hpp"
 
 #include <algorithm>
@@ -429,6 +428,8 @@ namespace redux {
             template <typename ...S> void permuteDimensions( S ...dims ) { permuteDimensions( {static_cast<size_t>( dims )...} ); }
             //@}
             
+            int64_t first( size_t index ) const { if( index < nDims_ ) return dimFirst[index]; return -1; }
+            int64_t last( size_t index ) const { if( index < nDims_ ) return dimLast[index]; return -1; }
             const std::vector<int64_t>& first( void ) const { return dimFirst; }
             const std::vector<int64_t>& last( void ) const { return dimLast; }
             const std::vector<size_t>& dimensions(void) const { return currentSizes; }
