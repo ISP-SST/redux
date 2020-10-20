@@ -34,7 +34,16 @@ namespace redux {
 
         
         template <typename T>
-        redux::util::Array<T> fitPlane( const redux::util::Array<T>& in, bool subtract_mean=false, double* coeffs=nullptr );
+        void makePlane( T* ptr, size_t ySize, size_t xSize, double* coeffs, uint8_t nCoeffs=3 );   //!< coeffs[0] is slope in y/row direction, 1: x/col, 2: avg/midpoint-value
+        template <typename T>
+        void makePlane( redux::util::Array<T>& arr, double* coeffs, uint8_t nCoeffs=3 );
+        template <typename T>
+        redux::util::Array<T> makePlane( size_t ySize, size_t xSize, double* coeffs, uint8_t nCoeffs=3 );
+
+        template <typename T>
+        void fitPlane( const T* data, size_t ySize, size_t xSize, double* coeffs, double* chisq=nullptr );
+        template <typename T>
+        redux::util::Array<T> fitPlane( const redux::util::Array<T>& in, bool subtract_mean=false, double* coeffs=nullptr, double* chisq=nullptr );
 
         template <typename T>
         double total( const redux::util::Array<T>& in ) {

@@ -11,12 +11,14 @@ namespace testsuite {
         
         void add_fourier_tests( test_suite* ts );   // defined in fourier.cpp
         void add_grid_tests( test_suite* ts );      // defined in grid.cpp
-        void add_zernike_tests( test_suite* ts );   // defined in grid.cpp
+        void add_util_tests( test_suite* ts );      // defined in util.cpp
+        void add_zernike_tests( test_suite* ts );   // defined in zernike.cpp
 
         void add_tests( test_suite* ts ) {
 
             add_fourier_tests( ts );
             add_grid_tests( ts );
+            add_util_tests( ts );
             add_zernike_tests( ts );
 
         }

@@ -126,72 +126,115 @@ double redux::image::makePupil( double** pupil, uint32_t pupilPixels, PointF cen
 
 
 template <typename T>
-redux::util::Array<T> redux::image::fitPlane (const redux::util::Array<T>& in, bool subtract_mean, double* coeffs) {
-
-    int ySize = in.dimSize(0);
-    int xSize = in.dimSize(1);
-    redux::util::Array<T> ret(ySize, xSize);
-
-    int n = ySize * xSize;
-    int nParams = 3;                                                        //   fit a plane as:   z = a*x + b*y + c
-
-    gsl_vector *data = gsl_vector_alloc (n);
-    gsl_vector *coeff = gsl_vector_alloc (nParams);
-    gsl_matrix *X = gsl_matrix_alloc (n, nParams);
-    gsl_matrix *covar = gsl_matrix_alloc (nParams, nParams);
-
-    int yHalf = ySize/2;
-    int xHalf = xSize/2;
-    const T* inPtr = in.ptr();
-    for (int i = 0; i < ySize; ++i) {
-        double y = static_cast<double>(i-yHalf);
-        for (int j = 0; j < xSize; ++j) {
-            double x = static_cast<double>(j-xHalf);
-            int offset = i*xSize + j;
-            gsl_matrix_set (X, offset, 0, x);
-            gsl_matrix_set (X, offset, 1, y);
-            gsl_matrix_set (X, offset, 2, 1);
-            gsl_vector_set (data, offset, inPtr[offset]);
+void redux::image::makePlane( T* ptr, size_t ySize, size_t xSize, double* coeffs, uint8_t nC ) {
+    if( nC < 1 ) return;
+    PointI offset(0);
+    double a = coeffs[0];
+    double b = (nC>1)?coeffs[1]:0.0;
+    double c = 0;
+    if( nC > 2 ) {
+        c = coeffs[2];
+        offset.y = ySize/2;
+        offset.x = xSize/2;
+    }
+    for( size_t y(0); y < ySize; ++y ) {
+        double dy = static_cast<double>(y) - offset.y;
+        for (size_t x(0); x < xSize; ++x ) {
+            double dx = static_cast<double>(x) - offset.x;
+            size_t offset = y*xSize+x;
+            ptr[offset] = a*dy + b*dx + c;
         }
     }
+}
 
-    double chisq;
-    gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc (n, nParams);
-    gsl_multifit_linear (X, data, coeff, covar, &chisq, work);
-    gsl_multifit_linear_free (work);
 
-    double a = gsl_vector_get (coeff, 0);
-    double b = gsl_vector_get (coeff, 1);
-    double c = gsl_vector_get (coeff, 2);
-    if (subtract_mean) {
-        c = 0;                                          // ignore c-coefficient (mean), to just fit the tilts, not the offset.
-    }
+template <typename T>
+void redux::image::makePlane( redux::util::Array<T>& arr, double* coeffs, uint8_t nC ) {
+    makePlane( arr.ptr(), arr.dimSize(0), arr.dimSize(1), coeffs, nC );
+}
+template void redux::image::makePlane(  Array<float>&, double*, uint8_t );
+template void redux::image::makePlane(  Array<double>&, double*, uint8_t );
 
-    if( coeffs ) {
-        coeffs[0] = a;
-        coeffs[1] = b;
-        coeffs[2] = c;
-    }
 
-    gsl_vector_free (data);
-    gsl_vector_free (coeff);
-    gsl_matrix_free (X);
-    gsl_matrix_free (covar);
-
-    T* retPtr = ret.ptr();
-    for (int i = 0; i < ySize; ++i) {
-        double y = static_cast<double>(i-yHalf+0.5);
-        for (int j = 0; j < xSize; ++j) {
-            double x = static_cast<double>(j-xHalf+0.5);
-            int offset = i * xSize + j;
-            retPtr[offset] = a*x + b*y + c;
-        }
-    }
-    
+template <typename T>
+Array<T> redux::image::makePlane( size_t ySize, size_t xSize, double* coeffs, uint8_t nC ) {
+    redux::util::Array<T> ret( ySize, xSize );
+    makePlane( ret.ptr(), ySize, xSize, coeffs, nC );
     return ret;
 }
-template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&, bool, double*);
-template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&, bool, double*);
+template Array<float> redux::image::makePlane<float>( size_t, size_t, double*, uint8_t nC );
+template Array<double> redux::image::makePlane<double>( size_t, size_t, double*, uint8_t nC );
+
+    
+template <typename T>
+void redux::image::fitPlane( const T* inPtr, size_t ySize, size_t xSize, double* coeffs, double* chisq ) {
+    
+    size_t n = ySize * xSize;
+    size_t nParams = 3;                                                        //   fit a plane as:   z = a*x + b*y + c
+
+    gsl_vector *data = gsl_vector_alloc( n );
+    gsl_vector *coeff = gsl_vector_alloc( nParams );
+    gsl_matrix *X = gsl_matrix_alloc( n, nParams );
+    gsl_matrix *covar = gsl_matrix_alloc( nParams, nParams );
+
+    size_t yHalf = ySize/2;
+    size_t xHalf = xSize/2;
+    for( size_t y(0); y <ySize; ++y ) {
+        double z_y = static_cast<double>(y) - yHalf;
+        for( size_t x(0); x <xSize; ++x ) {
+            double z_x = static_cast<double>(x) - xHalf;
+            size_t offset = y*xSize + x;
+            gsl_matrix_set( X, offset, 0, z_y );
+            gsl_matrix_set( X, offset, 1, z_x );
+            gsl_matrix_set( X, offset, 2, 1 );
+            gsl_vector_set( data, offset, inPtr[offset] );
+        }
+    }
+
+    double this_chisq;
+    gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc( n, nParams );
+    gsl_multifit_linear( X, data, coeff, covar, &this_chisq, work );
+    gsl_multifit_linear_free( work );
+
+    coeffs[0] = gsl_vector_get( coeff, 0 );
+    coeffs[1] = gsl_vector_get( coeff, 1 );
+    coeffs[2] = gsl_vector_get( coeff, 2 );
+
+    if( chisq ){
+        *chisq = this_chisq/n;
+    }
+    
+    gsl_vector_free( data );
+    gsl_vector_free( coeff );
+    gsl_matrix_free( X );
+    gsl_matrix_free( covar );
+
+}
+
+
+template <typename T>
+redux::util::Array<T> redux::image::fitPlane( const redux::util::Array<T>& in, bool subtract_mean, double* coeffs, double* chisq ) {
+
+    size_t ySize = in.dimSize(0);
+    size_t xSize = in.dimSize(1);
+    
+    double tmp_coeffs[4];
+    if( !coeffs ) coeffs = &tmp_coeffs[0];
+    if( !chisq ) chisq = &tmp_coeffs[3];
+
+    fitPlane( in.ptr(), ySize, xSize, coeffs, chisq );
+
+    if( subtract_mean ) {
+        coeffs[2] = 0.0;
+    }
+
+    redux::util::Array<T> ret( ySize, xSize );
+    makePlane( ret.ptr(), ySize, xSize, coeffs, 3 );
+    return ret;
+    
+}
+template redux::util::Array<float> redux::image::fitPlane (const redux::util::Array<float>&, bool, double*, double*);
+template redux::util::Array<double> redux::image::fitPlane (const redux::util::Array<double>&, bool, double*, double*);
 
 
 template <typename T>
