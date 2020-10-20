@@ -1166,115 +1166,105 @@ PointF Channel::getOffsetAt( const Point16& pos, size_t sz ) const {
 
 void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) const {
 
-    Point16 refPos = patch->position;       // position in clipped reference-channel coordinates
+    if( imgSize == 0 ) {
+        LOG_ERR << "No valid imgSize when adjusting cutout, this should not happen!!!" << ende;
+        return;
+    }
     
-    PointF localPos;                        // position in this channel in non-clipped coordinates
+    // Patch (midpoint) position. This is specified in the clipped/reference frame, if align_clip is specified.
+    Point16 patchPosition = patch->position;
+    Region16 imgBoundary( 0, 0, imgSize.y-1, imgSize.x-1 );     // defines the hard limit for coordinates.
     uint16_t halfPatch = myObject.patchSize/2;
-    RegionI desiredCutout( myObject.patchSize-1, myObject.patchSize-1 );                    // local cut-out
-    desiredCutout -= PointI( halfPatch, halfPatch );                                        // ...now centered on 0,0
 
     chData.residualOffset = 0;
     chData.patchStart = myObject.maxLocalShift;
     
+    PointF localPos;                        // exact position in this channel in non-clipped coordinates
     if( alignMap.size() == 9 ) {
         ProjectiveMap map( alignMap );
-        localPos = map*(refPos + myJob.roi.first);  // position in reference-channel, global coordinates
+        localPos = map*(patchPosition + myJob.roi.first - 1);  // position in reference-channel, global coordinates -> mapped to this channel (global coordinates)
     } else {                                // old style alignment with clips & offsetfiles
-        localPos = refPos;
-        if( xOffset.valid() ) {
-            chData.residualOffset.x = xOffset(refPos.y, refPos.x)/100.0;
-            localPos.x += chData.residualOffset.x;
-        }
-        if( yOffset.valid() ) {
-            chData.residualOffset.y = yOffset(refPos.y, refPos.x)/100.0;
-            localPos.y += chData.residualOffset.y;
-        }
+        chData.residualOffset = getOffsetAt( patchPosition, myObject.patchSize );         // temporarily store full offset, will be replaced with residual below
+        localPos = patchPosition;
+        localPos += chData.residualOffset;                       // exact position in this channel (in clipped coordinates)
         if( alignClip.size() == 4 ) {
             if( alignClip[0] > alignClip[1] ) {
-                localPos.x = alignClip[0] - localPos.x - 1 + myObject.patchSize%2;
+                localPos.x = alignClip[0] - localPos.x; // + myObject.patchSize%2;
+                chData.residualOffset.x *= -1;
             } else {
                 localPos.x += alignClip[0] - 1;
             }
             if( alignClip[2] > alignClip[3] ) {
-                localPos.y = alignClip[2] - localPos.y - 1 + myObject.patchSize%2;
+                localPos.y = alignClip[2] - localPos.y; // + myObject.patchSize%2;
+                chData.residualOffset.y *= -1;
             } else {
                 localPos.y += alignClip[2] - 1;
             }
         }
+        // localPos is now global (camera) coordinates
     }
     
-    if( imgSize == 0 ) {
-        LOG_ERR << "No valid imgSize when adjusting cutout, that should not happen..." << ende;
-        return;
-    }
+    chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );
+    PointI intLocalPos = PointI( lround(localPos.y), lround(localPos.x) );          // Integer coordinates
+    RegionI desiredPatch ( myObject.patchSize-1, myObject.patchSize-1 );            // local path
+    desiredPatch -= PointI( halfPatch, halfPatch );                                 // ... now centered on 0,0
+    desiredPatch += intLocalPos;                                                    // ... now centered on intLocalPos, this is our patch
     
-    if( flipX ) localPos.x += 1;
-    if( flipY ) localPos.y += 1;
-    
-    PointI finalPos = localPos+0.5;
-    desiredCutout += finalPos;                                                  // ...now centered on localPos, this is the cutout we want
-    RegionI imgBoundary(0,0,imgSize.y-1, imgSize.x-1);                          // restrict to lie inside image
-    
-    RegionI tmpCutout = desiredCutout;
-    tmpCutout.restrict(imgBoundary);
+    RegionI actualPatch = desiredPatch;
+    actualPatch.restrict(imgBoundary);
     bool alreadyWarned(false);
-    if( tmpCutout != desiredCutout ) {
+    if( actualPatch != desiredPatch ) {
         LOG_WARN << "Patch " << patch->index << " does not lie completely within image in channel " << myObject.ID << ":" << ID
-        << ": desired: " << desiredCutout << "  This will likely cause severe artifacts!!!" << ende;
+        << ": desired: " << desiredPatch << "  actual: " << actualPatch << "  This will likely cause severe artifacts!!!" << ende;
         alreadyWarned = true;
-        if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
-            chData.patchStart.y -= (tmpCutout.first.y - desiredCutout.first.y);
-            finalPos.y += (tmpCutout.first.y - desiredCutout.first.y);
+        if( !flipY && ( actualPatch.first.y != desiredPatch.first.y) ) {
+            chData.patchStart.y -= ( actualPatch.first.y - desiredPatch.first.y);
+            intLocalPos.y += ( actualPatch.first.y - desiredPatch.first.y);
         }
-        if( !flipX && (tmpCutout.first.x != desiredCutout.first.x) ) {
-            chData.patchStart.x -= (tmpCutout.first.x - desiredCutout.first.x);
-            finalPos.x += (tmpCutout.first.x - desiredCutout.first.x);
+        if( !flipX && ( actualPatch.first.x != desiredPatch.first.x) ) {
+            chData.patchStart.x -= ( actualPatch.first.x - desiredPatch.first.x);
+            intLocalPos.x += ( actualPatch.first.x - desiredPatch.first.x);
         }
-        if( flipY && (tmpCutout.last.y != desiredCutout.last.y) ) {
-            chData.patchStart.y += (tmpCutout.last.y - desiredCutout.last.y);
-            finalPos.y -= (tmpCutout.last.y - desiredCutout.last.y);
+        if( flipY && ( actualPatch.last.y != desiredPatch.last.y) ) {
+            chData.patchStart.y += ( actualPatch.last.y - desiredPatch.last.y);
+            intLocalPos.y -= ( actualPatch.last.y - desiredPatch.last.y);
         }
-        if( flipX && (tmpCutout.last.x != desiredCutout.last.x) ) {
-            chData.patchStart.x += (tmpCutout.last.x - desiredCutout.last.x);
-            finalPos.x -= (tmpCutout.last.x - desiredCutout.last.x);
+        if( flipX && ( actualPatch.last.x != desiredPatch.last.x) ) {
+            chData.patchStart.x += ( actualPatch.last.x - desiredPatch.last.x);
+            intLocalPos.x -= ( actualPatch.last.x - desiredPatch.last.x);
         }
     }
     
-    chData.channelOffset = PointI( lround(chData.residualOffset.y), lround(chData.residualOffset.x) );  // possibly apply shift from offsetfiles.
-    chData.channelOffset -= imgBoundary.outside( tmpCutout+chData.channelOffset );                      // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
-    chData.residualOffset = localPos - finalPos;
+    chData.channelOffset -= imgBoundary.outside( actualPatch +chData.channelOffset );                      // restrict the shift inside the image, leave the rest in "residualOffset" to be dealt with using Zernike tilts.
+    chData.residualOffset = localPos - intLocalPos;                                                        // residual, will be added as tip/tilt modes
     
-    // TODO cleanup all this arithmetic, it's not really clear like this...
-    if( flipX ) chData.residualOffset.x = -chData.residualOffset.x;
-    if( flipY ) chData.residualOffset.y = -chData.residualOffset.y;
-    
-    tmpCutout.grow( myObject.maxLocalShift );                               // add maxLocalshift
-    desiredCutout = tmpCutout;
-    tmpCutout.restrict(imgBoundary);
-    if( tmpCutout != desiredCutout ) {
+    actualPatch.grow( myObject.maxLocalShift );             // Start from possibly restricted patch, and add maxLocalshift on all sides
+    desiredPatch = actualPatch;
+    actualPatch.restrict(imgBoundary);
+    if( actualPatch != desiredPatch ) {                     // 
         if( !alreadyWarned ) {
             LOG_DEBUG << "Patch " << patch->index << " + maxLocalShift does not lie completely within image in channel " <<
-            myObject.ID << ":" << ID << ":  desired: " << desiredCutout << "  actual: " << tmpCutout << ende;
+            myObject.ID << ":" << ID << ":  desired: " << desiredPatch << "  actual: " << actualPatch << ende;
         }
-        if( !flipY && (tmpCutout.first.y != desiredCutout.first.y) ) {
-            chData.patchStart.y -= (tmpCutout.first.y - desiredCutout.first.y);
+        if( !flipY && ( actualPatch.first.y != desiredPatch.first.y) ) {
+            chData.patchStart.y -= ( actualPatch.first.y - desiredPatch.first.y);
         }
-        if( !flipX && (tmpCutout.first.x != desiredCutout.first.x) ) {
-            chData.patchStart.x -= (tmpCutout.first.x - desiredCutout.first.x);
+        if( !flipX && ( actualPatch.first.x != desiredPatch.first.x) ) {
+            chData.patchStart.x -= ( actualPatch.first.x - desiredPatch.first.x);
         }
-        if( flipY && (tmpCutout.last.y != desiredCutout.last.y) ) {
-            chData.patchStart.y += (tmpCutout.last.y - desiredCutout.last.y);
+        if( flipY && ( actualPatch.last.y != desiredPatch.last.y) ) {
+            chData.patchStart.y += ( actualPatch.last.y - desiredPatch.last.y);
         }
-        if( flipX && (tmpCutout.last.x != desiredCutout.last.x) ) {
-            chData.patchStart.x += (tmpCutout.last.x - desiredCutout.last.x);
+        if( flipX && ( actualPatch.last.x != desiredPatch.last.x) ) {
+            chData.patchStart.x += ( actualPatch.last.x - desiredPatch.last.x);
         }
     }
     
-    chData.cutout = tmpCutout;
+    chData.cutout = actualPatch;
     string actStr = "";
-    if( chData.cutout != desiredCutout ) actStr = "  actual="+(string)chData.cutout;
-    LOG_TRACE << "AdjustCutout ch=" <<myObject.ID << ":" << ID << ": patch=" << patch->index << refPos << "  mapped=" << localPos
-              << "  desired=" << desiredCutout << actStr
+    if( chData.cutout != desiredPatch ) actStr = "  actual="+(string)chData.cutout;
+    LOG_DEBUG << "AdjustCutout ch=" <<myObject.ID << ":" << ID << ": patchPos=" << patch->index << patchPosition << "  localPos=" << localPos
+              << "  desired=" << desiredPatch << actStr
               << "  localOffset=" << chData.channelOffset << "   start=" << chData.patchStart
               << "   residual=" << chData.residualOffset << ende;
          
