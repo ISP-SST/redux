@@ -64,7 +64,11 @@ namespace redux {
             template <typename U> RegionType<T> grown(const PointType<U>& rhs) const { RegionType<T> res(*this); res.grow(rhs); return res; }
             RegionType<T> grown(T rhs) const { RegionType<T> res(*this); res.grow(PointType<T>(rhs,rhs)); return res; }
             template <typename U> void restrict(const RegionType<U>& rhs) { first=first.max(rhs.first); last=last.min(rhs.last); }
-            operator std::string() const { return (std::string)first + "->" + (std::string)last; }
+            operator std::string() const {
+                std::string ret = "[" + std::to_string(first.y) + ":" + std::to_string(last.y) +",";
+                ret += std::to_string(first.x) + ":" + std::to_string(last.x) + "]";
+                return ret;
+            }
             template <typename U> RegionType<T>& operator+=(const PointType<U>& rhs) { first += rhs; last += rhs; return *this; }
             template <typename U> RegionType<T>& operator-=(const PointType<U>& rhs) { first -= rhs; last -= rhs; return *this; }
             template <typename U> RegionType<T> operator+(const PointType<U>& rhs) const { RegionType<T> res(*this); return res+=rhs; }
