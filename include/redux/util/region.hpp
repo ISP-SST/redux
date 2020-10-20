@@ -58,6 +58,8 @@ namespace redux {
             void shrink(T rhs) { shrink( PointType<T>(rhs,rhs) ); }
             template <typename U> void shrink(U rhs) { PointType<U> tmp(rhs,rhs); first+=tmp; last-=tmp; }
             template <typename U> void shrink(const PointType<U>& rhs) { first+=rhs; last-=rhs; }
+            PointType<T> mid( void ) const { return (first+last+1)/2; }
+            PointD com( void ) const { return PointD(first+last)/2; }
             Point span( void ) const { return Point(std::abs(last.y-first.y)+1, std::abs(last.x-first.x)+1); }
             template <typename U> RegionType<T> grown(const PointType<U>& rhs) const { RegionType<T> res(*this); res.grow(rhs); return res; }
             RegionType<T> grown(T rhs) const { RegionType<T> res(*this); res.grow(PointType<T>(rhs,rhs)); return res; }

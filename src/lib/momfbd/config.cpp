@@ -201,7 +201,7 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
             physicalDefocusDistance = true;
             tmpD = 1.00E-02;
         }
-        // we extracted the suffix/units avove, so now we can delete the letters and extract the numbers.
+        // we extracted the suffix/units above, so now we can delete the letters and extract the numbers.
         tmpString.erase( remove_if( tmpString.begin(), tmpString.end(),
                                []( const char&a ){ return ( a == 'c' || a == 'm' || a == ' ' || a == '"' ); } ), tmpString.end() );
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
