@@ -177,11 +177,22 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
     noRestore = tree.get<bool>("NO_RESTORE", defaults.noRestore);
     
     // TODO: collect diversity settings in a struct and write a translator
-    string tmpString = getValue<string>( tree, "DIVERSITY", "" );
-    diversity.clear();
-    diversityModes.clear();
-    diversityTypes.clear();
-    if( ! tmpString.empty() ) {
+    diversity = defaults.diversity;
+    diversityModes = defaults.diversityModes;
+    diversityTypes = defaults.diversityTypes;
+
+    string tmpString = getValue<string>( tree, "DIV_ORDERS", "" );
+    if( !tmpString.empty() ) {
+        vector<string> tokens;
+        boost::split( tokens, tmpString, boost::is_any_of( "," ) );
+        for( auto & token : tokens ) {
+            parseSegment( diversityModes, diversityTypes, token );
+        }
+
+    }
+    
+    tmpString = getValue<string>( tree, "DIVERSITY", "" );
+    if( !tmpString.empty() ) {
         double tmpD = 1.0;
         if( tmpString.find( "mm" ) != string::npos ) {
             physicalDefocusDistance = true;
@@ -196,34 +207,25 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
         bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
         tmpTree.put( "tmp", tmpString );
         diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
-
-        tmpString = getValue<string>( tree, "DIV_ORDERS", "" );
-        if( tmpString.empty() ) {
-            if( diversity.size() > 1 ) {
-                LOG_ERR << "Multiple diversity coefficients specified, but no orders provided!" << ende;
-            } else if( diversity.size() == 1 ) {  // A single diversity value is interpreted as ( de)focus.
-                diversityModes.resize( 1, 4 );
-                diversityTypes.resize( 1, ZERNIKE );
-            }
-        } else {
-            vector<string> tokens;
-            boost::split( tokens, tmpString, boost::is_any_of( "," ) );
-            for( auto & token : tokens ) {
-                parseSegment( diversityModes, diversityTypes, token );
-            }
-        }
-
-        if( diversity.size() == diversityModes.size() ) {
-            for( unsigned int i=0; i<diversity.size(); ++i ) {
-                if( diversityModes[i] == 4 ) {   // focus term, convert from physical length ( including mm/cm ) to coefficient
-                    diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
-                }
-            }
-        } else {
-            LOG_ERR << "Number of diversity orders does not match number of diversity coefficients!" << ende;
-        }
-
         
+        for( unsigned int i=0; i<diversity.size(); ++i ) {
+            if( diversityModes[i] == 4 ) {   // focus term, convert from physical length ( including mm/cm ) to coefficient
+                diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
+            }
+        }
+
+    }
+    
+    
+    if( diversity.size() > 0 ) {
+        if( diversityModes.empty() && (diversity.size() == 1) ) {
+            diversityModes.resize( 1, 4 );
+            diversityTypes.resize( 1, ZERNIKE );
+        } else if( diversityModes.size() != diversity.size() ) {
+             LOG_WARN << "Multiple diversity coefficients specified, but the number of modes does not match!" << ende;
+             LOG_WARN << printArray(diversity,"    diversity") << endl;
+             LOG_WARN << printArray(diversityModes,"    diversityModes") << endl;
+        }
     }
 
     alignMap = getValue( tree, "ALIGN_MAP", defaults.alignMap );
@@ -308,6 +310,7 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) c
     if(noRestore != defaults.noRestore) tree.put("NO_RESTORE", noRestore);
     
     if( diversity != defaults.diversity ) tree.put( "DIVERSITY", diversity );
+    if( diversityModes != defaults.diversityModes ) tree.put( "DIV_ORDERS", diversityModes ); // TODO fix printing with physical & type
     
     if( alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
     if( alignClip != defaults.alignClip ) tree.put( "ALIGN_CLIP", alignClip );
