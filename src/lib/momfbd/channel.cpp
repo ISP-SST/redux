@@ -1117,6 +1117,53 @@ uint32_t Channel::nImages(void) {
 }
 
 
+PointF Channel::getOffsetAt( const Point16& pos, size_t sz ) const {
+    
+    PointF ret(0,0);
+    if( !xOffset.valid() && yOffset.valid() ) {     //  No offset files
+        return ret;
+    }
+    
+    sz /= 2;    // We will only use half-size below
+    RegionI roi( pos.y-sz, pos.x-sz, pos.y+sz, pos.x+sz );
+    roi.first.max( PointI() );      // restrict to non-negative positions
+    
+    Image<int16_t> patch;
+    ArrayStats stats;
+    if( xOffset.valid() ) {
+        size_t ySz = xOffset.dimSize(0);
+        size_t xSz = xOffset.dimSize(1);
+        if( false && sz ) {     // FIXME: stats with stride seems buggy !!
+            roi.last.min( PointI(ySz-1, xSz-1) );    // restrict to array size
+            if( roi.span() != 0 ) {
+                patch.wrap( xOffset, roi.first.y, roi.first.x, roi.last.y, roi.last.x );
+                stats.getMinMaxMean( patch );
+                ret.x = stats.mean/100.0;
+            }
+        } else if( (pos.y < ySz) && (pos.x < xSz) ) {
+            ret.x = xOffset( pos.y, pos.x )/100.0;
+        }
+    }
+    if( yOffset.valid() ) {
+        size_t ySz = yOffset.dimSize(0);
+        size_t xSz = yOffset.dimSize(1);
+        if( false && sz ) {     // FIXME: stats with stride seems buggy !!
+            roi.last.min( PointI(ySz-1, xSz-1) );    // restrict to array size
+            if( roi.span() != 0 ) {
+                patch.wrap( yOffset, roi.first.y, roi.first.x, roi.last.y, roi.last.x );
+                stats.getMinMaxMean( patch );
+                ret.x = stats.mean/100.0;
+            }
+        } else if( (pos.y < ySz) && (pos.x < xSz) ) {
+            ret.y = yOffset( pos.y, pos.x )/100.0;
+        }
+    }
+    
+    return ret;
+    
+}
+
+
 void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) const {
 
     Point16 refPos = patch->position;       // position in clipped reference-channel coordinates

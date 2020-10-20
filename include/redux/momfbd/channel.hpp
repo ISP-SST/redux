@@ -69,6 +69,7 @@ namespace redux {
             void getFileNames(std::vector<std::string>& list) const { getFileNames( list, waveFrontList ); };
             uint32_t nImages( const std::vector<uint32_t>& );
             uint32_t nImages(void);
+            redux::util::PointF getOffsetAt( const redux::util::Point16& pos, size_t sz=0 ) const;
             void adjustCutout(ChannelData&, const PatchData::Ptr&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
             
