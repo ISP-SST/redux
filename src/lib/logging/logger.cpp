@@ -8,6 +8,8 @@
 #include <redux/util/datautil.hpp>
 #include <redux/util/stringutil.hpp>
 
+#include <unistd.h>
+
 #include <boost/filesystem.hpp>
 
 namespace bfs = boost::filesystem;
@@ -71,6 +73,7 @@ bpo::options_description Logger::getOptions( const string& application_name ) {
       ->composing(), "Less output. (ignored if --verbosity is specified)" )
 
     ( "log-file,L", bpo::value< vector<string> >()->implicit_value( vector<string>( 1, "" ), "" )
+      ->default_value( vector<string>( 1, "" ), "" )
       ->composing(),
       "Print output to file."
       /*" The environment variable RDX_LOGFILE will be used as default if it exists."*/ )
@@ -102,7 +105,7 @@ Logger::Logger( bpo::variables_map& vm ) : LogOutput( defaultLevelMask, 1 ) {
                 if( hasDefault ) {
                     continue;
                 }
-                filename = vm["appname"].as<string>() + ".log";
+                filename = vm["appname"].as<string>() + "_" + to_string( getpid() ) + ".log";
                 hasDefault = true;
             }
             addFile( filename, mask, false );

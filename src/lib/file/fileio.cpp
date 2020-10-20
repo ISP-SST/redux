@@ -534,8 +534,8 @@ string redux::file::cleanPath( string in, string base ) {
     
 
     bfs::path in_path(in);
-    bfs::path in_filename = in_path.filename();
-    if( in_filename.filename_is_dot() ) {
+    string in_filename = in_path.filename().c_str();
+    if( in_filename.empty() || in_filename == "." ) {
         in_path = in_path.parent_path();
     }
     
@@ -589,7 +589,8 @@ bfs::path redux::file::weaklyCanonical( bfs::path p ) {
         }
 #endif
     } catch( ... ) {};
-    if( p.filename_is_dot() ) {
+    string p_filename = p.filename().c_str();
+    if( p_filename.empty() || p_filename == "." ) {
         p = p.parent_path();
     }
     return p.lexically_normal();
