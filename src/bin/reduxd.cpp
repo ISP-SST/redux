@@ -68,16 +68,6 @@ int main( int argc, char *argv[] ) {
 #if BOOST_VERSION > 104800  // TODO check which version notify appears in
     vm.notify();
 #endif
-    
-    vector<string> logfiles = vm["log-file"].as<vector<string>>();
-    for( auto& lf: logfiles ) {
-        if( lf.empty() ) lf = vm["appname"].as<string>() + "_" + to_string( getpid() )+".log";
-        lf = cleanPath( lf );
-        if( (lf[0] != '/') && vm.count("cache-dir") ) {
-            lf = cleanPath( vm["cache-dir"].as<string>()+"/"+lf );
-        }
-    }
-    vm.at("log-file").as<vector<string>>() = logfiles;
 
     try {
         while( true ) {
