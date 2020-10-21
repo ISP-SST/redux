@@ -2,6 +2,7 @@
 #define REDUX_MOMFBD_CONFIG_HPP
 
 #include <redux/logging/logger.hpp>
+#include <redux/momfbd/modes.hpp>
 #include <redux/util/stringutil.hpp>
 #include <redux/util/trace.hpp>
 
@@ -22,8 +23,6 @@ namespace redux {
          *  @{
          */
 
-        enum ModeBase { ZERNIKE=1, KARHUNEN_LOEVE };
-        
         enum FileType { FT_NONE=0, FT_ANA, FT_FITS, FT_MOMFBD=4, FT_MASK=7 };
         extern const std::map<FileType, std::string> FileTypeNames;
         extern const std::map<FileType, std::string> FileTypeExtensions;
@@ -47,8 +46,6 @@ namespace redux {
         extern const std::map<std::string, int, cicomp> gradientMap;
         enum GetstepMethod { GSM_SDSC=1, GSM_CNJG, GSM_BFGS, GSM_BFGS_inv };
         extern const std::map<std::string, int, cicomp> getstepMap;
-        
-        
         
         
         /*!

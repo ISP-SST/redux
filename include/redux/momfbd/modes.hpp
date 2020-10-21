@@ -16,6 +16,48 @@ namespace redux {
 
     namespace momfbd {
         
+        enum ModeBase { MB_NONE=0, ZERNIKE=1, KARHUNEN_LOEVE, MB_ZKL };
+        
+        struct ModeID {
+            ModeID() : mode(0), type(ZERNIKE) {}
+            ModeID( uint16_t m, ModeBase t=ZERNIKE ) : mode(m), type(t) {}
+            bool operator==( const ModeID& rhs ) const { if( type==rhs.type ) return mode == rhs.mode; return type==rhs.type; }
+            bool operator<( const ModeID& rhs ) const { if( type==rhs.type ) return mode < rhs.mode; return type<rhs.type; }
+            uint16_t mode;
+            ModeBase type;
+        };
+        typedef std::vector<struct ModeID> VModeID;
+        
+        struct ModeList : public VModeID {
+            bool operator<( const ModeList& rhs ) const{
+                if( defaultType==rhs.defaultType ) {
+                    return (reinterpret_cast<const VModeID&>(*this) < reinterpret_cast<const VModeID&>(rhs));
+                }
+                return defaultType<rhs.defaultType;
+            }
+            void setDefaultModeType( ModeBase new_mb, ModeBase old_mb=MB_NONE ) {
+                defaultType = new_mb;
+                for( auto& a: *this ) {
+                    if( a.type == old_mb ) a.type = new_mb;
+                }
+            }
+            ModeBase defaultType;
+        };
+        
+        struct DiversityValue {
+            DiversityValue() : coefficient(0), physical(false) {}
+            DiversityValue( double c, bool p=false ) : coefficient(c), physical(p) {}
+            bool operator==( const DiversityValue& rhs ) const {
+                if( physical==rhs.physical ) {
+                    return coefficient == rhs.coefficient;
+                }
+                return physical==rhs.physical;
+            }
+            double coefficient;
+            bool physical;
+        };
+
+
         struct ModeInfo {
             
             uint16_t firstMode, lastMode, modeNumber, nPupilPixels;
