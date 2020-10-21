@@ -322,8 +322,9 @@ int main (int argc, char *argv[]) {
 
         if( vm.count ("print") ) {       // dump configuration to console and exit
             bpt::ptree dump;
+            bool showAll = vm.count ("verbose");
             for( auto & job : jobs ) {
-                job->getPropertyTree( &dump );
+                job->getPropertyTree( &dump, showAll );
             }
             bpt::write_info( cout<<endl, dump );
             return EXIT_SUCCESS;
