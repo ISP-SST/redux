@@ -15,6 +15,9 @@
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
 
+// define RDX_DO_TRANSPOSE to enable old way of transposing input
+//#define RDX_DO_TRANSPOSE
+
 namespace redux {
 
     

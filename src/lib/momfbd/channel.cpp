@@ -783,7 +783,8 @@ void Channel::initPatch (ChannelData& cd) {
     
     PointF totalshift = localShift + cd.residualOffset;
     
-    int32_t mIndex = myObject.modes->tiltMode.x;
+totalshift *= 0.5;
+   int32_t mIndex = myObject.modes->tiltMode.x;
     if( mIndex >= 0 && fabs(totalshift.x) > 0 ) {
         const double* modePtr = myObject.modes->modePointers[mIndex];
         float res = -totalshift.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
@@ -1117,7 +1118,7 @@ uint32_t Channel::nImages(void) {
 PointF Channel::getOffsetAt( const Point16& pos, size_t sz ) const {
     
     PointF ret(0,0);
-    if( !xOffset.valid() && yOffset.valid() ) {     //  No offset files
+    if( !xOffset.valid() && !yOffset.valid() ) {     //  No offset files
         return ret;
     }
     

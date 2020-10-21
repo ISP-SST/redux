@@ -141,8 +141,10 @@ void SubImage::getWindowedImg( double* out, float* plane, ArrayStats& imgStats, 
     }*/
     imgStats.getStats( out, imgSize2, ST_VALUES|ST_RMS );     // TODO test if this is necessary or if the stats for the larger area is sufficient
     
+#ifdef RDX_DO_TRANSPOSE
     transpose( out, imgSize, imgSize );                      // to match MvN
-    
+#endif
+
 }
 
 
@@ -447,29 +449,46 @@ bool SubImage::adjustShifts( const T* alpha ) {
     PointD oldVal(0,0),newVal(0,0);
     bool ret(false);
     
-    int32_t mIndex = object.modes->tiltMode.y;   // FIXME: should be x, but image is transposed
+    PointI xyDims(1,2);                     // N.B. dim=0 is the index of the image-stack
+#ifdef RDX_DO_TRANSPOSE
+    std::swap( xyDims.x, xyDims.y );
+#endif
+    
+    int32_t mIndex = object.modes->tiltMode.y;
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.y;
         double alphaToShift = 1.0/shiftToAlpha;
-        newVal.x = oldVal.x = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.x;
-        int adjust = -lround( oldVal.x*alphaToShift );
-        if( adjust && (adjust = shift(1/*FIXME 2*/,adjust)) ) {    // will return the "actual" shift. (the cube-edge might restrict it)
-            imageShift.x += adjust;
-            localAlpha[mIndex] += adjust*shiftToAlpha;
-            newVal.x += adjust*shiftToAlpha;
+        newVal.y = oldVal.y = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.y;
+        int desiredAdjust = -lround( oldVal.y*alphaToShift );
+        int actualAdjust(0);
+        if( desiredAdjust && ( actualAdjust = shift( xyDims.y, desiredAdjust )) ) {    // will return the "actual" shift. (the cube-edge might restrict it)
+            imageShift.y += actualAdjust;
+            localAlpha[mIndex] += actualAdjust *shiftToAlpha;
+            newVal.y += actualAdjust *shiftToAlpha;
+        }
+        if( actualAdjust != desiredAdjust ) {
+            LOG_ERR << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+                    << ": Patch is too close to edge, only shifted " << actualAdjust << "/" << desiredAdjust
+                    << " pixels." << ende;
         }
     }
 
-    mIndex = object.modes->tiltMode.x;   // FIXME: should be y, but image is transposed
+    mIndex = object.modes->tiltMode.x;
     if( mIndex >= 0 ) {
         double shiftToAlpha = object.shiftToAlpha.x;
         double alphaToShift = 1.0/shiftToAlpha;
-        newVal.y = oldVal.y = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.y;
-        int adjust = -lround( oldVal.y*alphaToShift );
-        if( adjust && (adjust = shift(2/*FIXME 1*/,adjust)) ) {        // will return the "actual" shift. (the cube-edge might restrict it)
-            imageShift.y += adjust;
-            localAlpha[mIndex] += adjust*shiftToAlpha;
-            newVal.y += adjust*shiftToAlpha;
+        newVal.x = oldVal.x = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.x;
+        int desiredAdjust = -lround( oldVal.x*alphaToShift );
+        int actualAdjust(0);
+        if( desiredAdjust && ( actualAdjust = shift( xyDims. x, desiredAdjust )) ) {        // will return the "actual" shift. (the cube-edge might restrict it)
+            imageShift.x += actualAdjust;
+            localAlpha[mIndex] += actualAdjust *shiftToAlpha;
+            newVal.x += actualAdjust *shiftToAlpha;
+        }
+        if( actualAdjust != desiredAdjust ) {
+            LOG_ERR << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+                    << ": Patch is too close to edge, only shifted " << actualAdjust << "/" << desiredAdjust
+                    << " pixels." << ende;
         }
     }
 
@@ -487,8 +506,13 @@ template bool SubImage::adjustShifts( const float* );
 
 void SubImage::resetShifts( void ) {
     
-    shift( 2/*FIXME 1*/, -imageShift.y );
-    shift( 1/*FIXME 2*/, -imageShift.x );
+    PointI xyDims(1,2);                     // N.B. dim=0 is the index of the image-stack
+#ifdef RDX_DO_TRANSPOSE
+    std::swap( xyDims.x, xyDims.y );
+#endif
+    
+    shift( xyDims.x, -imageShift.x );
+    shift( xyDims.y, -imageShift.y );
     imageShift = 0;
     int32_t mIndex = object.modes->tiltMode.x;
     if( mIndex >= 0 ) {

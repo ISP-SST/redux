@@ -665,8 +665,8 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
         swapEndian ( clipEndY.get(), nChannels );
     }
 
-    readOrThrow ( file, &nPatchesX, 1, "FileMomfbd:nPatchesX" );    // slow index of patch-array stored first
-    readOrThrow ( file, &nPatchesY, 1, "FileMomfbd:nPatchesY" );
+    readOrThrow ( file, &nPatchesY, 1, "FileMomfbd:nPatchesY" );    // slow index of patch-array stored first
+    readOrThrow ( file, &nPatchesX, 1, "FileMomfbd:nPatchesX" );
     readOrThrow ( file, &nPoints, 1, "FileMomfbd:nPoints" );
 
     if ( swapNeeded ) {
@@ -691,7 +691,7 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
             region[1] = std::max( region[1], tmpPatch.region[1] );
             region[2] = std::min( region[2], tmpPatch.region[2] );
             region[3] = std::max( region[3], tmpPatch.region[3] );
-            int nPatches = nPatchesX*nPatchesY-1;    // we already did the first one, so -1
+            int nPatches = nPatchesX * nPatchesY -1;    // we already did the first one, so -1
             for( int i(0); i<nPatches; ++i ) {
                 readOrThrow ( file, tmpPatch.region, 4, "PatchInfo:region" );
                 if ( swapNeeded ) {
@@ -707,10 +707,10 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
             }
         }
     } else {
-        patches.resize ( nPatchesX, nPatchesY );
-        for ( int x = 0; x < nPatchesX; ++x ) {
-            for ( int y = 0; y < nPatchesY; ++y ) {
-                FileMomfbd::PatchInfo* patch = patches.ptr ( x, y );
+        patches.resize ( nPatchesY, nPatchesX );
+        for ( int y(0); y < nPatchesY; ++y ) {
+            for ( int x(0); x < nPatchesX; ++x ) {
+                FileMomfbd::PatchInfo* patch = patches.ptr ( y, x );
                 dataMask |= patch->parse ( file, swapNeeded, version );
                 if(!hasROI) {
                     region[0] = std::min( region[0], patch->region[0] );
@@ -835,14 +835,14 @@ void FileMomfbd::write ( std::ofstream& file, const char* data, uint8_t writeMas
         writeOrThrow ( file, clipEndY.get(), nChannels, "FileMomfbd:clipEndY" );
     } else cout << "nChannels = 0!!" << endl;
 
-    writeOrThrow ( file, &nPatchesX, 1, "FileMomfbd:nPatchesX" );
     writeOrThrow ( file, &nPatchesY, 1, "FileMomfbd:nPatchesY" );
+    writeOrThrow ( file, &nPatchesX, 1, "FileMomfbd:nPatchesX" );
     writeOrThrow ( file, &nPoints, 1, "FileMomfbd:nPoints" );
     
-    for ( int x = 0; x < nPatchesX; ++x ) {
-        for ( int y = 0; y < nPatchesY; ++y ) {
-            FileMomfbd::PatchInfo* patch = patches.ptr ( x, y );
-            patch->write ( file, data, version, writeMask );
+    for ( int y(0); y < nPatchesY; ++y ) {
+        for ( int x(0); x < nPatchesX; ++x ) {
+            FileMomfbd::PatchInfo* patch = patches.ptr( y, x );
+            patch->write( file, data, version, writeMask );
         }
     }
 
@@ -918,15 +918,15 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
         const FileMomfbd::PatchInfo* patch;
 
         if ( verbosity > 1 ) {
-            cout << "Total patches: " << nPatchesX << " x " << nPatchesY << endl;
+            cout << "Total patches: (" << nPatchesY << " x " << nPatchesX << ")" << endl;
         }
 
-        for ( int x = 0; x < nPatchesX; ++x ) {
-            for ( int y = 0; y < nPatchesY; ++y ) {
-                patch = patches.ptr ( x, y );
+        for( int y(0); y < nPatchesY; ++y ) {
+            for( int x(0); x < nPatchesX; ++x ) {
+                patch = patches.ptr( y, x );
                 if ( patch ) {
                     if ( verbosity > 1 ) {
-                        cout << "Loading patch (" << x << "," << y << ")   \r" << flush;
+                        cout << "Loading patch (" << y << "," << x << ")   \r" << flush;
                     }
                     count += patch->load ( file, ptr+count, swapNeeded, version, loadMask, verbosity, alignTo );
                     //cout << "ptr = " << hexString(ptr) << "   ptr2 = " << hexString(ptr2) << "   diff = " << (ptrdiff_t)(ptr2-ptr0)<< endl;

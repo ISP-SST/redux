@@ -346,6 +346,8 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const Mode
         minfo.modeNumber = it.mode;
         if( minfo.modeNumber == 2 || minfo.modeNumber == 3 || (it.type == ZERNIKE) ) {     // force use of Zernike modes for all tilts
             minfo.firstMode = minfo.lastMode = 0;
+            if ( minfo.modeNumber == 2 ) tiltMode.x = modePointers.size();
+            else if ( minfo.modeNumber == 3 ) tiltMode.y = modePointers.size();
             it.type = ZERNIKE;
         }
         Zernike::NollToNM( minfo.modeNumber, n, m );
@@ -392,11 +394,13 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         info.modeNumber = it.mode;
         if ( info.modeNumber == 2 || info.modeNumber == 3 || (it.type == ZERNIKE) ) {     // force use of Zernike modes for all tilts
             info.firstMode = info.lastMode = 0;
+            if ( info.modeNumber == 2 ) tiltMode.x = modePointers.size();
+            else if ( info.modeNumber == 3 ) tiltMode.y = modePointers.size();
             it.type = ZERNIKE;
         }
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
         if( !mode || (flags&Zernike::FORCE) ) {
-            if( info.modeNumber == 2 || info.modeNumber == 3 ) {     // force use of Zernike modes for all tilts
+            if( it.type == ZERNIKE ) {     // force use of Zernike modes for all tilts
                 mode.reset( new PupilMode( info.modeNumber, pixels, radius, angle, flags ) );    // Zernike
             } else {
                 mode.reset( new PupilMode( firstZernike, lastZernike, info.modeNumber, pixels, radius, angle, cutoff, flags ) );    // K-L

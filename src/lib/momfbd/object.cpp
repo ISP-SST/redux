@@ -1084,8 +1084,12 @@ void Object::maybeInitializeStorage( void ) {
     lock_guard<mutex> lock(mtx);
     if( results.nElements() ) return;        // already allocated/loaded
     
-    size_t nPatchesX = myJob.subImagePosY.size();     // FIXME x/y swapped to be in the right order for block-copy in writeMOMFBD
-    size_t nPatchesY = myJob.subImagePosX.size();
+    size_t nPatchesX = myJob.subImagePosX.size();
+    size_t nPatchesY = myJob.subImagePosY.size();
+#ifdef RDX_DO_TRANSPOSE
+    std::swap( nPatchesX, nPatchesY );
+#endif
+    
     size_t resultSize = getResultSize();
 
     if( !(myJob.runFlags&RF_NOSWAP) ) {     // should we mmap?
@@ -1109,7 +1113,8 @@ void Object::getStorage( PatchData& pData, shared_ptr<ObjectData> oData ) {
     
     if( !oData ) return;
     
-    float* resPtr = results.ptr( pData.index.x, pData.index.y, 0 );     // FIXME x/y swapped to be in the right order for block-copy in writeMOMFBD
+    float* resPtr = results.ptr( pData.index.y, pData.index.x, 0 );
+    
     oData->img.wrap( resPtr, patchSize, patchSize );
     resPtr += patchSize*patchSize;
     if( saveMask & (SF_SAVE_PSF|SF_SAVE_PSF_AVG) ) {
@@ -1178,7 +1183,13 @@ void Object::doMozaic( float**& img, size_t& imgRows, size_t& imgCols, const red
     int margin = patchSize/8;
     int blend = (patchSize-2*margin)/3;
 
-    mozaic( img, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, true );
+    
+    bool doTranspose(false);
+#ifdef RDX_DO_TRANSPOSE
+    doTranspose = true;
+#endif
+    
+    mozaic( img, imgRows, imgCols, const_cast<const float***>(patchData.data()), nPatches, patchSize, patchSize, ypos.data(), xpos.data(), blend, margin, doTranspose );
 
     if( !(myJob.runFlags&RF_NO_CLIP) ) {
         img_trim( img, imgRows, imgCols, 1E-15 );
@@ -1416,9 +1427,16 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
 
         info->pix2cf = pixelsToAlpha;
         info->cf2pix = alphaToPixels;
-        info->nPatchesY = patchesData.dimSize(0 );
-        info->nPatchesX = patchesData.dimSize(1 );
-        info->patches.resize(info->nPatchesX, info->nPatchesY );
+        Point16 nP;                         // number of patches in output file.
+        nP.y = patchesData.dimSize(0);      // nPatchesY is the slowest dimension in the .momfbd file.
+        nP.x = patchesData.dimSize(1);
+        
+        info->nPatchesY = nP.y;             // nPatchesY is the slowest dimension in the .momfbd file.
+        info->nPatchesX = nP.x;
+#ifdef RDX_DO_TRANSPOSE
+        std::swap( info->nPatchesY, info->nPatchesX );      // old MvN code saved the output transposed
+#endif
+        info->patches.resize( info->nPatchesY, info->nPatchesX );
         info->nPoints = patchSize;
         
         info->region[0] = info->region[2] = numeric_limits<int32_t>::max();
@@ -1427,93 +1445,105 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
         size_t modeSize = tmpModes.nElements()*sizeof( float );
         size_t blockSize = modeSize;
         shared_ptr<ObjectData> oData( make_shared<ObjectData>() );
-        for( int x=0; x < info->nPatchesX; ++x ){
-            for( int y=0; y < info->nPatchesY; ++y ){
-                PatchData::Ptr thisPatch = patchesData(y,x);
-                if( thisPatch ){
-                    getStorage( *thisPatch, oData );
-                    shared_ptr<ObjectData> refData = thisPatch->getObjectData( oID );
+        for( uint16_t y(0); y < nP.y; ++y ) {                    // Loops are in the standard order
+            for( uint16_t x(0); x < nP.x; ++x ) {
+                FileMomfbd::PatchInfo& pi = info->patches
+#ifdef RDX_DO_TRANSPOSE
+                ( x, y );
+#else
+                ( y, x );
+#endif
+                PatchData::Ptr thisPatchData = patchesData( y, x );
+                if( thisPatchData ){
+                    getStorage( *thisPatchData, oData );
+                    shared_ptr<ObjectData> refData = thisPatchData->getObjectData( oID );
                     if( refData ) {
                         oData->channels = refData->channels;
                     }
-                    info->region[0] = std::min( info->region[0], thisPatch->roi.first.x+1 );
-                    info->region[1] = std::max( info->region[1], thisPatch->roi.last.x+1 );
-                    info->region[2] = std::min( info->region[2], thisPatch->roi.first.y+1 );
-                    info->region[3] = std::max( info->region[3], thisPatch->roi.last.y+1 );
-
-                    info->patches(x,y).region[0] = thisPatch->roi.first.x+1;         // store as 1-based indices
-                    info->patches(x,y).region[1] = thisPatch->roi.last.x+1;
-                    info->patches(x,y).region[2] = thisPatch->roi.first.y+1;
-                    info->patches(x,y).region[3] = thisPatch->roi.last.y+1;
-                    info->patches(x,y).nChannels = nChannels;
+                    pi.region[0] = thisPatchData->roi.first.x+1;         // store as 1-based indices
+                    pi.region[1] = thisPatchData->roi.last.x+1;
+                    pi.region[2] = thisPatchData->roi.first.y+1;
+                    pi.region[3] = thisPatchData->roi.last.y+1;
+                    pi.nChannels = nChannels;
       
-                    info->patches(x,y).nim = sharedArray<int32_t>( nChannels );
-                    info->patches(x,y).dx = sharedArray<int32_t>( nChannels );
-                    info->patches(x,y).dy = sharedArray<int32_t>( nChannels );
+                    info->region[0] = std::min( info->region[0], pi.region[0] );
+                    info->region[1] = std::max( info->region[1], pi.region[1] );
+                    info->region[2] = std::min( info->region[2], pi.region[2] );
+                    info->region[3] = std::max( info->region[3], pi.region[3] );
+
+                    pi.nim = sharedArray<int32_t>( nChannels );
+                    pi.dx = sharedArray<int32_t>( nChannels );
+                    pi.dy = sharedArray<int32_t>( nChannels );
                     for( int i=0; i < nChannels; ++i ){
-                        info->patches(x,y).nim.get()[i] = channels[i]->nImages( waveFrontList );
-                        info->patches(x,y).dx.get()[i] = oData->channels[i]->channelOffset.x;
-                        info->patches(x,y).dy.get()[i] = oData->channels[i]->channelOffset.y;
+                        pi.nim.get()[i] = channels[i]->nImages( waveFrontList );
+                        pi.dx.get()[i] = oData->channels[i]->channelOffset.x;
+                        pi.dy.get()[i] = oData->channels[i]->channelOffset.y;
                     }
                     blockSize += imgSize;
                     if( writeMask&MOMFBD_PSF ){
                         if(oData->psf.nDimensions()>1 ){
-                            info->patches(x,y).npsf = oData->psf.dimSize(0);
-                            blockSize += info->patches(x,y).npsf*imgSize;
+                            pi.npsf = oData->psf.dimSize(0);
+                            blockSize += pi.npsf*imgSize;
                         }
                     }
                     if( writeMask&MOMFBD_OBJ ){
                         if(oData->cobj.nDimensions()>1 ){
-                            info->patches(x,y).nobj = oData->cobj.dimSize(0);
-                            blockSize += info->patches(x,y).nobj*imgSize;
+                            pi.nobj = oData->cobj.dimSize(0);
+                            blockSize += pi.nobj*imgSize;
                         }
                     }
                     if( writeMask&MOMFBD_RES ){
                         if(oData->res.nDimensions()>1 ){
-                            info->patches(x,y).nres = oData->res.dimSize(0);
-                            blockSize += info->patches(x,y).nres*imgSize;
+                            pi.nres = oData->res.dimSize(0);
+                            blockSize += pi.nres*imgSize;
                         }
                     }
                     if( writeMask&MOMFBD_ALPHA ){
                         if(oData->alpha.nDimensions()==2 ){
-                            info->patches(x,y).nalpha = oData->alpha.dimSize(0);
-                            info->patches(x,y).nm = oData->alpha.dimSize(1 );
-                            blockSize += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
+                            pi.nalpha = oData->alpha.dimSize(0);
+                            pi.nm = oData->alpha.dimSize(1 );
+                            blockSize += pi.nalpha*pi.nm*sizeof(float );
                         }
                     }
                     if( writeMask&MOMFBD_DIV ){
                         if(oData->div.nDimensions()>1 ){
-                            info->patches(x,y).ndiv = oData->div.dimSize(0);
-                            info->patches(x,y).nphx = info->nPH;
-                            info->patches(x,y).nphy = info->nPH;
-                            blockSize += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
+                            pi.ndiv = oData->div.dimSize(0);
+                            pi.nphx = info->nPH;
+                            pi.nphy = info->nPH;
+                            blockSize += pi.ndiv*pi.nphx*pi.nphy*sizeof(float );
                         }
                     }
                 }
-            }   // y-loop
-        }   // x-loop
+            }   // x-loop
+        }   // y-loop
 
         auto tmp = sharedArray<char>( blockSize );
         memcpy(tmp.get(), tmpModes.get(), modeSize );
         char* tmpPtr = tmp.get( );
         int64_t offset = modeSize;
         results.copyTo<float>(tmpPtr+offset);
-        for( int x = 0; x < info->nPatchesX; ++x ){
-            for( int y = 0; y < info->nPatchesY; ++y ){
-                PatchData::Ptr thisPatch = patchesData(y,x);
-                if( thisPatch ){
-                    info->patches(x,y).imgPos = offset;
+        for( int y(0); y < info->nPatchesY; ++y ) {         // N.B. Loops are in "file order, which was transposed in the old code.
+            for( int x(0); x < info->nPatchesX; ++x ) {
+                FileMomfbd::PatchInfo& pi = info->patches( y, x );
+                PatchData::Ptr thisPatchData =
+#ifdef RDX_DO_TRANSPOSE
+                patchesData( x, y );
+#else
+                patchesData( y, x );
+#endif
+                if( thisPatchData ){
+                    pi.imgPos = offset;
                     offset += imgSize;
-                    info->patches(x,y).psfPos = offset;
-                    offset += info->patches(x,y).npsf*imgSize;
-                    info->patches(x,y).objPos = offset;
-                    offset += info->patches(x,y).nobj*imgSize;
-                    info->patches(x,y).resPos = offset;
-                    offset += info->patches(x,y).nres*imgSize;
-                    info->patches(x,y).alphaPos = offset;
-                    offset += info->patches(x,y).nalpha*info->patches(x,y).nm*sizeof(float );
-                    info->patches(x,y).diversityPos = offset;
-                    offset += info->patches(x,y).ndiv*info->patches(x,y).nphx*info->patches(x,y).nphy*sizeof(float );
+                    pi.psfPos = offset;
+                    offset += pi.npsf*imgSize;
+                    pi.objPos = offset;
+                    offset += pi.nobj*imgSize;
+                    pi.resPos = offset;
+                    offset += pi.nres*imgSize;
+                    pi.alphaPos = offset;
+                    offset += pi.nalpha*pi.nm*sizeof(float);
+                    pi.diversityPos = offset;
+                    offset += pi.ndiv*pi.nphx*pi.nphy*sizeof(float);
                 }
             }
         }
