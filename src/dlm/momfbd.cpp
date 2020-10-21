@@ -131,7 +131,6 @@ namespace {
         IDL_INT margin;
         IDL_INT modes;
         IDL_INT names;
-        IDL_INT notranspose;
         IDL_INT obj;
         IDL_INT psf;
         IDL_INT res;
@@ -151,7 +150,6 @@ namespace {
         { ( char* ) "MARGIN",        IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
         { ( char* ) "MODES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( modes ) },
         { ( char* ) "NAMES",         IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( names ) },
-        { ( char* ) "NOTRANSPOSE",   IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( notranspose ) },
         { ( char* ) "OBJ",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( obj ) },
         { ( char* ) "PSF",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( psf ) },
         { ( char* ) "RES",           IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( res ) },
@@ -221,7 +219,7 @@ namespace {
         cout << "                Read only img/psf data into struct (geometry in always loaded), printout progress and struct_info.\n";
         cout << "        IDL>momfbd_write,a,'/path/to/file/data_new.momfbd',/img,/names,\n";
         cout << "                Write only img data, and file-names used by momfbd,  (geometry in always written)\n";
-        cout << "        IDL>img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip, /notranspose, margin=20)\n";
+        cout << "        IDL>img = momfbd_mozaic( a.patch.img, a.patch(*,0).xl, a.patch(*,0).xh, a.patch(0,*).yl, a.patch(0,*).yh, /clip, /transpose, margin=20)\n";
         cout << "                Form mozaic from patches, using a margin of 20 pixels, don't transpose, clip afterwards.\n\n";
         cout << "    Accepted Keywords:\n";
         cout << "        /HELP                    Print this info.\n";
@@ -238,7 +236,7 @@ namespace {
         cout << "        /CLIP                    Remove dark rows/columns along edges after mozaic.\n";
         cout << "        /CROP                    Remove the fixed-size border around the mozaic.\n";
         cout << "        MARGIN=m                 Ignore outermost m pixels in each patch (default = PatchSize/8)\n";
-        cout << "        /NOTRANSPOSE             Do not transpose after mozaic. (transposing is default for backwards compatibility with old momfbd DLM)\n";
+        cout << "        /TRANSPOSE             Do not transpose after mozaic. (transposing is default for old momfbd files (< 20201014.0))\n";
         cout << "        VERBOSE={0,1,2}          Verbosity, default is 0 (no output)." << endl;
 
     }
@@ -257,14 +255,24 @@ namespace {
 
     void createPatchTags ( vector<IDL_STRUCT_TAG_DEF>& tags, uint8_t loadMask, const FileMomfbd* const info ) {
 
-        appendTag ( tags, "YL", 0, ( void* ) IDL_TYP_INT );                 // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
-        appendTag ( tags, "YH", 0, ( void* ) IDL_TYP_INT );
-        appendTag ( tags, "XL", 0, ( void* ) IDL_TYP_INT );
-        appendTag ( tags, "XH", 0, ( void* ) IDL_TYP_INT );
-        if ( info->version >= 20110714.0 ) {
-            appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );           // fast index first => in the IDL struct X & Y are interchanged compared to the c++ names
+        if( info->version < 20201022.0 ) {
+            appendTag ( tags, "YL", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "YH", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "XL", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "XH", 0, ( void* ) IDL_TYP_INT );
+            if ( info->version >= 20110714.0 ) {
+                appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );
+                appendTag ( tags, "OFFX", 0, ( void* ) IDL_TYP_INT );
+            }
+        } else {
+            appendTag ( tags, "XL", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "XH", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "YL", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "YH", 0, ( void* ) IDL_TYP_INT );
             appendTag ( tags, "OFFX", 0, ( void* ) IDL_TYP_INT );
+            appendTag ( tags, "OFFY", 0, ( void* ) IDL_TYP_INT );
         }
+
 
         IDL_MEMINT* tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
@@ -394,8 +402,8 @@ namespace {
             IDL_StructDefPtr ds = IDL_MakeStruct ( 0, patchTags.data() );
             tmpDims = new IDL_MEMINT[3];
             tmpDims[0] = 2;
-            tmpDims[1] = info->nPatchesY;       // fast index first
-            tmpDims[2] = info->nPatchesX;
+            tmpDims[1] = info->nPatchesX;       // fast index first
+            tmpDims[2] = info->nPatchesY;
             appendTag ( tags, "PATCH", tmpDims, ( void* ) ds );
             for ( auto & tag : patchTags ) { // delete the "dims" array for the tags that has them
                 if ( tag.dims ) {
@@ -1369,17 +1377,17 @@ IDL_VPTR redux::momfbd_mozaic ( int argc, IDL_VPTR *argv, char *argk ) {
     ( void ) IDL_KWProcessByOffset ( argc, argv, argk, kw_pars, ( IDL_VPTR* ) 0, 1, &kw );
     int do_clip = kw.clip;
     int margin = kw.margin;
-    int notranspose = kw.notranspose;
+    int transpose = kw.transpose;
     int verbosity = std::min ( std::max ( ( int ) kw.verbose, 0 ), 8 );
     IDL_KW_FREE;
 
     if ( verbosity > 0 ) {
         cout << "Mozaic:  nPatches = (" << nPatchesY << "," << nPatchesX << ")" << endl;
         cout << "        patchSize = (" << patchSizeY << "," << patchSizeX << ")" << endl;
-if( kw.crop ) cout << "             crop = YES" << endl;
-else          cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
+        if( kw.crop ) cout << "             crop = YES" << endl;
+        else          cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         cout << "           margin = " << margin << endl;
-        cout << "        transpose = " << ( notranspose?"NO":"YES" ) << endl;
+        cout << "        transpose = " << (transpose?"YES":"NO" ) << endl;
         cout << "      " << printArray(patchesFirstX,"firstPixelX") << endl;
         cout << "       " << printArray(patchesLastX,"lastPixelX") << endl;
         cout << "      " << printArray(patchesFirstY,"firstPixelY") << endl;
@@ -1458,7 +1466,7 @@ else          cout << "             clip = " << ( do_clip?"YES":"NO" ) << endl;
         }
     }
 
-    if ( !notranspose ) {
+    if ( transpose ) {
         if ( verbosity > 1 ) {
             cout << "       Transposing image." << endl;
         }

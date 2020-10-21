@@ -3053,6 +3053,7 @@ namespace mz {
         IDL_INT crop;
         IDL_INT help;
         IDL_INT margin;
+        IDL_INT ptranspose;
         IDL_INT transpose;
         IDL_INT verbose;
     } KW_RESULT;
@@ -3063,6 +3064,7 @@ namespace mz {
         { ( char* ) "CROP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( crop ) },
         { ( char* ) "HELP",          IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( help ) },
         { ( char* ) "MARGIN",        IDL_TYP_INT, 1,           0,                 0, ( char* ) IDL_KW_OFFSETOF ( margin ) },
+        { ( char* ) "PTRANSPOSE",    IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( ptranspose ) },
         { ( char* ) "TRANSPOSE",     IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( transpose ) },
         { ( char* ) "VERBOSE",       IDL_TYP_INT, 1, IDL_KW_ZERO,                 0, ( char* ) IDL_KW_OFFSETOF ( verbose ) },
         { NULL }
@@ -3083,7 +3085,8 @@ namespace mz {
                         "      CROP                Crop away the fixed boundary.\n"
                         "      HELP                Display this info.\n"
                         "      MARGIN              Ignore outermost m pixels in each patch (default = PatchSize/8)\n"
-                        "      TRANSPOSE           Transpose each patch before mozaic, and transpose the final image back afterwards.\n"
+                        "      PTRANSPOSE          Transpose each patch before mozaic.\n"
+                        "      TRANSPOSE           Transpose the final image.\n"
                         "      VERBOSE             Verbosity, default is 0 (only error output).\n";
             }
         } else ret += "\n";
@@ -3173,18 +3176,19 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
     size_t imgRows = maxPosY+pRows;
 
     if ( kw.verbose > 0 ) {
-        cout << "Mozaic:  nPatches = " << nPatches << endl;
-        cout << "          imgSize = (" << imgCols << "," << imgRows << ")" << endl;
-        cout << "        patchSize = (" << pCols << "," << pRows << ")" << endl;
+        cout << "Mozaic:   nPatches = " << nPatches << endl;
+        cout << "           imgSize = (" << imgCols << "," << imgRows << ")" << endl;
+        cout << "         patchSize = (" << pCols << "," << pRows << ")" << endl;
         if ( kw.verbose > 1 ) {
-            cout << "      " << printArray(posX,"patchPositionsX") << endl;
-            cout << "      " << printArray(posY,"patchPositionsY") << endl;
+            cout << "       " << printArray(posX,"patchPositionsX") << endl;
+            cout << "       " << printArray(posY,"patchPositionsY") << endl;
         }
-        if( kw.crop ) cout << "             crop = YES" << endl;
-        else cout << "             clip = " << ( kw.clip?"YES":"NO" ) << endl;
-        cout << "           margin = " << kw.margin << endl;
-        cout << "            blend = " << kw.blend << endl;
-        cout << "        transpose = " << ( kw.transpose?"YES":"NO" ) << endl;
+        if( kw.crop ) cout << "              crop = YES" << endl;
+        else cout << "              clip = " << ( kw.clip?"YES":"NO" ) << endl;
+        cout << "            margin = " << kw.margin << endl;
+        cout << "             blend = " << kw.blend << endl;
+        cout << " transpose patches = " << ( kw.ptranspose?"YES":"NO" ) << endl;
+        cout << "   final transpose = " << ( kw.transpose?"YES":"NO" ) << endl;
     }
 
     UCHAR dataType = patches->type;
@@ -3197,27 +3201,27 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
         switch( dataType ) {
             case( IDL_TYP_BYTE ): {
                 auto tmpPatches = reshapeArray( reinterpret_cast<const UCHAR*>(patches->value.arr->data), nPatches, pRows, pCols );
-                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.ptranspose );
                 break;
             }
             case( IDL_TYP_INT ): {
                 auto tmpPatches = reshapeArray( reinterpret_cast<const IDL_INT*>(patches->value.arr->data), nPatches, pRows, pCols );
-                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.ptranspose );
                 break;
             }
             case( IDL_TYP_LONG ): {
                 auto tmpPatches = reshapeArray( reinterpret_cast<const IDL_LONG*>(patches->value.arr->data), nPatches, pRows, pCols );
-                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.ptranspose );
                 break;
             }
             case( IDL_TYP_FLOAT ): {
                 auto tmpPatches = reshapeArray( reinterpret_cast<const float*>(patches->value.arr->data), nPatches, pRows, pCols );
-                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.ptranspose );
                 break;
             }
             case( IDL_TYP_DOUBLE ): {
                 auto tmpPatches = reshapeArray( reinterpret_cast<const double*>(patches->value.arr->data), nPatches, pRows, pCols );
-                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.transpose );
+                mozaic( tmpImg, imgRows, imgCols, tmpPatches.get(), nPatches, pRows, pCols, posY.data(), posX.data(), kw.blend, kw.margin, kw.ptranspose );
                 break;
             }
             default: ;
@@ -3234,9 +3238,12 @@ IDL_VPTR rdx_mozaic( int argc, IDL_VPTR *argv, char *argk ) {
             redux::image::img_trim( tmpImg, imgRows, imgCols, 1E-15 );
         }
         
-        redux::util::transpose( *tmpImg, imgRows, imgCols );
+        if( kw.transpose ) {
+            redux::util::transpose( *tmpImg, imgRows, imgCols );
+            std::swap( imgRows, imgCols );
+        }
         
-        IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgRows), static_cast<IDL_LONG64>(imgCols) };
+        IDL_MEMINT dims[] = { static_cast<IDL_LONG64>(imgCols), static_cast<IDL_LONG64>(imgRows) };
         char* retData = IDL_MakeTempArray( dataType, 2, dims, IDL_ARR_INI_ZERO, &ret );
         copyToIDL( *tmpImg, reinterpret_cast<UCHAR*>(retData), imgRows*imgCols, dataType );
         

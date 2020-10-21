@@ -18,7 +18,7 @@ static const int system_is_big_endian = 1;
 #endif
 
 
-uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, const float& version ) {
+uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, const double& version ) {
 
     int64_t tmpSize, patchSize ( 0 );
     uint8_t dataMask( 0 );
@@ -153,7 +153,7 @@ uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, c
 }
 
 
-int64_t FileMomfbd::PatchInfo::parseMeta ( ifstream& file, const bool& swapNeeded, const float& version ) {
+int64_t FileMomfbd::PatchInfo::parseMeta ( ifstream& file, const bool& swapNeeded, const double& version ) {
 
     int64_t tmpSize, patchSize ( 0 );
     uint8_t dataMask( 0 );
@@ -288,7 +288,7 @@ int64_t FileMomfbd::PatchInfo::parseMeta ( ifstream& file, const bool& swapNeede
 }
 
 
-size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask, int verbosity, uint8_t alignTo ) const {
+size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swapNeeded, const double& version, uint8_t loadMask, int verbosity, uint8_t alignTo ) const {
 
     size_t count(0);
     float* fPtr;
@@ -388,7 +388,7 @@ size_t FileMomfbd::PatchInfo::load ( ifstream& file, char* ptr, const bool& swap
     return count;
 }
 
-void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const float& version, uint8_t writeMask ) {
+void FileMomfbd::PatchInfo::write ( ofstream& file, const char* data, const double& version, uint8_t writeMask ) {
 
     char tmp8;
     const float* fPtr;
@@ -492,7 +492,7 @@ FileMomfbd::FileMomfbd( const std::string& filename ) : version(0), pix2cf(NAN),
 }
 
 
-size_t FileMomfbd::getPatchSize( const FileMomfbd* const info, uint8_t loadMask, const float& version, size_t alignTo ) {
+size_t FileMomfbd::getPatchSize( const FileMomfbd* const info, uint8_t loadMask, const double& version, size_t alignTo ) {
     
     if ( info->patches.nElements() == 0 ) return 0;                            // no patches
     

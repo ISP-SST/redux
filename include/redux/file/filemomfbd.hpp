@@ -49,17 +49,17 @@ namespace redux {
 
                 int64_t offset, imgPos, psfPos, objPos, resPos, alphaPos, diversityPos;
 
-                uint8_t parse( std::ifstream& file, const bool& swapNeeded, const float& version );
-                int64_t parseMeta( std::ifstream& file, const bool& swapNeeded, const float& version );
-                size_t load ( std::ifstream& file, char* ptr, const bool& swapNeeded, const float& version, uint8_t loadMask=MOMFBD_ALL, int verbosity=0, uint8_t alignTo=4 ) const;
-                void write( std::ofstream& file, const char* data, const float& version, uint8_t writeMask=MOMFBD_ALL );
+                uint8_t parse( std::ifstream& file, const bool& swapNeeded, const double& version );
+                int64_t parseMeta( std::ifstream& file, const bool& swapNeeded, const double& version );
+                size_t load ( std::ifstream& file, char* ptr, const bool& swapNeeded, const double& version, uint8_t loadMask=MOMFBD_ALL, int verbosity=0, uint8_t alignTo=4 ) const;
+                void write( std::ofstream& file, const char* data, const double& version, uint8_t writeMask=MOMFBD_ALL );
 
             };
 
             FileMomfbd( void );
             explicit FileMomfbd( const std::string& );
             
-            static size_t getPatchSize(const FileMomfbd* const info, uint8_t loadMask, const float& version, size_t alignTo=4);
+            static size_t getPatchSize(const FileMomfbd* const info, uint8_t loadMask, const double& version, size_t alignTo=4);
             size_t getPatchSize( uint8_t loadMask, size_t alignTo=4 ) const { return getPatchSize( this, loadMask, version, alignTo ); };
             
             void clear(void);
@@ -75,7 +75,8 @@ namespace redux {
             std::vector<std::string> getText( bool ) override { return std::vector<std::string>(1,""); }
             int getFormat(void) override { return FMT_MOMFBD; };
 
-            float version, pix2cf, cf2pix;
+            double version;
+            float pix2cf, cf2pix;
             std::string dateString, timeString, versionString;
             bpx::ptime modifiedTime;
             std::vector<std::string> fileNames;
