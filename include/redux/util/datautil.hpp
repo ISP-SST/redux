@@ -14,6 +14,10 @@
 #include <type_traits>
 
 namespace redux {
+    
+    namespace momfbd {
+        struct ModeList;     // forward declaration
+    }
 
     namespace util {
 
@@ -113,6 +117,7 @@ namespace redux {
         
         /*! @name size
          *  @brief Return the proper size needed for packing/unpacking certain types/structures.
+         *  @param   data Input
          */
         //@{
         inline uint64_t size( const std::vector<std::string>& data ) {
@@ -122,6 +127,8 @@ namespace redux {
             }
             return sz;
         }
+        
+        uint64_t size( const momfbd::ModeList& data );
        
         template <typename T>
         inline uint64_t size( const std::vector<T>& data ) {
@@ -129,9 +136,9 @@ namespace redux {
         }
        
         template <class T, class U, class Comp, class Alloc>
-        inline uint64_t size(const std::map<T,U,Comp,Alloc>& in) {
+        inline uint64_t size(const std::map<T,U,Comp,Alloc>& data) {
             uint64_t sz = sizeof(uint64_t);
-            sz += (sizeof(T) + sizeof(U)) * in.size();
+            sz += (sizeof(T) + sizeof(U)) * data.size();
             return sz;
         }
        
@@ -156,6 +163,8 @@ namespace redux {
             }
             return totalSize;
         }
+        
+        uint64_t pack( char* ptr, const momfbd::ModeList& in );
         
         template <typename T>
         inline uint64_t pack(char* ptr, const std::vector<T>& in) {
@@ -215,9 +224,9 @@ namespace redux {
         
         /*! @name unpack
          *  @brief Unpack the data stored in a dense string of characters.
-         *  @param   ptr Where to store the data
-         *  @param   in  Data
-         *  @param   count Number of elements to pack
+         *  @param   ptr   Character array holding the packed data.
+         *  @param   out   Container where to store the unpacked data
+         *  @param   count Number of elements to unpack
          *  @param   swap_endian Should the endianess be swapped ?
          */
         //@{
@@ -233,6 +242,8 @@ namespace redux {
             }
             return totalSize;
         }
+        
+        uint64_t unpack( const char* ptr, redux::momfbd::ModeList& out, bool swap_endian );
         
         template <typename T>
         inline uint64_t unpack(const char* ptr, std::vector<T>& out, bool swap_endian=false) {
