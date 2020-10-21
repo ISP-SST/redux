@@ -63,7 +63,7 @@ namespace redux {
             operator std::string() const;           //!< cast to string (for easy printing of configuration)
 
             virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ChannelCfg() );
-            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg() ) const;
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ChannelCfg(), bool showAll=false ) const;
             
             virtual uint64_t size(void) const;
             virtual uint64_t pack(char*) const;
@@ -136,7 +136,7 @@ namespace redux {
             virtual ~ObjectCfg();
             
             virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=ObjectCfg() ) override;
-            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg() ) const override;
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=ObjectCfg(), bool showAll=false ) const override;
 
             uint64_t size(void) const override;
             uint64_t pack(char*) const override;
@@ -179,7 +179,7 @@ namespace redux {
             ~GlobalCfg();
 
             virtual void parseProperties( bpt::ptree&, redux::logging::Logger&, const ChannelCfg& defaults=GlobalCfg() ) override;
-            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg() ) const override;
+            virtual void getProperties( bpt::ptree&, const ChannelCfg& defaults=GlobalCfg(), bool showAll=false ) const override;
 
             uint64_t size(void) const override;
             uint64_t pack(char*) const override;

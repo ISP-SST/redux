@@ -91,12 +91,12 @@ void Object::parsePropertyTree( bpt::ptree& tree, redux::logging::Logger& logger
 }
 
 
-bpt::ptree Object::getPropertyTree( bpt::ptree& tree ){
+bpt::ptree Object::getPropertyTree( bpt::ptree& tree, bool showAll ){
 
     bpt::ptree node;
 
     for( auto& ch : channels ){
-        ch->getPropertyTree( node );
+        ch->getPropertyTree( node, showAll );
     }
 
     ObjectCfg::getProperties(node, myJob);

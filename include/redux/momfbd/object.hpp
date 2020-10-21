@@ -52,7 +52,7 @@ namespace redux {
             ~Object();
 
             void parsePropertyTree( bpt::ptree&, redux::logging::Logger& );
-            bpt::ptree getPropertyTree( bpt::ptree& );
+            bpt::ptree getPropertyTree( bpt::ptree&, bool showAll=false );
 
             uint16_t id(void) const { return ID; };
             size_t size(void) const override;

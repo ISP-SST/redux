@@ -163,14 +163,14 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, red
 }
 
 
-bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root ) {
+bpt::ptree MomfbdJob::getPropertyTree( bpt::ptree* root, bool showAll ) {
 
-    bpt::ptree tree = Job::getPropertyTree();         // get Job-properties
+    bpt::ptree tree = Job::getPropertyTree( nullptr, showAll );         // get Job-properties
 
     GlobalCfg::getProperties(tree);
 
     for( auto& obj: objects ) {
-        obj->getPropertyTree( tree );
+        obj->getPropertyTree( tree, showAll );
     }
 
     if( root ) {

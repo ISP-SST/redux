@@ -64,10 +64,10 @@ void Channel::parsePropertyTree (bpt::ptree& tree, redux::logging::Logger& logge
 
 
 
-bpt::ptree Channel::getPropertyTree (bpt::ptree& tree) {
+bpt::ptree Channel::getPropertyTree( bpt::ptree& tree, bool showAll ) {
 
     bpt::ptree node;
-    ChannelCfg::getProperties (node, myObject);         // generate using our parent-object as default-values.
+    ChannelCfg::getProperties( node, myObject, showAll );         // generate using our parent-object as default-values.
     tree.push_back (bpt::ptree::value_type ("channel", node));
     return node;
 

@@ -43,7 +43,7 @@ namespace redux {
         static Job* create(void) { return new DebugJob(); }
 
         void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& ) override;
-        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr ) override;
+        bpt::ptree getPropertyTree( bpt::ptree* root=nullptr, bool showAll=false ) override;
         
         size_t size(void) const override;
         uint64_t pack(char*) const override;

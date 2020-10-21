@@ -61,7 +61,7 @@ namespace redux {
             uint64_t unpackParts(const char* ptr, WorkInProgress::Ptr, bool) override;
             
             void parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger& ) override;
-            bpt::ptree getPropertyTree( bpt::ptree* root = nullptr ) override;
+            bpt::ptree getPropertyTree( bpt::ptree* root = nullptr, bool showAll=false ) override;
 
             uint64_t size( void ) const override;
             uint64_t pack( char* ) const override;

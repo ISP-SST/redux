@@ -315,16 +315,16 @@ void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree, redux::log
 }
 
 
-bpt::ptree Job::getPropertyTree(bpt::ptree* root) {
+bpt::ptree Job::getPropertyTree( bpt::ptree* root, bool showAll ) {
     bpt::ptree tree;
-    if(info.timeout != globalDefaults.timeout) tree.put("TIMEOUT", info.timeout);
-    if(info.priority != globalDefaults.priority) tree.put("PRIORITY", info.priority);
-    if(info.verbosity != globalDefaults.verbosity) tree.put("VERBOSITY", info.verbosity);
-    if(info.maxThreads != globalDefaults.maxThreads) tree.put("MAX_THREADS", info.maxThreads);
-    if(info.maxPartRetries != globalDefaults.maxPartRetries) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
-    if(info.logFile != globalDefaults.logFile) tree.put("LOGFILE", info.logFile);
-    if(info.outputDir != globalDefaults.outputDir) tree.put("OUTPUT_DIR", info.outputDir);
-    if(info.name != globalDefaults.name) tree.put("NAME", info.name);
+    if( showAll || info.timeout != globalDefaults.timeout ) tree.put("TIMEOUT", info.timeout);
+    if( showAll || info.priority != globalDefaults.priority ) tree.put("PRIORITY", info.priority);
+    if( showAll || info.verbosity != globalDefaults.verbosity ) tree.put("VERBOSITY", info.verbosity);
+    if( showAll || info.maxThreads != globalDefaults.maxThreads ) tree.put("MAX_THREADS", info.maxThreads);
+    if( showAll || info.maxPartRetries != globalDefaults.maxPartRetries ) tree.put("MAX_PART_RETRIES", info.maxPartRetries);
+    if( showAll || info.logFile != globalDefaults.logFile ) tree.put("LOGFILE", info.logFile);
+    if( showAll || info.outputDir != globalDefaults.outputDir ) tree.put("OUTPUT_DIR", info.outputDir);
+    if( showAll || info.name != globalDefaults.name ) tree.put("NAME", info.name);
     if(root) {
         root->push_back(bpt::ptree::value_type("job", tree));
     }

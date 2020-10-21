@@ -231,50 +231,50 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
 }
 
 
-void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) const {
+void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults, bool showAll ) const {
 
-    if( rotationAngle != defaults.rotationAngle ) tree.put( "ANGLE", rotationAngle );
+    if( showAll || rotationAngle != defaults.rotationAngle ) tree.put( "ANGLE", rotationAngle );
 
-    if(noiseFudge != defaults.noiseFudge) tree.put("NF", noiseFudge);
-    if(weight != defaults.weight) tree.put("WEIGHT", weight);
-    if(noRestore != defaults.noRestore) tree.put("NO_RESTORE", noRestore);
+    if( showAll || noiseFudge != defaults.noiseFudge ) tree.put("NF", noiseFudge);
+    if( showAll || weight != defaults.weight ) tree.put("WEIGHT", weight);
+    if( showAll || noRestore != defaults.noRestore ) tree.put("NO_RESTORE", noRestore);
     
-    if( diversityBasis != defaults.diversityBasis ) tree.put( "DIV_BASIS", diversityBasis );
-    if( diversityModes != defaults.diversityModes ) tree.put( "DIV_ORDERS", diversityModes );
-    if( diversityValues != defaults.diversityValues ) tree.put( "DIVERSITY", diversityValues );
+    if( showAll || diversityBasis != defaults.diversityBasis ) tree.put( "DIV_BASIS", diversityBasis );
+    if( showAll || diversityModes != defaults.diversityModes ) tree.put( "DIV_ORDERS", diversityModes );
+    if( showAll || diversityValues != defaults.diversityValues ) tree.put( "DIVERSITY", diversityValues );
     
-    if( alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
-    if( alignClip != defaults.alignClip ) tree.put( "ALIGN_CLIP", alignClip );
-    if( discard != defaults.discard ) tree.put( "DISCARD", discard );
-    if( borderClip != defaults.borderClip ) tree.put( "BORDER_CLIP", borderClip );
-    if( incomplete != defaults.incomplete ) tree.put( "INCOMPLETE", ( bool)incomplete );
+    if( showAll || alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
+    if( showAll || alignClip != defaults.alignClip ) tree.put( "ALIGN_CLIP", alignClip );
+    if( showAll || discard != defaults.discard ) tree.put( "DISCARD", discard );
+    if( showAll || borderClip != defaults.borderClip ) tree.put( "BORDER_CLIP", borderClip );
+    if( showAll || incomplete != defaults.incomplete ) tree.put( "INCOMPLETE", ( bool)incomplete );
 
-    if( subImagePosXY != defaults.subImagePosXY ) tree.put( "SIM_XY", subImagePosXY );
-    if( subImagePosXY.empty() ) {
+    if( showAll || subImagePosXY != defaults.subImagePosXY ) tree.put( "SIM_XY", subImagePosXY );
+    if( showAll || subImagePosXY.empty() ) {
         if( subImagePosX != defaults.subImagePosX ) tree.put( "SIM_X", subImagePosX );
         if( subImagePosY != defaults.subImagePosY ) tree.put( "SIM_Y", subImagePosY );
     }
     
-    if( imageDataDir != defaults.imageDataDir ) tree.put( "IMAGE_DATA_DIR", imageDataDir );
-    if( imageTemplate != defaults.imageTemplate ) tree.put( "FILENAME_TEMPLATE", imageTemplate );
-    if( darkTemplate != defaults.darkTemplate ) tree.put( "DARK_TEMPLATE", darkTemplate );
-    if( gainFile != defaults.gainFile ) tree.put( "GAIN_FILE", gainFile );
-    if( responseFile != defaults.responseFile ) tree.put( "CCD_RESPONSE", responseFile );
-    if( backgainFile != defaults.backgainFile ) tree.put( "BACK_GAIN", backgainFile );
-    if( psfFile != defaults.psfFile ) tree.put( "PSF", psfFile );
-    if( mmFile != defaults.mmFile ) tree.put( "MODMAT", mmFile );
-    if( mmRow != defaults.mmRow ) tree.put( "MMROW", mmRow );
-    if( mmWidth != defaults.mmWidth ) tree.put( "MMWIDTH", mmWidth );
+    if( showAll || imageDataDir != defaults.imageDataDir ) tree.put( "IMAGE_DATA_DIR", imageDataDir );
+    if( showAll || imageTemplate != defaults.imageTemplate ) tree.put( "FILENAME_TEMPLATE", imageTemplate );
+    if( showAll || darkTemplate != defaults.darkTemplate ) tree.put( "DARK_TEMPLATE", darkTemplate );
+    if( showAll || gainFile != defaults.gainFile ) tree.put( "GAIN_FILE", gainFile );
+    if( showAll || responseFile != defaults.responseFile ) tree.put( "CCD_RESPONSE", responseFile );
+    if( showAll || backgainFile != defaults.backgainFile ) tree.put( "BACK_GAIN", backgainFile );
+    if( showAll || psfFile != defaults.psfFile ) tree.put( "PSF", psfFile );
+    if( showAll || mmFile != defaults.mmFile ) tree.put( "MODMAT", mmFile );
+    if( showAll || mmRow != defaults.mmRow ) tree.put( "MMROW", mmRow );
+    if( showAll || mmWidth != defaults.mmWidth ) tree.put( "MMWIDTH", mmWidth );
     
-    if( xOffsetFile != defaults.xOffsetFile ) tree.put( "XOFFSET", xOffsetFile );
-    if( yOffsetFile != defaults.yOffsetFile ) tree.put( "YOFFSET", yOffsetFile );
+    if( showAll || xOffsetFile != defaults.xOffsetFile ) tree.put( "XOFFSET", xOffsetFile );
+    if( showAll || yOffsetFile != defaults.yOffsetFile ) tree.put( "YOFFSET", yOffsetFile );
 
-    if( imageNumberOffset != defaults.imageNumberOffset ) tree.put( "DT", imageNumberOffset );
-    if( fileNumbers != defaults.fileNumbers ) tree.put( "IMAGE_NUM", fileNumbers );
-    if( waveFrontList != defaults.waveFrontList ) tree.put( "WFINDEX", waveFrontList );
-    if( darkNumbers != defaults.darkNumbers ) tree.put( "DARK_NUM", darkNumbers );
+    if( showAll || imageNumberOffset != defaults.imageNumberOffset ) tree.put( "DT", imageNumberOffset );
+    if( showAll || fileNumbers != defaults.fileNumbers ) tree.put( "IMAGE_NUM", fileNumbers );
+    if( showAll || waveFrontList != defaults.waveFrontList ) tree.put( "WFINDEX", waveFrontList );
+    if( showAll || darkNumbers != defaults.darkNumbers ) tree.put( "DARK_NUM", darkNumbers );
     
-    if( stokesWeights != defaults.stokesWeights ) tree.put( "VECTOR", stokesWeights );
+    if( showAll || stokesWeights != defaults.stokesWeights ) tree.put( "VECTOR", stokesWeights );
 
 }
 
@@ -467,17 +467,17 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
 }
 
 
-void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
+void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool showAll ) const {
 
     const ObjectCfg& defaults = reinterpret_cast<const ObjectCfg&>( def );
     
-    if( telescopeF != defaults.telescopeF ) tree.put( "TELESCOPE_F", telescopeF );
-    if( arcSecsPerPixel != defaults.arcSecsPerPixel ) tree.put( "ARCSECPERPIX", arcSecsPerPixel );
-    if( pixelSize != defaults.pixelSize ) tree.put( "PIXELSIZE", pixelSize );
-    if( maxLocalShift != defaults.maxLocalShift ) tree.put( "MAX_LOCAL_SHIFT", maxLocalShift );
-    if( minimumOverlap != defaults.minimumOverlap ) tree.put( "MINIMUM_OVERLAP", minimumOverlap );
-    if( patchSize != defaults.patchSize ) tree.put( "NUM_POINTS", patchSize );
-    if( pupilPixels != defaults.pupilPixels ) tree.put( "PUPIL_POINTS", pupilPixels );
+    if( showAll || telescopeF != defaults.telescopeF ) tree.put( "TELESCOPE_F", telescopeF );
+    if( showAll || arcSecsPerPixel != defaults.arcSecsPerPixel ) tree.put( "ARCSECPERPIX", arcSecsPerPixel );
+    if( showAll || pixelSize != defaults.pixelSize ) tree.put( "PIXELSIZE", pixelSize );
+    if( showAll || maxLocalShift != defaults.maxLocalShift ) tree.put( "MAX_LOCAL_SHIFT", maxLocalShift );
+    if( showAll || minimumOverlap != defaults.minimumOverlap ) tree.put( "MINIMUM_OVERLAP", minimumOverlap );
+    if( showAll || patchSize != defaults.patchSize ) tree.put( "NUM_POINTS", patchSize );
+    if( showAll || pupilPixels != defaults.pupilPixels ) tree.put( "PUPIL_POINTS", pupilPixels );
 
     uint16_t diff = saveMask ^ defaults.saveMask;
     if( diff & SF_SAVE_ALPHA ) tree.put( "GET_ALPHA", bool( saveMask & SF_SAVE_ALPHA ) );
@@ -489,12 +489,12 @@ void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( diff & SF_SAVE_PSF_AVG ) tree.put( "GET_PSF_AVG", bool( saveMask & SF_SAVE_PSF_AVG ) );
     if( diff & SF_SAVE_RESIDUAL ) tree.put( "GET_RESIDUAL", bool( saveMask & SF_SAVE_RESIDUAL ) );
     if( diff & SF_SAVE_FFDATA ) tree.put( "SAVE_FFDATA", bool( saveMask & SF_SAVE_FFDATA ) );
-    if( traceObject != defaults.traceObject ) tree.put( "TRACE_REF", traceObject );
-    if( outputFileName != defaults.outputFileName ) tree.put( "OUTPUT_FILE", outputFileName );
-    if( initFile != defaults.initFile ) tree.put( "INIT_FILE", initFile );
-    if( modeFile != defaults.modeFile ) tree.put( "MODE_FILE", modeFile );
-    if( pupilFile != defaults.pupilFile ) tree.put( "PUPIL", pupilFile );
-    if( wavelength != defaults.wavelength ) tree.put( "WAVELENGTH", wavelength );
+    if( showAll || traceObject != defaults.traceObject ) tree.put( "TRACE_REF", traceObject );
+    if( showAll || outputFileName != defaults.outputFileName ) tree.put( "OUTPUT_FILE", outputFileName );
+    if( showAll || initFile != defaults.initFile ) tree.put( "INIT_FILE", initFile );
+    if( showAll || modeFile != defaults.modeFile ) tree.put( "MODE_FILE", modeFile );
+    if( showAll || pupilFile != defaults.pupilFile ) tree.put( "PUPIL", pupilFile );
+    if( showAll || wavelength != defaults.wavelength ) tree.put( "WAVELENGTH", wavelength );
 
     ChannelCfg::getProperties( tree, defaults );
 
@@ -770,7 +770,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
 }
 
 
-void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
+void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool showAll ) const {
     
     const GlobalCfg& defaults = reinterpret_cast<const GlobalCfg&>(def);
 
@@ -790,39 +790,39 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
     if( diff & RF_OLD_NS ) tree.put( "OLD_NS", bool( runFlags & RF_OLD_NS ) );
     if( diff & RF_SORT_MODES ) tree.put( "SORT_MODES", bool( runFlags & RF_SORT_MODES ) );
 
-    if( trace != defaults.trace ) tree.put( "TRACE", trace );
+    if( showAll || trace != defaults.trace ) tree.put( "TRACE", trace );
     
-    if( (modeBasis && (modeBasis != defaults.modeBasis)) ) tree.put( "BASIS", basisTags[modeBasis%3] );
-    if( klMinMode != defaults.klMinMode ) tree.put( "KL_MIN_MODE", klMinMode );
-    if( klMaxMode != defaults.klMaxMode ) tree.put( "KL_MAX_MODE", klMaxMode );
-    if( klCutoff != defaults.klCutoff ) tree.put( "SVD_REG", klCutoff );
-    if( nInitialModes != defaults.nInitialModes ) tree.put( "MODE_START", nInitialModes );
-    if( nModeIncrement != defaults.nModeIncrement ) tree.put( "MODE_STEP", nModeIncrement );
-    if( modeList != defaults.modeList ) tree.put( "MODES", modeList );
+    if( showAll || (modeBasis && (modeBasis != defaults.modeBasis)) ) tree.put( "BASIS", basisTags[modeBasis%3] );
+    if( showAll || klMinMode != defaults.klMinMode ) tree.put( "KL_MIN_MODE", klMinMode );
+    if( showAll || klMaxMode != defaults.klMaxMode ) tree.put( "KL_MAX_MODE", klMaxMode );
+    if( showAll || klCutoff != defaults.klCutoff ) tree.put( "SVD_REG", klCutoff );
+    if( showAll || nInitialModes != defaults.nInitialModes ) tree.put( "MODE_START", nInitialModes );
+    if( showAll || nModeIncrement != defaults.nModeIncrement ) tree.put( "MODE_STEP", nModeIncrement );
+    if( showAll || modeList != defaults.modeList ) tree.put( "MODES", modeList );
     
-    if( telescopeD != defaults.telescopeD) tree.put( "TELESCOPE_D", telescopeD );
-    if( telescopeCO != defaults.telescopeCO) tree.put( "TELESCOPE_CO", telescopeCO );
+    if( showAll || telescopeD != defaults.telescopeD ) tree.put( "TELESCOPE_D", telescopeD );
+    if( showAll || telescopeCO != defaults.telescopeCO ) tree.put( "TELESCOPE_CO", telescopeCO );
     
-    if( minIterations != defaults.minIterations ) tree.put( "MIN_ITER", minIterations );
-    if( maxIterations != defaults.maxIterations ) tree.put( "MAX_ITER", maxIterations );
-    if( targetIterations != defaults.targetIterations ) tree.put( "N_DONE_ITER", targetIterations );
-    if( fillpixMethod != defaults.fillpixMethod ) tree.put( "FPMETHOD", fpmTags[fillpixMethod%4] );
-    if( gradientMethod != defaults.gradientMethod ) tree.put( "GRADIENT", gmTags[gradientMethod%3] );
-    if( getstepMethod != defaults.getstepMethod ) tree.put( "GETSTEP", gsmTags[getstepMethod%5] );
-    if( badPixelThreshold != defaults.badPixelThreshold ) tree.put( "BADPIXEL", badPixelThreshold );
-    if( FTOL != defaults.FTOL ) tree.put( "FTOL", FTOL );
-    if( EPS != defaults.EPS ) tree.put( "EPS", EPS );
-    if( reg_alpha != defaults.reg_alpha ) tree.put( "REG_ALPHA", reg_alpha );
-    if( graddiff_step != defaults.graddiff_step ) tree.put( "GRADDIFF_STEP", graddiff_step );
+    if( showAll || minIterations != defaults.minIterations ) tree.put( "MIN_ITER", minIterations );
+    if( showAll || maxIterations != defaults.maxIterations ) tree.put( "MAX_ITER", maxIterations );
+    if( showAll || targetIterations != defaults.targetIterations ) tree.put( "N_DONE_ITER", targetIterations );
+    if( showAll || fillpixMethod != defaults.fillpixMethod ) tree.put( "FPMETHOD", fpmTags[fillpixMethod%4] );
+    if( showAll || gradientMethod != defaults.gradientMethod ) tree.put( "GRADIENT", gmTags[gradientMethod%3] );
+    if( showAll || getstepMethod != defaults.getstepMethod ) tree.put( "GETSTEP", gsmTags[getstepMethod%5] );
+    if( showAll || badPixelThreshold != defaults.badPixelThreshold ) tree.put( "BADPIXEL", badPixelThreshold );
+    if( showAll || FTOL != defaults.FTOL ) tree.put( "FTOL", FTOL );
+    if( showAll || EPS != defaults.EPS ) tree.put( "EPS", EPS );
+    if( showAll || reg_alpha != defaults.reg_alpha ) tree.put( "REG_ALPHA", reg_alpha );
+    if( showAll || graddiff_step != defaults.graddiff_step ) tree.put( "GRADDIFF_STEP", graddiff_step );
  
-    if( outputFileType != ( ( runFlags & RF_CALIBRATE ) ? FT_ANA : FT_FITS) ) tree.put( "FILE_TYPE", ftTags[outputFileType%8] );
-    if( outputDataType != defaults.outputDataType ) tree.put( "DATA_TYPE", dtTags[outputDataType%5] );
-    if( sequenceNumber != defaults.sequenceNumber ) tree.put( "SEQUENCE_NUM", sequenceNumber );
-    if( observationTime != defaults.observationTime ) tree.put( "TIME_OBS", observationTime );
-    if( observationDate != defaults.observationDate ) tree.put( "DATE_OBS", observationDate );
-    if( tmpDataDir != defaults.tmpDataDir ) tree.put( "PROG_DATA_DIR", tmpDataDir );
-    if( outputFiles != defaults.outputFiles ) tree.put( "OUTPUT_FILES", outputFiles );
-    if( initFiles != defaults.initFiles ) tree.put( "INIT_FILES", initFiles );
+    if( showAll || outputFileType != ( ( runFlags & RF_CALIBRATE ) ? FT_ANA : FT_FITS) ) tree.put( "FILE_TYPE", ftTags[outputFileType%8] );
+    if( showAll || outputDataType != defaults.outputDataType ) tree.put( "DATA_TYPE", dtTags[outputDataType%5] );
+    if( showAll || sequenceNumber != defaults.sequenceNumber ) tree.put( "SEQUENCE_NUM", sequenceNumber );
+    if( showAll || observationTime != defaults.observationTime ) tree.put( "TIME_OBS", observationTime );
+    if( showAll || observationDate != defaults.observationDate ) tree.put( "DATE_OBS", observationDate );
+    if( showAll || tmpDataDir != defaults.tmpDataDir ) tree.put( "PROG_DATA_DIR", tmpDataDir );
+    if( showAll || outputFiles != defaults.outputFiles ) tree.put( "OUTPUT_FILES", outputFiles );
+    if( showAll || initFiles != defaults.initFiles ) tree.put( "INIT_FILES", initFiles );
 
     ObjectCfg::getProperties( tree, defaults );
 

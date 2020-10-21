@@ -88,9 +88,9 @@ void DebugJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, redu
 }
 
 
-bpt::ptree DebugJob::getPropertyTree( bpt::ptree* root ) {
+bpt::ptree DebugJob::getPropertyTree( bpt::ptree* root, bool showAll ) {
 
-    bpt::ptree tree = Job::getPropertyTree();         // get common properties
+    bpt::ptree tree = Job::getPropertyTree(root, showAll);         // get common properties
 
     tree.put( "MAX_ITERATIONS", maxIterations );
     tree.put( "PATCH_SIZE", patchSize );

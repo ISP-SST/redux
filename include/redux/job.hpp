@@ -162,7 +162,7 @@ namespace redux {
             }
          *  @endcode
          */
-        virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr );
+        virtual bpt::ptree getPropertyTree( bpt::ptree* root=nullptr, bool showAll=false );
 
         Job(void);
         Job(const Job&) = delete;

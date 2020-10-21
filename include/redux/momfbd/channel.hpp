@@ -57,7 +57,7 @@ namespace redux {
             ~Channel();
 
             void parsePropertyTree( bpt::ptree&, redux::logging::Logger& );
-            bpt::ptree getPropertyTree( bpt::ptree&);
+            bpt::ptree getPropertyTree( bpt::ptree&, bool showAll=false );
 
             uint16_t id(void) const { return ID; };
             void cleanup(void);
