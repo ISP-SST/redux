@@ -83,10 +83,9 @@ namespace redux {
 
             /********  Diversity  ********/
             // TODO: reorganize
-            std::vector<double> diversity;          //!< List of weights/values for the diversity modes. 
-            std::vector<uint16_t> diversityModes;   //!< List of diversity mode numbers
-            std::vector<uint16_t> diversityTypes;   //!< List of diversity mode types (Zernike/KL)
-            bool physicalDefocusDistance;
+            ModeBase diversityBasis;                //!< Which basis to use as default for unmarked modes.
+            ModeList diversityModes;             //!< List of diversity mode types/numbers
+            std::vector<DiversityValue> diversityValues;    //!< List of weights/values for the diversity modes. 
             bool noRestore;                         //!< Exclude this channel in the final reconstruction/deconvolution step (i.e. only use it during the fitting)
             /*****************************/
             
@@ -193,14 +192,14 @@ namespace redux {
             uint16_t runFlags;
 
             /*********** Modes ***********/
-            uint8_t modeBasis;          //!< Which basis to use for the fitting
+            ModeBase modeBasis;         //!< Which basis to use for the fitting
             uint16_t klMinMode;         //!< First Zernike-mode to be considered in Karhunen-Loève expansion
             uint16_t klMaxMode;         //!< Last Zernike-mode to be considered in Karhunen-Loève expansion
             float klCutoff;             //!< If the expansion-coefficient is smaller than this, it will be ignored.
             uint16_t nInitialModes;     //!< How many modes to use in the first iteration
             uint16_t nModeIncrement;    //!< How many modes to add in each iteration
             uint16_t nModes;
-            std::vector<uint16_t> modeNumbers;  //!< Which modes to use
+            ModeList modeList;        //!< Which modes to use
             /*****************************/
             
             /********* Hardware **********/

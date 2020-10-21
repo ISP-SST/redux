@@ -29,7 +29,6 @@
 #include <string>
 
 #include <boost/algorithm/string.hpp>
-//#include <boost/range/algorithm.hpp>
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/numeric/ublas/io.hpp>
@@ -42,16 +41,6 @@ using namespace redux::momfbd;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
-
-
-namespace {
-    
-    double def2cf( double pd_defocus, double telescope_r ) { // defocus distance in meters
-        static const double tmp = M_PI/(8.0 * sqrt(3.0));
-        return pd_defocus * telescope_r * telescope_r * tmp;
-    }
-   
-}
 
 
 Channel::Channel (Object& o, MomfbdJob& j, uint16_t id) : otfNormalization(0), ID (id),
@@ -238,14 +227,10 @@ bool Channel::checkCfg (void) {
     }
     discard.resize(2,0);
 
-    if( diversity.size() == diversityModes.size() ) {
-        for( unsigned int i=0; i<diversity.size(); ++i ) {
-            if( diversityModes[i] == 4 && physicalDefocusDistance ) {   // focus term, convert from physical length (including mm/cm) to coefficient
-                diversity[i] = def2cf( diversity[i], myJob.telescopeD / myObject.telescopeF );
-            }
-        }
-    } else {
-        LOG_WARN << "Number of diversity orders does not match number of diversity coefficients!" << ende;
+    if( diversityValues.size() != diversityModes.size() ) {
+        LOG_WARN << "Number of diversity orders (" << diversityModes.size()
+                 << ") does not match number of diversity coefficients (" << diversityValues.size() << ")!" << ende;
+        return false;
     }
 
     
@@ -450,24 +435,24 @@ bool Channel::checkData( bool verbose ) {
 }
 
 
-//#define INDEX_THRESHOLD  0
-#define INDEX_THRESHOLD  1E-12      // cutoff to get rid of some fft noise
-// TBD: this should be a parameter somewhere...
+
 void Channel::initChannel (void) {
 
-
-    ModeInfo mi(myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-    for (unsigned int i=0; i < diversityModes.size(); ++i) {
-        uint16_t modeNumber = diversityModes[i];
+    ModeInfo mi( myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+    for( size_t i(0); i < diversityModes.size(); ++i ) {
+        
+        uint16_t modeNumber = diversityModes[i].mode;
+        int modeType = diversityModes[i].type;
+        
         ModeInfo mi2 = mi;
-        if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {
+        if( modeNumber == 2 || modeNumber == 3 || modeType == ZERNIKE ) {
             mi2.firstMode = mi2.lastMode = 0;
         }
         mi2.modeNumber = modeNumber;
         const shared_ptr<ModeSet>& ret = myJob.globalData->get(mi2);
         unique_lock<mutex> lock(ret->mtx);
         if( ret->empty() ) {    // this set was inserted, so it is not generated yet.
-            if(diversityTypes[i] == ZERNIKE) {
+            if( modeType == ZERNIKE) {
                 ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes, Zernike::NORMALIZE );
             } else {
                 ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff, Zernike::NORMALIZE );
@@ -840,21 +825,34 @@ void Channel::initPhiFixed(void) {
     double* phiPtr = phi_fixed.get();
     size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
     
-    ModeInfo mi (myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff);
-    for (unsigned int i = 0; i < diversityModes.size(); ++i) {
-        uint16_t modeNumber = diversityModes[i];
+    if( diversityModes.empty() ) {
+        return;
+    }
+    
+    double scale = util::def2cf( myJob.telescopeD / myObject.telescopeF );
+    ModeInfo mi( myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+
+    for( size_t i(0); i < diversityModes.size(); ++i ) {
+        
+        uint16_t modeNumber = diversityModes[i].mode;
+        int modeType = diversityModes[i].type;
+        double alpha = diversityValues[i].coefficient/myObject.wavelength;
+        if( diversityValues[i].physical ) {
+            alpha *= scale;
+        }
+
         ModeInfo mi2 = mi;
-        if (modeNumber == 2 || modeNumber == 3 || diversityTypes[i] == ZERNIKE) {
+        if( modeNumber == 2 || modeNumber == 3 || modeType == ZERNIKE ) {
             mi2.firstMode = mi2.lastMode = 0;
         }
         mi2.modeNumber = modeNumber;
         const shared_ptr<ModeSet>& ms = myJob.globalData->get(mi2);
 
         if( ms->empty() ) {    // generate
-            if( diversityTypes[i] == ZERNIKE ) {
-                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeNumbers, Zernike::NORMALIZE );
+            if( modeType == ZERNIKE ) {
+                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.modeList, Zernike::NORMALIZE );
             } else {
-                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff, Zernike::NORMALIZE );
+                ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeList, myJob.klCutoff, Zernike::NORMALIZE );
             }
             if( ms->nDimensions() != 3 || ms->dimSize(1) != myObject.pupilPixels || ms->dimSize(2) != myObject.pupilPixels ) {    // mismatch
                 LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
@@ -862,13 +860,12 @@ void Channel::initPhiFixed(void) {
                 LOG_DEBUG << "Generated Modeset with " << ms->dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
             }
         }        
-        auto it = std::find(ms->modeNumbers.begin(), ms->modeNumbers.end(), modeNumber);
-        if( it != ms->modeNumbers.end() ) {
-            double div = diversity[i]/myObject.wavelength;     // minus/sign is just to keep old cfg-files usable.
-            const double* modePtr = ms->modePointers[static_cast<size_t>(it-ms->modeNumbers.begin())];
+        auto it = std::find( ms->modeList.begin(), ms->modeList.end(), modeNumber );
+        if( it != ms->modeList.end() ) {
+            const double* modePtr = ms->modePointers[static_cast<size_t>(it-ms->modeList.begin())];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
-                [div](const double& p, const double& m) {
-                    return p + div*m;
+                [alpha](const double& p, const double& m) {
+                    return p + alpha*m;
                 });
         }
 

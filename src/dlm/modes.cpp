@@ -240,10 +240,17 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         }
     }
     
+    ModeBase default_tp = kw.zernike ? ZERNIKE : KARHUNEN_LOEVE;
+    ModeList modeIDs;
+    for( const auto& m: modeNumbers ) {
+        ModeBase tp = default_tp;
+        if( m == 2 || m == 3 ) tp = ZERNIKE;
+        modeIDs.push_back( ModeID( m, tp ) );
+    }
     
     if( kw.sort_modes && !kw.zernike ) {
         const std::map<uint16_t, Zernike::KLPtr>& kle = Zernike::karhunenLoeveExpansion( kw.firstZernike, kw.lastZernike );
-        vector<uint16_t> tmpM;
+        ModeList tmpL;
         vector<Zernike::KLPtr> tmp;
         for( const auto& kl: kle ) tmp.push_back( kl.second );
         std::sort( tmp.begin(), tmp.end(), [](const Zernike::KLPtr& a, const Zernike::KLPtr& b){
@@ -251,15 +258,11 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
             return a->covariance > b->covariance;
             
         });
-        for( auto& i: modeNumbers ) {
-            if( i<kw.firstZernike || i >= tmp.size() ) continue;
-            if( i < kw.firstZernike ) {                 // the KL-expansion does not include these
-                tmpM.push_back( i );
-            } else {
-                tmpM.push_back( tmp[i-kw.firstZernike]->id );
-            }
+        for( auto& id: modeIDs ) {
+            if( id.mode<kw.firstZernike || id.mode >= tmp.size() ) continue;
+            tmpL.push_back( ModeID( tmp[id.mode-kw.firstZernike]->id, id.type )  );
         }
-        std::swap( tmpM, modeNumbers );
+        std::swap( tmpL, modeIDs );
     }
     
     IDL_LONG nPixels = IDL_LongScalar(argv[1]);
@@ -300,7 +303,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
         }
     }
     
-    ModeInfo mi(kw.firstZernike, kw.lastZernike, modeNumbers, nPixels, radius, kw.angle, kw.cutoff);
+    ModeInfo mi(kw.firstZernike, kw.lastZernike, modeIDs, nPixels, radius, kw.angle, kw.cutoff);
     if( kw.verbose ) {
         flags |= Zernike::VERBOSE;
         string msg = "Generating modes: " + (string)mi+ ".";
@@ -313,10 +316,10 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     }
     if( modesRef->empty() || kw.force ) {
         if( kw.firstZernike && kw.lastZernike ) {
-            modesRef->generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeNumbers, kw.cutoff, flags );
+            modesRef->generate( nPixels, radius, kw.angle, kw.firstZernike, kw.lastZernike, modeIDs, kw.cutoff, flags );
         } else {    // first=last=0  =>  Zernike
             kw.firstZernike = kw.lastZernike = 0;   // in case only one was 0.
-            modesRef->generate( nPixels, radius, kw.angle, modeNumbers, flags );
+            modesRef->generate( nPixels, radius, kw.angle, modeIDs, flags );
         }
     }
 

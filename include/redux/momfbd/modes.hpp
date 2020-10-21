@@ -61,13 +61,13 @@ namespace redux {
         struct ModeInfo {
             
             uint16_t firstMode, lastMode, modeNumber, nPupilPixels;
-            std::vector<uint16_t> modeNumbers;
+            ModeList modeList;
             double pupilRadius, angle, cutoff;
             std::string filename;
-            explicit ModeInfo ( const std::string&, uint16_t nPixels=0 );
-            ModeInfo ( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
-            ModeInfo ( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
-            ModeInfo ( uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modeNumbers, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
+            explicit ModeInfo( const std::string&, uint16_t nPixels=0 );
+            ModeInfo( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
+            ModeInfo( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
+            ModeInfo( uint16_t firstMode, uint16_t lastMode, const ModeList& modeList, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
             uint64_t size(void) const;
             uint64_t pack(char*) const;
             uint64_t unpack(const char*, bool);
@@ -111,8 +111,8 @@ namespace redux {
             ModeSet clone( void ) const;
             
             bool load( const std::string& filename, uint16_t pixels );
-            void generate( uint16_t pixels, double radius, double angle, const std::vector<uint16_t>& modes, int flags );  // Zernike
-            void generate( uint16_t pixels, double radius, double angle, uint16_t firstMode, uint16_t lastMode, const std::vector<uint16_t>& modes, double cutoff, int flags ); // Karhunen-Loeve
+            void generate( uint16_t pixels, double radius, double angle, const ModeList& modes, int flags );  // Zernike
+            void generate( uint16_t pixels, double radius, double angle, uint16_t firstMode, uint16_t lastMode, const ModeList& modes, double cutoff, int flags ); // Karhunen-Loeve
             
             void getNorms(const redux::image::Pupil&);         //!< Calculate the normalization factors so that sum(|mode*pupil|) = pupilArea
             void getNorms( void ) { getNorms( redux::image::Pupil::fetch( info.nPupilPixels, info.pupilRadius ) ); };
@@ -126,7 +126,7 @@ namespace redux {
             redux::util::PointI tiltMode;                   //!< Contains the indices for the tilt modes. (-1 if no tilts are present)
             redux::util::PointF shiftToAlpha;               //!< Converts a shift of 1 pixel into corresponding mode-coefficient (NB. if image-size != pupil-size it has to be re-scaled accordingly)
             
-            std::vector<uint16_t> modeNumbers;
+            ModeList modeList;
             std::vector<double*> modePointers;
             std::vector<double> atm_rms;
             std::vector<double> norms;                      //!< (square of) L_{2,2} norms for the modes over the pupil

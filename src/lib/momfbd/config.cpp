@@ -56,33 +56,6 @@ namespace {
         }
     }
 
-
-    void parseSegment( vector<uint16_t>& divs, vector<uint16_t>& types, string elem ) {
-        size_t n = std::count( elem.begin(), elem.end(), '-' );
-        uint16_t tp = 0;
-        if( elem.find_first_of( "Zz" ) != string::npos ) tp |= ZERNIKE;
-        if( elem.find_first_of( "Kk" ) != string::npos ) tp |= KARHUNEN_LOEVE;
-        if( tp == 3 ) {
-            //LLOG_ERR( "channel" ) << "Different mode-types in specified mode range \"" << elem << "\"";
-        } else if( tp == 0 ) tp = ZERNIKE;
-        
-        elem.erase( remove_if( elem.begin(), elem.end(),
-                               []( const char&a ){ return ( a == 'Z' || a == 'z' || a == 'K' || a == 'k' ); } ), elem.end() );
-        if( n == 0 ) {
-            divs.push_back( boost::lexical_cast<uint16_t>( elem ) );
-            types.push_back( tp );
-            return;
-        }
-        else if( n == 1 ) {
-            n = elem.find_first_of( '-' );
-            uint16_t first = boost::lexical_cast<uint16_t>( elem.substr( 0, n ) );
-            uint16_t last = boost::lexical_cast<uint16_t>( elem.substr( n + 1 ) );
-            while( first <= last ) {
-                divs.push_back( first++ );
-                types.push_back( tp );
-            }
-        }
-    }
     
     template<typename T>
     T getValue( const bpt::ptree& tree, string name, const T& defaultValue ) {
@@ -147,7 +120,7 @@ const map<string, int, cicomp> redux::momfbd::getstepMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), physicalDefocusDistance(false), noRestore(false),
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), diversityBasis(ZERNIKE), noRestore(false),
         borderClip(100), incomplete(0), discard(2,0),
         mmRow(0), mmWidth(0), imageNumberOffset(0) {
 
@@ -176,57 +149,14 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
     weight = tree.get<double>("WEIGHT", defaults.weight);
     noRestore = tree.get<bool>("NO_RESTORE", defaults.noRestore);
     
-    // TODO: collect diversity settings in a struct and write a translator
-    diversity = defaults.diversity;
-    diversityModes = defaults.diversityModes;
-    diversityTypes = defaults.diversityTypes;
-
-    string tmpString = getValue<string>( tree, "DIV_ORDERS", "" );
-    if( !tmpString.empty() ) {
-        vector<string> tokens;
-        boost::split( tokens, tmpString, boost::is_any_of( "," ) );
-        for( auto & token : tokens ) {
-            parseSegment( diversityModes, diversityTypes, token );
-        }
-
+    diversityBasis = tree.get<ModeBase>( "DIV_BASIS", defaults.diversityBasis );
+    diversityValues = tree.get<vector<DiversityValue>>("DIVERSITY", defaults.diversityValues);
+    diversityModes = tree.get<ModeList>("DIV_ORDERS", defaults.diversityModes);
+    diversityModes.setDefaultModeType( diversityBasis );
+    for( auto& d: diversityModes ) {
+        if( d.mode == 2 || d.mode == 3 ) d.type = ZERNIKE;      // Force Zernike for all tilt modes.
     }
-    
-    tmpString = getValue<string>( tree, "DIVERSITY", "" );
-    if( !tmpString.empty() ) {
-        double tmpD = 1.0;
-        if( tmpString.find( "mm" ) != string::npos ) {
-            physicalDefocusDistance = true;
-            tmpD = 1.00E-03;
-        } else if( tmpString.find( "cm" ) != string::npos ) {
-            physicalDefocusDistance = true;
-            tmpD = 1.00E-02;
-        }
-        // we extracted the suffix/units above, so now we can delete the letters and extract the numbers.
-        tmpString.erase( remove_if( tmpString.begin(), tmpString.end(),
-                               []( const char&a ){ return ( a == 'c' || a == 'm' || a == ' ' || a == '"' ); } ), tmpString.end() );
-        bpt::ptree tmpTree;                         // just to be able to use the VectorTranslator
-        tmpTree.put( "tmp", tmpString );
-        diversity = tmpTree.get<vector<double>>( "tmp", vector<double>() );
-        
-        for( unsigned int i=0; i<diversity.size(); ++i ) {
-            if( diversityModes[i] == 4 ) {   // focus term, convert from physical length ( including mm/cm ) to coefficient
-                diversity[i] = tmpD*diversity[i]; // TODO: verify conversion: def2cf( tmpD*diversity[i], globalDefaults.telescopeD / telescopeF );
-            }
-        }
 
-    }
-    
-    
-    if( diversity.size() > 0 ) {
-        if( diversityModes.empty() && (diversity.size() == 1) ) {
-            diversityModes.resize( 1, 4 );
-            diversityTypes.resize( 1, ZERNIKE );
-        } else if( diversityModes.size() != diversity.size() ) {
-             LOG_WARN << "Multiple diversity coefficients specified, but the number of modes does not match!" << ende;
-             LOG_WARN << printArray(diversity,"    diversity") << endl;
-             LOG_WARN << printArray(diversityModes,"    diversityModes") << endl;
-        }
-    }
 
     alignMap = getValue( tree, "ALIGN_MAP", defaults.alignMap );
     alignClip = getValue( tree, "ALIGN_CLIP", defaults.alignClip );
@@ -309,8 +239,9 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) c
     if(weight != defaults.weight) tree.put("WEIGHT", weight);
     if(noRestore != defaults.noRestore) tree.put("NO_RESTORE", noRestore);
     
-    if( diversity != defaults.diversity ) tree.put( "DIVERSITY", diversity );
-    if( diversityModes != defaults.diversityModes ) tree.put( "DIV_ORDERS", diversityModes ); // TODO fix printing with physical & type
+    if( diversityBasis != defaults.diversityBasis ) tree.put( "DIV_BASIS", diversityBasis );
+    if( diversityModes != defaults.diversityModes ) tree.put( "DIV_ORDERS", diversityModes );
+    if( diversityValues != defaults.diversityValues ) tree.put( "DIVERSITY", diversityValues );
     
     if( alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
     if( alignClip != defaults.alignClip ) tree.put( "ALIGN_CLIP", alignClip );
@@ -349,104 +280,110 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults ) c
 
 
 uint64_t ChannelCfg::size( void ) const {
-    uint64_t sz = 3*sizeof( double );         // rotationAngle, weight, noiseFudge
-    sz += sizeof( uint16_t)+5;             // borderClip, incomplete, mmRow, mmWidth,physicalDefocusDistance
-    sz += sizeof( uint32_t );                 // imageNumberOffset
-    sz += subImagePosXY.size()*sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += subImagePosX.size()*sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += subImagePosY.size()*sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += diversity.size() * sizeof( double ) + sizeof( uint64_t );
-    sz += diversityModes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += diversityTypes.size() * sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += alignMap.size()*sizeof( float ) + sizeof( uint64_t );
+    // static sizes (PoD types)
+    static uint64_t ssz = sizeof( borderClip ) + sizeof( diversityBasis ) + sizeof( imageNumberOffset )
+        + sizeof( incomplete ) + sizeof( mmRow ) + sizeof( mmWidth ) + sizeof( noiseFudge ) + sizeof( noRestore )
+        + sizeof( rotationAngle ) + sizeof( weight );
+    uint64_t sz = ssz;
+    // strings
+    sz += backgainFile.length() + darkTemplate.length() + gainFile.length() + 3;
+    sz += imageDataDir.length() + imageTemplate.length() + mmFile.length() + psfFile.length() + 4;
+    sz += responseFile.length() + xOffsetFile.length() + yOffsetFile.length() + 3;
+    // vectors etc.
     sz += alignClip.size()*sizeof( int16_t ) + sizeof( uint64_t );
-    sz += discard.size()*sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += imageDataDir.length() + 1;
-    sz += imageTemplate.length() + darkTemplate.length() + gainFile.length() + 3;
-    sz += responseFile.length() + backgainFile.length() + psfFile.length() + mmFile.length() + 4;
-    sz += xOffsetFile.length() + yOffsetFile.length() + 2;
-    sz += fileNumbers.size()*sizeof( uint32_t ) + sizeof( uint64_t );
-    sz += waveFrontList.size()*sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += alignMap.size()*sizeof( float ) + sizeof( uint64_t );
     sz += darkNumbers.size()*sizeof( uint32_t ) + sizeof( uint64_t );
+    sz += discard.size()*sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += redux::util::size( diversityModes );
+    sz += redux::util::size( diversityValues );
+    sz += fileNumbers.size()*sizeof( uint32_t ) + sizeof( uint64_t );
     sz += stokesWeights.size()*sizeof( float ) + sizeof( uint64_t );
+    sz += subImagePosX.size()*sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += subImagePosXY.size()*sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += subImagePosY.size()*sizeof( uint16_t ) + sizeof( uint64_t );
+    sz += waveFrontList.size()*sizeof( uint32_t ) + sizeof( uint64_t );
     return sz;
 }
 
 
 uint64_t ChannelCfg::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = pack( ptr, rotationAngle );
-    count += pack( ptr+count, noiseFudge );
-    count += pack( ptr+count, weight );
-    count += pack( ptr+count, diversity );
-    count += pack( ptr+count, diversityModes );
-    count += pack( ptr+count, diversityTypes );
-    count += pack( ptr+count, physicalDefocusDistance );
-    count += pack( ptr+count, noRestore );
-    count += pack( ptr+count, alignMap );
-    count += pack( ptr+count, alignClip );
-    count += pack( ptr+count, discard );
-    count += pack( ptr+count, borderClip );
+    // scalar values
+    uint64_t count = pack( ptr, borderClip );
+    count += pack( ptr+count, diversityBasis );
+    count += pack( ptr+count, imageNumberOffset );
     count += pack( ptr+count, incomplete );
-    count += pack( ptr+count, subImagePosXY );
-    count += pack( ptr+count, subImagePosX );
-    count += pack( ptr+count, subImagePosY );
-    count += pack( ptr+count, imageDataDir );
-    count += pack( ptr+count, imageTemplate );
-    count += pack( ptr+count, darkTemplate );
-    count += pack( ptr+count, gainFile );
-    count += pack( ptr+count, responseFile );
-    count += pack( ptr+count, backgainFile );
-    count += pack( ptr+count, psfFile );
-    count += pack( ptr+count, mmFile );
     count += pack( ptr+count, mmRow );
     count += pack( ptr+count, mmWidth );
+    count += pack( ptr+count, noiseFudge );
+    count += pack( ptr+count, noRestore );    //b
+    count += pack( ptr+count, rotationAngle );
+    count += pack( ptr+count, weight );
+    // strings
+    count += pack( ptr+count, backgainFile );
+    count += pack( ptr+count, darkTemplate );
+    count += pack( ptr+count, gainFile );
+    count += pack( ptr+count, imageDataDir );
+    count += pack( ptr+count, imageTemplate );
+    count += pack( ptr+count, mmFile );
+    count += pack( ptr+count, psfFile );
+    count += pack( ptr+count, responseFile );
     count += pack( ptr+count, xOffsetFile );
     count += pack( ptr+count, yOffsetFile );
-    count += pack( ptr+count, imageNumberOffset );
-    count += pack( ptr+count, fileNumbers );
-    count += pack( ptr+count, waveFrontList );
+    // vectors etc.
+    count += pack( ptr+count, alignClip );
+    count += pack( ptr+count, alignMap );
     count += pack( ptr+count, darkNumbers );
+    count += pack( ptr+count, discard );
+    count += pack( ptr+count, diversityModes );
+    count += pack( ptr+count, diversityValues );
+    count += pack( ptr+count, fileNumbers );
     count += pack( ptr+count, stokesWeights );
+    count += pack( ptr+count, subImagePosX );
+    count += pack( ptr+count, subImagePosXY );
+    count += pack( ptr+count, subImagePosY );
+    count += pack( ptr+count, waveFrontList );
     return count;
 }
 
 
 uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = unpack( ptr, rotationAngle, swap_endian );
-    count += unpack( ptr+count, noiseFudge, swap_endian );
-    count += unpack( ptr+count, weight, swap_endian );
-    count += unpack( ptr+count, diversity, swap_endian );
-    count += unpack( ptr+count, diversityModes, swap_endian );
-    count += unpack( ptr+count, diversityTypes, swap_endian );
-    count += unpack( ptr+count, physicalDefocusDistance, swap_endian );
-    count += unpack( ptr+count, noRestore );
-    count += unpack( ptr+count, alignMap, swap_endian );
-    count += unpack( ptr+count, alignClip, swap_endian );
-    count += unpack( ptr+count, discard, swap_endian );
-    count += unpack( ptr+count, borderClip, swap_endian );
+    // scalar values
+    uint64_t count = unpack( ptr, borderClip, swap_endian );
+    count += unpack( ptr+count, diversityBasis, swap_endian );
+    count += unpack( ptr+count, imageNumberOffset, swap_endian );
     count += unpack( ptr+count, incomplete );
-    count += unpack( ptr+count, subImagePosXY, swap_endian );
-    count += unpack( ptr+count, subImagePosX, swap_endian );
-    count += unpack( ptr+count, subImagePosY, swap_endian );
-    count += unpack( ptr+count, imageDataDir );
-    count += unpack( ptr+count, imageTemplate );
-    count += unpack( ptr+count, darkTemplate );
-    count += unpack( ptr+count, gainFile );
-    count += unpack( ptr+count, responseFile );
-    count += unpack( ptr+count, backgainFile );
-    count += unpack( ptr+count, psfFile );
-    count += unpack( ptr+count, mmFile );
     count += unpack( ptr+count, mmRow );
     count += unpack( ptr+count, mmWidth );
+    count += unpack( ptr+count, noiseFudge, swap_endian );
+    count += unpack( ptr+count, noRestore );
+    count += unpack( ptr+count, rotationAngle, swap_endian );
+    count += unpack( ptr+count, weight, swap_endian );
+    // strings
+    count += unpack( ptr+count, backgainFile );
+    count += unpack( ptr+count, darkTemplate );
+    count += unpack( ptr+count, gainFile );
+    count += unpack( ptr+count, imageDataDir );
+    count += unpack( ptr+count, imageTemplate );
+    count += unpack( ptr+count, mmFile );
+    count += unpack( ptr+count, psfFile );
+    count += unpack( ptr+count, responseFile );
     count += unpack( ptr+count, xOffsetFile );
     count += unpack( ptr+count, yOffsetFile );
-    count += unpack( ptr+count, imageNumberOffset, swap_endian );
-    count += unpack( ptr+count, fileNumbers, swap_endian );
-    count += unpack( ptr+count, waveFrontList, swap_endian );
+    // vectoruns etc.
+    count += unpack( ptr+count, alignClip, swap_endian );
+    count += unpack( ptr+count, alignMap, swap_endian );
     count += unpack( ptr+count, darkNumbers, swap_endian );
+    count += unpack( ptr+count, discard, swap_endian );
+    count += unpack( ptr+count, diversityModes, swap_endian );
+    count += unpack( ptr+count, diversityValues, swap_endian );
+    count += unpack( ptr+count, fileNumbers, swap_endian );
     count += unpack( ptr+count, stokesWeights, swap_endian );
+    count += unpack( ptr+count, subImagePosX, swap_endian );
+    count += unpack( ptr+count, subImagePosXY, swap_endian );
+    count += unpack( ptr+count, subImagePosY, swap_endian );
+    count += unpack( ptr+count, waveFrontList, swap_endian );
     return count;
 }
 
@@ -565,11 +502,14 @@ void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
 
 
 uint64_t ObjectCfg::size( void ) const {
-    uint64_t sz = ChannelCfg::size();
-    sz += 5*sizeof(uint16_t)+1;
-    sz += outputFileName.length() + initFile.length() + 2;
-    sz += modeFile.length() + pupilFile.length() + 2;
-    sz += 8*sizeof( double );
+    // static sizes (PoD types)
+    uint64_t ssz = sizeof( alphaToPixels ) + sizeof( alphaToDefocus ) + sizeof( arcSecsPerPixel ) + sizeof( defocusToAlpha )
+                 + sizeof( maxLocalShift ) + sizeof( minimumOverlap ) + sizeof( patchSize ) + sizeof( pixelSize )
+                 + sizeof( pixelsToAlpha ) + sizeof( pupilPixels ) + sizeof( saveMask ) + sizeof( telescopeF )
+                 + sizeof( traceObject ) + sizeof( wavelength );
+    uint64_t sz = ssz + ChannelCfg::size();
+    sz += initFile.length() + modeFile.length() + 2;
+    sz += outputFileName.length() + pupilFile.length() + 2;
     return sz;
 }
 
@@ -577,24 +517,26 @@ uint64_t ObjectCfg::size( void ) const {
 uint64_t ObjectCfg::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = ChannelCfg::pack( ptr );
-    count += pack( ptr+count, telescopeF );
-    count += pack( ptr+count, arcSecsPerPixel );
-    count += pack( ptr+count, pixelSize );
+    // scalar values
     count += pack( ptr+count, alphaToPixels );
-    count += pack( ptr+count, pixelsToAlpha );
     count += pack( ptr+count, alphaToDefocus );
+    count += pack( ptr+count, arcSecsPerPixel );
     count += pack( ptr+count, defocusToAlpha );
     count += pack( ptr+count, maxLocalShift );
     count += pack( ptr+count, minimumOverlap );
     count += pack( ptr+count, patchSize );
+    count += pack( ptr+count, pixelSize );
+    count += pack( ptr+count, pixelsToAlpha );
     count += pack( ptr+count, pupilPixels );
     count += pack( ptr+count, saveMask );
+    count += pack( ptr+count, telescopeF );
     count += pack( ptr+count, traceObject );
-    count += pack( ptr+count, outputFileName );
+    count += pack( ptr+count, wavelength );
+    // strings
     count += pack( ptr+count, initFile );
     count += pack( ptr+count, modeFile );
+    count += pack( ptr+count, outputFileName );
     count += pack( ptr+count, pupilFile );
-    count += pack( ptr+count, wavelength );
     return count;
 }
 
@@ -602,24 +544,26 @@ uint64_t ObjectCfg::pack( char* ptr ) const {
 uint64_t ObjectCfg::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = ChannelCfg::unpack( ptr, swap_endian );
-    count += unpack( ptr+count, telescopeF, swap_endian );
-    count += unpack( ptr+count, arcSecsPerPixel, swap_endian );
-    count += unpack( ptr+count, pixelSize, swap_endian );
+    // scalar values
     count += unpack( ptr+count, alphaToPixels, swap_endian );
-    count += unpack( ptr+count, pixelsToAlpha, swap_endian );
     count += unpack( ptr+count, alphaToDefocus, swap_endian );
+    count += unpack( ptr+count, arcSecsPerPixel, swap_endian );
     count += unpack( ptr+count, defocusToAlpha, swap_endian );
     count += unpack( ptr+count, maxLocalShift, swap_endian );
     count += unpack( ptr+count, minimumOverlap, swap_endian );
     count += unpack( ptr+count, patchSize, swap_endian );
+    count += unpack( ptr+count, pixelSize, swap_endian );
+    count += unpack( ptr+count, pixelsToAlpha, swap_endian );
     count += unpack( ptr+count, pupilPixels, swap_endian );
     count += unpack( ptr+count, saveMask, swap_endian );
+    count += unpack( ptr+count, telescopeF, swap_endian );
     count += unpack( ptr+count, traceObject );
-    count += unpack( ptr+count, outputFileName );
+    count += unpack( ptr+count, wavelength, swap_endian );
+    // strings
     count += unpack( ptr+count, initFile );
     count += unpack( ptr+count, modeFile );
+    count += unpack( ptr+count, outputFileName );
     count += unpack( ptr+count, pupilFile );
-    count += unpack( ptr+count, wavelength, swap_endian );
     return count;
 }
 
@@ -644,8 +588,8 @@ bool ObjectCfg::operator==( const ObjectCfg& rhs ) const {
 
 /********************   Global   ********************/
 
-GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis( ZERNIKE), klMinMode( 2), klMaxMode( 2000), klCutoff( 1E-3),
-    nInitialModes( 5), nModeIncrement(5), nModes(0), modeNumbers(),
+GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis(ZERNIKE), klMinMode( 2), klMaxMode( 2000), klCutoff( 1E-3),
+    nInitialModes( 5), nModeIncrement(5), nModes(0),
     telescopeD(0), telescopeCO(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
     badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2), trace(false),
@@ -691,53 +635,41 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
         runFlags &= ~RF_NEW_CONSTRAINTS;
     }
 */
-    string tmpString = getValue<string>( tree, "BASIS", "" );
-    modeBasis = defaults.modeBasis;
-    if( tmpString.length() ) {
-        if( iequals(tmpString, "Karhunen-Loeve") || iequals(tmpString, "KL") ) {
-            modeBasis = KARHUNEN_LOEVE;
-            LOG_DETAIL << "Using Karhunen-Loeve basis modes." << ende;
-        } else if( iequals(tmpString, "Zernike") || iequals(tmpString, "Z") ) {
-            modeBasis = ZERNIKE;
-            LOG_DETAIL << "Using Zernike basis modes." << ende;
-        } else {
-            LOG_ERR << "Unrecognized BASIS value \"" << tmpString << "\", using default \""
-                    << basisTags[defaults.modeBasis] << "\"" << ende;
-        }
-    } else {
-        LOG_DETAIL << "No BASIS specified, using default: \"" << basisTags[defaults.modeBasis] << "\"" << ende;
-    }
+    modeBasis = tree.get<ModeBase>( "BASIS", defaults.modeBasis );
+
 
     klMinMode  = getValue( tree, "KL_MIN_MODE", defaults.klMinMode );
     klMaxMode  = getValue( tree, "KL_MAX_MODE", defaults.klMaxMode );
     klCutoff = getValue( tree, "SVD_REG", defaults.klCutoff );
     nInitialModes  = getValue( tree, "MODE_START", defaults.nInitialModes );
     nModeIncrement  = getValue( tree, "MODE_STEP", defaults.nModeIncrement );
-    modeNumbers = getValue( tree, "MODES", defaults.modeNumbers );
     
+    modeList = getValue( tree, "MODES", defaults.modeList );
+    modeList.setDefaultModeType( modeBasis );
     if( (runFlags&RF_SORT_MODES) && (modeBasis == KARHUNEN_LOEVE) ) {
         const std::map<uint16_t, Zernike::KLPtr>& kle = Zernike::karhunenLoeveExpansion( klMinMode, klMaxMode );
-        vector<uint16_t> tmpM;
+        ModeList tmpL;
         vector<Zernike::KLPtr> tmp;
-        for( const auto& kl: kle  ) tmp.push_back( kl.second );
+        for( const auto& kl: kle ) tmp.push_back( kl.second );
         std::sort( tmp.begin(), tmp.end(), [](const Zernike::KLPtr& a, const Zernike::KLPtr& b){
             if( a->covariance == b->covariance ) return a->id < b->id;
             return a->covariance > b->covariance;
             
         });
-        for( const auto& i: modeNumbers  ) {
-            if( i<klMinMode || i >= tmp.size() ) continue;
-            if( i < klMinMode ) {                 // the KL-expansion does not include these
-                tmpM.push_back( i );
-            } else {
-                tmpM.push_back( tmp[i-klMinMode]->id );
-            }
+        for( auto& id: modeList ) {
+            if( id.mode<klMinMode || id.mode >= tmp.size() ) continue;
+            ModeBase tp = KARHUNEN_LOEVE;
+            uint16_t klID = tmp[id.mode-klMinMode]->id;
+            if( (klID == 2) || (klID == 3) ) tp = ZERNIKE;
+            tmpL.push_back( ModeID( klID, tp ) );
         }
-        std::swap( modeNumbers, tmpM );
+        std::swap( tmpL, modeList );
+    } else {
+        for( auto& d: diversityModes ) {
+            if( d.mode == 2 || d.mode == 3 ) d.type = ZERNIKE;      // Force Zernike for all tilt modes.
+        }
     }
-
-    
-    nModes = modeNumbers.size();
+    nModes = modeList.size();
 
     telescopeD = getValue( tree, "TELESCOPE_D", defaults.telescopeD );
     telescopeCO = getValue( tree, "TELESCOPE_CO", defaults.telescopeCO );
@@ -746,7 +678,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     maxIterations = getValue( tree, "MAX_ITER", defaults.maxIterations );
     targetIterations = getValue( tree, "N_DONE_ITER", defaults.targetIterations );
     fillpixMethod = defaults.fillpixMethod;
-    tmpString = getValue<string>( tree, "FPMETHOD", "" );
+    string tmpString = getValue<string>( tree, "FPMETHOD", "" );
     int tmpInt;
     if( tmpString.length() ) {
         tmpInt = getFromMap( tmpString, fillpixMap );
@@ -860,13 +792,13 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
 
     if( trace != defaults.trace ) tree.put( "TRACE", trace );
     
-    if( modeBasis && modeBasis != defaults.modeBasis ) tree.put( "BASIS", basisTags[modeBasis%3] );
+    if( (modeBasis && (modeBasis != defaults.modeBasis)) ) tree.put( "BASIS", basisTags[modeBasis%3] );
     if( klMinMode != defaults.klMinMode ) tree.put( "KL_MIN_MODE", klMinMode );
     if( klMaxMode != defaults.klMaxMode ) tree.put( "KL_MAX_MODE", klMaxMode );
     if( klCutoff != defaults.klCutoff ) tree.put( "SVD_REG", klCutoff );
     if( nInitialModes != defaults.nInitialModes ) tree.put( "MODE_START", nInitialModes );
     if( nModeIncrement != defaults.nModeIncrement ) tree.put( "MODE_STEP", nModeIncrement );
-    if( modeNumbers != defaults.modeNumbers ) tree.put( "MODES", modeNumbers );
+    if( modeList != defaults.modeList ) tree.put( "MODES", modeList );
     
     if( telescopeD != defaults.telescopeD) tree.put( "TELESCOPE_D", telescopeD );
     if( telescopeCO != defaults.telescopeCO) tree.put( "TELESCOPE_CO", telescopeCO );
@@ -898,19 +830,20 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def ) const {
 
 
 uint64_t GlobalCfg::size( void ) const {
-    uint64_t sz = ObjectCfg::size();
-    sz += 7*sizeof( uint8_t );                 // modeBasis, fillpixMethod, gradientMethod, getstepMethod, outputFileType, outputDataType, trace
-    sz += 10*sizeof( uint16_t );               // runFlags, klMinMode, klMaxMode, nInitialModes, nModeIncrement, minIterations, maxIterations, targetIterations, outputFiles.size()
-    sz += nModes*sizeof( uint16_t ) + sizeof( uint64_t );
-    sz += 6*sizeof( float );                   // klCutoff, badPixelThreshold, FTOL, EPS, reg_gamma, graddiff_step
-    sz += 2*sizeof( double );                  // telescopeD, telescopeCO
-    sz += sizeof( uint32_t );                  // sequenceNumber
-    sz += observationTime.length() + 1;
-    sz += observationDate.length() + 1;
-    sz += tmpDataDir.length() + 1;
-    for( const auto& filename : outputFiles ) {
-        sz += filename.length() + 1;
-    }
+    // static sizes (PoD types)
+    uint64_t ssz = sizeof( badPixelThreshold ) + sizeof( EPS ) + sizeof( fillpixMethod ) + sizeof( FTOL )
+                 + sizeof( getstepMethod ) + sizeof( graddiff_step ) + sizeof( gradientMethod ) + sizeof( klCutoff )
+                 + sizeof( klMaxMode ) + sizeof( klMinMode ) + sizeof( maxIterations ) + sizeof( minIterations )
+                 + sizeof( modeBasis ) + sizeof( nInitialModes ) + sizeof( nModeIncrement ) + sizeof( nModes )
+                 + sizeof( outputFileType ) + sizeof( outputDataType ) + sizeof( reg_alpha ) + sizeof( runFlags )
+                 + sizeof( sequenceNumber ) + sizeof( targetIterations ) + sizeof( telescopeCO )
+                 + sizeof( telescopeD ) + sizeof( trace );
+    uint64_t sz = ssz + ObjectCfg::size();
+    // strings
+    sz += observationTime.length() + observationDate.length() + tmpDataDir.length() + 3;
+    // vectors
+    sz += redux::util::size( modeList );
+    sz += redux::util::size( outputFiles );
     return sz;
 }
 
@@ -918,39 +851,39 @@ uint64_t GlobalCfg::size( void ) const {
 uint64_t GlobalCfg::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = ObjectCfg::pack( ptr );
-    count += pack( ptr+count, runFlags );
-    count += pack( ptr+count, modeBasis );
-    count += pack( ptr+count, klMinMode );
-    count += pack( ptr+count, klMaxMode );
+    // scalar values
+    count += pack( ptr+count, badPixelThreshold );
+    count += pack( ptr+count, EPS );
+    count += pack( ptr+count, fillpixMethod );
+    count += pack( ptr+count, FTOL );
+    count += pack( ptr+count, getstepMethod );
+    count += pack( ptr+count, graddiff_step );
+    count += pack( ptr+count, gradientMethod );
     count += pack( ptr+count, klCutoff );
+    count += pack( ptr+count, klMaxMode );
+    count += pack( ptr+count, klMinMode );
+    count += pack( ptr+count, maxIterations );
+    count += pack( ptr+count, minIterations );
+    count += pack( ptr+count, modeBasis );
     count += pack( ptr+count, nInitialModes );
     count += pack( ptr+count, nModeIncrement );
     count += pack( ptr+count, nModes );
-    count += pack( ptr+count, modeNumbers );
-    count += pack( ptr+count, telescopeD );
-    count += pack( ptr+count, telescopeCO );
-    count += pack( ptr+count, minIterations );
-    count += pack( ptr+count, maxIterations );
-    count += pack( ptr+count, targetIterations );
-    count += pack( ptr+count, fillpixMethod );
-    count += pack( ptr+count, gradientMethod );
-    count += pack( ptr+count, getstepMethod );
-    count += pack( ptr+count, badPixelThreshold );
-    count += pack( ptr+count, FTOL );
-    count += pack( ptr+count, EPS );
-    count += pack( ptr+count, reg_alpha );
-    count += pack( ptr+count, graddiff_step );
-    count += pack( ptr+count, trace );
     count += pack( ptr+count, outputFileType );
     count += pack( ptr+count, outputDataType );
+    count += pack( ptr+count, reg_alpha );
+    count += pack( ptr+count, runFlags );
     count += pack( ptr+count, sequenceNumber );
-    count += pack( ptr+count, observationTime );
+    count += pack( ptr+count, targetIterations );
+    count += pack( ptr+count, telescopeCO );
+    count += pack( ptr+count, telescopeD );
+    count += pack( ptr+count, trace );
+    // strings
     count += pack( ptr+count, observationDate );
+    count += pack( ptr+count, observationTime );
     count += pack( ptr+count, tmpDataDir );
-    count += pack( ptr+count, ( uint16_t)outputFiles.size() );
-    for( auto & filename : outputFiles ) {
-        count += pack( ptr+count, filename );
-    }
+    // vectors
+    count += pack( ptr+count, modeList );
+    count += pack( ptr+count, outputFiles );
 
     return count;
 }
@@ -960,42 +893,39 @@ uint64_t GlobalCfg::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
 
     uint64_t count = ObjectCfg::unpack( ptr, swap_endian );
-    count += unpack( ptr+count, runFlags, swap_endian );
-    count += unpack( ptr+count, modeBasis );
-    count += unpack( ptr+count, klMinMode, swap_endian );
-    count += unpack( ptr+count, klMaxMode, swap_endian );
+    // scalar values
+    count += unpack( ptr+count, badPixelThreshold, swap_endian );
+    count += unpack( ptr+count, EPS, swap_endian );
+    count += unpack( ptr+count, fillpixMethod );//b
+    count += unpack( ptr+count, FTOL, swap_endian );
+    count += unpack( ptr+count, getstepMethod );//b
+    count += unpack( ptr+count, graddiff_step, swap_endian );
+    count += unpack( ptr+count, gradientMethod );//b
     count += unpack( ptr+count, klCutoff, swap_endian );
+    count += unpack( ptr+count, klMaxMode, swap_endian );
+    count += unpack( ptr+count, klMinMode, swap_endian );
+    count += unpack( ptr+count, maxIterations, swap_endian );
+    count += unpack( ptr+count, minIterations, swap_endian );
+    count += unpack( ptr+count, modeBasis, swap_endian );
     count += unpack( ptr+count, nInitialModes, swap_endian );
     count += unpack( ptr+count, nModeIncrement, swap_endian );
     count += unpack( ptr+count, nModes, swap_endian );
-    count += unpack( ptr+count, modeNumbers, swap_endian );
-    count += unpack( ptr+count, telescopeD, swap_endian );
-    count += unpack( ptr+count, telescopeCO, swap_endian );
-    count += unpack( ptr+count, minIterations, swap_endian );
-    count += unpack( ptr+count, maxIterations, swap_endian );
-    count += unpack( ptr+count, targetIterations, swap_endian );
-    count += unpack( ptr+count, fillpixMethod );
-    count += unpack( ptr+count, gradientMethod );
-    count += unpack( ptr+count, getstepMethod );
-    count += unpack( ptr+count, badPixelThreshold, swap_endian );
-    count += unpack( ptr+count, FTOL, swap_endian );
-    count += unpack( ptr+count, EPS, swap_endian );
+    count += unpack( ptr+count, outputFileType );//b
+    count += unpack( ptr+count, outputDataType );//b
     count += unpack( ptr+count, reg_alpha, swap_endian );
-    count += unpack( ptr+count, graddiff_step, swap_endian );
-    count += unpack( ptr+count, trace );
-    count += unpack( ptr+count, outputFileType );
-    count += unpack( ptr+count, outputDataType );
+    count += unpack( ptr+count, runFlags, swap_endian );
     count += unpack( ptr+count, sequenceNumber, swap_endian );
-    count += unpack( ptr+count, observationTime, swap_endian );
-    count += unpack( ptr+count, observationDate, swap_endian );
-    count += unpack( ptr+count, tmpDataDir, swap_endian );
-    uint16_t tmp;
-    count += unpack( ptr+count, tmp, swap_endian );
-    outputFiles.resize( tmp );
-    for( auto& filename : outputFiles ) {
-        count += unpack( ptr+count, filename, swap_endian );
-    }
-
+    count += unpack( ptr+count, targetIterations, swap_endian );
+    count += unpack( ptr+count, telescopeCO, swap_endian );
+    count += unpack( ptr+count, telescopeD, swap_endian );
+    count += unpack( ptr+count, trace );//b
+    // strings
+    count += unpack( ptr+count, observationDate );
+    count += unpack( ptr+count, observationTime );
+    count += unpack( ptr+count, tmpDataDir );
+    // vectors
+    count += unpack( ptr+count, modeList, swap_endian );
+    count += unpack( ptr+count, outputFiles, swap_endian );
     return count;
 }
 
@@ -1037,7 +967,7 @@ bool GlobalCfg::operator==( const GlobalCfg& rhs ) const {
            ( observationTime == rhs.observationTime ) &&
            ( observationDate == rhs.observationDate ) &&
            ( tmpDataDir == rhs.tmpDataDir ) &&
-           ( modeNumbers == rhs.modeNumbers ) &&
+           ( modeList == rhs.modeList ) &&
            ObjectCfg::operator==( rhs ) &&
            ( outputFiles == rhs.outputFiles );
 }

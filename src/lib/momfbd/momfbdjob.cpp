@@ -898,7 +898,6 @@ void MomfbdJob::verifyPatches( void ) {
     int nPatchesY = patches.dimSize(0);
     int nFailedPatches(0);
 
-    size_t nModes = modeNumbers.size();
     size_t nAlpha = nModes*nImages();
     
     shared_ptr<double> bestFit = rdx_get_shared<double>(nAlpha);
@@ -1511,7 +1510,7 @@ bool MomfbdJob::checkCfg(void) {
         }
     }
     
-    if( modeNumbers.size() < 2 ) {
+    if( modeList.size() < 2 ) {
         // FIXME: sanity check: either file(s) specified or MODES, same number of modes has to exist in all objects AND the tilts has to be the first 2 modes. 
     }
 

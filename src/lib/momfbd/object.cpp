@@ -237,7 +237,7 @@ void Object::initProcessing( Solver& ws ){
         double mode_scale = 1.0/wavelength;
         ModeInfo info( modeFile, pupilPixels );
         if( modeFile.empty() ) {
-            info = ModeInfo( myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+            info = ModeInfo( myJob.klMinMode, myJob.klMaxMode, myJob.modeList, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
         }
         
         modes = myJob.globalData->get( info, mode_scale, pupil, modes );    // get properly scaled modes.
@@ -854,7 +854,7 @@ void Object::initObject( void ){
 
     ModeInfo info( modeFile, pupilPixels );
     if( modeFile.empty() ) {
-        info = ModeInfo( myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+        info = ModeInfo( myJob.klMinMode, myJob.klMaxMode, myJob.modeList, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
         if( myJob.modeBasis == ZERNIKE ){
             info.firstMode = info.lastMode = 0;
         }
@@ -863,13 +863,13 @@ void Object::initObject( void ){
     modes = myJob.globalData->get( info );          // get normalized modes
 
     lock_guard<mutex> lock( modes->mtx );
-    if( modes->empty() ){
+    if( modes->empty() ) {
         if( bfs::is_regular_file(modeFile) ){
             modes->load( modeFile, pupilPixels );
         } else if( info.firstMode == info.lastMode ) {
-            modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeNumbers, Zernike::NORMALIZE );
+            modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeList, Zernike::NORMALIZE );
         } else {
-            modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeNumbers, myJob.klCutoff, Zernike::NORMALIZE );
+            modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeList, myJob.klCutoff, Zernike::NORMALIZE );
         }
         modes->getNorms( *pupil );
         modes->normalize();
