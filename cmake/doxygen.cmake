@@ -1,5 +1,5 @@
 
-find_package(Doxygen)
+find_package(Doxygen QUIET)
 if(DOXYGEN_FOUND)
  
     set( DOX_SRCS "${RDX_DIR}/doc ${RDX_DIR}/include/redux")
