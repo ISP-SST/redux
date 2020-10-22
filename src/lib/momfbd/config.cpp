@@ -153,6 +153,11 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
     diversityValues = tree.get<vector<DiversityValue>>("DIVERSITY", defaults.diversityValues);
     diversityModes = tree.get<ModeList>("DIV_ORDERS", defaults.diversityModes);
     diversityModes.setDefaultModeType( diversityBasis );
+    
+    // if there is only 1 coefficient, we assume it is a PD defocus term, and don't require DIV_ORDERS
+    if( diversityValues.size() == 1 && diversityModes.empty() ) { 
+        diversityModes.push_back( ModeID(4,ZERNIKE) );
+    }
     for( auto& d: diversityModes ) {
         if( d.mode == 2 || d.mode == 3 ) d.type = ZERNIKE;      // Force Zernike for all tilt modes.
     }
