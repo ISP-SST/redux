@@ -25,6 +25,23 @@ namespace redux {
             Image( const Image<T>& rhs, S ...s ) : Image<T>( rhs, std::vector<int64_t>( {static_cast<int64_t>( s )...} ) ) {}
             template <typename ...S>
             explicit Image( S ...s ) : redux::util::Array<T>( s... ) {}
+            
+            void reverseX( void ) {
+                if( this->nDimensions() != 2 ) return;
+                size_t sy = this->dimSize(0);
+                size_t sx = this->dimSize(1);
+                std::shared_ptr<T*> arrayPtr = util::Array<T>::reshape(sy, sx);
+                T** imgPtr = arrayPtr.get();
+                redux::util::reverseX( imgPtr, sy, sx );
+            }
+            void reverseY( void ) {
+                if( this->nDimensions() != 2 ) return;
+                size_t sy = this->dimSize(0);
+                size_t sx = this->dimSize(1);
+                std::shared_ptr<T*> arrayPtr = util::Array<T>::reshape(sy, sx);
+                T** imgPtr = arrayPtr.get();
+                redux::util::reverseY( imgPtr, sy, sx );
+            }
 
             Image<T>& operator=( const Image<T>& rhs ) {
                 redux::util::Array<T>::operator=( reinterpret_cast<const redux::util::Array<T>&>(rhs) );
