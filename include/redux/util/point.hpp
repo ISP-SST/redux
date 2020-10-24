@@ -50,12 +50,18 @@ namespace redux {
                 return tmp; }
             T max( void ) const { return std::max<T>(x,y); }
             T min( void ) const { return std::min<T>(x,y); }
-            PointType<int> round(void) const { return PointType<int>( lround(y), lround(x) ); }
+            PointType<T> Abs( void ) const { return PointType<T>(redux::util::Abs<T>(y),redux::util::Abs<T>(x)); }
+            T maxAbs( void ) const { return std::max<T>(redux::util::Abs<T>(x),redux::util::Abs<T>(y)); }
+            PointType<long int> round(void) const { return PointType<long int>( lround(y), lround(x) ); }
             operator std::string() const { std::ostringstream out; out << "(" << y << "," << x << ")"; return out.str(); }
             template <typename U> PointType<T>& operator+=(const PointType<U>& rhs) { x += rhs.x; y += rhs.y; return *this; }
             template <typename U> PointType<T>& operator-=(const PointType<U>& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
             template <typename U> PointType<T> operator+(const PointType<U>& rhs) const { PointType<T> res(*this); return res+=rhs; }
             template <typename U> PointType<T> operator-(const PointType<U>& rhs) const { PointType<T> res(*this); return res-=rhs; }
+            template <typename U> PointType<T>& operator*=(const PointType<U>& rhs) { x *= rhs.x; y *= rhs.y; return *this; }
+            template <typename U> PointType<T>& operator/=(const PointType<U>& rhs) { x /= rhs.x; y /= rhs.y; return *this; }
+            template <typename U> PointType<T> operator*(const PointType<U>& rhs) const { PointType<T> res(*this); return res*=rhs; }
+            template <typename U> PointType<T> operator/(const PointType<U>& rhs) const { PointType<T> res(*this); return res/=rhs; }
             PointType<T>& operator=(const PointType<T>& rhs) { x = rhs.x; y = rhs.y; return *this; }
             template <typename U> PointType<T>& operator=(const PointType<U>& rhs) { x = rhs.x; y = rhs.y; return *this; }
             PointType<T>& operator=(const T& rhs) { x = rhs; y = rhs; return *this; }
@@ -69,6 +75,7 @@ namespace redux {
             template <typename U> PointType<T> operator/(const U& rhs) const { PointType<T> tmp(*this); tmp /= rhs; return tmp; }
             PointType<T> operator-(void) const { PointType<T> tmp(-y,-x); return tmp; }
             PointType<T> operator*(const T& rhs) const { PointType<T> tmp(*this); tmp *= rhs; return tmp; }
+            PointType<T> operator/(const T& rhs) const { PointType<T> tmp(*this); tmp /= rhs; return tmp; }
             template <typename U> bool operator==(const PointType<U>& rhs) const { return (x == rhs.x && y == rhs.y); }
             bool operator==(T rhs) const { return (x == rhs && y == rhs); }
             template <typename U> bool operator!=(const PointType<U>& rhs) const { return !(*this == rhs); }
