@@ -97,9 +97,10 @@ namespace redux {
             bool checkPost(void);
             bool checkWriting(void);
             uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const override;
-            const std::vector<std::shared_ptr<Object>>& getObjects(void) const { return objects; };
-            const std::shared_ptr<Object> getObject( uint16_t id ) const;
-            const std::vector<std::shared_ptr<Channel>>& getChannels(uint16_t objID) const;
+            const std::vector<Object::Ptr>& getObjects(void) const { return objects; };
+            const Object::Ptr getObject( uint16_t id ) const;
+            const std::vector<Channel::Ptr>& getChannels(uint16_t objID) const;
+            redux::util::Point16 getSmallestImageSize( void );
 
             const MomfbdJob& operator=(const GlobalCfg&);
 
@@ -121,8 +122,8 @@ namespace redux {
             
             void updateProgressString(void);
 
-            std::vector<std::shared_ptr<Object>> objects;
-            std::vector<std::shared_ptr<Object>> trace_objects;
+            std::vector<Object::Ptr> objects;
+            std::vector<Object::Ptr> trace_objects;
             WaveFronts waveFronts;
 
             redux::util::Array<PatchData::Ptr> patches;

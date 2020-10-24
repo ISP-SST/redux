@@ -1649,10 +1649,11 @@ size_t Object::estimateOutputSize( void) {
 
 
 
-Point16 Object::getImageSize( void ){
-    if( imgSize == 0 ){
+Point16 Object::getImageSize( bool force ){
+    if( force || (imgSize == 0) ) {
+        imgSize = 0;
         for( auto& ch : channels ){
-            Point16 tmp = ch->getImageSize( );
+            Point16 tmp = ch->getImageSize( force );
             if( imgSize == 0 ){
                 imgSize = tmp;
             } else if( tmp != imgSize ){

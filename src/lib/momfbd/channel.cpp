@@ -224,8 +224,8 @@ bool Channel::checkCfg (void) {
     
     if( alignClip.size() == 4 ) {
         if( !alignClip[0] || !alignClip[1] || !alignClip[2] || !alignClip[3] ) {
-            LOG_WARN << "ALIGN_CLIP values should be 1-based, i.e. first pixel is (1,1)." << ende;
-            alignClip.clear();
+            LOG_ERR << "ALIGN_CLIP values should be 1-based, i.e. first pixel is (1,1)." << ende;
+            return false;
         }
         for( auto& c: alignClip ) c -= 1;           // keep the clips 0-based internally
     }
@@ -1298,9 +1298,9 @@ void Channel::adjustCutouts( Array<PatchData::Ptr>& patches ) {
 }
 
 
-Point16 Channel::getImageSize(void) {
+Point16 Channel::getImageSize( bool force ) {
 
-    if( imgSize == 0 ) {
+    if( force || (imgSize == 0) ) {
 //         if( alignClip.size() == 4 ) {   // we have align-clip, but no mapping => reference channel.
 //             imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
 //         } else {                        //  No align-map or align-clip, get full image size.
@@ -1327,13 +1327,11 @@ Point16 Channel::getImageSize(void) {
                 } catch( ... ) {
                     LOG_ERR << boost::format ("Failed to get imgSize from file %s") % thisFile << ende;
                 }
-            } else {
-                LOG_ERR << boost::format ("Input-file %s not found!") % thisFile << ende;
             }
 //        }
             if( imgSize.x && imgSize.y ) { 
                 uint16_t old_clip = borderClip;
-                borderClip = min<uint16_t>( borderClip, imgSize.x/8 );     // ensure we are clipping too much.
+                borderClip = min<uint16_t>( borderClip, imgSize.x/8 );     // ensure we are not clipping too much.
                 borderClip = min<uint16_t>( borderClip, imgSize.y/8 );
                 if( borderClip != old_clip ) {
                     LOG_WARN << "BORDER_CLIP has been reduced from " << old_clip << " to " << borderClip << " to avoid clipping too much of the images." << ende;

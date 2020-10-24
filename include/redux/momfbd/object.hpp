@@ -46,6 +46,7 @@ namespace redux {
         {
 
         public:
+            typedef std::shared_ptr<Object> Ptr;
 
             explicit Object( MomfbdJob&, uint16_t id=0 );
             Object( const Object&, uint16_t id=0, int tid=-1 );
@@ -67,7 +68,7 @@ namespace redux {
         
             MomfbdJob& myJob;
             logging::Logger& logger;
-            std::vector<std::shared_ptr<Channel>> channels;
+            std::vector<Channel::Ptr> channels;
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
@@ -119,7 +120,7 @@ namespace redux {
             size_t estimateOutputSizeMOMFBD(void);
             size_t estimateOutputSize(void);
             
-            redux::util::Point16 getImageSize(void);
+            redux::util::Point16 getImageSize( bool force=false );
             
             /*************   Processing on slave   ***************/
             /*************     Local variables     ***************/

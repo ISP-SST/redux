@@ -53,6 +53,7 @@ namespace redux {
 
         public:
 
+            typedef std::shared_ptr<Channel> Ptr;
             Channel( Object&, MomfbdJob&, uint16_t id=0 );
             ~Channel();
 
@@ -71,7 +72,7 @@ namespace redux {
             uint32_t nImages(void);
             redux::util::PointF getOffsetAt( const redux::util::Point16& pos, size_t sz=0 ) const;
             void adjustCutout(ChannelData&, const PatchData::Ptr&) const;
-            void adjustCutouts(redux::util::Array<PatchData::Ptr>&);          
+            void adjustCutouts(redux::util::Array<PatchData::Ptr>&);
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/
@@ -103,7 +104,7 @@ namespace redux {
             void maybeLoadImages( void );          
             void getStorage(ChannelData&);          
             
-            redux::util::Point16 getImageSize(void);
+            redux::util::Point16 getImageSize( bool force=false );
             void logAndThrow( std::string );
 
 

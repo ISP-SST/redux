@@ -1640,6 +1640,16 @@ const vector<shared_ptr<Channel>>& MomfbdJob::getChannels( uint16_t objID ) cons
 }
 
 
+Point16 MomfbdJob::getSmallestImageSize( void ) {
+    Point16 ret;
+    ret = numeric_limits<uint16_t>::max();
+    for( auto& o: objects ) {
+        if( o ) ret = o->getImageSize( true ).min(ret);
+    }
+    return ret;
+}
+
+
 const MomfbdJob& MomfbdJob::operator=(const GlobalCfg& rhs) {
     GlobalCfg::operator=(rhs);
     return *this;

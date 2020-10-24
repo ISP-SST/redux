@@ -467,7 +467,7 @@ bool SubImage::adjustShifts( const T* alpha ) {
             newVal.y += actualAdjust *shiftToAlpha;
         }
         if( actualAdjust != desiredAdjust ) {
-            LOG_ERR << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+            LOG_WARN << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                     << ": Patch is too close to edge, only shifted " << actualAdjust << "/" << desiredAdjust
                     << " pixels." << ende;
         }
@@ -486,7 +486,7 @@ bool SubImage::adjustShifts( const T* alpha ) {
             newVal.x += actualAdjust *shiftToAlpha;
         }
         if( actualAdjust != desiredAdjust ) {
-            LOG_ERR << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+            LOG_WARN << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
                     << ": Patch is too close to edge, only shifted " << actualAdjust << "/" << desiredAdjust
                     << " pixels." << ende;
         }
