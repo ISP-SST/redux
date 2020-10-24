@@ -59,6 +59,7 @@ Channel::~Channel() {
 void Channel::parsePropertyTree (bpt::ptree& tree, redux::logging::Logger& logger) {
 
     ChannelCfg::parseProperties( tree, logger, myObject );       // parse using our parent-object as default-values.
+    checkFlip();    // just to set flipX/Y
 
 }
 
@@ -160,6 +161,20 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
 }
 
 
+void Channel::checkFlip( void ) {
+    
+    flipX = flipY = false;
+    if( alignMap.size() == 9 ) {
+        if( alignMap[0] < 0 ) flipX = true;
+        if( alignMap[4] < 0 ) flipY = true;
+    } else if( alignClip.size() == 4) {
+        if( alignClip[0] > alignClip[1] ) flipX = true;
+        if( alignClip[2] > alignClip[3] ) flipY = true;
+    }
+    
+}
+
+
 bool Channel::checkCfg (void) {
 
     // Do we have a correct filename template ?
@@ -212,15 +227,10 @@ bool Channel::checkCfg (void) {
             LOG_WARN << "ALIGN_CLIP values should be 1-based, i.e. first pixel is (1,1)." << ende;
             alignClip.clear();
         }
+        for( auto& c: alignClip ) c -= 1;           // keep the clips 0-based internally
     }
     
-    if( alignMap.size() == 9 ) {
-        if( alignMap[0] < 0 ) flipX = true;
-        if( alignMap[4] < 0 ) flipY = true;
-    } else if( alignClip.size() == 4) {
-        if( alignClip[0] > alignClip[1] ) flipX = true;
-        if( alignClip[2] > alignClip[3] ) flipY = true;
-    }
+    checkFlip();    // just to set flipX/Y
     
     if( discard.size() > 2 ) {
         LOG_WARN << "DISCARD only uses 2 numbers, how many frames to drop at beginning/end of a cube. It will be truncated." << ende;

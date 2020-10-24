@@ -87,6 +87,7 @@ namespace redux {
             void dump( std::string tag );
         private:
             
+            void checkFlip( void );
             bool checkCfg(void);
             bool checkData( bool verbose=false );
             

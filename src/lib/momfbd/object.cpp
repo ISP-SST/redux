@@ -1376,16 +1376,16 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
 
         for( int i = 0; i < nChannels; ++i ){
             channels[i]->getFileNames( info->fileNames, waveFrontList );
-            if(channels[i]->alignClip.empty() ){
+            if( channels[i]->alignClip.empty() ){
                 Point16 sz = channels[i]->getImageSize( );
                 info->clipStartX.get()[i] = info->clipStartY.get()[i] = 1;
                 info->clipEndX.get()[i] = sz.x;
                 info->clipEndY.get()[i] = sz.y;
             } else {
-                info->clipStartX.get()[i] = channels[i]->alignClip[0];
-                info->clipEndX.get()[i] = channels[i]->alignClip[1];
-                info->clipStartY.get()[i] = channels[i]->alignClip[2];
-                info->clipEndY.get()[i] = channels[i]->alignClip[3];
+                info->clipStartX.get()[i] = channels[i]->alignClip[0]+1;
+                info->clipEndX.get()[i] = channels[i]->alignClip[1]+1;
+                info->clipStartY.get()[i] = channels[i]->alignClip[2]+1;
+                info->clipEndY.get()[i] = channels[i]->alignClip[3]+1;
             }
         }
 

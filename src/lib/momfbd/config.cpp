@@ -249,7 +249,11 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults, bo
     if( showAll || diversityValues != defaults.diversityValues ) tree.put( "DIVERSITY", diversityValues );
     
     if( showAll || alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
-    if( showAll || alignClip != defaults.alignClip ) tree.put( "ALIGN_CLIP", alignClip );
+    if( showAll || alignClip != defaults.alignClip ) {
+        vector<int16_t> tmp = alignClip;
+        for( auto& ac: tmp ) ac += 1;       // make 1-based for cfg-files.
+        tree.put( "ALIGN_CLIP", tmp );
+    }
     if( showAll || discard != defaults.discard ) tree.put( "DISCARD", discard );
     if( showAll || borderClip != defaults.borderClip ) tree.put( "BORDER_CLIP", borderClip );
     if( showAll || incomplete != defaults.incomplete ) tree.put( "INCOMPLETE", ( bool)incomplete );
