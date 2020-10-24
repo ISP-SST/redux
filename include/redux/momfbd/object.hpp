@@ -63,7 +63,13 @@ namespace redux {
             void cleanup(void);
             uint32_t nImages(bool reCalc=false);
             
-            const std::vector<std::shared_ptr<Channel>>& getChannels(void) const { return channels; };
+            void addChannel( Channel::Ptr obj ) { channels.push_back(obj); }
+            Channel::Ptr addChannel( void ) {
+                Channel::Ptr chan( new Channel( *this, myJob, channels.size() ) );
+                addChannel(chan);
+                return chan;
+            }
+            const std::vector<Channel::Ptr>& getChannels(void) const { return channels; };
             const MomfbdJob& getJob(void) const { return myJob; };
         
             MomfbdJob& myJob;
@@ -154,7 +160,6 @@ namespace redux {
             friend class Channel;
 
         };
-
 
         /*! @} */
         

@@ -98,7 +98,7 @@ namespace redux {
             void copyResults( const ObjectData& rhs );
             void dump( std::string ) const;
             
-            std::vector<std::shared_ptr<ChannelData>> channels;
+            std::vector<ChannelData::Ptr> channels;
             
             /********* Results ********/
             redux::util::Array<float> img;              //!< Restored image.
@@ -137,8 +137,8 @@ namespace redux {
         struct PatchData : public Part {
             typedef std::shared_ptr<PatchData> Ptr;
             MomfbdJob& myJob;
-            std::vector<std::shared_ptr<ObjectData>> objects;
-            std::vector<std::shared_ptr<ObjectData>> trace_data;
+            std::vector<ObjectData::Ptr> objects;
+            std::vector<ObjectData::Ptr> trace_data;
             WavefrontData waveFronts;
             redux::util::Point16 index;                      //! Patch-index in mozaic
             redux::util::Point16 position;                   //! Patch position (centre coordinates in the reference channel)
@@ -149,7 +149,8 @@ namespace redux {
             PatchData( const PatchData& ) = delete;
             ~PatchData();
 
-            std::shared_ptr<ObjectData> getObjectData( uint16_t id ) const;
+            ObjectData::Ptr getObjectData( uint16_t id ) const;
+            ChannelData::Ptr getChannelData( uint16_t oid, uint16_t cid ) const;
             void setPath(const std::string& path) override;
             void initPatch(void);
             void load(void) override;

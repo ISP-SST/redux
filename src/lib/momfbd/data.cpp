@@ -331,14 +331,25 @@ void PatchData::setPath(const std::string& path) {
 }
 
 
-shared_ptr<ObjectData> PatchData::getObjectData( uint16_t id ) const {
+ObjectData::Ptr PatchData::getObjectData( uint16_t id ) const {
     for( auto& o: objects ) {
         if( o && o->myObject && (o->myObject->ID == id) ) return o;
     }
     for( auto& o: trace_data ) {
         if( o && o->myObject && (o->myObject->ID == id) ) return o;
     }
-    return shared_ptr<ObjectData>();
+    return ObjectData::Ptr();
+}
+
+
+ChannelData::Ptr PatchData::getChannelData( uint16_t oid, uint16_t cid ) const {
+    ObjectData::Ptr od = getObjectData( oid );
+    if( od && od->myObject && (od->myObject->ID == oid) ) {
+        for( auto& c: od->channels ) {
+            if( c && c->myChannel && (c->myChannel->ID == cid) ) return c;
+        }
+    }
+    return ChannelData::Ptr();
 }
 
 

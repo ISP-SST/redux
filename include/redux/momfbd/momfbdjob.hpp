@@ -99,6 +99,9 @@ namespace redux {
             uint16_t getNextStep( uint16_t s=JSTEP_NONE ) const override;
             const std::vector<Object::Ptr>& getObjects(void) const { return objects; };
             const Object::Ptr getObject( uint16_t id ) const;
+            void addObject( Object::Ptr obj ) { objects.push_back(obj); }
+            Object::Ptr addObject( void ) { Object::Ptr obj( new Object( *this, objects.size() ) ); addObject(obj); return obj; }
+            void addTraceObject( Object::Ptr obj ) { trace_objects.push_back(obj); }
             const std::vector<Channel::Ptr>& getChannels(uint16_t objID) const;
             redux::util::Point16 getSmallestImageSize( void );
 

@@ -73,6 +73,13 @@ namespace redux {
             redux::util::PointF getOffsetAt( const redux::util::Point16& pos, size_t sz=0 ) const;
             void adjustCutout(ChannelData&, const PatchData::Ptr&) const;
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);
+            void setClip( const std::vector<int16_t>& clip ) { alignClip = clip; checkFlip(); };
+            void setMap( const std::vector<float>& map ) { alignMap = map; checkFlip(); };
+            void clearOffsets( void ) { xOffset.clear(); yOffset.clear(); }
+            void setOffsets( image::Image<int16_t>& xoff, image::Image<int16_t>& yoff ) {
+                xOffset = xoff; // N.B. will use shared data.
+                yOffset = yoff;
+            }
             
             /*************   Processing on slave   ***************/
             /*************         Methods         ***************/

@@ -56,6 +56,7 @@ namespace redux {
             LogOutput( uint8_t m=LOG_MASK_ANY, unsigned int flushPeriod=1 );
 
         public:
+            typedef std::shared_ptr<LogOutput> Ptr;
             virtual ~LogOutput();
 
             
@@ -64,7 +65,7 @@ namespace redux {
             inline void setName( const std::string& n ) { name_ = n; }
             inline std::string name(void) const { return name_; }
             
-            inline void setLevel( uint8_t l ) { mask = LOG_UPTO(l); }
+            virtual void setLevel( uint8_t l ) { mask = LOG_UPTO(l); }
             inline void setMask( uint8_t m ) { mask = m; }
             inline uint8_t getMask(void) const { return mask; }
 

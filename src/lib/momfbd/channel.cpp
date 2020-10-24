@@ -933,7 +933,7 @@ void Channel::loadFile( size_t fileIndex, size_t offset ) {
         if( tmpImg.meta ) {
             addTimeStamps( tmpImg.meta->getStartTime(), tmpImg.meta->getEndTime() );
         }
-        LOG << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[fileIndex] % myObject.ID % ID % imStr << ende;
+        LOG_DETAIL << boost::format ("Loaded file "+imageTemplate+"  (%d:%d:%s)") % fileNumbers[fileIndex] % myObject.ID % ID % imStr << ende;
     } catch ( const std::exception& ) {
         throw;
     } catch ( ... ) {

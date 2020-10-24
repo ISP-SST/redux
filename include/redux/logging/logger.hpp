@@ -32,16 +32,17 @@ namespace redux {
             void flushBuffer( void ) override;
             void flushAll( void );
 
-            void addLogger( Logger& );      // forward output to another Logger instance.
-            void addStream( std::ostream&, uint8_t m=0, unsigned int flushPeriod=1 );
-            void addFile( const std::string &filename, uint8_t m=0, bool replace=false, unsigned int flushPeriod=1 );
-            void addNetwork( boost::asio::io_service&, const network::Host::Ptr, uint32_t id, uint8_t m=0, unsigned int flushPeriod=5 );
+            LogOutput::Ptr addLogger( Logger& );      // forward output to another Logger instance.
+            LogOutput::Ptr addStream( std::ostream&, uint8_t m=0, unsigned int flushPeriod=1 );
+            LogOutput::Ptr addFile( const std::string &filename, uint8_t m=0, bool replace=false, unsigned int flushPeriod=1 );
+            LogOutput::Ptr addNetwork( boost::asio::io_service&, const network::Host::Ptr, uint32_t id, uint8_t m=0, unsigned int flushPeriod=5 );
             void removeOutput( const std::string& );
             void removeAllOutputs( void );
             void addConnection( network::TcpConnection::Ptr conn, network::Host::Ptr host );
             void removeConnection( network::TcpConnection::Ptr conn );
             void netReceive( network::TcpConnection::Ptr conn );
             void setContext( const std::string& c ) { context = c; };
+            void setLevel( uint8_t l ) override;
             
             LogItem& getItem( LogMask m=LOG_MASK_NORMAL ) {
                 threadItem.setLogger( this );
@@ -100,6 +101,7 @@ namespace redux {
 #define LOG_WARN  LLOG_WARN(logger)
 #define LOG_ERR  LLOG_ERR(logger)
 #define LOG_FATAL  LLOG_FATAL(logger)
+#define LOG_MARK LLOG_FATAL(logger) << "<<< -----[" << __PRETTY_FUNCTION__ << ":"  << __LINE__ << "]----- >>>  " << ende;
 
 
 

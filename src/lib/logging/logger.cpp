@@ -142,7 +142,7 @@ Logger::~Logger() {
 
 void Logger::append( LogItem &i ) {
     
-    if( mask && !(i.entry.getMask() & mask) ) {
+    if( !mask || !(i.entry.getMask() & mask) ) {
         return;
     }
 
@@ -185,25 +185,26 @@ void Logger::flushAll( void ) {
 }
 
 
-void Logger::addLogger( Logger& out ) {
-
-    if( &out == this ) return;                  // avoid infinite loop
+LogOutput::Ptr Logger::addLogger( Logger& out ) {
+    
+    LogOutput::Ptr ret;
+    if( &out == this ) return ret;              // avoid infinite loop
     out.removeOutput( hexString(this) );        // avoid infinite loop
     
     string name = hexString(&out);
     unique_lock<mutex> lock( outputMutex );
     OutputMap::iterator it = outputs.find( name );
     if( it == outputs.end() ) {
-        std::shared_ptr<LogOutput> output( &out, [](LogOutput* p){} );
-        outputs.insert(make_pair(name,output));
-
+        ret.reset( &out, []( LogOutput* ){} );
+        outputs.insert(make_pair(name,ret));
     }
-    
+    return ret;
 }
 
 
-void Logger::addStream( ostream& strm, uint8_t m, unsigned int flushPeriod ) {
+LogOutput::Ptr Logger::addStream( ostream& strm, uint8_t m, unsigned int flushPeriod ) {
     
+    LogOutput::Ptr ret;
     if( m == 0 ) {
         m = getMask();
     }
@@ -211,15 +212,15 @@ void Logger::addStream( ostream& strm, uint8_t m, unsigned int flushPeriod ) {
     unique_lock<mutex> lock( outputMutex );
     OutputMap::iterator it = outputs.find( name );
     if( it == outputs.end() ) {
-        std::shared_ptr<LogOutput> output( new LogToStream( strm, m, flushPeriod) );
-        outputs.insert(make_pair(name,output));
+        ret.reset( new LogToStream( strm, m, flushPeriod) );
+        outputs.insert(make_pair(name,ret));
     }
-    
+    return ret;
 }
 
 
-void Logger::addFile( const std::string &filename, uint8_t m, bool replace, unsigned int flushPeriod ) {
-    
+LogOutput::Ptr Logger::addFile( const std::string &filename, uint8_t m, bool replace, unsigned int flushPeriod ) {
+    LogOutput::Ptr ret;
     if( m == 0 ) {
         m = getMask();
     }
@@ -228,18 +229,19 @@ void Logger::addFile( const std::string &filename, uint8_t m, bool replace, unsi
     unique_lock<mutex> lock( outputMutex );
     OutputMap::iterator it = outputs.find( name );
     if( it == outputs.end() ) {
-        std::shared_ptr<LogOutput> output( new LogToFile( name, m, replace, flushPeriod) );
-        outputs.insert(make_pair(name,output));
+        ret.reset( new LogToFile( name, m, replace, flushPeriod) );
+        outputs.insert(make_pair(name,ret));
 
     }
-
+    return ret;
 }
 
 
-void Logger::addNetwork( boost::asio::io_service& service, const Host::Ptr host, uint32_t id, uint8_t m, unsigned int flushPeriod ) {
+LogOutput::Ptr Logger::addNetwork( boost::asio::io_service& service, const Host::Ptr host, uint32_t id, uint8_t m, unsigned int flushPeriod ) {
     
+    LogOutput::Ptr ret;
     if( host->info.connectName.empty() || !host->info.connectPort ) {
-        return;
+        return ret;
     }
     
     string name = host->info.connectName + ":" + to_string( host->info.connectPort ) + ":" + to_string( id );
@@ -251,14 +253,14 @@ void Logger::addNetwork( boost::asio::io_service& service, const Host::Ptr host,
     try {
         unique_lock<mutex> lock( outputMutex );
         OutputMap::iterator it = outputs.find( name );
-        if( it != outputs.end() ) return;
-        std::shared_ptr<LogOutput> output( new LogToNetwork( service, host, id, m, flushPeriod ) );
-        outputs.insert(make_pair( name, output ));
+        if( it != outputs.end() ) return ret;
+        ret.reset( new LogToNetwork( service, host, id, m, flushPeriod ) );
+        outputs.insert(make_pair( name, ret ));
     } catch ( std::exception& e ) {
         getItem(LOG_MASK_ERROR) << "Logger::addNetwork exception: " << e.what() << ende;
         throw;
     }
-    
+    return ret;
 }
 
 
@@ -387,3 +389,12 @@ void Logger::netReceive( TcpConnection::Ptr conn ) {
 
 }
 
+void Logger::setLevel( uint8_t l ) {
+    mask = LOG_UPTO(l);
+    unique_lock<mutex> lockq( queueMutex );
+    unique_lock<mutex> lock( outputMutex );
+    for( auto &op: outputs ) {
+        if( op.second ) op.second->mask = mask;
+    }
+    
+}

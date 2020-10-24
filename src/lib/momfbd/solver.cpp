@@ -317,7 +317,7 @@ void Solver::run( PatchData::Ptr data ) {
     
     zeroAlphas();
 
-    LOG << "Starting patch.  index=" << data->index << "  region=" << data->roi
+    LOG << "Starting patch.  index=" << data->index << "  center=" << data->position << "  region=" << data->roi
         << "  nModes=" << nModes << "  nThreads=" << maxThreads << ende;
 
     std::function<gsl_f_t> wrapped_f = std::bind( &Solver::my_f, this, sp::_1, sp::_2 );
