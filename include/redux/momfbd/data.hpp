@@ -42,6 +42,8 @@ namespace redux {
 #endif
         {
             
+            typedef std::shared_ptr<ChannelData> Ptr;
+            
             explicit ChannelData( std::shared_ptr<Channel> c );
             ChannelData( const ChannelData& ) = delete;
             ChannelData( ChannelData&& ) = delete;
@@ -52,12 +54,14 @@ namespace redux {
             /***********************************/
             
             /********* Input *********/
-            redux::util::Array<float> images;                           //!< Image stack for this channel.
-            redux::util::RegionI cutout;                                //!< Coordinates of the cutout region. (size is usually patchSize+2*maxLocalShift, but might be constrained by edges)
-            redux::util::PointI channelOffset;                          //!< The displacement of this channel relative to the reference channel.
-            redux::util::PointI patchStart;                             //!< Local offset, i.e. where in the cutout we cut out the subimage for processing.
-            redux::util::PointF residualOffset;                         //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
-            /*************************/
+            redux::util::Array<float> images;               //!< Image stack for this channel.
+            redux::util::PointF exactPatchPosition;         //!< True coordinates for the patch in the (un-clipped) camera reference frame.
+            redux::util::PointI cutoutPosition;             //!< The integer position of the patch, restricted by edges and rounded
+            redux::util::RegionI cutoutRegion;              //!< Coordinates of the cutout region. (size is usually patchSize+2*maxLocalShift, but might be constrained by edges)
+            redux::util::PointI channelOffset;              //!< The displacement of this channel relative to the reference channel.
+            redux::util::PointI patchStart;                 //!< Local offset, i.e. where in the cutout we cut out the subimage for processing.
+            redux::util::PointF residualOffset;             //!< Remainders of the x/y offsets after aligning (on master) to nearest pixel.
+             /*************************/
             
             void clear(void);
             void load(void);
@@ -83,6 +87,7 @@ namespace redux {
             
             typedef std::shared_ptr<ObjectData> Ptr;
             std::shared_ptr<Object> myObject;
+            
             ObjectData(void) {};
             explicit ObjectData( std::shared_ptr<Object> o );
             ~ObjectData();

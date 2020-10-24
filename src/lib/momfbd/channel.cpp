@@ -1095,7 +1095,7 @@ void Channel::maybeLoadImages( void ) {
 void Channel::getStorage( ChannelData& chData ) {
 
     maybeLoadImages();
-    chData.images.wrap(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutout.first.y, chData.cutout.last.y, chData.cutout.first.x, chData.cutout.last.x);
+    chData.images.wrap(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutoutRegion.first.y, chData.cutoutRegion.last.y, chData.cutoutRegion.first.x, chData.cutoutRegion.last.x);
  
 }
 

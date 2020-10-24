@@ -44,14 +44,18 @@ void ChannelData::load( void ) {
 
 
 uint64_t ChannelData::size( void ) const {
-    static uint64_t fixed_sz = channelOffset.size() + patchStart.size() + residualOffset.size() + 1;
+    static uint64_t fixed_sz = exactPatchPosition.size() + cutoutPosition.size() + cutoutRegion.size()
+                             + channelOffset.size() + patchStart.size() + residualOffset.size() + 1;
     return fixed_sz + images.size();
 }
 
 
 uint64_t ChannelData::pack( char* ptr ) const {
     using redux::util::pack;
-    uint64_t count = channelOffset.pack(ptr);
+    uint64_t count = exactPatchPosition.pack(ptr);
+    count += cutoutPosition.pack(ptr);
+    count += cutoutRegion.pack(ptr);
+    count += channelOffset.pack(ptr);
     count += patchStart.pack(ptr+count);
     count += residualOffset.pack(ptr+count);
     uint8_t hasImages(0);
@@ -66,7 +70,10 @@ uint64_t ChannelData::pack( char* ptr ) const {
 
 uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
-    uint64_t count = channelOffset.unpack(ptr, swap_endian);
+    uint64_t count = exactPatchPosition.unpack(ptr, swap_endian);
+    count += cutoutPosition.unpack(ptr, swap_endian);
+    count += cutoutRegion.unpack(ptr, swap_endian);
+    count += channelOffset.unpack(ptr, swap_endian);
     count += patchStart.unpack(ptr+count, swap_endian);
     count += residualOffset.unpack(ptr+count, swap_endian);
     uint8_t hasImages(0);
@@ -80,7 +87,10 @@ uint64_t ChannelData::unpack( const char* ptr, bool swap_endian ) {
 
 ChannelData& ChannelData::operator=( const ChannelData& rhs ) {
 
-    cutout = rhs.cutout;
+    exactPatchPosition = rhs.exactPatchPosition;
+    cutoutPosition = rhs.cutoutPosition;
+    cutoutRegion = rhs.cutoutRegion;
+    cutoutRegion = rhs.cutoutRegion;
     channelOffset = rhs.channelOffset;
     patchStart = rhs.patchStart;
     residualOffset = rhs.residualOffset;
