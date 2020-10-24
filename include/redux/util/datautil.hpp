@@ -100,21 +100,104 @@ namespace redux {
         }
 
         
+        /*! @brief Test if all values in an array are zero (i.e. constructed from a 0)
+        *   @param ptr Pointer to data.
+        *   @param count How many elements to check (i.e. size of array or smaller)
+        *   @returns False if any element is non-zero (constructed), otherwose true.
+        */
         template <typename T>
-        inline bool checkAllZero(const T* ptr, size_t count) {
-            for(size_t i=0; i<count; ++i ) if( ptr[i] != T(0) ) return false;
+        inline bool checkAllZero( const T* ptr, size_t count ) {
+            for( size_t i(0); i<count; ++i ) if( ptr[i] != T(0) ) return false;
             return true;
         }
 
+        /*! @brief Test if all values in an array are smaller than some value. (uses fabs())
+        *   @param ptr Pointer to data.
+        *   @param count How many elements to check (i.e. size of array or smaller)
+        *   @param eps Limit
+        *   @returns False if any fabs(element) is larger than eps. Otherwise returns true.
+        */
         template <typename T>
         inline bool checkAllSmaller(const T* ptr, size_t count, double eps=1E-10 ) {
-            for(size_t i=0; i<count; ++i ) if( fabs(ptr[i]) > eps ) return false;
+            for( size_t i(0); i<count; ++i ) if( fabs(ptr[i]) > eps ) return false;
             return true;
         }
 
+        /*! @brief Templated version of absolute value. Has specializations for integer/float types.
+        *   @param v Input
+        *   @returns abs(v)
+        */
         template <typename T> T Abs( const T& v );
+    
+        /*! @brief Restrict a value to a specified range, templated for different types for value/range.
+        *   @param v Input value.
+        *   @param mx Largest allowed value.
+        *   @param mn Smallest allowed value.
+        *   @returns max(min(v,mx),mn)
+        */
+        template <typename T, typename U=T>
+        T restrict( T v, U mx, U mn=U(0) ) {
+            if( mn > mx ) std::swap( mn, mx );
+            T ret(v);
+            if( ret > mx ) ret = static_cast<T>(mx);
+            else if( ret < mn ) ret = static_cast<T>(mn);
+            return ret;
+        }
         
-        
+        /*! @brief Restrict a value to a periodic, half-open, range [mn,mx), templated for different types for value/range.
+        *   @param v Input value.
+        *   @param mx High boundary (note: v==mx will map to mn)
+        *   @param mn Low boundary
+        *   @returns mn + residual((v-mn)/(mx-mn))
+        */
+        template <typename T, typename U=T>
+        T restrict_periodic( T v, U mx, U mn=U(0) ) {
+            if( mn > mx ) std::swap( mn, mx );
+            U span(mx-mn);
+            T ret(v);
+            if( v >= mx ) {
+                int cnt = static_cast<int>( (v-mn)/span );
+                ret = v - static_cast<T>(cnt*span);
+            } else if( v < mn ) {
+                int cnt = static_cast<int>( (mx-v)/span );
+                ret = v + static_cast<T>(cnt*span);
+            }
+            return ret;
+        }
+
+        /*! @brief Restrict a value to a range [mn,mx], by reflecting at the boundaries. Templated for different types for value/range.
+        *   @param v Input value.
+        *   @param mx High boundary
+        *   @param mn Low boundary
+        *   @returns A value within the range after subracting some number of reflections.
+        */
+        template <typename T, typename U=T>
+        T restrict_reflected( T v, U mx, U mn=U(0) ) {
+            if( mn > mx ) std::swap( mn, mx );
+            if( v >= mn && v <= mx ) return v;              // within range
+            U span(mx-mn);
+            T ret(v);
+            bool fromMx(false);
+            if( v > mx ) {
+                int cnt = static_cast<int>( (v-mn)/span );
+                ret = static_cast<T>(v - mn - cnt*span);    // save remainder
+                if( cnt&1 ) fromMx = true;                  // odd, offset downwards from mx
+            } else if( v < mn ) {
+                int cnt = static_cast<int>( (mx-v)/span );
+                ret = static_cast<T>(mx - v - cnt*span);    // save remainder
+                if( !(cnt&1) ) fromMx = true;               // even, offset downwards from mx
+            }
+            
+            if( fromMx ) {          // odd, count from mx
+                ret = mx - ret;
+            } else {                // even, count from mn
+                ret = mn + ret;
+            }
+            
+            return ret;
+        }
+
+
         /*! @name size
          *  @brief Return the proper size needed for packing/unpacking certain types/structures.
          *  @param   data Input
@@ -325,8 +408,6 @@ namespace redux {
             return out.length() + 1;
         }
         //@}
-        
-        
         
 
 

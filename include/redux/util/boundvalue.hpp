@@ -2,6 +2,7 @@
 #define REDUX_UTIL_BOUNDVALUE_HPP
 
 #include "redux/util/convert.hpp"
+#include "redux/util/datautil.hpp"
 
 #include <iostream>
 #include <limits>
@@ -20,37 +21,7 @@ namespace redux {
 
         namespace detail {
 
-            template <typename T>
-            static void truncate ( T& v, const T& min, const T& max ) {
-                if ( v < min ) {
-                    v = min;
-                } else if ( v > max ) {
-                    v = max;
-                }
-            }
-
-            template <typename T>
-            static void wrap ( T& v, const T& min, const T& max ) {
-                T span ( max - min );
-                int cnt = static_cast<int> ( ( v - min ) / span );
-                if ( v < min ) cnt--;
-                v = v - cnt * span;
-            }
-
-            template <typename T>
-            static void reflect ( T& v, const T& min, const T& max ) {
-                T span ( max - min );
-                int cnt = static_cast<int> ( ( v - min ) / span );
-                if ( v < min ) cnt--;
-                bool reverse = ( cnt & 1 );
-                if ( reverse ) {
-                    v = max - v + cnt * span + min;
-                } else {
-                    v -= cnt * span;
-                }
-            }
-
-            enum TrimType { UNDEFINEDTRIM = 0, TRUNCATE, WRAP, REFLECT };
+            enum RestrictType { UNDEFINEDTRIM=0, TRUNCATE, WRAP, REFLECT };
 
         }
 
@@ -59,102 +30,98 @@ namespace redux {
          *   @author    Tomas Hillberg (hillberg@astro.su.se)
          *   @date      2013
          */
-        template<class T, detail::TrimType TT = detail::TRUNCATE>
+        template<class T, detail::RestrictType TT = detail::TRUNCATE>
         class BoundValue {
-            typedef void ( *trimFunction ) ( T&, const T&, const T& );
+            typedef T ( *trimFunction ) ( T, T, T );
 
         public:
-            BoundValue ( T val = 0, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max() ) : trim_ ( selectTrimFunction ( TT ) ) {
-                setLimits ( minVal, maxVal );
-                assignWithTruncation ( val );
+            BoundValue( T val = 0, T minVal = std::numeric_limits<T>::lowest(),
+                                   T maxVal = std::numeric_limits<T>::max() ) : trim_( setRestrictType(TT) ),
+                                   val_(val), minVal_(minVal), maxVal_(maxVal) {
+                if( minVal_ > maxVal_ ) std::swap( minVal_, maxVal_ );
+                assignWithRestriction( val_ );
             }
-            BoundValue ( const BoundValue& rhs ) : trim_ ( selectTrimFunction ( TT ) ), val_ ( rhs.val_ ), minVal_ ( rhs.minVal_ ), maxVal_ ( rhs.maxVal_ ) { }
-            template<class U, detail::TrimType UU>
-            BoundValue ( const BoundValue<U, UU>& rhs ) : trim_ ( selectTrimFunction ( UU ) ) {
+            BoundValue( const BoundValue& rhs ) : trim_(rhs.trim_), val_(rhs.val_),
+                                                  minVal_(rhs.minVal_), maxVal_(rhs.maxVal_) { }
+            template<class U, detail::RestrictType UU>
+            BoundValue( const BoundValue<U, UU>& rhs ) : trim_( setRestrictType(UU) ) {
                 T tmpV;
                 try {
-                    minVal_ = boost::numeric_cast<T> ( rhs.minVal_ );
-                    maxVal_ = boost::numeric_cast<T> ( rhs.maxVal_ );
-                    tmpV    = boost::numeric_cast<T> ( rhs.val_ );
-                } catch ( const boost::numeric::bad_numeric_cast& ) {
+                    minVal_ = boost::numeric_cast<T>( rhs.minVal_ );
+                    maxVal_ = boost::numeric_cast<T>( rhs.maxVal_ );
+                } catch( const boost::numeric::bad_numeric_cast& ) {
                     minVal_ = std::numeric_limits<T>::lowest();
                     maxVal_ = std::numeric_limits<T>::max();
-                    try {
-                        tmpV    = boost::numeric_cast<T> ( rhs.val_ );
-                    } catch ( const boost::numeric::bad_numeric_cast& ) {
-                        tmpV = minVal_;
-                    }
                 }
-                assignWithTruncation ( tmpV );
+                try {
+                    tmpV = boost::numeric_cast<T>( rhs.val_ );
+                } catch ( const boost::numeric::bad_numeric_cast& ) {
+                    tmpV = T(0);
+                }
+                assignWithRestriction( tmpV );
             }
 
 
-            void setLimits ( T minVal, T maxVal ) {
-                if ( minVal > maxVal ) {
-                    std::swap ( minVal, maxVal );
+            void setLimits( T minVal, T maxVal ) {
+                if( minVal > maxVal ) {
+                    std::swap( minVal, maxVal );
                 }
                 minVal_ = minVal;
                 maxVal_ = maxVal;
+                assignWithRestriction( val_ );
             }
 
-            const T& min ( void ) {
-                return minVal_;
-            };
-            void setMin ( T minVal ) {
-                minVal_ = minVal;
-                assignWithTruncation ( val_ );
-            }
+            const T& min( void ) const { return minVal_; };
+            inline void setMin( T minVal ) { setLimits( minVal, maxVal_ ); }
+            const T& max( void ) const { return maxVal_; };
+            inline void setMax( T maxVal ) { setLimits( minVal_, maxVal ); }
 
-            const T& max( void ) {
-                return maxVal_;
-            };
-            void setMax( T maxVal ) {
-                maxVal_ = maxVal;
-                assignWithTruncation ( val_ );
-            }
-
+            inline T span(void) const { return (maxVal_ - minVal_); }
+            
             T getRelative( float r ) {
-                return (T)( minVal_ + (T)(maxVal_ - minVal_)*r );
+                T s = span();
+                T ret;
+                //try {
+                    ret = boost::numeric_cast<T>( minVal_ + s*r );
+                //} catch ( const boost::numeric::bad_numeric_cast& ) {
+                //    ret = minVal_;
+                //}
+                return ret;
             }
 
-            T span(void) {
-                return (maxVal_ - minVal_);
-            }
-
-            BoundValue& operator= ( const BoundValue& rhs ) {
-                trim_ = rhs.trim_;
-                val_ = rhs.val_;
-                minVal_ = rhs.minVal_;
-                maxVal_ = rhs.maxVal_;
+            template <class U, detail::RestrictType UU>
+            BoundValue& operator=( const BoundValue<U,UU>& rhs ) {
+                BoundValue<T,TT> tmp(rhs);
+                *this = tmp;
                 return *this;
             }
 
-            BoundValue& operator= ( T val ) {
-                assignWithTruncation ( val );
+            BoundValue& operator=( T val ) {
+                assignWithRestriction( val );
                 return *this;
             }
 
-            BoundValue& operator+= ( T val ) {
-                assignWithTruncation ( val_ + val );
+            BoundValue& operator+=( T val ) {
+                assignWithRestriction( val_ + val );
                 return *this;
             }
 
-            BoundValue& operator-= ( T val ) {
-                assignWithTruncation ( val_ - val );
+            BoundValue& operator-=( T val ) {
+                assignWithRestriction( val_ - val );
                 return *this;
             }
 
-            BoundValue& operator*= ( T val ) {
-                assignWithTruncation ( val_ * val );
+            BoundValue& operator*=( T val ) {
+                assignWithRestriction( val_ * val );
                 return *this;
             }
 
-            BoundValue& operator/= ( T val ) {
-                assignWithTruncation ( val_ / val );
+            BoundValue& operator/=( T val ) {
+                assignWithRestriction( val_ / val );
                 return *this;
             }
 
-            T& value ( void ) {
+            T& value( void ) {
                 return val_;
             }
 
@@ -173,49 +140,46 @@ namespace redux {
 
             // Prefix
             BoundValue& operator++() {
-                assignWithTruncation ( static_cast<T> ( val_ + 1 ) );
+                assignWithRestriction ( static_cast<T> ( val_ + 1 ) );
                 return *this;
             }
             BoundValue& operator--() {
-                assignWithTruncation ( static_cast<T> ( val_ - 1 ) );
+                assignWithRestriction ( static_cast<T> ( val_ - 1 ) );
                 return *this;
             }
 
             // Postfix
             BoundValue operator++ ( int ) {
                 BoundValue old ( *this );
-                assignWithTruncation ( static_cast<T> ( val_ + 1 ) );
+                assignWithRestriction ( static_cast<T> ( val_ + 1 ) );
                 return old;
             }
             BoundValue operator-- ( int ) {
                 BoundValue old ( *this );
-                assignWithTruncation ( static_cast<T> ( val_ - 1 ) );
+                assignWithRestriction ( static_cast<T> ( val_ - 1 ) );
                 return old;
             }
 
-        protected:
-            trimFunction selectTrimFunction ( detail::TrimType tt ) {
+            trimFunction setRestrictType( detail::RestrictType tt ) {
                 switch ( tt ) {
                     case detail::TRUNCATE:
-                        return & ( detail::truncate<T> );
+                        trim_ = &(redux::util::restrict<T,T>); break;
                     case detail::WRAP:
-                        return & ( detail::wrap<T> );
+                        trim_ = &(redux::util::restrict_periodic<T,T>); break;
                     case detail::REFLECT:
-                        return & ( detail::reflect<T> );
+                        trim_ = &(redux::util::restrict_reflected<T,T>); break;
                     default:
-                        throw std::invalid_argument ( "Function not defined for this TrimType" );
+                        throw std::invalid_argument( "BoundValue: Function not defined for this RestrictType: "+std::to_string(tt) );
                 }
+                return trim_;
             }
-            inline T assignWithTruncation ( T val ) {
-                val_ = val;
-                trim_ ( val_, minVal_, maxVal_ );
+        protected:
 
-                return val_;
-            }
+            inline void assignWithRestriction( T val ) { val_ = trim_ ( val, minVal_, maxVal_ ); }
 
-            template <class U, detail::TrimType UU> friend std::ostream& operator<< ( std::ostream& os, const BoundValue<U, UU>& bv );
-            template <class U, detail::TrimType UU> friend std::istream& operator>> ( std::istream& in, BoundValue<U, UU>& bv );
-            template<class U, detail::TrimType UU> friend class BoundValue;
+            template <class U, detail::RestrictType UU> friend std::ostream& operator<< ( std::ostream& os, const BoundValue<U, UU>& bv );
+            template <class U, detail::RestrictType UU> friend std::istream& operator>> ( std::istream& in, BoundValue<U, UU>& bv );
+            template<class U, detail::RestrictType UU> friend class BoundValue;
 
         private:
             trimFunction trim_;
@@ -224,16 +188,16 @@ namespace redux {
             T maxVal_;
         };
 
-        template<class T, detail::TrimType TT>
+        template<class T, detail::RestrictType TT>
         std::ostream& operator<< ( std::ostream& os, const BoundValue<T, TT> & bv ) {
             return ( os << bv.val_ );
         }
 
-        template<class T, detail::TrimType TT>
+        template<class T, detail::RestrictType TT>
         std::istream& operator>> ( std::istream& in, BoundValue<T, TT>& bv ) {
             T tmp;
             in >> tmp;
-            bv.assignWithTruncation ( tmp );
+            bv.assignWithRestriction ( tmp );
             return in;
         }
 
