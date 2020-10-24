@@ -747,43 +747,53 @@ void Channel::initPatch (ChannelData& cd) {
         throw logic_error(msg);
     }
 
-    size_t blockSizeY = cd.images.dimSize(1);
-    size_t blockSizeX = cd.images.dimSize(2);
-    size_t blockPixels = blockSizeY*blockSizeX;
+    uint16_t patchSize = myObject.patchSize;
+    Point16 dataSize( cd.images.dimSize(1), cd.images.dimSize(2) );
+    Region16 dataRegion( dataSize-1 );
+    Region16 patchRegion( patchSize-1, patchSize-1 );
+    patchRegion += cd.patchStart;
+    
+    if( cd.patchStart+patchSize > dataSize ) {
+        LOG_ERR << "initPatch ch=" << myObject.ID << ":" << ID << ": patchStart(" << cd.patchStart
+                 << ")+patchSize(" << patchSize << ") > dataSize(" << dataSize << "). Something is very strange here..." << ende;
+    }
+    
+    size_t dataPixels = dataSize.x * dataSize.y;
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         float* dataPtr = cd.images.get();
         for( uint16_t i=0; i<nImages; ++i ) {
             double scale = myObject.objMaxMean/imageStats[i]->mean;
             //double scale = 1.0/imageStats[i]->mean;
-            transform(dataPtr, dataPtr+blockPixels, dataPtr, bind1st(multiplies<double>(),scale) );
-            dataPtr += blockPixels;
+            transform(dataPtr, dataPtr+ dataPixels, dataPtr, bind1st(multiplies<double>(),scale) );
+            dataPtr += dataPixels;
         }
     }
     
-    uint16_t patchSize = myObject.patchSize;
 
-    std::shared_ptr<float*> arrayPtr = cd.images.reshape(nTotalFrames*blockSizeY, blockSizeX);
+    std::shared_ptr<float*> arrayPtr = cd.images.reshape( nTotalFrames*dataSize.y, dataSize.x );
     float** imgPtr = arrayPtr.get();
     for( size_t i=0; i<nTotalFrames; ++i) {
-        if( flipX ) redux::util::reverseX(imgPtr, blockSizeY, blockSizeX);
-        if( flipY ) redux::util::reverseY(imgPtr, blockSizeY, blockSizeX);
-        imgPtr += blockSizeY;
+        if( flipX ) redux::util::reverseX(imgPtr, dataSize.y, dataSize.x);
+        if( flipY ) redux::util::reverseY(imgPtr, dataSize.y, dataSize.x);
+        imgPtr += dataSize.y;
     }
     
-    PointF localShift; 
-    int firstY = max( cd.patchStart.y, 0 );
-    int lastY = min<int>( firstY+patchSize-1, blockSizeY-1);
-    firstY = max( lastY-patchSize+1, 0 );   // this should actually never go out-of-bounds unless patchSize > blockSize
-    localShift.y = firstY-cd.patchStart.y;
-    int firstX = max( cd.patchStart.x, 0 );
-    int lastX = min<int>( firstX+patchSize-1, blockSizeX-1);
-    firstX = max( lastX-patchSize+1, 0 );
-    localShift.x = firstX-cd.patchStart.x;
+    if( flipX ) {
+        std::swap( dataRegion.first.x, dataRegion.last.x );
+        cd.residualOffset.x *= -1;
+    }
+    if( flipY ) {
+        std::swap( dataRegion.first.y, dataRegion.last.y );
+        cd.residualOffset.y *= -1;
+    }
+    
+    patchRegion = dataRegion.getAsGlobal( patchRegion );        // will flip if needed
+    
 
     for (uint16_t i=0; i < nImages; ++i) {
-        subImages[i]->wrap( cd.images, i, i, firstY, lastY, firstX, lastX );
-        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, blockSizeX, myObject.pupilPixels, myJob.nModes );
-        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), blockPixels, ST_VALUES|ST_RMS );
+        subImages[i]->wrap( cd.images, i, i, patchRegion.first.y, patchRegion.last.y, patchRegion.first.x, patchRegion.last.x );
+        subImages[i]->setPatchInfo( i, cd.patchStart, cd.residualOffset, patchSize, dataSize.x, myObject.pupilPixels, myJob.nModes );
+        subImages[i]->stats.getStats( cd.images.ptr(i,0,0), dataPixels, ST_VALUES|ST_RMS );
     }
 
     phi_fixed.copy( phi_channel );
@@ -791,10 +801,15 @@ void Channel::initPatch (ChannelData& cd) {
     double* phiPtr = phi_channel.get();
     size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
     
-    PointF totalshift = localShift + cd.residualOffset;
-    
-totalshift *= 0.5;
-   int32_t mIndex = myObject.modes->tiltMode.x;
+    PointF totalshift = cd.residualOffset;
+    LOG_DEBUG << "initPatch ch=" << myObject.ID << ":" << ID << ":  totalshift=" << totalshift
+             << "  patchRegion=" << patchRegion << "  dataRegion=" << dataRegion
+             << "\n    patchStart=" << cd.patchStart << "  exactPatchPosition=" << cd.exactPatchPosition
+             << "  cutoutRegion=" << cd.cutoutRegion << "  residualOffset=" << cd.residualOffset
+             << "  shiftToAlpha=" << myObject.shiftToAlpha << ende;
+
+    totalshift *= 0.5;
+    int32_t mIndex = myObject.modes->tiltMode.x;
     if( mIndex >= 0 && fabs(totalshift.x) > 0 ) {
         const double* modePtr = myObject.modes->modePointers[mIndex];
         float res = -totalshift.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
@@ -1126,7 +1141,7 @@ uint32_t Channel::nImages(void) {
 
 
 PointF Channel::getOffsetAt( const Point16& pos, size_t sz ) const {
-    
+
     PointF ret(0,0);
     if( !xOffset.valid() && !yOffset.valid() ) {     //  No offset files
         return ret;
