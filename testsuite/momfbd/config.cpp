@@ -8,6 +8,7 @@
 #include <boost/test/unit_test.hpp>
 
 
+using namespace redux::logging;
 using namespace redux::momfbd;
 using namespace redux::util;
  
@@ -20,7 +21,8 @@ namespace testsuite {
     namespace momfbd {
         
         namespace {
-            MomfbdJob mjob;     // unit-wide job for testing.
+//            MomfbdJob mjob;
+            /*MomfbdJob mjob;     // unit-wide job for testing.
             
             
             int logInit(void) {
@@ -35,23 +37,27 @@ namespace testsuite {
             int initOnce(void) {
                 static int init_done = logInit();
                 return init_done;
-            }
+            }*/
         }
 
         void cfgTest( void ) {
             return;
-            int dummy RDX_UNUSED = initOnce();
+            //int dummy RDX_UNUSED = initOnce();
+            MomfbdJob mjob;
+            redux::logging::Logger& logger = mjob.getLogger();
+            logger.setLevel( 8 );
+            logger.setContext( "testsuite" );
+            logger.addStream( cout, 0, 1 );
+
 
             bpt::ptree tree;
 
             
+            //return;
             ChannelCfg ccfg;
             {
                 // Set some non-default values for ChannelCfg
                 ccfg.noiseFudge = ccfg.weight = ccfg.rotationAngle = 138;
-                ccfg.diversity = {10.5,32.2};
-                ccfg.diversityModes = {11,33};
-                ccfg.diversityTypes = {12,34};
                 ccfg.alignClip = {13,34,14,35};
                 ccfg.borderClip = 139;
                 ccfg.incomplete = true;
@@ -98,7 +104,7 @@ namespace testsuite {
                 tmp = ccfg;                     // assign
                 BOOST_CHECK( ccfg == tmp );
             }
-
+return;
             ObjectCfg ocfg;
             {
                 // Set some non-default values for ObjectCfg
@@ -146,14 +152,13 @@ namespace testsuite {
             {
                 // Set some non-default values for GlobalCfg
                 gcfg.runFlags = 4095;
-                gcfg.modeBasis = 2;
+                gcfg.modeBasis = KARHUNEN_LOEVE;
                 gcfg.klMinMode = gcfg.klMaxMode = gcfg.klCutoff = gcfg.nInitialModes = gcfg.nModeIncrement = 118;
                 gcfg.telescopeD = gcfg.minIterations = gcfg.maxIterations = gcfg.targetIterations = 119;
                 gcfg.fillpixMethod = gcfg.getstepMethod = 3;
                 gcfg.gradientMethod = 2;
                 gcfg.badPixelThreshold = gcfg.FTOL = gcfg.EPS = gcfg.reg_alpha = gcfg.sequenceNumber = 117;
                 gcfg.outputFileType = gcfg.outputDataType = 1;
-                gcfg.modeNumbers = {2,56};
                 gcfg.observationTime = "time";
                 gcfg.observationDate = "date";
                 gcfg.tmpDataDir = "/datadir/";

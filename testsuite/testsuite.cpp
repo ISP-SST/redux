@@ -40,10 +40,10 @@ test_suite* init_unit_test_suite( int , char* [] ) {
     testsuite::math::add_tests( math_tests );
     framework::master_test_suite().add( math_tests );
 
-/*    test_suite* momfbd_tests = BOOST_TEST_SUITE( "MOMFBD" );
+    test_suite* momfbd_tests = BOOST_TEST_SUITE( "MOMFBD" );
     testsuite::momfbd::add_tests( momfbd_tests );
     framework::master_test_suite().add( momfbd_tests );
-*/
+
     test_suite* util_tests = BOOST_TEST_SUITE( "Util" );
     testsuite::util::add_tests( util_tests );
     framework::master_test_suite().add( util_tests );

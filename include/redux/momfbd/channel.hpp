@@ -75,6 +75,8 @@ namespace redux {
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);
             void setClip( const std::vector<int16_t>& clip ) { alignClip = clip; checkFlip(); };
             void setMap( const std::vector<float>& map ) { alignMap = map; checkFlip(); };
+            void setImageSize( const redux::util::Point16& sz ) { imgSize = sz; };
+            void setImageSize( uint16_t sz ) { imgSize = sz; };
             void clearOffsets( void ) { xOffset.clear(); yOffset.clear(); }
             void setOffsets( image::Image<int16_t>& xoff, image::Image<int16_t>& yoff ) {
                 xOffset = xoff; // N.B. will use shared data.
@@ -148,6 +150,8 @@ namespace redux {
             MomfbdJob& myJob;
             logging::Logger& logger;
 
+            friend struct PatchData;
+            friend struct ObjectData;
             friend struct ChannelData;
             friend class Object;
             friend class MomfbdJob;

@@ -46,11 +46,11 @@ namespace testsuite {
                 double yDist = y + 0.5 - originY;           // where the origin "should" be, by the design of the Grid-class
                 for( int x(0); x < xSize; ++x ) {
                     double xDist = x + 0.5 - originX;       // where the origin "should" be, by the design of the Grid-class
-                    BOOST_TEST( abs(distPtr[y][x] - (double)sqrt(yDist*yDist+xDist*xDist)) < 0.0001 );
+                    BOOST_CHECK_SMALL( distPtr[y][x] - sqrt(yDist*yDist+xDist*xDist), 0.0001 );
                     if( yDist || xDist ) {
-                        BOOST_TEST( abs(anglePtr[y][x] - (double)atan2(yDist, xDist)) < 0.0001 );
+                        BOOST_CHECK_SMALL( anglePtr[y][x] - atan2(yDist, xDist), 0.0001 );
                     } else {
-                        BOOST_TEST( anglePtr[y][x] == 0.0 );
+                        BOOST_CHECK_SMALL( anglePtr[y][x], 0.0001 );
                     }
                 }
             }

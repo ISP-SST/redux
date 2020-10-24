@@ -15,7 +15,7 @@ namespace testsuite {
     namespace momfbd {
         
         namespace {
-            MomfbdJob mjob;     // unit-wide job for testing.
+            /*MomfbdJob mjob;     // unit-wide job for testing.
             
             
             int logInit(void) {
@@ -30,16 +30,16 @@ namespace testsuite {
             int initOnce(void) {
                 static int init_done = logInit();
                 return init_done;
-            }
+            }*/
         }
 
 
         void dataTest( void ) {
             
             return;
-        //    MomfbdJob mjob;
+            MomfbdJob mjob;
 
-            int dummy RDX_UNUSED = initOnce();
+            //int dummy RDX_UNUSED = initOnce();
             
             {   // default-constructed job
                 auto buf = sharedArray<char>( mjob.size() );
