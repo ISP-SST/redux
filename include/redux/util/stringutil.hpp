@@ -9,6 +9,17 @@
 #include <typeinfo>
 #include <iomanip>
 
+#include <boost/date_time/posix_time/time_parsers.hpp>
+
+#if BOOST_VERSION < 106200  // from_iso_extended_string was added in 1.62
+namespace boost {
+    namespace posix_time {
+        inline ptime from_iso_extended_string( const std::string& s ) {
+            return date_time::parse_delimited_time<ptime>(s, 'T');
+        }
+    }
+}
+#endif
 
 namespace redux {
 

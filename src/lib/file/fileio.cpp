@@ -538,9 +538,11 @@ string redux::file::cleanPath( string in, string base ) {
     if( in_filename.empty() || in_filename == "." ) {
         in_path = in_path.parent_path();
     }
-    
+#if BOOST_VERSION < 106000    // lexically_normal was introduced in 1.60
+    return in_path.string();
+#else
     return in_path.lexically_normal().string();
-
+#endif
 }
 
 
@@ -577,7 +579,7 @@ bfs::path redux::file::weaklyCanonical( bfs::path p ) {
     p = expandTilde( p.string() );
     try {
 #if BOOST_VERSION > 106000
-        p = bfs::weakly_canonical( p );
+        p = bfs::weakly_canonical( p ).lexically_normal();
 #elif BOOST_VERSION > 104800
         bfs::path tmp = p;
         while( !tmp.empty() && !exists( tmp ) ) {
@@ -593,7 +595,7 @@ bfs::path redux::file::weaklyCanonical( bfs::path p ) {
     if( p_filename.empty() || p_filename == "." ) {
         p = p.parent_path();
     }
-    return p.lexically_normal();
+    return p;
 }
 
 
