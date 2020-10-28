@@ -209,13 +209,39 @@ Fits::~Fits() {
 void Fits::close(void) {
 
     if( fitsPtr_ ) {
+        status_ = 0;
         if( fits_close_file( fitsPtr_, &status_ ) ) {
-            throwStatusError( "Failed to close FITS file.", status_ );
+            throwStatusError( "Fits:close:  Error: ", status_ );
         }
         fitsPtr_ = nullptr;
     }
 }
 
+void Fits::open( const std::string& filename ) {
+    
+    try {
+        if( fitsPtr_ ) {
+            if( filename != fitsPtr_->Fptr->filename ) {
+            close();
+            } else {
+                int hdutype(ANY_HDU);
+                status_ = 0;
+                if( fits_movabs_hdu( fitsPtr_, 1, &hdutype, &status_ ) ) {
+                    throwStatusError( "Fits:reopen: "+filename, status_ );
+                }
+                return;
+            }
+        }
+    } catch( const std::exception& e ) {
+        cerr << "Exception while re-opening fitsfile: " << e.what() << endl;
+    }
+    
+    status_ = 0;
+    if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
+        throwStatusError( "Fits:open: "+filename, status_ );
+    }
+    
+}    
 
 namespace {
 
@@ -434,11 +460,9 @@ void Fits::read( const string& filename ) {
     memset( data, 0, FLEN_VALUE );
     memset( card, 0, FLEN_CARD );
 
-    status_ = 0;
-    if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
-        throwStatusError( "read:open:"+filename, status_ );
-    }
+    open( filename );
     
+    status_ = 0;
     if( fits_get_num_hdus( fitsPtr_, &nHDU, &status_ ) ) {
         throwStatusError( "read:num_hdus:"+filename, status_ );
     }
@@ -467,11 +491,9 @@ void Fits::read( const string& filename ) {
             size_t offset = fitsPtr_->Fptr->headstart[ii-1];
             if( offset > 0 ) {
                 close();
-                readRawHDU( filename, offset, *hdu );
+                readRawHDU( filename, offset, *hdu );   //read the HDU with direct-IO, sice cfitsio can't handle non-conforming HDUs
                 extHDUs.push_back( hdu );
-                if( fits_open_file( &fitsPtr_, filename.c_str(), READONLY, &status_ ) ) {
-                    throwStatusError( "read:open2:"+filename, status_ );
-                }
+                open( filename );
                 fits_movabs_hdu( fitsPtr_, ii, &hdutype, &status_);
                 status_ = 0;
             }

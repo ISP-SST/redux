@@ -45,6 +45,7 @@ namespace redux {
             ~Fits();
 
             void close( void );
+            void open( const std::string& );
             void read( const std::string& );
 
             void write( std::ofstream& );
