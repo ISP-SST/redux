@@ -425,10 +425,8 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
 
     // Note: re-adding the plane has to be done *after* calculating the convolved objects and residuals
     if( fittedPlane.sameSize(od.img) ) {
-        transpose( fittedPlane.get(), fittedPlane.dimSize(0), fittedPlane.dimSize(1) );                 // to match the transposed subimage.
         LOG_DEBUG << "Object " << to_string(ID) << ": re-adding fitted plane to result." << ende;
         od.img += fittedPlane;
-        transpose( fittedPlane.get(), fittedPlane.dimSize(1), fittedPlane.dimSize(0) );                 // restore fittedPlane for future use.
     } else if( !fittedPlane.empty() ) {
         LOG_WARN << "Size mismatch when re-adding fitted plane." << ende;
     }
