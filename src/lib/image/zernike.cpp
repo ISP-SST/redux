@@ -218,11 +218,12 @@ shared_ptr<double> Zernike::getAngular( unsigned int nPixels, float angle, int16
         float midPlusHalf = nPixels/2.0 + 0.5;
         const shared_ptr<Grid> grid = Grid::get( nPixels, midPlusHalf, midPlusHalf );
         double* aPtr = grid->angle.get();
+        double angleRadians = angle*M_PI/180.0;
         if( m < 0 ) {
             m = abs(m);
-            std::transform( aPtr, aPtr+blockSize, angPtr, [&](const double& a){ return sinl(m*(a-angle)); });
+            std::transform( aPtr, aPtr+blockSize, angPtr, [&](const double& a){ return sinl(m*(a-angleRadians)); });
         } else {
-            std::transform( aPtr, aPtr+blockSize, angPtr, [&](const double& a){ return cosl(m*(a-angle)); });
+            std::transform( aPtr, aPtr+blockSize, angPtr, [&](const double& a){ return cosl(m*(a-angleRadians)); });
         }
     }
     
