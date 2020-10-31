@@ -43,6 +43,19 @@ namespace {
 
     }
 
+    vector<string> txtToCards( string in ) {
+        vector<string> out;
+        while( in.length() >= 80 ) {
+            out.push_back( in.substr(0,80) );
+            in.erase( 0, 80 );
+        }
+        if( !in.empty() ) {
+            out.push_back( in );
+            // TBD:: throw or warn about not a multiple of 80?
+        }
+        return out;
+    }
+    
 }
 
 
@@ -54,16 +67,16 @@ Format redux::file::readFmt( const string& filename ) {
         strm.read( reinterpret_cast<char*>( &magic ), sizeof(uint32_t) );
         if( strm.good() && (strm.gcount()==sizeof(uint32_t)) ) {
             switch( magic ) {
-                case Ana::MAGIC_ANA: ;
+                case Ana::MAGIC_ANA: ;	             // Fall through
                 case Ana::MAGIC_ANAR: return FMT_ANA;
-                case FileMomfbd::MAGIC_MOMFBD8: ;	// Fall through
-                case FileMomfbd::MAGIC_MOMFBD10: ;	// Fall through
+                case FileMomfbd::MAGIC_MOMFBD8: ;	 // Fall through
+                case FileMomfbd::MAGIC_MOMFBD10: ;	 // Fall through
                 case FileMomfbd::MAGIC_MOMFBD11: return FMT_MOMFBD;
 #ifdef RDX_WITH_FITS
                 case Fits::MAGIC_FITS: return FMT_FITS;
 #endif
                 //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
-                default: std::ios_base::failure("readFmt needs to be implemented for this file-type: \"" +filename+"\""); 
+                default: throw std::ios_base::failure("readFmt needs to be implemented for this file-type: \"" +filename+"\""); 
             }
         } else throw std::ios_base::failure("Failed to read file: "+filename);
     } else throw std::ios_base::failure("Failed to open file: "+filename);
@@ -92,7 +105,83 @@ Format redux::file::guessFmt( const string& filename ) {
 }
 
 
+string redux::file::filetype( const string& file ) {
+    Format fmt = FMT_NONE;
+    try {
+        fmt = redux::file::readFmt( file );
+    } catch( const std::ios_base::failure& ) {
+        // silently ignore IO/read errors, and guess frmat from extension below.
+    }
+    if( fmt == FMT_NONE ) fmt = redux::file::guessFmt( file );
+    switch(fmt) {
+        case FMT_ANA: return "ANA";
+        case FMT_FITS: return "FITS";
+        case FMT_NCDF: return "NCDF";
+        case FMT_MOMFBD: return "MOMFBD";
+        default: ;
+    }
+    return "";
+}
 
+
+vector<string> redux::file::filetypes( const vector<string>& files ) {
+    vector<string> filetypes;
+    size_t nF = files.size();
+    if( nF == 0 ) return filetypes;
+    filetypes.resize( files.size(), "" );
+    for( size_t i=0; i<nF; ++i ) {
+        filetypes[i] = filetype( files[i] );
+    }
+    return filetypes;
+}
+
+
+string redux::file::getMetaText( string file, FileMeta::Ptr& meta, bool raw, bool all ) {
+    string txt;
+    try {
+        if( !meta ) {
+            bfs::path fn( file );
+            if( bfs::exists(fn) && bfs::is_regular_file(fn) ) {
+                meta = getMeta( file );
+            }
+        }
+        if( meta ) {
+            meta->getAverageTime();
+            meta->getEndTime();
+            meta->getStartTime();
+            vector<string> hdrTexts = meta->getText( raw );
+            if( !all && (hdrTexts.size() > 1) ) hdrTexts.resize(1);   // just return primary info
+            for( auto& t: hdrTexts ) txt += t;
+        }
+    } catch( ... ) {}
+    return txt;
+}
+
+
+vector<string> redux::file::getMetaTexts( const vector<string>& files, bool raw, bool all ) {
+    vector<string> texts;
+    size_t nF = files.size();
+    if( nF == 0 ) return texts;
+    texts.resize( files.size(), "" );
+    for( size_t i(0); i<nF; ++i ) {
+        texts[i] = getMetaText( files[i], raw, all );
+    }
+    return texts;
+}
+
+
+vector<string> redux::file::getMetaTextAsCards( const string& file, FileMeta::Ptr& meta, bool raw, bool all ) {
+    return txtToCards( getMetaText( file, meta, raw, all ) );
+}
+
+
+vector<vector<string>> redux::file::getMetaTextsAsCards( const vector<string>& files, bool raw, bool all ) {
+    vector<vector<string>> ret(files.size());
+    for( size_t i(0); i<files.size(); ++i ) {
+        ret[i] = txtToCards( getMetaText( files[i], raw, all ) );
+    }
+    return ret;
+}
 
 
 template <typename T>
@@ -136,10 +225,10 @@ template void redux::file::getOrRead2( const string&, shared_ptr<redux::image::I
 template void redux::file::getOrRead2( const string&, shared_ptr<redux::image::Image<double>>& );
 
 
-shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool size_only) {
+FileMeta::Ptr redux::file::getMeta(const string& fn, bool size_only) {
 
     Format fmt = readFmt(fn);
-    shared_ptr<redux::file::FileMeta> meta;
+    FileMeta::Ptr meta;
     
     switch(fmt) {
         case FMT_ANA: {
@@ -165,7 +254,7 @@ shared_ptr<redux::file::FileMeta> redux::file::getMeta(const string& fn, bool si
 }
 
 
-void redux::file::readFile( const string& filename, char* data, shared_ptr<FileMeta>& meta ) {
+void redux::file::readFile( const string& filename, char* data, FileMeta::Ptr& meta ) {
 
     try {
         Format fmt = readFmt(filename);
@@ -178,7 +267,7 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
                 if( hdr ) {
                     Ana::read( filename, data, hdr );
                 } else {
-                    string msg = "readFile(string,char*,shared_ptr<FileMeta>&) failed to cast meta-pointer into Ana type.";
+                    string msg = "readFile(string,char*,FileMeta::Ptr&) failed to cast meta-pointer into Ana type.";
                     throw runtime_error(msg);
                 }
                 break;
@@ -193,7 +282,7 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
                     hdr->read( filename );
                     Fits::read( hdr, data );
                 } else {
-                    string msg = "readFile(string,char*,shared_ptr<FileMeta>&) failed to cast meta-pointer into Fits type.";
+                    string msg = "readFile(string,char*,FileMeta::Ptr&) failed to cast meta-pointer into Fits type.";
                     throw runtime_error(msg);
                 }
                 break;
@@ -201,7 +290,7 @@ void redux::file::readFile( const string& filename, char* data, shared_ptr<FileM
 #endif
         //case Ncdf::MAGIC_NCDF: return FMT_NCDF;
             default: {
-                string msg = "readFile(string,char*,shared_ptr<FileMeta>&) needs to be implemented for this file-type: " + to_string(fmt)
+                string msg = "readFile(string,char*,FileMeta::Ptr&) needs to be implemented for this file-type: " + to_string(fmt)
                            + "   \"" + filename + "\"";
                 throw runtime_error(msg);
             }
@@ -381,7 +470,7 @@ template void redux::file::writeFile( const string& filename, const redux::image
         threads.push_back( std::thread(
             [&](){
                 size_t myIndex;
-                shared_ptr<FileMeta> myMeta;
+                FileMeta::Ptr myMeta;
                 while( (myIndex=imgIndex.fetch_add(1)) < nImages ) {
                     char* myPtr = out + myIndex*frameSize;
                     try {
@@ -401,7 +490,7 @@ template void redux::file::writeFile( const string& filename, const redux::image
 
 
 void redux::file::loadFiles( const vector<string>& filenames, char* out, size_t frameSize, uint8_t nThreads,
-                             function<void(char*,size_t,shared_ptr<FileMeta>&)> postLoad) {
+                             function<void(char*,size_t,FileMeta::Ptr&)> postLoad) {
     
     size_t nImages = filenames.size();
     
@@ -414,7 +503,7 @@ void redux::file::loadFiles( const vector<string>& filenames, char* out, size_t 
         threads.push_back( std::thread(
             [&](){
                 size_t myIndex;
-                shared_ptr<FileMeta> myMeta;
+                FileMeta::Ptr myMeta;
                 while( (myIndex=imgIndex.fetch_add(1)) < nImages ) {
                     char* myPtr = out + myIndex*frameSize;
                     string fn;

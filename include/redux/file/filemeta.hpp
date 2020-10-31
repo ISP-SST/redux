@@ -29,6 +29,7 @@ namespace redux {
             : public redux::util::TraceObject<FileMeta>
 #endif
         {
+            typedef std::shared_ptr<FileMeta> Ptr;
 
             FileMeta ( void ) {}
             virtual ~FileMeta ( void ) = default;

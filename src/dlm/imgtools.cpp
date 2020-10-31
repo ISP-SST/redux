@@ -2323,7 +2323,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             return IDL_GettmpInt(0);
         }
         // Get size etc from first image.
-        std::shared_ptr<redux::file::FileMeta> meta = redux::file::getMeta( existingFiles[0] );
+        FileMeta::Ptr meta = getMeta( existingFiles[0] );
         if( !meta ) {        // Only allow 2D images
             cout << "rdx_sumfiles: Failed to get metadata." << endl;
             return IDL_GettmpInt(0);
@@ -2376,7 +2376,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             progWatch.set( nFiles );
             for( auto &fn: existingFiles ) {
                 ioService.post([&](){
-                    auto tmpMeta = redux::file::getMeta( fn );
+                    auto tmpMeta = getMeta( fn );
                     if( meta ) {
                         size_t frames = tmpMeta->dimSize(0);
                         unique_lock<mutex> lock(mtx);
@@ -2595,7 +2595,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         for( size_t i=0; i<existingFiles.size(); ++i ) {
             ioService.post([&,i,frameCount](){
                 shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
-                shared_ptr<redux::file::FileMeta> threadMeta;
+                FileMeta::Ptr threadMeta;
                 try {
                     readFile( existingFiles[i], threadBuffer.get(), threadMeta );
                     if( threadMeta ) {
@@ -2689,7 +2689,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                         progWatch.increaseTarget(1);
                         ioService.post([&,i,frameCount](){
                             shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
-                            shared_ptr<redux::file::FileMeta> threadMeta;
+                            FileMeta::Ptr threadMeta;
                             try {
                                 readFile( existingFiles[i], threadBuffer.get(), threadMeta );
                                 size_t bufferOffset(0);

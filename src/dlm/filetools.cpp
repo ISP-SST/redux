@@ -105,7 +105,7 @@ IDL_VPTR loadfiles( int argc, IDL_VPTR* argv, char* argk ) {
         }
 
         // Get size etc from first image.
-        std::shared_ptr<redux::file::FileMeta> meta = redux::file::getMeta( filenames[0] );
+        FileMeta::Ptr meta = getMeta( filenames[0] );
         if( !meta || (meta->nDims() != 2) ) {        // Only allow images for now
             cout << "rdx_loadfiles: Failed to get meta, or not 2D input." << endl;
             return IDL_GettmpInt(0);
@@ -153,7 +153,7 @@ IDL_VPTR loadfiles( int argc, IDL_VPTR* argv, char* argk ) {
         size_t frameSize = meta->dataSize();
 
         atomic<size_t> nLoaded(0);
-        postLoadCallback postLoad = [=,&nLoaded]( char* data, size_t i, std::shared_ptr<redux::file::FileMeta>& meta ) {
+        postLoadCallback postLoad = [=,&nLoaded]( char* data, size_t i, FileMeta::Ptr& meta ) {
             if( timesPtr ) timesPtr[ i ] = meta->getAverageTime().time_of_day().total_nanoseconds()*1E-9;
             size_t nl = nLoaded++;
             if( kw.verbose > 1 ) printProgress( statusString, (nl*100.0/(nImages-1)));
@@ -279,7 +279,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
         }
 
         try {
-            shared_ptr<redux::file::FileMeta> myMeta = getMeta( existingFiles[0] );
+            FileMeta::Ptr myMeta = getMeta( existingFiles[0] );
             if( kw.header ) {
                 IDL_VPTR tmpHdr;
                 myMeta->getAverageTime();
@@ -459,7 +459,7 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
         }
 
         try {
-            shared_ptr<redux::file::FileMeta> myMeta = getMeta( existingFiles[0] );
+            FileMeta::Ptr myMeta = getMeta( existingFiles[0] );
             IDL_VPTR tmpHdr;
             myMeta->getAverageTime();
             myMeta->getEndTime();

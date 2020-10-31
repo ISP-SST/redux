@@ -15,7 +15,7 @@ namespace bfs = boost::filesystem;
 namespace redux {
 
     namespace file {
-
+        
         /*! @defgroup file FileIO
          *  @{
          */
@@ -32,15 +32,39 @@ namespace redux {
         Format readFmt( const std::string& );
         Format guessFmt( const std::string& );
 
+        std::string filetype( const std::string& );
+        std::vector<std::string> filetypes( const std::vector<std::string>& );
+
+        std::string getMetaText( std::string, FileMeta::Ptr&, bool raw=false, bool all=false );
+        std::vector<std::string> getMetaTextAsCards( const std::string&, FileMeta::Ptr&, bool raw=false, bool all=false );
+        std::vector<std::string> getMetaTexts( const std::vector<std::string>&, bool raw=false, bool all=false );
+        std::vector<std::vector<std::string>> getMetaTextsAsCards( const std::vector<std::string>&, bool raw=false, bool all=false );
+        inline std::string getMetaText( std::string file, bool raw=false, bool all=false ) {
+            std::string ret;
+            try {
+                FileMeta::Ptr meta;
+                ret = getMetaText( file, meta, raw, all );
+            } catch( ... ) {}
+            return ret;
+        }
+        inline std::vector<std::string> getMetaTextAsCards( const std::string& file, bool raw=false, bool all=false ) {
+            std::vector<std::string> ret;
+            try {
+                FileMeta::Ptr meta;
+                ret = getMetaTextAsCards( file, meta, raw, all );
+            } catch( ... ) {}
+            return ret;
+        }
+        
         template <typename T>
         void getOrRead( const std::string& fn, std::shared_ptr<T>& data );
 
         template <typename T>
         void getOrRead2( const std::string& fn, std::shared_ptr<redux::image::Image<T>>& im );
         
-        std::shared_ptr<redux::file::FileMeta> getMeta(const std::string& fn, bool size_only=false);
+        FileMeta::Ptr getMeta(const std::string& fn, bool size_only=false);
 
-        void readFile( const std::string& fn, char* data, std::shared_ptr<redux::file::FileMeta>& meta );
+        void readFile( const std::string& fn, char* data, FileMeta::Ptr& meta );
         template <typename T>
         void readFile( const std::string& fn, redux::util::Array<T>& data );
         template <typename T>
@@ -51,8 +75,8 @@ namespace redux {
         template <typename T>
         void writeFile( const std::string& fn, const redux::image::Image<T>& data );
 
-        typedef std::function<void(char*,size_t,std::shared_ptr<redux::file::FileMeta>&)> postLoadCallback;
-        typedef std::function<void(char*,size_t,std::shared_ptr<redux::file::FileMeta>&)> preSumCallback;
+        typedef std::function<void(char*,size_t,FileMeta::Ptr&)> postLoadCallback;
+        typedef std::function<void(char*,size_t,FileMeta::Ptr&)> preSumCallback;
         
 //         void loadFiles( const std::vector<std::string>& fn, char* out, size_t frameSize, uint8_t nThreads=std::thread::hardware_concurrency(),
 //                        double* averages=nullptr, double* times=nullptr, std::string progressMsg="" );
