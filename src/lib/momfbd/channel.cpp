@@ -801,18 +801,18 @@ void Channel::initPatch (ChannelData& cd) {
     double* phiPtr = phi_channel.get();
     size_t pupilSize2 = myObject.pupilPixels*myObject.pupilPixels;
     
-    PointF totalshift = cd.residualOffset;
-    LOG_DEBUG << "initPatch ch=" << myObject.ID << ":" << ID << ":  totalshift=" << totalshift
-             << "  patchRegion=" << patchRegion << "  dataRegion=" << dataRegion
+    PointD residualAlpha = myObject.modes->shiftToAlpha (cd.residualOffset);
+
+    LOG_DEBUG << "initPatch ch=" << myObject.ID << ":" << ID << ":  patchRegion=" << patchRegion << "  dataRegion=" << dataRegion
              << "\n    patchStart=" << cd.patchStart << "  exactPatchPosition=" << cd.exactPatchPosition
              << "  cutoutRegion=" << cd.cutoutRegion << "  residualOffset=" << cd.residualOffset
-             << "  shiftToAlpha=" << myObject.shiftToAlpha << ende;
+             << "  residualAlpha=" << residualAlpha << ende;
 
-    totalshift *= 0.5;
+
     int32_t mIndex = myObject.modes->tiltMode.x;
-    if( mIndex >= 0 && fabs(totalshift.x) > 0 ) {
+    if( mIndex >= 0 && fabs(cd.residualOffset.x) > 0 ) {
         const double* modePtr = myObject.modes->modePointers[mIndex];
-        float res = -totalshift.x*myObject.shiftToAlpha.x;   // positive coefficient shifts image to the left
+        double res = -residualAlpha.x;   // positive coefficient shifts image to the left
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [res](const double& p, const double& m) {
                 return p + res*m;
@@ -820,9 +820,9 @@ void Channel::initPatch (ChannelData& cd) {
     }
     
     mIndex = myObject.modes->tiltMode.y;
-    if( mIndex >= 0 && fabs(totalshift.y) > 0 ) {
+    if( mIndex >= 0 && fabs(cd.residualOffset.y) > 0 ) {
         const double* modePtr = myObject.modes->modePointers[mIndex];
-        float res = -totalshift.y*myObject.shiftToAlpha.y;   // positive coefficient shifts image downwards
+        double res = -residualAlpha.y;   // positive coefficient shifts image downwards
         transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
             [res](const double& p, const double& m) {
                 return p + res*m;
