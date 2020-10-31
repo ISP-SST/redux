@@ -135,6 +135,82 @@ namespace redux {
         template<typename T, typename U>
         void brent(std::function<U(T)> f, T a, T b, T& x, U& fx, double tol=1E-4, int limit=100);
         
+        template<typename T, typename U>
+        void invert_4x4( const T* in, U* out ) {
+            
+            const double s0 = in[0] * in[5] - in[4] * in[1];
+            const double s1 = in[0] * in[6] - in[4] * in[2];
+            const double s2 = in[0] * in[7] - in[4] * in[3];
+            const double s3 = in[1] * in[6] - in[5] * in[2];
+            const double s4 = in[1] * in[7] - in[5] * in[3];
+            const double s5 = in[2] * in[7] - in[6] * in[3];
+
+            const double c5 = in[10] * in[15] - in[14] * in[11];
+            const double c4 = in[ 9] * in[15] - in[13] * in[11];
+            const double c3 = in[ 9] * in[14] - in[13] * in[10];
+            const double c2 = in[ 8] * in[15] - in[12] * in[11];
+            const double c1 = in[ 8] * in[14] - in[12] * in[10];
+            const double c0 = in[ 8] * in[13] - in[12] * in[ 9];
+            
+            const double invdet = 1 / (s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0);
+            
+            out[0] = (in[5] * c5 - in[6] * c4 + in[7] * c3) * invdet;
+            out[1] = (-in[1] * c5 + in[2] * c4 - in[3] * c3) * invdet;
+            out[2] = (in[13] * s5 - in[14] * s4 + in[15] * s3) * invdet;
+            out[3] = (-in[9] * s5 + in[10] * s4 - in[11] * s3) * invdet;
+
+            out[4] = (-in[4] * c5 + in[6] * c2 - in[7] * c1) * invdet;
+            out[5] = (in[0] * c5 - in[2] * c2 + in[3] * c1) * invdet;
+            out[6] = (-in[12] * s5 + in[14] * s2 - in[15] * s1) * invdet;
+            out[7] = (in[8] * s5 - in[10] * s2 + in[11] * s1) * invdet;
+
+            out[8] = (in[4] * c4 - in[5] * c2 + in[7] * c0) * invdet;
+            out[9] = (-in[0] * c4 + in[1] * c2 - in[3] * c0) * invdet;
+            out[10] = (in[12] * s4 - in[13] * s2 + in[15] * s0) * invdet;
+            out[11] = (-in[8] * s4 + in[9] * s2 - in[11] * s0) * invdet;
+
+            out[12] = (-in[4] * c3 + in[5] * c1 - in[6] * c0) * invdet;
+            out[13] = (in[0] * c3 - in[1] * c1 + in[2] * c0) * invdet;
+            out[14] = (-in[12] * s3 + in[13] * s1 - in[14] * s0) * invdet;
+            out[15] = (in[8] * s3 - in[9] * s1 + in[10] * s0) * invdet;
+
+        }
+        
+        template<typename T, typename U>
+        void invert_3x3( const T* in, U* out ) {
+            
+            const double i37 = in[3]*in[7];
+            const double i38 = in[3]*in[8];
+            const double i46 = in[4]*in[6];
+            const double i48 = in[4]*in[8];
+            const double i56 = in[5]*in[6];
+            const double i57 = in[5]*in[7];
+            
+            const double invdet = 1 / (in[0]*(i48 - i57) - in[1]*(i38 - i56) + in[2]*(i37 - i46));
+            
+            out[0] = (i48 - i57) * invdet;
+            out[1] = (in[2]*in[7] - in[1]*in[8]) * invdet;
+            out[2] = (in[1]*in[5] - in[2]*in[4]) * invdet;
+            out[3] = (i56 - i38) * invdet;
+            out[4] = (in[0]*in[8] - in[2]*in[6]) * invdet;
+            out[5] = (in[2]*in[3] - in[0]*in[5]) * invdet;
+            out[6] = (i37 - i46) * invdet;
+            out[7] = (in[1]*in[6] - in[0]*in[7]) * invdet;
+            out[8] = (in[0]*in[4] - in[1]*in[3]) * invdet;
+
+        }
+        
+        template<typename T, typename U>
+        void invert_2x2( const T* in, U* out ) {
+            
+            const double invdet = 1 / (in[0]*in[3] - in[1]*in[2]);
+            
+            out[0] =  in[3] * invdet;
+            out[1] = -in[2] * invdet;
+            out[2] = -in[1] * invdet;
+            out[3] =  in[0] * invdet;
+
+        }
         
     }
 }
