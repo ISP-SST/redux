@@ -109,8 +109,6 @@ return;
             {
                 // Set some non-default values for ObjectCfg
                 ocfg.telescopeF = ocfg.arcSecsPerPixel = ocfg.pixelSize = 137;
-                ocfg.alphaToPixels = ocfg.pixelsToAlpha = 138.33;
-                ocfg.alphaToDefocus = ocfg.defocusToAlpha = 138.66;
                 ocfg.maxLocalShift = ocfg.minimumOverlap = 139;
                 ocfg.patchSize = ocfg.pupilPixels = 140;
                 ocfg.saveMask = ocfg.wavelength = 58;

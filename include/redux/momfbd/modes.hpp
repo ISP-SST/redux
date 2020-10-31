@@ -117,14 +117,26 @@ namespace redux {
             void getNorms(const redux::image::Pupil&);         //!< Calculate the normalization factors so that sum(|mode*pupil|) = pupilArea
             void getNorms( void ) { getNorms( redux::image::Pupil::fetch( info.nPupilPixels, info.pupilRadius ) ); };
             
+            void measureJacobian( const redux::image::Pupil&, double scale=1.0 );
+            template <typename T> redux::util::PointType<T> alphaToShift( redux::util::PointType<T> alpha ) {
+                return redux::util::PointType<T>( alpha.x * J_T_xy[0][0] + alpha.y * J_T_xy[0][1],
+                                                  alpha.x * J_T_xy[1][0] + alpha.y * J_T_xy[1][1] );
+            }
+            template <typename T> redux::util::PointType<T> shiftToAlpha( redux::util::PointType<T> shift ) {
+                return redux::util::PointType<T>( shift.x * J_xy_T[0][0] + shift.y * J_xy_T[0][1],
+                                                  shift.x * J_xy_T[1][0] + shift.y * J_xy_T[1][1] );
+            }
+            
             void setPupilSize( uint16_t nPixels, double radiusInPixels, double rotation );
             
             void normalize( double scale=1.0 );
             
             ModeInfo info;
             
+            double J_T_xy[2][2];          //!< Jacobian for the tilts w.r.t. the pixel coordinates. Used for converting tilts to pixels.
+            double J_xy_T[2][2];          //!< Inverse of the above Jacobian. Used for converting pixels to tilts.
+            
             redux::util::PointI tiltMode;                   //!< Contains the indices for the tilt modes. (-1 if no tilts are present)
-            redux::util::PointF shiftToAlpha;               //!< Converts a shift of 1 pixel into corresponding mode-coefficient (NB. if image-size != pupil-size it has to be re-scaled accordingly)
             
             ModeList modeList;
             std::vector<double*> modePointers;

@@ -258,11 +258,6 @@ void Object::initProcessing( Solver& ws ){
         }
     
         //shiftToAlpha = modes->shiftToAlpha;
-        shiftToAlpha = modes->shiftToAlpha*(pupilPixels*1.0/patchSize ); ///wavelength );
-        
-        defocusToAlpha = util::def2cf(myJob.telescopeD/2.0 );
-        alphaToDefocus = 1.0/defocusToAlpha;
-
 //          ModeSet& ret = myJob.globalData->get(info );
 //         unique_lock<mutex> lock(ret.mtx );
 //         if( ret.empty( ) ){    // this set was inserted, so it is not loaded yet.
@@ -277,6 +272,9 @@ void Object::initProcessing( Solver& ws ){
 //         
         
         //modes->init( myJob, *this );                 // will get modes from globalData
+        modes->tiltMode = -1;   // FIXME: Why do we need to force a recalc? Jacobian should be sent from master.
+        modes->measureJacobian( *pupil, wavelength*(0.5*frequencyCutoff)/util::pix2cf( arcSecsPerPixel, myJob.telescopeD ) );
+
     } else {
         LOG_ERR << "Object patchSize is 0 !!!" << ende;
     }
@@ -873,6 +871,7 @@ void Object::initObject( void ){
         modes->normalize();
     }
     
+    modes->measureJacobian( *pupil, (0.5*frequencyCutoff)/util::pix2cf( arcSecsPerPixel, myJob.telescopeD ) );
     pixelsToAlpha =  alphaToPixels = 0;
     //double pixelsToAlpha2(0 );
     //double alphaToPixels2(0 );
@@ -890,7 +889,8 @@ void Object::initObject( void ){
         alphaToPixels = 1.0/pixelsToAlpha;
     }
     
-    LOG_TRACE << "Tilt-to-pixels conversion: " << alphaToPixels << ende;
+    LOG_DETAIL << "Alpha-to-Shift: " << modes->alphaToShift( PointF(1,1) )
+              << "    Shift-to-Alpha: " << modes->shiftToAlpha( PointF(1,1) ) << ende;
 
     for( shared_ptr<Channel>& ch: channels ){
         ch->initChannel( );
@@ -1411,6 +1411,8 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
                 Array<double> mode_wrap(reinterpret_cast<Array<double>&>(*modes), 0, myJob.nModes-1, 0, info->nPH-1, 0, info->nPH-1 );
                 Array<float> tmp_slice(tmpModes, 0, 0, 0, info->nPH - 1, 0, info->nPH - 1 );     // subarray
                 tmp_slice.assign(reinterpret_cast<const Array<double>&>(*pupil) );
+                info->pix2cf = modes->shiftToAlpha( PointD(1,1) ).avg();
+                info->cf2pix = modes->alphaToShift( PointD(1,1) ).avg();
                 info->phOffset = 0;
                 tmp_slice.wrap(tmpModes, 1, myJob.nModes, 0, info->nPH - 1, 0, info->nPH - 1 );
                 tmp_slice.assign(mode_wrap);
@@ -1423,8 +1425,6 @@ void Object::writeMomfbd( const redux::util::Array<PatchData::Ptr>& patchesData 
             }
         }
 
-        info->pix2cf = pixelsToAlpha;
-        info->cf2pix = alphaToPixels;
         Point16 nP;                         // number of patches in output file.
         nP.y = patchesData.dimSize(0);      // nPatchesY is the slowest dimension in the .momfbd file.
         nP.x = patchesData.dimSize(1);

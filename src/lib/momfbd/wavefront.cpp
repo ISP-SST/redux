@@ -43,7 +43,7 @@ string WaveFront::print(void) {
     for( auto& im: images ) {
         if(!first) ret += ", ";
         first = false;
-        ret += im->idString() + (string)im->imageShift;
+        ret += im->idString() + (string)im->currentShift;
     }
     ret += "]";
     return ret;

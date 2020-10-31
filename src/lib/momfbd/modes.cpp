@@ -6,6 +6,7 @@
 #include "redux/file/fileio.hpp"
 #include "redux/image/utils.hpp"
 #include "redux/image/zernike.hpp"
+#include "redux/math/helpers.hpp"
 #include "redux/util/cache.hpp"
 
 #include <cmath>
@@ -16,6 +17,7 @@
 
 using namespace redux::file;
 using namespace redux::image;
+using namespace redux::math;
 using namespace redux::momfbd;
 using namespace redux::util;
 using namespace std;
@@ -198,7 +200,7 @@ PupilMode::PupilMode(uint16_t firstZernike, uint16_t lastZernike, uint16_t klMod
 }
 
 
-ModeSet::ModeSet() : info(""), tiltMode(-1,-1) {
+ModeSet::ModeSet() : info(""), J_T_xy{{0}}, J_xy_T{{0}}, tiltMode(-1,-1) {
     
 }
 
@@ -206,6 +208,9 @@ ModeSet::ModeSet() : info(""), tiltMode(-1,-1) {
 ModeSet::ModeSet(ModeSet&& rhs) : redux::util::Array<double>(std::move(reinterpret_cast<redux::util::Array<double>&>(rhs))),
     info(std::move(rhs.info)), tiltMode(std::move(rhs.tiltMode)), modeList(std::move(rhs.modeList)),
     modePointers(std::move(rhs.modePointers)), atm_rms(std::move(rhs.atm_rms)) {
+        
+    memcpy( J_T_xy, rhs.J_T_xy, sizeof(J_T_xy) );
+    memcpy( J_xy_T, rhs.J_xy_T, sizeof(J_xy_T) );
 
 }
 
@@ -213,13 +218,17 @@ ModeSet::ModeSet(ModeSet&& rhs) : redux::util::Array<double>(std::move(reinterpr
 ModeSet::ModeSet(const ModeSet& rhs) : redux::util::Array<double>(reinterpret_cast<const redux::util::Array<double>&>(rhs)),
     info(rhs.info), tiltMode(rhs.tiltMode), modeList(rhs.modeList), modePointers(rhs.modePointers),
     atm_rms(rhs.atm_rms) {
+        
+    memcpy( J_T_xy, rhs.J_T_xy, sizeof(J_T_xy) );
+    memcpy( J_xy_T, rhs.J_xy_T, sizeof(J_xy_T) );
     
 }
 
 
 uint64_t ModeSet::size( void ) const {
     uint64_t sz = Array<double>::size();
-    sz += info.size() + tiltMode.size() + shiftToAlpha.size();
+    sz += info.size() + tiltMode.size();
+    sz += sizeof(J_T_xy) + sizeof(J_xy_T);
     sz += redux::util::size(modeList);
     sz += atm_rms.size()*sizeof(double) + sizeof(uint64_t);
     sz += norms.size()*sizeof(double) + sizeof(uint64_t);
@@ -232,7 +241,8 @@ uint64_t ModeSet::pack( char* data ) const {
     uint64_t count = Array<double>::pack(data);
     count += info.pack(data+count);
     count += tiltMode.pack(data+count);
-    count += shiftToAlpha.pack(data+count);
+    count += pack(data+count,J_T_xy);
+    count += pack(data+count,J_xy_T);
     count += pack(data+count,modeList);
     count += pack(data+count,atm_rms);
     count += pack(data+count,norms);
@@ -245,7 +255,8 @@ uint64_t ModeSet::unpack( const char* data, bool swap_endian ) {
     uint64_t count = Array<double>::unpack(data,swap_endian);
     count += info.unpack(data+count,swap_endian);
     count += tiltMode.unpack(data+count,swap_endian);
-    count += shiftToAlpha.unpack(data+count,swap_endian);
+    count += unpack(data+count,J_T_xy,swap_endian);
+    count += unpack(data+count,J_xy_T,swap_endian);
     count += unpack(data+count,modeList,swap_endian);
     count += unpack(data+count,atm_rms,swap_endian);
     count += unpack(data+count,norms,swap_endian);
@@ -264,7 +275,8 @@ ModeSet& ModeSet::operator=( const ModeSet& rhs ) {
     norms = rhs.norms;
     modePointers = rhs.modePointers;
     tiltMode = rhs.tiltMode;
-    shiftToAlpha = rhs.shiftToAlpha;
+    memcpy( J_T_xy, rhs.J_T_xy, sizeof(J_T_xy) );
+    memcpy( J_xy_T, rhs.J_xy_T, sizeof(J_xy_T) );
     info = rhs.info;
     return *this;
 }
@@ -309,9 +321,6 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
             for( unsigned int i=0; i<dimSize(0); ++i) {
                 modePointers.push_back( ptr(i,0,0) );
             }
-            // FIXME  properly detect tilts, this is hardcoded for the mode-files with tilts as the old MOMFBD code !!!
-            tiltMode.x = 1;
-            tiltMode.y = 0;
             return true;
         }
     }
@@ -394,8 +403,6 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t f
         info.modeNumber = it.mode;
         if ( info.modeNumber == 2 || info.modeNumber == 3 || (it.type == ZERNIKE) ) {     // force use of Zernike modes for all tilts
             info.firstMode = info.lastMode = 0;
-            if ( info.modeNumber == 2 ) tiltMode.x = modePointers.size();
-            else if ( info.modeNumber == 3 ) tiltMode.y = modePointers.size();
             it.type = ZERNIKE;
         }
         auto& mode = redux::util::Cache::get< ModeInfo, PupilMode::Ptr >( info );
@@ -442,13 +449,54 @@ void ModeSet::getNorms( const redux::image::Pupil& pup ) {
         }
         norms[i] = sqrtl( norm/pup.area );
 
-        if( i == tiltMode.x ) {
-            shiftToAlpha.x = 2 * M_PI / (mx-mn); // * norms[i];     // A shift of 1 pixel corresponds to an introduced phase-shift across the pupil of 1 period.
-        } else if ( i == tiltMode.y ) {
-            shiftToAlpha.y = 2 * M_PI / (mx-mn); // * norms[i];
+    }
+}
+
+void ModeSet::measureJacobian( const redux::image::Pupil& pup, double scale ) {
+    
+    if( tiltMode.min() < 0 ) {
+        
+        fill_n( &J_T_xy[0][0], 4, 0.0 );
+        fill_n( &J_xy_T[0][0], 4, 0.0 );
+    
+        size_t ySize = dimSize(1);
+        size_t xSize = dimSize(2);
+        vector<double> coeffs( 4, 0.0 );
+        double* cdata = coeffs.data();
+        const double* pupPtr = pup.get();
+        map<vector<double>,uint16_t> fits;
+        for( uint16_t i(0); i<modePointers.size(); ++i ) {
+            double* ptr = modePointers[i];
+            if( !ptr ) continue;
+            fitPlane( ptr, ySize, xSize, pupPtr, cdata+1, cdata );
+            fits[coeffs] = i;
+        }
+        if( fits.size() < 2 ) return;
+        double chisq[3] = { numeric_limits<double>::max() };
+        size_t cnt(0);
+        for( const auto& m: fits ) {
+            auto coeffs = m.first;
+            chisq[cnt] = coeffs[0];
+            J_T_xy[cnt][0] = scale*coeffs[2];    // x-coefficient from fitting plane
+            J_T_xy[cnt][1] = scale*coeffs[1];    // y-coefficient from fitting plane
+            switch( cnt++ ) {
+                case 0: tiltMode.x = m.second; break;   // We assume the first tilt is X, we swap below if the assumption is wrong.
+                case 1: tiltMode.y = m.second; break;
+                default: ;
+            }
+            if( cnt == 3 )  break;
         }
 
+        if( (100*chisq[0] < chisq[2]) && (100*chisq[1] < chisq[2]) ) {  // it seems we found 2 tilts.
+            // Was the assumtion that the first found tilt is X accurate? Else swap tiltModes
+            if( fabs(J_T_xy[0][0])/fabs(J_T_xy[1][0]) < 1 ) {
+                std::swap( tiltMode.x, tiltMode.y );
+            }
+        }
+        invert_2x2( J_T_xy[0], J_xy_T[0] ); 
     }
+    
+    // shiftToAlpha.x = 2 * M_PI / (mx-mn); // * norms[i];     // A shift of 1 pixel corresponds to an introduced phase-shift across the pupil of 1 period.
 
 }
 
@@ -470,11 +518,6 @@ void ModeSet::normalize( double scale ) {
         double* ptr = modePointers[i];
         double mode_scale = scale/norms[i];
         std::transform( ptr, ptr+nPixels, ptr, std::bind1st(std::multiplies<double>(), mode_scale) );
-        if( i == tiltMode.x ) {
-            shiftToAlpha.x /= mode_scale;
-        } else if (i == tiltMode.y) {
-            shiftToAlpha.y /= mode_scale;
-        }
         norms[i] = mode_scale;
     }
     
