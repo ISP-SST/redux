@@ -9,6 +9,8 @@
 #include "redux/types.hpp"
 
 #include <fstream>
+#include <functional>
+#include <mutex>
 #include <numeric>
 
 #include <boost/filesystem.hpp>
@@ -47,6 +49,19 @@ namespace {
     
     const char end_card[] = "END                                                                             ";
     
+    const bool use_mutex = (fits_is_reentrant() == 0);
+    
+    std::mutex fmtx;
+    void lock( void ) { if(use_mutex) fmtx.lock(); }
+    void unlock( void ) { if(use_mutex) fmtx.unlock(); }
+    
+    int locked_call( std::function<int(void)> f ) {
+        lock();
+        int ret = f();
+        unlock();
+        return ret;
+    }
+    
     /* not used at the moment, so commented out to avoid compiler warnings about it
     template <typename T> Fits::TypeIndex getDatyp( void )  { return Fits::FITS_NOTYPE; }
     template <> Fits::TypeIndex getDatyp<uint8_t>( void ) { return Fits::FITS_BYTE; }
@@ -82,7 +97,9 @@ namespace {
     
     void throwStatusError( const string& filename, int status ) {
        char err_text[80];
+       lock();
        fits_get_errstatus( status, err_text );
+       unlock();
        throw ios_base::failure("Failed to read fits: " + filename + "  cfitsio reports("+to_string(status)+"): " + string(err_text) );
     }
     
