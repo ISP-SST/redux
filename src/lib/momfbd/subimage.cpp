@@ -73,8 +73,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
     index = i;
     initialOffset = pos;
     channelResidualOffset = resOffs;
-    imageShift = 0;
-    adjustedTilts = 0;
+    currentShift = 0;
     rowStride = bStride;
     imgSize = patchSize;
     imgSize2 = imgSize*imgSize;
@@ -182,7 +181,7 @@ void SubImage::initialize( Object& o, bool doReset ) {
         stats.noise *= channel.noiseFudge;
         double rg = stats.noise/stats.stddev;
         msg += " noise=" + to_string (stats.noise) + " rg=" + to_string(rg);
-        msg += "  initial shift=" + (string)imageShift;
+        msg += "  initial shift=" + (string) currentShift;
         LOG_TRACE << msg << ende;
         o.addRegGamma( rg );
     }
@@ -427,14 +426,14 @@ void SubImage::alignAgainst( const Ptr& refIm ) {
     auto arr = reshapeArray( tmpPtrD, imgSize, imgSize );
     double** arrPtr = arr.get();
     int mid = imgSize/2;
-    imageShift = 0;
+    currentShift = 0;
     double maxVal = arrPtr[mid][mid];
     for( int x=-19; x<20; ++x ) {
         for( int y=-19; y<20; ++y ) {
             if( arrPtr[mid+y][mid+x] > maxVal ) {
                 maxVal = arrPtr[mid+y][mid+x];
-                imageShift.x = x;
-                imageShift.y = y;
+                currentShift.x = x;
+                currentShift.y = y;
             }
         }
     }
@@ -445,60 +444,39 @@ void SubImage::alignAgainst( const Ptr& refIm ) {
 template <typename T>
 bool SubImage::adjustShifts( const T* alpha ) {
 
-    PointI oldShift = imageShift;
-    PointD oldVal(0,0),newVal(0,0);
     bool ret(false);
     
     PointI xyDims(1,2);                     // N.B. dim=0 is the index of the image-stack
 #ifdef RDX_DO_TRANSPOSE
     std::swap( xyDims.x, xyDims.y );
 #endif
+    const PointI& tm = modes->tiltMode;
+    const PointD thisAlpha = PointD( alpha[tm.y], alpha[tm.x] ) + currentTiltOffset;
+
+    const PointI thisShift = -modes->alphaToShift( thisAlpha ).round();
     
-    int32_t mIndex = object.modes->tiltMode.y;
-    if( mIndex >= 0 ) {
-        double shiftToAlpha = object.shiftToAlpha.y;
-        double alphaToShift = 1.0/shiftToAlpha;
-        newVal.y = oldVal.y = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.y;
-        int desiredAdjust = -lround( oldVal.y*alphaToShift );
-        int actualAdjust(0);
-        if( desiredAdjust && ( actualAdjust = shift( xyDims.y, desiredAdjust )) ) {    // will return the "actual" shift. (the cube-edge might restrict it)
-            imageShift.y += actualAdjust;
-            localAlpha[mIndex] += actualAdjust *shiftToAlpha;
-            newVal.y += actualAdjust *shiftToAlpha;
-        }
-        if( actualAdjust != desiredAdjust ) {
-            LOG_WARN << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
-                    << ": Patch is too close to edge, only shifted " << actualAdjust << "/" << desiredAdjust
-                    << " pixels." << ende;
-        }
+    PointI actualShift;
+    if( thisShift.x ) {
+        actualShift.x = shift( xyDims.x, thisShift.x );
+    }
+    if( thisShift.y ) {
+        actualShift.y = shift( xyDims.y, thisShift.y );
+    }
+    
+    if( actualShift != 0 ) {
+        //cout << index << "  thisShift = " << thisShift << "  actualShift = " << actualShift
+        //     << "  aToS = " << modes->alphaToShift( PointD(1,1) ) << endl;
+        currentShift += actualShift;
+        currentTiltOffset += modes->shiftToAlpha ( actualShift );
+        ret = true;
     }
 
-    mIndex = object.modes->tiltMode.x;
-    if( mIndex >= 0 ) {
-        double shiftToAlpha = object.shiftToAlpha.x;
-        double alphaToShift = 1.0/shiftToAlpha;
-        newVal.x = oldVal.x = alpha[mIndex]+localAlpha[mIndex]; // + channelResidualOffset.x;
-        int desiredAdjust = -lround( oldVal.x*alphaToShift );
-        int actualAdjust(0);
-        if( desiredAdjust && ( actualAdjust = shift( xyDims. x, desiredAdjust )) ) {        // will return the "actual" shift. (the cube-edge might restrict it)
-            imageShift.x += actualAdjust;
-            localAlpha[mIndex] += actualAdjust *shiftToAlpha;
-            newVal.x += actualAdjust *shiftToAlpha;
-        }
-        if( actualAdjust != desiredAdjust ) {
-            LOG_WARN << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
-                    << ": Patch is too close to edge, only shifted " << actualAdjust << "/" << desiredAdjust
-                    << " pixels." << ende;
-        }
-    }
-
-    if( oldShift != imageShift ) {
-        LOG_TRACE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
-                  << ":  cutout was shifted, from " << oldShift << " to " << imageShift
-                  << std::scientific << " oldVal=" << oldVal << "  newVal=" << newVal << ende;
-        ret = shifted = true;
+    if( actualShift != thisShift ) {
+        LOG_NOTICE << "SubImage " << to_string(object.ID) << ":" << to_string(channel.ID) << ":" << to_string(index)
+                   << ": Patch is too close to edge, could only shift " << actualShift << "/" << thisShift << " pixels!" << ende;
     }
     return ret;
+    
 }
 template bool SubImage::adjustShifts( const double* );
 template bool SubImage::adjustShifts( const float* );
@@ -511,18 +489,10 @@ void SubImage::resetShifts( void ) {
     std::swap( xyDims.x, xyDims.y );
 #endif
     
-    shift( xyDims.x, -imageShift.x );
-    shift( xyDims.y, -imageShift.y );
-    imageShift = 0;
-    int32_t mIndex = object.modes->tiltMode.x;
-    if( mIndex >= 0 ) {
-        localAlpha[mIndex] = 0;
-    }
-    
-    mIndex = object.modes->tiltMode.y;
-    if( mIndex >= 0 ) {
-        localAlpha[mIndex] = 0;
-    }
+    shift( xyDims.x, -currentShift.x );
+    shift( xyDims.y, -currentShift.y );
+    currentShift = 0;
+    currentTiltOffset = 0;
     
 }
 
@@ -543,12 +513,17 @@ void SubImage::addToPhi( const T* a, double* phiPtr ) const {
     LOG_TRACE << "SubImage(" << object.ID << ":" << index << ")::addToPhi()" << printArray( a, nModes, "  newAlpha" ) << ende;
 #endif
 
-    for( unsigned int i=0; i<nModes; ++i ) {
-        double alpha = a[i] + localAlpha[i];
+    for( int mi(0); mi <nModes; ++mi ) {
+        double alpha = a[mi];
+        if( mi == modes->tiltMode.x ) {
+            alpha += currentTiltOffset.x;
+        } else if( mi == modes->tiltMode.y ) {
+            alpha += currentTiltOffset.y;
+        }
         if( fabs(alpha) > ALPHA_CUTOFF ) {
-            const double* modePtr = modes->modePointers[i];
+            const double* modePtr = modes->modePointers[mi];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
-                [alpha](const double& p, const double& m) {
+                [alpha]( const double& p, const double& m ) {
                     return p + alpha*m;
                 });
         }
@@ -677,19 +652,17 @@ void SubImage::dump( std::string tag ) const {
     Array<double> img( imgSize, imgSize );
     Array<complex_t> tmp;
     ArrayStats s;
-    getWindowedImg(img,s,true);
-    Ana::write (tag + "_rimg.f0", *this);
-    Ana::write (tag + "_img.f0", img);
-    Ana::write (tag + "_phi.f0", phi);
-    tmp.wrap( PF.get(), pupilSize, pupilSize);
-    Ana::write (tag + "_pf.f0", tmp);
-    Ana::write (tag + "_otf.f0", OTF);
-    Ana::write (tag + "_psf.f0", getPSF());
-    Ana::write (tag + "_imgFT.f0", imgFT);
-    Ana::write (tag + "_window.f0", window);
-    Ana::write (tag + "_vogel.f0", vogel);
-    Ana::write (tag + "_alpha.f0", localAlpha);
-    
+    getWindowedImg( img,s, true );
+    Ana::write( tag + "_rimg.f0", *this );
+    Ana::write( tag + "_img.f0", img );
+    Ana::write( tag + "_phi.f0", phi );
+    tmp.wrap( PF.get(), pupilSize, pupilSize );
+    Ana::write( tag + "_pf.f0", tmp );
+    Ana::write( tag + "_otf.f0", OTF );
+    Ana::write( tag + "_psf.f0", getPSF() );
+    Ana::write( tag + "_imgFT.f0", imgFT );
+    Ana::write( tag + "_window.f0", window );
+    Ana::write( tag + "_vogel.f0", vogel );
 
 
 }

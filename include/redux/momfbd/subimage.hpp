@@ -135,7 +135,9 @@ namespace redux {
             uint32_t index;
             redux::util::PointI initialOffset;          //<! Starting location of the patch in the datablock, this is typically (maxLocalShift, maxLocalShift)
             redux::util::PointF channelResidualOffset;  //<! Remainder after shifting the cutout integer pixels.
-            redux::util::PointI imageShift;            //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
+            redux::util::PointI currentShift;           //<! How the subimage has been shifted to compensate for large tip/tilt coefficients.
+            redux::util::PointD currentTiltOffset;      //<! The current shift in alpha-offset.
+            redux::util::Point16 dataSize;              //<! Size of the available data (i.e. the limit for shifting)
             uint16_t imgSize, pupilSize, nModes;
             uint32_t otfSize, pupilSize2, otfSize2;
             size_t rowStride,imgSize2;

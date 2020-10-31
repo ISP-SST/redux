@@ -324,7 +324,7 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
         if( si ) {
             si->restore( aoPtr, dPtr );
             avgNoiseVariance += sqr(si->stats.noise);
-            avgShift += si->imageShift;
+            avgShift += si->currentShift;
             imgCount++;
         }
     }
