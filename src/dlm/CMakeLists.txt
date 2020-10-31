@@ -54,35 +54,12 @@ if (DEFINED IDL_FOUND)
          "${RDX_LIB_BASE}/file/anacompress.cpp"
          "${RDX_LIB_BASE}/file/anadecompress.cpp"
     )
-    add_library(ana SHARED ana.cpp ${RDX_ANA_DEPS} )
-    set(ANA_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libana.dlm")
-    configure_file("libana.dlm.in" "${ANA_DLM_FILE_LOCATION}")
-    target_link_libraries (ana ${RDX_CURRENT_LIBRARIES})
-    
     set( RDX_MOMFBD_DEPS
          "${RDX_LIB_BASE}/file/filefits.cpp"
          "${RDX_LIB_BASE}/util/stringutil.cpp"
          "${RDX_LIB_BASE}/file/filemomfbd.cpp"
          "${RDX_LIB_BASE}/math/functions.cpp"
     )
-    add_library(momfbd SHARED momfbd.cpp ${RDX_MOMFBD_DEPS} )
-    set(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
-    configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")
-    target_link_libraries (momfbd ${RDX_CURRENT_LIBRARIES})
-    
-    add_library(gridmatch SHARED gridmatch.cpp )
-    set(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
-    configure_file("libgridmatch.dlm.in" "${GRIDMATCH_DLM_FILE_LOCATION}")
-    
-    install(TARGETS ana momfbd gridmatch DESTINATION ${IDL_DLM_DIR} )
-    install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
-        
-    if( Boost_VERSION VERSION_LESS "1.41" OR NOT RDX_WITH_FFTW3 OR NOT RDX_WITH_GSL OR NOT Threads_FOUND )
-        message(STATUS "The rdx DLM will not be built (requires Boost>=1.41, FFTW3, GSL and Threads).")
-        return()
-    endif()
-
-        
     set( RDX_RDX_DEPS filetools.cpp idlutil.cpp imgtools.cpp modes.cpp string.cpp
          ${RDX_ANA_DEPS} ${RDX_MOMFBD_DEPS}
          "${RDX_LIB_BASE}/file/fileio.cpp"
@@ -101,11 +78,9 @@ if (DEFINED IDL_FOUND)
          "${RDX_LIB_BASE}/util/stringutil.cpp"
          "${RDX_LIB_BASE}/util/astro_comp.cpp"
          "${RDX_LIB_BASE}/util/solar_system_geo.cpp"
-         "${RDX_LIB_BASE}/util/trace.cpp"
          "${RDX_LIB_BASE}/version.cpp"
          "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )
-    set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp" GENERATED )
     if( RDX_WITH_FFTW3 )
         set( RDX_RDX_DEPS ${RDX_RDX_DEPS} fft.cpp "${RDX_LIB_BASE}/image/fouriertransform.cpp")
     endif()
@@ -116,6 +91,36 @@ if (DEFINED IDL_FOUND)
         file( GLOB RDX_UTIL_OPENCV_CPP "${RDX_LIB_BASE}/util/opencv/*.cpp")
         set( RDX_RDX_DEPS ${RDX_RDX_DEPS} cvutil.cpp ${RDX_UTIL_OPENCV_CPP} )
     endif()
+    if( RDX_TRACE )
+        set(RDX_ANA_DEPS "${RDX_ANA_DEPS}" "${RDX_LIB_BASE}/util/trace.cpp")
+        set(RDX_MOMFBD_DEPS "${RDX_MOMFBD_DEPS}" "${RDX_LIB_BASE}/util/trace.cpp")
+        set(RDX_RDX_DEPS "${RDX_RDX_DEPS}" "${RDX_LIB_BASE}/util/trace.cpp")
+    endif()
+
+    add_library(ana SHARED ana.cpp ${RDX_ANA_DEPS} )
+    set(ANA_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libana.dlm")
+    configure_file("libana.dlm.in" "${ANA_DLM_FILE_LOCATION}")
+    target_link_libraries (ana ${RDX_CURRENT_LIBRARIES})
+    
+    add_library(momfbd SHARED momfbd.cpp ${RDX_MOMFBD_DEPS} )
+    set(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
+    configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")
+    target_link_libraries (momfbd ${RDX_CURRENT_LIBRARIES})
+    
+    add_library(gridmatch SHARED gridmatch.cpp )
+    set(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
+    configure_file("libgridmatch.dlm.in" "${GRIDMATCH_DLM_FILE_LOCATION}")
+    
+    install(TARGETS ana momfbd gridmatch DESTINATION ${IDL_DLM_DIR} )
+    install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
+
+    
+    if( Boost_VERSION VERSION_LESS "1.41" OR NOT RDX_WITH_FFTW3 OR NOT RDX_WITH_GSL OR NOT Threads_FOUND )
+        message(STATUS "The rdx DLM will not be built (requires Boost>=1.41, FFTW3, GSL and Threads).")
+        return()
+    endif()
+    
+    set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp" GENERATED )
     
     add_library(rdx SHARED rdx.cpp convertlog.cpp ${RDX_RDX_DEPS} )
     set(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
