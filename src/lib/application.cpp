@@ -23,7 +23,7 @@ void Application::getOptions( bpo::options_description& options, const string& n
     general.add_options()
     ( "version,V", "Print version information and quit." )
     ( "copyright", "Print copyright information and quit." )
-    ( "help,h", "Show command line options and quit." )
+    ( "help,?", "Show command line options and quit." )
 //    ( "tutorial", "Print full tutorial and quit." )
 //    ( "sample", "Produce a sample config script on standard output, that uses" " various application features." )
     ;
