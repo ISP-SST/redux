@@ -71,6 +71,7 @@ namespace redux {
                 return Ptr( new TcpConnection( io_service ) );
             }
 
+            uint64_t receiveN( std::shared_ptr<char> buf, uint64_t N );
             std::shared_ptr<char> receiveBlock( uint64_t& blockSize );
             
             size_t readline( std::string& line );

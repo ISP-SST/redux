@@ -61,6 +61,33 @@ TcpConnection::~TcpConnection( void ) {
 }
 
 
+uint64_t TcpConnection::receiveN( std::shared_ptr<char> buf, uint64_t N ) {
+    
+    int64_t remain = N;
+    uint64_t count(0);
+    boost::system::error_code ec;
+    while( remain > 0 ) {
+        try {
+            uint64_t this_count = boost::asio::read( mySocket, boost::asio::buffer(buf.get()+count,remain), boost::asio::transfer_at_least(1), ec );
+            if( this_count == 0 ) {
+                if( ec == boost::asio::error::eof || !mySocket.is_open() ) break;
+            }
+            count += this_count;
+            remain -= this_count;
+        }
+        catch( const exception& ) {
+            // ignore and continue. Connection errors are dealt with above.
+        }
+    }
+    
+    if( remain ) {  // connection severed before completion, clear partial transfer.
+        count = 0;
+    }
+
+    return count;
+}
+
+
 shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
 
     using redux::util::unpack;
@@ -83,27 +110,13 @@ shared_ptr<char> TcpConnection::receiveBlock( uint64_t& received ) {
         return buf;
     }
 
+    if( count < sizeof(uint64_t) ) return buf;
     unpack( sz, blockSize, swapEndian_ );
     if( blockSize == 0 ) return buf;
 
     buf = rdx_get_shared<char>(blockSize);
-
-    int64_t remain = blockSize;
-    while( remain > 0 ) {
-        try {
-            count = boost::asio::read( mySocket, boost::asio::buffer(buf.get()+received,remain), boost::asio::transfer_at_least(1), ec );
-            if( count == 0 ) {
-                if( ec == boost::asio::error::eof || !mySocket.is_open() ) break;
-            }
-            received += count;
-            remain -= count;
-        }
-        catch( const exception& ) {
-            // ignore and continue. Connection errors are dealt with above.
-        }
-    }
-    
-    if( remain ) {  // connection severed before completion, clear partial transfer.
+    received = receiveN( buf, blockSize );
+    if( received != blockSize ) {  // connection severed before completion, clear partial transfer.
         buf.reset();
         received = 0;
     }
