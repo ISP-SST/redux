@@ -48,6 +48,7 @@ namespace redux {
                 tmp.x=std::min<T>(tmp.x,rhs.x);
                 tmp.y=std::min<T>(tmp.y,rhs.y);
                 return tmp; }
+            double avg( void ) const { return static_cast<double>(x+y)*0.5; }
             T max( void ) const { return std::max<T>(x,y); }
             T min( void ) const { return std::min<T>(x,y); }
             PointType<T> Abs( void ) const { return PointType<T>(redux::util::Abs<T>(y),redux::util::Abs<T>(x)); }
@@ -95,6 +96,23 @@ namespace redux {
         std::ostream& operator<<(std::ostream& os, const PointType<T>& pt) {
             os << (std::string)pt;
             return os;
+        }
+        
+        template<typename T>
+        PointType<T> operator+( T a, const PointType<T>& pt ) {
+            return PointType<T>( a+pt.y, a+pt.x );
+        }
+        template<typename T>
+        PointType<T> operator-( T a, const PointType<T>& pt ) {
+            return PointType<T>( a-pt.y, a-pt.x );
+        }
+        template<typename T>
+        PointType<T> operator*( T a, const PointType<T>& pt ) {
+            return PointType<T>( a*pt.y, a*pt.x );
+        }
+        template<typename T>
+        PointType<T> operator/( T a, const PointType<T>& pt ) {
+            return PointType<T>( a/pt.y, a/pt.x );
         }
         
 
