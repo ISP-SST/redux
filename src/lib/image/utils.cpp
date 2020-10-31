@@ -481,6 +481,11 @@ double redux::image::horizontalInterpolation (T** array, size_t sizeY, size_t si
     }
 
 }
+template double redux::image::horizontalInterpolation (uint8_t**, size_t, size_t, size_t, size_t);
+template double redux::image::horizontalInterpolation (int16_t**, size_t, size_t, size_t, size_t);
+template double redux::image::horizontalInterpolation (uint16_t**, size_t, size_t, size_t, size_t);
+template double redux::image::horizontalInterpolation (int32_t**, size_t, size_t, size_t, size_t);
+template double redux::image::horizontalInterpolation (uint32_t**, size_t, size_t, size_t, size_t);
 template double redux::image::horizontalInterpolation (float**, size_t, size_t, size_t, size_t);
 template double redux::image::horizontalInterpolation (double**, size_t, size_t, size_t, size_t);
 

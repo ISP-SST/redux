@@ -134,8 +134,8 @@ int redux::file::anadecrunch32(const unsigned char* x, int32_t* array, int slice
                         r0 = r0 + 8;
                         /* add 8 bits for each all zero byte */
                         if(r0 > 32) {
-                            fprintf(stderr, "DECRUNCH -- bad bit sequence, cannot continue\n");
-                            fprintf(stderr, "i = %d, r1 = %d, ix= %d, iy = %d\n", i, r1, ix, iy);
+                            fprintf(stderr, "DECRUNCH32 -- bad bit sequence, cannot continue\n");
+                            fprintf(stderr, "i = %d, r0 = %d, r1 = %d, ix= %d, iy = %d\n", i, r0, r1, ix, iy);
                             return -1;
                         }
                     }
@@ -326,7 +326,7 @@ int redux::file::anadecrunch(const unsigned char* x, int16_t* array, int slice, 
                         /* add 8 bits for each all zero byte */
                         if(r0 > 32) {
                             fprintf(stderr, "DECRUNCH -- bad bit sequence, cannot continue\n");
-                            fprintf(stderr, "i = %d, r1 = %d, ix= %d, iy = %d\n", i, r1, ix, iy);
+                            fprintf(stderr, "i = %d, r0 = %d, r1 = %d, ix= %d, iy = %d\n", i, r0, r1, ix, iy);
                             return -1;
                         }
                     }
@@ -493,7 +493,8 @@ int redux::file::anadecrunch8(const unsigned char* x, int8_t* array, int slice, 
                         r0 = r0 + 8;
                         /* add 8 bits for each all zero byte */
                         if(r0 > 32) {
-                            fprintf(stderr, "DECRUNCH -- bad bit sequence, cannot continue");
+                            fprintf(stderr, "DECRUNCH8 -- bad bit sequence, cannot continue");
+                            fprintf(stderr, "i = %d, r0 = %d, r1 = %d, ix= %d, iy = %d\n", i, r0, r1, ix, iy);
                             return -1;
                         }
                     }
@@ -697,8 +698,8 @@ int redux::file::anadecrunchrun(const unsigned char* x, int16_t* array, int slic
                                 r0 = r0 + 8;
                                 /* add 8 bits for each all zero byte */
                                 if(r0 > 32) {
-                                    fprintf(stderr, "DECRUNCH -- bad bit sequence, cannot continue\n");
-                                    fprintf(stderr, "i = %d, r1 = %d, iy = %d\n", i, r1, iy);
+                                    fprintf(stderr, "DECRUNCHRUN -- bad bit sequence, cannot continue\n");
+                                    fprintf(stderr, "i = %d, r0 = %d, r1 = %d, iy = %d\n", i, r0, r1, iy);
                                     return -1;
                                 }
                             }
@@ -902,8 +903,8 @@ int redux::file::anadecrunchrun8(const unsigned char* x, int8_t* array, int slic
                                 r0 = r0 + 8;
                                 /* add 8 bits for each all zero byte */
                                 if(r0 > 32) {
-                                    fprintf(stderr, "DECRUNCH -- bad bit sequence, cannot continue\n");
-                                    fprintf(stderr, "i = %d, r1 = %d, iy = %d\n", i, r1, iy);
+                                    fprintf(stderr, "DECRUNCHRUN8 -- bad bit sequence, cannot continue\n");
+                                    fprintf(stderr, "i = %d, r0 = %d, r1 = %d, iy = %d\n", i, r0, r1, iy);
                                     return -1;
                                 }
                             }
