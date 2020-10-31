@@ -40,8 +40,14 @@ namespace redux {
         template <typename T>
         redux::util::Array<T> makePlane( size_t ySize, size_t xSize, double* coeffs, uint8_t nCoeffs=3 );
 
+        template <typename T, typename U>
+        void fitPlane( const T* data, size_t ySize, size_t xSize, const U* mask, double* coeffs, double* chisq=nullptr );
         template <typename T>
-        void fitPlane( const T* data, size_t ySize, size_t xSize, double* coeffs, double* chisq=nullptr );
+        void fitPlane( const T* data, size_t ySize, size_t xSize, double* coeffs, double* chisq=nullptr ) {
+            fitPlane( data, ySize, xSize, (bool*)nullptr, coeffs, chisq);
+        }
+        template <typename T, typename U>
+        redux::util::Array<T> fitPlane( const redux::util::Array<T>& in, const redux::util::Array<U>& mask, bool subtract_mean=false, double* coeffs=nullptr, double* chisq=nullptr );
         template <typename T>
         redux::util::Array<T> fitPlane( const redux::util::Array<T>& in, bool subtract_mean=false, double* coeffs=nullptr, double* chisq=nullptr );
 
