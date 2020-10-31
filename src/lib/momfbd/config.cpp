@@ -418,8 +418,6 @@ bool ChannelCfg::operator==( const ChannelCfg& rhs ) const {
 /********************   Object  ********************/
 
 ObjectCfg::ObjectCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5),
-                         alphaToPixels(0), pixelsToAlpha(0),
-                         alphaToDefocus(0), defocusToAlpha(0),
                          maxLocalShift(5), minimumOverlap(16), 
                          patchSize(128), pupilPixels(64), saveMask(0), wavelength(0), traceObject(false) {
 
@@ -512,9 +510,9 @@ void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool sho
 
 uint64_t ObjectCfg::size( void ) const {
     // static sizes (PoD types)
-    uint64_t ssz = sizeof( alphaToPixels ) + sizeof( alphaToDefocus ) + sizeof( arcSecsPerPixel ) + sizeof( defocusToAlpha )
+    uint64_t ssz = sizeof( arcSecsPerPixel )
                  + sizeof( maxLocalShift ) + sizeof( minimumOverlap ) + sizeof( patchSize ) + sizeof( pixelSize )
-                 + sizeof( pixelsToAlpha ) + sizeof( pupilPixels ) + sizeof( saveMask ) + sizeof( telescopeF )
+                 + sizeof( pupilPixels ) + sizeof( saveMask ) + sizeof( telescopeF )
                  + sizeof( traceObject ) + sizeof( wavelength );
     uint64_t sz = ssz + ChannelCfg::size();
     sz += initFile.length() + modeFile.length() + 2;
@@ -527,15 +525,11 @@ uint64_t ObjectCfg::pack( char* ptr ) const {
     using redux::util::pack;
     uint64_t count = ChannelCfg::pack( ptr );
     // scalar values
-    count += pack( ptr+count, alphaToPixels );
-    count += pack( ptr+count, alphaToDefocus );
     count += pack( ptr+count, arcSecsPerPixel );
-    count += pack( ptr+count, defocusToAlpha );
     count += pack( ptr+count, maxLocalShift );
     count += pack( ptr+count, minimumOverlap );
     count += pack( ptr+count, patchSize );
     count += pack( ptr+count, pixelSize );
-    count += pack( ptr+count, pixelsToAlpha );
     count += pack( ptr+count, pupilPixels );
     count += pack( ptr+count, saveMask );
     count += pack( ptr+count, telescopeF );
@@ -554,15 +548,11 @@ uint64_t ObjectCfg::unpack( const char* ptr, bool swap_endian ) {
     using redux::util::unpack;
     uint64_t count = ChannelCfg::unpack( ptr, swap_endian );
     // scalar values
-    count += unpack( ptr+count, alphaToPixels, swap_endian );
-    count += unpack( ptr+count, alphaToDefocus, swap_endian );
     count += unpack( ptr+count, arcSecsPerPixel, swap_endian );
-    count += unpack( ptr+count, defocusToAlpha, swap_endian );
     count += unpack( ptr+count, maxLocalShift, swap_endian );
     count += unpack( ptr+count, minimumOverlap, swap_endian );
     count += unpack( ptr+count, patchSize, swap_endian );
     count += unpack( ptr+count, pixelSize, swap_endian );
-    count += unpack( ptr+count, pixelsToAlpha, swap_endian );
     count += unpack( ptr+count, pupilPixels, swap_endian );
     count += unpack( ptr+count, saveMask, swap_endian );
     count += unpack( ptr+count, telescopeF, swap_endian );

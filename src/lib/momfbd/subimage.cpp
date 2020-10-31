@@ -57,7 +57,7 @@ namespace {
 
 SubImage::SubImage (Object& obj, const Channel& ch, const Array<double>& wind, const Array<double>& nwind)
     : imgSize(0), pupilSize(0), nModes(0), rowStride(0), imgSize2(0), oldRG(0), grad_step(0), object (obj), channel(ch), logger(ch.logger), modes(obj.modes),
-      window (wind), noiseWindow(nwind), shifted(false) {
+      window (wind), noiseWindow(nwind) {
 #ifdef USE_LUT
     static int dummy RDX_UNUSED = initSineLUT(); 
 #endif
@@ -97,7 +97,6 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
     }
     
     nModes = nM;
-    localAlpha.assign( nM, 0.0 );
     grad_step = object.myJob.graddiff_step * object.wavelength;
 
 }

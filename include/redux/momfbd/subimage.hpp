@@ -152,13 +152,6 @@ namespace redux {
             const redux::util::Array<double>& window;
             const redux::util::Array<double>& noiseWindow;
             
-            redux::util::PointD adjustedTilts;
-            bool shifted;
-            bool newPhi;
-            bool newOTF;
-            std::mutex mtx;
-            
-            std::vector<double> localAlpha;
             redux::util::Array<double> phi;         //!< Array containing the phase of this OTF               size = pupilsize
             std::shared_ptr<complex_t> PF;          //!< Pupil Function = pupilmask * exp(i*phi).             size = pupilsize
             redux::image::FourierTransform OTF;     //!< Optical Transfer Function = autocorrelation of PF.   size = 2*pupilsize

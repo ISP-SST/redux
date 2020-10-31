@@ -257,21 +257,6 @@ void Object::initProcessing( Solver& ws ){
             throw std::logic_error("The pupil has the wrong dimensions.");
         }
     
-        //shiftToAlpha = modes->shiftToAlpha;
-//          ModeSet& ret = myJob.globalData->get(info );
-//         unique_lock<mutex> lock(ret.mtx );
-//         if( ret.empty( ) ){    // this set was inserted, so it is not loaded yet.
-//             if( ret.load( modeFile, pupilPixels ) ){
-//                 LOG_DEBUG << "Loaded Mode-file " << modeFile << ende;
-//                 ret.getNorms( *pupil );
-//                 modes = ret;
-//                 LOG_WARN << "Using a Mode-file will force the tilt-indices to be( y,x)=" << modes->tiltMode
-//                          << ".  This should be auto-detected in the future..." << ende;
-//               } else LOG_ERR << "Failed to load Mode-file " << modeFile << ende;
-//         }
-//         
-        
-        //modes->init( myJob, *this );                 // will get modes from globalData
         modes->tiltMode = -1;   // FIXME: Why do we need to force a recalc? Jacobian should be sent from master.
         modes->measureJacobian( *pupil, wavelength*(0.5*frequencyCutoff)/util::pix2cf( arcSecsPerPixel, myJob.telescopeD ) );
 
@@ -872,22 +857,6 @@ void Object::initObject( void ){
     }
     
     modes->measureJacobian( *pupil, (0.5*frequencyCutoff)/util::pix2cf( arcSecsPerPixel, myJob.telescopeD ) );
-    pixelsToAlpha =  alphaToPixels = 0;
-    //double pixelsToAlpha2(0 );
-    //double alphaToPixels2(0 );
-    if( modes->tiltMode.y >= 0 ){
-        double delta = (*modes)(modes->tiltMode.y,pupilPixels/2+1,pupilPixels/2 )- (*modes)(modes->tiltMode.y,pupilPixels/2,pupilPixels/2 );
-        //pixelsToAlpha2 =( 2 * M_PI /( delta*(pupilPixels-1)) )* pupilPixels/patchSize;
-        //alphaToPixels2 = 1.0 / pixelsToAlpha2;
-        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta );
-    } else if( modes->tiltMode.x >= 0 ){
-        double delta = (*modes)(modes->tiltMode.x,pupilPixels/2,pupilPixels/2+1 )- (*modes)(modes->tiltMode.x,pupilPixels/2,pupilPixels/2 );
-        pixelsToAlpha = util::pix2cf(arcSecsPerPixel,myJob.telescopeD)/(0.5*frequencyCutoff*delta );
-    }
-    
-    if( fabs(pixelsToAlpha )> 0 ){
-        alphaToPixels = 1.0/pixelsToAlpha;
-    }
     
     LOG_DETAIL << "Alpha-to-Shift: " << modes->alphaToShift( PointF(1,1) )
               << "    Shift-to-Alpha: " << modes->shiftToAlpha( PointF(1,1) ) << ende;

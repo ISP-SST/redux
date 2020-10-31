@@ -41,7 +41,7 @@ namespace testsuite {
             
             //BOOST_TEST( weaklyCanonical(test_dir / "non/existing/../path/") == (test_dir/"non/path") );   // TODO test with resolution of known symlink
             BOOST_TEST( weaklyCanonical( "~root/non/existing/../path/" ) == "/root/non/path" );
-            
+
             BOOST_TEST( cleanPath( "non/existing/../path/" ) == "non/path" );
             BOOST_TEST( cleanPath( my_home+"non/existing/../path/" ) == my_home+"non/path" );
             BOOST_TEST( cleanPath( "~/non/existing/../path/" ) == my_home+"non/path" );
