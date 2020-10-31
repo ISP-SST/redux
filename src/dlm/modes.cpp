@@ -66,13 +66,13 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
     if( nPlainArgs < 2 ) {
         string msg = "Two arguments needed. nPixels & pupil-radius (in pixels).";
         msg += " An optional argument can be supplied to central-obscuration radius.";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
     
     if( kw.help ) {
         int lvl = 1;
         if( kw.verbose ) lvl++;
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, make_pupil_info(lvl).c_str() );
+        printMessage( make_pupil_info(lvl) );
         return IDL_GettmpInt(0);
     }
     
@@ -105,7 +105,7 @@ IDL_VPTR make_pupil(int argc, IDL_VPTR* argv, char* argk) {
         if( innerRadius > 0.0 ) msg += " and a central obscuration of radius " + to_string(innerRadius);
         if( kw.center ) msg += ", centered at " + (string)center;
         msg += ".";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+        printMessage( msg );
     }
     
     auto tmp2D = reshapeArray( tmpData, nPixels, nPixels );
@@ -210,7 +210,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     
     if (nPlainArgs < 3) {
         string msg = "Three arguments needed: Mode-number(s), nPixels & pupil-radius (in pixels).";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
     
     IDL_VPTR index = argv[0];
@@ -230,7 +230,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
             std::copy( beg, beg + index->value.arr->n_elts , back_inserter(modeNumbers) );
         } else  {
             string msg = "Mode-numbers must be of type BYTE, INT or LONG.";
-            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+            printMessage( msg, IDL_MSG_LONGJMP );
         }
     } else {
         if( index->type == IDL_TYP_STRING ) {
@@ -307,7 +307,7 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     if( kw.verbose ) {
         flags |= Zernike::VERBOSE;
         string msg = "Generating modes: " + (string)mi+ ".";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+        printMessage( msg );
     }
 
     shared_ptr<ModeSet>& modesRef = Cache::get<ModeInfo,shared_ptr<ModeSet>>(mi );
@@ -327,6 +327,9 @@ IDL_VPTR make_modes(int argc, IDL_VPTR* argv, char* argk) {
     if( kw.normalize ) {
         modes.getNorms( pupil );
         modes.normalize( 1.0 );
+        // TODO: do the actual normalization of the local copy of the modes below
+        string msg = "Normalizing not fully implemented/tested yet.";
+        printMessage( msg );
     }
         
     vector<IDL_LONG64> dimss;
@@ -498,7 +501,7 @@ string clear_modecache_info( int lvl ) {
 }
 
 
-void clear_modecache(int, IDL_VPTR, char* ) {
+void clear_modecache( int, IDL_VPTR, char* ) {
     clear_modes();
 }
 

@@ -328,7 +328,7 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
     if (nPlainArgs < 3) {
-        cout << "cbezier2: needs 3 arguments. " << endl;
+        printMessage( "cbezier3: needs 3 arguments.", IDL_MSG_LONGJMP );
         return IDL_GettmpInt (-1);
     }
     
@@ -337,7 +337,7 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
     IDL_VPTR xp_in = argv[2];
 
     if (kw.help) {
-        cout << "cbezier2: no help available yet..." << endl;
+        printMessage( "cbezier3: no help available yet..." );
         return IDL_GettmpInt (-1);
     }
     
@@ -353,13 +353,13 @@ IDL_VPTR cbezier3(int argc, IDL_VPTR* argv, char* argk) {
     int nDims = x->value.arr->n_dim;
 
     if (nDims != 1 || nDims != xp_in->value.arr->n_dim || nDims != y->value.arr->n_dim) {
-        cout << "cbezier2: input must be 1-dimensional arrays." << endl;
+        printMessage( "cbezier3: input must be 1-dimensional arrays.", IDL_MSG_LONGJMP );
         return IDL_GettmpInt (-1);
     }
     
     if (x->type < 4 || y->type < 4 || xp_in->type < 4 ||
         x->type > 5 || y->type > 5 || xp_in->type > 5) {
-        cout << "cbezier2: ERROR, input data must be double or float!" << endl;
+        printMessage( "cbezier3: ERROR, input data must be double or float!", IDL_MSG_LONGJMP );
         return IDL_GettmpInt (-1);
     }
 
@@ -461,17 +461,17 @@ void timer_elapsed( int argc, IDL_VPTR* argv, char* argk ) {
     (void) IDL_KWProcessByOffset(argc, argv, argk, kw_timer_pars, (IDL_VPTR*)0, 255, &kw);
     
     if( kw.help ) {
-        cout << timer_info(2) << endl;
+        printMessage( timer_info(2) );
         return;
     }
 
     if( kw.seconds ) {
         IDL_ALLTYPES tmp;
         tmp.f = sw.getSeconds();
-        cout << "Secs: " << tmp.f << endl;;
+        printMessage( "Secs: " + to_string( tmp.f ) );
         IDL_StoreScalar( kw.seconds, IDL_TYP_FLOAT, &tmp );
     } else {
-        cout << sw.print() << endl;
+        printMessage( sw.print() );
     }
     
 }
@@ -517,7 +517,7 @@ IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
     int nPlainArgs = IDL_KWProcessByOffset(argc, argv, argk, kw_segment_pars, (IDL_VPTR*)0, 255, &kw);
     
     if( nPlainArgs < 3 ) {
-        cout << segment_info(2) << endl;
+        printMessage( segment_info(2) );
         return IDL_GettmpInt(-1);
     }
     
@@ -531,7 +531,7 @@ IDL_VPTR rdx_segment( int argc, IDL_VPTR* argv, char* argk ) {
     }
     
     if( kw.help ) {
-        cout << segment_info(2) << endl;
+        printMessage( segment_info(2) );
         return IDL_GettmpInt(-1);
     }
     
@@ -591,7 +591,7 @@ string filetype_info( int lvl ) {
 IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
     
     if( argc < 1 ) {
-        cout << filetype_info(2) << endl;
+        printMessage( filetype_info(2) );
         return IDL_StrToSTRING( (char*)"" );
     }
     
@@ -617,8 +617,8 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
                 fmt = redux::file::guessFmt( fn.string() );
             }
         } catch( const exception& e) {
-            cout << "Failed to determine type: " << e.what() << endl;
-            cout << "filename: " << fn << endl;
+            printMessage( "filename: " + fn.string() );
+            printMessage( string("Failed to determine type: ") + e.what(), IDL_MSG_LONGJMP );
         }
         switch(fmt) {
             case FMT_ANA: return IDL_StrToSTRING( (char*)"ANA" );
@@ -640,8 +640,8 @@ IDL_VPTR rdx_filetype( int argc, IDL_VPTR* argv, char* argk ) {
                     fmt = redux::file::guessFmt( fn.string() );
                 }
             } catch( const exception& e) {
-                cout << "Failed to determine type: " << e.what() << endl;
-                cout << "filename: " << fn << endl;
+                printMessage( "filename: " + fn.string() );
+                printMessage( string("Failed to determine type: ") + e.what(), IDL_MSG_LONGJMP );
             }
             switch(fmt) {
                 case FMT_ANA: fileTypes.push_back("ANA"); break;
@@ -699,12 +699,12 @@ string cacheinfo_info( int lvl ) {
 
 void cacheinfo( int argc, IDL_VPTR argv[], char* argk ) {
     auto map = Cache::get().getMap< string, std::shared_ptr<IDL_VARIABLE> >();
-    cout << "rdx_cache contains " << map.second.size() << " entries.";
+    printMessage("rdx_cache contains " + to_string( map.second.size() ) + " entries.");
     uint64_t sz(0);
     for( auto& p: map.second ) {
         sz += getVarSize(p.second.get());
     }
-    cout << "  Total size: " << sz << " bytes." << endl;
+    printMessage("  Total size: " + to_string( sz ) + " bytes.");
 }
 
 
@@ -724,7 +724,7 @@ string cache_info( int lvl ) {
 void cache( int argc, IDL_VPTR* argv, char* argk ) {
 
     if( argc < 2 ) {
-        cout << cache_info(2) << endl;
+        printMessage( cache_info(2) );
         return;
     }
     
@@ -804,7 +804,7 @@ IDL_VPTR cacheget( int argc, IDL_VPTR* argv, char* argk ) {
         IDL_VarCopy( it->second.get(), tmp );
     } else if( !kw.count ) {  // only warn if keyword found was not passed
       string out = tagS + " not found.";
-      IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, out.c_str() );
+      printMessage( out );
     }
     
     if( kw.count ) {
@@ -833,7 +833,7 @@ string cachedel_info( int lvl ) {
 void cachedel( int argc, IDL_VPTR* argv, char* argk ) {
 
     if( argc < 1 ) {
-        cout << cachedel_info(2) << endl;
+        printMessage( cachedel_info(2) );
         return;
     }
 
@@ -855,7 +855,7 @@ void cachedel( int argc, IDL_VPTR* argv, char* argk ) {
         }
     }
     if( count == 0 ) {
-        //cout << "rdx_cachedel: not found." << endl;
+        //printMessage("rdx_cachedel: not found.");
     }
 }
 
@@ -899,7 +899,7 @@ void cachestore( int argc, IDL_VPTR* argv, char* argk ) {
     int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_store_pars, (IDL_VPTR*)0, 255, &kw );
     
     if( nPlainArgs < 1 || kw.help ) {
-        cout << cachestore_info(2) << endl;
+        printMessage( cachestore_info(2) );
         return;
     }
 
@@ -921,7 +921,7 @@ void cachestore( int argc, IDL_VPTR* argv, char* argk ) {
             thisSize += getVarSize( p.second.get() );
             dataSize += thisSize;
         }
-        //cout << "dataSize = " << dataSize;
+
         unique_ptr<Bytef[]> tmpData( new Bytef[dataSize] );
         char* tmpPtr = reinterpret_cast<char*>(tmpData.get());
         uint64_t packCount(0);
@@ -929,7 +929,6 @@ void cachestore( int argc, IDL_VPTR* argv, char* argk ) {
             packCount += pack( tmpPtr+packCount, p.first );
             packCount += packVar( tmpPtr+packCount, p.second.get() );
         }
-        //cout << "  packCount = " << packCount;
 
         if( kw.clear ) {
             map.second.clear();
@@ -942,17 +941,16 @@ void cachestore( int argc, IDL_VPTR* argv, char* argk ) {
         int ret = compress( buf.get()+ sizeof(packCount), &tmpSz, tmpData.get(), packCount );
         switch(ret){
             case(Z_OK): compressedSz = tmpSz; break;
-            case(Z_MEM_ERROR): cout << "compressing data: out of memory." << endl; break;
-            case(Z_BUF_ERROR): cout << "compressing data: buffer not large enough" << endl; break;
-            default: cout << "compressing data: unknown reason. ret=" << ret << endl; break;
+            case(Z_MEM_ERROR): printMessage( "compressing data: out of memory.", IDL_MSG_LONGJMP ); break;
+            case(Z_BUF_ERROR): printMessage( "compressing data: buffer not large enough", IDL_MSG_LONGJMP ); break;
+            default: printMessage( "compressing data: unknown reason. ret=" + to_string( ret ), IDL_MSG_LONGJMP ); break;
         }
         redux::util::pack( reinterpret_cast<char*>(buf.get()), packCount );
-        //cout << "  compressedSz = " << compressedSz << endl;
         
         file.write( reinterpret_cast<char*>(buf.get()), compressedSz+sizeof(packCount) );
     
     } catch( exception& e ){
-        cerr << "Failed to write \"" << fn << "\"  reason:" << e.what() << endl;
+        printMessage( "Failed to write \"" + fn + "\"  reason:" + string(e.what()), IDL_MSG_LONGJMP );
     }
     
 }
@@ -977,7 +975,7 @@ void cacheload( int argc, IDL_VPTR* argv, char* argk ) {
     int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_store_pars, (IDL_VPTR*)0, 255, &kw );
     
     if( nPlainArgs < 1 || kw.help ) {
-        cout << cacheload_info(2) << endl;
+        printMessage( cacheload_info(2) );
         return;
     }
 
@@ -1009,12 +1007,12 @@ void cacheload( int argc, IDL_VPTR* argv, char* argk ) {
         
         switch(ret){
             case(Z_OK): break;
-            case(Z_DATA_ERROR): cout << "decompressing data: corrupt buffer." << endl; break;
-            case(Z_MEM_ERROR): cout << "decompressing data: out of memory." << endl; break;
-            case(Z_BUF_ERROR): cout << "decompressing data: buffer not large enough." << endl; break;
-            default: cout << "decompressing data: unknown reason. ret=" << ret << endl; break;
+            case(Z_DATA_ERROR): printMessage( "decompressing data: corrupt buffer.", IDL_MSG_LONGJMP ); break;
+            case(Z_MEM_ERROR): printMessage( "decompressing data: out of memory.", IDL_MSG_LONGJMP ); break;
+            case(Z_BUF_ERROR): printMessage( "decompressing data: buffer not large enough.", IDL_MSG_LONGJMP ); break;
+            default: printMessage( "decompressing data: unknown reason. ret=" + to_string( ret ), IDL_MSG_LONGJMP ); break;
         }
-        
+
         tmpPtr = reinterpret_cast<char*>( buf.get() );
         uint64_t unpackCount(0);
         
@@ -1033,7 +1031,7 @@ void cacheload( int argc, IDL_VPTR* argv, char* argk ) {
         }
 
     } catch( exception& e ){
-        cerr << "Failed to read \"" << fn << "\"  reason:" << e.what() << endl;
+        printMessage( "Failed to read \"" + fn + "\"  reason:" + string(e.what()), IDL_MSG_LONGJMP );
     }
 
 }
@@ -1075,7 +1073,6 @@ extern "C" {
     }
 
     void IDL_ResetSession(void) {
-        //cout << "IDL_ResetSession" << endl;
         IdlContainer::reset();
      //  IDL_ExitUnregister(&test_exit_callback);
 

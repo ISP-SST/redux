@@ -55,10 +55,6 @@ string str2ints_info( int lvl ) {
 
 
 IDL_VPTR str2ints(int argc, IDL_VPTR* argv, char* argk) {
- 
-    if (argc < 1) {
-        return IDL_GettmpInt(0);
-    }
     
     IDL_VPTR ret;
     vector<uint32_t> uints;
@@ -72,7 +68,7 @@ IDL_VPTR str2ints(int argc, IDL_VPTR* argv, char* argk) {
     kw.unique = 0;
     (void) IDL_KWProcessByOffset (argc, argv, argk, str_to_int_kw_pars, (IDL_VPTR*) 0, 255, &kw);
     if( kw.help ) {
-        cout << str2ints_info(2) << endl;
+        printMessage( str2ints_info(2) );
         return IDL_GettmpInt(0);
     }
     
@@ -80,7 +76,7 @@ IDL_VPTR str2ints(int argc, IDL_VPTR* argv, char* argk) {
     try {
         uints = redux::util::stringToUInts<uint32_t>( IDL_VarGetString(str) );
     } catch( const exception& e ) {
-        cout << "rdx_str2ints: Error during call to redux::util::stringToUInts() : " << e.what() << endl;
+        printMessage( "rdx_str2ints: Error during call to redux::util::stringToUInts() : " + string(e.what()), IDL_MSG_LONGJMP );
     }
 
     if( kw.sort || kw.unique ) {
@@ -134,6 +130,7 @@ IDL_VPTR ints2str( int argc, IDL_VPTR* argv, char* argk ) {
     
     string ret;
     if (nPlainArgs < 1) {
+        printMessage( ints2str_info(2) );
         return IDL_StrToSTRING( (char*)"" );
     }
     
@@ -142,7 +139,7 @@ IDL_VPTR ints2str( int argc, IDL_VPTR* argv, char* argk ) {
     IDL_ENSURE_ARRAY(uints);
     
     if( kw.help ) {
-        cout << ints2str_info(2) << endl;
+        printMessage( ints2str_info(2) );
         return IDL_StrToSTRING( (char*)"" );
     }
     
@@ -157,7 +154,7 @@ IDL_VPTR ints2str( int argc, IDL_VPTR* argv, char* argk ) {
         auto beg = reinterpret_cast<int32_t*>(uints->value.arr->data);
         std::copy( beg, beg + uints->value.arr->n_elts , back_inserter(tmp) );
     } else  {
-        cout << "rdx_ints2str: input array must be of type BYTE, INT or LONG." << endl;
+        printMessage( "rdx_ints2str: input array must be of type BYTE, INT or LONG.", IDL_MSG_LONGJMP );
         return IDL_GettmpInt (0);
     }
     
@@ -172,7 +169,7 @@ IDL_VPTR ints2str( int argc, IDL_VPTR* argv, char* argk ) {
     try {
         ret = redux::util::uIntsToString( tmp );
     } catch( const exception & e ) {
-        cout << "rdx_ints2str: Error during call to redux::util::uIntsToString() : " << e.what() << endl;
+        printMessage( "rdx_ints2str: Error during call to redux::util::uIntsToString() : " + string(e.what()), IDL_MSG_LONGJMP );
     }
     
     return IDL_StrToSTRING( (char*)ret.c_str() );
@@ -223,7 +220,8 @@ IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
     MT_KW kw;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, mt_kw_pars, (IDL_VPTR*)0, 255, &kw);
     
-    if (nPlainArgs < 1) {
+    if (nPlainArgs < 1 || kw.help ) {
+        printMessage( maketemplate_info(2) );
         return IDL_StrToSTRING( (char*)"" );
     }
     
@@ -241,12 +239,6 @@ IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
     if ( strarr->n_elts == 1) {
         return IDL_StrToSTRING( strptr->s );
     }
-    
-    if ( kw.help ) {
-        cout << maketemplate_info(2) << endl;
-        return IDL_StrToSTRING( (char*)"" );
-    }
-    
 
     string split_chars = ".";
     if( kw.split_chars.slen ) split_chars = kw.split_chars.s;
@@ -261,7 +253,7 @@ IDL_VPTR maketemplate(int argc, IDL_VPTR* argv, char* argk) {
     try {
         arg_list = redux::util::make_template( stringList, tpl, split_chars );
     } catch( const exception & e ) {
-        cout << "rdx_make_template: Error during call to redux::util::make_template : " << e.what() << endl;
+        printMessage( "rdx_make_template: Error during call to redux::util::make_template : " + string(e.what()), IDL_MSG_LONGJMP );
     }
         
     IDL_MEMINT nArgs = arg_list.size();
@@ -329,7 +321,8 @@ IDL_VPTR str_replace(int argc, IDL_VPTR* argv, char* argk) {
     kw.max_n = 1;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, str_replace_pars, (IDL_VPTR*)0, 255, &kw);
     
-    if( nPlainArgs < 3 ) {
+    if( nPlainArgs < 3 || kw.help ) {
+        printMessage( strreplace_info(2) );
         return IDL_StrToSTRING( (char*)"" );
     }
 

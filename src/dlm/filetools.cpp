@@ -65,7 +65,8 @@ IDL_VPTR loadfiles( int argc, IDL_VPTR* argv, char* argk ) {
     kw.nthreads = std::thread::hardware_concurrency();
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_loadfiles_pars, (IDL_VPTR*)0, 255, &kw);
 
-    if( nPlainArgs < 1 ) {
+    if( nPlainArgs < 1 || kw.help ) {
+        printMessage( loadfiles_info(2) );
         return IDL_GettmpInt(0);
     }
 
@@ -99,22 +100,17 @@ IDL_VPTR loadfiles( int argc, IDL_VPTR* argv, char* argk ) {
 
         kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
 
-        if( kw.help ) {
-            cout << loadfiles_info(2) << endl;
-            return IDL_GettmpInt(0);
-        }
-
         // Get size etc from first image.
         FileMeta::Ptr meta = getMeta( filenames[0] );
         if( !meta || (meta->nDims() != 2) ) {        // Only allow images for now
-            cout << "rdx_loadfiles: Failed to get meta, or not 2D input." << endl;
+            printMessage( "rdx_loadfiles: Failed to get meta, or not 2D input.", IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         }
 
         string statusString;
         if( kw.verbose ) {
-            statusString = "Loading " + to_string(nImages)
-                           + " files using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":".");
+            statusString = "Loading " + to_string(nImages) + " files using "
+                         + to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":".");
             cout << statusString << ((kw.verbose == 1)?"\n":"") << flush;
         }
 
@@ -166,7 +162,7 @@ IDL_VPTR loadfiles( int argc, IDL_VPTR* argv, char* argk ) {
         }
 
     } catch (const exception& e ) {
-        cout << "rdx_loadfiles: unhandled exception: " << e.what() << endl;
+        printMessage("rdx_loadfiles: unhandled exception: " + string(e.what()), IDL_MSG_LONGJMP);
         return IDL_GettmpInt(0);
     }
 
@@ -236,7 +232,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
     (void)IDL_KWProcessByOffset( argc, argv, argk, kw_readdata_pars, (IDL_VPTR*)0, 255, &kw );
 
     if( kw.help ) {
-        cout << readdata_info(2) << endl;
+        printMessage( readdata_info(2) );
         return IDL_GettmpInt(0);
     }
 
@@ -271,10 +267,10 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
         size_t nImages = existingFiles.size();
 
         if( !nImages ) {
-            cout << "rdx_readdata: No input files." << endl;
+            printMessage( "rdx_readdata: No input files.", IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         } else if ( nImages > 1 ) {
-            cout << "rdx_readdata: Only a single file supported at the moment." << endl;
+            printMessage( "rdx_readdata: Only a single file supported at the moment.", IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         }
 
@@ -339,7 +335,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
             char* data = (char*)IDL_MakeTempArray( myMeta->getIDLType(), nDims, dims.data(), IDL_ARR_INI_NOP, &ret ); //IDL_ARR_INI_ZERO
             readFile( existingFiles[0], data, myMeta );
         } catch (const exception& e ) {
-            cout << "rdx_readdata: unhandled exception: " << e.what() << endl;
+            printMessage( "rdx_readdata: unhandled exception: " + string(e.what()), IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         }
 
@@ -349,7 +345,7 @@ IDL_VPTR readdata( int argc, IDL_VPTR* argv, char* argk ) {
         return ret;
 
     } catch (const exception& e ) {
-        cout << "rdx_readdata: unhandled exception: " << e.what() << endl;
+        printMessage( "rdx_readdata: unhandled exception: " + string(e.what()), IDL_MSG_LONGJMP );
         return IDL_GettmpInt(0);
     }
 
@@ -406,20 +402,20 @@ string readhead_info( int lvl ) {
 
 IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
 
-    IDL_VPTR filenames = argv[0];
-    IDL_ENSURE_SIMPLE( filenames );
-
-    if( filenames->type != IDL_TYP_STRING ) {
-        cout << readhead_info(2) << endl;
-        return IDL_GettmpInt(0);
-    }
-
     KW_READHEAD kw;
     kw.status = nullptr;
     (void)IDL_KWProcessByOffset( argc, argv, argk, kw_readhead_pars, (IDL_VPTR*)0, 255, &kw );
 
     if( kw.help ) {
-        cout << readhead_info(2) << endl;
+        printMessage( readhead_info(2) );
+        return IDL_GettmpInt(0);
+    }
+
+    IDL_VPTR filenames = argv[0];
+    IDL_ENSURE_SIMPLE( filenames );
+
+    if( filenames->type != IDL_TYP_STRING ) {
+        printMessage( readhead_info(2) );
         return IDL_GettmpInt(0);
     }
 
@@ -451,10 +447,10 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
         //kw.nthreads = static_cast<UCHAR>( min<size_t>(kw.nthreads, nImages) );
 
         if( !nImages ) {
-            cout << "rdx_readhead: No input files." << endl;
+            printMessage( "rdx_readhead: No input files.", IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         } else if ( nImages > 1 ) {
-            cout << "rdx_readhead: Only a single file supported at the moment." << endl;
+            printMessage( "rdx_readhead: Only a single file supported at the moment.", IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         }
 
@@ -524,7 +520,7 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
 
 
         } catch (const exception& e ) {
-            cout << "rdx_readhead: unhandled exception: " << e.what() << endl;
+            printMessage( "rdx_readhead: unhandled exception: " + string(e.what()), IDL_MSG_LONGJMP );
             return IDL_GettmpInt(0);
         }
 
@@ -534,7 +530,7 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
         return ret;
 
     } catch (const exception& e ) {
-        cout << "rdx_readhead: unhandled exception: " << e.what() << endl;
+        printMessage( "rdx_readhead: unhandled exception: " + string(e.what()), IDL_MSG_LONGJMP );
         return IDL_GettmpInt(0);
     }
 
@@ -543,7 +539,7 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
 
 
 namespace {
-static int dummy RDX_UNUSED =
+    static int dummy RDX_UNUSED =
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)loadfiles, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, loadfiles_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readdata, (char*)"RDX_READDATA", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readdata_info ) +
     IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readhead, (char*)"RDX_READHEAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readhead_info );

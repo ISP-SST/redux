@@ -1,10 +1,13 @@
 #ifdef RDX_WITH_OPENCV
 
 #include "cvutil.hpp"
+#include "idlutil.hpp"
 
 #include <iostream>
+#include <string>
 
 using namespace cv;
+using namespace std;
 
 
 Mat redux::arrayToMat (const IDL_VPTR& in, int verbose) {
@@ -28,8 +31,9 @@ Mat redux::arrayToMat (const IDL_VPTR& in, int verbose) {
             case IDL_TYP_FLOAT:  type |= CV_32F; break;
             case IDL_TYP_DOUBLE: type |= CV_64F; break;
             default:
-                if (verbose) std::cerr << "Unsupported data type. " << (int) in->type << std::endl;
-                return Mat();
+                string msg = "Unsupported data type. " + to_string((int)in->type);
+                printMessage( msg, IDL_MSG_LONGJMP );
+                return cv::Mat();
         }
 
         Mat img (nDims, dims.data(), CV_MAKETYPE (type, 1), in->value.arr->data);
@@ -60,7 +64,8 @@ Mat redux::getImgAsGrayFloat (const IDL_VPTR& in, int verbose) {
         img2 = (img2 - minValue) / (maxValue - minValue);
         return img2;
     } catch (cv::Exception& e) {
-        if (verbose) std::cerr << "OpenCV error: " << e.msg << std::endl;
+        string msg = "OpenCV error: " + string(e.msg.c_str());
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
 
     return Mat();

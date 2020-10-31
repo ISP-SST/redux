@@ -79,7 +79,7 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_conv_pars, (IDL_VPTR*) 0, 255, &kw);
     
     if (nPlainArgs < 2) {
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Needs 2 arguments (image and psf)." );
+        printMessage( "Needs 2 arguments (image and psf).", IDL_MSG_LONGJMP );
     }
 
     IDL_VPTR imageVar  = argv[0];
@@ -94,14 +94,14 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
     if( kw.help ) {
         int lvl = 1;
         if( kw.verbose ) lvl++;
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, convolve_info(lvl).c_str() );
+        printMessage( convolve_info(lvl) );
         return IDL_GettmpInt(-1);
     }
 
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
 
     if( psfVar->value.arr->n_dim != 2 ) {
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "PSF must be A 2D array." );
+        printMessage( "PSF must be A 2D array.", IDL_MSG_LONGJMP );
     }
     IDL_LONG64 xSize = psfVar->value.arr->dim[0];
     IDL_LONG64 ySize = psfVar->value.arr->dim[1];
@@ -110,11 +110,11 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
         string msg = "PSF and image(s) must be of the same size."
                    + printArray( imageVar->value.arr->dim, imageVar->value.arr->n_dim, "\n   img")
                    + printArray( psfVar->value.arr->dim, psfVar->value.arr->n_dim, "\n   psf");
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
 
     if( !xSize || !ySize ) {
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Input has zero-size." );
+        printMessage( "Input has zero-size.", IDL_MSG_LONGJMP );
     }
 
     size_t nImages = 1;
@@ -168,7 +168,7 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
             fft_memalign( 1, &imageVar );   // align if needed, else no action.
             dataPtr = reinterpret_cast<double*>( imageVar->value.arr->data );
         } else if ( kw.in_place ) {
-            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Images have to be of type double when transforming in_place." );
+            printMessage( "Images have to be of type double when transforming in_place.", IDL_MSG_LONGJMP );
         } else {
             //dataAlign = 0;
             allocatedData = (double*)fftw_malloc(nImages*dataSize*sizeof(double));
@@ -208,7 +208,7 @@ IDL_VPTR convolve (int argc, IDL_VPTR* argv, char* argk) {
     
     } catch( const exception& e ) {
         string msg = string("Unhandled exception: ") + e.what();
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
 
 
@@ -286,7 +286,7 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
 
     if( nPlainArgs < 3 ) {
         string msg = "Needs at least 3 arguments, image(s), backgain and PSF.";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
 
     IDL_VPTR imageVar  = argv[0];
@@ -305,14 +305,14 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
     if( kw.help ) {
         int lvl = 1;
         if( kw.verbose ) lvl++;
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, rdx_descatter_info(lvl).c_str() );
+        printMessage( rdx_descatter_info(lvl) );
         return IDL_GettmpInt (-1);
     }
 
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
     
     if( psfVar->value.arr->n_dim != 2 || gainVar->value.arr->n_dim != 2 ) {
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Backgain and psf must be A 2D arrays." );
+        printMessage( "Backgain and psf must be A 2D arrays.", IDL_MSG_LONGJMP );
     }
     IDL_LONG64 xSize = psfVar->value.arr->dim[0];
     IDL_LONG64 ySize = psfVar->value.arr->dim[1];
@@ -323,11 +323,11 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         msg += printArray(imageVar->value.arr->dim, imageVar->value.arr->n_dim, "\n   img")
              + printArray(gainVar->value.arr->dim, gainVar->value.arr->n_dim, "\n  gain")
              + printArray(psfVar->value.arr->dim, psfVar->value.arr->n_dim, "\n   psf");
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
     
     if( !xSize || !ySize ) {
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Input has zero-size." );
+        printMessage( "Input has zero-size.", IDL_MSG_LONGJMP );
     }
 
     size_t nImages = 1;
@@ -390,7 +390,7 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
             fft_memalign( 1, &imageVar );   // align if needed, else no action.
             dataPtr = reinterpret_cast<double*>( imageVar->value.arr->data );
         } else if ( kw.in_place ) {
-            IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Images have to be of type double when transforming in_place." );
+            printMessage( "Images have to be of type double when transforming in_place.", IDL_MSG_LONGJMP );
         } else {
             //dataAlign = 0;
             allocatedData = (double*)fftw_malloc(nImages*dataSize*sizeof(double));
@@ -430,7 +430,7 @@ IDL_VPTR rdx_descatter( int argc, IDL_VPTR* argv, char* argk ) {
         
     } catch( const exception& e ) {
         string msg = string("Unhandled exception: ") + e.what();
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
     
     return IDL_GettmpInt(0);
@@ -469,7 +469,7 @@ void fft_reorder(int argc, IDL_VPTR* argv) {
     
     if ( array->value.arr->n_dim != 2 ) {
         string msg = "A single 2D array should be passed as input.";
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+        printMessage( msg, IDL_MSG_LONGJMP );
     }
 
     size_t nX = array->value.arr->dim[0];
@@ -487,7 +487,7 @@ void fft_reorder(int argc, IDL_VPTR* argv) {
         }
     } catch ( const exception& e ) {   // catch-all to avoid killing the idl session.
         string msg = string("Error during call to FourierTransform::reorder(): ") + e.what();
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+        printMessage( msg );
     }
 
 }
@@ -544,8 +544,8 @@ void fft_memalign( int argc, IDL_VPTR* argv ) {
         }
         
     } catch ( const exception& e ) {   // catch-all to avoid killing the idl session.
-        string msg = string("Error during re-alignment: ") + e.what();
-        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+        string msg = string("Error during memory alignment: ") + e.what();
+        printMessage( msg );
     }
 
     

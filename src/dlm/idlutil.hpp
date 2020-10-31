@@ -17,7 +17,7 @@ namespace redux {
         typedef std::function<std::string(int)> info_func;
         typedef std::function<void(void)> void_func;
         struct RoutineInfo {
-            RoutineInfo( IDL_SYSFUN_DEF2& d, info_func i ) : def(d), info(i), is_function(0), cleanup(nullptr) {}
+            RoutineInfo( IDL_SYSFUN_DEF2& d, info_func& i ) : def(d), info(i), is_function(0), cleanup(nullptr) {}
             IDL_SYSFUN_DEF2 def;
             info_func info;
             int is_function;
@@ -38,6 +38,8 @@ namespace redux {
         
         std::map< std::string, RoutineInfo > routines;
     };
+    
+    void printMessage( std::string msg, int action=IDL_MSG_INFO );
 
     template <typename T> UCHAR idlType(void);
     
@@ -141,7 +143,8 @@ namespace redux {
                     case IDL_TYP_ULONG: ret[0] = v->value.ul; break;
                     case IDL_TYP_FLOAT: ret[0] = v->value.f; break;
                     case IDL_TYP_DOUBLE: ret[0] = v->value.d; break;
-                    default: std::cout << "getAsVector: Type not implemented.  (type=" << v->type << ")" << std::endl;
+                    default:  printMessage( "getAsVector():  type = " + std::to_string((int)v->type)
+                              + " has not been implemented.", IDL_MSG_LONGJMP );
                 }
             }
         }

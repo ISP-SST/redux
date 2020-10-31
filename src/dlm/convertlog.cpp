@@ -554,27 +554,29 @@ IDL_VPTR convertlog( int argc, IDL_VPTR* argv, char* argk ) {
     kw.scale = std::numeric_limits<float>::infinity();
     int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, cvtlog_pars, (IDL_VPTR*)0, 255, &kw );
     
-    if( kw.help ) {
-        cout << cvtlog_info(2) << endl;
-        return IDL_StrToSTRING( (char*)"" );
-    }
-
-    if( nPlainArgs < 1 ) {
+    if( nPlainArgs < 1 || kw.help ) {
+        printMessage( cvtlog_info(2) );
         return IDL_StrToSTRING( (char*)"" );
     }
 
     if( !isfinite(kw.x) || !isfinite(kw.y) ) {
-        if( kw.verbose > -1 ) cout << "WARNING: no x/y offset given!" << endl;
+        if( kw.verbose > -1 ) {
+            printMessage( "WARNING: no x/y offset given!" );
+        }
         kw.x = kw.y = 0;
     }
 
     if( !isfinite(kw.rotation) ) {
-        if( kw.verbose > -1 ) cout << "WARNING: no rotation given!" << endl;
+        if( kw.verbose > -1 ) {
+            printMessage( "WARNING: no rotation given!" );
+        }
         kw.rotation = 0;
     } else kw.rotation *= DtoR;     // convert to radians
 
     if( !isfinite(kw.radius) && !isfinite(kw.scale) ) {
-        if( kw.verbose > -1 ) cout << "WARNING: no image scale given!" << endl;
+        if( kw.verbose > -1 ) {
+            printMessage( "WARNING: no image scale given!" );
+        }
         kw.radius = 0;
         kw.scale = 0;
     }
@@ -636,7 +638,9 @@ IDL_VPTR convertlog( int argc, IDL_VPTR* argv, char* argk ) {
         
         double t, cx, cy, cr;
         if( sscanf( line.data(), "%lf %*f %*f %lf %lf %lf", &t, &cx, &cy, &cr) != 4 ) {
-            if( kw.verbose > 1 ) cout << "Error parsing line: \"" << line << "\"" << endl;
+            if( kw.verbose > 1 ) {
+                printMessage( "Error parsing line: \"" + line + "\"");
+            }
             continue;
         }
 
@@ -729,13 +733,8 @@ void convertlog_proc( int argc, IDL_VPTR* argv, char* argk ) {
     kw.scale = std::numeric_limits<float>::infinity();
     int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, cvtlog_pars, (IDL_VPTR*)0, 255, &kw );
     
-    if( kw.help ) {
-        cout << cvtlog_info(2) << endl;
-        return;
-    }
-
-    if( nPlainArgs < 1 ) {
-        cout << "No input specified." << endl;
+    if( nPlainArgs < 1 || kw.help ) {
+        printMessage( cvtlog_info(2) );
         return;
     }
 
@@ -760,7 +759,7 @@ void convertlog_proc( int argc, IDL_VPTR* argv, char* argk ) {
             throw std::ios_base::failure( "Failed to open file: " + infile );
         }
     } catch( std::exception& e ) {
-        cout << e.what() << endl;
+        printMessage( "convertlog_proc: unhandled exception. What = " + string(e.what()), IDL_MSG_LONGJMP );
         return;
     }
     
@@ -786,8 +785,7 @@ void convertlog_proc( int argc, IDL_VPTR* argv, char* argk ) {
             throw std::ios_base::failure( "Failed to write to file: " + outfile );
         }
     } catch( std::exception& e ) {
-        cout << e.what() << endl;
-
+        printMessage( "convertlog_proc: unhandled exception. What = " + string(e.what()), IDL_MSG_LONGJMP );
     }
     
     

@@ -53,14 +53,16 @@ int IdlContainer::load( void ) {
     
     int ret(1);
     
-    string dlmVer = xstringize(RDX_IDL_HDR_VER);
+    string hdrVer = xstringize(RDX_IDL_HDR_VER);
     string idlVer = string(IDL_SysvVersion.release.s);
-    size_t nChars = min( dlmVer.length(), idlVer.length() );
-    if( strncmp( idlVer.c_str(), dlmVer.c_str(), nChars ) ) {
-        cout << colorString("Warning",YELLOW) << ": The redux DLM was not compiled using the same IDL-header (idl_export.h) as the current session." << endl;
-        cout << "IDL Version: " << IDL_SysvVersion.release.s << endl;
-        cout << "Header Version: " << dlmVer << endl;
-        cout << "This might lead to undefined behaviour if there is a mismatch in the data/functions used, YOU HAVE BEEN WARNED!" << endl;
+    size_t nChars = min( hdrVer.length(), idlVer.length() );
+    if( strncmp( idlVer.c_str(), hdrVer.c_str(), nChars ) ) {
+        string out = "Warning"; //colorString("Warning",YELLOW);
+        out += ": The redux DLM was not compiled using the same IDL-header (idl_export.h) as the current session.\n";
+        out += "IDL Version: " + idlVer + "\n";
+        out += "Header Version: " + hdrVer + "\n";
+        out += "This might lead to undefined behaviour if there is a mismatch in the data/functions used, YOU HAVE BEEN WARNED!";
+        printMessage( out );
     }
     for( auto& r: get().routines ) {
         ret &= IDL_SysRtnAdd( &r.second.def, r.second.is_function, 1);
@@ -96,8 +98,9 @@ string info_help( int lvl ) {
     if( lvl > 0 ) {
         
         ret += ((lvl > 1)?"\n":"     ");          // newline if lvl>1
-        ret += "   Syntax:   rdx, 1/2, /KEYWORDS\n";
-        ret += "             rdx, str, /KEYWORDS\n";
+        ret += "   Syntax:   rdx, /KEYWORDS\n";
+        ret += "             rdx, [1-3], /KEYWORDS\n";
+        ret += "             rdx, 'proc_name', /KEYWORDS\n";
     
         if( lvl > 1 ) {
             ret +=  "   Accepted Keywords:\n"
@@ -118,7 +121,7 @@ void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
     int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_info, (IDL_VPTR*)0, 255, &kw );
 
     if( kw.help ) {
-        cout << info_help(2) << endl;
+        printMessage( info_help(2) );
         return;
     }
 
@@ -130,7 +133,7 @@ void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
     }
     
     int verb(0);
-    string out;
+    string infos;
     
     if( nPlainArgs ) {
         
@@ -142,39 +145,37 @@ void IdlContainer::info( int argc, IDL_VPTR* argv, char* argk ) {
             string fragment = IDL_VarGetString( arg );
             for( auto& r: get().routines ) {
                 if( r.second.info && contains(r.first, fragment, true) ) {
-                    out += r.second.info(2);
+                    infos += r.second.info(2);
                 }
             }
         } else {
             verb = IDL_LongScalar( arg );
             for( auto& r: get().routines ) {
                 if( r.second.info ) {
-                    out += r.second.info(verb);
+                    infos += r.second.info(verb);
                 }
             }
         }
     } else {
         for( auto& r: get().routines ) {
             if( r.second.info ) {
-                out += r.second.info(0);
+                infos += r.second.info(0);
             }
         }
     }
-    
-    cout << "\nRedux DLM";
-    
+
+    string out = "Redux DLM";
     if( verb > 2 ) {
-        cout << endl;
-        cout << "   Version:  " << getLongVersionString() << endl;
-        cout << "   Commited: " << reduxCommitTime << endl;
-        cout << "   Compiled: " << reduxBuildTime;
-        cout << " (using idl_exports " << xstringize(RDX_IDL_HDR_VER) << ")" << endl;
+        out += "\n";
+        out += "   Version:  " + getLongVersionString() + "\n";
+        out += "   Commited: " + string(reduxCommitTime) + "\n";
+        out += "   Compiled: " + string(reduxBuildTime) + "\n";
+        out += "   (using idl_exports " + string(xstringize(RDX_IDL_HDR_VER)) + ")\n";
     } else {
-        cout << " - " << getVersionString() << endl;
+        out += " - " + getVersionString() + "\n" + infos;
     }
-    
-    if( verb <= 2 ) cout << endl << out << endl;
-    else cout << endl;
+
+    printMessage( out );
     
 }
 
@@ -243,6 +244,37 @@ namespace redux {
         }
     }
     
+    void printMessage( std::string msg, int action ) {
+        
+        action |= IDL_MSG_ATTR_NOPREFIX;        // no prefix/decoration (like the leading '%' in idlde)
+        action |= IDL_MSG_ATTR_QUIET;           // allow supression with !QUIET
+        
+        size_t nChars = msg.length();
+        if( nChars < IDL_MSG_ERR_BUF_LEN ) {
+            IDL_Message( IDL_M_GENERIC, action, msg.c_str() );
+        } else {
+            int max_width = IDL_FileTermColumns() - 3;
+            while( !msg.empty() ) {
+                string tmp( msg, 0, IDL_MSG_ERR_BUF_LEN );
+                size_t loc = tmp.find_last_of("\n");
+                size_t erase_to = string::npos;
+                if( loc == string::npos ) {     // if no newline, break at whitespace
+                    loc = tmp.find_last_of(" \t");
+                }
+                if( loc == string::npos || loc == 0 ) {
+                    loc = max_width;
+                    erase_to = loc;
+                } else {
+                    erase_to = loc+1;       // skip newline/whitespace
+                }
+                tmp = msg.substr( 0, loc );
+                msg.erase( 0, erase_to );
+                IDL_Message( IDL_M_GENERIC, action, tmp.c_str() );
+            }
+        }
+        
+    }
+ 
 }
 
 
@@ -512,7 +544,7 @@ void redux::copyFromIDL(const UCHAR* in, T* out, size_t nElements, UCHAR IDLtype
             std::copy(cin, cin+nElements, out);
             break;
         }
-        default: cout << "copyFromIDL():  type = " << (int)IDLtype << " has not been implemented." << endl;
+        default: printMessage( "copyFromIDL():  type = " + to_string((int)IDLtype) + " has not been implemented.", IDL_MSG_LONGJMP );
     }
 
 }
@@ -548,7 +580,8 @@ void redux::copyToIDL(const T* in, UCHAR* out, size_t nElements, UCHAR IDLtype) 
             std::copy(in, in+nElements, reinterpret_cast<double*>( out ));
             break;
         }
-        default:  cout << "copyToIDL():  type = " << (int)IDLtype << " has not been implemented." << endl;
+        default:  printMessage( "copyToIDL():  type = " + to_string((int)IDLtype)
+                                + " has not been implemented.", IDL_MSG_LONGJMP );
     }
 
 }
@@ -587,7 +620,8 @@ void redux::subtractFromIDL(const UCHAR* in1, const T* in2, U* out, size_t nElem
                            []( const UCHAR& a, const T&b ){ return a-b;} );
             break;
         }
-        default:  cout << "subtractFromIDL():  type = " << (int)IDLtype << " has not been implemented." << endl;
+        default:  printMessage( "subtractFromIDL():  type = " + to_string((int)IDLtype)
+                                + " has not been implemented.", IDL_MSG_LONGJMP );
     }
 
 }
@@ -606,7 +640,8 @@ double redux::getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype
         case( IDL_TYP_LONG ):   stats.getMinMaxMean( reinterpret_cast<const IDL_LONG*>(data), nElements ); break;
         case( IDL_TYP_FLOAT ):  stats.getMinMaxMean( reinterpret_cast<const float*>(data), nElements ); break;
         case( IDL_TYP_DOUBLE ): stats.getMinMaxMean( reinterpret_cast<const double*>(data), nElements ); break;
-        default: ;
+        default: printMessage( "getMinMaxMean():  type = " + to_string((int)IDLtype)
+                                + " has not been implemented.", IDL_MSG_LONGJMP );
     }
     if( Min ) *Min = stats.min;
     if( Max ) *Max = stats.max;
@@ -628,9 +663,9 @@ size_t printStruct (IDL_VPTR data, int current, int indent, IDL_INT max_length) 
     
     if (data->type == IDL_TYP_STRUCT) {
         if (current < 0) {
-            cout << "           TAG           TYPE                     OFFSET         SIZE           VALUE" << endl;
-            sz += printStruct (data, indent, indent, max_length );
-            cout << string (45, ' ') << "Total Size:         " << to_string (sz) << endl;
+            printMessage("           TAG           TYPE                     OFFSET         SIZE           VALUE");
+            sz += printStruct( data, indent, indent, max_length );
+            printMessage( string(45, ' ') + "Total Size:         " + to_string(sz) );
             return sz;
         }
 
@@ -674,19 +709,19 @@ size_t printStruct (IDL_VPTR data, int current, int indent, IDL_INT max_length) 
                 typeName.append (")");
                 dataPtr = reinterpret_cast<UCHAR*>(&(v->value));
             }
-
-            cout.setf (std::ios::left);
-
-            cout << std::setw (25) << (string (current, ' ') + name);
-            cout << std::setw (25) << typeName;
-            cout << std::setw (15) << to_string ( (size_t) offset);
+            
+            stringstream ss;
+            ss.setf (std::ios::left);
+            ss << std::setw(25) << (string (current, ' ') + name);
+            ss << std::setw(25) << typeName;
+            ss << std::setw(15) << to_string ( (size_t) offset);
             if( dataType == IDL_TYP_STRUCT ) {
-                cout << endl;
+                printMessage( ss.str() );
                 sz += count * printStruct(v, current + indent, indent, max_length);
             } else {
-                cout << std::setw (15) << to_string (count * dataSize);
-                cout << std::setw (30) << printValue( v, dataPtr, max_length );
-                cout << endl;
+                ss << std::setw(15) << to_string (count * dataSize);
+                ss << std::setw(30) << printValue( v, dataPtr, max_length );
+                printMessage( ss.str() );
                 sz += count * dataSize;
             }
 
@@ -745,18 +780,13 @@ void redux::structinfo( int argc, IDL_VPTR argv[], char* argk ) {
     kw.max_length = 90;
     int nPlainArgs = IDL_KWProcessByOffset (argc, argv, argk, kw_pars, (IDL_VPTR*) 0, 255, &kw);
 
-    if( nPlainArgs < 1 ) {
-        cout << structinfo_help(2) << endl;
+    if( nPlainArgs < 1 || kw.help ) {
+        printMessage( structinfo_help(2) );
         return;
     }
 
     IDL_VPTR data = argv[0];
     IDL_ENSURE_STRUCTURE( data );
-
-    if (kw.help) {
-        cout << structinfo_help(2) << endl;
-        return;
-    }
 
     int indent = std::min (std::max ( (int) kw.indent, 0), 30);
     if( kw.name && data->value.s.sdef->id->len ) {
@@ -913,14 +943,13 @@ size_t redux::getVarSize( IDL_VPTR v ) {
     
     if( dataType == IDL_TYP_OBJREF ) {    // if it is an object-reference, fetch the heap-pointer and call again.
         IDL_HEAP_VPTR heapPtr = IDL_HeapVarHashFind( v->value.hvid );
-        cout << "This is an objref" << endl;
         return getVarSize( &(heapPtr->var) );
     }
 
     if( dataType == IDL_TYP_STRUCT ) {
         
         if( !v->value.s.arr ) {
-            cout << "weird, all structs should have the arr..." << endl;
+            printMessage("weird, all structs should have the arr...");
         }
         
         // data block
