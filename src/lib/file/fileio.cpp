@@ -579,7 +579,7 @@ bfs::path redux::file::weaklyCanonical( bfs::path p ) {
     p = expandTilde( p.string() );
     try {
 #if BOOST_VERSION > 106000
-        p = bfs::weakly_canonical( p ).lexically_normal();
+        p = bfs::weakly_canonical( p );
 #elif BOOST_VERSION > 104800
         bfs::path tmp = p;
         while( !tmp.empty() && !exists( tmp ) ) {
@@ -595,7 +595,11 @@ bfs::path redux::file::weaklyCanonical( bfs::path p ) {
     if( p_filename.empty() || p_filename == "." ) {
         p = p.parent_path();
     }
+#if BOOST_VERSION < 106000
     return p;
+#else
+    return p.lexically_normal();
+#endif
 }
 
 

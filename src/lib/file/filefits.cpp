@@ -217,12 +217,13 @@ void Fits::close(void) {
     }
 }
 
+
 void Fits::open( const std::string& filename ) {
     
     try {
         if( fitsPtr_ ) {
             if( filename != fitsPtr_->Fptr->filename ) {
-            close();
+                close();
             } else {
                 int hdutype(ANY_HDU);
                 status_ = 0;
@@ -242,6 +243,7 @@ void Fits::open( const std::string& filename ) {
     }
     
 }    
+
 
 namespace {
 
