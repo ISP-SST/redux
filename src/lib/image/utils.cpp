@@ -489,6 +489,97 @@ template double redux::image::horizontalInterpolation (uint32_t**, size_t, size_
 template double redux::image::horizontalInterpolation (float**, size_t, size_t, size_t, size_t);
 template double redux::image::horizontalInterpolation (double**, size_t, size_t, size_t, size_t);
 
+template <typename T>
+void redux::image::apodizeInPlace2( T** data, size_t nRows, size_t nCols, size_t rowBlend, size_t colBlend ) {
+
+    if( rowBlend > nCols/2 ) {
+        rowBlend = nCols/2;
+    }
+    if( colBlend > nRows/2 ) {
+        colBlend = nRows/2;
+    }
+    
+    size_t sz = std::max( 2*rowBlend, 2*colBlend )+2;
+    double* apod = new double[ sz ];
+    T avg1(0);
+    Array<T> bla( nCols, 2*rowBlend );
+    for( size_t c=0; c<nCols; ++c ) {
+        for( size_t r=0; r<rowBlend; ++r ) {
+            bla( c, rowBlend+r ) = data[r][c];
+            bla( c, rowBlend-1-r ) = data[nRows-1-r][c];
+            avg1 += bla( c, rowBlend+r ) + bla( c, rowBlend-1-r );
+        }
+    }
+    file::Ana::write( "aip2_bt.f0", bla );
+    avg1 /= (2*nCols*rowBlend);
+    
+    T avg1b(0);
+    memset( apod, 0, sz*sizeof(T) );
+    redux::math::apodize( apod, 2*rowBlend+2, 1.0 );
+    for( size_t c=0; c<nCols; ++c ) {
+        T lastVal = data[nRows-rowBlend-1][c];
+        T firstVal = data[rowBlend][c];
+        T diff = firstVal-lastVal;
+        for( size_t r=0; r<rowBlend; ++r ) {
+            double a1 = apod[rowBlend+r+1];
+            T db = firstVal-data[2*rowBlend-r][c];
+            T de = lastVal-data[nRows-2*rowBlend-1+r][c];
+            data[r][c] = a1*(diff+db)+lastVal-0.5*db;
+            data[nRows-1-r][c] = a1*(de-diff)+firstVal-0.5*de;
+            bla( c, rowBlend+r ) = data[r][c];
+            bla( c, rowBlend-1-r ) = data[nRows-1-r][c];
+            avg1b += bla( c, rowBlend+r ) + bla( c, rowBlend-1-r );
+        }
+    }
+    file::Ana::write( "aip2_btb.f0", bla );
+    avg1b /= (2*nCols*rowBlend);
+    
+    T avg2(0);
+    bla.resize( nRows, 2*colBlend );
+    for( size_t r=0; r<nRows; ++r ) {
+        for( size_t c=0; c<colBlend; ++c ) {
+            bla( r, colBlend-1-c ) = data[r][nCols-1-c];
+            bla( r, colBlend+c ) = data[r][c];
+            avg2 += bla( r, colBlend-1-c ) + bla( r, colBlend+c );
+        }
+    }
+    file::Ana::write( "aip2_rl.f0", bla );
+    avg2 /= (2*nRows*colBlend);
+    
+    if( colBlend != rowBlend ) {
+        memset( apod, 0, sz*sizeof(T) );
+        redux::math::apodize( apod, 2*colBlend+2, 1.0 );
+    }
+    T avg2b(0);
+    for( size_t r=0; r<nRows; ++r ) {
+        T lastVal = data[r][nCols-colBlend-1];
+        T firstVal = data[r][colBlend];
+        T diff = firstVal-lastVal;
+        for( size_t c=0; c<colBlend; ++c ) {
+            double a1 = apod[colBlend+c+1];
+            T db = firstVal-data[r][2*colBlend-c];
+            T de = lastVal-data[r][nCols-2*colBlend-1+c];
+            data[r][c] = a1*(diff+db)+lastVal-0.5*db;
+            data[r][nCols-1-c] = a1*(de-diff)+firstVal-0.5*de;
+            bla( r, colBlend-1-c ) = data[r][nCols-1-c];
+            bla( r, colBlend+c ) = data[r][c];
+            avg2b += bla( r, colBlend-1-c ) + bla( r, colBlend+c );
+        }
+    }
+    file::Ana::write( "aip2_rlb.f0", bla );
+    avg2b /= (2*nRows*colBlend);
+    cout << "Avg1: " << avg1 << "  Avg1b: " << avg1b << endl;
+    cout << "Avg2: " << avg2 << "  Avg2b: " << avg2b << endl;
+    
+    delete[] apod;
+
+}
+template void redux::image::apodizeInPlace2(int16_t**, size_t, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace2(int32_t**, size_t, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace2(float**, size_t, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace2(double**, size_t, size_t, size_t, size_t);
+template void redux::image::apodizeInPlace2(complex_t**, size_t, size_t, size_t, size_t);
+
 
 template <typename T>
 void redux::image::apodizeInPlace( T** data, size_t nRows, size_t nCols, size_t rowBlend, size_t colBlend, size_t rowMargin, size_t colMargin ) {

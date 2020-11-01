@@ -345,6 +345,15 @@ namespace redux {
         }
                 
         template <typename T>
+        void apodizeInPlace2( T** data, size_t nRows, size_t nCols, size_t rowBlend, size_t colBlend );
+        template <typename T>
+        void apodizeInPlace2( redux::util::Array<T>& array, size_t blendRegion ) {
+            size_t nRows = array.dimSize(0);
+            size_t nCols = array.dimSize(1);
+            std::shared_ptr<T*> tmp = array.reshape( nRows, nCols );
+            apodizeInPlace2( tmp.get(), nRows, nCols, blendRegion, blendRegion );
+        }
+        template <typename T>
         void apodizeInPlace( T** data, size_t nRows, size_t nCols, size_t rowBlend, size_t colBlend, size_t rowMargin=0, size_t colMargin=0 );
         template <typename T>
         void apodizeInPlace( redux::util::Array<T>& array, size_t blendRegion, size_t margin=0 ) {
