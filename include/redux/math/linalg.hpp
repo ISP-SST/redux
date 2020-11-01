@@ -28,6 +28,18 @@ namespace redux {
 
         }
  */       
+        void normalize_columns( double* A, size_t rows, size_t cols );
+        void normalize_columns( redux::util::Array<double>& A );
+        
+        void normalize_rows( double* A, size_t rows, size_t cols );
+        void normalize_rows( redux::util::Array<double>& A );
+        
+        void gauss_jordan( double* A, size_t rows, size_t cols );
+        void gauss_jordan( redux::util::Array<double>& A );
+        
+        void lu_decomp( double* A, int rows, int cols );
+        void lu_decomp( redux::util::Array<double>& A);
+        
         void qr_decomp(const double* A, int rows, int cols, double* Q, double* R);
         void qr_decomp(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R);
         
@@ -35,6 +47,8 @@ namespace redux {
         void qr_decomp_pivot(const double* A, int rows, int cols, double* Q, double* R);
         void qr_decomp_pivot(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R, gsl_permutation* p);
         
+        void cod_decomp(const double* A, int rows, int cols, double* Q, double* R, double* Z);
+        void cod_decomp(const redux::util::Array<double>& A, redux::util::Array<double>& Q, redux::util::Array<double>& R, redux::util::Array<double>& Z);
         
         void svd(double* A_U, int rows, int cols, double* S, double* V);
         
