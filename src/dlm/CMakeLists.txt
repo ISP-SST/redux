@@ -127,8 +127,8 @@ if (DEFINED IDL_FOUND)
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${RDX_CURRENT_LIBRARIES})
     
-    if(RDX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)
-        add_dependencies(rdx GIT_CHECK_LIBREDUX)
+    if(RDX_AUTO_REVISION AND TARGET GIT_CHECK_LIBRDX)
+        add_dependencies(rdx GIT_CHECK_LIBRDX)
     endif()
     
     install(TARGETS rdx DESTINATION ${IDL_DLM_DIR} )

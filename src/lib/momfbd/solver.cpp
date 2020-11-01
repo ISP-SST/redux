@@ -102,6 +102,10 @@ void Solver::init( void ) {
     if( job.globalData->constraints.ns_rows.size() != nParameters ||
         job.globalData->constraints.ns_cols.size() != nFreeParameters ||
         job.globalData->constraints.ns_entries.empty() ) {
+        LOG_ERR << "The constraint-set is corrupt, the nullspace has the wrong number of entries." << ende;
+        LOG_ERR << "ns_rows.size() = " << job.globalData->constraints.ns_rows.size() << "  nPar = " << nParameters <<  ende;
+        LOG_ERR << "ns_cols.size() = " << job.globalData->constraints.ns_cols.size() << "  nFreePar = " << nFreeParameters <<  ende;
+        LOG_ERR << "ns_entries.size() = " << job.globalData->constraints.ns_entries.size() <<  ende;
         throw std::logic_error("The constraint-set is corrupt, the nullspace has the wrong number of entries.");
     }
 

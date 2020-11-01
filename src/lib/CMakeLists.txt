@@ -123,7 +123,7 @@ endif()
 ##### revison info ######
 set(RDX_REVISION_SRC_FILE "${CMAKE_CURRENT_BINARY_DIR}/revision.cpp")
 set_source_files_properties( ${RDX_REVISION_SRC_FILE} GENERATED )
-CHECK_REVISION(LIBREDUX "${CMAKE_CURRENT_LIST_DIR}/revision.cpp.template" "${RDX_REVISION_SRC_FILE}")
+CHECK_REVISION(LIBRDX "${CMAKE_CURRENT_LIST_DIR}/revision.cpp.template" "${RDX_REVISION_SRC_FILE}")
 
 RDX_ADD_LIBRARY(redux ${RDX_REVISION_SRC_FILE}
                     ${RDX_CPP} ${RDX_HPP} 
@@ -139,8 +139,8 @@ RDX_ADD_LIBRARY(redux ${RDX_REVISION_SRC_FILE}
                     ${RDX_UTIL_CPP} ${RDX_UTIL_GSL_CPP} ${RDX_UTIL_OPENCV_CPP} ${RDX_UTIL_HPP}
 )
 
-if(RDX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)
-    add_dependencies(redux GIT_CHECK_LIBREDUX)
+if(RDX_AUTO_REVISION AND TARGET GIT_CHECK_LIBRDX)
+    add_dependencies(redux GIT_CHECK_LIBRDX)
 endif()
 
 # Installation (distribution) settings

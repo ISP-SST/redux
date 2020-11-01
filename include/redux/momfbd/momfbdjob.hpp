@@ -123,7 +123,9 @@ namespace redux {
             void generateTraceData(PatchData::Ptr);
             void postProcess( void );
             
+            void dumpConfig(void);
             void updateProgressString(void);
+            void updateStatus(void);
 
             std::vector<Object::Ptr> objects;
             std::vector<Object::Ptr> trace_objects;

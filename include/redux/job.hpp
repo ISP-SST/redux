@@ -213,6 +213,7 @@ namespace redux {
         virtual size_t memUsage(void) { return 0; }       //!< Approximate current memory usage of this job
         virtual size_t diskUsage(void) { return 0; }      //!< Approximate current disk usage of this job
         virtual size_t procUsage(void) { return 0; }      //!< Approximate memory usage for processing 1 part
+        virtual void updateStatus(void) {};
         
         void addThread( uint16_t n );
         void delThread( uint16_t n );

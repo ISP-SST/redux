@@ -18,6 +18,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
+#include <boost/property_tree/info_parser.hpp>
 using boost::algorithm::iequals;
 
 using namespace redux::logging;
@@ -1322,6 +1323,24 @@ void MomfbdJob::postProcess( void ) {
 }
 
 
+void MomfbdJob::dumpConfig(void) {
+
+    if( cachePath.empty() ) {
+        return;
+    }
+    string cfgName = cachePath + "cfg";
+    
+    try {
+        ofstream cfgOut( cfgName, ofstream::trunc );
+        bpt::ptree cfgTree;
+        getPropertyTree( &cfgTree );
+        bpt::write_info( cfgOut, cfgTree );
+    } catch ( exception& e ) {
+        LOG_ERR << "Error when trying to write config \"" << cfgName << "\": " << e.what() << ende;
+    }
+}
+
+
 void MomfbdJob::updateProgressString(void) {
 
     memset( info.progressString, 0, RDX_JOB_PROGSTRING_LENGTH );
@@ -1341,6 +1360,13 @@ void MomfbdJob::updateProgressString(void) {
     }
 
 
+}
+
+
+void MomfbdJob::updateStatus(void) {
+
+    dumpConfig();
+  
 }
 
 

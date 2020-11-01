@@ -76,7 +76,7 @@ string redux::network::cmdToString( uint8_t cmd ) {
         case CMD_RESET: return "CMD_RESET";
         case CMD_DIE: return "CMD_DIE";
         case CMD_ERR: return "CMD_ERR";
-        default: return "unreconized";
+        default: return "unrecognized";
     }
     
 }

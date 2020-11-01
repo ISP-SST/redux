@@ -20,8 +20,8 @@ namespace redux {
             unsigned int count( void );
             unsigned int getInit( void );
             
-            void decrease( unsigned int );
-            void increase( unsigned int );
+            void decrease( unsigned int val=1 );
+            void increase( unsigned int val=1 );
             void set( unsigned int );
             void reset( void );
             

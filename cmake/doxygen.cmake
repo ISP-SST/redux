@@ -9,8 +9,8 @@ if(DOXYGEN_FOUND)
                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                        COMMENT "Generate documentation with Doxygen" VERBATIM )
 
-    if(NOT RDX_NO_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX)
-        add_dependencies(doc GIT_CHECK_LIBREDUX)
+    if(NOT RDX_NO_AUTO_REVISION AND TARGET GIT_CHECK_LIBRDX)
+        add_dependencies(doc GIT_CHECK_LIBRDX)
     endif()
 
 endif()

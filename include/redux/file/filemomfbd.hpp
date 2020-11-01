@@ -7,13 +7,13 @@
 
 #include <fstream>
 
-#define MOMFBD_IMG        1
+#define MOMFBD_IMG        1       ///< Image data should be read (or written).
 #define MOMFBD_PSF        2
 #define MOMFBD_OBJ        4
 #define MOMFBD_RES        8
 #define MOMFBD_ALPHA     16
 #define MOMFBD_DIV       32
-#define MOMFBD_PATCH     63       // convenience for flagging any "per-patch" data.
+#define MOMFBD_PATCH     63       ///< convenience for flagging any "per-patch" data.
 #define MOMFBD_MODES     64
 #define MOMFBD_NAMES    128
 #define MOMFBD_ALL      255

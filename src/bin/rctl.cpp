@@ -131,6 +131,7 @@ void interactive( TcpConnection::Ptr conn, Logger& logger ) {
         char* ptr; 
         while( cmd != CMD_ERR ) {
             string line,reply;
+            auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists, will throw if not connected.
 
             cout << "rdx_ctl>" << flush;
             getline( cin, line );
@@ -143,8 +144,7 @@ void interactive( TcpConnection::Ptr conn, Logger& logger ) {
                 ptr = buf.get();
                 ptr += pack( ptr, lineSize );
                 line.copy( ptr, lineSize );
-                ptr[lineSize-1] = '\0';
-
+                ptr[lineSize-1] = 0;
                 conn->syncWrite( buf.get(), lineSize+sizeof(uint64_t) );
                 
                 // reply

@@ -171,7 +171,7 @@ void Daemon::maintenance( void ) {
     updateLoadAvg();
     checkSwapSpace();
     cleanup();
-    //checkCurrentUsage();
+    checkCurrentUsage();
     
 
     logger.flushAll();
@@ -226,6 +226,8 @@ void Daemon::checkCurrentUsage( void ) {
     unique_lock<mutex> lock( jobsMutex );
     for( auto& job : jobs ) {
         if( !job ) continue;
+        job->updateStatus();
+        continue;   // FIXME: usage check is not working.
         size_t memUsage = job->memUsage();
         size_t diskUsage = job->diskUsage();
         LOG << "Job " << job->info.id << " (" << job->info.name << "), memUsage = " << static_cast<double>(memUsage)/(1<<30)

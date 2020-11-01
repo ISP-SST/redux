@@ -446,7 +446,9 @@ uint64_t PatchData::pack( char* ptr ) const {
     count += pack( ptr+count, finalMetric );
     count += pack( ptr+count, metrics );
     for( auto& obj: objects ) {
-        if(obj) count += obj->pack(ptr+count);
+        if( obj ) {
+            count += obj->pack(ptr+count);
+        }
     }
     count += waveFronts.WavefrontData::pack(ptr+count);
     uint16_t tmp = trace_data.size();
@@ -474,7 +476,9 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, metrics, swap_endian );
     for( auto& obj: objects ) {
         // use explicit scope to bypass compression (only compress the patch, not the individual objects/channels)
-        if(obj) count += obj->unpack( ptr+count, swap_endian );
+        if(obj) {
+            count += obj->unpack( ptr+count, swap_endian );
+        }
     }
     count += waveFronts.WavefrontData::unpack(ptr+count, swap_endian);
     uint16_t tmp;
