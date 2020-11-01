@@ -37,15 +37,21 @@ message(STATUS "GDL is defined.")
     
     set( RDX_RDX_DEPS 
 #         "${RDX_LIB_BASE}/file/fileio.cpp"
-#         "${RDX_LIB_BASE}/version.cpp"
-#         "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
+         "${RDX_LIB_BASE}/version.cpp"
+         "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp"
     )
-    add_library( rdx_gdl SHARED rdx.cpp ana.cpp ${RDX_RDX_DEPS} )
-    target_link_libraries( rdx_gdl redux ${RDX_CURRENT_LIBRARIES} )
+    add_library( rdx_gdl SHARED rdx.cpp two.cpp ${RDX_RDX_DEPS} )
     install(TARGETS rdx_gdl DESTINATION ${GDL_DLM_DIR} )
+    get_property(fancy_lib_location TARGET rdx_gdl PROPERTY LOCATION)
+    get_property(fancy_lib_locations TARGET rdx_gdl PROPERTY NAME)
+    #get_target_property(Shared PROPERTIES LIBRARY_OUTPUT_NAME demo.so.1.2.3)
 
+    message (STATUS "fancy_lib_location == ${fancy_lib_location}")
+    message (STATUS "fancy_lib_location == ${fancy_lib_locations}")
     set( RDX_GDL_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/load_rdx_gdl.pro" )
     configure_file( "load_rdx_gdl_tpl.pro" "${RDX_GDL_FILE_LOCATION}" )
+    target_link_libraries( rdx_gdl ${RDX_CURRENT_LIBRARIES} )
+
     
 #    if( RDX_AUTO_REVISION AND TARGET GIT_CHECK_LIBREDUX )
 #        add_dependencies( rdx_gdl GIT_CHECK_LIBREDUX )
