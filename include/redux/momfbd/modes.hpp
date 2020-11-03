@@ -16,7 +16,7 @@ namespace redux {
 
     namespace momfbd {
         
-        enum ModeBase { MB_NONE=0, ZERNIKE=1, KARHUNEN_LOEVE, MB_ZKL };
+        enum ModeBase { MB_NONE=0, ZERNIKE=1, KARHUNEN_LOEVE, MB_ZKL, MB_FILE };
         
         struct ModeID {
             ModeID() : mode(0), type(ZERNIKE) {}
@@ -73,8 +73,11 @@ namespace redux {
             uint64_t unpack(const char*, bool);
             bool operator<( const ModeInfo& rhs ) const;
             operator std::string() const;
-            
         };
+        inline std::ostream& operator<<( std::ostream& os, const ModeInfo& mi ) {
+            os << (std::string)mi;
+            return os;
+        }
 
 
 

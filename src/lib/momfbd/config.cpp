@@ -152,16 +152,25 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
     diversityBasis = tree.get<ModeBase>( "DIV_BASIS", defaults.diversityBasis );
     diversityValues = tree.get<vector<DiversityValue>>("DIVERSITY", defaults.diversityValues);
     diversityModes = tree.get<ModeList>("DIV_ORDERS", defaults.diversityModes);
+    diversityModes = tree.get<ModeList>("DIV_MODES", diversityModes);
     diversityModes.setDefaultModeType( diversityBasis );
-    
-    // if there is only 1 coefficient, we assume it is a PD defocus term, and don't require DIV_ORDERS
-    if( diversityValues.size() == 1 && diversityModes.empty() ) { 
-        diversityModes.push_back( ModeID(4,ZERNIKE) );
-    }
-    for( auto& d: diversityModes ) {
-        if( d.mode == 2 || d.mode == 3 ) d.type = ZERNIKE;      // Force Zernike for all tilt modes.
-    }
+    diversityModeFile = getValue<string>( tree, "DIV_MODE_FILE", defaults.diversityModeFile );
 
+    if( !diversityModeFile.empty() ) {
+        // if there is *no* coefficient, should we use #ID in the file, and use coefficient=1 ?
+        // if there is only 1 coefficient, and no DIV_ORDER/MODE specified, should we use #ID in the file?
+        if( diversityValues.size() == 1 && diversityModes.empty() ) { 
+            diversityModes.push_back( ModeID(0,MB_FILE) );
+        }
+    } else {
+        // if there is only 1 coefficient, we assume it is a PD defocus term, and don't require DIV_ORDERS
+        if( diversityValues.size() == 1 && diversityModes.empty() ) { 
+            diversityModes.push_back( ModeID(4,ZERNIKE) );
+        }
+        for( auto& d: diversityModes ) {
+            if( d.mode == 2 || d.mode == 3 ) d.type = ZERNIKE;      // Force Zernike for all tilt modes.
+        }
+    }
 
     alignMap = getValue( tree, "ALIGN_MAP", defaults.alignMap );
     alignClip = getValue( tree, "ALIGN_CLIP", defaults.alignClip );
@@ -245,8 +254,9 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults, bo
     if( showAll || noRestore != defaults.noRestore ) tree.put("NO_RESTORE", noRestore);
     
     if( showAll || diversityBasis != defaults.diversityBasis ) tree.put( "DIV_BASIS", diversityBasis );
-    if( showAll || diversityModes != defaults.diversityModes ) tree.put( "DIV_ORDERS", diversityModes );
+    if( showAll || diversityModes != defaults.diversityModes ) tree.put( "DIV_MODES", diversityModes );
     if( showAll || diversityValues != defaults.diversityValues ) tree.put( "DIVERSITY", diversityValues );
+    if( showAll || diversityModeFile != defaults.diversityModeFile ) tree.put( "DIV_MODE_FILE", diversityModeFile );
     
     if( showAll || alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
     if( showAll || alignClip != defaults.alignClip ) {
@@ -295,7 +305,7 @@ uint64_t ChannelCfg::size( void ) const {
         + sizeof( rotationAngle ) + sizeof( weight );
     uint64_t sz = ssz;
     // strings
-    sz += backgainFile.length() + darkTemplate.length() + gainFile.length() + 3;
+    sz += backgainFile.length() + darkTemplate.length() + diversityModeFile.length() + gainFile.length() + 4;
     sz += imageDataDir.length() + imageTemplate.length() + mmFile.length() + psfFile.length() + 4;
     sz += responseFile.length() + xOffsetFile.length() + yOffsetFile.length() + 3;
     // vectors etc.
@@ -331,6 +341,7 @@ uint64_t ChannelCfg::pack( char* ptr ) const {
     // strings
     count += pack( ptr+count, backgainFile );
     count += pack( ptr+count, darkTemplate );
+    count += pack( ptr+count, diversityModeFile );
     count += pack( ptr+count, gainFile );
     count += pack( ptr+count, imageDataDir );
     count += pack( ptr+count, imageTemplate );
@@ -372,6 +383,7 @@ uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     // strings
     count += unpack( ptr+count, backgainFile );
     count += unpack( ptr+count, darkTemplate );
+    count += unpack( ptr+count, diversityModeFile );
     count += unpack( ptr+count, gainFile );
     count += unpack( ptr+count, imageDataDir );
     count += unpack( ptr+count, imageTemplate );

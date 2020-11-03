@@ -84,8 +84,9 @@ namespace redux {
             /********  Diversity  ********/
             // TODO: reorganize
             ModeBase diversityBasis;                //!< Which basis to use as default for unmarked modes.
-            ModeList diversityModes;             //!< List of diversity mode types/numbers
+            ModeList diversityModes;                //!< List of diversity mode types/numbers
             std::vector<DiversityValue> diversityValues;    //!< List of weights/values for the diversity modes. 
+            std::string diversityModeFile;          //!< File containining modes to be used for the diversity.
             bool noRestore;                         //!< Exclude this channel in the final reconstruction/deconvolution step (i.e. only use it during the fitting)
             /*****************************/
             

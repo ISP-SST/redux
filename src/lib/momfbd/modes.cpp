@@ -8,6 +8,7 @@
 #include "redux/image/zernike.hpp"
 #include "redux/math/helpers.hpp"
 #include "redux/util/cache.hpp"
+#include "redux/translators.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -120,8 +121,8 @@ ModeInfo::operator string() const {
         ret += "KL";
     }
     if( !modeList.empty() ) {
-        //ret += "["+uIntsToString( modeNumbers )+"]";  TODO FIXME
-        ret += "[]";
+        redux::ModeListTranslator mlt;
+        ret += "[" + mlt.put_value( modeList ).get() + "]";
     } else  {
         ret += "("+ to_string(modeNumber) + ")";
     }
@@ -152,7 +153,7 @@ PupilMode::PupilMode(uint16_t modeNumber, uint16_t nPoints, double r_c, double a
 
 PupilMode::PupilMode(uint16_t firstZernike, uint16_t lastZernike, uint16_t klModeNumber,
                      uint16_t nPoints, double r_c, double angle, double cutoff, int flags ) :
-     Array<double> (nPoints, nPoints), atm_rms(0) {
+    Array<double> (nPoints, nPoints), atm_rms(0) {
 
     if( firstZernike > lastZernike ) swap( firstZernike, lastZernike );
 
@@ -434,17 +435,10 @@ void ModeSet::getNorms( const redux::image::Pupil& pup ) {
         double* ptr = modePointers[i];
         if( !ptr ) continue;
         double norm(0);
-        double mx = std::numeric_limits<double>::min();
-        double mn = std::numeric_limits<double>::max();
-        bool isTilt = (i == tiltMode.x) || (i == tiltMode.y);
         for( size_t ind=0; ind<nPixels; ++ind) {
             if( pupPtr[ind] > 0 ) {
                 double tmp = ptr[ind]*pupPtr[ind];
                 norm += tmp*ptr[ind];               // i.e. = mode² * pupil
-                if( isTilt ) {
-                    mx = std::max( mx, tmp );
-                    mn = std::min( mn, tmp );
-                }
             }
         }
         norms[i] = sqrtl( norm/pup.area );

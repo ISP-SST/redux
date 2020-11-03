@@ -27,6 +27,10 @@ namespace redux {
             bool operator<( const PupilInfo& rhs ) const;
             operator std::string() const;
         };
+        inline std::ostream& operator<<( std::ostream& os, const PupilInfo& pi ) {
+            os << (std::string)pi;
+            return os;
+        }
 
 
         struct Pupil : public redux::util::Array<double>

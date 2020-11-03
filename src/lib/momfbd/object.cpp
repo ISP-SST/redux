@@ -228,12 +228,13 @@ void Object::initProcessing( Solver& ws ){
             fittedPlane.resize( patchSize, patchSize );
             fittedPlane.zero();
         }
+        
+        
         for( auto& ch : channels ){
             ch->initProcessing( ws );
         }
-
         initObject( );            // load global pupil/modes
-        
+
         double mode_scale = 1.0/wavelength;
         ModeInfo info( modeFile, pupilPixels );
         if( modeFile.empty() ) {

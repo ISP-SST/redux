@@ -69,7 +69,7 @@ bool PupilInfo::operator<(const PupilInfo& rhs) const {
 
 PupilInfo::operator string() const {
     string ret = to_string(nPixels)+":"+to_string(pupilRadius);
-    if( coRadius > 0 ) ret +=  ":" + bitString(coRadius);
+    if( coRadius > 0 ) ret +=  ":" + to_string(coRadius);
     if( !filename.empty() ) ret += ":\"" + filename + "\"";
     return ret;
 }
