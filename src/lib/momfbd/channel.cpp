@@ -448,31 +448,57 @@ bool Channel::checkData( bool verbose ) {
 
 void Channel::initChannel (void) {
 
-    ModeInfo mi( myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+    ModeInfo info( myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+    
+    if( !diversityModeFile.empty() ) {      // A file with modes was supplied
+        
+        info = ModeInfo( diversityModeFile, myObject.pupilPixels );
+
+        const shared_ptr<ModeSet>& modes = myJob.globalData->get( info );
+        lock_guard<mutex> lock( modes->mtx );
+        if( modes->empty() && bfs::is_regular_file(diversityModeFile) ) {   // load file
+            LOG_DEBUG << "initChannel(" << idString() << "):   Empty diversity ModeSet: loading \"" << diversityModeFile << "\"" << ende;
+            modes->load( diversityModeFile, myObject.pupilPixels );
+            if( !modes->empty() ) {
+                if( myObject.pupil ) modes->getNorms( *(myObject.pupil) );
+                else modes->getNorms();
+                modes->normalize();
+            }
+        }
+        if( modes->empty() ) {
+            LOG_ERR << "initChannel(" << idString() << "):  Could not load diversityModeFile=\"" << diversityModeFile << "\"" << ende;
+        }
+        return;
+    }
+
+    
     for( size_t i(0); i < diversityModes.size(); ++i ) {
         
         uint16_t modeNumber = diversityModes[i].mode;
         int modeType = diversityModes[i].type;
         
-        ModeInfo mi2 = mi;
+        ModeInfo mi2 = info;
         if( modeNumber == 2 || modeNumber == 3 || modeType == ZERNIKE ) {
             mi2.firstMode = mi2.lastMode = 0;
         }
         mi2.modeNumber = modeNumber;
-        const shared_ptr<ModeSet>& ret = myJob.globalData->get(mi2);
-        unique_lock<mutex> lock(ret->mtx);
-        if( ret->empty() ) {    // this set was inserted, so it is not generated yet.
+        const shared_ptr<ModeSet>& dmode = myJob.globalData->get(mi2);
+        unique_lock<mutex> lock( dmode->mtx);
+        if( dmode->empty() ) {    // this (single-mode-) set was inserted, so it is not generated yet.
             if( modeType == ZERNIKE) {
-                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes, Zernike::NORMALIZE );
+                LOG_DEBUG << "initChannel(" << idString() << "):   Empty diversity mode: generating Zernike mode." << ende;
+                dmode->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, diversityModes, Zernike::NORMALIZE );
             } else {
-                ret->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff, Zernike::NORMALIZE );
+            LOG_DEBUG << "initChannel(" << idString() << "):   Empty diversity mode: generating KL mode." << ende;
+                dmode->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, diversityModes, myJob.klCutoff, Zernike::NORMALIZE );
             }
-            if( ret->nDimensions() != 3 || ret->dimSize(1) != myObject.pupilPixels || ret->dimSize(2) != myObject.pupilPixels ) {    // mismatch
-                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
+            if( dmode->nDimensions() != 3 || dmode->dimSize(1) != myObject.pupilPixels || dmode->dimSize(2) != myObject.pupilPixels ) {    // mismatch
+                LOG_ERR << "Generated diversity-mode does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ret->dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels
-                << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
-                ret->getNorms( *(myObject.pupil) );
+                if( myObject.pupil && myObject.pupil->valid() ) dmode->getNorms( *(myObject.pupil) );
+                else dmode->getNorms();
+                LOG_DETAIL << "Generated diversity-mode: " << mi2 << printArray( dmode->norms,"\n\t\t  norm" ) << ende;
+                dmode->normalize();
             }
         }  
     }
@@ -855,23 +881,54 @@ void Channel::initPhiFixed(void) {
         return;
     }
     
-    double scale = util::def2cf( myJob.telescopeD / myObject.telescopeF );
-    ModeInfo mi( myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+    ModeInfo minfo( myJob.klMinMode, myJob.klMaxMode, 0, myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
+    double scale4 = util::def2cf( myJob.telescopeD / myObject.telescopeF );     // conversion factor from m to radians, only used for focus-term.
+    
+    if( ! diversityModeFile.empty() ) {     // using mode-file
+        minfo = ModeInfo( diversityModeFile, myObject.pupilPixels );
+    
+        const shared_ptr<ModeSet>& modes = myJob.globalData->get( minfo );
+        lock_guard<mutex> lock( modes->mtx );
+        if( !modes->empty() ) {
+            for( size_t i(0); i < diversityModes.size(); ++i ) {
+                uint16_t modeNumber = diversityModes[i].mode;
+                if( modeNumber >= modes->modePointers.size() ) {
+                    LOG_WARN << "initPhiFixed(" << idString() << "): modeNumber = " << modeNumber
+                            << " >= nModes in modefile \"" << diversityModeFile << "\"\n\t\tThis Diversity mode will be ignored!!!" << ende;
+                    continue;
+                }
+                double alpha = diversityValues[i].coefficient/myObject.wavelength;
+                if( diversityValues[i].physical ) {
+                    alpha *= scale4;
+                }
+                const double* modePtr = modes->modePointers[static_cast<size_t>(modeNumber)];
+                transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
+                    [alpha](const double& p, const double& m) {
+                        return p + alpha*m;
+                    });
+            }
+        } else {
+            LOG_ERR << "initPhiFixed: DIV_MODE_FILE=\"" << diversityModeFile
+                    << "\", but ModeSet is empty!! This should NOT happen!!" << ende;
+        }
 
+        return;
+    }
+    
     for( size_t i(0); i < diversityModes.size(); ++i ) {
         
-        uint16_t modeNumber = diversityModes[i].mode;
+        ModeInfo mi2 = minfo;
+        mi2.modeNumber = diversityModes[i].mode;
         int modeType = diversityModes[i].type;
         double alpha = diversityValues[i].coefficient/myObject.wavelength;
         if( diversityValues[i].physical ) {
-            alpha *= scale;
+            alpha *= scale4;
         }
 
-        ModeInfo mi2 = mi;
-        if( modeNumber == 2 || modeNumber == 3 || modeType == ZERNIKE ) {
+        if( mi2.modeNumber == 2 || mi2.modeNumber == 3 || modeType == ZERNIKE ) {   // generated tilts always Zernike
             mi2.firstMode = mi2.lastMode = 0;
         }
-        mi2.modeNumber = modeNumber;
+        
         const shared_ptr<ModeSet>& ms = myJob.globalData->get(mi2);
 
         if( ms->empty() ) {    // generate
@@ -881,12 +938,12 @@ void Channel::initPhiFixed(void) {
                 ms->generate( myObject.pupilPixels, myObject.pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeList, myJob.klCutoff, Zernike::NORMALIZE );
             }
             if( ms->nDimensions() != 3 || ms->dimSize(1) != myObject.pupilPixels || ms->dimSize(2) != myObject.pupilPixels ) {    // mismatch
-                LOG_ERR << "Generated ModeSet does not match. This should NOT happen!!" << ende;
+                LOG_ERR << "Generated diversity-mode does not match. This should NOT happen!!" << ende;
             } else {
-                LOG_DEBUG << "Generated Modeset with " << ms->dimSize(0) << " modes. (" << myObject.pupilPixels << "x" << myObject.pupilPixels << "  radius=" << myObject.pupilRadiusInPixels << ")" << ende;
+                LOG_DETAIL << "Generated diversity-mode: " << mi2 << printArray( ms->norms,"\n\t\t  norm" ) << ende;
             }
         }        
-        auto it = std::find( ms->modeList.begin(), ms->modeList.end(), modeNumber );
+        auto it = std::find( ms->modeList.begin(), ms->modeList.end(), mi2.modeNumber );
         if( it != ms->modeList.end() ) {
             const double* modePtr = ms->modePointers[static_cast<size_t>(it-ms->modeList.begin())];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
