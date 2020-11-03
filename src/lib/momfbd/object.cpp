@@ -794,10 +794,10 @@ void Object::initObject( void ){
         lock_guard<mutex> lock(ret->mtx );
         if( ret->empty() ){    // this set was inserted, so it is not loaded yet.
             if( ret->load( pupilFile, pupilPixels, pupilRadiusInPixels ) ){
-                LOG << "Loaded Pupil-file " << pupilFile << ende;
+                LOG << "Loaded Pupil-file (" << info << ")" << ende;
                 ret->info = info;
                 pupil = ret;
-            } else LOG_ERR << "Failed to load Pupil-file " << pupilFile << ende;
+            } else LOG_ERR << "Failed to load Pupil-file " << info << ende;
         } else {
             if( ret->nPixels && ret->nPixels == pupilPixels ){    // matching pupil
                 //LOG_DEBUG << "Using pre-calculated pupil: ( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
@@ -821,7 +821,7 @@ void Object::initObject( void ){
             if( ret->nDimensions() != 2 || ret->dimSize(0) != pupilPixels || ret->dimSize(1) != pupilPixels ){    // mismatch
                 LOG_ERR << "Generated Pupil does not match. This should NOT happen!!" << ende;
             } else {
-                LOG << "Generated pupil( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
+                LOG_DETAIL << "Generated pupil: " << info << ende;
                 pupil = ret; 
             }
         } else {
@@ -829,7 +829,8 @@ void Object::initObject( void ){
                 //LOG_DEBUG << "Using pre-calculated Pupil: ( " << pupilPixels << "x" << pupilPixels << "  radius=" << pupilRadiusInPixels << ")" << ende;
                 pupil = ret;
             } else {
-                LOG_ERR << "The Cache returned a non-matching Pupil. This should NOT happen!!" << ende;
+                LOG_ERR << "The Cache returned a non-matching Pupil (" << info << "). PupilPixels = " << pupilPixels
+                        << "\n\t\tThis should NOT happen!!" << ende;
             }
         }
     }
@@ -847,23 +848,28 @@ void Object::initObject( void ){
     lock_guard<mutex> lock( modes->mtx );
     if( modes->empty() ) {
         if( bfs::is_regular_file(modeFile) ){
+            LOG_DEBUG << "initObject(" << to_string(ID) << "):   Empty ModeSet: loading \"" << modeFile << "\"" << ende;
             modes->load( modeFile, pupilPixels );
         } else if( info.firstMode == info.lastMode ) {
+            LOG_DEBUG << "initObject(" << to_string(ID) << "):   Empty ModeSet: generating Zernike set." << ende;
             modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeList, Zernike::NORMALIZE );
         } else {
+            LOG_DEBUG << "initObject(" << to_string(ID) << "):   Empty ModeSet: generating KL set." << ende;
             modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klMinMode, myJob.klMaxMode, myJob.modeList, myJob.klCutoff, Zernike::NORMALIZE );
         }
-        modes->getNorms( *pupil );
+        if( pupil ) modes->getNorms( *pupil );
+        else modes->getNorms();
+        LOG_DEBUG << "initObject(" << to_string(ID) << "): " << printArray( modes->norms,"measured norms" ) << ende;
         modes->normalize();
     }
     
     modes->measureJacobian( *pupil, (0.5*frequencyCutoff)/util::pix2cf( arcSecsPerPixel, myJob.telescopeD ) );
     
     LOG_DETAIL << "Alpha-to-Shift: " << modes->alphaToShift( PointF(1,1) )
-              << "    Shift-to-Alpha: " << modes->shiftToAlpha( PointF(1,1) ) << ende;
+               << "    Shift-to-Alpha: " << modes->shiftToAlpha( PointF(1,1) ) << ende;
 
     for( shared_ptr<Channel>& ch: channels ){
-        ch->initChannel( );
+        ch->initChannel();
     }
     
 }
