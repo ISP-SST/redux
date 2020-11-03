@@ -262,8 +262,12 @@ uint64_t ModeSet::unpack( const char* data, bool swap_endian ) {
     count += unpack(data+count,atm_rms,swap_endian);
     count += unpack(data+count,norms,swap_endian);
     modePointers.clear();
-    for(unsigned int i=0; i<dimSize(0); ++i) {
-        modePointers.push_back( ptr(i,0,0) );
+    if( nDimensions() == 2 ) {
+        modePointers.push_back( ptr(0,0) );
+    } else if ( nDimensions() == 3 ) {
+        for( size_t i(0); i<dimSize(0); ++i ) {
+            modePointers.push_back( ptr(i,0,0) );
+        }
     }
     return count;
 }
@@ -303,12 +307,10 @@ ModeSet ModeSet::clone( void ) const {
 
 
 bool ModeSet::load( const string& filename, uint16_t pixels ) {
-    
+
     if ( bfs::is_regular_file(filename) ) {
         redux::file::readFile( filename, *this );
-        if( nDimensions() != 3 || dimSize(1) != pixels || dimSize(2) != pixels ) {    // mismatch
-            clear();
-        } else {
+        if( (nDimensions() == 3) && (dimSize(1) == pixels) && (dimSize(2) == pixels) ) {          // matching modeset
             // TODO rescale file to right size
             info.nPupilPixels = pixels;
             info.pupilRadius = info.angle = 0;
@@ -323,8 +325,17 @@ bool ModeSet::load( const string& filename, uint16_t pixels ) {
                 modePointers.push_back( ptr(i,0,0) );
             }
             return true;
+        } else if( nDimensions() == 2 || dimSize(0) == pixels || dimSize(1) == pixels ) {   // matching single mode
+            info.nPupilPixels = pixels;
+            info.pupilRadius = info.angle = 0;
+            modeList.resize( 1, ModeID( 0, MB_NONE ) );
+            modePointers.resize( 1, ptr(0,0) );
+            return true;
+        } else {
+            clear();
         }
     }
+
     return false;
     
 }
@@ -382,7 +393,7 @@ void ModeSet::generate( uint16_t pixels, double radius, double angle, const Mode
 
 
 void ModeSet::generate( uint16_t pixels, double radius, double angle, uint16_t firstZernike, uint16_t lastZernike, const ModeList& modes, double cutoff, int flags ) {
-    
+
     resize();       // clear
     modeList = modes;
     modePointers.clear();
