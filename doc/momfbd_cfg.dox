@@ -40,8 +40,10 @@ can also be specified on object/global leve, and will then be inherited by all c
     <tr><td>DARK_TEMPLATE           <td>string                  <td>Filename template to be used with sprintf (and DARK_NUM), to generate the filename(s) to be used as dark image(s) <td>
     <tr><td>DISCARD                 <td>int(1-2)                <td>Specifies number of frames to skip in the beginning (and end) of multi-frame files.<br>
     This is useful if e.g. the first frame of each burst is untrusted because of instrument oscillation after tuning <td>
-    <tr><td>DIVERSITY               <td>float(N)                <td>List of weights/values for the fixed aberrations (specified in DIV_ORDERS) <td>
-    <tr><td>DIV_ORDERS              <td>int(N)                  <td>List of mode indices to use as fixed aberrations for this channel <td>
+    <tr><td>DIVERSITY               <td>float(N)                <td>List of weights/values for the fixed aberrations (specified in DIV_MODES/ORDERS).<td>
+    <tr><td>DIV_MODES               <td>int(N)                  <td>List of modes/indices to use as fixed aberrations for this channel. Should be specified as a comma-separated list of numbers, with optional "Z" or "K" tags to indicate if the mode(s) should be Zernike or Karhunen-Loeve. This list should be the same length as DIVERSITY.<td>
+    <tr><td>DIV_MODE_FILE           <td>path/filename           <td>Filename containing modes to use for the phase diversity. When a mode-file is provided, DIV_MODES/ORDERS will be interpreted as indices in the supplied file. <td>
+    <tr><td>DIV_ORDERS              <td>int(N)                  <td>This does exactly the same as DIV_MODES.<td>
     <tr><td>DT                      <td>int                     <td>Image number offset to be added to all IMAGE_NUMs in this channel <td>
     <tr><td>FILENAME_TEMPLATE       <td>string                  <td>Filename template to be used with sprintf (and IMAGE_NUM), to generate the filename(s) to be used as input<td> 
     <tr><td>GAIN_FILE               <td>path/filename           <td>Path to a file with a gain table. Will be applied *after* backscatter correction.     <td> 
