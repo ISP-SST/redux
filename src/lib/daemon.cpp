@@ -171,7 +171,7 @@ void Daemon::maintenance( void ) {
     updateLoadAvg();
     checkSwapSpace();
     cleanup();
-    checkCurrentUsage();
+    //checkCurrentUsage();
     
 
     logger.flushAll();
