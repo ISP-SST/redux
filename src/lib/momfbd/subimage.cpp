@@ -466,7 +466,7 @@ bool SubImage::adjustShifts( const T* alpha ) {
         //cout << index << "  thisShift = " << thisShift << "  actualShift = " << actualShift
         //     << "  aToS = " << modes->alphaToShift( PointD(1,1) ) << endl;
         currentShift += actualShift;
-        currentTiltOffset += modes->shiftToAlpha ( actualShift );
+        currentTiltOffset += modes->shiftToAlpha( PointD(actualShift) );
         ret = true;
     }
 
