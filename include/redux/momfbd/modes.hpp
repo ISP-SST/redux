@@ -122,12 +122,12 @@ namespace redux {
             
             void measureJacobian( const redux::image::Pupil&, double scale=1.0 );
             template <typename T> redux::util::PointType<T> alphaToShift( redux::util::PointType<T> alpha ) {
-                return redux::util::PointType<T>( alpha.x * J_T_xy[0][0] + alpha.y * J_T_xy[0][1],
-                                                  alpha.x * J_T_xy[1][0] + alpha.y * J_T_xy[1][1] );
+                return redux::util::PointType<T>( alpha.x * J_T_xy[1][0] + alpha.y * J_T_xy[1][1],
+                                                  alpha.x * J_T_xy[0][0] + alpha.y * J_T_xy[0][1] );
             }
             template <typename T> redux::util::PointType<T> shiftToAlpha( redux::util::PointType<T> shift ) {
-                return redux::util::PointType<T>( shift.x * J_xy_T[0][0] + shift.y * J_xy_T[0][1],
-                                                  shift.x * J_xy_T[1][0] + shift.y * J_xy_T[1][1] );
+                return redux::util::PointType<T>( shift.x * J_xy_T[1][0] + shift.y * J_xy_T[1][1],
+                                                  shift.x * J_xy_T[0][0] + shift.y * J_xy_T[0][1] );
             }
             
             void setPupilSize( uint16_t nPixels, double radiusInPixels, double rotation );

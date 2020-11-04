@@ -845,6 +845,7 @@ void Object::initObject( void ){
     
     modes = myJob.globalData->get( info );          // get normalized modes
 
+    bool doPrint(false);    // just to reduce spamming the log, print only when modes are generated (i.e. on the master)
     lock_guard<mutex> lock( modes->mtx );
     if( modes->empty() ) {
         if( bfs::is_regular_file(modeFile) ){
@@ -861,13 +862,16 @@ void Object::initObject( void ){
         else modes->getNorms();
         LOG_DEBUG << "initObject(" << to_string(ID) << "): " << printArray( modes->norms,"measured norms" ) << ende;
         modes->normalize();
+        doPrint = true;
     }
     
     modes->measureJacobian( *pupil, (0.5*frequencyCutoff)/util::pix2cf( arcSecsPerPixel, myJob.telescopeD ) );
     
-    LOG_DETAIL << "Alpha-to-Shift: " << modes->alphaToShift( PointF(1,1) )
-               << "    Shift-to-Alpha: " << modes->shiftToAlpha( PointF(1,1) ) << ende;
-
+    if( doPrint ) {
+        LOG_DETAIL << "Alpha-to-Shift: " << modes->alphaToShift( PointF(1,1) )
+                   << "    Shift-to-Alpha: " << modes->shiftToAlpha( PointF(1,1) ) << ende;
+    }
+    
     for( shared_ptr<Channel>& ch: channels ){
         ch->initChannel();
     }
