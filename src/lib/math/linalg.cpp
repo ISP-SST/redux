@@ -283,9 +283,10 @@ void redux::math::cod_decomp( const double* A, int rows, int cols, double* Q, do
     size_t rank;
 
     memcpy(a->data,A,rows*cols*sizeof(double));
-
+#if GSL_MAJOR_VERSION > 2
     gsl_linalg_COD_decomp( a, tauQ, tauZ, p, &rank, work );
-
+#endif
+    
     gsl_matrix q,r,z;
     q.data = Q;
     r.data = R;
@@ -295,7 +296,9 @@ void redux::math::cod_decomp( const double* A, int rows, int cols, double* Q, do
     r.tda = r.size2 = cols;
     z.tda = z.size1 = z.size2 = cols;
 
+#if GSL_MAJOR_VERSION > 2
     gsl_linalg_COD_unpack( a, tauQ, tauZ, rank, &q, &r, &z );
+#endif
 
     gsl_permutation_free(p);
     gsl_vector_free(work);
