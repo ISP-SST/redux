@@ -482,8 +482,8 @@ void ModeSet::measureJacobian( const redux::image::Pupil& pup, double scale ) {
         for( const auto& m: fits ) {
             auto coeffs = m.first;
             chisq[cnt] = coeffs[0];
-            J_T_xy[cnt][0] = scale*coeffs[2];    // x-coefficient from fitting plane
-            J_T_xy[cnt][1] = scale*coeffs[1];    // y-coefficient from fitting plane
+            J_T_xy[0][cnt] = scale*coeffs[2];    // x-coefficient from fitting plane
+            J_T_xy[1][cnt] = scale*coeffs[1];    // y-coefficient from fitting plane
             switch( cnt++ ) {
                 case 0: tiltMode.x = m.second; break;   // We assume the first tilt is X, we swap below if the assumption is wrong.
                 case 1: tiltMode.y = m.second; break;
@@ -493,9 +493,11 @@ void ModeSet::measureJacobian( const redux::image::Pupil& pup, double scale ) {
         }
 
         if( (100*chisq[0] < chisq[2]) && (100*chisq[1] < chisq[2]) ) {  // it seems we found 2 tilts.
-            // Was the assumtion that the first found tilt is X accurate? Else swap tiltModes
+            // Was the assumtion that the first found tilt is X accurate? Else swap tiltModes & columns in Jacobian
             if( fabs(J_T_xy[0][0])/fabs(J_T_xy[1][0]) < 1 ) {
                 std::swap( tiltMode.x, tiltMode.y );
+                std::swap( J_T_xy[0][0], J_T_xy[0][1] );
+                std::swap( J_T_xy[1][0], J_T_xy[1][1] );
             }
         }
         invert_2x2( J_T_xy[0], J_xy_T[0] ); 

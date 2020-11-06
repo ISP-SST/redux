@@ -74,6 +74,7 @@ void SubImage::setPatchInfo( uint32_t i, const PointI& pos, const PointF& resOff
     initialOffset = pos;
     channelResidualOffset = resOffs;
     currentShift = 0;
+    currentTiltOffset = 0;
     rowStride = bStride;
     imgSize = patchSize;
     imgSize2 = imgSize*imgSize;
