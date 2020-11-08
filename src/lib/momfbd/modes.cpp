@@ -482,6 +482,7 @@ void ModeSet::measureJacobian( const redux::image::Pupil& pup, double scale ) {
         for( const auto& m: fits ) {
             auto coeffs = m.first;
             chisq[cnt] = coeffs[0];
+            if( cnt == 2 )  break;
             J_T_xy[0][cnt] = scale*coeffs[2];    // x-coefficient from fitting plane
             J_T_xy[1][cnt] = scale*coeffs[1];    // y-coefficient from fitting plane
             switch( cnt++ ) {
@@ -489,7 +490,6 @@ void ModeSet::measureJacobian( const redux::image::Pupil& pup, double scale ) {
                 case 1: tiltMode.y = m.second; break;
                 default: ;
             }
-            if( cnt == 3 )  break;
         }
 
         if( (100*chisq[0] < chisq[2]) && (100*chisq[1] < chisq[2]) ) {  // it seems we found 2 tilts.
