@@ -60,8 +60,6 @@ void Worker::exitWhenDone( void ) {
     if( running_ ) {
         exitWhenDone_ = true;
         stop();
-    } else {
-        daemon.stop();
     }
     
 }
@@ -72,8 +70,6 @@ void Worker::resetWhenDone( void ) {
     if( running_ ) {
         resetWhenDone_ = true;
         stop();
-    } else {
-        daemon.reset();
     }
     
 }
