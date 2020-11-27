@@ -805,15 +805,13 @@ void Channel::initPatch (ChannelData& cd) {
     }
     
     if( flipX ) {
-        std::swap( dataRegion.first.x, dataRegion.last.x );
         cd.residualOffset.x *= -1;
     }
     if( flipY ) {
-        std::swap( dataRegion.first.y, dataRegion.last.y );
         cd.residualOffset.y *= -1;
     }
     
-    patchRegion = dataRegion.getAsGlobal( patchRegion );        // will flip if needed
+    patchRegion = dataRegion.getAsGlobal( patchRegion );
     
 
     for (uint16_t i=0; i < nImages; ++i) {
@@ -1276,53 +1274,60 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     if( alignMap.size() == 9 ) {
         ProjectiveMap map( alignMap );
         // the align-map is always in global coordinates
-        localPos = map * localPos;
+        localPos = map * (localPos-0.5) + 0.5;
         // localPos is now in global (camera) coordinates.
     } else {                                // old style alignment with clips & offsetfiles
         // getOffsetAt() must be called with "clipped&flipped" coordinates, and returns the offset, also in "clipped&flipped"
         localOffset = getOffsetAt( localPos-clipRegion.first, myObject.patchSize );
         chData.channelOffset = localOffset.round();
-        localPos += localOffset;
+        localPos += localOffset + PointI(flipY,flipX);
         // localPos is now global (camera) coordinates, channelOffset holds the integer "offset" from files
     }
     chData.exactPatchPosition = localPos;
-    chData.cutoutPosition = localPos.round();
-    localOffset = localPos-chData.cutoutPosition;
-    chData.residualOffset = localPos - chData.cutoutPosition;
+    chData.cutoutPosition = localPos.round(); // + PointI(flipY,flipX);
+    chData.residualOffset = localPos.remainder();
     
     RegionI desiredPatch( myObject.patchSize-1, myObject.patchSize-1 );         // patch region
-    desiredPatch += chData.cutoutPosition - halfPatch;                                    // ... now centered on intLocalPos, this is our patch
-    clipRegion.shrink( halfPatch );
+    desiredPatch += chData.cutoutPosition - halfPatch;                          // ... now centered on cutoutPosition, this is our patch
     desiredPatch.expand( myObject.maxLocalShift );
+
+    clipRegion.first += halfPatch;
+    clipRegion.last -= (halfPatch-1);
     RegionI actualPatch = desiredPatch;
 
     bool alreadyWarned(false);
     if( !clipRegion.isInside(chData.cutoutPosition) ) {
-        LOG_ERR << "Patch " << (patchPos+1) << " (mapped to: " << chData.cutoutPosition
-                << "), does not lie completely within image (" << clipRegion << ") in channel " << myObject.ID << ":" << ID
-                << ". Difference=" << clipRegion.diff(localPos) << "  This will likely cause severe artifacts!!!" << ende;
+        LOG_WARN << "Patch " << patchPos << " (mapped to: " << chData.cutoutPosition
+                << "), does not lie within allowed patch placement (" << clipRegion << ") in channel " << myObject.ID << ":" << ID
+                << ". Difference=" << clipRegion.diff(localPos) << "  This *will* cause severe artifacts!!!" << ende;
         alreadyWarned = true;
     }
     
-    clipRegion.shrink( myObject.maxLocalShift );
+    // N.B. align-clip should be ignored for the restriction of max_local_shift
+    clipRegion.first = halfPatch + myObject.maxLocalShift;
+    clipRegion.last = imgSize - halfPatch - myObject.maxLocalShift;
     if( !clipRegion.isInside(chData.cutoutPosition) ) {
         PointD diff = clipRegion.diff(localPos);
         if( !alreadyWarned ) {
-            LOG_DEBUG << "Patch " << (patchPos+1) << " (mapped to: " << chData.cutoutPosition
-                      << "), does not lie completely within usable image region (" << clipRegion << ") in channel " <<
-            myObject.ID << ":" << ID << ". Difference=" << clipRegion.diff(localPos) << "." << ende;
+            LOG_NOTICE << "Patch " << patchPos << " (mapped to: " << chData.cutoutPosition
+                      << "), lies closer to the border than MAX_LOCAL_SHIFT in channel " << myObject.ID
+                      << ":" << ID << ", this *might* cause artifacts if image motion is large."
+                      << "\n\tPlace patch within (" << clipRegion << ") to avoid this potential issue."
+                      << "\n\tDifference=" << diff << "." << ende;
         }
         actualPatch.shrinkSigned( diff.round() );
     }
-
-    localPos -= actualPatch.first;              // localPos is now relative to cutout-beginning.
-    localPos -= halfPatch;                      // localPos is now the patch-start coordinate relative to the cutout.
     chData.cutoutRegion = actualPatch;
-    chData.patchStart = localPos.round();
+    chData.patchStart = (chData.cutoutPosition - halfPatch) - actualPatch.first;
+    if( flipY ) {
+        chData.patchStart.y = actualPatch.last.y - (chData.cutoutPosition.y + halfPatch - 1);
+    }
+    if( flipX ) {
+        chData.patchStart.x = actualPatch.last.x - (chData.cutoutPosition.x + halfPatch - 1);
+    }
     string actStr = "";
-
     if( chData.cutoutRegion != desiredPatch ) actStr = "  actual="+(string)chData.cutoutRegion;
-    LOG_DEBUG << "AdjustCutout ch=" << myObject.ID << ":" << ID << ": specifiedPosition" << (patchPos+1)
+    LOG_DETAIL<< "AdjustCutout ch=" << myObject.ID << ":" << ID << ": specifiedPosition" << patchPos
               << "  mappedPosition=" << chData.exactPatchPosition
               << "  cutoutPosition=" << chData.cutoutPosition
               << "\n    residualPosition=" << chData.residualOffset

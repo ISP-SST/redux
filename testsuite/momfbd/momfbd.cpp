@@ -31,6 +31,8 @@ namespace testsuite {
             logger.setContext( "testsuite" );
             
             float EPS = 1E-6;
+            PointF diff;
+            
             // Instances 
             Object::Ptr obj = job.addObject();
             BOOST_REQUIRE_MESSAGE( obj, "Got null Object, can't continue." );
@@ -69,106 +71,146 @@ namespace testsuite {
                 BOOST_CHECK_THROW( chan->adjustCutout( *cd, nullptr ), std::runtime_error );
                 BOOST_CHECK_THROW( chan->adjustCutout( *cd, patch ), std::runtime_error );
                 
-                obj->patchSize = 1;         // We're just testing the center position here, so keep it trivial.
+                obj->patchSize = 2;         // We're just testing the center position here, so keep it trivial.
                 obj->maxLocalShift = 0;
                 
-                chan->setImageSize(1000);       // use image size = (1000,1000)
-                patch->position = 503;      // place patch near midpoint
+                chan->setImageSize(100);       // use image size = (100,100)
                 
                 chan->alignMap.clear();
-                chan->alignClip.clear();
+                chan->setClip({});
                 
                 // test that the corners map as expected
-                patch->position = 0;
+                patch->position = 1;            // 0-based coordinates, not 1-based as cfg-file.
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(0,0) );
-                chan->setClip({ 999, 0, 999, 0 });
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(1,1) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(0,0,1,1) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(0,0) );
+                chan->setMap({ -1, 0, 99, 0, -1, 99, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(999,999) );
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(99,99) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(98,98,99,99) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(0,0) );
+                chan->setMap({});
+                chan->setClip({ 99, 0, 99, 0 });
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(99,99) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(98,98,99,99) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(0,0) );
 
-                // patch near midpoint
-                chan->alignClip.clear();        // No clip
-                patch->position = 503;
+                // same, but add maxLocalShift
+                obj->maxLocalShift = 1;
+                patch->position = 2;
+                chan->setClip({});
                 chan->adjustCutout( *cd, patch );
-                PointF diff = cd->exactPatchPosition - patch->position;
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(2,2) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(0,0,3,3) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(1,1) );
+                chan->setMap({ -1, 0, 99, 0, -1, 99, 0, 0, 1 });
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(98,98) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(96,96,99,99) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(1,1) );
+                chan->setMap({});
+                chan->setClip({ 99, 0, 99, 0 });
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(98,98) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(96,96,99,99) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(1,1) );
+                
+                obj->maxLocalShift = 0;
+
+                // centered
+                chan->setClip({});              // No clip
+                patch->position = 51;
+                chan->adjustCutout( *cd, patch );
+                diff = cd->exactPatchPosition - patch->position;
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );    // should be exact
+                BOOST_CHECK_EQUAL( cd->cutoutPosition, PointI(51,51) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(50,50,51,51) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(0,0) );
 
                 // without flips
-                chan->setClip({ 0, 999, 0, 999 });
+                chan->setClip({ 0, 99, 0, 99 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(503,503);     // compare to expected
+                diff = cd->exactPatchPosition - PointI(51,51);     // compare to expected
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setClip({ 1, 999, 2, 999 });
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(50,50,51,51) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(0,0) );
+                chan->setClip({ 1, 99, 2, 99 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(505,504);
+                diff = cd->exactPatchPosition - PointI(53,52);
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(52,51,53,52) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(0,0) );
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
 
                 // flip + shift
-                chan->setClip({ 1, 998, 997, 2 });
+                chan->setClip({ 1, 98, 97, 2 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(494,504);
+                diff = cd->exactPatchPosition - PointI(47,52);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                chan->setClip({ 998, 1, 2, 997 });
+                chan->setClip({ 98, 1, 2, 97 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(505,495);
+                diff = cd->exactPatchPosition - PointI(53,48);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                chan->setClip({ 998, 1, 997, 2 });
+                chan->setClip({ 98, 1, 97, 2 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(494,495);
+                diff = cd->exactPatchPosition - PointI(47,48);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                chan->setClip({ 997, 1, 998, 2 });              // test with odd clip-sizes
+                chan->setClip({ 97, 1, 98, 2 });              // test with odd clip-sizes
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(495,494);
+                diff = cd->exactPatchPosition - PointI(48,47);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                
+
                 // simple maps  (integer shifts and mirrorings)
-                chan->setImageSize(1000);       // map needs imgSize to be set
+                patch->position = 51;
+                chan->setImageSize(100);       // map needs imgSize to be set
                 chan->setClip({});
                 chan->setMap({ 1, 0, 0, 0, 1, 0, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(503,503);
+                diff = cd->exactPatchPosition - PointI(51,51);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                chan->setMap({ -1, 0, 990, 0, 1, 0, 0, 0, 1 });
+                chan->setMap({ -1, 0, 89, 0, 1, 0, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(503,487);
+                diff = cd->exactPatchPosition - PointI(51,39);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                chan->setMap({ 1, 0, 0, 0, -1, 1009, 0, 0, 1 });
+                chan->setMap({ 1, 0, 0, 0, -1, 108, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointI(506,503);
+                diff = cd->exactPatchPosition - PointI(58,51);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 BOOST_CHECK_SMALL( cd->residualOffset.maxAbs(), EPS );
-                
+
                 // decimal maps
                 EPS = 1E-4;
                 chan->setMap({ 1, 0, 5.6, 0, 1, 3.8, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointF(506.8,508.6);
+                diff = cd->exactPatchPosition - PointF(54.8,56.6);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 diff = cd->residualOffset - PointF(-0.2,-0.4);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setMap({ -1, 0, 993.3, 0, 1, 1.2, 0, 0, 1 });
+                chan->setMap({ -1, 0, 93.3, 0, 1, 1.2, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointF(504.2,490.3);
+                diff = cd->exactPatchPosition - PointF(52.2,43.3);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 diff = cd->residualOffset - PointF(0.2,0.3);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setMap({ 1, 0, 0, 0, -1, 997.33, 0, 0, 1 });
+                chan->setMap({ 1, 0, 0, 0, -1, 97.33, 0, 0, 1 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointF(494.33,503);
+                diff = cd->exactPatchPosition - PointF(47.33,51);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 diff = cd->residualOffset - PointF(0.33,0.0);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
 
                 // offset files
                 chan->setMap({});
-                chan->setClip({ 0, 999, 0, 999 });
-                Image<int16_t> xoff(1000,1000), yoff(1000,1000);
+                chan->setClip({ 0, 99, 0, 99 });
+                patch->position = 51;
+                Image<int16_t> xoff(100,100), yoff(100,100);
                 
                 // initial test, check that arrays are copied as references.
                 BOOST_CHECK_EQUAL( chan->getOffsetAt( PointI(50,50) ), PointF(0,0) );
@@ -179,19 +221,19 @@ namespace testsuite {
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointF(504.45,502.67);
+                diff = cd->exactPatchPosition - PointF(52.45,50.67);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 diff = cd->residualOffset - PointF(0.45,-0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setClip({ 999, 0, 0, 999 });
+                chan->setClip({ 99, 0, 0, 99 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointF(504.45,495.67);
+                diff = cd->exactPatchPosition - PointF(52.45,48.67);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 diff = cd->residualOffset - PointF(0.45,-0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setClip({ 999, 0, 999, 0 });
+                chan->setClip({ 99, 0, 99, 0 });
                 chan->adjustCutout( *cd, patch );
-                diff = cd->exactPatchPosition - PointF(497.45,495.67);
+                diff = cd->exactPatchPosition - PointF(50.45,48.67);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 diff = cd->residualOffset - PointF(0.45,-0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
@@ -199,29 +241,60 @@ namespace testsuite {
                 // cutoutRegion
                 // only mirroring & shifts
                 xoff = 0; yoff = 0;
-                obj->patchSize = 1;
+                obj->patchSize = 2;
                 obj->maxLocalShift = 0;
                 chan->setClip({});
-                patch->position = 0;
+                patch->position = 1;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(0,0,0,0) );
-                patch->position = 999;
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(0,0,1,1) );
+                patch->position = 99;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(999,999,999,999) );
-                chan->setClip({1,998,2,997});
-                patch->position = 0;
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(98,98,99,99) );
+
+                chan->setClip({1,98,2,97});
+                patch->position = 1;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(2,1,2,1) );
-                patch->position = 995;
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(2,1,3,2) );
+                patch->position = 95;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(997,996,997,996) );
-                chan->setClip({998,1,997,2});
-                patch->position = 0;
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(96,95,97,96) );
+                chan->setClip({98,1,97,2});
+                patch->position = 1;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(997,998,997,998) );
-                patch->position = 995;
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(96,97,97,98) );
+                patch->position = 95;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(2,3,2,3) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(2,3,3,4) );
+
+                // add maxLocalShift
+                obj->maxLocalShift = 10;
+                chan->setClip({});
+                patch->position = 11;
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(0,0,21,21) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(10,10) );
+                patch->position = 89;
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(78,78,99,99) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(10,10) );
+                chan->setClip({1,98,2,97});
+                patch->position = 11;
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(2,1,23,22) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(10,10) );
+                patch->position = 85;
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(76,75,97,96) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(10,10) );
+                chan->setClip({98,1,97,2});
+                patch->position = 11;
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(76,77,97,98) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(10,10) );
+                patch->position = 84;
+                chan->adjustCutout( *cd, patch );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(3,4,24,25) );
+                BOOST_CHECK_EQUAL( cd->patchStart, PointI(10,10) );
 
                 // add offset files with residuals, verify shifts
                 xoff = 133; yoff = 255;
@@ -234,31 +307,31 @@ namespace testsuite {
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
 
-                patch->position = 977;
+                patch->position = 77;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(960,958,998,997) ); // yh will be reduced by 1 by soft cutout limit
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(60,58,99,97) );
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setClip({1,998,2,997});
+                chan->setClip({1,98,2,97});
                 patch->position = 20;
                 chan->adjustCutout( *cd, patch );
                 BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(5,2,44,41) );
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                patch->position = 973;
+                patch->position = 73;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(958,955,996,994) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(58,55,97,94) );
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                chan->setClip({997,1,995,2});
+                chan->setClip({97,1,95,2});
                 patch->position = 23;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(955,955,994,994) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(56,56,95,95) );
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
-                patch->position = 973;
+                patch->position = 73;
                 chan->adjustCutout( *cd, patch );
-                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(5,5,44,44) );
+                BOOST_CHECK_EQUAL( cd->cutoutRegion, RegionI(6,6,45,45) );
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 BOOST_CHECK_SMALL( diff.maxAbs(), EPS );
                 

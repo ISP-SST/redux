@@ -1167,10 +1167,14 @@ void MomfbdJob::generateTraceObjects( void ) {
     if( refID < 0 ) return;
 
     shared_ptr<Object> ref_obj = objects[refID];
-    size_t found =  ref_obj->outputFileName.find_first_of("_.");
+    size_t last_slash =  ref_obj->outputFileName.find_last_of("/");     // so we don't detect "._" in dirnames
+    size_t found =  ref_obj->outputFileName.find_first_of("_.",last_slash);
     string refTag;
+    if( last_slash == string::npos ) {
+        last_slash = 0;
+    }
     if( found != string::npos ) {
-        refTag = ref_obj->outputFileName.substr( 0, found );
+        refTag = ref_obj->outputFileName.substr( last_slash, found );
     }
     set<uint32_t> refWaveFronts( ref_obj->waveFrontList.begin(), ref_obj->waveFrontList.end() );
     vector<string> refFiles;
@@ -1251,10 +1255,14 @@ loopend: ;
 
     if( !refTag.empty() ) {
         for( shared_ptr<Object>& obj: trace_objects ) {
-            size_t separator_found =  obj->outputFileName.find_first_of("_.");
+            last_slash =  obj->outputFileName.find_last_of("/");     // so we don't detect "._" in dirnames
+            size_t separator_found =  obj->outputFileName.find_first_of("_.",last_slash);
             string objTag;
+            if( last_slash == string::npos ) {
+                last_slash = 0;
+            }
             if( separator_found != string::npos ) {
-                objTag = obj->outputFileName.substr( 0, separator_found );
+                objTag = obj->outputFileName.substr( last_slash, separator_found );
             }
             if( !objTag.empty() && (objTag != refTag) ) {
                 obj->outputFileName = replace_n( obj->outputFileName, objTag, refTag );

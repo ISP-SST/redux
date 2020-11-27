@@ -54,6 +54,7 @@ namespace redux {
             PointType<T> Abs( void ) const { return PointType<T>(redux::util::Abs<T>(y),redux::util::Abs<T>(x)); }
             T maxAbs( void ) const { return std::max<T>(redux::util::Abs<T>(x),redux::util::Abs<T>(y)); }
             PointType<long int> round(void) const { return PointType<long int>( lround(y), lround(x) ); }
+            PointType<double> remainder(void) const { PointType<double> rem(*this); rem -= round(); return rem; }
             operator std::string() const { std::ostringstream out; out << "(" << y << "," << x << ")"; return out.str(); }
             template <typename U> PointType<T>& operator+=(const PointType<U>& rhs) { x += rhs.x; y += rhs.y; return *this; }
             template <typename U> PointType<T>& operator-=(const PointType<U>& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
