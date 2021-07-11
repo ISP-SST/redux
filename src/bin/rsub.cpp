@@ -204,9 +204,17 @@ string filterOldCfg( const string& filename, const string& jobname, const string
     replace(text, " ", "");     // spaces not allowed in cfg-values (e.g. DIVERSITY=0.00 mm)
     bool found = replace(text, "channel{", "channel {");
     found |= replace(text, "object{", "object {");
-    found |= replace(text, "=", " ");
     
     if (found) { // old cfg file, wrap inside momfbd { ... }
+        bool newLine(true);
+        for( auto& c: text ) {
+            if( newLine && c == '=' ) {
+                newLine = false;
+                c = ' ';
+            } else if( c == '\n' ) {
+                newLine = true;
+            }
+        }
         text = "momfbd { \n" + text;
         if( *(text.rbegin()) != '\n') text += "\n";
         text += "NAME " + jobname + "\n";
