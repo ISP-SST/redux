@@ -306,7 +306,7 @@ bool Channel::checkData( bool verbose ) {
             string thisFile = boost::str( boost::format(imageTemplate) % (imageNumberOffset + number) );
             bfs::path fn = bfs::path (imageDataDir) / bfs::path( thisFile );
             if (!bfs::is_regular_file(fn)) {
-                LOG_ERR << boost::format ("Input-file %s not found!") % thisFile << ende;
+                LOG_ERR << boost::format ("Input-file %s not found!") % fn << ende;
                 return false;
             }
             try {

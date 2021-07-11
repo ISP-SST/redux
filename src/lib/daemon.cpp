@@ -894,7 +894,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
         if( ids[0] ) LOG << "Received " << ids[0] << " jobs." << printArray(ids.data()+1,ids[0],"  IDs") << ende;
         if( nJobs > ids[0] ) {
             nJobs -= ids[0];
-            LOG_WARN << "Feiled to parse " << nJobs << " jobs." << ende;
+            LOG_WARN << "Failed to parse " << nJobs << " jobs." << ende;
         }
         *conn << CMD_OK;           // all ok, return IDs
         conn->syncWrite(ids);
