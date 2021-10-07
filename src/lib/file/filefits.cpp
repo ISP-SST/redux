@@ -1506,9 +1506,9 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
             throwStatusError( "Fits::read(hdr,data) moving to cHDU.", status );
         }
 
-        if( hdr->primaryHDU.dataType == TSHORT ) {      // only support int16_t at the moment
-            char* dataPtr = data;
-            FITSfile* fptr = hdr->fitsPtr_->Fptr;
+        char* dataPtr = data;
+        FITSfile* fptr = hdr->fitsPtr_->Fptr;
+        if( fptr->zbitpix == 16 ) {      // only support int16_t at the moment
             size_t imgSize = fptr->maxtilelen;
             size_t blockSize = fptr->rice_blocksize;
             vector<thread> threads;
