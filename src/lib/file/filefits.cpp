@@ -94,13 +94,20 @@ namespace {
         return 0;
     }
     
-    
-    void throwStatusError( const string& filename, int status ) {
+    string statusString( const string& prefix, int status ) {
        char err_text[80];
        lock();
        fits_get_errstatus( status, err_text );
        unlock();
-       throw ios_base::failure("Failed to read fits: " + filename + "  cfitsio reports("+to_string(status)+"): " + string(err_text) );
+       return "Failed to read fits: " + prefix + "  cfitsio reports("+to_string(status)+"): " + string(err_text);
+    }
+    
+    void printStatusError( const string& prefix, int status ) {
+       cerr << statusString( prefix, status ) << endl;
+    }
+
+    void throwStatusError( const string& prefix, int status ) {
+       throw ios_base::failure( statusString( prefix, status ) );
     }
     
     
@@ -1507,24 +1514,51 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
         }
 
         char* dataPtr = data;
-        FITSfile* fptr = hdr->fitsPtr_->Fptr;
+        auto fP = hdr->fitsPtr_;
+        FITSfile* fptr = fP->Fptr;
         if( fptr->zbitpix == 16 ) {      // only support int16_t at the moment
             size_t imgSize = fptr->maxtilelen;
             size_t blockSize = fptr->rice_blocksize;
-            vector<thread> threads;
-            for( LONGLONG i=1; i<=fptr->numrows; ++i ) {
+            std::mutex fMtx;
+            LONGLONG rowIndex(1);
+            struct rowInfo {
+                rowInfo() : offset(0), sz(0), idx(0) {}
+                rowInfo(LONGLONG o, LONGLONG s, LONGLONG i ) : offset(o), sz(s), idx(i) {}
+                LONGLONG offset, sz, idx;
+                bool operator<( const struct rowInfo& rhs ) const { return offset < rhs.offset; }
+            };
+            std::function<bool(void)> readTile = [&status,&dataPtr,&rowIndex,&fMtx,imgSize,blockSize,fP,fptr](){
                 LONGLONG rSize, rOffset;
-                if( fits_read_descriptll( hdr->fitsPtr_, fptr->cn_compressed, i, &rSize, &rOffset, &status ) ) {
-                    throwStatusError( "Fits::read(hdr,data) getting row info.", status );
+                char* dP;
+                LONGLONG thisI;
+                shared_ptr<uint8_t> tmp;
+                {
+                    std::lock_guard<mutex> fLock( fMtx );
+                    dP = dataPtr;
+                    dataPtr += imgSize * 2;
+                    thisI = rowIndex++;
+                    if( thisI > fptr->numrows ) return false;
+                    if( fits_read_descriptll( fP, fptr->cn_compressed, thisI, &rSize, &rOffset, &status ) ) {
+                        printStatusError( "Fits::read(hdr,data), getting row("+to_string(thisI)+") info.", status );
+                    }
+                    if( (rOffset+rSize) > fptr->heapsize ) {
+                        cerr << "This file has a corrupt index-table for the compressed data. Tile #" << thisI << " will be skipped!" << endl; 
+                        return true;
+                    }
+
+                    tmp.reset( new uint8_t[rSize], []( uint8_t*& p ) { delete[] p; } );
+                    if( fits_read_col( fP, TBYTE, fptr->cn_compressed, thisI, 1, rSize, NULL, tmp.get(), NULL, &status ) ) {
+                        printStatusError( "Fits::read(hdr,data), reading row("+to_string(thisI)+").", status );
+                    }
                 }
-                shared_ptr<uint8_t> tmp( new uint8_t[rSize], []( uint8_t*& p ) { delete[] p; } );
-                if( fits_read_col( hdr->fitsPtr_, TBYTE, fptr->cn_compressed, i, 1, rSize, NULL, tmp.get(), NULL, &status ) ) {
-                    throwStatusError( "Fits::read(hdr,data) reading row.", status );
-                }
-                threads.push_back( thread([ tmp, dataPtr, rSize, &imgSize, &blockSize ](){
-                    rice_decomp16( tmp.get(), rSize, reinterpret_cast<int16_t*>(dataPtr), imgSize, blockSize );
-                }));
-               dataPtr += imgSize * 2;
+                rice_decomp16( tmp.get(), rSize, reinterpret_cast<int16_t*>(dP), imgSize, blockSize );
+                std::lock_guard<mutex> fLock( fMtx );
+                return true;
+            };
+            vector<thread> threads;
+            int nT=std::thread::hardware_concurrency();
+            for( int t(0); t<nT; ++t ) {
+                threads.push_back( thread([&](){ while( readTile() ); }));
             }
             for( auto &t: threads ) t.join();
         }

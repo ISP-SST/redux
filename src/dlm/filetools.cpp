@@ -1,7 +1,6 @@
 #include "idlutil.hpp"
 
-#include <redux/file/fileana.hpp>
-#include <redux/file/filefits.hpp>
+#include <redux/file/fileio.hpp>
 #include <redux/util/stringutil.hpp>
 
 #include <atomic>
