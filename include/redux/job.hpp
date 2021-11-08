@@ -123,6 +123,9 @@ namespace redux {
         static std::string stateString(uint8_t);
         static std::string stateTag(uint8_t);
         
+        static void setStepCount( const StepID& s, const CountT& c ) { counts[ s ] = c; };
+
+        
         struct Info {
             uint32_t id, timeout, maxProcessingTime;
             uint8_t priority, verbosity, maxPartRetries;

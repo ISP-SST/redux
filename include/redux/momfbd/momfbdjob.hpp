@@ -80,6 +80,7 @@ namespace redux {
 
             void cleanup(void) override;
             bool run( WorkInProgress::Ptr, uint16_t ) override;
+            static void setRunningCount( const CountT& c ) { Job::setStepCount(StepID(Job::MOMFBDJOB,JSTEP_RUNNING), c); }
             
             bool mayBeDeleted(void) override;
             

@@ -5,6 +5,7 @@
 #endif
 
 #include "redux/logging/logger.hpp"
+#include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"
@@ -73,7 +74,12 @@ Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ),
         auto & c = Cache::get();
         c.setPath( params["cache-dir"].as<string>() );
     }
-    
+
+    if( params.count("max-running") ) {
+        uint32_t maxRunning = params["max-running"].as<uint32_t>();
+        Job::JobPtr slask = Job::newJob( "MOMFBD" ); // create a job to trigger static Initializions, otherwise this setting might get mangled.
+        momfbd::MomfbdJob::setRunningCount( Job::CountT(1, maxRunning) );
+    }
 
 }
 
