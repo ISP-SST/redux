@@ -217,8 +217,6 @@ bool MpiWrapper::next(const double* base, double *& ptr) {
 
 
 void MpiWrapper::run( void ) {
-    
-    using namespace std::placeholders;
 
     currentOffset = 0;
     int myThreads = nThreads.empty() ? 1 : nThreads[0];
@@ -238,7 +236,7 @@ void MpiWrapper::run( void ) {
     double* ptr = buf.get();
     MPI_Scatterv( data.get(), blockSizes.data(), blockOffsets.data(), MPI_DOUBLE, ptr, currentOffset, MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
-    function<bool(double*&)> next_fn = std::bind(&MpiWrapper::next,this,ptr,_1);
+    function<bool(double*&)> next_fn = std::bind(&MpiWrapper::next,this,ptr,std::placeholders::_1);
 
     gsl_rng_env_setup();
     rngType = gsl_rng_default;

@@ -29,6 +29,7 @@ namespace redux {
         typedef std::vector<struct ModeID> VModeID;
         
         struct ModeList : public VModeID {
+            ModeList() : defaultType(MB_NONE) {}
             bool operator<( const ModeList& rhs ) const{
                 if( defaultType==rhs.defaultType ) {
                     return (reinterpret_cast<const VModeID&>(*this) < reinterpret_cast<const VModeID&>(rhs));

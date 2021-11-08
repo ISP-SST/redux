@@ -853,7 +853,7 @@ namespace {
             IDL_INT  help;
             IDL_INT  interpol;
             IDL_INT  preserve;
-            IDL_VPTR size;
+            IDL_VPTR image_size;
             IDL_INT  verbose;
         } kw_img_trans;
         
@@ -864,7 +864,7 @@ namespace {
             { (char*) "HELP",          IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, help) },
             { (char*) "INTERPOL",      IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, interpol) },
             { (char*) "PRESERVE_SIZE", IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, preserve) },
-            { (char*) "SIZE",          IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, size ) },
+            { (char*) "SIZE",          IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2( kw_img_trans, image_size ) },
             { (char*) "VERBOSE",       IDL_TYP_INT,   1, IDL_KW_ZERO, 0, (char*)IDL_KW_OFFSETOF2( kw_img_trans, verbose) },
             { NULL }
         };
@@ -987,8 +987,8 @@ IDL_VPTR img_transform( int argc, IDL_VPTR* argv, char* argk ) {
             }
             outDims[0] = inSize.width;
             outDims[1] = inSize.height;
-        } else if( kw.size ) {
-            vector<int> sz = getAsVector<int>( kw.size );
+        } else if( kw.image_size ) {
+            vector<int> sz = getAsVector<int>( kw.image_size );
             if( sz.size() == 2 ) {
                 outDims[0] = sz[0];
                 outDims[1] = sz[1];

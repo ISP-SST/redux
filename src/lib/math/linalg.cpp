@@ -280,10 +280,10 @@ void redux::math::cod_decomp( const double* A, int rows, int cols, double* Q, do
     gsl_vector* tauZ = gsl_vector_alloc(std::min(rows,cols));
     gsl_vector* work = gsl_vector_alloc( cols );
     gsl_permutation* p = gsl_permutation_alloc( cols );
-    size_t rank;
 
     memcpy(a->data,A,rows*cols*sizeof(double));
 #if GSL_MAJOR_VERSION > 2
+    size_t rank;
     gsl_linalg_COD_decomp( a, tauQ, tauZ, p, &rank, work );
 #endif
     

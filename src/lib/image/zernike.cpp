@@ -191,8 +191,7 @@ shared_ptr<double> Zernike::getRadial( unsigned int nPixels, float radius, uint1
             }
 
         } else {
-            using namespace std::placeholders;
-            std::transform( rPtr, rPtr+blockSize, tmpPtr, std::bind( &RadialPolynomial::eval, poly, _1 ));
+            std::transform( rPtr, rPtr+blockSize, tmpPtr, std::bind( &RadialPolynomial::eval, poly, std::placeholders::_1 ));
         }
 
         std::copy_n( tmpPtr, blockSize, polyPtr );

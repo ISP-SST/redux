@@ -364,7 +364,7 @@ namespace {
         }
 
         // ROI will indicate the size of the mozaiced/clipped image.
-        tmpDims = new IDL_MEMINT[1];
+        tmpDims = new IDL_MEMINT[2];
         tmpDims[0] = 1;
         tmpDims[1] = 4;
         appendTag ( tags, "ROI", tmpDims, (void*)IDL_TYP_INT );

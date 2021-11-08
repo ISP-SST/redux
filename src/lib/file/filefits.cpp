@@ -52,16 +52,20 @@ namespace {
     const bool use_mutex = (fits_is_reentrant() == 0);
     
     std::mutex fmtx;
-    void lock( void ) { if(use_mutex) fmtx.lock(); }
-    void unlock( void ) { if(use_mutex) fmtx.unlock(); }
+    void lockFits( void ) { if(use_mutex) fmtx.lock(); }
+    void unlockFits( void ) { if(use_mutex) fmtx.unlock(); }
+    struct lockGuard {
+        lockGuard(){ lockFits(); }
+        ~lockGuard(){ unlockFits(); }
+    };
     
-    int locked_call( std::function<int(void)> f ) {
-        lock();
-        int ret = f();
-        unlock();
-        return ret;
+    
+    template <class T, typename... Args>
+    T lockedCall( std::function<T(Args...)> f, Args...  args ) {
+        lockGuard();
+        return f( args... );
     }
-    
+
     /* not used at the moment, so commented out to avoid compiler warnings about it
     template <typename T> Fits::TypeIndex getDatyp( void )  { return Fits::FITS_NOTYPE; }
     template <> Fits::TypeIndex getDatyp<uint8_t>( void ) { return Fits::FITS_BYTE; }
@@ -96,9 +100,8 @@ namespace {
     
     string statusString( const string& prefix, int status ) {
        char err_text[80];
-       lock();
-       fits_get_errstatus( status, err_text );
-       unlock();
+       static std::function<void(int,char*)> fn = fits_get_errstatus;
+       lockedCall( fn, status, err_text );
        return "Failed to read fits: " + prefix + "  cfitsio reports("+to_string(status)+"): " + string(err_text);
     }
     
