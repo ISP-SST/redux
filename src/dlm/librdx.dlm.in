@@ -50,3 +50,6 @@ FUNCTION        RDX_POINT_TRANSFORM 2     2          KEYWORDS
 FUNCTION        RDX_IMG_PROJECT   2       2          KEYWORDS
 FUNCTION        RDX_IMG_REMAP     3       3          KEYWORDS
 FUNCTION        RDX_INPAINT       2       2          KEYWORDS
+FUNCTION        RDX_CDSGRIDNEST   4       4          KEYWORDS
+FUNCTION        RDX_CSTRETCH      2       2          KEYWORDS
+FUNCTION        RDX_INTERPOL      3       3          KEYWORDS

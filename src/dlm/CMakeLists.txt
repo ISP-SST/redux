@@ -1,5 +1,5 @@
 #USE_REDUX(redux)
-USE_EXTERNAL( boost fftw3 fits gsl idl opencv threads )
+USE_EXTERNAL( boost fftw3 fits gsl idl opencv threads openmp )
 
 
 if (DEFINED IDL_FOUND)
@@ -122,7 +122,7 @@ if (DEFINED IDL_FOUND)
     
     set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp" GENERATED )
     
-    add_library(rdx SHARED rdx.cpp convertlog.cpp ${RDX_RDX_DEPS} )
+    add_library(rdx SHARED rdx.cpp convertlog.cpp libgrid.cpp ${RDX_RDX_DEPS} )
     set(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${RDX_CURRENT_LIBRARIES})
