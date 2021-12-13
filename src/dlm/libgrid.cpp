@@ -675,7 +675,7 @@ IDL_VPTR stretch_wrap( int nArg, IDL_VPTR argv[], char* argk ) {
     IDL_ENSURE_SIMPLE( arr2 );
     IDL_ENSURE_ARRAY( arr2 );
 
-    if( arr1->value.arr->n_dim != 2 || arr1->value.arr->n_dim != 3 ) {
+    if( arr1->value.arr->n_dim != 2 || arr2->value.arr->n_dim != 3 ) {
         printf("rdx_cstrectch expects one 2D array, and one 3D array as input.");
     }
     
