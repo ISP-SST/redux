@@ -5,7 +5,7 @@
 
 #include <functional>
 #include <limits>
-
+#include <stdexcept>
 
 namespace redux {
 

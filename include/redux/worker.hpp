@@ -6,7 +6,7 @@
 #include "redux/work.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/program_options.hpp>
 #include <boost/thread/thread.hpp>
 

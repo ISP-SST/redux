@@ -11,7 +11,7 @@
 #include <sstream>
 #include <thread>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
