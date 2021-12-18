@@ -603,6 +603,7 @@ GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis(ZERNIKE), klMinMode( 2), klMaxM
     nInitialModes( 5), nModeIncrement(5), nModes(0),
     telescopeD(0), telescopeCO(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
+    apodizationSize(-1),
     badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2), trace(false),
     outputFileType(FT_NONE), outputDataType(DT_I16T), sequenceNumber(0),
     observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
@@ -730,7 +731,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     EPS = getValue( tree, "EPS", defaults.EPS );
     reg_alpha = getValue( tree, "REG_ALPHA", defaults.reg_alpha );
     graddiff_step = getValue( tree, "GRADDIFF_STEP", defaults.graddiff_step );
-
+    apodizationSize = getValue( tree, "APODIZATION", defaults.apodizationSize );
     vector<FileType> filetypes = getValue( tree, "FILE_TYPE", vector<FileType>( 1, ( runFlags & RF_CALIBRATE ) ? FT_ANA : FT_FITS ) );
     for( const FileType& it : filetypes ) outputFileType |= it;
     if( ( outputFileType & FT_MASK ) == 0 ) {
@@ -825,7 +826,7 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool sho
     if( showAll || EPS != defaults.EPS ) tree.put( "EPS", EPS );
     if( showAll || reg_alpha != defaults.reg_alpha ) tree.put( "REG_ALPHA", reg_alpha );
     if( showAll || graddiff_step != defaults.graddiff_step ) tree.put( "GRADDIFF_STEP", graddiff_step );
- 
+    if( showAll || apodizationSize != defaults.apodizationSize ) tree.put( "APODIZATION", apodizationSize );
     if( showAll || outputFileType != ( ( runFlags & RF_CALIBRATE ) ? FT_ANA : FT_FITS) ) tree.put( "FILE_TYPE", ftTags[outputFileType%8] );
     if( showAll || outputDataType != defaults.outputDataType ) tree.put( "DATA_TYPE", dtTags[outputDataType%5] );
     if( showAll || sequenceNumber != defaults.sequenceNumber ) tree.put( "SEQUENCE_NUM", sequenceNumber );
@@ -843,6 +844,7 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool sho
 uint64_t GlobalCfg::size( void ) const {
     // static sizes (PoD types)
     uint64_t ssz = sizeof( badPixelThreshold ) + sizeof( EPS ) + sizeof( fillpixMethod ) + sizeof( FTOL )
+                 + sizeof( apodizationSize )
                  + sizeof( getstepMethod ) + sizeof( graddiff_step ) + sizeof( gradientMethod ) + sizeof( klCutoff )
                  + sizeof( klMaxMode ) + sizeof( klMinMode ) + sizeof( maxIterations ) + sizeof( minIterations )
                  + sizeof( modeBasis ) + sizeof( nInitialModes ) + sizeof( nModeIncrement ) + sizeof( nModes )
@@ -888,6 +890,7 @@ uint64_t GlobalCfg::pack( char* ptr ) const {
     count += pack( ptr+count, telescopeCO );
     count += pack( ptr+count, telescopeD );
     count += pack( ptr+count, trace );
+    count += pack( ptr+count, apodizationSize );
     // strings
     count += pack( ptr+count, observationDate );
     count += pack( ptr+count, observationTime );
@@ -929,7 +932,8 @@ uint64_t GlobalCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, targetIterations, swap_endian );
     count += unpack( ptr+count, telescopeCO, swap_endian );
     count += unpack( ptr+count, telescopeD, swap_endian );
-    count += unpack( ptr+count, trace );//b
+    count += unpack( ptr+count, trace );
+    count += unpack( ptr+count, apodizationSize, swap_endian );
     // strings
     count += unpack( ptr+count, observationDate );
     count += unpack( ptr+count, observationTime );
@@ -968,6 +972,7 @@ bool GlobalCfg::operator==( const GlobalCfg& rhs ) const {
            ( fillpixMethod == rhs.fillpixMethod ) &&
            ( gradientMethod == rhs.gradientMethod ) &&
            ( getstepMethod == rhs.getstepMethod ) &&
+           ( apodizationSize == rhs.apodizationSize ) &&
            ( badPixelThreshold == rhs.badPixelThreshold ) &&
            ( FTOL == rhs.FTOL ) &&
            ( EPS == rhs.EPS ) &&

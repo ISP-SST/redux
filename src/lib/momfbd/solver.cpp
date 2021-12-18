@@ -111,11 +111,21 @@ void Solver::init( void ) {
 
     window.resize( patchSize, patchSize );
     window = 1.0;
-    redux::image::apodizeInPlace( window, patchSize / 8);
-
     noiseWindow.resize(patchSize,patchSize);
     noiseWindow = 1.0;
-    redux::image::apodizeInPlace( noiseWindow, patchSize / 16);     // FIXME: old code specifies md/16, but applies it after "window", so it is actually the product...
+    
+    int16_t apodSize(0);
+    if( job.apodizationSize < 0 ) {
+        apodSize = patchSize / 8;
+    } else {
+        apodSize = job.apodizationSize;
+    }
+    if( apodSize ) {
+        redux::image::apodizeInPlace( window, apodSize );
+        redux::image::apodizeInPlace( noiseWindow, apodSize / 2 );
+    }
+    
+    //redux::image::apodizeInPlace( noiseWindow, patchSize / 16);     // FIXME: old code specifies md/16, but applies it after "window", so it is actually the product...
     
     tmpPhi.resize( nTotalImages, pupilSize, pupilSize );
     tmpPhiGrad.resize( nTotalImages, pupilSize, pupilSize );

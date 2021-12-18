@@ -213,6 +213,7 @@ namespace redux {
             uint8_t fillpixMethod;
             uint8_t gradientMethod;
             uint8_t getstepMethod;
+            int16_t apodizationSize;
             float badPixelThreshold;
             float FTOL;
             float EPS;
