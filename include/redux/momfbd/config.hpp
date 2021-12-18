@@ -35,7 +35,8 @@ namespace redux {
                          RF_FLATFIELD=16, RF_GLOBAL_NOISE=32, RF_NEW_CONSTRAINTS=64, RF_NO_CLIP=128,
                          RF_NO_CONSTRAINTS=256, RF_NO_FILTER=512, RF_FORCE_WRITE=1024, RF_NOSWAP=2048,
                          RF_OLD_NS=4096, RF_SORT_MODES=8192 };
-
+        enum NormType { NORM_NONE=0, NORM_OBJ_MAX_MEAN, NORM_OBJ_MAX_MEDIAN, NORM_OBJ_MEDIAN_MEDIAN };
+        
         struct cicomp {  // case-insensitive comparator for the maps below.
             bool operator() ( const std::string& a,const std::string& b ) const { return redux::util::nocaseLess(a,b); }
         };
@@ -46,6 +47,7 @@ namespace redux {
         extern const std::map<std::string, int, cicomp> gradientMap;
         enum GetstepMethod { GSM_SDSC=1, GSM_CNJG, GSM_BFGS, GSM_BFGS_inv };
         extern const std::map<std::string, int, cicomp> getstepMap;
+        extern const std::map<std::string, int, cicomp> normMap;
         
         
         /*!
@@ -213,6 +215,7 @@ namespace redux {
             uint8_t fillpixMethod;
             uint8_t gradientMethod;
             uint8_t getstepMethod;
+            uint8_t normType;
             int16_t apodizationSize;
             float badPixelThreshold;
             float FTOL;

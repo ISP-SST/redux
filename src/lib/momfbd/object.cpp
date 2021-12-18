@@ -51,7 +51,7 @@ namespace {
 
 Object::Object( MomfbdJob& j, uint16_t id ): ObjectCfg(j), myJob(j), logger(j.logger), currentMetric(0), reg_gamma(0),
     frequencyCutoff(0),pupilRadiusInPixels(0), patchSize2(0), otfSize(0), otfSize2(0),
-    ID(id), traceID(-1), objMaxMean(0), imgSize(0), nObjectImages(0),
+    ID(id), traceID(-1), normalizeTo(0), imgSize(0), nObjectImages(0),
     startT(bpx::not_a_date_time), endT(bpx::not_a_date_time) {
 
 }
@@ -61,7 +61,7 @@ Object::Object( const Object& rhs, uint16_t id, int tid ) : ObjectCfg(rhs), myJo
     channels(rhs.channels), currentMetric(rhs.currentMetric), reg_gamma(rhs.reg_gamma),
     frequencyCutoff(rhs.frequencyCutoff), pupilRadiusInPixels(rhs.pupilRadiusInPixels),
     patchSize2(rhs.patchSize2), otfSize(rhs.otfSize), otfSize2(rhs.otfSize2),
-    ID (id), traceID(tid), objMaxMean(rhs.objMaxMean), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
+    ID (id), traceID(tid), normalizeTo(rhs.normalizeTo), imgSize(rhs.imgSize), nObjectImages(rhs.nObjectImages),
     startT(rhs.startT), endT(rhs.endT) {
 
 }
@@ -128,7 +128,7 @@ uint64_t Object::pack(char* ptr )const {
     count += pack(ptr+count, currentMetric );
     count += pack(ptr+count, frequencyCutoff );
     count += pack(ptr+count, pupilRadiusInPixels );
-    count += pack(ptr+count, objMaxMean );
+    count += pack(ptr+count, normalizeTo );
     count += imgSize.pack(ptr+count );
     count += pack(ptr+count,( uint16_t)channels.size() );
     for( const auto& ch : channels ){
@@ -151,7 +151,7 @@ uint64_t Object::unpack(const char* ptr, bool swap_endian ){
     count += unpack(ptr+count, currentMetric, swap_endian );
     count += unpack(ptr+count, frequencyCutoff, swap_endian );
     count += unpack(ptr+count, pupilRadiusInPixels, swap_endian );
-    count += unpack(ptr+count, objMaxMean, swap_endian );
+    count += unpack(ptr+count, normalizeTo, swap_endian );
     count += imgSize.unpack(ptr+count, swap_endian );
     uint16_t tmp;
     count += unpack(ptr+count, tmp, swap_endian );
@@ -915,15 +915,33 @@ void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& 
 //     } );
 
     progWatch.setHandler([this](){        // this will be triggered after all images in this object are loaded/pre-processed
-        objMaxMean = std::numeric_limits<double>::lowest( );
+        vector<double> channelNorms;
+        normalizeTo = std::numeric_limits<double>::lowest( );
         for( auto& ch : channels ){
-            objMaxMean = std::max(objMaxMean,ch->getMaxMean() );
+            if( myJob.normType == NORM_OBJ_MAX_MEAN ) channelNorms.push_back( ch->getMaxMean() );
+            else if( myJob.normType == NORM_OBJ_MAX_MEDIAN ) channelNorms.push_back( ch->getMaxMedian() );
+            else if( myJob.normType == NORM_OBJ_MEDIAN_MEDIAN ) channelNorms.push_back( ch->getMedianMedian() );
             if(startT.is_special() )startT = ch->startT;
             else startT = std::min(startT,ch->startT );
             if(endT.is_special() )endT = ch->endT;
             else endT = std::max(endT,ch->endT );
         }
-        LOG_DEBUG << "Object " << ID << " has maximal image mean = " << objMaxMean << ", the images will be normalized to this value." << ende;
+        std::sort( channelNorms.begin(), channelNorms.end() );
+        if( myJob.normType == NORM_OBJ_MAX_MEAN || myJob.normType == NORM_OBJ_MAX_MEDIAN ) {
+            normalizeTo = *(channelNorms.rbegin());
+        } else if( myJob.normType == NORM_OBJ_MEDIAN_MEDIAN ) {
+            size_t nM = channelNorms.size();
+            size_t nHalf = (nM>>1) - !(nM&1);
+            auto mid = channelNorms.begin() + nHalf;
+            std::nth_element( channelNorms.begin(), mid, channelNorms.end());
+            normalizeTo = *mid;
+            if( !(nM&1) ) {
+                std::nth_element( mid, mid+1, channelNorms.end());
+                normalizeTo += *(mid+1);
+                normalizeTo /= 2;
+            }
+        }
+        LOG_DEBUG << "Object " << ID << ": The images will be normalized to " << normalizeTo << ende;
     } );
     
     for( shared_ptr<Channel>& ch: channels ){

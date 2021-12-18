@@ -149,7 +149,7 @@ namespace redux {
 
             uint16_t ID;
             int traceID;
-            double objMaxMean;
+            double normalizeTo;
             redux::util::Point16 imgSize;
             mutable uint32_t nObjectImages;
             bpx::ptime startT, endT;

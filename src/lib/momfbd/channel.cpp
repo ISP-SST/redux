@@ -716,11 +716,42 @@ void Channel::unloadCalib(void) {               // unload what was accessed thro
 
 
 double Channel::getMaxMean(void) {
-    double maxMean = std::numeric_limits<double>::lowest();
+    double mm = std::numeric_limits<double>::lowest();
     for ( const ArrayStats::Ptr &stat : imageStats ) {
-        if( stat ) maxMean = std::max(maxMean,stat->mean);
+        if( stat ) mm = std::max( mm, stat->mean );
     }
-    return maxMean;
+    return mm;
+}
+
+
+double Channel::getMaxMedian(void) {
+    double mm = 0.0;
+    for ( const ArrayStats::Ptr &stat : imageStats ) {
+        if( stat ) mm = std::max( mm, stat->median );
+    }
+    return mm;
+}
+
+
+double Channel::getMedianMedian(void) {
+    vector<double> medians;
+    for ( const ArrayStats::Ptr &stat : imageStats ) {
+        if( stat ) medians.push_back( stat->median );
+    }
+    double mm = 0.0;
+    size_t nM = medians.size();
+    if( nM ) {
+        size_t nHalf = (nM>>1) - !(nM&1);
+        auto mid = medians.begin() + nHalf;
+        std::nth_element( medians.begin(), mid, medians.end());
+        mm = *mid;
+        if( !(nM&1) ) {
+            std::nth_element( mid, mid+1, medians.end());
+            mm += *(mid+1);
+            mm /= 2;
+        }
+    }
+    return mm;
 }
 
 
@@ -788,9 +819,13 @@ void Channel::initPatch (ChannelData& cd) {
     if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
         float* dataPtr = cd.images.get();
         for( uint16_t i=0; i<nImages; ++i ) {
-            double scale = myObject.objMaxMean/imageStats[i]->mean;
-            //double scale = 1.0/imageStats[i]->mean;
-            transform(dataPtr, dataPtr+ dataPixels, dataPtr, bind1st(multiplies<double>(),scale) );
+            double scale = myObject.normalizeTo;
+            if( myJob.normType == NORM_OBJ_MAX_MEAN ) {
+                scale /= imageStats[i]->mean;
+            } else if( (myJob.normType == NORM_OBJ_MAX_MEDIAN) || (myJob.normType == NORM_OBJ_MEDIAN_MEDIAN) ) {
+                scale /= imageStats[i]->median;
+            } else if( myJob.normType == NORM_NONE ) scale = 1.0;
+            transform( dataPtr, dataPtr+ dataPixels, dataPtr, bind1st(multiplies<double>(), scale) );
             dataPtr += dataPixels;
         }
     }
@@ -1124,9 +1159,43 @@ void Channel::preprocessImage( size_t i ) {
         }
 
         view.assign(tmpImg);                            // copy back to image
+        
+        
+        if( borderClip ) {
+            std::vector<int64_t> first, last;
+            const std::vector<size_t>& dims = tmpImg.dimensions();
+            size_t nDims = dims.size();
+            for( size_t i = 0; i < nDims; ++i ) {
+                if( dims[i] == 1 ) {            // if dimSize == 1 we don't clip it.
+                    first.push_back( tmpImg.first()[i] );
+                    last.push_back( tmpImg.last()[i] );
+                }
+                else {
+                    if( 2 * borderClip > dims[i] ) {    // all data clipped, nothing to do
+                        return;
+                    }
+                    first.push_back( tmpImg.first()[i] + borderClip );
+                    last.push_back( tmpImg.last()[i] - borderClip );
+                }
+            }
+            tmpImg = Array<double>( tmpImg, first, last ).copy();
+        }
+        
         imageStats[i].reset( new ArrayStats() );
-        imageStats[i]->getStats( borderClip, tmpImg );    // get stats for corrected data
-    
+        imageStats[i]->getStats( tmpImg );    // get stats for corrected data
+        
+        // compute median value
+        double* tmpPtr = tmpImg.ptr();
+        size_t nEl = tmpImg.nElements();
+        size_t halfEl = (nEl>>1) - !(nEl&1);
+        double* mid = tmpPtr + halfEl;
+        std::nth_element( tmpPtr, mid, tmpPtr+nEl);
+        imageStats[i]->median = *mid;
+        if( !(nEl&1) ) {
+            std::nth_element( mid, mid+1, tmpPtr+nEl );
+            imageStats[i]->median += *(mid+1);
+            imageStats[i]->median /= 2;
+        }
     } catch ( const std::exception& e ) {
         LOG_ERR << boost::format("Failed to preprocess image (%d:%d:%d)  %s") % myObject.ID % ID % i % printArray(images.dimensions(),"dims")
                 << ".  reason: " << e.what() << ende;

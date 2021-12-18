@@ -133,7 +133,7 @@ void SubImage::getWindowedImg( double* out, float* plane, ArrayStats& imgStats, 
     }
     newAvg /= imgSize2;
     if( rescaled ) {
-        avg = object.objMaxMean;
+        avg = object.normalizeTo;
     } /*else {
         avg = 1.0/newAvg;
         s.mean = newAvg;

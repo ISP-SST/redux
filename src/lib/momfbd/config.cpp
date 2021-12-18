@@ -32,6 +32,7 @@ namespace {
 
     const char* basisTags[] = { "", "Zernike", "Karhunen-Loeve" };
     const char* fpmTags[] = { "", "median", "invdistweight", "horint" };
+    const char* normTags[] = { "none", "obj_max_mean", "obj_max_median", "obj_median_median" };
     const char* gmTags[] = { "", "gradient_diff", "gradient_Vogel" };
     const char* gsmTags[] = { "", "getstep_steepest_descent", "getstep_conjugate_gradient", "getstep_BFGS", "getstep_BFGS_inv" };
     const char* ftTags[] = { "", "ANA", "FITS", "ANA,FITS", "MOMFBD", "ANA,MOMFBD", "FITS,MOMFBD", "ANA,FITS,MOMFBD" };
@@ -112,6 +113,12 @@ const map<string, int, cicomp> redux::momfbd::getstepMap = {
     { "bfgs_inv", GSM_BFGS_inv }
 };
 
+const map<string, int, cicomp> redux::momfbd::normMap = {
+    { normTags[NORM_NONE], NORM_NONE },
+    { normTags[NORM_OBJ_MAX_MEAN], NORM_OBJ_MAX_MEAN },
+    { normTags[NORM_OBJ_MAX_MEDIAN], NORM_OBJ_MAX_MEDIAN },
+    { normTags[NORM_OBJ_MEDIAN_MEDIAN], NORM_OBJ_MEDIAN_MEDIAN }
+};
 
 
 
@@ -603,7 +610,7 @@ GlobalCfg::GlobalCfg() : runFlags( 0), modeBasis(ZERNIKE), klMinMode( 2), klMaxM
     nInitialModes( 5), nModeIncrement(5), nModes(0),
     telescopeD(0), telescopeCO(0), minIterations(5), maxIterations(500), targetIterations(3),
     fillpixMethod(FPM_INVDISTWEIGHT), gradientMethod(GM_DIFF), getstepMethod(GSM_BFGS_inv),
-    apodizationSize(-1),
+    normType(NORM_OBJ_MAX_MEAN), apodizationSize(-1),
     badPixelThreshold(1E-5), FTOL(1E-3), EPS(1E-10), reg_alpha(0), graddiff_step(1E-2), trace(false),
     outputFileType(FT_NONE), outputDataType(DT_I16T), sequenceNumber(0),
     observationTime(""), observationDate("N/A"), tmpDataDir("./data") {
@@ -732,6 +739,18 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     reg_alpha = getValue( tree, "REG_ALPHA", defaults.reg_alpha );
     graddiff_step = getValue( tree, "GRADDIFF_STEP", defaults.graddiff_step );
     apodizationSize = getValue( tree, "APODIZATION", defaults.apodizationSize );
+    tmpString = getValue<string>( tree, "NORMALIZATION", "" );
+    normType = NORM_OBJ_MAX_MEAN;   // use as default
+    if( tmpString.length() ) {
+        tmpInt = getFromMap( tmpString, normMap );
+        if( tmpInt ) {
+            normType = tmpInt;
+        } else {
+            string msg = "Unrecognized NORMALIZATION value \"" + tmpString + "\"\n  Valid entries are: ";
+            for( const auto& entry: normMap ) msg += "\"" + entry.first + "\" ";
+            LOG_ERR << msg << ende;
+        }
+    }
     vector<FileType> filetypes = getValue( tree, "FILE_TYPE", vector<FileType>( 1, ( runFlags & RF_CALIBRATE ) ? FT_ANA : FT_FITS ) );
     for( const FileType& it : filetypes ) outputFileType |= it;
     if( ( outputFileType & FT_MASK ) == 0 ) {
@@ -827,6 +846,8 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool sho
     if( showAll || reg_alpha != defaults.reg_alpha ) tree.put( "REG_ALPHA", reg_alpha );
     if( showAll || graddiff_step != defaults.graddiff_step ) tree.put( "GRADDIFF_STEP", graddiff_step );
     if( showAll || apodizationSize != defaults.apodizationSize ) tree.put( "APODIZATION", apodizationSize );
+    if( showAll || normType != defaults.normType ) tree.put( "NORMALIZATION", normTags[normType] );
+
     if( showAll || outputFileType != ( ( runFlags & RF_CALIBRATE ) ? FT_ANA : FT_FITS) ) tree.put( "FILE_TYPE", ftTags[outputFileType%8] );
     if( showAll || outputDataType != defaults.outputDataType ) tree.put( "DATA_TYPE", dtTags[outputDataType%5] );
     if( showAll || sequenceNumber != defaults.sequenceNumber ) tree.put( "SEQUENCE_NUM", sequenceNumber );
@@ -844,7 +865,7 @@ void GlobalCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool sho
 uint64_t GlobalCfg::size( void ) const {
     // static sizes (PoD types)
     uint64_t ssz = sizeof( badPixelThreshold ) + sizeof( EPS ) + sizeof( fillpixMethod ) + sizeof( FTOL )
-                 + sizeof( apodizationSize )
+                 + sizeof( normType ) + sizeof( apodizationSize )
                  + sizeof( getstepMethod ) + sizeof( graddiff_step ) + sizeof( gradientMethod ) + sizeof( klCutoff )
                  + sizeof( klMaxMode ) + sizeof( klMinMode ) + sizeof( maxIterations ) + sizeof( minIterations )
                  + sizeof( modeBasis ) + sizeof( nInitialModes ) + sizeof( nModeIncrement ) + sizeof( nModes )
@@ -890,6 +911,7 @@ uint64_t GlobalCfg::pack( char* ptr ) const {
     count += pack( ptr+count, telescopeCO );
     count += pack( ptr+count, telescopeD );
     count += pack( ptr+count, trace );
+    count += pack( ptr+count, normType );
     count += pack( ptr+count, apodizationSize );
     // strings
     count += pack( ptr+count, observationDate );
@@ -933,6 +955,7 @@ uint64_t GlobalCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, telescopeCO, swap_endian );
     count += unpack( ptr+count, telescopeD, swap_endian );
     count += unpack( ptr+count, trace );
+    count += unpack( ptr+count, normType );
     count += unpack( ptr+count, apodizationSize, swap_endian );
     // strings
     count += unpack( ptr+count, observationDate );
@@ -972,6 +995,7 @@ bool GlobalCfg::operator==( const GlobalCfg& rhs ) const {
            ( fillpixMethod == rhs.fillpixMethod ) &&
            ( gradientMethod == rhs.gradientMethod ) &&
            ( getstepMethod == rhs.getstepMethod ) &&
+           ( normType == rhs.normType ) &&
            ( apodizationSize == rhs.apodizationSize ) &&
            ( badPixelThreshold == rhs.badPixelThreshold ) &&
            ( FTOL == rhs.FTOL ) &&
