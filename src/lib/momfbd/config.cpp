@@ -743,7 +743,7 @@ void GlobalCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     normType = NORM_OBJ_MAX_MEAN;   // use as default
     if( tmpString.length() ) {
         tmpInt = getFromMap( tmpString, normMap );
-        if( tmpInt ) {
+        if( tmpInt >= 0 ) {
             normType = tmpInt;
         } else {
             string msg = "Unrecognized NORMALIZATION value \"" + tmpString + "\"\n  Valid entries are: ";
