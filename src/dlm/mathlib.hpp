@@ -161,15 +161,15 @@ namespace redux {
         T const scly = T ( ny-1.0 ) / T ( ny1-1.0 );
 
         for ( int jj=0; jj<ny1; ++jj ) {
-            T   const yl = jj * scly;
-            int const iy = std::min<int> ( int ( yl ), ny-2 );
+	  T   const yl = std::min<T>(jj * scly, ny-1);
+	  int const iy = std::min<int> ( int ( yl ), ny-2 );
 
             T const dy  = yl-iy;
             T const dy1 = 1 - dy;
 
             for ( int ii=0; ii<nx1; ++ii ) {
-                T const xl = ii * sclx;
-                int    const ix = std::min<int> ( int ( xl ), nx-2 );
+	      T const xl = std::min<T>(ii * sclx, nx-1);
+	      int    const ix = std::min<int> ( int ( xl ), nx-2 );
 
                 T const dx  = xl-ix;
                 T const dx1 = 1 - dx;

@@ -162,8 +162,8 @@ inline double resid(T *m1, T *m2, int idx, int idy, int nxa,
   double	sum, sumx, t, ndmx2;
   int	i, j;
   double   sumg;
-  static int	mxc, mxd, myc, myd;
-  static double	gsum;
+  //static int	mxc, mxd, myc, myd;
+  //static double	gsum;
 
   /*set up limits */
   nxc = nxa;
@@ -184,7 +184,7 @@ inline double resid(T *m1, T *m2, int idx, int idy, int nxa,
   p2 = gy + nyc;
   ps = gx + nxc;
 
-  if (nxc != mxc || nxd != mxd || nyc != myc || nyd != myd) {
+  // if (nxc != mxc || nxd != mxd || nyc != myc || nyd != myd) {
     /* sum gaussians over rectangle to get normalization */
     /* (only if limits change)*/
     j = nyd -nyc + 1;
@@ -200,13 +200,13 @@ inline double resid(T *m1, T *m2, int idx, int idy, int nxa,
       p2++;
       j--;
     }
-    gsum = sumg;
-    mxc = nxc;
-    mxd = nxd;
-    myc = nyc;
-    myd = nyd;
-  } else
-    sumg = gsum;
+    //gsum = sumg;
+    //mxc = nxc;
+    //mxd = nxd;
+    //myc = nyc;
+    //myd = nyd;
+    // } else
+    //  sumg = gsum;
 
   m1 += nyc*nxs + nxc;
   m2 += (nyc + idy)*nxs + nxc + idx;
@@ -248,7 +248,7 @@ inline void match_1(T *p1, T *p2, int nxa, int nxb,
   int idelx, idely, i, j, k, ndmx = 1000, done[9]={};
   int	di, dj, in, jn, iter, dd, badflag = 0;
   double	av1, av2, cx, cy, cxx, cxy, cyy, avdif, t, res[9], buf[9]={}, t1, t2;
-  static int	itmax = 40;
+  int const	itmax = 20;
   
   idelx = rint(xoffset);
   idely = rint(yoffset); 
@@ -375,7 +375,7 @@ void gridmatch(int const ny, int const nx, int const nyg, int const nxg, const T
 
   //double t0 = getTime();
   // 
-  double	        /*xoffset, yoffset,*/ *gwx, *gwy;
+  double	        /*xoffset, yoffset,*/ *gwx=NULL, *gwy=NULL;
   //int      i1, i2, j1, j2;
   //int  const dims[3] = {2,nxg,nxg};
 
@@ -384,25 +384,23 @@ void gridmatch(int const ny, int const nx, int const nyg, int const nxg, const T
   stretch_clip--;
 
   /* prepare the gaussian kernel */
-  gwx = (double *) malloc((nx + ny)*sizeof(double));
-  gwy = gwx + nx;
-  
+
   int const nc = nxg*nyg;			/* the number of subimages */
   int const dx2 = dx/2;
   int const dy2 = dy/2;
-  //int badmatch = 0;
   int ii;
-#pragma omp parallel default(shared) firstprivate(ii) num_threads(nthreads)
+#pragma omp parallel default(shared) firstprivate(ii,gwx,gwy) num_threads(nthreads)
   {
+    gwx = (double *) malloc((nx + ny)*sizeof(double));
+    gwy = gwx + nx;
+  
 #pragma omp for schedule(static) 
     for( ii=0; ii<nc;++ii) {	
       do_one<double,T>(ii, gwx, gwy, gwid,  p1, p2, stretch_clip, dx2, dy2, nyg, nxg, nx, ny, out, gx, gy);
     }
+    free(gwx);
   }
  
-  
-  free(gwx);
-
 }
 
 
@@ -679,7 +677,7 @@ IDL_VPTR stretch_wrap( int nArg, IDL_VPTR argv[], char* argk ) {
         printf("rdx_cstrectch expects one 2D array, and one 3D array as input.");
     }
     
-    using fp_t = float; // if you change this, make sure you also change IDL_TYP_FLOAT to double
+    using fp_t = double; // if you change this, make sure you also change IDL_TYP_FLOAT to double
 
     int const nx    = arr1->value.arr->dim[0];
     int const ny    = arr1->value.arr->dim[1];
@@ -701,7 +699,7 @@ IDL_VPTR stretch_wrap( int nArg, IDL_VPTR argv[], char* argk ) {
     
     fp_t* res = stretch<fp_t>( ny, nx, data1.get(), npy, npx, data2.get(), nthreads );
 
-    return IDL_ImportArray( 2, dims, IDL_TYP_FLOAT, (UCHAR*)res, redux::util::castAndDelete<fp_t>, 0);
+    return IDL_ImportArray( 2, dims, IDL_TYP_DOUBLE, (UCHAR*)res, redux::util::castAndDelete<fp_t>, 0);
 
 }
 
@@ -791,14 +789,14 @@ IDL_VPTR dsgridnest( int nArg, IDL_VPTR argv[], char* argk ) {
     if( (nx != nx1) || (ny != ny1) ) {
         fprintf(stdout, "dlm::dsgridnest: ERROR, the images have different dimensions [%d,%d] != [%d,%d]\n", nx,ny,nx1,ny1);
         IDL_LONG64 dims[3] = {2,1,1};
-        IDL_MakeTempArray(IDL_TYP_DOUBLE, 3, dims, IDL_ARR_INI_ZERO, &result);
+        IDL_MakeTempArray(IDL_TYP_FLOAT, 3, dims, IDL_ARR_INI_ZERO, &result);
         return result;
     }
   
     if( nTile != nClip ){
         fprintf(stdout, "dlm::dsgridnest: ERROR, the tile and clip arrays have different sizes: %d != %d\n", nTile, nClip);
         IDL_LONG64 dims[3] = {2,1,1};
-        IDL_MakeTempArray(IDL_TYP_DOUBLE, 3, dims, IDL_ARR_INI_ZERO, &result);
+        IDL_MakeTempArray(IDL_TYP_FLOAT, 3, dims, IDL_ARR_INI_ZERO, &result);
         return result;
     }
 
@@ -806,6 +804,7 @@ IDL_VPTR dsgridnest( int nArg, IDL_VPTR argv[], char* argk ) {
     shared_ptr<fp_t> imgData2 = castOrCopy<fp_t>(imgVar2);
     shared_ptr<int> tileData = castOrCopy<int>(tileVar);
     shared_ptr<int> clipData = castOrCopy<int>(clipVar);
+    
     const fp_t* const __restrict__ im1 = imgData1.get();
     const fp_t* const __restrict__ im2 = imgData2.get();
     const int* const __restrict__ tiles = tileData.get();
@@ -831,8 +830,8 @@ IDL_VPTR dsgridnest( int nArg, IDL_VPTR argv[], char* argk ) {
         fp_t const wx = fp_t(nx) / ngx;
         fp_t const wy = fp_t(ny) / ngy;
         
-        int* const __restrict__ pgx = new int [ngx*ngy];
-        int* const __restrict__ pgy = new int [ngx*ngy];
+        int* const __restrict__ pgx = new int [ngx*ngy]();
+        int* const __restrict__ pgy = new int [ngx*ngy]();
         
         // --- make subfields grid --- //
         
@@ -850,7 +849,7 @@ IDL_VPTR dsgridnest( int nArg, IDL_VPTR argv[], char* argk ) {
         displ.resize(2*ngx*ngy,fp_t(0));
         
         if( k == 0 ){
-            gridmatch(ny, nx, ngy, ngx, im1, im2, pgy, pgx, dy, dx, gwid, stretch_clip, &displ[0], nthreads);
+            gridmatch<fp_t>(ny, nx, ngy, ngx, im1, im2, pgy, pgx, dy, dx, gwid, stretch_clip, &displ[0], nthreads);
         } else {
             if( n != nprev ){
                 int const ngtotprev = igx[k-1]*igy[k-1];
@@ -864,12 +863,12 @@ IDL_VPTR dsgridnest( int nArg, IDL_VPTR argv[], char* argk ) {
                 
                 const fp_t* const __restrict__ fx = redux::congrid<fp_t,fp_t>(igy[k-1],igx[k-1], disx, ngy, ngx);
                 const fp_t* const __restrict__ fy = redux::congrid<fp_t,fp_t>(igy[k-1],igx[k-1], disy, ngy, ngx);
-
+		
                 delete [] disx;
                 delete [] disy;
                 
                 int const ngtot = ngx*ngy;
-                prev.resize(2*ngx*ngy,0);
+                prev.resize(2*ngtot,0);
                 
                 for(int ii =0; ii<ngtot; ++ii){
                     prev[2*ii] = fx[ii];
@@ -1065,7 +1064,7 @@ namespace interp {
         IDL_ENSURE_SIMPLE( yVar );
         IDL_ENSURE_ARRAY( yVar );
 
-        using fp_t = float; // if you change this, make sure you also change IDL_TYP_FLOAT to double
+        using fp_t = double; // if you change this, make sure you also change IDL_TYP_FLOAT to double
 
         int const nx    = imgVar->value.arr->dim[0];
         int const ny    = imgVar->value.arr->dim[1];
