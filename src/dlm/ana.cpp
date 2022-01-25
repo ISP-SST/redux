@@ -2,6 +2,8 @@
 
 #include "redux/file/fileana.hpp"
 
+#include <boost/filesystem.hpp>
+
 #include <iostream>
 #include <stdexcept>
 
@@ -16,6 +18,8 @@
 
 using namespace redux::file;
 using namespace std;
+
+namespace bfs=boost::filesystem;
 
 namespace {
 
@@ -73,6 +77,7 @@ IDL_VPTR redux::fzhead( int argc, IDL_VPTR* argv ) {
     string name = IDL_VarGetString( name_raw );
     string hdrText;
     try {
+        if( !bfs::is_regular_file(name) ) throw std::runtime_error("Not a readable file: " + std::string(name) );
         Ana header( name );
         vector<string> hdrTexts = header.getText();
         if( !hdrTexts.empty() ) hdrText = hdrTexts.front();
@@ -130,6 +135,7 @@ IDL_VPTR redux::f0( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     try {
+        if( !bfs::is_regular_file(name) ) throw std::runtime_error("Not a readable file: " + std::string(name) );
         
         Ana::Ptr header( new Ana(name) );
 
@@ -208,7 +214,7 @@ void redux::fzread( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     try {
-        
+        if( !bfs::is_regular_file(name) ) throw std::runtime_error("Not a readable file: " + std::string(name) );
         Ana::Ptr header( new Ana(name) );
 
         int nDims = header->m_Header.ndim;

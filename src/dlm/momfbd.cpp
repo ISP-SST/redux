@@ -7,6 +7,8 @@
 #include "redux/file/filemomfbd.hpp"
 #include "redux/file/filefits.hpp"
 
+#include <boost/filesystem.hpp>
+
 #include <algorithm>
 #include <map>
 #include <iostream>
@@ -17,6 +19,8 @@ using namespace redux::math;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
+
+namespace bfs=boost::filesystem;
 
 //a=momfbd_read('/home/devel/bigtest.momfbd')
 //a=momfbd_read('/scratch/Data.local/camXIX_im22Apr2008.1804856..1805202.momfbd')
@@ -627,6 +631,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
     std::shared_ptr<FileMomfbd> info ( new FileMomfbd() );
 
     try {
+        if( !bfs::is_regular_file(name) ) throw std::runtime_error("Not a readable file: " + std::string(name) );
         file.open ( name );
         info->read ( file );
     } catch ( exception& e ) {
@@ -801,6 +806,7 @@ IDL_VPTR redux::momfbd_header ( int argc, IDL_VPTR* argv, char* argk ) {
     std::shared_ptr<FileMomfbd> info( new FileMomfbd() );
 
     try {
+        if( !bfs::is_regular_file(name) ) throw std::runtime_error("Not a readable file: " + std::string(name) );
         file.open( name );
         info->read( file, true );
     } catch ( exception& e ) {
