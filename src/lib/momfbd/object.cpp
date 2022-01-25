@@ -981,19 +981,20 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
         size_t nPatchesY = info->nPatchesY;
         size_t patchSize = info->getPatchSize( MOMFBD_ALPHA );
         size_t offset = info->getPatchSize( 0 );
-        size_t nImgs =( patchSize-offset)/(info->nModes*sizeof(float) );
 
         if(( patches.dimSize(0 )!= nPatchesY )||( patches.dimSize(1 )!= nPatchesX ) ){
             LOG_ERR << "Initialization file: " << tmpFile <<  " has the wrong number of patches." << ende;
-            LOG_ERR << "nPatchesX = " << nPatchesX << " - " << patches.dimSize(1 )<< ende;
-            LOG_ERR << "nPatchesY = " << nPatchesY << " - " << patches.dimSize(0 )<< ende;
+            LOG_ERR << "nPatchesX = " << nPatchesX << " - " << patches.dimSize(1)<< ende;
+            LOG_ERR << "nPatchesY = " << nPatchesY << " - " << patches.dimSize(0)<< ende;
             return;
         }
-        if( info->nModes != myJob.nModes ){
+        size_t nModes = info->patches(0,0).nm;
+        if( nModes != myJob.nModes ){
             LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of modes." << ende;
-            LOG_ERR << "info->nModes = " << info->nModes << " != " << myJob.nModes << ende;
+            LOG_ERR << "init->nModes = " << nModes << " != " << myJob.nModes << ende;
             return;
         }
+        size_t nImgs = ( patchSize-offset)/(nModes*sizeof(float) );
         if( nImgs != nImages( ) ){
             LOG_ERR << "Initilazation file: " << tmpFile <<  " has the wrong number of alphas." << ende;
             LOG_ERR << "nImgs = " << nImgs << " != " << nImages( )<< ende;
@@ -1007,7 +1008,7 @@ void Object::loadInit( boost::asio::io_service& service, Array<PatchData::Ptr>& 
                 info->patches(y,x).load( file, tmpData.get(), info->swapNeeded, info->version, MOMFBD_ALPHA );
                 auto oData = patches(y,x)->getObjectData(ID);
                 if( !oData ) throw runtime_error("patches(y,x)->getObjectData(ID) returned a null pointer !");
-                oData->alpha.resize( nImgs, info->nModes );
+                oData->alpha.resize( nImgs, nModes );
                 oData->alpha.copyFrom<float>( reinterpret_cast<float*>(tmpData.get()+offset ) );
             }
         }
