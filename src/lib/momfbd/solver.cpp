@@ -462,8 +462,8 @@ void Solver::run( PatchData::Ptr data ) {
         //Ana::write("grad_alphac_"+to_string(totalIterations)+".f0",gwrapper);
         //cout << printArray(grad_alpha.get(), nParameters, "\nreversed_agrad") << endl;
 #endif
-
-        do {
+        while( (!done || iter < job.minIterations) && iter < maxIterations ) {
+        //do {
             iter++;
             boost::this_thread::interruption_point();
             status = gsl_multimin_fdfminimizer_iterate( s );
@@ -516,10 +516,10 @@ void Solver::run( PatchData::Ptr data ) {
             }
 
             previousMetric = thisMetric;
+        }
+//        } while( (!done || iter < job.minIterations) && iter < maxIterations );
 
-        } while( (!done || iter < job.minIterations) && iter < maxIterations );
-
-        GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
+        thisMetric = GSL_MULTIMIN_FN_EVAL_F( &my_func, s->x );
         totalIterations += iter;
         if( status != GSL_FAILURE ) { // bad first iteration -> don't print.
             if( !exitLoop ) {
