@@ -127,7 +127,7 @@ const map<string, int, cicomp> redux::momfbd::normMap = {
 
 /********************  Channel  ********************/
 
-ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), diversityBasis(ZERNIKE), noRestore(false),
+ChannelCfg::ChannelCfg() : rotationAngle(0), noiseFudge(1), weight(1), diversityBasis(ZERNIKE), divModeFileNormalize(true), noRestore(false),
         borderClip(100), incomplete(0), discard(2,0),
         mmRow(0), mmWidth(0), imageNumberOffset(0) {
 
@@ -162,7 +162,8 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
     diversityModes = tree.get<ModeList>("DIV_MODES", diversityModes);
     diversityModes.setDefaultModeType( diversityBasis );
     diversityModeFile = getValue<string>( tree, "DIV_MODE_FILE", defaults.diversityModeFile );
-
+    divModeFileNormalize = tree.get<bool>("DIV_MODE_FILE_NORMALIZE", defaults.divModeFileNormalize);
+    
     if( !diversityModeFile.empty() ) {
         // if there is *no* coefficient, should we use #ID in the file, and use coefficient=1 ?
         // if there is only 1 coefficient, and no DIV_ORDER/MODE specified, should we use #ID in the file?
@@ -264,6 +265,7 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults, bo
     if( showAll || diversityModes != defaults.diversityModes ) tree.put( "DIV_MODES", diversityModes );
     if( showAll || diversityValues != defaults.diversityValues ) tree.put( "DIVERSITY", diversityValues );
     if( showAll || diversityModeFile != defaults.diversityModeFile ) tree.put( "DIV_MODE_FILE", diversityModeFile );
+    if( showAll || divModeFileNormalize != defaults.divModeFileNormalize ) tree.put( "DIV_MODE_FILE_NORMALIZE", divModeFileNormalize );
     
     if( showAll || alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
     if( showAll || alignClip != defaults.alignClip ) {
@@ -308,7 +310,7 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults, bo
 uint64_t ChannelCfg::size( void ) const {
     // static sizes (PoD types)
     static uint64_t ssz = sizeof( borderClip ) + sizeof( diversityBasis ) + sizeof( imageNumberOffset )
-        + sizeof( incomplete ) + sizeof( mmRow ) + sizeof( mmWidth ) + sizeof( noiseFudge ) + sizeof( noRestore )
+        + sizeof( incomplete ) + sizeof( mmRow ) + sizeof( mmWidth ) + sizeof( noiseFudge ) + sizeof( divModeFileNormalize ) + sizeof( noRestore )
         + sizeof( rotationAngle ) + sizeof( weight );
     uint64_t sz = ssz;
     // strings
@@ -342,7 +344,8 @@ uint64_t ChannelCfg::pack( char* ptr ) const {
     count += pack( ptr+count, mmRow );
     count += pack( ptr+count, mmWidth );
     count += pack( ptr+count, noiseFudge );
-    count += pack( ptr+count, noRestore );    //b
+    count += pack( ptr+count, divModeFileNormalize );   //b
+    count += pack( ptr+count, noRestore );              //b
     count += pack( ptr+count, rotationAngle );
     count += pack( ptr+count, weight );
     // strings
@@ -384,6 +387,7 @@ uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, mmRow );
     count += unpack( ptr+count, mmWidth );
     count += unpack( ptr+count, noiseFudge, swap_endian );
+    count += unpack( ptr+count, divModeFileNormalize );
     count += unpack( ptr+count, noRestore );
     count += unpack( ptr+count, rotationAngle, swap_endian );
     count += unpack( ptr+count, weight, swap_endian );
@@ -438,7 +442,7 @@ bool ChannelCfg::operator==( const ChannelCfg& rhs ) const {
 
 ObjectCfg::ObjectCfg() : telescopeF(0), arcSecsPerPixel(0), pixelSize(1E-5),
                          maxLocalShift(5), minimumOverlap(16), 
-                         patchSize(128), pupilPixels(64), saveMask(0), wavelength(0), traceObject(false) {
+                         patchSize(128), pupilPixels(64), saveMask(0), wavelength(0), modeFileNormalize(true), traceObject(false) {
 
 }
 
@@ -475,6 +479,7 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     outputFileName = getValue<string>( tree, "OUTPUT_FILE", defaults.outputFileName );
     initFile = getValue<string>( tree, "INIT_FILE", defaults.initFile );
     modeFile = getValue<string>( tree, "MODE_FILE", defaults.modeFile );
+    modeFileNormalize = getValue<bool>( tree, "MODE_FILE_NORMALIZE", defaults.modeFileNormalize );
     pupilFile = getValue<string>( tree, "PUPIL", defaults.pupilFile );
     wavelength = getValue( tree, "WAVELENGTH", defaults.wavelength );
 
@@ -519,6 +524,7 @@ void ObjectCfg::getProperties( bpt::ptree& tree, const ChannelCfg& def, bool sho
     if( showAll || outputFileName != defaults.outputFileName ) tree.put( "OUTPUT_FILE", outputFileName );
     if( showAll || initFile != defaults.initFile ) tree.put( "INIT_FILE", initFile );
     if( showAll || modeFile != defaults.modeFile ) tree.put( "MODE_FILE", modeFile );
+    if( showAll || modeFileNormalize != defaults.modeFileNormalize ) tree.put( "MODE_FILE_NORMALIZE", modeFileNormalize );
     if( showAll || pupilFile != defaults.pupilFile ) tree.put( "PUPIL", pupilFile );
     if( showAll || wavelength != defaults.wavelength ) tree.put( "WAVELENGTH", wavelength );
 
@@ -532,7 +538,7 @@ uint64_t ObjectCfg::size( void ) const {
     uint64_t ssz = sizeof( arcSecsPerPixel )
                  + sizeof( maxLocalShift ) + sizeof( minimumOverlap ) + sizeof( patchSize ) + sizeof( pixelSize )
                  + sizeof( pupilPixels ) + sizeof( saveMask ) + sizeof( telescopeF )
-                 + sizeof( traceObject ) + sizeof( wavelength );
+                 + sizeof( modeFileNormalize ) + + sizeof( traceObject ) + sizeof( wavelength );
     uint64_t sz = ssz + ChannelCfg::size();
     sz += initFile.length() + modeFile.length() + 2;
     sz += outputFileName.length() + pupilFile.length() + 2;
@@ -552,6 +558,7 @@ uint64_t ObjectCfg::pack( char* ptr ) const {
     count += pack( ptr+count, pupilPixels );
     count += pack( ptr+count, saveMask );
     count += pack( ptr+count, telescopeF );
+    count += pack( ptr+count, modeFileNormalize );
     count += pack( ptr+count, traceObject );
     count += pack( ptr+count, wavelength );
     // strings
@@ -575,6 +582,7 @@ uint64_t ObjectCfg::unpack( const char* ptr, bool swap_endian ) {
     count += unpack( ptr+count, pupilPixels, swap_endian );
     count += unpack( ptr+count, saveMask, swap_endian );
     count += unpack( ptr+count, telescopeF, swap_endian );
+    count += unpack( ptr+count, modeFileNormalize );
     count += unpack( ptr+count, traceObject );
     count += unpack( ptr+count, wavelength, swap_endian );
     // strings

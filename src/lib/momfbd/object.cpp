@@ -861,7 +861,7 @@ void Object::initObject( void ){
         if( pupil ) modes->getNorms( *pupil );
         else modes->getNorms();
         LOG_DEBUG << "initObject(" << to_string(ID) << "): " << printArray( modes->norms,"measured norms" ) << ende;
-        modes->normalize();
+        if( !bfs::is_regular_file(modeFile) || modeFileNormalize ) modes->normalize();
         doPrint = true;
     }
     

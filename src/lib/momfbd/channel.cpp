@@ -462,7 +462,7 @@ void Channel::initChannel (void) {
             if( !modes->empty() ) {
                 if( myObject.pupil ) modes->getNorms( *(myObject.pupil) );
                 else modes->getNorms();
-                modes->normalize();
+                if( !bfs::is_regular_file(diversityModeFile) || divModeFileNormalize ) modes->normalize();
             }
         }
         if( modes->empty() ) {

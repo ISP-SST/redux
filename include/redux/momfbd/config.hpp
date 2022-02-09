@@ -89,6 +89,7 @@ namespace redux {
             ModeList diversityModes;                //!< List of diversity mode types/numbers
             std::vector<DiversityValue> diversityValues;    //!< List of weights/values for the diversity modes. 
             std::string diversityModeFile;          //!< File containining modes to be used for the diversity.
+            bool divModeFileNormalize;              //!< flag to disable normalization of modes supplied in file (default is enabled/true)
             bool noRestore;                         //!< Exclude this channel in the final reconstruction/deconvolution step (i.e. only use it during the fitting)
             /*****************************/
             
@@ -165,6 +166,7 @@ namespace redux {
             std::string modeFile;
             std::string pupilFile;
             double wavelength;                      //!< (default: 0, has to be specified)
+            bool modeFileNormalize;                 //!< flag to disable normalization of modes supplied in file (default is enabled/true)
             bool traceObject;                       //!< specifies that this object should be used as a reference for spatial distortions.
             /*****************************/
             
