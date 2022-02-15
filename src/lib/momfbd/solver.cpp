@@ -434,7 +434,7 @@ void Solver::run( PatchData::Ptr data ) {
         
         std::fill( enabledModes.get(), enabledModes.get()+modeCount, true );
 
-        if( modeCount == nModes ) {   // final loop, use proper FTOL and maxIterations
+        if( modeCount == nModes || (job.maxIterations==0) ) {   // final loop, use proper FTOL and maxIterations
             exitLoop = true;                // exit outer loop.
             tol = job.FTOL;
             maxIterations = job.maxIterations;
