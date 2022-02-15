@@ -835,7 +835,7 @@ void Object::initObject( void ){
         }
     }
 
-    ModeInfo info( modeFile, pupilPixels );
+    ModeInfo info( modeFile, pupilPixels, modeFileNormalize );
     if( modeFile.empty() ) {
         info = ModeInfo( myJob.klMinMode, myJob.klMaxMode, myJob.modeList, pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.klCutoff );
         if( myJob.modeBasis == ZERNIKE ){
@@ -848,9 +848,11 @@ void Object::initObject( void ){
     bool doPrint(false);    // just to reduce spamming the log, print only when modes are generated (i.e. on the master)
     lock_guard<mutex> lock( modes->mtx );
     if( modes->empty() ) {
+        bool doModeNormalize(true);
         if( bfs::is_regular_file(modeFile) ){
             LOG_DEBUG << "initObject(" << to_string(ID) << "):   Empty ModeSet: loading \"" << modeFile << "\"" << ende;
             modes->load( modeFile, pupilPixels );
+            doModeNormalize = modeFileNormalize;
         } else if( info.firstMode == info.lastMode ) {
             LOG_DEBUG << "initObject(" << to_string(ID) << "):   Empty ModeSet: generating Zernike set." << ende;
             modes->generate( pupilPixels, pupilRadiusInPixels, rotationAngle, myJob.modeList, Zernike::NORMALIZE );
@@ -860,8 +862,9 @@ void Object::initObject( void ){
         }
         if( pupil ) modes->getNorms( *pupil );
         else modes->getNorms();
+        LOG_DEBUG << "initObject(" << to_string(ID) << "): normalize: " << (doModeNormalize?"Yes":"No") << ende;
         LOG_DEBUG << "initObject(" << to_string(ID) << "): " << printArray( modes->norms,"measured norms" ) << ende;
-        if( !bfs::is_regular_file(modeFile) || modeFileNormalize ) modes->normalize();
+        if( doModeNormalize ) modes->normalize();
         doPrint = true;
     }
     
@@ -921,6 +924,7 @@ void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& 
             if( myJob.normType == NORM_OBJ_MAX_MEAN ) channelNorms.push_back( ch->getMaxMean() );
             else if( myJob.normType == NORM_OBJ_MAX_MEDIAN ) channelNorms.push_back( ch->getMaxMedian() );
             else if( myJob.normType == NORM_OBJ_MEDIAN_MEDIAN ) channelNorms.push_back( ch->getMedianMedian() );
+            else if( myJob.normType == NORM_NONE ) channelNorms.push_back( 0 );
             if(startT.is_special() )startT = ch->startT;
             else startT = std::min(startT,ch->startT );
             if(endT.is_special() )endT = ch->endT;
@@ -940,8 +944,11 @@ void Object::loadData( boost::asio::io_service& service, Array<PatchData::Ptr>& 
                 normalizeTo += *(mid+1);
                 normalizeTo /= 2;
             }
-        }
-        LOG_DEBUG << "Object " << ID << ": The images will be normalized to " << normalizeTo << ende;
+        } else if( myJob.normType == NORM_NONE ) normalizeTo = 0.0;
+                         
+        if( normalizeTo > 0.0 ) LOG_DEBUG << "Object " << ID << ": The images will be normalized to " << normalizeTo << ende;
+        else LOG_DEBUG << "Object " << ID << ": The images will not be normalized." << ende;
+
     } );
     
     for( shared_ptr<Channel>& ch: channels ){

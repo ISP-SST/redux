@@ -65,7 +65,8 @@ namespace redux {
             ModeList modeList;
             double pupilRadius, angle, cutoff;
             std::string filename;
-            explicit ModeInfo( const std::string&, uint16_t nPixels=0 );
+            bool normalize;
+            explicit ModeInfo( const std::string&, uint16_t nPixels=0, bool norm=true );
             ModeInfo( uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle );
             ModeInfo( uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff );
             ModeInfo( uint16_t firstMode, uint16_t lastMode, const ModeList& modeList, uint16_t nPoints, double pupilRadius, double angle, double cutoff );

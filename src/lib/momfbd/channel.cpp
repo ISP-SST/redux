@@ -452,7 +452,7 @@ void Channel::initChannel (void) {
     
     if( !diversityModeFile.empty() ) {      // A file with modes was supplied
         
-        info = ModeInfo( diversityModeFile, myObject.pupilPixels );
+        info = ModeInfo( diversityModeFile, myObject.pupilPixels, divModeFileNormalize );
 
         const shared_ptr<ModeSet>& modes = myJob.globalData->get( info );
         lock_guard<mutex> lock( modes->mtx );
@@ -462,7 +462,9 @@ void Channel::initChannel (void) {
             if( !modes->empty() ) {
                 if( myObject.pupil ) modes->getNorms( *(myObject.pupil) );
                 else modes->getNorms();
-                if( !bfs::is_regular_file(diversityModeFile) || divModeFileNormalize ) modes->normalize();
+                if( divModeFileNormalize ) modes->normalize();
+                LOG_DEBUG << "initChannel(" << idString() << "): normalize: " << (divModeFileNormalize?"Yes":"No") << ende;
+                LOG_DEBUG << "initChannel(" << idString() << "): " << printArray( modes->norms,"measured norms" ) << ende;
             }
         }
         if( modes->empty() ) {
@@ -816,20 +818,21 @@ void Channel::initPatch (ChannelData& cd) {
     }
     
     size_t dataPixels = dataSize.x * dataSize.y;
-    if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
-        float* dataPtr = cd.images.get();
-        for( uint16_t i=0; i<nImages; ++i ) {
-            double scale = myObject.normalizeTo;
-            if( myJob.normType == NORM_OBJ_MAX_MEAN ) {
-                scale /= imageStats[i]->mean;
-            } else if( (myJob.normType == NORM_OBJ_MAX_MEDIAN) || (myJob.normType == NORM_OBJ_MEDIAN_MEDIAN) ) {
-                scale /= imageStats[i]->median;
-            } else if( myJob.normType == NORM_NONE ) scale = 1.0;
-            transform( dataPtr, dataPtr+ dataPixels, dataPtr, bind1st(multiplies<double>(), scale) );
-            dataPtr += dataPixels;
+    if( myObject.normalizeTo > 0.0 ) {
+        if( (imageStats.size() == nImages) && (cd.images.nDimensions() == 3) ) {
+            float* dataPtr = cd.images.get();
+            for( uint16_t i=0; i<nImages; ++i ) {
+                double scale = myObject.normalizeTo;
+                if( myJob.normType == NORM_OBJ_MAX_MEAN ) {
+                    scale /= imageStats[i]->mean;
+                } else if( (myJob.normType == NORM_OBJ_MAX_MEDIAN) || (myJob.normType == NORM_OBJ_MEDIAN_MEDIAN) ) {
+                    scale /= imageStats[i]->median;
+                } else if( myJob.normType == NORM_NONE ) scale = 1.0;
+                transform( dataPtr, dataPtr+ dataPixels, dataPtr, bind1st(multiplies<double>(), scale) );
+                dataPtr += dataPixels;
+            }
         }
     }
-    
 
     std::shared_ptr<float*> arrayPtr = cd.images.reshape( nTotalFrames*dataSize.y, dataSize.x );
     float** imgPtr = arrayPtr.get();

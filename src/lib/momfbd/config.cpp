@@ -423,6 +423,7 @@ uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
 bool ChannelCfg::operator==( const ChannelCfg& rhs ) const {
     return ( rotationAngle == rhs.rotationAngle ) &&
            ( noiseFudge == rhs.noiseFudge ) &&
+           ( divModeFileNormalize == rhs.divModeFileNormalize ) &&
            ( weight == rhs.weight ) &&
            ( borderClip == rhs.borderClip ) &&
            ( incomplete == rhs.incomplete ) &&
@@ -605,6 +606,7 @@ bool ObjectCfg::operator==( const ObjectCfg& rhs ) const {
            ( patchSize == rhs.patchSize ) &&
            ( pupilPixels == rhs.pupilPixels ) &&
            ( maxLocalShift == rhs.maxLocalShift ) &&
+           ( modeFileNormalize == rhs.modeFileNormalize ) &&
            ( wavelength == rhs.wavelength ) &&
            ( outputFileName == rhs.outputFileName ) &&
            ChannelCfg::operator==( rhs );

@@ -26,36 +26,36 @@ using namespace std;
 namespace bfs = boost::filesystem;
 
 
-ModeInfo::ModeInfo( const string& filename, uint16_t nPixels )
+ModeInfo::ModeInfo( const string& filename, uint16_t nPixels, bool norm )
     : firstMode(0), lastMode(0), modeNumber(0), nPupilPixels(nPixels),
-      pupilRadius(0), angle(0), cutoff(0), filename(filename) {
+      pupilRadius(0), angle(0), cutoff(0), filename(filename), normalize(norm) {
 
 }
 
 
 ModeInfo::ModeInfo(uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle)
     : firstMode(0), lastMode(0), modeNumber(modeNumber), nPupilPixels(nPoints),
-      pupilRadius(pupilRadius), angle(angle), cutoff(0), filename("") {
+      pupilRadius(pupilRadius), angle(angle), cutoff(0), filename(""), normalize(true) {
 
 }
 
 
 ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, uint16_t modeNumber, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
     : firstMode(firstMode), lastMode(lastMode), modeNumber(modeNumber), nPupilPixels(nPoints),
-      pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename("") {
+      pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename(""), normalize(true) {
           
 }
 
 
 ModeInfo::ModeInfo(uint16_t firstMode, uint16_t lastMode, const ModeList& modeList, uint16_t nPoints, double pupilRadius, double angle, double cutoff)
     : firstMode(firstMode), lastMode(lastMode), modeNumber(0), nPupilPixels(nPoints), modeList(modeList),
-      pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename("") {
+      pupilRadius(pupilRadius), angle(angle), cutoff(cutoff), filename(""), normalize(true) {
           
 }
 
       
 uint64_t ModeInfo::size( void ) const {
-    static uint64_t sz = 4*sizeof(uint16_t) + 3*sizeof(double) + 1;
+    static uint64_t sz = 4*sizeof(uint16_t) + 3*sizeof(double) + 2;
     sz += redux::util::size(modeList);
     sz += filename.length();
     return sz;
@@ -73,6 +73,7 @@ uint64_t ModeInfo::pack( char* ptr ) const {
     count += pack(ptr+count,angle);
     count += pack(ptr+count,cutoff);
     count += pack(ptr+count,filename);
+    count += pack(ptr+count,normalize);
     return count;
 }
 
@@ -88,6 +89,7 @@ uint64_t ModeInfo::unpack( const char* ptr, bool swap_endian ) {
     count += unpack(ptr+count,angle,swap_endian);
     count += unpack(ptr+count,cutoff,swap_endian);
     count += unpack(ptr+count,filename,swap_endian);
+    count += unpack(ptr+count,normalize);
     return count;
 }
 
@@ -95,6 +97,8 @@ uint64_t ModeInfo::unpack( const char* ptr, bool swap_endian ) {
 bool ModeInfo::operator<(const ModeInfo& rhs) const {
     if(filename != rhs.filename)
         return filename < rhs.filename;
+    if(normalize != rhs.normalize)
+        return !normalize;
     if(firstMode != rhs.firstMode)
         return firstMode < rhs.firstMode;
     if(lastMode != rhs.lastMode)
