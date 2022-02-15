@@ -41,8 +41,10 @@ can also be specified on object/global leve, and will then be inherited by all c
     <tr><td>DISCARD                 <td>int(1-2)                <td>Specifies number of frames to skip in the beginning (and end) of multi-frame files.<br>
     This is useful if e.g. the first frame of each burst is untrusted because of instrument oscillation after tuning <td>
     <tr><td>DIVERSITY               <td>float(N)                <td>List of weights/values for the fixed aberrations (specified in DIV_MODES/ORDERS).<td>
+    <tr><td>DIV_BASIS               <td>float(N)                <td>"Zernike" or "Karhunen-Loeve".<td> Zernike
     <tr><td>DIV_MODES               <td>int(N)                  <td>List of modes/indices to use as fixed aberrations for this channel. Should be specified as a comma-separated list of numbers, with optional "Z" or "K" tags to indicate if the mode(s) should be Zernike or Karhunen-Loeve. This list should be the same length as DIVERSITY.<td>
     <tr><td>DIV_MODE_FILE           <td>path/filename           <td>Filename containing modes to use for the phase diversity. When a mode-file is provided, DIV_MODES/ORDERS will be interpreted as indices in the supplied file. <td>
+    <tr><td>DIV_MODE_FILE_NORMALIZE <td>bool                    <td>Normalize the supplied modes. <td> True
     <tr><td>DIV_ORDERS              <td>int(N)                  <td>This does exactly the same as DIV_MODES.<td>
     <tr><td>DT                      <td>int                     <td>Image number offset to be added to all IMAGE_NUMs in this channel <td>
     <tr><td>FILENAME_TEMPLATE       <td>string                  <td>Filename template to be used with sprintf (and IMAGE_NUM), to generate the filename(s) to be used as input<td> 
@@ -91,6 +93,7 @@ On the object level, all the channel-keywords above can be specified, and also t
     <tr><td>MAX_LOCAL_SHIFT         <td>int                     <td>How much are the patches allowed to be shifted.             <td>5
     <tr><td>MINIMUM_OVERLAP         <td>int                     <td>Smallest allowed overlap between patches (used when auto-positioning patches) <td>16
     <tr><td>MODE_FILE               <td>path/filename           <td>Filename containing modes to use                            <td>
+    <tr><td>MODE_FILE_NORMALIZE     <td>bool                    <td>Normalize the supplied modes.                               <td> True
     <tr><td>NUM_POINTS              <td>int                     <td>Patch size                                                  <td>64
     <tr><td>OUTPUT_FILE             <td>path/filename           <td>Where to save the results.                                  <td><b>Has to be specified</b>
     <tr><td>PIXELSIZE               <td>float                   <td>Physical pixel-size for the camera (in meters)              <td><b>Has to be specified</b>
@@ -105,6 +108,7 @@ On the object level, all the channel-keywords above can be specified, and also t
 On the global level, all the channel, and object, keywords above can be specified, and also the following:
 <table>
     <tr><th>Keyword                 <th>Type                    <th>Description                                                 <th>Default Value (if any)    
+    <tr><td>APODIZATION             <td>int                     <td>Size of apodization region around the patches               <td>-1 (will use patchSize/8)
     <tr><td>BADPIXEL                <td>float                   <td>Threshold for marking a pixel as bad                        <td>1E-5
     <tr><td>BASIS                   <td>string                  <td>Type of modes (Zernike/Karhunen-Loeve)                      <td>Zernike
     <tr><td>CALIBRATE               <td>bool                    <td>Run in calibration mode (to determine fixed aberrations between channels) <td>
@@ -112,10 +116,10 @@ On the global level, all the channel, and object, keywords above can be specifie
     <tr><td>DATE_OBS                <td>string                  <td>Date of observations. Will be entered in the header/metadata of the output files. <td>N/A
     <tr><td>DONT_MATCH_IMAGE_NUMS   <td>bool                    <td>                            <td>
     <tr><td>EPS                     <td>float                   <td>Precision/step length for finite differences calculations   <td>1E-10
-    <tr><td>FAST_QR                 <td>bool                    <td>                            <td>
+    <tr><td>FAST_QR                 <td>bool                    <td>Use fast QR decomposition (always enabled in redux)        <td>
     <tr><td>FILE_TYPE               <td>string                  <td>Output file format (ANA/FITS/MOMFBD)             <td>FITS (ANA for calibration runs)
-    <tr><td>FIT_PLANE               <td>bool                    <td>                            <td>
-    <tr><td>FLATFIELD               <td>bool                    <td>                            <td>
+    <tr><td>FIT_PLANE               <td>bool                    <td>Subtract a fitted plane from the patch before processing.<br>This can help if there is an intensity gradient in the patch.                            <td>
+    <tr><td>FLATFIELD               <td>bool                    <td>Save calibrated images only (i.e. no processing)            <td>
     <tr><td>FPMETHOD                <td>string                  <td>Method to use for filling in bad pixels ("median"/"invdistweight"/"horint")<td>"invdistweight"
     <tr><td>FTOL                    <td>float                   <td>Tolerance/exit condition for the fitting                    <td>1E-3
     <tr><td>GETSTEP                 <td>string                  <td>Method to use for calculating the gradient <br>
@@ -134,6 +138,7 @@ On the global level, all the channel, and object, keywords above can be specifie
     <tr><td>MODES                   <td>list(int)               <td>Modes to use (from the selected BASIS)                      <td><b>Has to be specified</b>
     <tr><td>N_DONE_ITER             <td>int                     <td>How many iterations before adding more modes (not applied to last step, when all modes are active) <td>3
     <tr><td>NEW_CONSTRAINTS         <td>bool                    <td>                            <td>
+    <tr><td>NORMALIZATION           <td>string                  <td>Method to use for normalization ("obj_max_mean"/"obj_max_median"/"obj_median_median"/"none")<td>"obj_max_mean"
     <tr><td>NOSWAP                  <td>bool                    <td>                            <td>
     <tr><td>NO_CLIP                 <td>bool                    <td>                            <td>
     <tr><td>NO_CONSTRAINTS          <td>bool                    <td>                            <td>
