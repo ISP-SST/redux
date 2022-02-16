@@ -243,6 +243,29 @@ bool Channel::checkCfg (void) {
         return false;
     }
 
+    // Check if data directory exists (doesn't have to, it might only be visible by the manager, not necessarily on the machine where the job was submitted.
+    bfs::path fn = bfs::path( boost::str(boost::format (imageTemplate) % (imageNumberOffset)) ).parent_path();
+    if( !bfs::is_directory(fn) ) {    // try alternative path for data directory
+        fn = bfs::path(imageDataDir) / bfs::path (boost::str(boost::format (imageTemplate) % (imageNumberOffset))).parent_path();
+    }
+    if( incomplete && bfs::is_directory(fn) ) {   // if directory is present, and INCOMPLETE is specified, check which image numbers exists
+        for( size_t i(0); i < fileNumbers.size(); ) {
+            fn = bfs::path( boost::str( boost::format(imageTemplate) % (imageNumberOffset + fileNumbers[i]) ) );
+            if( !bfs::is_regular_file(fn) ) {
+                fn = bfs::path(imageDataDir) / bfs::path( boost::str( boost::format(imageTemplate) % (imageNumberOffset + fileNumbers[i]) ) );
+                if (!bfs::is_regular_file(fn)) {
+                    //LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers." << ende;
+                    fileNumbers.erase(fileNumbers.begin() + i);
+                    continue;
+                }
+            }
+            ++i;
+        }
+        if( fileNumbers.empty() ) {
+            LOG_FATAL << boost::format("No files found for incomplete channel with filename template \"%s\" in directory \"%s\"") % imageTemplate % imageDataDir << ende;
+            return false;
+        }
+    }
     
     return true;
 
@@ -252,12 +275,12 @@ bool Channel::checkCfg (void) {
 bool Channel::checkData( bool verbose ) {
 
     // Images
-    if ( incomplete ) {   // check if files are present
-        for (size_t i (0); i < fileNumbers.size();) {
-            bfs::path fn = bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + fileNumbers[i])));
-            if (!bfs::is_regular_file (fn)) {
+    if( incomplete ) {   // check if files are present
+        for( size_t i(0); i < fileNumbers.size(); ) {
+            bfs::path fn = bfs::path( boost::str( boost::format(imageTemplate) % (imageNumberOffset + fileNumbers[i]) ) );
+            if( !bfs::is_regular_file (fn)) {
                 fn = bfs::path (imageDataDir) / bfs::path (boost::str (boost::format (imageTemplate) % (imageNumberOffset + fileNumbers[i])));
-                if (!bfs::is_regular_file(fn)) {
+                if( !bfs::is_regular_file(fn) ) {
                     //LOG_TRACE << "File not found: \"" << fn.string() << "\", removing from list of image numbers." << ende;
                     fileNumbers.erase(fileNumbers.begin() + i);
                     continue;
@@ -265,8 +288,8 @@ bool Channel::checkData( bool verbose ) {
             }
             ++i;
         }
-        if (fileNumbers.empty()) {
-            LOG_FATAL << boost::format ("No files found for incomplete object with filename template \"%s\" in directory \"%s\"") % imageTemplate % imageDataDir << ende;
+        if( fileNumbers.empty() ) {
+            LOG_FATAL << boost::format("No files found for incomplete channel with filename template \"%s\" in directory \"%s\"") % imageTemplate % imageDataDir << ende;
             return false;
         }
     }
@@ -921,7 +944,7 @@ void Channel::initPhiFixed(void) {
     double scale4 = util::def2cf( myJob.telescopeD / myObject.telescopeF );     // conversion factor from m to radians, only used for focus-term.
     
     if( ! diversityModeFile.empty() ) {     // using mode-file
-        minfo = ModeInfo( diversityModeFile, myObject.pupilPixels );
+        minfo = ModeInfo( diversityModeFile, myObject.pupilPixels, divModeFileNormalize );
     
         const shared_ptr<ModeSet>& modes = myJob.globalData->get( minfo );
         lock_guard<mutex> lock( modes->mtx );
@@ -933,9 +956,9 @@ void Channel::initPhiFixed(void) {
                             << " >= nModes in modefile \"" << diversityModeFile << "\"\n\t\tThis Diversity mode will be ignored!!!" << ende;
                     continue;
                 }
-                double alpha = diversityValues[i].coefficient/myObject.wavelength;
+                double alpha = diversityValues[i].coefficient;
                 if( diversityValues[i].physical ) {
-                    alpha *= scale4;
+                    alpha *= scale4/myObject.wavelength;
                 }
                 const double* modePtr = modes->modePointers[static_cast<size_t>(modeNumber)];
                 transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,
@@ -956,9 +979,9 @@ void Channel::initPhiFixed(void) {
         ModeInfo mi2 = minfo;
         mi2.modeNumber = diversityModes[i].mode;
         int modeType = diversityModes[i].type;
-        double alpha = diversityValues[i].coefficient/myObject.wavelength;
+        double alpha = diversityValues[i].coefficient;
         if( diversityValues[i].physical ) {
-            alpha *= scale4;
+            alpha *= scale4/myObject.wavelength;
         }
 
         if( mi2.modeNumber == 2 || mi2.modeNumber == 3 || modeType == ZERNIKE ) {   // generated tilts always Zernike
@@ -1442,6 +1465,7 @@ Point16 Channel::getImageSize( bool force ) {
 //         if( alignClip.size() == 4 ) {   // we have align-clip, but no mapping => reference channel.
 //             imgSize = Point16(abs(alignClip[3]-alignClip[2])+1, abs(alignClip[1]-alignClip[0])+1);
 //         } else {                        //  No align-map or align-clip, get full image size.
+            checkCfg();
             string thisFile;
             if( !fileNumbers.empty() ) {
                 thisFile = boost::str(boost::format (imageTemplate) % fileNumbers[0]);

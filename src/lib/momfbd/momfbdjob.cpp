@@ -1406,7 +1406,7 @@ bool MomfbdJob::check(void) {
         case JSTEP_NONE: {   // rdx_sub will check with a default-value (from constructor) of JSTEP_NONE
             moveTo( this, JSTEP_CHECKING );
             updateProgressString();
-            ret =  (cfgChecked || checkCfg());
+            ret = (cfgChecked || checkCfg());
             if(ret) ret &= (dataChecked || checkData(false));
             if(ret) {
                 moveTo( this, JSTEP_CHECKED );
