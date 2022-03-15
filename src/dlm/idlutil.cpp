@@ -244,8 +244,15 @@ namespace redux {
         }
     }
     
-    void printMessage( std::string msg, int action ) {
+    void printMessage( std::string msg, int action, IDL_INT lun ) {
         
+        if( lun ) {     // print to file handle
+            static char nl[] = "\n";
+            IDL_PoutRaw( lun, (char*)msg.c_str(), msg.length() );
+            IDL_PoutRaw( lun, nl, 1 );
+            return;
+        }
+
         action |= IDL_MSG_ATTR_NOPREFIX;        // no prefix/decoration (like the leading '%' in idlde)
         action |= IDL_MSG_ATTR_QUIET;           // allow supression with !QUIET
         
@@ -648,6 +655,28 @@ double redux::getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype
     if( hasInf ) *hasInf = stats.hasInfinity;
     
     return stats.mean;
+    
+}
+
+size_t redux::findLongestStreak( const UCHAR* const data, int64_t nElements, UCHAR IDLtype, int64_t value ) {
+
+
+    switch( IDLtype ) {
+        case( IDL_TYP_BYTE ):
+            return util::findLongestStreak( data, nElements, static_cast<UCHAR>(value) );
+        case( IDL_TYP_INT ):
+            return util::findLongestStreak( reinterpret_cast<const IDL_INT*>(data), nElements, static_cast<IDL_INT>(value) );
+        case( IDL_TYP_LONG ):
+            return util::findLongestStreak( reinterpret_cast<const IDL_LONG*>(data), nElements, static_cast<IDL_LONG>(value) );
+        case( IDL_TYP_FLOAT ):
+            return util::findLongestStreak( reinterpret_cast<const float*>(data), nElements, static_cast<float>(value) );
+        case( IDL_TYP_DOUBLE ):
+            return util::findLongestStreak( reinterpret_cast<const double*>(data), nElements, static_cast<double>(value) );
+        default: printMessage( "findLongestStreak():  type = " + to_string((int)IDLtype)
+                                + " has not been implemented.", IDL_MSG_LONGJMP );
+    }
+ 
+    return 0;
     
 }
 

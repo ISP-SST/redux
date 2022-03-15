@@ -1559,7 +1559,7 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                 return true;
             };
             vector<thread> threads;
-            int nT=std::thread::hardware_concurrency();
+            int nT = std::min<int>( 4, std::thread::hardware_concurrency() );
             for( int t(0); t<nT; ++t ) {
                 threads.push_back( thread([&](){ while( readTile() ); }));
             }

@@ -123,6 +123,40 @@ namespace redux {
             return true;
         }
 
+        /*! @brief Find the longest continuous streak of a given number in the array
+        *   @param dataStart Pointer to data.
+        *   @param dataEnd End pointer (should point to lastElement+1)
+        *   @param eps Limit
+        *   @returns False if any fabs(element) is larger than eps. Otherwise returns true.
+        */
+        template <typename T>
+        inline size_t findLongestStreak( const T* dataStart, const T* dataEnd, T value ) {
+            size_t longestStreak(0);
+            size_t currentStreak(0);
+            while( dataStart < dataEnd ) {
+                if( *dataStart == value ) {
+                    ++currentStreak;
+                } else if( currentStreak ) {
+                    if( currentStreak > longestStreak ) {
+                        longestStreak = currentStreak;
+                    }
+                    currentStreak = 0;
+                }
+
+                dataStart++;
+            }
+            return longestStreak;
+        }
+        /*! @brief Find the longest continuous streak of a given number in the array
+        *   @param ptr Pointer to data.
+        *   @param count How many elements to check (i.e. size of array or smaller)
+        *   @param eps Limit
+        *   @returns False if any fabs(element) is larger than eps. Otherwise returns true.
+        */
+        template <typename T>
+        inline size_t findLongestStreak( const T* const ptr, size_t count, T value ) {
+            return findLongestStreak( ptr, ptr+count, value );
+        }
         /*! @brief Templated version of absolute value. Has specializations for integer/float types.
         *   @param v Input
         *   @returns abs(v)

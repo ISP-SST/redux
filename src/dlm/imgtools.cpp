@@ -50,8 +50,6 @@ namespace bfs = boost::filesystem;
 
 namespace {
 
-    static char nl[] = "\n";
-
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_INT help;
@@ -1622,10 +1620,12 @@ namespace {
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD; /* Must be first entry in structure */
         IDL_INT check;
+        IDL_INT chunktest;
         IDL_INT help;
         UCHAR nthreads;
         IDL_INT padding;
         IDL_INT pinh_align;
+        IDL_INT progress;
         IDL_INT verbose;
         IDL_INT lun;
         IDL_INT filter;
@@ -1651,6 +1651,7 @@ namespace {
         { (char*) "BACKSCATTER_GAIN", IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,bs_gain) },
         { (char*) "BACKSCATTER_PSF",  IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,bs_psf) },
         { (char*) "CHECK",            IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,check) },
+        { (char*) "CHUNKTEST",        IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW, chunktest ) },
         { (char*) "DARK",             IDL_TYP_UNDEF, 1, IDL_KW_VIN|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,dark) },
         { (char*) "DISCARDED",        IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,discarded) },
         { (char*) "FILLPIX_THRESHOLD",IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,fp_thres) },
@@ -1664,6 +1665,7 @@ namespace {
         { (char*) "NTHREADS",         IDL_TYP_BYTE,  1, 0,                      0, (char*) IDL_KW_OFFSETOF2(SI_KW,nthreads) },
         { (char*) "PADDING",          IDL_TYP_INT,   1, 0,                      0, (char*) IDL_KW_OFFSETOF2(SI_KW,padding) },
         { (char*) "PINHOLE_ALIGN",    IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,pinh_align) },
+        { (char*) "PROGRESS",         IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(SI_KW,progress) },
         { (char*) "SUMMED",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,summed) },
         { (char*) "TIME_AVG",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_avg) },
         { (char*) "TIME_BEG",         IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(SI_KW,time_beg) },
@@ -1731,6 +1733,10 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
     
     if( kw.filter<2 && kw.check ) {
         kw.filter = 3;
+    }
+
+    if( kw.verbose > 1 ) {
+        kw.progress = 1;
     }
     
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
@@ -1863,10 +1869,10 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         size_t ySizePadded = ySize + 2*kw.padding;
         
         string statusString;
-        if( kw.verbose ) {
+        if( kw.progress || kw.verbose ) {
             statusString = (kw.check?"Checking and summing ":"Summing ") + to_string(nImages)
             + " images using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":".");
-            cout << statusString << ((kw.verbose == 1)?"\n":"") << flush;
+            cout << statusString << (kw.progress?"":"\n") << flush;
         }
         
         IDL_MEMINT dims[] = { ySize, xSize }; 
@@ -2028,7 +2034,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                 }
                 
                 size_t ns = nSummed++;
-                if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nImages-1)));
+                if( kw.progress ) printProgress( statusString, (ns*100.0/(nImages-1)));
             } catch( const exception& e ) {
                 cout << "rdx_sumimages:sumFunc: unhandled exception: " << e.what() << endl;
             }
@@ -2048,9 +2054,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                             sumFunc( myImgIndex, mySumPtr, myTmpPtr, reinterpret_cast<UCHAR*>(myDataPtr) );
                         } else {
                             if ( kw.lun ) {
-                                string tmp = "Image #" + to_string(myImgIndex);
-                                IDL_PoutRaw( kw.lun, (char*)tmp.c_str(), tmp.length() );
-                                IDL_PoutRaw( kw.lun, nl, 1 );
+                                printMessage( "Image #" + to_string(myImgIndex), 0, kw.lun );
                             }
                         }
                     }
@@ -2076,8 +2080,11 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         }
 #endif
 
-        if( kw.verbose > 1 ) {
+        if( kw.progress ) {
             printProgress( statusString, 100.0 );
+            cout << endl;
+        }
+        if( kw.verbose > 1 ) {
             if( nSummed == nImages ) {
                 cout << "  All ok." << endl;
             } else {
@@ -2202,7 +2209,11 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
     if( kw.filter<2 && kw.check ) {
         kw.filter = 3;
     }
-    
+
+    if( kw.verbose > 1 ) {
+        kw.progress = 1;
+    }
+
     kw.nthreads = max<UCHAR>(1, min<UCHAR>(kw.nthreads, thread::hardware_concurrency()));
     kw.padding = max<IDL_INT>(0, min<IDL_INT>(kw.padding, 4096));   // prevent insane padding
 
@@ -2322,18 +2333,29 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             cout << "rdx_sumfiles: No input files." << endl;
             return IDL_GettmpInt(0);
         }
+        
         // Get size etc from first image.
-        FileMeta::Ptr meta = getMeta( existingFiles[0] );
-        if( !meta ) {        // Only allow 2D images
+        size_t idx(0);
+        FileMeta::Ptr meta;
+        while( idx < nFiles && !meta ) {
+            try {
+                meta = getMeta( existingFiles[idx++] );
+            } catch ( ... ) {
+                meta.reset();
+            }
+        }
+        
+        if( !meta ) {
             cout << "rdx_sumfiles: Failed to get metadata." << endl;
             return IDL_GettmpInt(0);
         }
+        
         size_t nDims = meta->nDims();
         IDL_MEMINT xSize(0);
         IDL_MEMINT ySize(0);
         size_t nTotalFrames( nFiles );
         vector<size_t> nFrames( nFiles, 1 );
-        if( nDims == 2 ) {
+        if( nDims == 2 ) {        // Only allow 2D/3D images
             xSize = meta->dimSize(1);
             ySize = meta->dimSize(0);
         } else if( nDims == 3 ) {
@@ -2374,21 +2396,28 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             nFrames.clear();
             nTotalFrames = 0;
             progWatch.set( nFiles );
-            for( auto &fn: existingFiles ) {
-                ioService.post([&](){
-                    auto tmpMeta = getMeta( fn );
-                    if( meta ) {
-                        size_t frames = tmpMeta->dimSize(0);
-                        unique_lock<mutex> lock(mtx);
-                        nFrames.push_back( frames );
-                        nTotalFrames += frames;
+            for( auto& fn: existingFiles ) {
+                ioService.post([&,fn](){
+                    FileMeta::Ptr tmpMeta;
+                    try {
+                        tmpMeta = getMeta( fn );
+                    } catch ( exception& e ) {
+                        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, e.what() );
+                        tmpMeta.reset();
                     }
+                    unique_lock<mutex> lock(mtx);
+                    size_t frames(0);
+                    if( tmpMeta ) {
+                       frames = tmpMeta->dimSize(0);
+                    }
+                    nFrames.push_back( frames );
+                    nTotalFrames += frames;
                     ++progWatch;
                 });
             }
             progWatch.wait();
         }
-        
+
         size_t maxFileSize = *std::max_element( nFrames.begin(), nFrames.end() ) * frameSize;
         atomic<size_t> nSummed(0);
         atomic<size_t> frameIndex(0);
@@ -2402,10 +2431,10 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         }
         
         string statusString;
-        if( kw.verbose ) {
+        if( kw.progress || kw.verbose ) {
             statusString = (kw.check?"Checking and summing ":"Summing ") + to_string(nTotalFrames)
             + " frames using " +to_string((int)kw.nthreads) + string(" thread") + ((kw.nthreads>1)?"s.":":");
-            cout << statusString << ((kw.verbose == 1)?"\n":"") << flush;
+            cout << statusString << (kw.progress?"":"\n") << flush;
         }
         
         IDL_MEMINT dims[] = { xSize, ySize }; 
@@ -2481,7 +2510,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                     checkedPtr[frameIndex] = getMinMaxMean( framePtr, nPixels, dataType, 0, 0, &hasInf );
                     if( hasInf ) {
                         checkedPtr[frameIndex] = std::numeric_limits<double>::infinity();
-                        ++progWatch;
+                        //++progWatch;
                         return;
                     }
                 }
@@ -2570,7 +2599,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                         
                     } catch( const cv::Exception& e ) {
                         nSummed--;
-                        if( checkedPtr  ) {
+                        if( checkedPtr ) {
                             checkedPtr[frameIndex] = std::numeric_limits<double>::infinity();
                         }
                     }
@@ -2584,20 +2613,30 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
                     }
                 }
-                
-                size_t ns = nSummed++;
-                if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nTotalFrames-1)));
+                nSummed++;
+                //size_t ns = nSummed++;
+                //if( kw.verbose > 1 ) printProgress( statusString, (ns*100.0/(nTotalFrames-1)));
                 ++progWatch;
+                if( kw.progress ) printProgress( statusString, 100.0*progWatch.progress() );
         };
 
-        progWatch.set( nFiles+nTotalFrames );
+        progWatch.set( nTotalFrames );
         size_t frameCount(0);
+        size_t skippedFiles(0);
+
         for( size_t i=0; i<existingFiles.size(); ++i ) {
-            ioService.post([&,i,frameCount](){
+            if( nFrames[i] == 0 ) {
+                skippedFiles++;
+                continue;
+            }
+            string fn = existingFiles[i];
+            progWatch.increaseTarget( 1 );
+            ioService.post([&,i,fn, frameCount](){
                 shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
                 FileMeta::Ptr threadMeta;
                 try {
-                    readFile( existingFiles[i], threadBuffer.get(), threadMeta );
+                    readFile( fn, threadBuffer.get(), threadMeta );
+                    std::lock_guard<std::mutex> blaLock( mtx );
                     if( threadMeta ) {
                         if( !time_beg.empty() ) {
                             vector<bpx::ptime> startTimes = threadMeta->getStartTimes();
@@ -2623,23 +2662,45 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                         }
                     }
                     size_t bufferOffset(0);
-                    for( size_t j=0; j<nFrames[i]; ++j ) {
-                        //sumFunc( frameCount+j, threadBuffer, bufferOffset);
-                        ioService.post( std::bind(sumFunc,frameCount+j,threadBuffer, bufferOffset) );
-                        bufferOffset += frameSize;
+                    if( kw.chunktest ) {
+                        size_t streak = findLongestStreak( reinterpret_cast<UCHAR*>( threadBuffer.get()), nPixels*nFrames[i], dataType, 0 );
+                        if( streak > 2000 ) {
+                            throw runtime_error("Zero-block detected! Size = "+to_string(streak) );
+                        }
+                        progWatch.increase( nFrames[i] );
+                    } else {
+                        for( size_t j=0; j<nFrames[i]; ++j ) {
+                            sumFunc( frameCount+j, threadBuffer, bufferOffset );
+                            //ioService.post( std::bind(sumFunc,frameCount+j,threadBuffer, bufferOffset) );
+                            bufferOffset += frameSize;
+                        }
                     }
-
-                } catch( const exception& e ) {
-                    string msg = "Failed to load file: " + existingFiles[i] + "  Reason: ";
-                    msg += e.what();
-                    IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+                } catch( exception& e ) {
+                    std::lock_guard<std::mutex> blaLock( mtx );
+                    string msg = e.what();
+                    std::size_t found = msg.find( fn );
+                    if( found == std::string::npos ) { // filename not present in error message, so pre-pend it to the message.
+                        msg = fn + string(": ") + e.what();
+                    }
+                    if( kw.verbose > 1 ) IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
                     for( size_t j=0; j<nFrames[i]; ++j ) {
-                        frameNumbers[frameCount+j] = -frameCount-j;
-                        checkedPtr[frameCount+j] = std::numeric_limits<double>::infinity();     // flag frames as discarded in the log
+                        frameNumbers[frameCount+j] *= -1;
+                        if( checkedPtr ) checkedPtr[frameCount+j] = std::numeric_limits<double>::infinity();     // flag frames as discarded in the log
                     }
                     progWatch.decreaseTarget( nFrames[i] );
+                } catch( ... ) {
+                    std::lock_guard<std::mutex> blaLock( mtx );
+                    string msg = "Failed to load file: " + fn;
+                    if( kw.verbose > 1 ) IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, msg.c_str() );
+                    for( size_t j=0; j<nFrames[i]; ++j ) {
+                        frameNumbers[frameCount+j] *= -1;
+                        if( checkedPtr ) checkedPtr[frameCount+j] = std::numeric_limits<double>::infinity();     // flag frames as discarded in the log
+                    }
                 }
+                    std::lock_guard<std::mutex> blaLock( mtx );
+                //progWatch.decreaseTarget( nFrames[i] );
                 ++progWatch;
+                if( kw.progress ) printProgress( statusString, 100.0*progWatch.progress() );
             });
             frameCount += nFrames[i];
         }
@@ -2666,6 +2727,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 }
                 ++nDiscarded;
             }
+
             if( nDiscarded ) {
                 memset( sumPtr, 0, nPixels*kw.nthreads*sizeof(double) );
                 frameIndex = 0;
@@ -2673,25 +2735,25 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 progWatch.set( 0 );
                 size_t frameCount(0);
                 for( size_t i=0; i<existingFiles.size(); ++i ) {
+                    string fn = existingFiles[i];
                     bool shouldSubtract(false);
                     for( size_t j=0; j<nFrames[i]; ++j ) {
                         if( !isfinite(checkedPtr[frameCount+j]) || checkedPtr[frameCount+j] == 0 ) {
                             if( kw.lun ) {
-                                string msg = existingFiles[i];
+                                string msg = fn;
                                 if( nFrames[i] > 1 ) msg += ", frame # " + to_string(j);
-                                IDL_PoutRaw( kw.lun, (char*)msg.c_str(), msg.length() );
-                                IDL_PoutRaw( kw.lun, nl, 1 );
+                                printMessage( msg, 0, kw.lun );
                             }
                             if( isfinite(checkedPtr[frameCount+j]) ) shouldSubtract = true;
                         }
                     }
                     if( shouldSubtract ) {
                         progWatch.increaseTarget(1);
-                        ioService.post([&,i,frameCount](){
+                        ioService.post([&,i,fn, frameCount](){
                             shared_ptr<char> threadBuffer( new char[ maxFileSize ], []( char*& p ) { delete[] p; } );
                             FileMeta::Ptr threadMeta;
                             try {
-                                readFile( existingFiles[i], threadBuffer.get(), threadMeta );
+                                readFile( fn, threadBuffer.get(), threadMeta );
                                 size_t bufferOffset(0);
                                 for( size_t j=0; j<nFrames[i]; ++j ) {
                                     if( !isfinite(checkedPtr[frameCount+j]) || checkedPtr[frameCount+j] == 0 ) {
@@ -2708,7 +2770,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                     bufferOffset += frameSize;
                                 }
                             } catch( const exception& e ) {
-                                //cout << "rdx_sumfiles: Failed to load file: " << existingFiles[i] << "  Reason: " << e.what() << endl;
+                                //cout << "rdx_sumfiles: Failed to load file: " << fn << "  Reason: " << e.what() << endl;
                             }
                             ++progWatch;
                         });
@@ -2760,7 +2822,6 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                                                    return true;
                                                }
                                                return false;
-                                               
                                         }), frameNumbers.end() );
         
         nDiscarded = discarded.size();
@@ -2769,13 +2830,21 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             cout << "  FrameCount mismatch: " << nSummed << "+" << nDiscarded << " != " << nTotalFrames << endl;
         }
         
-        if( kw.verbose > 1 ) {
+        if( kw.progress ) {
             printProgress( statusString, 100.0 );
-            if( nDiscarded ) {
-                cout << "  Check failed for " << nDiscarded << " frame" << ((nDiscarded>1)?"s.":".") << endl;
-            } else {
-                cout << "  All ok." << endl;
+            cout << endl;
+        }
+
+        if( kw.verbose > 1 ) {
+            string msg;
+            if( skippedFiles ) {
+                msg = "  Skipped " + to_string(skippedFiles) + " file" + ((skippedFiles>1)?"s.":".");
             }
+            if( nDiscarded ) {
+                msg += "  Check failed for " + to_string(nDiscarded) + " frame" + ((nDiscarded>1)?"s.":".");
+            }
+            if( msg.empty() ) msg = "  All ok.";
+            cout << msg << endl;
         }
         
         if( kw.summed ) {
@@ -2797,10 +2866,12 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         if( kw.framenumbers ) {
             IDL_VPTR tmpFN;
             IDL_MEMINT nFN = frameNumbers.size();
-            IDL_MEMINT dims[] = { nFN }; 
-            int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmpFN );
-            memcpy( tmpData, frameNumbers.data(), nFN*sizeof(int32_t));
-            IDL_VarCopy( tmpFN, kw.framenumbers );
+            if( nFN ) {
+                IDL_MEMINT dims[] = { nFN }; 
+                int32_t* tmpData = (int32_t*)IDL_MakeTempArray( IDL_TYP_LONG, 1, dims, IDL_ARR_INI_NOP, &tmpFN );
+                memcpy( tmpData, frameNumbers.data(), nFN*sizeof(int32_t));
+                IDL_VarCopy( tmpFN, kw.framenumbers );
+            }
         }
 
         if( kw.nsummed ) {
@@ -2810,10 +2881,13 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         
         if( kw.pinh_align && kw.xyc ) {
             IDL_VPTR tmpXYC;
-            IDL_MEMINT dims[] = { 2, static_cast<IDL_MEMINT>(nTotalFrames) }; 
-            float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmpXYC ); //IDL_ARR_INI_ZERO
-            memcpy( tmpData, *shifts, 2*nTotalFrames*sizeof(float));
-            IDL_VarCopy( tmpXYC, kw.xyc );
+            IDL_MEMINT nTF = nTotalFrames;
+            if( nTF ) {
+                IDL_MEMINT dims[] = { 2, nTF }; 
+                float* tmpData = (float*)IDL_MakeTempArray( IDL_TYP_FLOAT, 2, dims, IDL_ARR_INI_ZERO, &tmpXYC ); //IDL_ARR_INI_ZERO
+                memcpy( tmpData, *shifts, 2*nTotalFrames*sizeof(float));
+                IDL_VarCopy( tmpXYC, kw.xyc );
+            }
         }
         
         if( !time_beg.empty() ) {

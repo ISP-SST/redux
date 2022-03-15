@@ -39,7 +39,7 @@ namespace redux {
         std::map< std::string, RoutineInfo > routines;
     };
     
-    void printMessage( std::string msg, int action=IDL_MSG_INFO );
+    void printMessage( std::string msg, int action=IDL_MSG_INFO, IDL_INT lun=0 );
 
     template <typename T> UCHAR idlType(void);
     
@@ -152,6 +152,7 @@ namespace redux {
     }
 
     double getMinMaxMean( const UCHAR* data, int64_t nElements, UCHAR IDLtype, double* Min=nullptr, double* Max=nullptr, bool* hasInf=nullptr );
+    size_t findLongestStreak( const UCHAR* const data, int64_t nElements, UCHAR IDLtype, int64_t value );
     
     void structinfo( int argc, IDL_VPTR argv[], char* argk );
     size_t getVarSize( IDL_VPTR );
