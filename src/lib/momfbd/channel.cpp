@@ -296,6 +296,7 @@ bool Channel::checkData( bool verbose ) {
     
     size_t nFiles = std::max<size_t>(1,fileNumbers.size());         // If no numbers, load template as single file
     nFrames.resize( nFiles, 1 );                                    // Assume 1 frame per file by default
+    frameNumbersPerFile.resize( nFiles );                           // for storing the frameNumbers obtained from each file.
 
     if (fileNumbers.empty()) {         // single file
         bfs::path fn = bfs::path(imageDataDir) / bfs::path(imageTemplate);
@@ -308,6 +309,14 @@ bool Channel::checkData( bool verbose ) {
             //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
             redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
             uint8_t nDims = tmp.meta->nDims();
+            vector<size_t> fNums = tmp.meta->getFrameNumbers();
+            if( discard[0] ) {
+                fNums.erase( fNums.begin(), fNums.begin()+discard[0] );
+            }
+            if( discard[1] ) {
+                fNums.erase( fNums.end()-discard[1], fNums.end() );
+            }
+            frameNumbersPerFile[0] = fNums;
             //CachedFile::unload<float>( fn.string() );
             if( nDims == 3 ) {
                 nFrames[0] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
@@ -324,7 +333,7 @@ bool Channel::checkData( bool verbose ) {
             return false;
         }
     } else {                            // template + numbers
-        for( size_t i=0; i<fileNumbers.size(); ++i) {
+        for( size_t i=0; i<nFiles; ++i) {
             uint32_t number = fileNumbers[i];
             string thisFile = boost::str( boost::format(imageTemplate) % (imageNumberOffset + number) );
             bfs::path fn = bfs::path (imageDataDir) / bfs::path( thisFile );
@@ -337,6 +346,14 @@ bool Channel::checkData( bool verbose ) {
                 //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
                 redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
                 uint8_t nDims = tmp.meta->nDims();
+                vector<size_t> fNums = tmp.meta->getFrameNumbers();
+                if( discard[0] ) {
+                    fNums.erase( fNums.begin(), fNums.begin()+discard[0] );
+                }
+                if( discard[1] ) {
+                    fNums.erase( fNums.end()-discard[1], fNums.end() );
+                }
+                frameNumbersPerFile[i] = fNums;
                 //CachedFile::unload<float>( fn.string() );
                 if( nDims == 3 ) {
                     nFrames[i] = tmp.meta->dimSize(0) - (discard[0]+discard[1]);
@@ -361,15 +378,15 @@ bool Channel::checkData( bool verbose ) {
         waveFrontList.resize( nFiles, imageNumberOffset );
     }
 
-    if( waveFrontList.size() == fileNumbers.size() ) {
+    if( waveFrontList.size() == nFiles ) {
         std::transform( waveFrontList.begin(), waveFrontList.end(), fileNumbers.begin(), waveFrontList.begin(), std::plus<uint32_t>() );
     }
 
     if( nFiles != nTotalFrames ) {
         vector<uint32_t> tmpV;
         for( size_t i=0; i<nFiles; ++i ) {
-            for( size_t j=0; j<nFrames[i]; ++j ) {
-                tmpV.push_back( waveFrontList[i]+j+discard[0] );
+            for( const auto& fn: frameNumbersPerFile[i] ) {
+                tmpV.push_back( waveFrontList[i]+fn );
             }
         }
         std::swap( waveFrontList, tmpV );
@@ -783,13 +800,11 @@ double Channel::getMedianMedian(void) {
 void Channel::getFileNames( std::vector<std::string>& files, const std::vector<uint32_t>& wf ) const {
 
     set<uint32_t> wfSet( wf.begin(), wf.end() );
-    size_t frameCounter(0);
     size_t nFiles = std::min( nFrames.size(), fileNumbers.size() );
     for( size_t i=0; i<nFiles; ++i ) {
         bool inList(false);
-        for( size_t j=0; j<nFrames[i]; ++j ) {
-            if( frameCounter+j >= waveFrontList.size() ) continue;
-            if( wfSet.count( waveFrontList[frameCounter+j] ) ) {
+        for( const auto& fn: frameNumbersPerFile[i] ) {
+            if( wfSet.count( fn ) ) {
                 inList = true;
                 break;
             }
@@ -798,7 +813,6 @@ void Channel::getFileNames( std::vector<std::string>& files, const std::vector<u
             bfs::path fn = bfs::path(imageDataDir)/bfs::path(boost::str(boost::format(imageTemplate) % fileNumbers[i]));
             files.push_back(fn.string());
         }
-        frameCounter += nFrames[i];
     }
     
 }

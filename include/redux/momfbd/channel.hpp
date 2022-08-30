@@ -131,6 +131,7 @@ namespace redux {
             bpx::ptime startT, endT;
             std::future<bool> patchWriteFail;
             std::vector<size_t> nFrames;                                    //!< Number of frames in each file
+            std::vector<std::vector<size_t>> frameNumbersPerFile;            //!< for storing the frameNumbers obtained from each file.
             std::string cacheFile;
             /*****************************************************/
             

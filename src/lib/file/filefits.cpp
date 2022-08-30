@@ -1369,16 +1369,32 @@ vector<size_t> Fits::getFrameNumbers(void) {
         return redux::util::stringToUInts<size_t>(fnstr);
     }
     // else treat it as an integer.
-    size_t firstFrame = 0;
+
+    string fistr = getValue<string>( primaryHDU.cards, "FRAMEINC" );
+    size_t frameNumber = 0;
+    size_t frameIncr = 1;
     try {
-        firstFrame = boost::lexical_cast<size_t>(fnstr);
+        if( !fnstr.empty() ) {
+            frameNumber = boost::lexical_cast<size_t>(fnstr);
+        }
+        if( !fistr.empty() ) {
+            frameIncr = boost::lexical_cast<size_t>(fistr);
+        }
     } catch( const boost::bad_lexical_cast& ) {
-        // catch and ignore, use 0 as default.
+        // catch and ignore, use 0 & 1 as defaults.
     }
 
     size_t nFrames = getNumberOfFrames();
     vector<size_t> ret(nFrames);
-    std::iota( ret.begin(), ret.end(), firstFrame );
+    if( frameIncr == 1 ) {
+        std::iota( ret.begin(), ret.end(), frameNumber );
+    } else {
+        std::generate( std::begin(ret), std::end(ret), [&] () {
+                  size_t thisFrameNumber = frameNumber;
+                  frameNumber += frameIncr;
+                  return thisFrameNumber;
+            });
+    }
     return ret;
     
 }
