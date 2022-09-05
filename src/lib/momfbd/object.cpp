@@ -1090,6 +1090,12 @@ void Object::maybeInitializeStorage( void ) {
     
     size_t nPatchesX = myJob.subImagePosX.size();
     size_t nPatchesY = myJob.subImagePosY.size();
+
+    if( !myJob.subImagePosXY.empty() ) {
+        // patches will be stored as 1 x nPatchesX array.
+        nPatchesY = 1;
+    }
+
 #ifdef RDX_DO_TRANSPOSE
     std::swap( nPatchesX, nPatchesY );
 #endif
