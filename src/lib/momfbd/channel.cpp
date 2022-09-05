@@ -113,6 +113,8 @@ size_t Channel::size (void) const {
     size_t sz = ChannelCfg::size();
     sz += sizeof (uint16_t) + sizeof(uint32_t) + 2;          // ID + nTotalFrames + flipX/Y
     sz += nFrames.size()*sizeof( size_t ) + sizeof( uint64_t );
+    sz += sizeof( size_t );                               // frameNumbersPerFile.size()
+    for( const auto& fn: frameNumbersPerFile )  sz += fn.size()*sizeof( size_t )+ sizeof( size_t );
     sz += imgSize.size();
     sz += imageStats.size() * ArrayStats().size() + sizeof (uint16_t);
     return sz;
@@ -126,6 +128,8 @@ uint64_t Channel::pack (char* ptr) const {
     count += pack (ptr + count, ID);
     count += pack (ptr + count, nTotalFrames);
     count += pack (ptr + count, nFrames );
+    count += pack (ptr + count, frameNumbersPerFile.size() );
+    for( const auto& fn: frameNumbersPerFile )  count += pack( ptr + count, fn );
     count += pack (ptr + count, flipX );
     count += pack (ptr + count, flipY );
     count += imgSize.pack (ptr + count);
@@ -142,11 +146,14 @@ uint64_t Channel::pack (char* ptr) const {
 
 uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
     using redux::util::unpack;
-
     uint64_t count = ChannelCfg::unpack (ptr, swap_endian);
     count += unpack (ptr + count, ID, swap_endian);
     count += unpack (ptr + count, nTotalFrames, swap_endian);
     count += unpack (ptr + count, nFrames, swap_endian );
+    size_t nFpF;
+    count += unpack (ptr + count, nFpF, swap_endian );
+    frameNumbersPerFile.resize( nFpF );
+    for( auto& fn: frameNumbersPerFile )  count += unpack( ptr + count, fn,swap_endian  );
     count += unpack (ptr + count, flipX );
     count += unpack (ptr + count, flipY );
     count += imgSize.unpack (ptr + count, swap_endian);
@@ -386,7 +393,7 @@ bool Channel::checkData( bool verbose ) {
         vector<uint32_t> tmpV;
         for( size_t i=0; i<nFiles; ++i ) {
             for( const auto& fn: frameNumbersPerFile[i] ) {
-                tmpV.push_back( waveFrontList[i]+fn );
+                tmpV.push_back( fn );
             }
         }
         std::swap( waveFrontList, tmpV );
