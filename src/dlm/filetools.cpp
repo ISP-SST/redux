@@ -539,7 +539,7 @@ IDL_VPTR readhead( int argc, IDL_VPTR* argv, char* argk ) {
 
 namespace {
     static int dummy RDX_UNUSED =
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)loadfiles, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, loadfiles_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readdata, (char*)"RDX_READDATA", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readdata_info ) +
-    IdlContainer::registerRoutine( {(IDL_SYSRTN_GENERIC)readhead, (char*)"RDX_READHEAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readhead_info );
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)loadfiles}, (char*)"RDX_LOADFILES", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, loadfiles_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)readdata}, (char*)"RDX_READDATA", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readdata_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)readhead}, (char*)"RDX_READHEAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, readhead_info );
 }

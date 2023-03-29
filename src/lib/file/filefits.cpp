@@ -539,6 +539,8 @@ void Fits::read( const string& filename ) {
                 if( fitsPtr_->Fptr->compressimg ) {
                     primaryHDU.dHDU = ii;
                     primaryHDU.bitpix = fitsPtr_->Fptr->zbitpix;
+                    primaryHDU.dataType = getDataType( fitsPtr_->Fptr->zbitpix, fitsPtr_->Fptr->cn_bzero );
+                    primaryHDU.elementSize = getElementSize( primaryHDU.dataType );
                     primaryHDU.nDims = fitsPtr_->Fptr->zndim;
                     primaryHDU.dims.assign( fitsPtr_->Fptr->znaxis, fitsPtr_->Fptr->znaxis+fitsPtr_->Fptr->zndim );
                     primaryHDU.nElements = 1;
@@ -1548,12 +1550,12 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
             };
             std::function<bool(void)> readTile = [&status,&dataPtr,&rowIndex,&fMtx,imgSize,blockSize,fP,fptr](){
                 LONGLONG rSize, rOffset;
-                char* dP;
+                int16_t* dP;
                 LONGLONG thisI;
                 shared_ptr<uint8_t> tmp;
                 {
                     std::lock_guard<mutex> fLock( fMtx );
-                    dP = dataPtr;
+                    dP = reinterpret_cast<int16_t*>(dataPtr);
                     dataPtr += imgSize * 2;
                     thisI = rowIndex++;
                     if( thisI > fptr->numrows ) return false;
@@ -1570,7 +1572,7 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                         printStatusError( "Fits::read(hdr,data), reading row("+to_string(thisI)+").", status );
                     }
                 }
-                rice_decomp16( tmp.get(), rSize, reinterpret_cast<int16_t*>(dP), imgSize, blockSize );
+                rice_decomp16( tmp.get(), rSize, dP, imgSize, blockSize );
                 std::lock_guard<mutex> fLock( fMtx );
                 return true;
             };
@@ -1580,6 +1582,11 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                 threads.push_back( thread([&](){ while( readTile() ); }));
             }
             for( auto &t: threads ) t.join();
+            if( fptr->cn_bzero ) {
+                double bz = fptr->cn_bzero;
+                int16_t* dP = reinterpret_cast<int16_t*>(data);
+                std::for_each( dP, dP+hdr->nElements(), [&](int16_t &i){i -= bz;});
+            }
         }
         return;
     }
