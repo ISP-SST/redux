@@ -94,7 +94,7 @@ namespace redux {
             bpx::ptime getAverageTime(void) override;
             bpx::time_duration getExposureTime(void) override;
             std::vector<bpx::ptime> getStartTimes(void) override;
-            std::vector<size_t> getFrameNumbers(void) override;
+            std::vector<size_t> getFrameNumbers( size_t offset=0 ) override;
            
             size_t dataSize(void) override;
             size_t dimSize(size_t) override;

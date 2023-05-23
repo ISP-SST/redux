@@ -341,8 +341,8 @@ bool Channel::checkData( bool verbose ) {
         }
     } else {                            // template + numbers
         for( size_t i=0; i<nFiles; ++i) {
-            uint32_t number = fileNumbers[i];
-            string thisFile = boost::str( boost::format(imageTemplate) % (imageNumberOffset + number) );
+            uint32_t number = fileNumbers[i] + imageNumberOffset;
+            string thisFile = boost::str( boost::format(imageTemplate) % (number) );
             bfs::path fn = bfs::path (imageDataDir) / bfs::path( thisFile );
             if (!bfs::is_regular_file(fn)) {
                 LOG_ERR << boost::format ("Input-file %s not found!") % fn << ende;
@@ -353,7 +353,7 @@ bool Channel::checkData( bool verbose ) {
                 //CachedFile::load( tmp, fn.string(), true );       // Only read metadata
                 redux::file::readFile( fn.string(), tmp, true );       // Only read metadata
                 uint8_t nDims = tmp.meta->nDims();
-                vector<size_t> fNums = tmp.meta->getFrameNumbers();
+                vector<size_t> fNums = tmp.meta->getFrameNumbers(number);
                 if( discard[0] ) {
                     fNums.erase( fNums.begin(), fNums.begin()+discard[0] );
                 }

@@ -1363,7 +1363,7 @@ vector<bpx::ptime> Fits::getStartTimes(void){
     
 }
 
-vector<size_t> Fits::getFrameNumbers(void) {
+vector<size_t> Fits::getFrameNumbers( size_t offset ) {
     
     string fnstr = getValue<string>( primaryHDU.cards, "FRAMENUM" );
     size_t found = fnstr.find_first_of("-,");   // check if it is a range.
@@ -1373,7 +1373,7 @@ vector<size_t> Fits::getFrameNumbers(void) {
     // else treat it as an integer.
 
     string fistr = getValue<string>( primaryHDU.cards, "FRAMEINC" );
-    size_t frameNumber = 0;
+    size_t frameNumber = offset;
     size_t frameIncr = 1;
     try {
         if( !fnstr.empty() ) {
