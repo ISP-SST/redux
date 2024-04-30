@@ -1,6 +1,8 @@
 #ifndef REDUX_DLM_IDLUTIL_HPP
 #define REDUX_DLM_IDLUTIL_HPP
 
+#include "redux/types.hpp"
+
 #include <functional>
 #include <iostream>
 #include <map>

@@ -1,7 +1,7 @@
 #include "idlutil.hpp"
 
-#include <redux/file/fileio.hpp>
-#include <redux/util/stringutil.hpp>
+#include "redux/file/fileio.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <atomic>
 

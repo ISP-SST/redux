@@ -1,6 +1,8 @@
 #ifndef REDUX_UTIL_ARRAYUTIL_HPP
 #define REDUX_UTIL_ARRAYUTIL_HPP
 
+#include "redux/types.hpp"
+
 #include <memory>
 #include <algorithm>
 #include <string.h>

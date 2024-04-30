@@ -1,7 +1,7 @@
 #ifndef REDUX_DLM_MATHLIB_HPP
 #define REDUX_DLM_MATHLIB_HPP
 
-#include <redux/util/arrayutil.hpp>
+#include "redux/util/arrayutil.hpp"
 
 #include <cmath>
 #include <algorithm>

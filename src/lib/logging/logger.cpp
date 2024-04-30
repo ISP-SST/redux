@@ -1,12 +1,12 @@
-#include <redux/logging/logger.hpp>
+#include "redux/logging/logger.hpp"
 
-#include <redux/file/fileio.hpp>
-#include <redux/logging/logtofile.hpp>
-#include <redux/logging/logtostream.hpp>
-#include <redux/logging/logtonetwork.hpp>
-#include <redux/network/protocol.hpp>
-#include <redux/util/datautil.hpp>
-#include <redux/util/stringutil.hpp>
+#include "redux/file/fileio.hpp"
+#include "redux/logging/logtofile.hpp"
+#include "redux/logging/logtostream.hpp"
+#include "redux/logging/logtonetwork.hpp"
+#include "redux/network/protocol.hpp"
+#include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <boost/filesystem.hpp>
 

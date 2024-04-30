@@ -137,7 +137,7 @@ void DirWatch::begin_read(void) {
     
 }
 
-#include <redux/util/stringutil.hpp>
+#include "redux/util/stringutil.hpp"
 using namespace redux::util;
 void DirWatch::end_read( const boost::system::error_code &ec, std::size_t bytes_transferred ) {
 

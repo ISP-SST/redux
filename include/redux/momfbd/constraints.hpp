@@ -7,7 +7,6 @@
 #include "redux/util/point.hpp"
 #include "redux/util/trace.hpp"
 
-#include <cstdint>
 #include <string>
 #include <map>
 #include <memory>

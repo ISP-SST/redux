@@ -1,7 +1,6 @@
 #ifndef REDUX_UTIL_TIMER_HPP
 #define REDUX_UTIL_TIMER_HPP
 
-#include <cstdint>
 
 #include <functional>
 #include <chrono>

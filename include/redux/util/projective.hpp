@@ -1,7 +1,7 @@
 #ifndef REDUX_UTIL_PROJECTIVE_HPP
 #define REDUX_UTIL_PROJECTIVE_HPP
 
-#include <redux/util/point.hpp>
+#include "redux/util/point.hpp"
 
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>

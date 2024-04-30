@@ -1,6 +1,7 @@
 #ifndef REDUX_MATH_FUNCTIONS_HPP
 #define REDUX_MATH_FUNCTIONS_HPP
 
+#include "redux/types.hpp"
 #include <algorithm>
 #include <complex>
 #include <cstdlib>

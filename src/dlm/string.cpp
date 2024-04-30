@@ -1,7 +1,7 @@
 #include "idlutil.hpp"
 
-#include <redux/util/datautil.hpp>
-#include <redux/util/stringutil.hpp>
+#include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 
 #include <algorithm>

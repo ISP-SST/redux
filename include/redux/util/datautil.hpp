@@ -1,6 +1,7 @@
 #ifndef REDUX_UTIL_DATAUTIL_HPP
 #define REDUX_UTIL_DATAUTIL_HPP
 
+#include "redux/types.hpp"
 #include "redux/util/endian.hpp"
 
 #include <algorithm>
@@ -762,8 +763,8 @@ namespace redux {
             return ret;
         }
 
-        
-        
+
+
         /*! @} */
 
 

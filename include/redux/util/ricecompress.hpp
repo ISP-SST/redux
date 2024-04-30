@@ -1,8 +1,10 @@
 #ifndef RICECOMPRESS_HPP
 #define RICECOMPRESS_HPP
 
+#include "redux/types.hpp"
+
 #include <cstddef>
-#include <cstdint>
+
 
 
 namespace redux {

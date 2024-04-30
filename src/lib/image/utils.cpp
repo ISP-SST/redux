@@ -8,7 +8,6 @@
 #include "redux/file/fileana.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/constants.hpp"
-#include "redux/types.hpp"
 
 #include <functional>
 #include <map>

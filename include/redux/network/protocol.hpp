@@ -1,7 +1,6 @@
 #ifndef REDUX_NETWORK_PROTOCOL_HPP
 #define REDUX_NETWORK_PROTOCOL_HPP
 
-#include <cstdint>
 #include <string>
 
 namespace redux {

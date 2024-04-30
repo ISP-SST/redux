@@ -1,7 +1,7 @@
 #ifndef REDUX_DLM_RDX_HPP
 #define REDUX_DLM_RDX_HPP
 
-#include <redux/util/stringutil.hpp>
+#include "redux/util/stringutil.hpp"
 
 #include <memory>
 #include <string>

@@ -2,8 +2,8 @@
 #define REDUX_IMAGE_DESCATTER_HPP
 
 
-#include <redux/types.hpp>
-#include <redux/util/array.hpp>
+#include "redux/types.hpp"
+#include "redux/util/array.hpp"
 
 namespace redux {
 

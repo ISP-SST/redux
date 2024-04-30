@@ -1,6 +1,7 @@
 #ifndef REDUX_UTIL_CACHEITEM_HPP
 #define REDUX_UTIL_CACHEITEM_HPP
 
+#include "redux/types.hpp"
 #ifdef RDX_TRACE_CACHE
 #   include "redux/util/trace.hpp"
 #endif

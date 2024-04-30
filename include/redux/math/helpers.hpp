@@ -1,6 +1,8 @@
 #ifndef REDUX_MATH_HELPERS_HPP
 #define REDUX_MATH_HELPERS_HPP
 
+
+#include <algorithm>
 #include <functional>
 #include <limits>
 #include <numeric>

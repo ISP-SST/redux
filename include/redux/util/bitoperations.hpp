@@ -1,7 +1,8 @@
 #ifndef REDUX_UTIL_BITOPERATIONS_HPP
 #define REDUX_UTIL_BITOPERATIONS_HPP
 
-#include <cstdint>
+#include "redux/types.hpp"
+
 #include <cstdlib>
 
 namespace redux {

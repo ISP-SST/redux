@@ -1,7 +1,7 @@
 #ifndef REDUX_LOGGING_LOGTOFILE_HPP
 #define REDUX_LOGGING_LOGTOFILE_HPP
 
-#include <redux/logging/logtostream.hpp>
+#include "redux/logging/logtostream.hpp"
 
 namespace redux {
 

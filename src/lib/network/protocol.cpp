@@ -1,6 +1,6 @@
 #include "redux/network/protocol.hpp"
 
-#include <redux/util/stringutil.hpp>
+#include "redux/util/stringutil.hpp"
 
 #include <boost/lexical_cast.hpp>
 

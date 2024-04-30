@@ -1,5 +1,6 @@
 #include "redux/util/recursepath.hpp"
 
+#include <algorithm>
 #include <iostream>
 
 using namespace redux::util;

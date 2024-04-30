@@ -1,7 +1,6 @@
 #ifndef REDUX_UTIL_ARRAY_HPP
 #define REDUX_UTIL_ARRAY_HPP
 
-#include "redux/types.hpp"
 #include "redux/math/functions.hpp"
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/datautil.hpp"

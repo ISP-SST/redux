@@ -6,7 +6,6 @@
 #include "redux/util/arrayutil.hpp"
 #include "redux/util/point.hpp"
 #include "redux/util/progresswatch.hpp"
-#include "redux/types.hpp"
 
 #ifdef RDX_WITH_OPENCV
 #   include "redux/util/opencv.hpp"

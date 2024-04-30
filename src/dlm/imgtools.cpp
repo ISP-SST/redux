@@ -2,17 +2,17 @@
 
 #include "idlutil.hpp"
 
-#include <redux/file/fileio.hpp>
-#include <redux/file/fileana.hpp>
-#include <redux/image/image.hpp>
-#include <redux/image/descatter.hpp>
-#include <redux/image/fouriertransform.hpp>
-#include <redux/image/utils.hpp>
-#include <redux/util/array.hpp>
-#include <redux/util/datautil.hpp>
-#include <redux/util/stringutil.hpp>
-#include <redux/util/arraystats.hpp>
-#include <redux/util/progresswatch.hpp>
+#include "redux/file/fileio.hpp"
+#include "redux/file/fileana.hpp"
+#include "redux/image/image.hpp"
+#include "redux/image/descatter.hpp"
+#include "redux/image/fouriertransform.hpp"
+#include "redux/image/utils.hpp"
+#include "redux/util/array.hpp"
+#include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
+#include "redux/util/arraystats.hpp"
+#include "redux/util/progresswatch.hpp"
 
 #include <atomic>
 #include <future>
@@ -27,7 +27,7 @@
 
 #ifdef RDX_WITH_OPENCV
 #    include "cvutil.hpp"
-#    include <redux/util/opencv.hpp>
+#    include "redux/util/opencv.hpp"
 #    include <opencv2/core/core.hpp>
 #    include <opencv2/core/version.hpp>
 #    include <opencv2/features2d/features2d.hpp>

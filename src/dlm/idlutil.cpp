@@ -1,11 +1,11 @@
 #include "idlutil.hpp"
 
-#include <redux/revision.hpp>
-#include <redux/version.hpp>
-#include <redux/util/arrayutil.hpp>
-#include <redux/util/arraystats.hpp>
-#include <redux/util/datautil.hpp>
-#include <redux/util/stringutil.hpp>
+#include "redux/revision.hpp"
+#include "redux/version.hpp"
+#include "redux/util/arrayutil.hpp"
+#include "redux/util/arraystats.hpp"
+#include "redux/util/datautil.hpp"
+#include "redux/util/stringutil.hpp"
 
 #include <algorithm>
 #include <iostream>

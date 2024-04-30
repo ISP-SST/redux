@@ -1,6 +1,8 @@
 #ifndef REDUX_UTIL_STRINGUTIL_HPP
 #define REDUX_UTIL_STRINGUTIL_HPP
 
+#include "redux/types.hpp"
+
 #include <map>
 #include <set>
 #include <vector>

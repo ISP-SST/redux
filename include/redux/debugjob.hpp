@@ -2,7 +2,6 @@
 #define REDUX_DEBUGJOB_HPP
 
 #include "redux/job.hpp"
-#include "redux/work.hpp"
 #include "redux/util/array.hpp"
 
 #include <complex>

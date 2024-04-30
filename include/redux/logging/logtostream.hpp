@@ -1,7 +1,7 @@
 #ifndef REDUX_LOGGING_LOGTOSTREAM_HPP
 #define REDUX_LOGGING_LOGTOSTREAM_HPP
 
-#include <redux/logging/logoutput.hpp>
+#include "redux/logging/logoutput.hpp"
 
 #include <fstream>
 #include <mutex>

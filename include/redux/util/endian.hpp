@@ -1,7 +1,6 @@
 #ifndef REDUX_UTIL_ENDIAN_HPP
 #define REDUX_UTIL_ENDIAN_HPP
 
-//#include "redux/util/datautil.hpp"
 #include <cstdlib>
 #include <utility>
 

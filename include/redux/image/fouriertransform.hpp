@@ -1,7 +1,6 @@
 #ifndef REDUX_IMAGE_FOURIERTRANSFORM_HPP
 #define REDUX_IMAGE_FOURIERTRANSFORM_HPP
 
-#include "redux/types.hpp"
 #include "redux/util/array.hpp"
 #include "redux/util/point.hpp"
 #include "redux/util/stringutil.hpp"

@@ -1,7 +1,7 @@
 #ifndef REDUX_LOGGING_LOGENTRY_HPP
 #define REDUX_LOGGING_LOGENTRY_HPP
 
-#include <redux/util/stringutil.hpp>
+#include "redux/util/stringutil.hpp"
 
 #include <string>
 #include <ostream>

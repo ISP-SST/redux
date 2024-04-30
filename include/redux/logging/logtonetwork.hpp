@@ -1,9 +1,9 @@
 #ifndef REDUX_LOGGING_LOGTONETWORK_HPP
 #define REDUX_LOGGING_LOGTONETWORK_HPP
 
-#include <redux/logging/logoutput.hpp>
-#include <redux/network/host.hpp>
-#include <redux/network/tcpconnection.hpp>
+#include "redux/logging/logoutput.hpp"
+#include "redux/network/host.hpp"
+#include "redux/network/tcpconnection.hpp"
 
 #include <fstream>
 #include <mutex>

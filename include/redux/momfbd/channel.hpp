@@ -4,10 +4,10 @@
 #include "redux/momfbd/config.hpp"
 #include "redux/momfbd/solver.hpp"
 
-#include <redux/image/image.hpp>
-#include <redux/util/arraystats.hpp>
-#include <redux/util/progresswatch.hpp>
-#include <redux/util/region.hpp>
+#include "redux/image/image.hpp"
+#include "redux/util/arraystats.hpp"
+#include "redux/util/progresswatch.hpp"
+#include "redux/util/region.hpp"
 
 #ifdef RDX_TRACE_JOB
 #   include "redux/util/trace.hpp"

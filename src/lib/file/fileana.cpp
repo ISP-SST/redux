@@ -1,10 +1,8 @@
 #include "redux/file/fileana.hpp"
 
-#include "redux/util/endian.hpp"
-#include "redux/types.hpp"
-
 #include "redux/file/anacompress.hpp"
 #include "redux/file/anadecompress.hpp"
+#include "redux/util/endian.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>

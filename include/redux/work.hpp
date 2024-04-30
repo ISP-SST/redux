@@ -8,7 +8,6 @@
 #   include "redux/util/trace.hpp"
 #endif
 
-#include <cstdint>
 #include <memory>
 #include <vector>
 

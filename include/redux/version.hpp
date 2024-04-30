@@ -1,6 +1,8 @@
 #ifndef REDUX_VERSION_HPP
 #define REDUX_VERSION_HPP
 
+#include "redux/types.hpp"
+
 #include <string>
 
 namespace redux {

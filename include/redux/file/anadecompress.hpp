@@ -1,7 +1,7 @@
 #ifndef REDUX_FILE_ANADECOMPRESS_HPP
 #define REDUX_FILE_ANADECOMPRESS_HPP
 
-#include <cstdint>
+#include "redux/types.hpp"
 
 namespace redux {
 

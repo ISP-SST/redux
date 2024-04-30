@@ -9,7 +9,7 @@
 #include "idlutil.hpp"
 
 #include "redux/util/arrayutil.hpp"
-#include <redux/util/datautil.hpp>
+#include "redux/util/datautil.hpp"
 
 using namespace redux::util;
 using namespace redux;

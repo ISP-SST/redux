@@ -3,7 +3,6 @@
 
 #include "defs.hpp"
 
-#include <cstdint>
 #include <map>
 #include <memory>
 #include <set>

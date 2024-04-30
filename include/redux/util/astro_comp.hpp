@@ -1,7 +1,7 @@
 #ifndef REDUX_UTIL_ASTRO_COMP_HPP
 #define REDUX_UTIL_ASTRO_COMP_HPP
 
-#include <redux/util/datautil.hpp>
+#include "redux/util/datautil.hpp"
 
 #include <math.h>
 

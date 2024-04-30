@@ -2,8 +2,8 @@
 #define REDUX_NETWORK_TCPCONNECTION_HPP
 
 #include "redux/network/protocol.hpp"
+#include "redux/types.hpp"
 #include "redux/util/arrayutil.hpp"
-
 #include "redux/util/trace.hpp"
 
 #include <iostream>

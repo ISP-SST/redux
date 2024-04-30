@@ -1,11 +1,11 @@
 #ifndef REDUX_LOGGING_LOGGER_HPP
 #define REDUX_LOGGING_LOGGER_HPP
 
-#include <redux/logging/logitem.hpp>
-#include <redux/logging/logoutput.hpp>
-#include <redux/network/host.hpp>
-#include <redux/network/tcpconnection.hpp>
-#include <redux/util/datautil.hpp>
+#include "redux/logging/logitem.hpp"
+#include "redux/logging/logoutput.hpp"
+#include "redux/network/host.hpp"
+#include "redux/network/tcpconnection.hpp"
+#include "redux/util/datautil.hpp"
 
 
 #include <mutex>

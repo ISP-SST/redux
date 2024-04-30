@@ -1,8 +1,8 @@
 #ifndef REDUX_TYPES_HPP
 #define REDUX_TYPES_HPP
 
-#include <cstdint>
 #include <complex>
+#include <cstdint>
 
 #ifdef RDX_WITH_FFTW3
 #   include <fftw3.h>
@@ -27,7 +27,17 @@ namespace redux {
         
         
         typedef std::complex<double> complex_t;
-        
+
+        using std::int8_t;
+        using std::int16_t;
+        using std::int32_t;
+        using std::int64_t;
+
+        using std::uint8_t;
+        using std::uint16_t;
+        using std::uint32_t;
+        using std::uint64_t;
+
 #ifdef RDX_WITH_FFTW3
         inline const complex_t& operator*=( complex_t& lhs, const fftw_complex& rhs ) { return lhs *= reinterpret_cast<const complex_t&>(rhs); }
         inline const fftw_complex& operator*=( fftw_complex& lhs, const complex_t& rhs ) { reinterpret_cast<complex_t&>(lhs) *= rhs; return lhs; }

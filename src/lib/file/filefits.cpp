@@ -6,7 +6,6 @@
 #include "redux/util/endian.hpp"
 #include "redux/util/ricecompress.hpp"
 #include "redux/util/stringutil.hpp"
-#include "redux/types.hpp"
 
 #include <fstream>
 #include <functional>
