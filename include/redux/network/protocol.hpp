@@ -1,6 +1,8 @@
 #ifndef REDUX_NETWORK_PROTOCOL_HPP
 #define REDUX_NETWORK_PROTOCOL_HPP
 
+#include "redux/types.hpp"
+
 #include <string>
 
 namespace redux {
