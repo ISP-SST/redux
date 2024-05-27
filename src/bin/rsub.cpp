@@ -293,7 +293,7 @@ int main (int argc, char *argv[]) {
                 LOG_WARN << "No such file: " << it << ende;
                 continue;
             }
-            string bn = bfs::basename(it);
+            string bn = bfs::path(it).stem().string();
             string jobName = globalName.empty() ? bn : globalName;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
             string tmpS = filterOldCfg(it, jobName, logFile, outputDir.string());

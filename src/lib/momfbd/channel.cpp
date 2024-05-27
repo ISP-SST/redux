@@ -702,7 +702,7 @@ void Channel::loadData( boost::asio::io_service& service, redux::util::Array<Pat
                 if( saveFFData ) {
                     bfs::path fn;
                     try {
-                        fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).leaf();
+                        fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).filename();
                         bfs::path ext = fn.extension();
                         if(ext.string().empty() || ext.string().length() > 5 ) {     // we assume the filename does not have a proper extenstion, add a temporary dummy
                             fn = bfs::path( fn.string() + ".ext" );
@@ -875,7 +875,7 @@ void Channel::initPatch (ChannelData& cd) {
                 } else if( (myJob.normType == NORM_OBJ_MAX_MEDIAN) || (myJob.normType == NORM_OBJ_MEDIAN_MEDIAN) ) {
                     scale /= imageStats[i]->median;
                 } else if( myJob.normType == NORM_NONE ) scale = 1.0;
-                transform( dataPtr, dataPtr+ dataPixels, dataPtr, bind1st(multiplies<double>(), scale) );
+                transform( dataPtr, dataPtr+ dataPixels, dataPtr, [scale]( const float &a ){ return a*scale; } );
                 dataPtr += dataPixels;
             }
         }
