@@ -182,7 +182,7 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
 
     alignMap = getValue( tree, "ALIGN_MAP", defaults.alignMap );
     alignMapX = getValue( tree, "ALIGN_MAP_X", defaults.alignMapX );
-    alignMapY = getValue( tree, "ALIGN_MAP_X", defaults.alignMapY );
+    alignMapY = getValue( tree, "ALIGN_MAP_Y", defaults.alignMapY );
     alignClip = getValue( tree, "ALIGN_CLIP", defaults.alignClip );
     discard = getValue( tree, "DISCARD", defaults.discard );
     borderClip = getValue( tree, "BORDER_CLIP", defaults.borderClip );
