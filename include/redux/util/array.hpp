@@ -741,9 +741,9 @@ namespace redux {
             }
             const Array<T>& operator+=( T rhs ) {
                 if(dense_) {
-                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::plus<T>(),rhs));
+                    std::transform(get()+begin_, get()+end_, get()+begin_, [rhs](const T& a) { return a+rhs; });
                 } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::plus<T>(),rhs));
+                    std::transform(begin(), end(), begin(), [rhs](const T& a) { return a+rhs; });
                 }
                 return *this;
             }
@@ -755,9 +755,9 @@ namespace redux {
             }
             const Array<T>& operator-=( T rhs ) {
                 if(dense_) {
-                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::minus<T>(),rhs));
+                    std::transform(get()+begin_, get()+end_, get()+begin_, [rhs](const T& a) { return a-rhs; });
                 } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::minus<T>(),rhs));
+                    std::transform(begin(), end(), begin(), [rhs](const T& a) { return a-rhs; });
                 }
                 return *this;
             }
@@ -769,9 +769,9 @@ namespace redux {
             }
             const Array<T>& operator*=( const T& rhs ) {
                 if(dense_) {
-                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::multiplies<T>(),rhs));
+                    std::transform(get()+begin_, get()+end_, get()+begin_, [rhs](const T& a) { return a*rhs; } );
                 } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::multiplies<T>(),rhs));
+                    std::transform(begin(), end(), begin(), [rhs](const T& a) { return a*rhs; } );
                 }
                 return *this;
             }
@@ -782,10 +782,11 @@ namespace redux {
                 return tmp/=rhs;
             }
             const Array<T>& operator/=( const T& rhs ) {
+                T rhs_inv = 1.0/rhs;
                 if(dense_) {
-                    std::transform(get()+begin_, get()+end_, get()+begin_, std::bind2nd<>(std::divides<T>(),rhs));
+                    std::transform(get()+begin_, get()+end_, get()+begin_, [rhs_inv](const T& a) { return a*rhs_inv; });
                 } else {
-                    std::transform(begin(), end(), begin(), std::bind2nd<>(std::divides<T>(),rhs));
+                    std::transform(begin(), end(), begin(), [rhs_inv](const T& a) { return a*rhs_inv; });
                 }
                 return *this;
             }

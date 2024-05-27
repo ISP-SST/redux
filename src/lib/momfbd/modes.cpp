@@ -528,7 +528,7 @@ void ModeSet::normalize( double scale ) {
     for ( uint16_t i=0; i<modePointers.size(); ++i ) {
         double* ptr = modePointers[i];
         double mode_scale = scale/norms[i];
-        std::transform( ptr, ptr+nPixels, ptr, std::bind1st(std::multiplies<double>(), mode_scale) );
+        std::transform( ptr, ptr+nPixels, ptr, [mode_scale](const double& a) { return a*mode_scale; } );
         norms[i] = mode_scale;
     }
     

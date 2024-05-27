@@ -9,7 +9,7 @@ set( EXT_LIB_PREFIX boost_ )
 set( EXT_LIB_SUFFIXES "-mt" "" )
 set( EXT_LIB_DEBUG_SUFFIX "-mt-d" )
 
-set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR}" )
+set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR},/x86_64-linux-gnu/" )
 set( EXT_COMPONENTS date_time filesystem program_options serialization system thread regex )
 
 set( EXT_HEADER_FILE boost/version.hpp )

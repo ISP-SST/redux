@@ -26,7 +26,7 @@ namespace redux {
         inline T sqr( const T& a ) { return a*a; }
         
         template<typename T, typename U>
-        struct assign : public std::binary_function<T, U, T> {
+        struct assign {
             T operator()( const T& a, const U& b ) const { return static_cast<T>(b); }
         };
 
@@ -41,7 +41,7 @@ namespace redux {
         };
         
         template<typename T, typename U>
-        struct add : public std::binary_function<T, U, T> {
+        struct add {
             T operator()( const T& a, const U& b ) const { return static_cast<T>(a + b); }
         };
 
@@ -51,27 +51,27 @@ namespace redux {
         };
 
         template<typename T, typename U>
-        struct subtract : public std::binary_function<T, U, T> {
+        struct subtract {
             T operator()( const T& a, const U& b ) const { return static_cast<T>(a - b); }
         };
 
         template<typename T, typename U>
-        struct multiply : public std::binary_function<T, U, T> {
+        struct multiply {
             T operator()( const T& a, const U& b ) const { return static_cast<T>(a * b); }
         };
 
         template<typename T, typename U>
-        struct divide : public std::binary_function<T, U, T> {
+        struct divide {
             T  operator()( const T& a, const U& b ) const { return static_cast<T>(a / b); }
         };
 
         template<typename T, typename U>
-        struct norm_multiply : public std::binary_function<T, U, U> {
+        struct norm_multiply {
             U operator()( const T& a, const U& b ) const { return static_cast<U>(std::norm(a) * b); }
         };
 
         template<typename T, typename U>
-        struct inv_multiply : public std::binary_function<T, U, T> {
+        struct inv_multiply {
             T operator()( const T& a, const U& b ) const { return static_cast<T>(1/a * b); }
         };
 
