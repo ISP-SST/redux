@@ -902,6 +902,21 @@ namespace {
         return ret;
     }
 
+    string point_warp_info( int lvl ) {
+        string ret = "RDX_POINT_WARP";
+        if( lvl > 0 ) {
+            ret += ((lvl > 1)?"\n":"        ");          // newline if lvl>1
+            ret += "   Syntax:   mapped_points = rdx_point_warp( P, Q, point(_list), /KEYWORDS )\n";
+            if( lvl > 1 ) {
+                ret +=  "   where P/Q are arrays with polynomial coefficients (with 6, 16, 25, .. elements).\n";
+                ret +=  "   Accepted Keywords:\n"
+                        "      HELP                Display this info.\n"
+                        "      VERBOSE             Verbosity, default is 0 (only error output).\n";
+            }
+        } else ret += "\n";
+        return ret;
+    }
+
 }
 
 
@@ -1074,7 +1089,7 @@ IDL_VPTR point_transform( int argc, IDL_VPTR* argv, char* argk ) {
     if (nPlainArgs != 2) {
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Two arguments needed. A 3x3 or 2x3 transformation matrix, and an array with (x,y) points." );
     }
-    
+
     if( kw.help ) {
         int lvl = 1;
         if( kw.verbose ) lvl++;
@@ -1093,11 +1108,11 @@ IDL_VPTR point_transform( int argc, IDL_VPTR* argv, char* argk ) {
     if( points_in->value.arr->n_elts % 2 ) {
         IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "point-array has to have an even number of elements!" );
     }
-    
+
     size_t nPoints = points_in->value.arr->n_elts/2;
-    
+
     try {
-        
+
         Mat H = arrayToMat(H_in);
         int trans_type(0);  // 0 = undefined, +1 = perspective, -1 = affine
         if( H.cols == 3 ) {
@@ -1111,14 +1126,14 @@ IDL_VPTR point_transform( int argc, IDL_VPTR* argv, char* argk ) {
             IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Transformation matrix has to be 2x3 or 3x3." );
         }
         UCHAR nDim = points_in->value.arr->n_dim;
-        
+
         vector<Point2f> in_points(nPoints), out_points;
         // = redux::castOrCopy<float>( points_in );
         shared_ptr<float> inFlt( new float[ 2*nPoints ], [](float* p){ delete[] p; } );
         float* ptr = inFlt.get();
-        
+
         redux::copyToRaw<float>( points_in, inFlt.get() );
-        
+
         bool doTranspose(false);
         if( nDim == 2 && points_in->value.arr->dim[0] != 2 ) {
             doTranspose = true;
@@ -1128,13 +1143,13 @@ IDL_VPTR point_transform( int argc, IDL_VPTR* argv, char* argk ) {
             p = Point2f(ptr[0],ptr[1]);
             ptr += 2;
         }
-        
+
         if ( trans_type > 0 ) {
             perspectiveTransform( in_points, out_points, H );
         } else { // affine
             transform( in_points, out_points, H );
         }
-        
+
         IDL_MakeTempArray ( IDL_TYP_FLOAT, points_in->value.arr->n_dim, points_in->value.arr->dim, IDL_ARR_INI_NOP, &out );
         Mat outImg = arrayToMat(out);
         ptr = reinterpret_cast<float*>(out->value.arr->data);
@@ -1154,8 +1169,95 @@ IDL_VPTR point_transform( int argc, IDL_VPTR* argv, char* argk ) {
     }
 
     return out;
-    
+
 #endif
+
+}
+
+/*
+ P = [2046.1421,-0.015501516,9.9812633e-06,-1.1473369e-09,-1.0223765,4.1367922e-05,-3.3036140e-08,6.8754618e-12,2.1551864e-05,-3.1628448e-08,2.9072370e-11,-7.2049673e-15,-6.8144409e-09,8.7141340e-12,-7.9548002e-15,1.9150090e-18]
+Q = [-6.0292222,1.0245124,-2.2461842e-05,7.3523675e-09,0.016363291,-2.1648751e-05,1.0089719e-08,-3.0236722e-12,-8.3376829e-06,8.1659502e-09,1.4669835e-12,-1.0624823e-15,7.1950872e-10,5.1277707e-13,-2.4155407e-15,1.0256008e-18]
+kx = reform(P,[4,4])
+ky = reform(Q,[4,4])
+
+points = [ 102,579,102,648,102,717,102,786,102,855,102,924,102,993,102,1062 ]
+p2d = reform(points,[2,8])
+
+p1 = red_warp_coords(p2d,kx,ky,/double)
+
+p2 = rdx_point_warp(P,Q,p2d)
+p3 = rdx_point_warp(kx,ky,transpose(p2d))
+*/
+
+IDL_VPTR point_warp( int argc, IDL_VPTR* argv, char* argk ) {
+
+
+    kw_img_trans kw;
+    int nPlainArgs = IDL_KWProcessByOffset( argc, argv, argk, kw_img_trans_pars, (IDL_VPTR*)0, 255, &kw );
+
+    if (nPlainArgs != 3 ) {
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Three arguments needed. P/Q polynomial coefficients, and an array with (x,y) points." );
+    }
+
+    if( kw.help ) {
+        int lvl = 1;
+        if( kw.verbose ) lvl++;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_INFO, point_transform_info(lvl).c_str() );
+        return IDL_GettmpInt(0);
+    }
+
+    IDL_VPTR P_in = argv[0];
+    IDL_ENSURE_SIMPLE ( P_in );
+    IDL_ENSURE_ARRAY ( P_in );
+    IDL_VPTR Q_in = argv[1];
+    IDL_ENSURE_SIMPLE ( Q_in );
+    IDL_ENSURE_ARRAY ( Q_in );
+    IDL_VPTR points_in = argv[2];
+    IDL_ENSURE_SIMPLE ( points_in );
+    IDL_ENSURE_ARRAY ( points_in );
+
+    IDL_VPTR out;
+    if( points_in->value.arr->n_elts % 2 ) {
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "point-array has to have an even number of elements!" );
+    }
+
+    UCHAR nDim = points_in->value.arr->n_dim;
+
+    try {
+
+        vector<float> P = getAsVector<float>( P_in );
+        vector<float> Q = getAsVector<float>( Q_in );
+        if( P.size() != 16 || Q.size() != 16 ) {
+           IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, "Polynomial maps P/Q has to have 16 elements!" );
+        }
+
+        vector<double> points = getAsVector<double>( points_in );
+
+        bool doTranspose(false);
+        if( nDim == 2 && points_in->value.arr->dim[0] != 2 ) {
+            doTranspose = true;
+            redux::util::transpose( points.data(), points_in->value.arr->dim[1], points_in->value.arr->dim[0] );
+        }
+
+        vector<double> out_points = redux::util::pointWarp( P, Q, points );
+
+        IDL_MakeTempArray ( IDL_TYP_FLOAT, points_in->value.arr->n_dim, points_in->value.arr->dim, IDL_ARR_INI_NOP, &out );
+        Mat outImg = arrayToMat(out);
+        float* ptr = reinterpret_cast<float*>(out->value.arr->data);
+        std::copy_n( out_points.data(),out_points.size(), ptr );
+
+        if( doTranspose ) {
+           redux::util::transpose( ptr, points_in->value.arr->dim[0], points_in->value.arr->dim[1] );
+        }
+
+    } catch( const cv::Exception& e ) {
+        string msg = "OpenCV error: " + e.msg;
+        IDL_Message( IDL_M_NAMED_GENERIC, IDL_MSG_LONGJMP, msg.c_str() );
+    }
+
+    return out;
+
+
 
 }
 
@@ -3339,6 +3441,7 @@ namespace {
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_align}, (char*)"RDX_IMG_ALIGN", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_align_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_transform}, (char*)"RDX_IMG_TRANSFORM", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, img_transform_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)point_transform}, (char*)"RDX_POINT_TRANSFORM", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, point_transform_info ) +
+    IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)point_warp}, (char*)"RDX_POINT_WARP", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, point_warp_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)img_transform}, (char*)"RDX_IMG_PROJECT", 2, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1 ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_make_mask},  (char*)"RDX_MAKE_MASK",  0, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, make_mask_info ) +
     IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)rdx_make_win},  (char*)"RDX_MAKE_WINDOW",  1, 2, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 1, apz::make_win_info ) +

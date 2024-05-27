@@ -181,6 +181,8 @@ void ChannelCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channe
     }
 
     alignMap = getValue( tree, "ALIGN_MAP", defaults.alignMap );
+    alignMapX = getValue( tree, "ALIGN_MAP_X", defaults.alignMapX );
+    alignMapY = getValue( tree, "ALIGN_MAP_X", defaults.alignMapY );
     alignClip = getValue( tree, "ALIGN_CLIP", defaults.alignClip );
     discard = getValue( tree, "DISCARD", defaults.discard );
     borderClip = getValue( tree, "BORDER_CLIP", defaults.borderClip );
@@ -268,6 +270,8 @@ void ChannelCfg::getProperties( bpt::ptree& tree, const ChannelCfg& defaults, bo
     if( showAll || divModeFileNormalize != defaults.divModeFileNormalize ) tree.put( "DIV_MODE_FILE_NORMALIZE", divModeFileNormalize );
     
     if( showAll || alignMap != defaults.alignMap ) tree.put( "ALIGN_MAP", alignMap );
+    if( showAll || alignMapX != defaults.alignMapX ) tree.put( "ALIGN_MAP_X", alignMapX );
+    if( showAll || alignMapY != defaults.alignMapY ) tree.put( "ALIGN_MAP_Y", alignMapY );
     if( showAll || alignClip != defaults.alignClip ) {
         vector<int16_t> tmp = alignClip;
         for( auto& ac: tmp ) ac += 1;       // make 1-based for cfg-files.
@@ -320,6 +324,8 @@ uint64_t ChannelCfg::size( void ) const {
     // vectors etc.
     sz += alignClip.size()*sizeof( int16_t ) + sizeof( uint64_t );
     sz += alignMap.size()*sizeof( float ) + sizeof( uint64_t );
+    sz += alignMapX.size()*sizeof( float ) + sizeof( uint64_t );
+    sz += alignMapY.size()*sizeof( float ) + sizeof( uint64_t );
     sz += darkNumbers.size()*sizeof( uint32_t ) + sizeof( uint64_t );
     sz += discard.size()*sizeof( uint16_t ) + sizeof( uint64_t );
     sz += redux::util::size( diversityModes );
@@ -363,6 +369,8 @@ uint64_t ChannelCfg::pack( char* ptr ) const {
     // vectors etc.
     count += pack( ptr+count, alignClip );
     count += pack( ptr+count, alignMap );
+    count += pack( ptr+count, alignMapX );
+    count += pack( ptr+count, alignMapY );
     count += pack( ptr+count, darkNumbers );
     count += pack( ptr+count, discard );
     count += pack( ptr+count, diversityModes );
@@ -406,6 +414,8 @@ uint64_t ChannelCfg::unpack( const char* ptr, bool swap_endian ) {
     // vectoruns etc.
     count += unpack( ptr+count, alignClip, swap_endian );
     count += unpack( ptr+count, alignMap, swap_endian );
+    count += unpack( ptr+count, alignMapX, swap_endian );
+    count += unpack( ptr+count, alignMapY, swap_endian );
     count += unpack( ptr+count, darkNumbers, swap_endian );
     count += unpack( ptr+count, discard, swap_endian );
     count += unpack( ptr+count, diversityModes, swap_endian );

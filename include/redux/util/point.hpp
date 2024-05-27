@@ -116,6 +116,18 @@ namespace redux {
             return PointType<T>( a/pt.y, a/pt.x );
         }
         
+        template <typename T>
+        PointD pointWarp( std::vector<T> P, std::vector<T> Q, const PointD& point ) {
+            if( P.size() != 16 || Q.size() != 16 ) return point;
+            PointD ret(0,0);
+            for( size_t j(0); j < 4; ++j ) {
+                for( size_t k(0); k < 4; ++k ) {
+                    ret.x += P.at(4*j+k) * pow(point.x,j) * pow(point.y,k);
+                    ret.y += Q.at(4*j+k) * pow(point.x,j) * pow(point.y,k);
+                }
+            }
+            return ret;
+        }
 
         /*! @} */
 

@@ -77,6 +77,7 @@ namespace redux {
             void adjustCutouts(redux::util::Array<PatchData::Ptr>&);
             void setClip( const std::vector<int16_t>& clip ) { alignClip = clip; checkFlip(); };
             void setMap( const std::vector<float>& map ) { alignMap = map; checkFlip(); };
+            void setMaps( const std::vector<float>& xmap, const std::vector<float>& ymap ) { alignMapX = xmap; alignMapY=ymap; checkFlip(); };
             void setImageSize( const redux::util::Point16& sz ) { imgSize = sz; };
             void setImageSize( uint16_t sz ) { imgSize = sz; };
             void clearOffsets( void ) { xOffset.clear(); yOffset.clear(); }

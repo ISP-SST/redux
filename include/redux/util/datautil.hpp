@@ -764,6 +764,33 @@ namespace redux {
         }
 
 
+        /*! @brief Transform coordinate points using a polynomial (follows the implementaion of IDL's poly_2d function)
+        *   @param P Polynomial coefficients for x.
+        *   @param Q Polynomial coefficients for y.
+        *   @param point Points to be transformed
+        *   @returns A vector containing the new points.
+        */
+        template <typename T, typename U=T>
+        std::vector<U> pointWarp( std::vector<T> P, std::vector<T> Q, const std::vector<U>& points ) {
+            if( P.size() != 16 || Q.size() != 16 ) return points;
+            std::vector<U> ret(points.size(),0);
+            for( size_t i(0); i < points.size(); i+=2 ) {
+                const U& x = points.at(i);
+                const U& y = points.at(i+1);
+                U& xx = ret.at(i);
+                U& yy = ret.at(i+1);
+                for( size_t j(0); j < 4; ++j ) {
+                    for( size_t k(0); k < 4; ++k ) {
+                        xx += P.at(4*j+k) * pow(x,j) * pow(y,k);
+                        yy += Q.at(4*j+k) * pow(x,j) * pow(y,k);
+                    }
+                }
+            }
+            return ret;
+        }
+
+
+
 
         /*! @} */
 

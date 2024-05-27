@@ -171,7 +171,10 @@ uint64_t Channel::unpack (const char* ptr, bool swap_endian) {
 void Channel::checkFlip( void ) {
     
     flipX = flipY = false;
-    if( alignMap.size() == 9 ) {
+    if( alignMapX.size() == 16 && alignMapY.size() == 16 ) {
+        if( alignMapX[4] < 0 ) flipX = true;
+        if( alignMapY[1] < 0 ) flipY = true;
+    } else if( alignMap.size() == 9 ) {
         if( alignMap[0] < 0 ) flipX = true;
         if( alignMap[4] < 0 ) flipY = true;
     } else if( alignClip.size() == 4) {
@@ -1387,7 +1390,9 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
 
     chData.channelOffset = 0;
     
-    if( alignMap.size() == 9 ) {
+    if( alignMapX.size() == 16 && alignMapY.size() == 16 ) {
+        localPos = pointWarp( alignMapX, alignMapY, localPos );
+    } else if( alignMap.size() == 9 ) {
         ProjectiveMap map( alignMap );
         // the align-map is always in global coordinates
         localPos = map * (localPos-0.5) + 0.5;
