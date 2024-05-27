@@ -126,7 +126,7 @@ Application::Application( bpo::variables_map& vm, RunMode rm ) : runMode(rm), re
 
     if( vm.count("settings") ) {
         settingsFile = vm["settings"].as<string>();
-        if( bfs::is_regular(settingsFile) ) {
+        if( bfs::is_regular_file(settingsFile) ) {
             LOG_DETAIL << "Loading file \"" <<  settingsFile << "\"" << ende;
             bpt::read_info( settingsFile, propTree );
         } else {
