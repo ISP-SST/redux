@@ -1440,13 +1440,17 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
     }
     chData.cutoutRegion = actualPatch;
     chData.patchStart = (chData.cutoutPosition - halfPatch) - actualPatch.first;
-    if( flipY ) {
-        chData.patchStart.y = actualPatch.last.y - (chData.cutoutPosition.y + halfPatch - 1);
-    }
+    string flipStr = (flipX||flipY)?"  flip: ":"";
     if( flipX ) {
+        flipStr += "X";
         chData.patchStart.x = actualPatch.last.x - (chData.cutoutPosition.x + halfPatch - 1);
     }
+    if( flipY ) {
+        flipStr += flipX?"/Y":"Y";
+        chData.patchStart.y = actualPatch.last.y - (chData.cutoutPosition.y + halfPatch - 1);
+    }
     string actStr = "";
+    if( chData.cutoutRegion != desiredPatch ) actStr = "  actual="+(string)chData.cutoutRegion;
     if( chData.cutoutRegion != desiredPatch ) actStr = "  actual="+(string)chData.cutoutRegion;
     LOG_DETAIL<< "AdjustCutout ch=" << myObject.ID << ":" << ID << ": specifiedPosition" << patchPos
               << "  mappedPosition=" << chData.exactPatchPosition
@@ -1454,7 +1458,7 @@ void Channel::adjustCutout( ChannelData& chData, const PatchData::Ptr& patch ) c
               << "\n    residualPosition=" << chData.residualOffset
               << "  desiredPatch=" << desiredPatch << actStr
               << "  localOffset=" << chData.channelOffset <<"  actualPatch=" << actualPatch
-              << "   start=" << chData.patchStart << ende;
+              << "   start=" << chData.patchStart << flipStr << ende;
          
 }
 
