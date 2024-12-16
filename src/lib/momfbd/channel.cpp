@@ -596,7 +596,7 @@ void Channel::loadCalib( boost::asio::io_service& service ) {     // load throug
     if( !gainFile.empty() ) {
         CachedFile::load<float>( gain, gainFile );
         gainMask = rdx_get_shared<uint8_t>(imgSize.y*imgSize.x);
-        make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, false ); // filter away larger features than ~8 pixels
+        make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, true ); // filter away larger features than ~8 pixels
     }
 
 
@@ -1182,8 +1182,8 @@ void Channel::preprocessImage( size_t i ) {
             switch (myJob.fillpixMethod) {
                 case FPM_HORINT: {
                     //LOG_DETAIL << "Filling bad pixels using horizontal interpolation." << ende;
-                    function<double (size_t, size_t) > func = bind (horizontalInterpolation<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
-                    fillPixels (arrayPtr, sy, sx, func, std::bind2nd (std::less_equal<double>(), myJob.badPixelThreshold), mask2D.get());
+                    function<double (size_t, size_t) > func = bind( horizontalInterpolation<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
+                    fillPixels (arrayPtr, sy, sx, func, std::bind( std::less_equal<double>(), sp::_1, myJob.badPixelThreshold), mask2D.get());
                     break;
                 }
                 case FPM_MEDIAN: {
@@ -1193,15 +1193,15 @@ void Channel::preprocessImage( size_t i ) {
                 case FPM_INVDISTWEIGHT:       // inverse distance weighting is the default method, so fall through
                 default: {
                     //LOG_DETAIL << "Filling bad pixels using inverse distance weighted average." << ende;
-                    function<double (size_t, size_t) > func = bind (inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
-                    fillPixels (arrayPtr, sy, sx, func, std::bind2nd (std::less_equal<double>(), myJob.badPixelThreshold), mask2D.get());
+                    function<double (size_t, size_t) > func = bind( inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
+                    fillPixels (arrayPtr, sy, sx, func, std::bind( std::less_equal<double>(), sp::_1, myJob.badPixelThreshold), mask2D.get());
                 }
             }
 
             // Fill larger features that the mask will exclude. This will fill e.g. black borders.
             // TBD: Should this be skipped and force the user to be stricter with the clip/ROI instead?
-            function<double (size_t, size_t) > func = bind (inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
-            fillPixels (arrayPtr, sy, sx, func, std::bind2nd (std::less_equal<double>(), myJob.badPixelThreshold));
+            function<double (size_t, size_t) > func = bind( inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
+            fillPixels (arrayPtr, sy, sx, func, std::bind( std::less_equal<double>(), sp::_1, myJob.badPixelThreshold));
             
             // FIXME: This is a hack to create truncated values as the old code!!
             //for(size_t i=0; i<sy*sx; ++i) arrayPtr[0][i] = (int)arrayPtr[0][i];

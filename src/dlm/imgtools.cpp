@@ -15,6 +15,7 @@
 #include "redux/util/progresswatch.hpp"
 
 #include <atomic>
+#include <functional>
 #include <future>
 #include <iostream>
 #include <numeric>
@@ -1396,6 +1397,7 @@ namespace {
     typedef struct {
         IDL_KW_RESULT_FIRST_FIELD;
         IDL_INT help;
+        IDL_INT horint;
         UCHAR nthreads;
         IDL_INT verbose;
         float thres;
@@ -1407,9 +1409,10 @@ namespace {
     static IDL_KW_PAR kw_fillpix_pars[] = {
         IDL_KW_FAST_SCAN,
         { (char*) "HELP",           IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,help) },
+        { (char*) "HORINT",         IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,horint) },
         { (char*) "MASK",           IDL_TYP_UNDEF, 1, IDL_KW_OUT|IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,mask) },
         { (char*) "NTHREADS",       IDL_TYP_BYTE,  1, 0,                      0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,nthreads) },
-        { (char*) "THRESHOLD",      IDL_TYP_FLOAT, 1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,thres) },
+        { (char*) "THRESHOLD",      IDL_TYP_FLOAT, 1, 0,                      0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,thres) },
         { (char*) "VERBOSE",        IDL_TYP_INT,   1, IDL_KW_ZERO,            0, (char*) IDL_KW_OFFSETOF2(KW_FILLPIX,verbose) },
         { NULL }
     };
@@ -1423,9 +1426,10 @@ string rdx_fillpix_info( int lvl ) {
         if( lvl > 1 ) {
             ret +=  "   Accepted Keywords:\n"
                     "      HELP                Display this info.\n"
+                    "      HORINT              (flag) Use horizontal interpolation.\n"
                     "      MASK                Mask with non-zero values where filling is supposed to be performed.\n"
-                    "      NTHREADS            Number of threads.\n"
-                    "      THRESHOLD           Value below which a pixel qualifies for filling. (default: 0)\n"
+                    "      NTHREADS            Number of threads. (currently not used)\n"
+                    "      THRESHOLD           Value below which a pixel qualifies for filling. (default: 1E-3)\n"
                     "      VERBOSE             Verbosity, default is 0 (only error output).\n";
         }
     } else ret += "\n";
@@ -1444,6 +1448,7 @@ IDL_VPTR rdx_fillpix( int argc, IDL_VPTR* argv, char* argk ) {
     shared_ptr<uint8_t*> mask2D;
     
     KW_FILLPIX kw;
+    kw.thres = 1E-3;    // Set some default threshold to use if no mask is supplied.
     kw.nthreads = std::thread::hardware_concurrency();
     kw.mask = nullptr;
     (void) IDL_KWProcessByOffset( argc, argv, argk, kw_fillpix_pars, (IDL_VPTR*)0, 255, &kw );
@@ -1488,11 +1493,21 @@ IDL_VPTR rdx_fillpix( int argc, IDL_VPTR* argv, char* argk ) {
             if( dPtr[n] <= kw.thres ) mPtr[n] = 1;
         }
     }
-    
+    // We now have a mask, so allow all numerical values to be filled as dictated by mask.
+    kw.thres = std::numeric_limits<float>::max();
+
+    namespace sp = std::placeholders;
     UCHAR dataType = images->type;
     IDL_VPTR ret;
     char* retData = IDL_MakeTempArray( dataType, images->value.arr->n_dim, images->value.arr->dim, IDL_ARR_INI_NOP, &ret );
     memcpy( retData, images->value.arr->data, images->value.arr->n_elts*images->value.arr->elt_len );
+
+    if( kw.verbose ) {
+        cout << "rdx_fillpix:  dataType: " << (int)dataType << endl;
+        cout << "rdx_fillpix:  horint: " << (kw.horint?"Yes":"No") << endl;
+        cout << "rdx_fillpix:  threshold: " << kw.thres << endl;
+    }
+
 
     
     try {
@@ -1501,31 +1516,56 @@ IDL_VPTR rdx_fillpix( int argc, IDL_VPTR* argv, char* argk ) {
             case( IDL_TYP_BYTE ): {
                 auto data = reinterpret_cast<UCHAR*>( retData );
                 auto images2D = reshapeArray( data, ySize, xSize );
-                fillPixels( images2D.get(), ySize, xSize, mask2D.get() );
+                auto arrayPtr = images2D.get();
+                function<double (size_t, size_t) > func = bind (inverseDistanceWeight<UCHAR>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                if( kw.horint ) {
+                    func = bind (horizontalInterpolation<UCHAR>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                }
+                fillPixels (arrayPtr, ySize, xSize, func, std::bind(std::less_equal<double>(), sp::_1, kw.thres), mask2D.get());
                 break;
             }
             case( IDL_TYP_INT ): {
                 auto data = reinterpret_cast<IDL_INT*>( retData );
                 auto images2D = reshapeArray( data, ySize, xSize );
-                fillPixels( images2D.get(), ySize, xSize, mask2D.get() );
+                auto arrayPtr = images2D.get();
+                function<double (size_t, size_t) > func = bind (inverseDistanceWeight<IDL_INT>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                if( kw.horint ) {
+                    func = bind (horizontalInterpolation<IDL_INT>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                }
+                fillPixels (arrayPtr, ySize, xSize, func, std::bind(std::less_equal<double>(), sp::_1, kw.thres), mask2D.get());
                 break;
             }
             case( IDL_TYP_LONG ): {
                 auto data = reinterpret_cast<IDL_LONG*>( retData );
                 auto images2D = reshapeArray( data, ySize, xSize );
-                fillPixels( images2D.get(), ySize, xSize, mask2D.get() );
+                auto arrayPtr = images2D.get();
+                function<double (size_t, size_t) > func = bind (inverseDistanceWeight<IDL_LONG>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                if( kw.horint ) {
+                    func = bind (horizontalInterpolation<IDL_LONG>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                }
+                fillPixels (arrayPtr, ySize, xSize, func, std::bind(std::less_equal<double>(), sp::_1, kw.thres), mask2D.get());
                 break;
             }
             case( IDL_TYP_FLOAT ): {
                 auto data = reinterpret_cast<float*>( retData );
                 auto images2D = reshapeArray( data, ySize, xSize );
-                fillPixels( images2D.get(), ySize, xSize, mask2D.get() );
+                auto arrayPtr = images2D.get();
+                function<double (size_t, size_t) > func = bind (inverseDistanceWeight<float>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                if( kw.horint ) {
+                    func = bind (horizontalInterpolation<float>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                }
+                fillPixels (arrayPtr, ySize, xSize, func, std::bind(std::less_equal<double>(), sp::_1, kw.thres), mask2D.get());
                 break;
             }
             case( IDL_TYP_DOUBLE ): {
                 auto data = reinterpret_cast<double*>( retData );
                 auto images2D = reshapeArray( data, ySize, xSize );
-                fillPixels( images2D.get(), ySize, xSize, mask2D.get() );
+                auto arrayPtr = images2D.get();
+                function<double (size_t, size_t) > func = bind (inverseDistanceWeight<double>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                if( kw.horint ) {
+                    func = bind (horizontalInterpolation<double>, arrayPtr, ySize, xSize, sp::_1, sp::_2);
+                }
+                fillPixels( arrayPtr, ySize, xSize, func, std::bind(std::less_equal<double>(), sp::_1, kw.thres), mask2D.get());
                 break;
             }
             default: ;
@@ -1881,7 +1921,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
                 gainPtr = gainData.get();
                 xCalibSize = kw.gain->value.arr->dim[1];
                 yCalibSize = kw.gain->value.arr->dim[0];
-                maskData.reset( new uint8_t[xCalibSize*yCalibSize] );
+                maskData.reset( new uint8_t[xCalibSize*yCalibSize], []( uint8_t* p ){ delete[] p; } );
                 mask2D = reshapeArray( maskData.get(), yCalibSize, xCalibSize );
                 make_mask( gainPtr, maskData.get(), yCalibSize, xCalibSize, 0, 5, true, true ); // filter away larger features than ~5 pixels and invert
             } else cout << "gain must be a 2D image." << endl;
@@ -2358,7 +2398,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
                 gainPtr = gainData.get();
                 xCalibSize = kw.gain->value.arr->dim[1];
                 yCalibSize = kw.gain->value.arr->dim[0];
-                maskData.reset( new uint8_t[xCalibSize*yCalibSize] );
+                maskData.reset( new uint8_t[xCalibSize*yCalibSize], []( uint8_t* p ){ delete[] p; } );
                 mask2D = reshapeArray( maskData.get(), yCalibSize, xCalibSize );
                 make_mask( gainPtr, maskData.get(), yCalibSize, xCalibSize, 0, 5, true, true ); // filter away larger features than ~5 pixels and invert
             } else cout << "gain must be a 2D image." << endl;

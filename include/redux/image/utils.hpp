@@ -266,7 +266,7 @@ namespace redux {
             size_t offset = 0;
             for( size_t y = 0; y < sy; ++y ) {
                 for( size_t x = 0; x < sx; ++x ) {
-                    if( (!mask || !mask[y][x]) && predicate( array[y][x] ) ) tmp.insert( std::pair<size_t, T>( offset, filler( y, x ) ) );
+                    if( (!mask || mask[y][x]) && predicate( array[y][x] ) ) tmp.insert( std::pair<size_t, T>( offset, filler( y, x ) ) );
                     ++offset;
                 }
             }
