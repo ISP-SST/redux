@@ -520,26 +520,27 @@ namespace redux {
 
         template <typename T>
         void img_trim( T**& img, size_t& imgRows, size_t& imgCols, float threshold=1E-6 ) {
-            std::vector<T> rowSums( imgCols, 0 );
-            std::vector<T> colSums( imgRows, 0 );
+
+            std::vector<double> rowSums( imgCols, 0 );
+            std::vector<double> colSums( imgRows, 0 );
             for ( size_t c=0; c < imgCols; ++c ) {
                 for ( size_t r=0; r < imgRows; ++r ) {
-                    T val = img[r][c];
+                    double val = fabs(img[r][c]);
                     rowSums[c] += val;
                     colSums[r] += val;
                 }
             }
 
-            size_t firstCol(0), lastCol(imgCols-1), firstRow(0), lastRow(imgRows-1);
+            int64_t firstCol(0), lastCol(imgCols-1), firstRow(0), lastRow(imgRows-1);
             while ( firstCol < lastCol && rowSums[firstCol] < threshold ) ++firstCol;
-            while ( lastCol && rowSums[lastCol] < threshold  ) --lastCol;
-            while ( firstRow < lastRow && colSums[firstRow] < threshold  ) ++firstRow;
-            while ( lastRow && colSums[lastRow] < threshold  ) --lastRow;
+            while ( lastCol>firstCol && rowSums[lastCol] < threshold ) --lastCol;
+            while ( firstRow < lastRow && colSums[firstRow] < threshold ) ++firstRow;
+            while ( lastRow>firstRow && colSums[lastRow] < threshold ) --lastRow;
 
             size_t imgRows2 = lastRow-firstRow+1;
             size_t imgCols2 = lastCol-firstCol+1;
 
-            if( imgRows2 != imgRows || imgCols2 != imgCols ) {
+            if( imgRows2 < imgRows || imgCols2 < imgCols ) {
                 T** tmp = redux::util::newArray<T>( imgRows2, imgCols2 );
                 for( size_t r=0; r<imgRows2; ++r ) {
                     memcpy( tmp[r], img[r+firstRow]+firstCol, imgCols2*sizeof(T) );
