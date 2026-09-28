@@ -170,14 +170,16 @@ namespace redux {
             }
             double tmp, chisq = 0;
             typename redux::util::Array<U>::const_iterator bit = b.begin();
-            typename redux::util::Array<V>::const_iterator wit = weight.begin()--;
+            typename redux::util::Array<V>::const_iterator wit = weight.begin();
             size_t count(0);
             for( auto &avalue : a ) {
-                if( *++wit ) {
-                    tmp = ( avalue - *bit++ ) * ( *wit );
+                if( *wit ) {
+                    tmp = ( avalue - *bit ) * ( *wit );
                     chisq += tmp * tmp;
                     ++count;
                 }
+                ++bit;
+                ++wit;
             }
             if( count == 0 ) return 0.0;
             return chisq / static_cast<double>( count );
@@ -252,7 +254,7 @@ namespace redux {
         }
 
         template <typename T, typename Predicate>
-        void fillPixels( redux::util::Array<T>& array, T fillValue, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+        void fillPixels( redux::util::Array<T>& array, T fillValue, Predicate predicate = []( const T& v ) { return v <= T(0); } ) {
             for( auto & value : array ) {
                 if( predicate( value ) ) value = fillValue;
             }
@@ -260,7 +262,7 @@ namespace redux {
 
 
         template <typename T, typename Predicate, typename MaskType=uint8_t>
-        void fillPixels( T** array, size_t sy, size_t sx, std::function<double( size_t, size_t )> filler, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ), MaskType** mask=nullptr  ) {
+        void fillPixels( T** array, size_t sy, size_t sx, std::function<double( size_t, size_t )> filler, Predicate predicate = []( const T& v ) { return v <= T(0); }, MaskType** mask=nullptr  ) {
             std::map<size_t, T> tmp;
             T* ptr = *array;
             size_t offset = 0;
@@ -279,7 +281,7 @@ namespace redux {
 
 
         template <typename T, typename FillFunction, typename Predicate>
-        void fillPixels( redux::util::Array<T>& array, FillFunction* filler, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+        void fillPixels( redux::util::Array<T>& array, FillFunction* filler, Predicate predicate = []( const T& v ) { return v <= T(0); } ) {
             for( auto it = array.begin(); it != array.end(); ++it ) {
                 if( predicate( *it ) ) *it = filler( it );
             }
@@ -295,8 +297,8 @@ namespace redux {
             size_t o;
             while( (o = offset++) < nPixels ) {
                 if( !mask || mask[0][o%nPixels] ) {
-                    size_t y = o/sy;
-                    size_t x = o%sy;
+                    size_t y = o/sx;
+                    size_t x = o%sx;
                     values.insert( std::pair<size_t, T>( o, inverseDistanceWeight( image, sy, sx, y, x ) ) );
                     //values.insert( std::pair<size_t, T>( o, horizontalInterpolation( image, sy, sx, y, x ) ) );
                 }
@@ -329,8 +331,8 @@ namespace redux {
                         size_t myOffset;
                         std::map<size_t, T> values;
                         while( (myOffset=nextbad()) < nPixels ) {
-                            size_t y = myOffset/sy;
-                            size_t x = myOffset%sy;
+                            size_t y = myOffset/sx;
+                            size_t x = myOffset%sx;
                             values.insert( std::pair<size_t, T>( myOffset, inverseDistanceWeight( image, sy, sx, y, x ) ) );
                         }
 

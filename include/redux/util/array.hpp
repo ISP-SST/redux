@@ -11,6 +11,7 @@
 #include <memory>
 #include <cstddef>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 #include <iostream>
 #include <sys/mman.h>
@@ -660,7 +661,7 @@ namespace redux {
 
 
             template <typename Predicate>
-            void fill( T val, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+            void fill( T val, Predicate predicate = []( const T& v ) { return v <= T(0); } ) {
                 if( dense_ ) {
                     std::fill(get()+begin_, get()+end_, val );
                 } else {
@@ -670,7 +671,7 @@ namespace redux {
             }
             
             template <typename FillFunction, typename Predicate>
-            void fill( FillFunction* filler, Predicate predicate = std::bind2nd( std::less_equal<T>(), 0 ) ) {
+            void fill( FillFunction* filler, Predicate predicate = []( const T& v ) { return v <= T(0); } ) {
                 if( dense_ ) {
                     std::transform(get()+begin_, get()+end_, get()+begin_, filler );
                 } else {
@@ -782,11 +783,19 @@ namespace redux {
                 return tmp/=rhs;
             }
             const Array<T>& operator/=( const T& rhs ) {
-                T rhs_inv = 1.0/rhs;
-                if(dense_) {
-                    std::transform(get()+begin_, get()+end_, get()+begin_, [rhs_inv](const T& a) { return a*rhs_inv; });
+                if constexpr ( std::is_floating_point<T>::value ) {
+                    T rhs_inv = T(1)/rhs;
+                    if(dense_) {
+                        std::transform(get()+begin_, get()+end_, get()+begin_, [rhs_inv](const T& a) { return a*rhs_inv; });
+                    } else {
+                        std::transform(begin(), end(), begin(), [rhs_inv](const T& a) { return a*rhs_inv; });
+                    }
                 } else {
-                    std::transform(begin(), end(), begin(), [rhs_inv](const T& a) { return a*rhs_inv; });
+                    if(dense_) {
+                        std::transform(get()+begin_, get()+end_, get()+begin_, [rhs](const T& a) { return a/rhs; });
+                    } else {
+                        std::transform(begin(), end(), begin(), [rhs](const T& a) { return a/rhs; });
+                    }
                 }
                 return *this;
             }

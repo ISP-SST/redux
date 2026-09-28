@@ -391,8 +391,8 @@ FourierTransform::FourierTransform( const FourierTransform& rhs ) : plan_full(rh
 
 
 FourierTransform::FourierTransform( FourierTransform&& rhs ) : plan_full(rhs.plan_full), plan_half(rhs.plan_half),
-    centered(rhs.centered), normalized(rhs.normalized), nThreads(rhs.nThreads), inputSize(rhs.inputSize),
-    ftSize(rhs.ftSize), inPixels(rhs.inPixels), ftPixels(rhs.ftPixels), currentBlockSize(0),
+    centered(rhs.centered), normalized(rhs.normalized), currentFlags(rhs.currentFlags), nThreads(rhs.nThreads),
+    inputSize(rhs.inputSize), ftSize(rhs.ftSize), inPixels(rhs.inPixels), ftPixels(rhs.ftPixels), currentBlockSize(0),
     ftData(rhs.ftData), ftPtr(rhs.ftPtr), tmpPtr(rhs.tmpPtr), tmpPtr2(rhs.tmpPtr2) {
 
     wrap();

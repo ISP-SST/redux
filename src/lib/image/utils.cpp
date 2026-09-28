@@ -513,7 +513,7 @@ void redux::image::apodizeInPlace2( T** data, size_t nRows, size_t nCols, size_t
     avg1 /= (2*nCols*rowBlend);
     
     T avg1b(0);
-    memset( apod, 0, sz*sizeof(T) );
+    memset( apod, 0, sz*sizeof(double) );
     redux::math::apodize( apod, 2*rowBlend+2, 1.0 );
     for( size_t c=0; c<nCols; ++c ) {
         T lastVal = data[nRows-rowBlend-1][c];
@@ -546,7 +546,7 @@ void redux::image::apodizeInPlace2( T** data, size_t nRows, size_t nCols, size_t
     avg2 /= (2*nRows*colBlend);
     
     if( colBlend != rowBlend ) {
-        memset( apod, 0, sz*sizeof(T) );
+        memset( apod, 0, sz*sizeof(double) );
         redux::math::apodize( apod, 2*colBlend+2, 1.0 );
     }
     T avg2b(0);
@@ -594,7 +594,7 @@ void redux::image::apodizeInPlace( T** data, size_t nRows, size_t nCols, size_t 
     shared_ptr<double> tmpD = rdx_get_shared<double>( sz );
     double* tmp = tmpD.get();
     
-    memset( tmp, 0, sz*sizeof(T) );
+    memset( tmp, 0, sz*sizeof(double) );
     redux::math::apodize( tmp+rowMargin, rowBlend+2, 1.0 );
     for( size_t c=0; c<nCols; ++c ) {
         for( size_t r=0; r<rowBlend+rowMargin; ++r ) {
@@ -602,7 +602,7 @@ void redux::image::apodizeInPlace( T** data, size_t nRows, size_t nCols, size_t 
             data[nRows-r-1][c] *= tmp[r+1];
         }
     }
-    memset( tmp, 0, sz*sizeof(T) );
+    memset( tmp, 0, sz*sizeof(double) );
     redux::math::apodize( tmp+colMargin, colBlend+2, 1.0 );
     for( size_t rr=0; rr<nRows; ++rr ) {
         for( size_t c=0; c<colBlend+colMargin; ++c ) {

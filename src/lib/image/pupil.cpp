@@ -33,7 +33,7 @@ PupilInfo::PupilInfo( uint16_t pupilPixels, double pupilRadius, double coRadius 
 
       
 uint64_t PupilInfo::size( void ) const {
-    static uint64_t sz = sizeof(uint16_t) + 2*sizeof(double) + 1;
+    uint64_t sz = sizeof(uint16_t) + 2*sizeof(double) + 1;
     sz += filename.length();
     return sz;
 }
@@ -346,8 +346,10 @@ Pupil& Pupil::fetch( uint16_t pupilPixels, double pupilRadius, double coRadius )
 
 Pupil& Pupil::operator=( const Pupil& rhs ) {
     redux::util::Array<double>::operator=( reinterpret_cast<const redux::util::Array<double>&>(rhs) );
+    info = rhs.info;
     nPixels = rhs.nPixels;
     radius = rhs.radius;
+    co_radius = rhs.co_radius;
     area = rhs.area;
     pupilSupport = rhs.pupilSupport;
     otfSupport = rhs.otfSupport;
