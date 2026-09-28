@@ -639,19 +639,20 @@ string redux::file::getHome( const string& username ) {
     
     string tmp;
     struct passwd pwent;
-    struct passwd *pwentp;
+    struct passwd *pwentp = nullptr;
     char buf[1024];
     if( username.empty() ) {    // resolve own home-directory
-        tmp = getenv("HOME");
+        const char* homeEnv = getenv("HOME");
+        if( homeEnv ) tmp = homeEnv;
         if( tmp.empty() ) { // No HOME in env, try looking with pwuid
-            if( !getpwuid_r( geteuid(), &pwent, buf, sizeof buf, &pwentp ) ) {
-                tmp = pwent.pw_dir;
+            if( !getpwuid_r( geteuid(), &pwent, buf, sizeof buf, &pwentp ) && pwentp ) {
+                tmp = pwentp->pw_dir;
             }
         }
     } else {                // resolve home-directory of named user
-        if( !getpwnam_r( username.c_str(), &pwent, buf, sizeof buf, &pwentp ) ) {
-            if( username == pwent.pw_name ) {   // NOTE: non-existant user can return weird results if this is not verified
-                tmp = pwent.pw_dir;
+        if( !getpwnam_r( username.c_str(), &pwent, buf, sizeof buf, &pwentp ) && pwentp ) {
+            if( username == pwentp->pw_name ) {
+                tmp = pwentp->pw_dir;
             }
         }
     }

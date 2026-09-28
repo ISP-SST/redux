@@ -211,10 +211,10 @@ string redux::util::getUname(__uid_t id) {
 
     string tmp;
     struct passwd pwent;
-    struct passwd *pwentp;
+    struct passwd *pwentp = nullptr;
     char buf[1024];
-    if( !getpwuid_r( id, &pwent, buf, 1024, &pwentp ) ) {
-        tmp = pwent.pw_name;
+    if( !getpwuid_r( id, &pwent, buf, 1024, &pwentp ) && pwentp ) {
+        tmp = pwentp->pw_name;
     }
     else {
         tmp = std::to_string((int)id);
