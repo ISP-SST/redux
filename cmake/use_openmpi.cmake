@@ -4,7 +4,7 @@
 
 set( EXT_NAME "OpenMPI" )
 
-set( EXT_COMPONENTS mpi_cxx mpi dl hwloc)
+set( EXT_COMPONENTS mpi dl hwloc)
 set( EXT_INCLUDE_SUFFIXES mpi openmpi openmpi-x86_64)
 
 set( EXT_HEADER_FILE "mpi.h" )

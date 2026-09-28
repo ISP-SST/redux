@@ -288,7 +288,7 @@ endmacro()
 #     REVISION_ID               (string, e.g hash-tag)
 #     REVISION_DESCRIPTION      (string, id + comment)
 # -----------------------------------------------------------------------------
-macro(CHECK_REVISION REVNAME REVISION_TEMPLATE_LOCATION REVISION_FILE_LOCATION) # optional 4th argument = path
+function(CHECK_REVISION REVNAME REVISION_TEMPLATE_LOCATION REVISION_FILE_LOCATION) # optional 4th argument = path
 
     if(IS_DIRECTORY "${ARGN}") # default path is current project
         set(GIT_WORKTREE "${ARGN}")
@@ -318,10 +318,11 @@ macro(CHECK_REVISION REVNAME REVISION_TEMPLATE_LOCATION REVISION_FILE_LOCATION) 
         set(REVISION_COMMIT_COMMENT "No revision control")
         set(REVISION_DESCRIPTION "No revision control")
         set(${REVNAME}_VERSION_MAJOR 0)
+        set(${REVNAME}_VERSION_MINOR 0)
         set(${REVNAME}_VERSION_PATCH 0)
         set(${REVNAME}_VERSION_COMMIT 0)
         configure_file("${REVISION_TEMPLATE_LOCATION}" "${REVISION_FILE_LOCATION}")
     endif()
 
-endmacro()
+endfunction()
 

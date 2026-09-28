@@ -4,7 +4,7 @@
 
 set( EXT_NAME "GSL" )
 
-set( USE_VERSION "1.16" )
+set( EXT_REQUIRED_VERSION "1.16" )
 set( EXT_COMPONENTS gsl gslcblas)
 
 set( EXT_HEADER_FILE "gsl/gsl_version.h" )

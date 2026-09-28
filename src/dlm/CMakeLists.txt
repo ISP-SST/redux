@@ -101,11 +101,13 @@ if (DEFINED IDL_FOUND)
     set(ANA_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libana.dlm")
     configure_file("libana.dlm.in" "${ANA_DLM_FILE_LOCATION}")
     target_link_libraries (ana ${RDX_CURRENT_LIBRARIES})
-    
+    target_compile_options(ana PRIVATE -Wno-register)
+
     add_library(momfbd SHARED momfbd.cpp ${RDX_MOMFBD_DEPS} )
     set(MOMFBD_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libmomfbd.dlm")
     configure_file("libmomfbd.dlm.in" "${MOMFBD_DLM_FILE_LOCATION}")
     target_link_libraries (momfbd ${RDX_CURRENT_LIBRARIES})
+    target_compile_options(momfbd PRIVATE -Wno-register)
     
     add_library(gridmatch SHARED gridmatch.cpp )
     set(GRIDMATCH_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libgridmatch.dlm")
@@ -114,18 +116,13 @@ if (DEFINED IDL_FOUND)
     install(TARGETS ana momfbd gridmatch DESTINATION ${IDL_DLM_DIR} )
     install(FILES ${ANA_DLM_FILE_LOCATION} ${MOMFBD_DLM_FILE_LOCATION} ${GRIDMATCH_DLM_FILE_LOCATION} DESTINATION ${IDL_DLM_DIR} )
 
-    
-    if( Boost_VERSION VERSION_LESS "1.41" OR NOT RDX_WITH_FFTW3 OR NOT RDX_WITH_GSL OR NOT Threads_FOUND )
-        message(STATUS "The rdx DLM will not be built (requires Boost>=1.41, FFTW3, GSL and Threads).")
-        return()
-    endif()
-    
     set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/../lib/revision.cpp" GENERATED )
     
     add_library(rdx SHARED rdx.cpp convertlog.cpp libgrid.cpp ${RDX_RDX_DEPS} )
     set(RDX_DLM_FILE_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/librdx.dlm")
     configure_file("librdx.dlm.in" "${RDX_DLM_FILE_LOCATION}")
     target_link_libraries (rdx ${RDX_CURRENT_LIBRARIES})
+    target_compile_options(rdx PRIVATE -Wno-register)
     
     if(RDX_AUTO_REVISION AND TARGET GIT_CHECK_LIBRDX)
         add_dependencies(rdx GIT_CHECK_LIBRDX)

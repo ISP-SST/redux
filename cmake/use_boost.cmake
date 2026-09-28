@@ -1,42 +1,13 @@
-#
-# Set input data for FindExternal.cmake
-#
 
-set( EXT_NAME "Boost" )
-#set( EXT_DEBUG "1" )
+find_package( Boost 1.66 QUIET CONFIG COMPONENTS date_time filesystem program_options serialization system thread regex )
 
-set( EXT_LIB_PREFIX boost_ )
-set( EXT_LIB_SUFFIXES "-mt" "" )
-set( EXT_LIB_DEBUG_SUFFIX "-mt-d" )
-
-set( EXT_LIBPATH_SUFFIXES "lib${LIB_ARCH}${LIB_SUBDIR},/x86_64-linux-gnu/" )
-set( EXT_COMPONENTS date_time filesystem program_options serialization system thread regex )
-
-set( EXT_HEADER_FILE boost/version.hpp )
-set( EXT_VERSION_FILE boost/version.hpp )
-set( EXT_MAJOR_REGEXP "define[ \t]+BOOST_VERSION[ \t]+" )
-set( EXT_MINOR_REGEXP "Disabled-NotAvailable" )
-set( EXT_PATCH_REGEXP "Disabled-NotAvailable" )
-
-# Attempt to locate libs/headers automagically
-include("${CMAKE_CURRENT_LIST_DIR}/FindExternal.cmake")
-
-# From boost/version.hpp:
-# Each component uses two digits, so:
-#   major = BOOST_VERSION / 100000
-#   minor = BOOST_VERSION / 100 % 1000
-#   patch = BOOST_VERSION % 100
-
-if(Boost_VERSION VERSION_GREATER 100)
-    MATH(EXPR lb_major "${Boost_VERSION} / 100000")
-    MATH(EXPR lb_minor "${Boost_VERSION} / 100 % 1000")
-    MATH(EXPR lb_patch "${Boost_VERSION} % 100")
-    set(Boost_VERSION "${lb_major}.${lb_minor}.${lb_patch}" CACHE STRING "Version" FORCE)
+if( Boost_FOUND )
+    set( Boost_VERSION "${Boost_VERSION_MAJOR}.${Boost_VERSION_MINOR}.${Boost_VERSION_PATCH}" CACHE STRING "Version" FORCE )
+    append_libs_unique( RDX_CURRENT_LIBRARIES "${Boost_LIBRARIES}" )
+    append_paths_unique( RDX_CURRENT_INCLUDES "${Boost_INCLUDE_DIRS}" )
+    append_paths_unique( RDX_CURRENT_LIBDIRS "${Boost_LIBRARY_DIRS}" )
+else()
+    message(STATUS "Boost >= 1.66 (with components: date_time filesystem program_options serialization system thread regex) not found."
+                    " Try your system's equivalent of \"apt-get install libboost-all-dev\","
+                    " or point cmake at a non-standard install via -DBOOST_ROOT=/path/to/boost or the BOOST_ROOT environment variable.")
 endif()
-
-# Check if Boost version is less than 1.66.0
-if(Boost_VERSION VERSION_LESS "1.66.0")
-    message(FATAL_ERROR "Boost version ${Boost_VERSION} is too old. Minimum required version is 1.66.0.")
-endif()
-
-appendPaths()

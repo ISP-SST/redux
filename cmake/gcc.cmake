@@ -3,7 +3,7 @@
 
 message(STATUS "Loading gcc-specific configuration. (${CMAKE_CURRENT_LIST_FILE})")
 
-execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpfullversion OUTPUT_VARIABLE GCC_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
 if (GCC_VERSION VERSION_GREATER 7.0 )
     message(STATUS "C++17 activated.")
     add_definitions("-std=gnu++17")
