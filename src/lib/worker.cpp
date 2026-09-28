@@ -142,7 +142,7 @@ bool Worker::fetchWork( void ) {
     if( !msg.empty() ) {
         try {   // only log if the connection was not severed (otherwise the manager will get spammed by messages on restart)
             auto test RDX_UNUSED = conn->socket().remote_endpoint();  // check if endpoint exists, will throw if not connected.
-            LLOG_ERR(daemon.logger) << "fetchWork: Unrecognized exception caught while fetching job." << ende;
+            LLOG_ERR(daemon.logger) << msg << ende;
         } catch ( ... ) {}
         ret = false;
         if( conn ) conn->socket().close();
@@ -264,9 +264,11 @@ void Worker::returnWork( void ) {
         }
         catch( const exception& e ) {
             LLOG_ERR(daemon.logger) << "getJob: Exception caught while returning work: " << e.what() << ende;
+            if( conn ) conn->socket().close();
         }
         catch( ... ) {
             LLOG_ERR(daemon.logger) << "getJob: Unrecognized exception caught while returning work." << ende;
+            if( conn ) conn->socket().close();
         }
 
         if( conn ) daemon.unlockMaster();

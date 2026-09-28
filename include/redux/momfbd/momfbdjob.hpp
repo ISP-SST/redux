@@ -12,6 +12,9 @@
 #include "redux/util/progresswatch.hpp"
 #include "redux/util/region.hpp"
 
+#include <atomic>
+#include <chrono>
+
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
 
@@ -142,6 +145,8 @@ namespace redux {
             
             bool cfgChecked;
             bool dataChecked;
+
+            std::atomic<int64_t> lastPartsCheck{0};
         
             friend struct Constraints;
             friend class WaveFronts;

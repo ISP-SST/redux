@@ -1423,23 +1423,46 @@ bool MomfbdJob::check(void) {
             updateProgressString();
             std::thread([this]() {
                 THREAD_MARK
-                auto lock = getLock();
-                bool all_ok =  (cfgChecked || checkCfg());
-                all_ok &= (dataChecked || checkData(false));
-                if( all_ok ) {
-                    moveTo( this, JSTEP_CHECKED );
+                try {
+                    auto lock = getLock();
+                    bool all_ok =  (cfgChecked || checkCfg());
+                    all_ok &= (dataChecked || checkData(false));
+                    if( all_ok ) {
+                        moveTo( this, JSTEP_CHECKED );
+                        updateProgressString();
+                    } else {
+                        moveTo( this, JSTEP_ERR );
+                        updateProgressString();
+                    }
+                    stopLog();
+                } catch( const exception& e ) {
+                    LOG_ERR << "MomfbdJob::check(): Exception caught while checking job " << info.id << ": " << e.what() << ende;
+                    moveTo( this, JSTEP_ERR );
                     updateProgressString();
-                } else {
+                } catch( ... ) {
+                    LOG_ERR << "MomfbdJob::check(): Unrecognized exception caught while checking job " << info.id << ende;
                     moveTo( this, JSTEP_ERR );
                     updateProgressString();
                 }
-                stopLog();
 //                THREAD_UNMARK;
             }).detach();
             break;
         }
         case JSTEP_RUNNING: {    // this check should find orphan parts etc.
-            std::thread( std::bind(&MomfbdJob::checkParts,this) ).detach();
+            using namespace std::chrono;
+            int64_t now = duration_cast<milliseconds>( steady_clock::now().time_since_epoch() ).count();
+            int64_t last = lastPartsCheck.load();
+            if( (now - last > 1000) && lastPartsCheck.compare_exchange_strong( last, now ) ) {
+                std::thread([this]() {
+                    try {
+                        checkParts();
+                    } catch( const exception& e ) {
+                        LOG_ERR << "MomfbdJob::checkParts(): Exception caught for job " << info.id << ": " << e.what() << ende;
+                    } catch( ... ) {
+                        LOG_ERR << "MomfbdJob::checkParts(): Unrecognized exception caught for job " << info.id << ende;
+                    }
+                }).detach();
+            }
             break;
         }
         case JSTEP_CHECKING:
@@ -1527,15 +1550,15 @@ bool MomfbdJob::checkCfg(void) {
         return false;
     }
 
+    if( objects.empty() ) {
+        LOG_ERR << "The configuration file contains no objects." << ende;
+        return false;
+    }
+
     if( !checkPatchPositions() ) return false;
 
     if( subImagePosXY.empty() && (subImagePosX.empty() || subImagePosY.empty()) ) {
         LOG_ERR << "Patch X and/or Y positions are not specified (and autogeneration failed)." << ende;
-        return false;
-    }
-    
-    if( objects.empty() ) {
-        LOG_ERR << "The configuration file contains no objects." << ende;
         return false;
     }
     

@@ -71,14 +71,13 @@ int main( int argc, char *argv[] ) {
 #endif
 
     try {
+        if( (vm.count( "log-stdout" ) == 0) && (vm.count( "foreground" ) == 0) ) {
+            if( daemon( 1, 0 ) ) {
+                throw runtime_error( string("Failed to background process: ") + strerror( errno ) );
+            }
+        }
         while( true ) {
             try {
-                if( (vm.count( "log-stdout" ) == 0) && (vm.count( "foreground" ) == 0) ) {
-                    if( daemon( 1, 0 ) ) {
-                        throw runtime_error( string("Failed to background process: ") + strerror( errno ) );
-                    }
-
-                }
                 Daemon daemon( vm );
                 return daemon.run();
             }

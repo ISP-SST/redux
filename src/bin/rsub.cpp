@@ -191,7 +191,7 @@ string filterOldCfg( const string& filename, const string& jobname, const string
     
     std::ifstream in(filename, std::ios::in | std::ios::binary);
     if (!in) {
-        throw (errno);
+        throw std::runtime_error( "Failed to open \"" + filename + "\": " + strerror(errno) );
     }
 
     std::string text;

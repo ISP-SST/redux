@@ -587,8 +587,10 @@ void Daemon::urgentHandler( TcpConnection::Ptr conn ) {
         conn->uIdle();
     } catch( const std::exception& e ) {
         LOG_ERR << "urgentHandler() Failed to process command Reason: " << e.what() << ende;
+        conn->uIdle();
     } catch( ... ) {
         LOG_ERR << "urgentHandler() Unrecognized exception." << ende;
+        conn->uIdle();
     }
 
 }
@@ -723,21 +725,26 @@ void Daemon::cleanup( void ) {
     for( auto& wip: timedOutWIPs ) failedWIP( wip );
     
     std::thread( [&](){
-        vector<Job::JobPtr> deletedJobs;        // will clear/reset jobs when the vector goes out of scope.
-        {
-            unique_lock<mutex> lock( jobsMutex );
-            for( auto& job : jobs ) {
-                if( !job ) continue;
-                if( job->info.step == Job::JSTEP_COMPLETED ) {
-                    LOG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
-                    LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
-                    deletedJobs.push_back( job );
-                    job.reset();
+        try {
+            vector<Job::JobPtr> deletedJobs;        // will clear/reset jobs when the vector goes out of scope.
+            {
+                unique_lock<mutex> lock( jobsMutex );
+                for( auto& job : jobs ) {
+                    if( !job ) continue;
+                    if( job->info.step == Job::JSTEP_COMPLETED ) {
+                        LOG << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
+                        LLOG(job->logger) << "Job " << job->info.id << " (" << job->info.name << ") is completed, removing from queue." << ende;
+                        deletedJobs.push_back( job );
+                        job.reset();
+                    }
                 }
+                jobs.erase( std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){ return !j; }), jobs.end() );
             }
-            jobs.erase( std::remove_if(jobs.begin(), jobs.end(), [](const shared_ptr<Job>& j){ return !j; }), jobs.end() );
+        } catch( const exception& e ) {
+            LOG_ERR << "Daemon::cleanup(): Exception caught while removing completed jobs: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "Daemon::cleanup(): Unrecognized exception caught while removing completed jobs." << ende;
         }
-        // here deletedJobs will be destructed, and the jobs cleaned up. This might take a while, so we do it in a detached thread.
     }).detach();
     
     cleanupThreads();
@@ -2084,7 +2091,11 @@ void Daemon::prepareLocalWork( int count ) {
                         break;
                     }
                 }
-            } catch ( ... ) { }
+            } catch ( const exception& e ) {
+                LOG_ERR << "prepareLocalWork: exception while scanning jobs for work: " << e.what() << ende;
+            } catch ( ... ) {
+                LOG_ERR << "prepareLocalWork: unrecognized exception while scanning jobs for work." << ende;
+            }
             THREAD_MARK
 
             if( !gotJob ) {
@@ -2093,7 +2104,7 @@ void Daemon::prepareLocalWork( int count ) {
             }
             THREAD_MARK
             
-            std::thread( [this,wip](){
+            boost::asio::post( ioContext, [this,wip](){
                 THREAD_MARK
                 try {
                     for( auto& part: wip->parts ) {
@@ -2112,11 +2123,15 @@ void Daemon::prepareLocalWork( int count ) {
                 }
                 --preparing_local;
                 THREAD_UNMARK
-            }).detach();
+            });
             THREAD_MARK
             --count;
         }
-    } catch( ... ) { }
+    } catch( const exception& e ) {
+        LOG_ERR << "prepareLocalWork: exception: " << e.what() << ende;
+    } catch( ... ) {
+        LOG_ERR << "prepareLocalWork: unrecognized exception." << ende;
+    }
     THREAD_UNMARK
     preparing_local -= count;
 
@@ -2152,7 +2167,11 @@ void Daemon::prepareRemoteWork( int count ) {
                         break;
                     }
                 }
-            } catch ( ... ) { }
+            } catch ( const exception& e ) {
+                LOG_ERR << "prepareRemoteWork: exception while scanning jobs for work: " << e.what() << ende;
+            } catch ( ... ) {
+                LOG_ERR << "prepareRemoteWork: unrecognized exception while scanning jobs for work." << ende;
+            }
             THREAD_MARK
 
             if( !gotJob || !wip ) {
@@ -2161,7 +2180,7 @@ void Daemon::prepareRemoteWork( int count ) {
             }
             THREAD_MARK
             
-            std::thread( [this,wip](){
+            boost::asio::post( ioContext, [this,wip](){
                 THREAD_MARK
                 try {
                     for( auto& part: wip->parts ) {
@@ -2182,11 +2201,15 @@ void Daemon::prepareRemoteWork( int count ) {
                 }
                 --preparing_remote;
                 THREAD_UNMARK
-            }).detach();
+            });
             THREAD_MARK
             --count;
         }
-    } catch( ... ) { }
+    } catch( const exception& e ) {
+        LOG_ERR << "prepareRemoteWork: exception: " << e.what() << ende;
+    } catch( ... ) {
+        LOG_ERR << "prepareRemoteWork: unrecognized exception." << ende;
+    }
     THREAD_UNMARK
     preparing_remote -= count;
 }
@@ -2208,7 +2231,7 @@ void Daemon::prepareWork( void ) {
                 if( nToPrepare > 0 ) {
                     THREAD_MARK
                     preparing_local += nToPrepare;
-                    std::thread( std::bind( &Daemon::prepareLocalWork, this, nToPrepare  ) ).detach();
+                    boost::asio::post( ioContext, std::bind( &Daemon::prepareLocalWork, this, nToPrepare  ) );
                 }
             }
             THREAD_MARK
@@ -2217,12 +2240,16 @@ void Daemon::prepareWork( void ) {
             if( nToPrepare > 0 ) {
                 THREAD_MARK
                 preparing_remote += nToPrepare;
-                std::thread( std::bind( &Daemon::prepareRemoteWork, this, nToPrepare ) ).detach();
+                boost::asio::post( ioContext, std::bind( &Daemon::prepareRemoteWork, this, nToPrepare ) );
             }
             THREAD_MARK
-        } catch(...){ }
+        } catch( const exception& e ) {
+            LOG_ERR << "prepareWork: exception: " << e.what() << ende;
+        } catch(...){
+            LOG_ERR << "prepareWork: unrecognized exception." << ende;
+        }
     }
-    
+
 }
 
 

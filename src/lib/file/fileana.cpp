@@ -72,8 +72,13 @@ void Ana::read( ifstream& file ) {
         throw logic_error( "Failed to read ANA header: initial 4 bytes does not match ANA" );
     }
 
-    if( m_Header.nhb > 16 ) {
-        throw logic_error( "Warning: Ana::read() - extended header is longer than 16 blocks!" );
+    if( m_Header.datyp > Ana::ANA_COMPLEX ) {
+        throw logic_error( "Failed to read ANA header: datyp=" + to_string(m_Header.datyp) + " is out of range." );
+    }
+
+    if( m_Header.nhb < 1 || m_Header.nhb > 16 ) {
+        throw logic_error( "Warning: Ana::read() - extended header block count (nhb="
+                            + to_string(m_Header.nhb) + ") is invalid." );
     }
     else {
         size_t extraTextSize = ( m_Header.nhb - 1 ) * rawSize;

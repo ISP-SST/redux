@@ -102,8 +102,12 @@ void LogToNetwork::flushBuffer( void ) {
         if( cmd == CMD_OK ) {
             sendBuffer.clear();
         }
+    } catch( const exception& e ) {
+        cerr << "LogToNetwork::flushBuffer: failed to send " << sendBuffer.size() << " log item(s) to "
+             << (host ? host->info.connectName : "unknown host") << ": " << e.what() << endl;
     } catch( ... ) {
-        // TODO Narrower catch, log error message
+        cerr << "LogToNetwork::flushBuffer: failed to send " << sendBuffer.size() << " log item(s) to "
+             << (host ? host->info.connectName : "unknown host") << ": unrecognized exception." << endl;
     }
     conn->unlock();
 
