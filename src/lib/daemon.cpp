@@ -18,8 +18,9 @@
 #include "redux/revision.hpp"
 #include "redux/version.hpp"
 
+#include <chrono>
 #include <functional>
-#include <sys/resource.h> 
+#include <sys/resource.h>
 
 #include <boost/asio/time_traits.hpp>
 #include <boost/algorithm/string.hpp>
@@ -182,8 +183,8 @@ void Daemon::maintenance( void ) {
 
     logger.flushAll();
     updateStatus();   // TODO: use a secondary connection for auxiliary communications
-    
-    timer.expires_from_now( boost::posix_time::seconds( 5 ) );
+
+    timer.expires_after( std::chrono::seconds( 5 ) );
     
     boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
     boost::posix_time::time_duration elapsed = (now - myInfo.status.lastActive);
@@ -312,7 +313,7 @@ bool Daemon::doWork( void ) {
         
         // start the maintenance loop
         LOG_DEBUG << "Initializing maintenance timer." << ende;
-        timer.expires_from_now( boost::posix_time::seconds( 5 ) );
+        timer.expires_after( std::chrono::seconds( 5 ) );
         timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
 
         // Add some threads for the async work.

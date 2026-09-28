@@ -136,7 +136,7 @@ namespace redux {
         
         boost::asio::io_context ioContext;
         boost::thread_group pool;
-        boost::asio::deadline_timer timer;
+        boost::asio::steady_timer timer;
         std::unique_ptr<network::TcpServer> server;
         
         Worker worker;
