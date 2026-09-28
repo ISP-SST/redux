@@ -165,19 +165,19 @@ void Solver::init( void ) {
     
     thread::TmpStorage::setSize( patchSize, pupilSize );
     tmp(true)->init();     // temp-storage for the main thread.
-    set<std::thread::id> initDone;
+    auto initDone = std::make_shared<set<std::thread::id>>();
     while(true) {
         for( uint16_t i=0; i<2*maxThreads; ++i ) {
-            boost::asio::post(ioContext, [&](){
+            boost::asio::post(ioContext, [this,initDone](){
                 unique_lock<mutex> lock(mtx);
-                if( initDone.count(std::this_thread::get_id()) ) return;
+                if( initDone->count(std::this_thread::get_id()) ) return;
                 tmp(true)->init();
-                initDone.insert(std::this_thread::get_id());
+                initDone->insert(std::this_thread::get_id());
             });
         }
         std::this_thread::sleep_for( std::chrono::seconds(1) );
         unique_lock<mutex> lock(mtx);
-        if( initDone.size() == maxThreads ) break;
+        if( initDone->size() == maxThreads ) break;
     }
 
 }
@@ -259,7 +259,7 @@ void Solver::my_precalc( const gsl_vector* b, const gsl_vector* b_grad ) {
         //if( o->weight > 0 ) {
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im: c->getSubImages() ) {
-                    boost::asio::post(ioContext, [this,&im, alphaPtr, phiPtr] {    // use a lambda to ensure these calls are sequential
+                    boost::asio::post(ioContext, [this,im, alphaPtr, phiPtr] {    // use a lambda to ensure these calls are sequential
                         im->calcPhi( alphaPtr, phiPtr );
                         ++progWatch;
                     });
@@ -276,7 +276,7 @@ void Solver::my_precalc( const gsl_vector* b, const gsl_vector* b_grad ) {
         //if( o->weight > 0 ) {
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im: c->getSubImages() ) {
-                    boost::asio::post(ioContext, [this,&im, alphaPtr, phiPtr] {    // use a lambda to ensure these calls are sequential
+                    boost::asio::post(ioContext, [this,im, alphaPtr, phiPtr] {    // use a lambda to ensure these calls are sequential
                         im->addToPhi( alphaPtr, phiPtr );
                         ++progWatch;
                     });
@@ -302,7 +302,7 @@ double Solver::metricAt( double step ) {
             double normalization = sqrt(1.0 / (o->pupil->area*otfSize2));
             for( const auto& c: o->getChannels() ) {
                 for( const auto& im RDX_UNUSED: c->getSubImages() ) {
-                    boost::asio::post(ioContext,  [this, &o, normalization, step, otfPtr, phiPtr, phiGradPtr] {
+                    boost::asio::post(ioContext,  [this, o, normalization, step, otfPtr, phiPtr, phiGradPtr] {
                         const double* pupilPtr = o->pupil->get();
                         for( const auto& ind: o->pupil->pupilInOTF ) {
                             otfPtr[ind.second] = polar(pupilPtr[ind.first]*normalization, phiPtr[ind.first]+step*phiGradPtr[ind.first]);
@@ -591,7 +591,7 @@ void Solver::shiftAndInit( const T* a, bool doReset ) {
         o->progWatch.setHandler( std::bind( &Object::reInitialize, o.get(), std::ref(ioContext), std::ref(progWatch), doReset ) );
         for( const auto& c: o->channels ) {
             for( const auto& im: c->getSubImages() ) {
-                boost::asio::post(ioContext,  [&,a](){
+                boost::asio::post(ioContext,  [o,im,a](){
                     o->imgShifted.fetch_or(im->adjustShifts(a));
                     ++o->progWatch;
                 } );
@@ -614,7 +614,7 @@ void Solver::alignWavefronts( void ) {
         for( const auto& c: o->getChannels() ) {
             shared_ptr<SubImage> refIm;
             for( const auto& im: c->getSubImages() ) {
-                boost::asio::post(ioContext, [&im,refIm,this] {    // use a lambda to ensure these calls are sequential
+                boost::asio::post(ioContext, [im,refIm,this] {    // use a lambda to ensure these calls are sequential
                     im->alignAgainst( refIm );
                     ++progWatch;
                 });
@@ -643,7 +643,7 @@ void Solver::applyAlpha( T* a ) {
     for( const auto& o: objects ) {
         for( const auto& c: o->getChannels() ) {
             for( const auto& im: c->getSubImages() ) {
-                boost::asio::post(ioContext, [&im,a,this] {    // use a lambda to ensure these calls are sequential
+                boost::asio::post(ioContext, [im,a,this] {    // use a lambda to ensure these calls are sequential
                     im->calcPhi( a );
                     im->calcPFOTF();
                     ++progWatch;
@@ -687,7 +687,7 @@ void Solver::applyConstraints( const double* a, double* b ) {
 
     progWatch.set( job.globalData->constraints.ns_cols.size() );
     for( auto& r: job.globalData->constraints.ns_cols ) {
-        boost::asio::post(ioContext,  [this,&r,&a,&b]() {
+        boost::asio::post(ioContext,  [this,r,a,b]() {
             double tmp(0);
             for( auto& e: r.second ) tmp += e.second * a[e.first];
             b[r.first] += tmp;
@@ -703,7 +703,7 @@ void Solver::reverseConstraints( const double* b, double* a ) {
 
     progWatch.set( job.globalData->constraints.ns_rows.size() );
     for( auto& r: job.globalData->constraints.ns_rows ) {
-        boost::asio::post(ioContext, [this,&r,&a,&b]() {
+        boost::asio::post(ioContext, [this,r,a,b]() {
             double tmpD(0);
             for( auto& e: r.second ) tmpD += e.second * b[e.first];
             a[r.first] += tmpD;
@@ -739,7 +739,7 @@ void Solver::initImages( double* a ) {
     for( const auto& o: job.objects ) {
         for( const shared_ptr<Channel>& c: o->channels ) {
             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
-                boost::asio::post(ioContext,  [&,a](){
+                boost::asio::post(ioContext,  [this,im,a](){
                     im->adjustShifts( a );
                     im->initialize(true);
                     ++progWatch;
@@ -922,7 +922,7 @@ void Solver::dump( string tag ) {
 
     progWatch.set( objects.size()+1 );
     for( auto & o : objects ) {
-        boost::asio::post(ioContext, [this,tag, &o](){
+        boost::asio::post(ioContext, [this,tag, o](){
             o->dump(tag);
             ++progWatch;
         });

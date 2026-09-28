@@ -939,7 +939,7 @@ void Daemon::failJobs( string jobString ) {
 
 void Daemon::removeJobs( const vector<size_t>& jobList ) {
 
-    std::thread( [&](){
+    std::thread( [this, jobList](){
         std::set<size_t> jobSet( jobList.begin(), jobList.end() );
         vector<Job::JobPtr> removedJobs;
         unique_lock<mutex> lock( jobsMutex );
