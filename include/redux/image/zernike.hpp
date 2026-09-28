@@ -73,7 +73,7 @@ namespace redux {
             static Zernike& get(void) { static Zernike ret; return ret; };
             
             std::vector<double> factorials;
-            std::mutex mtx;
+            std::recursive_mutex mtx;
             
         public:
             

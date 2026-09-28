@@ -418,8 +418,11 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
         THREAD_MARK
         if( step == JSTEP_CHECKED ) {
             // we are also restricted by nQueued.
+            auto glock2 = getGlobalLock();
             const CountT& limits2 = counts[StepID(jobType,JSTEP_QUEUED)];
-            if( limits2.active >= limits2.max ) {
+            bool overLimit = (limits2.active >= limits2.max);
+            glock2.unlock();
+            if( overLimit ) {
                 return false;
             }
             startLog();

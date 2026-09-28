@@ -189,7 +189,7 @@ bool Worker::getWork( void ) {
         if( running_ && !exitWhenDone_ && !resetWhenDone_ ) {
             if( daemon.getWork( wip, false ) || fetchWork() ) {    // first check for local work, then remote
                 myInfo.active();
-                myInfo.status.statusString = "...";
+                myInfo.setStatusString( "..." );
                 thisJob = wip->job.lock();
                 if(thisJob && (wip->jobID != thisJob->info.id)) {                                  // initialize if it is a new job.
                     thisJob->logger.setLevel( thisJob->info.verbosity );

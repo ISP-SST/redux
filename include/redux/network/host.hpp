@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 
@@ -58,7 +59,11 @@ namespace redux {
                 std::string statusString;
                 boost::posix_time::ptime lastSeen;
                 boost::posix_time::ptime lastActive;
+
+                mutable std::mutex mtx;
                 HostStatus( void );
+                HostStatus( const HostStatus& );
+                HostStatus& operator=( const HostStatus& );
                 uint64_t size(void) const;
                 uint64_t pack( char* ) const;
                 uint64_t unpack( const char*, bool );
@@ -77,6 +82,7 @@ namespace redux {
             void idle(void);
             void active(void);
             void limbo(void);
+            void setStatusString( const std::string& );
             
             static Host& myInfo(void);
             static std::string printHeader( int verbosity=0 );

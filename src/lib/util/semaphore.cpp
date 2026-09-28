@@ -59,8 +59,9 @@ void Semaphore::set( unsigned int val ) {
     lock_guard<mutex> lock(mtx);
     int64_t diff = static_cast<int64_t>(val)-static_cast<int64_t>(init);
     if( diff ) {
-        init += diff;
-        counter += diff;
+        init = val;
+        int64_t newCounter = static_cast<int64_t>(counter) + diff;
+        counter = (newCounter > 0) ? static_cast<unsigned int>(newCounter) : 0;
     }
 }
 

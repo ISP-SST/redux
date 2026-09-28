@@ -83,7 +83,9 @@ void LogToStream::flushBuffer( void ) {
     }
     itemQueue.clear();
     itemCount = 0;
+    lock.unlock();
 
+    lock_guard<mutex> wlock( writeMutex );
     for( LogItem& it: tmpQueue ) {
         writeFormatted( it );
     }

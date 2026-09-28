@@ -140,15 +140,19 @@ void Daemon::reset( void ) {
         worker.stop();
         runMode = RESET;
         logger.flushAll();
-        if( myMaster.conn && myMaster.conn->socket().is_open() ) {
-            *myMaster.conn << CMD_DISCONNECT;
-            myMaster.conn->socket().close();
-            myInfo.info.peerType &= ~Host::TP_WORKER;
+        if( myMaster.conn ) {
+            myMaster.conn->lock();
+            if( myMaster.conn->socket().is_open() ) {
+                *myMaster.conn << CMD_DISCONNECT;
+                myMaster.conn->socket().close();
+                myInfo.info.peerType &= ~Host::TP_WORKER;
+            }
+            myMaster.conn->unlock();
         }
         ioContext.stop();
         pool.interrupt_all();
     }).detach();
-    
+
 }
 
 
@@ -159,14 +163,18 @@ void Daemon::stop( void ) {
     worker.stop();
     runMode = EXIT;
     logger.flushAll();
-    if( myMaster.conn && myMaster.conn->socket().is_open() ) {
-        *myMaster.conn << CMD_DISCONNECT;
-        myMaster.conn->socket().close();
-        myInfo.info.peerType &= ~Host::TP_WORKER;
+    if( myMaster.conn ) {
+        myMaster.conn->lock();
+        if( myMaster.conn->socket().is_open() ) {
+            *myMaster.conn << CMD_DISCONNECT;
+            myMaster.conn->socket().close();
+            myInfo.info.peerType &= ~Host::TP_WORKER;
+        }
+        myMaster.conn->unlock();
     }
     ioContext.stop();
     pool.interrupt_all();
-    
+
 }
 
 
@@ -647,14 +655,28 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
     if( conn && server ) {
         Host::Ptr host = server->getHost( conn );
+        bool lastConnection = false;
         if( host && (host->info.peerType & Host::TP_WORKER) ) {
-            if( host->nConnections == 1 ) {
+            lastConnection = (host->nConnections == 1);
+            if( lastConnection ) {
                 LOG_DEBUG << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
             }
         }
-        unique_lock<mutex> lock( peerMutex );
-        peers.erase( host );
-        server->removeConnection( conn );
+
+        WorkInProgress::Ptr orphanedWIP;
+        {
+            unique_lock<mutex> lock( peerMutex );
+            if( host && lastConnection ) {
+                auto wipit = peerWIP.find( host );
+                if( wipit != peerWIP.end() ) {
+                    orphanedWIP = wipit->second;
+                    peerWIP.erase( wipit );
+                }
+            }
+            peers.erase( host );
+            server->removeConnection( conn );
+        }
+        if( orphanedWIP ) failedWIP( orphanedWIP );
     }
 
 }
@@ -862,7 +884,8 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                 nJobs++;
                 try {
                     count += job->unpack( ptr+count, swap_endian );
-                    job->info.id = jobCounter;
+                    lock_guard<mutex> lock( jobsMutex );
+                    job->info.id = jobCounter++;
                     if( job->info.name.empty() ) job->info.name = "job_" + to_string( job->info.id );
                     if( job->info.logFile.empty() ) {
                         job->info.logFile = job->info.name + ".log";
@@ -876,9 +899,7 @@ void Daemon::addJobs( TcpConnection::Ptr& conn ) {
                     job->info.submitTime = bpx::second_clock::universal_time();
                     ids.push_back( job->info.id );
                     ids[0]++;
-                    jobCounter++;
                     job->stopLog();
-                    lock_guard<mutex> lock( jobsMutex );
                     jobs.push_back( job );
                 } catch( const job_error& e ) {
                     messages.push_back( e.what() );
@@ -1537,7 +1558,7 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
                 if( job ) {
                     wip->jobID = oldJobID;
                     uint64_t blockSize = wip->workSize() + sizeof(uint64_t);
-                    host->status.statusString = alignLeft(to_string(job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ...";
+                    host->setStatusString( alignLeft(to_string(job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ..." );
                     host->active();
                     data = rdx_get_shared<char>( blockSize );
                     char* ptr = data.get()+sizeof(uint64_t);
@@ -1756,7 +1777,7 @@ void Daemon::addToLog( network::TcpConnection::Ptr& conn ) {
                 logger.addConnection( conn, host );
                 ret = CMD_OK;
             } else {
-                //unique_lock<mutex> lock( jobsMutex );
+                unique_lock<mutex> lock( jobsMutex );
                 for( Job::JobPtr & job : jobs ) {
                     if( job && (job->info.id == logid) ) {
                         job->logger.addConnection( conn, host );

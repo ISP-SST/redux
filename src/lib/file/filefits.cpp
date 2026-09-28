@@ -61,7 +61,7 @@ namespace {
     
     template <class T, typename... Args>
     T lockedCall( std::function<T(Args...)> f, Args...  args ) {
-        lockGuard();
+        lockGuard lg;
         return f( args... );
     }
 
@@ -1552,8 +1552,8 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                 int16_t* dP;
                 LONGLONG thisI;
                 shared_ptr<uint8_t> tmp;
+                std::lock_guard<mutex> fLock( fMtx );
                 {
-                    std::lock_guard<mutex> fLock( fMtx );
                     dP = reinterpret_cast<int16_t*>(dataPtr);
                     dataPtr += imgSize * 2;
                     thisI = rowIndex++;
@@ -1562,7 +1562,7 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                         printStatusError( "Fits::read(hdr,data), getting row("+to_string(thisI)+") info.", status );
                     }
                     if( (rOffset+rSize) > fptr->heapsize ) {
-                        cerr << "This file has a corrupt index-table for the compressed data. Tile #" << thisI << " will be skipped!" << endl; 
+                        cerr << "This file has a corrupt index-table for the compressed data. Tile #" << thisI << " will be skipped!" << endl;
                         return true;
                     }
 
@@ -1572,7 +1572,6 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                     }
                 }
                 rice_decomp16( tmp.get(), rSize, dP, imgSize, blockSize );
-                std::lock_guard<mutex> fLock( fMtx );
                 return true;
             };
             vector<thread> threads;

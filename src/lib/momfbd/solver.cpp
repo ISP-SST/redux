@@ -430,7 +430,7 @@ void Solver::run( PatchData::Ptr data ) {
 
         string progressString = boost::str( boost::format(" (%03.1f%%)") %
                                 ((modeCount-min(job.nInitialModes,nModes))*100.0/nModes));
-        myInfo.status.statusString = patchString + progressString;
+        myInfo.setStatusString( patchString + progressString );
         
         std::fill( enabledModes.get(), enabledModes.get()+modeCount, true );
 
@@ -538,7 +538,7 @@ void Solver::run( PatchData::Ptr data ) {
     
     LOG << "Patch" << (string)data->index << ":  After " << totalIterations << " iterations:  metric=" << thisMetric
         << "  (relative=" << (thisMetric/initialMetric) << ")  " << timer.print() << ende;
-    myInfo.status.statusString = patchString + " completed";
+    myInfo.setStatusString( patchString + " completed" );
     
 
 #ifdef RDX_DUMP_PATCHDATA

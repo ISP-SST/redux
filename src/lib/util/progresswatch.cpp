@@ -28,10 +28,14 @@ void ProgressWatch::clear(void) {
 
 
 void ProgressWatch::reset(void) {
-    
+
+    unique_lock<mutex> lock(mtx);
     int previous = counter_;
     counter_ = start_;
-    if( onChange && (counter_ != previous)) onChange();
+    bool changed = (counter_ != previous);
+    auto ticker = onChange;
+    lock.unlock();
+    if( ticker && changed ) ticker();
 
 }
 

@@ -139,7 +139,7 @@ double Zernike::getCovariance ( unsigned int i, unsigned int j ) {
     if( i > j ) std::swap(i, j);      // it's symmetric, so only store 1
     
     double& cov = Cache::get<PairID,double>( PairID(i,j), std::numeric_limits<double>::infinity() );
-    unique_lock<mutex> lock(get().mtx);
+    unique_lock<recursive_mutex> lock(get().mtx);
     if( ! isfinite(cov) ) { // not calulated yet
         cov = calcCovariance( i, j );
     }
@@ -152,7 +152,7 @@ shared_ptr<double> Zernike::getRadial( unsigned int nPixels, float radius, uint1
     
     RadialID rid( nPixels, radius, n, m );
     shared_ptr<double>& rpoly = Cache::get<RadialID,shared_ptr<double>>( rid );
-    
+    unique_lock<recursive_mutex> lock(get().mtx);
     if( !rpoly || (flags&FORCE) ) {
         
         if( flags & VERBOSE ) {
@@ -206,7 +206,7 @@ shared_ptr<double> Zernike::getAngular( unsigned int nPixels, float angle, int16
     
     AngularID aid( nPixels, angle, m );
     shared_ptr<double>& ang = Cache::get<AngularID,shared_ptr<double>>( aid );
-    
+    unique_lock<recursive_mutex> lock(get().mtx);
     if( !ang ) {    // never force re-calculation for the angular part
         if( flags & VERBOSE ) {
             cout << "Generating Zernike angular part (" << nPixels << "x" << nPixels << " pixels, m=" << m << endl;
@@ -278,8 +278,8 @@ Zernike::RadialPolynomial& Zernike::getRadialPolynomial( uint16_t n, uint16_t m,
     
     Zernike::RadialPolynomial& poly = Cache::get<PolyID,RadialPolynomial>( PolyID(n,m,flags&0xFF), RadialPolynomial(n,m,flags) );
 
-    //unique_lock<mutex> lock(get().mtx);
-    
+    unique_lock<recursive_mutex> lock(get().mtx);
+
     if( poly.empty() || flags&FORCE ) poly.calc( flags );
     
     return poly;
@@ -482,7 +482,7 @@ const std::map<uint16_t, Zernike::KLPtr>& Zernike::karhunenLoeveExpansion(uint16
 
 void Zernike::clear(void) {
     Zernike& z = get();
-    unique_lock<mutex> lock(get().mtx);
+    unique_lock<recursive_mutex> lock(get().mtx);
     Cache::clear<PairID,vector<double>>();          // covariances
     Cache::clear<PairID,double>();
     Cache::clear<PolyID,RadialPolynomial>();        // radial polynomials

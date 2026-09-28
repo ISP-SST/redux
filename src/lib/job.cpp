@@ -461,24 +461,27 @@ void Job::stopLog(void) {
 
 void Job::moveTo( Job* job, uint16_t to ) {
     if( !job ) return;
-    uint16_t current = job->info.step;
-    if( current == to ) return;
-    THREAD_MARK
-    auto glock = getGlobalLock();
-    CountT& c_old = counts[StepID(job->getTypeID(),current)];
-    CountT& c_new = counts[StepID(job->getTypeID(),to)];
-    c_old.active--;
-    c_new.active++;
-    glock.unlock();
-    THREAD_MARK
-    job->info.step = to;
-    bpx::ptime now = bpx::second_clock::universal_time();
-    auto it = job->info.times.emplace( to, now );
-    if( !it.second ) {
-        it.first->second = now;
-    }
-    if( to == JSTATE_ERR ) {
-        job->stopLog();
+    uint16_t current = job->info.step.load();
+    while( current != to ) {
+        if( job->info.step.compare_exchange_weak( current, to ) ) {
+            THREAD_MARK
+            auto glock = getGlobalLock();
+            CountT& c_old = counts[StepID(job->getTypeID(),current)];
+            CountT& c_new = counts[StepID(job->getTypeID(),to)];
+            c_old.active--;
+            c_new.active++;
+            glock.unlock();
+            THREAD_MARK
+            bpx::ptime now = bpx::second_clock::universal_time();
+            auto it = job->info.times.emplace( to, now );
+            if( !it.second ) {
+                it.first->second = now;
+            }
+            if( to == JSTATE_ERR ) {
+                job->stopLog();
+            }
+            return;
+        }
     }
 }
 
@@ -505,8 +508,9 @@ void Job::delThread( uint16_t n ) {
 
 
 void Job::cleanupThreads( void ) {
-    
-    lock_guard<mutex> lock(globalJobMutex);
+
+    lock_guard<mutex> lock(jobMutex);
+    lock_guard<mutex> glock(globalJobMutex);
     std::set<boost::thread::id> tmp_ot = old_threads;   // loop over local copy since we might delete elements.
     for( auto& tid: tmp_ot ) {
         boost::thread* t = thread_map[tid];

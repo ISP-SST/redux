@@ -75,11 +75,47 @@ Host::HostInfo::HostInfo( string username ) : peerType(0), connectPort(0), user(
 
 Host::HostStatus::HostStatus( void ) : currentJob( 0 ), maxThreads( std::thread::hardware_concurrency() ), listenPort(0),
     state( ST_IDLE ), progress( 0 ), statusString("idle") {
-        
-    lastSeen = boost::posix_time::second_clock::universal_time(); 
+
+    lastSeen = boost::posix_time::second_clock::universal_time();
     lastActive = boost::posix_time::second_clock::universal_time();
     nThreads = maxThreads;
     load[0] = load[1] = 0;
+}
+
+
+Host::HostStatus::HostStatus( const HostStatus& rhs ) {
+    lock_guard<mutex> lock( rhs.mtx );
+    currentJob = rhs.currentJob;
+    nThreads = rhs.nThreads;
+    maxThreads = rhs.maxThreads;
+    listenPort = rhs.listenPort;
+    state = rhs.state;
+    load[0] = rhs.load[0];
+    load[1] = rhs.load[1];
+    progress = rhs.progress;
+    statusString = rhs.statusString;
+    lastSeen = rhs.lastSeen;
+    lastActive = rhs.lastActive;
+}
+
+
+Host::HostStatus& Host::HostStatus::operator=( const HostStatus& rhs ) {
+    if( this == &rhs ) return *this;
+    lock( mtx, rhs.mtx );
+    lock_guard<mutex> lockL( mtx, std::adopt_lock );
+    lock_guard<mutex> lockR( rhs.mtx, std::adopt_lock );
+    currentJob = rhs.currentJob;
+    nThreads = rhs.nThreads;
+    maxThreads = rhs.maxThreads;
+    listenPort = rhs.listenPort;
+    state = rhs.state;
+    load[0] = rhs.load[0];
+    load[1] = rhs.load[1];
+    progress = rhs.progress;
+    statusString = rhs.statusString;
+    lastSeen = rhs.lastSeen;
+    lastActive = rhs.lastActive;
+    return *this;
 }
 
 
@@ -133,31 +169,43 @@ uint64_t Host::unpack( const char* ptr, bool swap_endian ) {
 
 void Host::touch(void) {
 
+    lock_guard<mutex> lock( status.mtx );
     status.lastSeen = boost::posix_time::second_clock::universal_time();
-    
+
 }
 
 
 void Host::active(void) {
 
+    lock_guard<mutex> lock( status.mtx );
     status.lastActive = boost::posix_time::second_clock::universal_time();
     status.state = ST_ACTIVE;
-    
+
 }
 
 
 void Host::limbo(void) {
 
+    lock_guard<mutex> lock( status.mtx );
     status.lastActive = boost::posix_time::second_clock::universal_time();
     status.state = ST_LIMBO;
-    
+
 }
 
 
 void Host::idle(void) {
 
+    lock_guard<mutex> lock( status.mtx );
     status.state = ST_IDLE;
     status.statusString = "idle";
+
+}
+
+
+void Host::setStatusString( const std::string& s ) {
+
+    lock_guard<mutex> lock( status.mtx );
+    status.statusString = s;
 
 }
 
@@ -180,20 +228,21 @@ std::string Host::printHeader( int verbosity ) {
 
 
 std::string Host::print( int verbosity ) {
+    HostStatus s = status;
     boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
-    boost::posix_time::time_duration elapsed = (now - status.lastActive);
+    boost::posix_time::time_duration elapsed = (now - s.lastActive);
     boost::posix_time::time_duration uptime = (now - info.startedAt);
     string elapsedString = "";
-    if( (status.state != ST_IDLE) && !elapsed.is_not_a_date_time() ) elapsedString = to_simple_string(elapsed);
+    if( (s.state != ST_IDLE) && !elapsed.is_not_a_date_time() ) elapsedString = to_simple_string(elapsed);
     string ret = alignRight(std::to_string(id),5) + alignCenter(info.name,25) + alignCenter(to_string(info.pid),7);
-    ret += alignCenter(to_string(status.nThreads) + string("/") + to_string(info.nCores),10);
+    ret += alignCenter(to_string(s.nThreads) + string("/") + to_string(info.nCores),10);
     ret += alignLeft(getVersionString(info.reduxVersion),10);
-    ret += alignLeft(boost::str(boost::format("%.2f/%.2f") % status.load[0] % status.load[1]),12);
+    ret += alignLeft(boost::str(boost::format("%.2f/%.2f") % s.load[0] % s.load[1]),12);
     ret += alignCenter(to_simple_string(uptime),12) + alignCenter(elapsedString,12);
-    ret += alignLeft(status.statusString,18); 
+    ret += alignLeft(s.statusString,18);
     if( verbosity ) {
-        if( id && status.listenPort ) {
-            ret += alignRight( to_string(status.listenPort), 6 );
+        if( id && s.listenPort ) {
+            ret += alignRight( to_string(s.listenPort), 6 );
         }
     }
     return ret;
@@ -292,6 +341,7 @@ bool Host::HostInfo::operator==(const HostInfo& rhs) const {
 
 
 uint64_t Host::HostStatus::size(void) const {
+    lock_guard<mutex> lock( mtx );
     uint64_t sz = sizeof(currentJob) + sizeof(nThreads) + sizeof(maxThreads) + sizeof(listenPort);
     sz += sizeof(state) + sizeof(load) + sizeof(progress) + 2*sizeof(time_t);
     sz += statusString.length() + 1;
@@ -300,9 +350,10 @@ uint64_t Host::HostStatus::size(void) const {
 
 
 uint64_t Host::HostStatus::pack( char* ptr ) const {
-    
+
     using redux::util::pack;
-    
+
+    lock_guard<mutex> lock( mtx );
     uint64_t count = pack(ptr,nThreads);
     count += pack(ptr+count,maxThreads);
     count += pack(ptr+count,listenPort);
@@ -324,9 +375,10 @@ uint64_t Host::HostStatus::pack( char* ptr ) const {
 
 
 uint64_t Host::HostStatus::unpack( const char* ptr, bool swap_endian ) {
-    
+
     using redux::util::unpack;
-    
+
+    lock_guard<mutex> lock( mtx );
     lastSeen = boost::posix_time::ptime( boost::posix_time::not_a_date_time );
     lastActive = boost::posix_time::ptime( boost::posix_time::not_a_date_time );
     
