@@ -19,6 +19,8 @@ uint8_t redux::network::cmdFromString( const string& str ) {
     
     if( contains(str, "OK", true ) ) return CMD_OK;
     if( contains(str, "NOTICE", true ) ) return CMD_NOTICE;
+    if( contains(str, "DISCONNECT", true ) ) return CMD_DISCONNECT;   // must precede "CONNECT" - it's a substring match.
+    if( contains(str, "LOG_CONNECT", true ) ) return CMD_LOG_CONNECT; // same: substring of "CONNECT".
     if( contains(str, "CONNECT", true ) ) return CMD_CONNECT;
     if( contains(str, "ADD_JOB", true ) ) return CMD_ADD_JOB;
     if( contains(str, "MOD_JOB", true ) ) return CMD_MOD_JOB;
@@ -36,8 +38,6 @@ uint8_t redux::network::cmdFromString( const string& str ) {
     if( contains(str, "DEL_SLV", true ) ) return CMD_DEL_SLV;
     if( contains(str, "AUTH", true ) ) return CMD_AUTH;
     if( contains(str, "CFG", true ) ) return CMD_CFG;
-    if( contains(str, "DISCONNECT", true ) ) return CMD_DISCONNECT;
-    if( contains(str, "LOG_CONNECT", true ) ) return CMD_LOG_CONNECT;
     if( contains(str, "PUT_LOG", true ) ) return CMD_PUT_LOG;
     if( contains(str, "RESET", true ) ) return CMD_RESET;
     if( contains(str, "DIE", true ) ) return CMD_DIE;

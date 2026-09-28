@@ -6,6 +6,9 @@
 
 #include <thread>
 
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
+
 namespace ba = boost::asio;
 
 using namespace redux::util;
@@ -17,7 +20,7 @@ using namespace std;
 #endif
 
 namespace {
-    
+
     set<uint64_t> connection_ids;
     mutex gmtx;
 
@@ -28,17 +31,22 @@ namespace {
         connection_ids.insert( id );
         return id;
     }
-    
+
     void freeID( uint64_t id ) {
         lock_guard<mutex> lock( gmtx );
         connection_ids.erase( id );
     }
-    
+
     /*size_t idCount( void ) RDX_UNUSED {
         lock_guard<mutex> lock( gmtx );
         return connection_ids.size();
     }*/
-    
+
+    boost::asio::thread_pool& callbackPool( void ) {
+        static boost::asio::thread_pool pool( std::thread::hardware_concurrency() );
+        return pool;
+    }
+
 }
 
 
@@ -69,14 +77,12 @@ uint64_t TcpConnection::receiveN( std::shared_ptr<char> buf, uint64_t N ) {
     while( remain > 0 ) {
         try {
             uint64_t this_count = boost::asio::read( mySocket, boost::asio::buffer(buf.get()+count,remain), boost::asio::transfer_at_least(1), ec );
-            if( this_count == 0 ) {
-                if( ec == boost::asio::error::eof || !mySocket.is_open() ) break;
-            }
+            if( this_count == 0 ) break;
             count += this_count;
             remain -= this_count;
         }
         catch( const exception& ) {
-            // ignore and continue. Connection errors are dealt with above.
+            break;  // don't spin retrying after a genuine connection error
         }
     }
     
@@ -249,13 +255,12 @@ void TcpConnection::urgentHandler( const boost::system::error_code& ec, size_t t
         if( urgentCallback ) {
             //LOG_DEBUG << "Activity on connection \"" << connptr->socket().remote_endpoint().address().to_string() << "\"";
             if( mySocket.is_open() ) {
-                std::thread( urgentCallback, shared_from_this() ).detach();
-                //myService.post( std::bind( urgentCallback, shared_from_this() ) );
+                ba::post( callbackPool(), std::bind( urgentCallback, shared_from_this() ) );
             }
         }
     } else {
         if( errorCallback ) {
-            std::thread( errorCallback, shared_from_this() ).detach();
+            ba::post( callbackPool(), std::bind( errorCallback, shared_from_this() ) );
         } else {
             if( ( error == ba::error::eof ) || ( error == ba::error::connection_reset ) || (  error == ba::error::operation_aborted) ) {
                 lock.unlock();
@@ -300,13 +305,12 @@ void TcpConnection::onActivity( const boost::system::error_code& ec, size_t tran
         if( activityCallback ) {
             //LOG_DEBUG << "Activity on connection \"" << connptr->socket().remote_endpoint().address().to_string() << "\"";
             if( mySocket.is_open() ) {
-                std::thread( activityCallback, shared_from_this() ).detach();
-                //myService.post( std::bind( activityCallback, shared_from_this() ) );
+                ba::post( callbackPool(), std::bind( activityCallback, shared_from_this() ) );
             }
         }
     } else {
         if( errorCallback ) {
-            std::thread( errorCallback, shared_from_this() ).detach();
+            ba::post( callbackPool(), std::bind( errorCallback, shared_from_this() ) );
         } else {
             if( ( error == ba::error::eof ) || ( error == ba::error::connection_reset ) || (  error == ba::error::operation_aborted) ) {
                 lock.unlock();

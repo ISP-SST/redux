@@ -2,6 +2,7 @@
 
 #include "redux/application.hpp"
 #include "redux/logging/logger.hpp"
+#include "redux/util/datautil.hpp"
 #include "redux/util/stringutil.hpp"
 
 #include <boost/thread.hpp>
@@ -14,6 +15,22 @@ using namespace std;
 namespace {
     std::map<boost::thread::id,boost::thread*> thread_map;
     std::set<boost::thread::id> old_threads;
+
+    void asyncReadTimed( TcpConnection::Ptr conn, shared_ptr<boost::asio::steady_timer> timer,
+                          boost::asio::mutable_buffer buf,
+                          function<void(const boost::system::error_code&, size_t)> handler ) {
+        timer->async_wait( [conn]( const boost::system::error_code& ec ) {
+            if( !ec ) {     // timeout
+                boost::system::error_code ignore;
+                conn->socket().cancel( ignore );
+            }
+        });
+        boost::asio::async_read( conn->socket(), buf,
+            [timer, handler]( const boost::system::error_code& ec, size_t transferred ) {
+                timer->cancel();   // no op
+                handler( ec, transferred );
+            });
+    }
 }
 
 
@@ -100,7 +117,11 @@ void TcpServer::cleanup(void) {
 
     lock_guard<mutex> lock(mtx);
     for( auto& t: old_threads ) {
-        pool.remove_thread( thread_map[t] );
+        boost::thread* thr = thread_map[t];
+        pool.remove_thread( thr );
+        thread_map.erase( t );
+        if( thr->joinable() ) thr->join();
+        delete thr;
     }
     old_threads.clear();
     
@@ -180,9 +201,10 @@ void TcpServer::removeConnection( TcpConnection::Ptr conn ) {       //  remove f
     }
     
     releaseConnection( conn );
-    
+
     conn->setErrorCallback(nullptr);
     conn->setCallback(nullptr);
+    conn->setUrgentCallback(nullptr);
     if( conn->socket().is_open() ) {
         conn->socket().close();
     }
@@ -253,37 +275,88 @@ void TcpServer::onAccept( TcpConnection::Ptr conn,
                                const boost::system::error_code& error ) {
     accept();    // always start another accept
 
-    if( !error ) {
+    if( error ) {
+        //LOG_ERR << "TcpServer::onAccept():  asio reports error:" << error.message();    // TODO some intelligent error handling
+        return;
+    }
+
+    if( !do_handshake ) {
         try {
             Host::HostInfo rhi;
-            if( do_handshake ) {
-                Host& hi = Host::myInfo();
-                Command cmd;
-                *conn >> cmd;
-                if( cmd != CMD_CONNECT ) return;    // The connection is terminated when going out of scope.
-                *conn << CMD_CFG;           // request handshake
-                *conn >> rhi;
-                *conn << hi.info;
-                if( do_auth ) {                       // TODO simple authentication. (key exchange ?)
-                    *conn << CMD_AUTH;
-                    // if auth fails => return, else continue and do the callback
-                }
-                *conn << CMD_OK;           // all ok
-            }
             addConnection( rhi, conn );
             if( onConnected ) {
                 onConnected(conn);
             }
             conn->idle();
-            
         } catch( const exception& e ) {
-            //LOG_TRACE << "onAccept() Failed to process new connection. Reason: " << e.what();   // only report to trace level since connect/disconnect should be quiet.
             return;
-        } 
-        //LOG_DETAIL << "Accepted connection from \"" << conn->socket().remote_endpoint().address().to_string() << "\"";
-    } else {
-        //LOG_ERR << "TcpServer::onAccept():  asio reports error:" << error.message();    // TODO some intelligent error handling
+        }
+        return;
     }
+
+    doHandshake( conn );
+
+}
+
+
+void TcpServer::doHandshake( TcpConnection::Ptr conn ) {
+
+    auto timer = make_shared<boost::asio::steady_timer>( ioContext );
+    timer->expires_after( std::chrono::seconds(5) );
+
+    auto cmdBuf = make_shared<Command>( CMD_ERR );
+
+    asyncReadTimed( conn, timer, boost::asio::buffer( cmdBuf.get(), sizeof(Command) ),
+        [this, conn, timer, cmdBuf]( const boost::system::error_code& ec, size_t transferred ) {
+            if( ec || transferred != sizeof(Command) || *cmdBuf != CMD_CONNECT ) {
+                return;
+            }
+
+            try {
+                *conn << CMD_CFG;           // request handshake
+            } catch( const exception& e ) {
+                return;
+            }
+
+            auto hdrBuf = make_shared<std::array<char, sizeof(uint64_t)+1>>();
+            asyncReadTimed( conn, timer, boost::asio::buffer( hdrBuf->data(), hdrBuf->size() ),
+                [this, conn, timer, hdrBuf]( const boost::system::error_code& ec2, size_t transferred2 ) {
+                    if( ec2 || transferred2 != hdrBuf->size() ) return;
+
+                    int one = 1;
+                    bool swap_endian = ( *reinterpret_cast<char*>(&one) != (*hdrBuf)[0] );
+                    uint64_t sz(0);
+                    redux::util::unpack( hdrBuf->data()+1, sz, swap_endian );
+                    if( sz == 0 || sz > (1<<20) ) return;   // HostInfo is small - reject anything absurd rather than allocate it
+
+                    auto bodyBuf = redux::util::rdx_get_shared<char>( sz );
+                    asyncReadTimed( conn, timer, boost::asio::buffer( bodyBuf.get(), sz ),
+                        [this, conn, timer, bodyBuf, sz, swap_endian]( const boost::system::error_code& ec3, size_t transferred3 ) {
+                            if( ec3 || transferred3 != sz ) return;
+
+                            try {
+                                Host::HostInfo rhi;
+                                rhi.unpack( bodyBuf.get(), swap_endian );
+
+                                Host& hi = Host::myInfo();
+                                *conn << hi.info;
+                                if( do_auth ) {                       // TODO simple authentication. (key exchange ?)
+                                    *conn << CMD_AUTH;
+                                    // if auth fails => return, else continue and do the callback
+                                }
+                                *conn << CMD_OK;           // all ok
+
+                                addConnection( rhi, conn );
+                                if( onConnected ) {
+                                    onConnected(conn);
+                                }
+                                conn->idle();
+                            } catch( const exception& e ) {
+                                return;
+                            }
+                        });
+                });
+        });
 
 }
 

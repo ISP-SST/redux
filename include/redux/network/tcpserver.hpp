@@ -42,6 +42,7 @@ namespace redux {
         private:
 
             void onAccept( TcpConnection::Ptr conn, const boost::system::error_code& error );
+            void doHandshake( TcpConnection::Ptr conn );
             void threadLoop( void );
 
             std::map<TcpConnection::Ptr, Host::Ptr, redux::util::PtrCompare<TcpConnection>> connections;

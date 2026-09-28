@@ -29,24 +29,26 @@ namespace redux {
 #endif
        {
 
-            static void writeCallback( size_t sent, const boost::system::error_code& error, size_t transferred ) {
-                using namespace boost::asio;
-
-                if( !error ) {
-                    if( sent != transferred ) {
-                        std::cerr << "TcpConnection::write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
-                    }
+            void writeCallback( std::shared_ptr<void> /*keepAlive*/, size_t sent, const boost::system::error_code& error, size_t transferred ) {
+                if( error ) {
+                    std::cerr << "TcpConnection::write: failed after " << transferred << "/" << sent
+                               << " bytes: " << error.message() << std::endl;
+                    close();
+                    return;
+                }
+                if( sent != transferred ) {
+                    std::cerr << "TcpConnection::write: only " << transferred << "/" << sent << " bytes were successfully transferred.";
                 }
             }
 
-            
+
         public:
 
             template <typename T>
             void asyncWrite( const std::shared_ptr<T> data, size_t sz ) {
                 if( mySocket.is_open() ) {
                     boost::asio::async_write( mySocket, boost::asio::buffer( data.get(), sz ),
-                                              boost::bind( &TcpConnection::writeCallback, sz,
+                                              boost::bind( &TcpConnection::writeCallback, shared_from_this(), data, sz,
                                                            boost::asio::placeholders::error,
                                                            boost::asio::placeholders::bytes_transferred )
                                             );
