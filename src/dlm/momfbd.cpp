@@ -728,7 +728,7 @@ IDL_VPTR redux::momfbd_read ( int argc, IDL_VPTR* argv, char* argk ) {
 
 
     // Allocate the datablock needed.
-    std::unique_ptr<char> data ( new char [ totalSize ] );
+    std::unique_ptr<char[]> data ( new char [ totalSize ] );
 
     v = IDL_ImportArray ( 1, dims, IDL_TYP_STRUCT, ( UCHAR* ) data.get() + sizeof ( MomfdContainer ), cleanupMomfbd, myStruct );
 

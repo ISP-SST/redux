@@ -1003,7 +1003,7 @@ void cacheload( int argc, IDL_VPTR* argv, char* argk ) {
         uint64_t uncompressedSz;
         redux::util::unpack( tmpPtr, uncompressedSz );
         unique_ptr<Bytef[]> buf( new Bytef[ uncompressedSz ] );
-        int ret = uncompress( buf.get(), &uncompressedSz, tmpData.get()+sizeof(uncompressedSz), dataSize );
+        int ret = uncompress( buf.get(), &uncompressedSz, tmpData.get()+sizeof(uncompressedSz), dataSize-sizeof(uncompressedSz) );
         
         switch(ret){
             case(Z_OK): break;

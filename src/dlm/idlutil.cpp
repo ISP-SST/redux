@@ -919,10 +919,13 @@ uint64_t unpackStructDef( const char* ptr, IDL_StructDefPtr& structDef ) {
     int nTags;
     count += unpack( ptr+count, nTags );
     vector<IDL_STRUCT_TAG_DEF> tags;
-    
+    vector<string> tagNames;
+    tagNames.reserve( nTags );
+
     IDL_STRUCT_TAG_DEF tmp;
     for( int i=0; i < nTags; ++i ) {
-        string tagName;
+        tagNames.emplace_back();
+        string& tagName = tagNames.back();
         count += unpack( ptr+count, tagName );
         tmp.name = const_cast<char*> ( tagName.c_str() );
         IDL_MEMINT tagOffset;
@@ -930,13 +933,13 @@ uint64_t unpackStructDef( const char* ptr, IDL_StructDefPtr& structDef ) {
         count += unpack( ptr+count, tagOffset );
         count += unpack( ptr+count, tagType );
         count += unpack( ptr+count, tmp.flags );
-        
+
         UCHAR nTagDims;
-        IDL_MEMINT* tagDims = new IDL_MEMINT[IDL_MAX_ARRAY_DIM];
         void* tagTypePtr = reinterpret_cast<void*>(tagType);
         count += unpack( ptr+count, nTagDims );
         tmp.dims = nullptr;
         if( nTagDims ) {
+            IDL_MEMINT* tagDims = new IDL_MEMINT[IDL_MAX_ARRAY_DIM];
             memcpy( tagDims+1, ptr+count, nTagDims*sizeof(IDL_MEMINT) );
             count += nTagDims * sizeof(IDL_MEMINT);
             tagDims[0] = nTagDims;

@@ -425,13 +425,13 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
             max_areas.resize( 2, max_areas[0] );  // if only 1 value, it will be copied
             max_areas[0] = std::min<float>( std::max(max_areas[0], 0.0f), hsz1 );
             max_areas[1] = std::min<float>( std::max(max_areas[1], 0.0f), hsz2 );
-            params.maxArea = min_areas[0];
+            params.maxArea = max_areas[0];
         }
     }
-    
+
     vector<float> distances;
-    if( kw.min_area ) {
-        distances = getAsVector<float>( kw.min_area );
+    if( kw.min_distance ) {
+        distances = getAsVector<float>( kw.min_distance );
         if( distances.size() ) {
             distances.resize( 2, distances[0] );  // if only 1 value, it will be copied
             distances[0] = std::min<float>( std::max(distances[0], 0.0f), hsz1 );
@@ -443,9 +443,9 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
     if ( kw.verbose > 1 ) {
         if( min_areas.size() > 1 ) cout << "img_align: applying " << printArray(min_areas,"min_area") << endl;
         else cout << "img_align: applying min_area = " << params.minArea << endl;
-        if( min_areas.size() > 1 ) cout << "img_align: applying " << printArray(max_areas,"max_area") << endl;
+        if( max_areas.size() > 1 ) cout << "img_align: applying " << printArray(max_areas,"max_area") << endl;
         else cout << "img_align: applying max_area = " << params.maxArea << endl;
-        if( distances.size() > 1 ) cout << "img_align: applying " << printArray(min_areas,"min_distance") << endl;
+        if( distances.size() > 1 ) cout << "img_align: applying " << printArray(distances,"min_distance") << endl;
         else cout << "img_align: applying min_distance = " << params.minDistBetweenBlobs << endl;
     }
 
@@ -503,7 +503,7 @@ IDL_VPTR img_align (int argc, IDL_VPTR* argv, char* argk) {
                     GaussianBlur( imgByte1, imgByte1, Size(smooths[0],smooths[0]), 0, 0 );
                 }
                 if( smooths[1]>0 ) {
-                    GaussianBlur( imgByte2, imgByte2, Size(smooths[0],smooths[0]), 0, 0 );
+                    GaussianBlur( imgByte2, imgByte2, Size(smooths[1],smooths[1]), 0, 0 );
                 }
             }
         }
@@ -2848,7 +2848,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
         }
         progWatch.wait();
 
-        for( size_t t=0; t<kw.nthreads; ++t ) {
+        for( size_t t=0; t<static_cast<size_t>(kw.nthreads); ++t ) {
             std::transform( summedData, summedData+nPixels, sumPtr+t*nPixels, summedData, std::plus<double>() );
         }
 
@@ -2922,7 +2922,7 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
 
                 progWatch.wait();
 
-                for( size_t t=0; t<kw.nthreads; ++t ) {
+                for( size_t t=0; t<static_cast<size_t>(kw.nthreads); ++t ) {
                     std::transform( summedData, summedData+nPixels, sumPtr+t*nPixels, summedData, std::minus<double>() );
                 }
 
@@ -3041,13 +3041,13 @@ IDL_VPTR sum_files( int argc, IDL_VPTR* argv, char* argk ) {
             std::sort( time_end.begin(), time_end.end() );
         }
         
-        if( kw.time_beg ) {
+        if( kw.time_beg && !time_beg.empty() ) {
             string tStr = bpx::to_simple_string(time_beg.begin()->time_of_day());
             IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
             IDL_VarCopy( tmpTimeString, kw.time_beg );
         }
 
-        if( kw.time_end ) {
+        if( kw.time_end && !time_end.empty() ) {
             string tStr = bpx::to_simple_string(time_end.rbegin()->time_of_day());
             IDL_VPTR tmpTimeString = IDL_StrToSTRING( (char*)tStr.c_str() );
             IDL_VarCopy( tmpTimeString, kw.time_end );

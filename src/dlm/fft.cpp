@@ -38,7 +38,7 @@ namespace {
         { (char*) "IN_PLACE",     IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_CONV_RESULT,in_place) },
         { (char*) "NONORMALIZE",  IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_CONV_RESULT,nonormalize) },
         { (char*) "NTHREADS",     IDL_TYP_BYTE, 1, 0,           0, (char*) IDL_KW_OFFSETOF2(KW_CONV_RESULT,nthreads) },
-        { (char*) "VERBOSE",      IDL_TYP_INT, 1, 0,           0, (char*) IDL_KW_OFFSETOF2(KW_CONV_RESULT,verbose) },
+        { (char*) "VERBOSE",      IDL_TYP_INT, 1, IDL_KW_ZERO, 0, (char*) IDL_KW_OFFSETOF2(KW_CONV_RESULT,verbose) },
         { NULL }
     };
 }

@@ -608,7 +608,7 @@ IDL_VPTR redux::stretch( int argc, IDL_VPTR argv[] )
                 i3 = min( i2 + 1, nm1 );
                 i3 = max( i3, 0 );
                 i4 = min( i2 + 2, nm1 );
-                i1 = max( i4, 0 );
+                i4 = max( i4, 0 );
             }
             dx1 = 1.0 - dx0;
             dx2 = -dx0 * 0.5;
@@ -634,7 +634,7 @@ IDL_VPTR redux::stretch( int argc, IDL_VPTR argv[] )
                 j3 = min( j2 + 1, mm1 );
                 j3 = max( j3, 0 );
                 j4 = min( j2 + 2, mm1 );
-                j1 = max( j4, 0 );
+                j4 = max( j4, 0 );
             }
             dx1 = 1.0 - dx0;
             dx2 = -dx0 * 0.5;

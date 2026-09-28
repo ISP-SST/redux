@@ -891,10 +891,11 @@ IDL_VPTR dsgridnest( int nArg, IDL_VPTR argv[], char* argk ) {
                 for(int ii=0; ii<ngtot; ++ii) displ[ii] = prev[ii] + displnew[ii];
                 delete [] displnew;
             }
-                    
-            delete [] pgx;
-            delete [] pgy;
         }
+
+        delete [] pgx;
+        delete [] pgy;
+
         if( k < (nTile-1) ){
             nprev = n;
             displprev = displ;
@@ -1097,7 +1098,7 @@ namespace interp {
             kw.missing = redux::mean(nx*ny, image);
         }
 
-        int const nthreads = std::max<int>(kw.nthreads, 4);
+        int const nthreads = std::max(std::min<int>(kw.nthreads, std::thread::hardware_concurrency()), 1);
         int const nearest  = std::max<int>(std::abs(kw.nearest), 0);
         double const missing = kw.missing;
 
