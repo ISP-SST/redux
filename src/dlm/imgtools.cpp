@@ -2022,7 +2022,7 @@ IDL_VPTR sum_images( int argc, IDL_VPTR* argv, char* argk ) {
         
         unique_ptr<double[]> checked;
         unique_ptr<double[]> sums( new double [ nPixels*kw.nthreads ] );
-        unique_ptr<double[]> tmp( new double [ nPixels*kw.nthreads ] );
+        unique_ptr<double[]> tmp( new double [ 2*nPixels*kw.nthreads ] );
         
         shared_ptr<float*> shiftsData;
         if( kw.pinh_align ) {

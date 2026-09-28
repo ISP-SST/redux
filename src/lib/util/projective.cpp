@@ -108,8 +108,8 @@ void ProjectiveMap::restrict(std::vector<PointD>& pts, double minValue, double m
 
 bool ProjectiveMap::operator==(const ProjectiveMap& rhs) {
     bool ret(true);
-    for (size_t i=0; ret && i<4; ++i) {
-        for (size_t j=0; ret && j<4; ++j) {
+    for (size_t i=0; ret && i<3; ++i) {
+        for (size_t j=0; ret && j<3; ++j) {
             ret &= (fabs(operator()(i,j)-rhs(i,j)) < 1E-9);
         }
     }

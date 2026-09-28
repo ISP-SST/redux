@@ -523,7 +523,7 @@ namespace {
             return it->second;
         }
 
-        Array<float> tmp ( ny, ny );
+        Array<float> tmp ( ny, nx );
         memset ( tmp.ptr(), 0, nx * ny * sizeof ( float ) );
 
         for ( int x = margin; x < nx - margin; ++x ) {
