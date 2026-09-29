@@ -578,7 +578,7 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
     // version string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:version-length" );
     if ( swapNeeded ) swapEndian ( &tmp32 );
-    tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
+    tmpStr.resize ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:version-string" );
     versionString = string(tmpStr.data());
     version = atof ( versionString.c_str() );
@@ -587,7 +587,7 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
     if ( version >= 20190408.0 ) {
         readOrThrow ( file, &tmp32, 1, "FileMomfbd:modifiedTime-length" );
         if ( swapNeeded ) swapEndian ( &tmp32 );
-        tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
+        tmpStr.resize ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
         readOrThrow ( file, &(tmpStr[0]), tmp32, "FileMomfbd:modifiedTime-string" );
         string modifiedString = replace_n(string(tmpStr.data()),"T"," ",1);
         modifiedTime = bpx::time_from_string( modifiedString );
@@ -596,14 +596,14 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
     // time string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:time-length" );
     if ( swapNeeded ) swapEndian ( &tmp32 );
-    tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
+    tmpStr.resize ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:time-string" );
     timeString = string(tmpStr.data());
 
     // date string
     readOrThrow ( file, &tmp32, 1, "FileMomfbd:date-length" );
     if ( swapNeeded ) swapEndian ( &tmp32 );
-    tmpStr.reserve ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
+    tmpStr.resize ( tmp32 );   // strings are stored including \0 termination, so no additional char needed
     readOrThrow ( file, & ( tmpStr[0] ), tmp32, "FileMomfbd:date-string" );
     dateString = string(tmpStr.data());
 
@@ -951,7 +951,7 @@ size_t FileMomfbd::load ( ifstream& file, char* ptr, uint8_t loadMask, int verbo
         while ( i < nFileNames ) {
             readOrThrow ( file, &nameLength, 1, "MomfbdData:namelength #" + to_string ( i ) );
             if ( swapNeeded ) swapEndian ( nameLength );
-            tmpStr.reserve ( nameLength );
+            tmpStr.resize ( nameLength );
             readOrThrow ( file, & ( tmpStr[0] ), nameLength,  "MomfbdData:name #" + to_string ( i ) );
             fileNames.push_back ( string ( tmpStr.begin(), tmpStr.begin() + nameLength ) );
             i++;

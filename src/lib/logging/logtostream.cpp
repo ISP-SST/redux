@@ -49,7 +49,6 @@ void LogToStream::writeFormatted( const LogItem &i ) {
     typedef boost::date_time::c_local_adjustor<bpx::ptime> local_adj;
 
     if( out.good() ) {
-        boost::io::ios_all_saver settings(out);
         if( localtime ) {
             out << to_iso_extended_string( local_adj::utc_to_local(i.entry.getTime()) ) << " ";
         } else {

@@ -343,17 +343,9 @@ int main (int argc, char *argv[]) {
         conn->connect( vm["master"].as<string>(), vm["port"].as<string>() );
 
         if( conn->socket().is_open() ) {
-            std::vector<std::shared_ptr<std::thread> > threads;
-            for ( int i=0; i<5; ++i) {
-                shared_ptr<thread> t( new thread( boost::bind( &boost::asio::io_context::run, &ioContext ) ) );
-                threads.push_back( t );
-            }
             int priority = vm["priority"].as<int>();
-            shared_ptr<thread> t( new thread( boost::bind( uploadJobs, conn, jobs, priority, std::ref(logger)) ) );
-            threads.push_back( t );
-            for( auto & it : threads ) {
-                it->join();
-            }
+            std::thread t( boost::bind( uploadJobs, conn, jobs, priority, std::ref(logger)) );
+            t.join();
         } else {
             cout << "Connection failed: " << vm["master"].as<string>() << ":" << vm["port"].as<string>() << endl;
         }

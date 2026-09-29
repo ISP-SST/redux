@@ -39,7 +39,7 @@ namespace testsuite {
 
         
         template <typename T>
-        void writeAndVerify( const string& filename, const T& indata ) {
+        void writeAndVerifyFits( const string& filename, const T& indata ) {
             writeFile( filename, indata );
             T data;
             readFile( filename, data );
@@ -332,16 +332,16 @@ namespace testsuite {
                 }
             }
 
-            writeAndVerify( testFileFits, array.copy<uint8_t>() );
-            //writeAndVerify( string("dbg_")+testFileFits, array.copy<int8_t>() );  // FIXME: causes illegal bitpix value on close.
-            writeAndVerify( testFileFits, array.copy<int16_t>() );
-            writeAndVerify( testFileFits, array.copy<uint16_t>() );
-            writeAndVerify( testFileFits, array );                       // int32_t
-            writeAndVerify( testFileFits, array.copy<uint32_t>() );
-            writeAndVerify( testFileFits, array.copy<int64_t>() );
-            writeAndVerify( testFileFits, array.copy<uint64_t>() );
-            writeAndVerify( testFileFits, array.copy<float>() );
-            writeAndVerify( testFileFits, array.copy<double>() );
+            writeAndVerifyFits( testFileFits, array.copy<uint8_t>() );
+            //writeAndVerifyFits( string("dbg_")+testFileFits, array.copy<int8_t>() );  // FIXME: causes illegal bitpix value on close.
+            writeAndVerifyFits( testFileFits, array.copy<int16_t>() );
+            writeAndVerifyFits( testFileFits, array.copy<uint16_t>() );
+            writeAndVerifyFits( testFileFits, array );                       // int32_t
+            writeAndVerifyFits( testFileFits, array.copy<uint32_t>() );
+            writeAndVerifyFits( testFileFits, array.copy<int64_t>() );
+            writeAndVerifyFits( testFileFits, array.copy<uint64_t>() );
+            writeAndVerifyFits( testFileFits, array.copy<float>() );
+            writeAndVerifyFits( testFileFits, array.copy<double>() );
             
             testFitsCards();
 
