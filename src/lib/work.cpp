@@ -234,12 +234,11 @@ void WorkInProgress::returnResults(void) {
 
 bool WorkInProgress::operator<( const WorkInProgress& rhs ) const {
     if( jobID != rhs.jobID ) return jobID < rhs.jobID;
-    size_t sz = std::min( parts.size(), rhs.parts.size() );
-    for( size_t i(0); i<sz; ++i ) {
-        if( !parts[i] || !rhs.parts[i] ) return parts[i] < rhs.parts[i];
-        if( !(*parts[i] == *rhs.parts[i]) ) return (*parts[i] < *rhs.parts[i]);
-    }
-    return (parts.size() < rhs.parts.size());
+    const Part::Ptr& thisPart = parts.empty() ? nullptr : parts[0];
+    const Part::Ptr& rhsPart = rhs.parts.empty() ? nullptr : rhs.parts[0];
+    if( !thisPart || !rhsPart ) return thisPart < rhsPart;
+    if( !(*thisPart == *rhsPart) ) return (*thisPart < *rhsPart);
+    return false;
 
 }
 
