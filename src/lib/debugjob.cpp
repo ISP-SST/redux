@@ -9,6 +9,7 @@
 #include "redux/util/stringutil.hpp"
 
 #include <algorithm>
+#include <random>
 #include <thread>
 
 using namespace redux::file;
@@ -326,7 +327,8 @@ void DebugJob::preProcess( void ) {
 
     }
 
-    std::random_shuffle( indices.begin(), indices.end() );
+    std::mt19937 rng( std::random_device{}() );
+    std::shuffle( indices.begin(), indices.end(), rng );
     count = 0;
     for( auto & part : pts ) {
         part->id = indices[count++];

@@ -359,7 +359,7 @@ bool Daemon::workerInit( void ) {
     
     if( master.empty() ) {
         logger.setContext( "master" );
-        logger.setFlushPeriod(1);
+        logger.setFlushPeriod(100);
     } else {
         myMaster.host.reset( new Host() );
         myMaster.host->info.connectName = master;
@@ -1111,11 +1111,10 @@ void Daemon::pokeSlaves( size_t n ) {
     std::copy( peers.begin(), peers.end(), std::back_inserter(tmpPeers) );
     plock.unlock();
 
-    // remove slave that are already active
+    // remove slaves that are already active
     tmpPeers.erase( std::remove_if( tmpPeers.begin(), tmpPeers.end(),
         []( const Host::Ptr& h ) {
             if( !h ) return true;
-            if( h->status.load[1] <= 0.0 ) return true;
             return (h->status.state != Host::ST_IDLE);
     }), tmpPeers.end() );
 
@@ -1581,17 +1580,19 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
                 LOG_DETAIL << "sendWork: wip/job is NULL. This should NOT happen !!" << ende;
             }
         }
-    }
-    THREAD_MARK
-        
-    if( count ) {
-        pack( data.get(), count );         // Store actual packed bytecount (something might be compressed)
-        LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print()
-                   << "  (size=" << count << ")" << ende;
-        conn->syncWrite( data.get(), count+sizeof(uint64_t) );
+        THREAD_MARK
+
+        if( count ) {
+            pack( data.get(), count );
+            LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print()
+                       << "  (size=" << count << ")" << ende;
+            conn->syncWrite( data.get(), count+sizeof(uint64_t) );
+        } else {
+            conn->syncWrite(count);
+            host->idle();
+        }
     } else {
         conn->syncWrite(count);
-        host->idle();
     }
     THREAD_UNMARK
 

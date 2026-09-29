@@ -199,10 +199,13 @@ bool Channel::checkCfg (void) {
     } else if (nWild == 1 && fileNumbers.empty()) {
         LOG_ERR << "Filename template contains wildcard and no image-numbers given (with IMAGE_NUM)" << ende;
         return false;
+    } else if (nWild == 0 && fileNumbers.size()) {
+        fileNumbers.clear();
     } /*else if( nWild == 2 && sequenceNumber == 0 ) {
         LOG_ERR << "Filename template contains 2 wildcards and no sequence-number given (with SEQUENCE_NUM)" << ende;
         return false;
     }*/
+    size_t nImageWild = nWild;
 
 
     if( darkTemplate.empty() != gainFile.empty() ) {
@@ -254,9 +257,10 @@ bool Channel::checkCfg (void) {
     }
 
     // Check if data directory exists (doesn't have to, it might only be visible by the manager, not necessarily on the machine where the job was submitted.
-    bfs::path fn = bfs::path( boost::str(boost::format (imageTemplate) % (imageNumberOffset)) ).parent_path();
+    string imageTemplateOffset = nImageWild ? boost::str(boost::format(imageTemplate) % (imageNumberOffset)) : imageTemplate;
+    bfs::path fn = bfs::path( imageTemplateOffset ).parent_path();
     if( !bfs::is_directory(fn) ) {    // try alternative path for data directory
-        fn = bfs::path(imageDataDir) / bfs::path (boost::str(boost::format (imageTemplate) % (imageNumberOffset))).parent_path();
+        fn = bfs::path(imageDataDir) / bfs::path( imageTemplateOffset ).parent_path();
     }
     if( incomplete && bfs::is_directory(fn) ) {   // if directory is present, and INCOMPLETE is specified, check which image numbers exists
         for( size_t i(0); i < fileNumbers.size(); ) {

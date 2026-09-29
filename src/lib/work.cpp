@@ -238,11 +238,11 @@ bool WorkInProgress::operator<( const WorkInProgress& rhs ) const {
     if( thisJob != rhsJob ) return thisJob < rhsJob;
     size_t sz = std::min( parts.size(), rhs.parts.size() );
     for( size_t i(0); i<sz; ++i ) {
-        if( parts[i] != rhs.parts[i] ) return thisJob < rhsJob;
+        if( !parts[i] || !rhs.parts[i] ) return parts[i] < rhs.parts[i];
+        if( !(*parts[i] == *rhs.parts[i]) ) return (*parts[i] < *rhs.parts[i]);
     }
-    //return (parts.size() < rhs.parts.size());
-    return false;
-    
+    return (parts.size() < rhs.parts.size());
+
 }
 
 
