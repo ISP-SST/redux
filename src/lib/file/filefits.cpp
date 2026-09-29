@@ -1552,8 +1552,8 @@ void Fits::read( shared_ptr<redux::file::Fits>& hdr, char* data ) {
                 int16_t* dP;
                 LONGLONG thisI;
                 shared_ptr<uint8_t> tmp;
-                std::lock_guard<mutex> fLock( fMtx );
                 {
+                    std::lock_guard<mutex> fLock( fMtx );
                     dP = reinterpret_cast<int16_t*>(dataPtr);
                     dataPtr += imgSize * 2;
                     thisI = rowIndex++;
