@@ -2088,6 +2088,7 @@ void Daemon::prepareLocalWork( int count ) {
                 THREAD_MARK
                     if( job && job->getWork( wip, myInfo.status.nThreads, activeCounts ) ) {
                         wip->job = job;
+                        wip->jobID = job->info.id;
                         gotJob = true;
                         break;
                     }
@@ -2164,6 +2165,7 @@ void Daemon::prepareRemoteWork( int count ) {
                 THREAD_MARK
                     if( job && job->getWork( wip, 0, activeCounts ) ) {
                         wip->job = job;
+                        wip->jobID = job->info.id;
                         gotJob = true;
                         break;
                     }

@@ -233,9 +233,7 @@ void WorkInProgress::returnResults(void) {
 
 
 bool WorkInProgress::operator<( const WorkInProgress& rhs ) const {
-    Job::JobPtr thisJob = job.lock();
-    Job::JobPtr rhsJob = rhs.job.lock();
-    if( thisJob != rhsJob ) return thisJob < rhsJob;
+    if( jobID != rhs.jobID ) return jobID < rhs.jobID;
     size_t sz = std::min( parts.size(), rhs.parts.size() );
     for( size_t i(0); i<sz; ++i ) {
         if( !parts[i] || !rhs.parts[i] ) return parts[i] < rhs.parts[i];
