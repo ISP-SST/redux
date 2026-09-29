@@ -1627,8 +1627,8 @@ void Daemon::putParts( TcpConnection::Ptr conn ) {
                 THREAD_MARK
                 try {
                     tmpwip->unpackWork( buf.get(), tmpJob, endian );
+                    returnWork( tmpwip );      // must run before returnResults(), which clears tmpwip's parts
                     tmpwip->returnResults();   // TBD: should this step be async/by manager?
-                    returnWork( tmpwip );
                     LOG_DETAIL << msg << ende;
                 } catch ( exception& e ) {
                     LOG_ERR << "putParts:  exception when unpacking results: " << e.what() << ende;
