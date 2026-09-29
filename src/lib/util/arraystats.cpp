@@ -28,7 +28,8 @@ namespace redux {
                 double tmp = static_cast<double>( *ptr );
                 if( tmp > max ) {
                     max = tmp;
-                } else if( tmp < min ) {
+                }
+                if( tmp < min ) {
                     min = tmp;
                 }
                 if ( isfinite( tmp ) ) { // will exclude NaN

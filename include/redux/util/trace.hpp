@@ -75,7 +75,7 @@ namespace redux {
             
             TraceObject() {
                 Cache::get<T*,trace::BT>(reinterpret_cast<T*>(this));
-                static Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
+                Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
                                       std::bind(TraceObject<T>::getStats),
                                       std::bind(TraceObject<T>::printBackTraces),
                                       std::bind(TraceObject<T>::t_count),
@@ -129,7 +129,8 @@ namespace redux {
             T* tmp = new T[n];
 #endif
             Cache::get<T*,trace::BT>(tmp);
-            static Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
+
+            Trace::trace_t& tt = Trace::addTraceObject( Cache::getID1<T*,trace::BT>(),
                                     std::bind(TraceObject<T>::getStats),
                                     std::bind(TraceObject<T>::printBackTraces),
                                     std::bind(TraceObject<T>::t_count),

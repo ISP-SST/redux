@@ -42,8 +42,20 @@ timespec& redux::util::operator+= ( timespec& a, const timespec& b ) {
 timespec redux::util::operator- ( const timespec& a, const timespec& b ) {
 
     struct timespec c;
-    c.tv_sec = abs( a.tv_sec - b.tv_sec );
-    c.tv_nsec = abs( a.tv_nsec - b.tv_nsec );
+    c.tv_sec = a.tv_sec - b.tv_sec;
+    c.tv_nsec = a.tv_nsec - b.tv_nsec;
+    if( c.tv_nsec < 0 ) {
+        c.tv_sec--;
+        c.tv_nsec += 1000000000;
+    }
+    if( c.tv_sec < 0 ) {
+        c.tv_sec = -c.tv_sec;
+        c.tv_nsec = -c.tv_nsec;
+        if( c.tv_nsec < 0 ) {
+            c.tv_sec--;
+            c.tv_nsec += 1000000000;
+        }
+    }
     return c;
 }
 

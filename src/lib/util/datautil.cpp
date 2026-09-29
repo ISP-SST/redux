@@ -55,7 +55,6 @@ uint64_t redux::util::pack( char* ptr, const momfbd::ModeList& in ) {
     uint64_t totalSize = sizeof(uint64_t);
     *reinterpret_cast<momfbd::ModeBase*>(ptr+totalSize) = in.defaultType;
     totalSize += sizeof(momfbd::ModeBase);
-    memcpy( ptr, reinterpret_cast<const char*>(&count), sizeof(uint64_t) );
     for( auto &m: in ) {
         *reinterpret_cast<momfbd::ModeBase*>(ptr+totalSize) = m.type;
         totalSize += sizeof(momfbd::ModeBase);

@@ -19,10 +19,7 @@ RecursePath::RecursePath( const RecursePath& rhs, int sublevels ) : nSubLevels( 
 }
 
 
-RecursePath::RecursePath( const RecursePath& rhs ) {
-    
-    nSubLevels = rhs.nSubLevels-1;
-    callBack = rhs.callBack;
+RecursePath::RecursePath( const RecursePath& rhs ) : nSubLevels( rhs.nSubLevels ), callBack( rhs.callBack ) {
 
 }
 
