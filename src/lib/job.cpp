@@ -516,6 +516,7 @@ void Job::cleanupThreads( void ) {
         boost::thread* t = thread_map[tid];
         if( pool.is_thread_in(t) ) {
             pool.remove_thread( t );
+            delete t;
             old_threads.erase( tid );
             thread_map.erase( tid );
         }

@@ -2,6 +2,8 @@
 
 #include "redux/momfbd/util.hpp"
 
+#include <malloc.h>
+
 #ifdef DEBUG_
 #   define TRACE_THREADS
 #endif
@@ -510,7 +512,9 @@ void MomfbdJob::cleanup(void) {
 
     objects.clear();
     globalData.reset();
-    
+
+    malloc_trim(0);
+
     THREAD_MARK
 }
 

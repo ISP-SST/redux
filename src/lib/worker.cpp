@@ -187,6 +187,7 @@ bool Worker::getWork( void ) {
         
         boost::this_thread::interruption_point();
         if( running_ && !exitWhenDone_ && !resetWhenDone_ ) {
+            Job::JobPtr previousJob = currentJob;    // fetchWork()/unpackWork() may silently overwrite currentJob with a new Job.
             if( daemon.getWork( wip, false ) || fetchWork() ) {    // first check for local work, then remote
                 myInfo.active();
                 myInfo.setStatusString( "..." );
@@ -201,6 +202,9 @@ bool Worker::getWork( void ) {
                     thisJob->init();
                     wip->jobID = thisJob->info.id;
                     currentJob = thisJob;
+                }
+                if( previousJob && (previousJob != currentJob) ) {
+                    previousJob->cleanup();    // release the old job's Solver/thread-pool/etc. before our last reference to it goes away.
                 }
                 THREAD_MARK
                 if( !wip->isRemote ) {
@@ -217,6 +221,9 @@ bool Worker::getWork( void ) {
     }
     
     boost::this_thread::interruption_point();
+    if( currentJob ) {
+        currentJob->cleanup();    // release Solver/thread-pool/etc. before dropping our last reference.
+    }
     currentJob.reset();
     THREAD_UNMARK;
     return false;
