@@ -580,9 +580,6 @@ vector<string> makeStandardHeader( vector<string> cards, int32_t bitpix, const v
     Fits::removeCards( cards, "NAXIS" );
     for( int i=1; i<=20; ++i ) Fits::removeCards( cards, "NAXIS"+to_string(i) );
     Fits::removeCards( cards, "END" );
-    cards.erase( std::remove_if( cards.begin(), cards.end(), []( const string& c ) {
-                     return boost::trim_copy(c).empty();
-                 } ), cards.end() );
 
     vector<string> hdr;
     hdr.push_back( Fits::makeCard( "SIMPLE", true, "conforms to FITS standard" ) );
