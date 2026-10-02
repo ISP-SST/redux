@@ -1160,6 +1160,7 @@ namespace redux {
         }
     }
 }
+template int32_t Fits::getValue<int32_t>( const vector<string>&, string );
 
 
 template <typename T>
