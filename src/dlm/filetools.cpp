@@ -575,19 +575,24 @@ int32_t getIntCard( const vector<string>& cards, const string& key, int32_t def 
 
 vector<string> makeStandardHeader( vector<string> cards, int32_t bitpix, const vector<int32_t>& dims ) {
 
-    Fits::removeCards( cards, "SIMPLE" );
-    Fits::removeCards( cards, "BITPIX" );
-    Fits::removeCards( cards, "NAXIS" );
-    for( int i=1; i<=20; ++i ) Fits::removeCards( cards, "NAXIS"+to_string(i) );
-    Fits::removeCards( cards, "END" );
+    auto takeOrMake = [&cards]( const string& key, const string& madeCard ) -> string {
+        string existing = Fits::getCard( cards, key );
+        Fits::removeCards( cards, key );
+        return existing.empty() ? madeCard : existing;
+    };
 
     vector<string> hdr;
-    hdr.push_back( Fits::makeCard( "SIMPLE", true, "conforms to FITS standard" ) );
-    hdr.push_back( Fits::makeCard( "BITPIX", bitpix, "number of bits per data pixel" ) );
-    hdr.push_back( Fits::makeCard( "NAXIS", static_cast<int32_t>(dims.size()), "number of data axes" ) );
+    hdr.push_back( takeOrMake( "SIMPLE", Fits::makeCard( "SIMPLE", true, "conforms to FITS standard" ) ) );
+    hdr.push_back( takeOrMake( "BITPIX", Fits::makeCard( "BITPIX", bitpix, "number of bits per data pixel" ) ) );
+    hdr.push_back( takeOrMake( "NAXIS", Fits::makeCard( "NAXIS", static_cast<int32_t>(dims.size()), "number of data axes" ) ) );
     for( size_t i=0; i<dims.size(); ++i ) {
-        hdr.push_back( Fits::makeCard( "NAXIS"+to_string(i+1), dims[i] ) );
+        string key = "NAXIS"+to_string(i+1);
+        hdr.push_back( takeOrMake( key, Fits::makeCard( key, dims[i] ) ) );
     }
+    for( size_t i=dims.size()+1; i<=20; ++i ) {
+        Fits::removeCards( cards, "NAXIS"+to_string(i) );
+    }
+    Fits::removeCards( cards, "END" );
 
     hdr.insert( hdr.end(), cards.begin(), cards.end() );
     hdr.push_back( Fits::makeCard( "END" ) );
