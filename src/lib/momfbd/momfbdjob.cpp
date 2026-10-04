@@ -198,11 +198,13 @@ uint64_t MomfbdJob::size( void ) const {
     sz += GlobalCfg::size();
     sz += roi.size();
     sz += 2*sizeof(uint16_t) + 2;           // objects.size() + trace_objects.size() + cfgChecked & dataChecked
-    for( const auto& obj: objects ) {
-        sz += obj->size();
-    }
-    for( const auto& tobj: trace_objects ) {
-        sz += tobj->size();
+    if( info.step != JSTEP_PREPROCESS ) {
+        for( const auto& obj: objects ) {
+            sz += obj->size();
+        }
+        for( const auto& tobj: trace_objects ) {
+            sz += tobj->size();
+        }
     }
 
     return sz;
@@ -210,12 +212,12 @@ uint64_t MomfbdJob::size( void ) const {
 
 
 uint64_t MomfbdJob::pack( char* ptr ) const {
-    
+
     if( packed.packedSize ) {
         memcpy( ptr, packed.data.get(), packed.packedSize );
         return packed.packedSize;
     }
-    
+
     using redux::util::pack;
 
     uint64_t count = Job::pack( ptr );
@@ -223,15 +225,21 @@ uint64_t MomfbdJob::pack( char* ptr ) const {
     count += roi.pack( ptr+count );
     count += pack( ptr+count, cfgChecked );
     count += pack( ptr+count, dataChecked );
-    count += pack( ptr+count, (uint16_t)objects.size() );
-    for( const auto& obj: objects ) {
-        count += obj->pack( ptr+count );
+
+    bool preprocessing = ( info.step == JSTEP_PREPROCESS );
+    count += pack( ptr+count, (uint16_t)(preprocessing ? 0 : objects.size()) );
+    if( !preprocessing ) {
+        for( const auto& obj: objects ) {
+            count += obj->pack( ptr+count );
+        }
     }
-    count += pack( ptr+count, (uint16_t)trace_objects.size() );
-    for( const auto& tobj: trace_objects ) {
-        count += tobj->pack( ptr+count );
+    count += pack( ptr+count, (uint16_t)(preprocessing ? 0 : trace_objects.size()) );
+    if( !preprocessing ) {
+        for( const auto& tobj: trace_objects ) {
+            count += tobj->pack( ptr+count );
+        }
     }
-    
+
     return count;
     
 }

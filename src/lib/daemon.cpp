@@ -1657,25 +1657,34 @@ void Daemon::sendJobList( TcpConnection::Ptr& conn ) {
     unique_lock<mutex> lock( jobsMutex );
     vector<Job::JobPtr> tmpJobs( jobs );
     lock.unlock();
-    
-    uint64_t blockSize(0);
-    for( auto& job : tmpJobs ) {
-        if(job) blockSize += job->size();
-    }
-    uint64_t totalSize = blockSize + sizeof( uint64_t );                    // blockSize will be sent before block
-    shared_ptr<char> buf = rdx_get_shared<char>(totalSize);
-    char* ptr = buf.get()+sizeof( uint64_t );
+
+    vector<pair<shared_ptr<char>,uint64_t>> packedJobs;
+    packedJobs.reserve( tmpJobs.size() );
     uint64_t packedSize(0);
     for( auto& job : tmpJobs ) {
-        if(job) packedSize += job->pack( ptr+packedSize );
+        if( !job ) continue;
+        auto jobLock = job->getLock();
+        uint64_t sz = job->size();
+        shared_ptr<char> jobBuf = rdx_get_shared<char>(sz);
+        uint64_t n = job->pack( jobBuf.get() );
+        if( n > sz ) {
+            string msg = "sendJobList(): Packing mismatch for job " + to_string(job->info.id)
+                       + ":  packed = " + to_string(n) + "   size = " + to_string(sz) + "  bytes.";
+            throw length_error(msg);
+        }
+        packedJobs.emplace_back( jobBuf, n );
+        packedSize += n;
     }
-    //lock.unlock();
-    if( packedSize > blockSize ) {
-        string msg = "sendJobList(): Packing mismatch:  packedSize = " + to_string(packedSize) + "   blockSize = " + to_string(blockSize) + "  bytes.";
-        throw length_error(msg);
-        //LOG_DEBUG << msg << ende;
+
+    uint64_t totalSize = packedSize + sizeof( uint64_t );                    // blockSize will be sent before block
+    shared_ptr<char> buf = rdx_get_shared<char>(totalSize);
+    char* ptr = buf.get()+sizeof( uint64_t );
+    uint64_t offset(0);
+    for( auto& pj : packedJobs ) {
+        memcpy( ptr+offset, pj.first.get(), pj.second );
+        offset += pj.second;
     }
-    totalSize = packedSize + sizeof( uint64_t );
+
     pack( buf.get(), packedSize );                                                // store real blockSize
     conn->syncWrite( buf.get(), totalSize );
 

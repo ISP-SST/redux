@@ -520,7 +520,7 @@ namespace redux {
                     ret += oss.str();
                 }
             }
-            if( ret.back() == ',' ) ret.pop_back();
+            if( !ret.empty() && ret.back() == ',' ) ret.pop_back();
             return ret;
         }
     };
