@@ -657,25 +657,26 @@ void Daemon::removeConnection( TcpConnection::Ptr conn ) {
 
     if( conn && server ) {
         Host::Ptr host = server->getHost( conn );
-        bool lastConnection = false;
-        if( host && (host->info.peerType & Host::TP_WORKER) ) {
-            lastConnection = (host->nConnections == 1);
-            if( lastConnection ) {
-                LOG_DEBUG << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
-            }
+
+        bool lastConnection = (host && (host->nConnections == 1));  // only remove peer if the last connection is lost.
+
+        if( lastConnection && (host->info.peerType & Host::TP_WORKER) ) {
+            LOG_DEBUG << "Host #" << host->id << "  (" << host->info.name << ":" << host->info.pid << ") disconnected." << ende;
         }
 
         WorkInProgress::Ptr orphanedWIP;
         {
             unique_lock<mutex> lock( peerMutex );
-            if( host && lastConnection ) {
-                auto wipit = peerWIP.find( host );
-                if( wipit != peerWIP.end() ) {
-                    orphanedWIP = wipit->second;
-                    peerWIP.erase( wipit );
+            if( lastConnection ) {
+                if( host->info.peerType & Host::TP_WORKER ) {
+                    auto wipit = peerWIP.find( host );
+                    if( wipit != peerWIP.end() ) {
+                        orphanedWIP = wipit->second;
+                        peerWIP.erase( wipit );
+                    }
                 }
+                peers.erase( host );
             }
-            peers.erase( host );
             server->removeConnection( conn );
         }
         if( orphanedWIP ) failedWIP( orphanedWIP );
