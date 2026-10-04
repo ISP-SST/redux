@@ -897,10 +897,10 @@ namespace redux {
                 if( this->sameSize( rhs ) ) {
                     if(dense_ && rhs.dense_) {
                         std::transform(get()+begin_, get()+end_, rhs.get()+rhs.begin_, get()+begin_,
-                                       [eps]( const complex_t& a, const complex_t& b) { if( fabs(b)>eps ) return static_cast<T>(a/b); return T(0); } );
+                                       [eps]( const complex_t& a, const complex_t& b) { if( std::abs(b)>eps ) return static_cast<T>(a/b); return T(0); } );
                     } else {
                         std::transform(begin(), end(), rhs.begin(), begin(),
-                                       [eps]( const complex_t& a, const complex_t& b) { if( fabs(b)>eps ) return static_cast<T>(a/b); return T(0); } );
+                                       [eps]( const complex_t& a, const complex_t& b) { if( std::abs(b)>eps ) return static_cast<T>(a/b); return T(0); } );
                     }
                 }
                 else {
