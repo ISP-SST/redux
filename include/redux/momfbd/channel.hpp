@@ -108,6 +108,7 @@ namespace redux {
             
             void loadCalib(boost::asio::io_context&);
             void loadData(boost::asio::io_context&, redux::util::Array<PatchData::Ptr>&);
+            void buildPatchCoverageMask(redux::util::Array<PatchData::Ptr>&);
             void unloadCalib(void);
 
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
@@ -129,6 +130,7 @@ namespace redux {
             redux::image::Image<float> psf, modulationMatrix;
             redux::image::Image<int16_t> xOffset, yOffset;
             std::shared_ptr<uint8_t> gainMask;
+            std::shared_ptr<uint8_t> patchCoverageMask;     //!< Mask indicating pixels are inside at least one patch.
             bpx::ptime startT, endT;
             std::future<bool> patchWriteFail;
             std::vector<size_t> nFrames;                                    //!< Number of frames in each file

@@ -23,6 +23,7 @@
 #include "redux/util/projective.hpp"
 #include "redux/util/trace.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <math.h>
 #include <numeric>
@@ -680,17 +681,10 @@ void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchDa
             images.clear();
         }
     });
-    for( unsigned int y=0; y<patches.dimSize(0); ++y ) {
-        for( unsigned int x=0; x<patches.dimSize(1); ++x ) {
-            boost::asio::post( ioc, [this,&patches,y,x]() {
-                auto oData = patches(y,x)->getObjectData(myObject.ID);
-                if( !oData ) throw runtime_error("patches(y,x)->getObjectData() returned a null pointer !");
-                auto chData = oData->channels[ID];
-                adjustCutout( *chData, patches(y,x) );
-                ++progWatch;
-            } );
-        }
-    }
+
+    adjustCutouts( patches );
+    buildPatchCoverageMask( patches );
+    progWatch.step( patches.dimSize(0)*patches.dimSize(1) );
     
     size_t nPreviousFrames(0);
     for( size_t i=0; i<nFiles; ++i ) {
@@ -1203,10 +1197,14 @@ void Channel::preprocessImage( size_t i ) {
             }
 
             // Fill larger features that the mask will exclude. This will fill e.g. black borders.
-            // TBD: Should this be skipped and force the user to be stricter with the clip/ROI instead?
+            // Restricted to pixels inside at least one patch's cutout.
+            shared_ptr<uint8_t*> coverage2D;
+            if( patchCoverageMask ) {
+                coverage2D = reshapeArray( patchCoverageMask.get(), sy, sx );
+            }
             function<double (size_t, size_t) > func = bind( inverseDistanceWeight<double>, arrayPtr, sy, sx, sp::_1, sp::_2);
-            fillPixels (arrayPtr, sy, sx, func, std::bind( std::less_equal<double>(), sp::_1, myJob.badPixelThreshold));
-            
+            fillPixels (arrayPtr, sy, sx, func, std::bind( std::less_equal<double>(), sp::_1, myJob.badPixelThreshold), coverage2D.get());
+
             // FIXME: This is a hack to create truncated values as the old code!!
             //for(size_t i=0; i<sy*sx; ++i) arrayPtr[0][i] = (int)arrayPtr[0][i];
             
@@ -1489,7 +1487,43 @@ void Channel::adjustCutouts( Array<PatchData::Ptr>& patches ) {
             }
         }
     }
-    
+
+}
+
+
+void Channel::buildPatchCoverageMask( Array<PatchData::Ptr>& patches ) {
+
+    patchCoverageMask.reset();      // fillPixels() by default covers every pixel
+    if( patches.nDimensions() != 2 || !patches.nElements() ) return;
+
+    size_t sy = imgSize.y;
+    size_t sx = imgSize.x;
+    std::shared_ptr<uint8_t> tmpMask = rdx_get_shared<uint8_t>( sy*sx );
+    uint8_t* mask = tmpMask.get();
+    std::fill_n( mask, sy*sx, uint8_t(0) );
+
+    size_t nPatchesY = patches.dimSize(0);
+    size_t nPatchesX = patches.dimSize(1);
+    for( size_t py=0; py<nPatchesY; ++py ) {
+        for( size_t px=0; px<nPatchesX; ++px ) {
+            const PatchData::Ptr& patch( patches(py,px) );
+            if( !patch ) continue;
+            ChannelData::Ptr chData = patch->getChannelData( myObject.ID, ID );
+            if( !chData ) continue;
+            RegionI r = chData->cutoutRegion;
+            r.normalize();
+            int64_t y0 = std::max<int64_t>( 0, r.first.y );
+            int64_t y1 = std::min<int64_t>( (int64_t)sy-1, r.last.y );
+            int64_t x0 = std::max<int64_t>( 0, r.first.x );
+            int64_t x1 = std::min<int64_t>( (int64_t)sx-1, r.last.x );
+            for( int64_t y=y0; y<=y1; ++y ) {
+                std::fill_n( mask+y*sx+x0, (x1-x0+1), uint8_t(1) );
+            }
+        }
+    }
+
+    patchCoverageMask = tmpMask;
+
 }
 
 
