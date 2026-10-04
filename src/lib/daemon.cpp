@@ -973,6 +973,7 @@ void Daemon::removeJobs( const vector<size_t>& jobList ) {
         unique_lock<mutex> lock( jobsMutex );
         jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
                     if( !job ) return true;
+                    if( !job->mayBeDeleted() ) return false;
                     if( jobSet.count( job->info.id ) ) {
                         removedJobs.push_back( job );
                         return true;
