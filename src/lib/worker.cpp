@@ -56,37 +56,58 @@ void Worker::stop( void ) {
 
 
 void Worker::exitWhenDone( void ) {
-    
-    if( running_ ) {
+
+    bool triggerNow(false);
+    {
+        std::lock_guard<std::mutex> lock( stateMtx_ );
         exitWhenDone_ = true;
-        stop();
+        if( running_ ) {
+            stop();                 // will exit when completed.
+        } else {
+            triggerNow = true;      // not running, exit immediately.
+        }
     }
-    
+    if( triggerNow ) daemon.stop();
+
 }
 
 
 void Worker::resetWhenDone( void ) {
-    
-    if( running_ ) {
+
+    bool triggerNow(false);
+    {
+        std::lock_guard<std::mutex> lock( stateMtx_ );
         resetWhenDone_ = true;
-        stop();
+        if( running_ ) {
+            stop();
+        } else {
+            triggerNow = true;
+        }
     }
-    
+    if( triggerNow ) daemon.reset();
+
 }
 
 
 void Worker::done( void ) {
 
-    running_ = false;
+    bool doExit, doReset;
+    {
+        std::lock_guard<std::mutex> lock( stateMtx_ );
+        running_ = false;
+        doExit = exitWhenDone_;
+        doReset = resetWhenDone_;
+    }
+
     wip->reset();
     myInfo.touch();
     myInfo.idle();
 
-    if( exitWhenDone_ ) {
+    if( doExit ) {
         daemon.stop();
     }
 
-    if( resetWhenDone_ ) {
+    if( doReset ) {
         daemon.reset();
     }
 

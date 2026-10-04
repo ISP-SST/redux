@@ -5,6 +5,8 @@
 #include "redux/job.hpp"
 #include "redux/work.hpp"
 
+#include <mutex>
+
 #include <boost/asio.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/program_options.hpp>
@@ -44,6 +46,7 @@ namespace redux {
         std::atomic<bool> stopped_;
         std::atomic<bool> exitWhenDone_;
         std::atomic<bool> resetWhenDone_;
+        std::mutex stateMtx_;      // protects exit/reset flags.
         
         WorkInProgress::Ptr wip;
         std::shared_ptr<Job> currentJob;
