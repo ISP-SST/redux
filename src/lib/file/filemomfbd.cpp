@@ -34,7 +34,7 @@ uint8_t FileMomfbd::PatchInfo::parse ( ifstream& file, const bool& swapNeeded, c
     
     patchSize += readOrThrow ( file, &nChannels, 1, "PatchInfo:nChannels" );
     if ( swapNeeded ) {
-        swapEndian ( &region, 4 );
+        swapEndian ( region, 4 );
         swapEndian ( nChannels );
     }
 
@@ -169,7 +169,7 @@ int64_t FileMomfbd::PatchInfo::parseMeta ( ifstream& file, const bool& swapNeede
     
     patchSize += readOrThrow ( file, &nChannels, 1, "PatchInfo:nChannels" );
     if ( swapNeeded ) {
-        swapEndian ( &region, 4 );
+        swapEndian ( region, 4 );
         swapEndian ( nChannels );
     }
 
@@ -610,7 +610,7 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
     if ( version >= 20190401.17 ) {
         readOrThrow ( file, region, 4, "FileMomfbd:region" );
         if ( swapNeeded ) {
-            swapEndian ( &region, 4 );
+            swapEndian ( region, 4 );
         }
         if ( region[0] > region[1] ) swap ( region[0], region[1] );
         if ( region[2] > region[3] ) swap ( region[2], region[3] );
@@ -695,7 +695,7 @@ void FileMomfbd::read ( std::ifstream& file, bool onlyMeta ) {
             for( int i(0); i<nPatches; ++i ) {
                 readOrThrow ( file, tmpPatch.region, 4, "PatchInfo:region" );
                 if ( swapNeeded ) {
-                    swapEndian ( &tmpPatch.region, 4 );
+                    swapEndian ( tmpPatch.region, 4 );
                 }
                 if ( tmpPatch.region[0] > tmpPatch.region[1] ) swap ( tmpPatch.region[0], tmpPatch.region[1] );
                 if ( tmpPatch.region[2] > tmpPatch.region[3] ) swap ( tmpPatch.region[2], tmpPatch.region[3] );

@@ -124,7 +124,7 @@ void Ana::read( ifstream& file ) {
 
     // m_Header.dim is always stored as little-endian, so swap endianess if system is big-endian.
     if( system_is_big_endian ) {
-        swapEndian( &( m_Header.dim ), m_Header.ndim );
+        swapEndian( m_Header.dim, m_Header.ndim );
     }
 
     // compressed data
@@ -175,7 +175,7 @@ void Ana::write( ofstream& file ) {
         m_Header.subf |= 128;   // mark file as written on big-endian machine.
         swapEndian( &( m_Header.synch_pattern ) );
         swapEndian( &( m_Header.cbytes ) );
-        swapEndian( &( m_Header.dim ), m_Header.ndim );
+        swapEndian( m_Header.dim, m_Header.ndim );
     }
 
     file.write( reinterpret_cast<char*>( &m_Header ), 256 );
@@ -186,7 +186,7 @@ void Ana::write( ofstream& file ) {
     if( system_is_big_endian ) { // ...and then swap back
         swapEndian( &( m_Header.synch_pattern ) );
         swapEndian( &( m_Header.cbytes ) );
-        swapEndian( &( m_Header.dim ), m_Header.ndim );
+        swapEndian( m_Header.dim, m_Header.ndim );
     }
 
     if( textSize > 0 ) { // we have header text
