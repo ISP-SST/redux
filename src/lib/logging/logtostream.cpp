@@ -2,6 +2,8 @@
 
 #include "redux/util/stringutil.hpp"
 
+#include <iostream>
+
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/date_time/c_local_time_adjustor.hpp>
 
@@ -86,7 +88,13 @@ void LogToStream::flushBuffer( void ) {
 
     lock_guard<mutex> wlock( writeMutex );
     for( LogItem& it: tmpQueue ) {
-        writeFormatted( it );
+        try {
+            writeFormatted( it );
+        } catch( const exception& e ) {
+            cerr << "LogToStream::flushBuffer: failed to write log item: " << e.what() << endl;
+        } catch( ... ) {
+            cerr << "LogToStream::flushBuffer: failed to write log item: unrecognized exception." << endl;
+        }
     }
 
 }

@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <iostream>
 #include <thread>
 //#include <stdio.h>
 #include <syslog.h>
@@ -40,6 +41,17 @@ LogOutput::~LogOutput( )  {
 }
 
 
+void LogOutput::flushBufferAsync( void ) {
+    try {
+        flushBuffer();
+    } catch( const exception& e ) {
+        cerr << "LogOutput::flushBuffer (async) failed: " << e.what() << endl;
+    } catch( ... ) {
+        cerr << "LogOutput::flushBuffer (async) failed: unrecognized exception." << endl;
+    }
+}
+
+
 void LogOutput::addItem( LogItemPtr item ) {
     
     unique_lock<mutex> lock(queueMutex);
@@ -47,7 +59,7 @@ void LogOutput::addItem( LogItemPtr item ) {
     itemCount = itemQueue.size();
     if( itemCount >= flushPeriod ) {
         if(async_) {
-            std::thread( std::bind(&LogOutput::flushBuffer, this) ).detach();
+            std::thread( std::bind(&LogOutput::flushBufferAsync, this) ).detach();
         } else {
             lock.unlock();
             this->flushBuffer();
@@ -66,7 +78,7 @@ void LogOutput::addItems( const vector<LogItemPtr>& items ) {
     itemCount = itemQueue.size();
     if( (flushPeriod == 0) || (itemCount > flushPeriod) ) {
         if(async_) {
-            std::thread( std::bind(&LogOutput::flushBuffer, this) ).detach();
+            std::thread( std::bind(&LogOutput::flushBufferAsync, this) ).detach();
         } else {
             lock.unlock();
             this->flushBuffer();

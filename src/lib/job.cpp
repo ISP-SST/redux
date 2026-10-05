@@ -400,7 +400,15 @@ bool Job::isOK(void) {
     lock_guard<mutex> lock(jobMutex);
     THREAD_MARK
     return !(info.state&JSTATE_ERR);
-    
+
+}
+
+
+void Job::fail(const string& reason) {
+    moveTo( this, JSTEP_ERR );
+    setFailed();
+    updateProgressString();
+    LOG_ERR << "Job " << info.id << " (" << info.name << ") failed: " << reason << ende;
 }
 
 string Job::cfg(void) {

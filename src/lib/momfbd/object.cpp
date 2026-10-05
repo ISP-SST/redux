@@ -891,8 +891,17 @@ void Object::reInitialize( boost::asio::io_context& ioc, ProgressWatch& pw, bool
         for( const shared_ptr<Channel>& c: channels ) {
             for( const shared_ptr<SubImage>& im: c->getSubImages() ) {
                 boost::asio::post( ioc, [this,&pw,im,doReset](){
-                    //im->initialize(true);   // always re-calculate noise statistics
-                    im->initialize( *this, doReset );
+                    if( !myJob.isOK() ) return;
+                    try {
+                        //im->initialize(true);   // always re-calculate noise statistics
+                        im->initialize( *this, doReset );
+                    } catch( const exception& e ) {
+                        myJob.fail( "Object::reInitialize() failed for object " + to_string(ID) + ": " + e.what() );
+                        return;
+                    } catch( ... ) {
+                        myJob.fail( "Object::reInitialize() failed for object " + to_string(ID) + ": unknown reason." );
+                        return;
+                    }
                     ++pw;
                 } );
             }
@@ -1578,15 +1587,42 @@ void Object::writeResults( boost::asio::io_context& ioc, const redux::util::Arra
 
     if( myJob.outputFileType & FT_ANA ) {
         progWatch.increaseTarget( 1 );
-        boost::asio::post( ioc, std::bind( &Object::writeAna, this, std::ref( patches) ) );
+        boost::asio::post( ioc, [this,&patches](){
+            if( !myJob.isOK() ) return;
+            try {
+                writeAna( patches );
+            } catch( const exception& e ) {
+                myJob.fail( "writeAna() failed for object " + to_string(ID) + ": " + e.what() );
+            } catch( ... ) {
+                myJob.fail( "writeAna() failed for object " + to_string(ID) + ": unknown reason." );
+            }
+        } );
     }
     if( myJob.outputFileType & FT_FITS ) {
         progWatch.increaseTarget( 1 );
-        boost::asio::post( ioc, std::bind( &Object::writeFits, this, std::ref( patches) ) );
+        boost::asio::post( ioc, [this,&patches](){
+            if( !myJob.isOK() ) return;
+            try {
+                writeFits( patches );
+            } catch( const exception& e ) {
+                myJob.fail( "writeFits() failed for object " + to_string(ID) + ": " + e.what() );
+            } catch( ... ) {
+                myJob.fail( "writeFits() failed for object " + to_string(ID) + ": unknown reason." );
+            }
+        } );
     }
     if( myJob.outputFileType & FT_MOMFBD ){
         progWatch.increaseTarget(1 );
-        boost::asio::post( ioc, std::bind( &Object::writeMomfbd, this, std::ref(patches) ) );
+        boost::asio::post( ioc, [this,&patches](){
+            if( !myJob.isOK() ) return;
+            try {
+                writeMomfbd( patches );
+            } catch( const exception& e ) {
+                myJob.fail( "writeMomfbd() failed for object " + to_string(ID) + ": " + e.what() );
+            } catch( ... ) {
+                myJob.fail( "writeMomfbd() failed for object " + to_string(ID) + ": unknown reason." );
+            }
+        } );
     }
     ++progWatch;
     

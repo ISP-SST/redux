@@ -313,10 +313,10 @@ void Worker::run( void ) {
     if( wip ) {
         // LOG_TRACE << "run:   nWipParts = " << wip->parts.size() << "  conn = " << hexString(wip->connection.get()) << "  job = " << hexString(wip->job.get());
         while( getWork() ) {
+            Job::JobPtr thisJob = wip->job.lock();
             try {
-                Job::JobPtr thisJob = wip->job.lock();
                 while( thisJob && thisJob->run( wip, myInfo.status.nThreads ) ) ;
-                if( thisJob ) thisJob->logger.flushAll(); 
+                if( thisJob ) thisJob->logger.flushAll();
             }
             catch( const boost::thread_interrupted& ) {
                 LLOG_DEBUG(daemon.logger) << "Worker: Job interrupted."  << ende;
@@ -324,9 +324,11 @@ void Worker::run( void ) {
             }
             catch( const exception& e ) {
                 LLOG_ERR(daemon.logger) << "Worker: Exception caught while processing job: " << e.what() << ende;
+                if( thisJob ) thisJob->fail( e.what() );
             }
             catch( ... ) {
                 LLOG_ERR(daemon.logger) << "Worker: Unrecognized exception caught while processing job." << ende;
+                if( thisJob ) thisJob->fail( "unrecognized exception" );
             }
         }
     }

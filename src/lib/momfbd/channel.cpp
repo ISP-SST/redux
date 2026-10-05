@@ -689,6 +689,7 @@ void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchDa
     size_t nPreviousFrames(0);
     for( size_t i=0; i<nFiles; ++i ) {
         boost::asio::post( ioc, [&,i,nPreviousFrames,saveFFData](){
+            if( !myJob.isOK() ) return;      // job already failed, no point doing more work
             try {
                 loadFile(i,nPreviousFrames);
                 if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
@@ -717,14 +718,14 @@ void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchDa
                 ++progWatch;
                 return;
             } catch ( const std::exception& e ) {
-                LOG_ERR << "Failed to load/preprocess file. reason: " << e.what() << ende;
+                myJob.fail( "Failed to load/preprocess file " + to_string(fileNumbers[i]) +
+                            " (object " + to_string(myObject.ID) + ", channel " + to_string(ID) + "): " + e.what() );
             } catch ( ... ) {
-                LOG_ERR << "Failed to load/preprocess file for unknown reason." << ende;
+                myJob.fail( "Failed to load/preprocess file " + to_string(fileNumbers[i]) +
+                            " (object " + to_string(myObject.ID) + ", channel " + to_string(ID) + "): unknown reason." );
             }
-            Job::moveTo( &myJob, Job::JSTATE_ERR );
             myJob.progWatch.clear();
             progWatch.clear();
-            myJob.updateProgressString();
         });
         nPreviousFrames += nFrames[i];
     }

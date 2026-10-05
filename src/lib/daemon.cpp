@@ -135,22 +135,27 @@ void Daemon::reset( void ) {
 
     LOG << "Resetting daemon." << ende;
     std::thread( [this](){
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        stop_server();
-        worker.stop();
-        runMode = RESET;
-        logger.flushAll();
-        if( myMaster.conn ) {
-            myMaster.conn->lock();
-            if( myMaster.conn->socket().is_open() ) {
-                *myMaster.conn << CMD_DISCONNECT;
-                myMaster.conn->socket().close();
-                myInfo.info.peerType &= ~Host::TP_WORKER;
+        try {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            stop_server();
+            worker.stop();
+            runMode = RESET;
+            logger.flushAll();
+            if( myMaster.conn ) {
+                lock_guard<TcpConnection> connLock( *myMaster.conn );
+                if( myMaster.conn->socket().is_open() ) {
+                    *myMaster.conn << CMD_DISCONNECT;
+                    myMaster.conn->socket().close();
+                    myInfo.info.peerType &= ~Host::TP_WORKER;
+                }
             }
-            myMaster.conn->unlock();
+            ioContext.stop();
+            pool.interrupt_all();
+        } catch( const exception& e ) {
+            LOG_ERR << "reset: exception: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "reset: unrecognized exception." << ende;
         }
-        ioContext.stop();
-        pool.interrupt_all();
     }).detach();
 
 }
@@ -183,35 +188,41 @@ void Daemon::maintenance( void ) {
 #ifdef DEBUG_
     LOG_TRACE << "Maintenance:  nJobs = " << jobs.size() << "  nConn = " << server->size() << "  nPeerWIP = " << peerWIP.size() << ende;
 #endif
-    updateLoadAvg();
-    checkSwapSpace();
-    cleanup();
-    //checkCurrentUsage();
-    
+    try {
+        updateLoadAvg();
+        checkSwapSpace();
+        cleanup();
+        //checkCurrentUsage();
 
-    logger.flushAll();
-    updateStatus();   // TODO: use a secondary connection for auxiliary communications
+        logger.flushAll();
+        updateStatus();   // TODO: use a secondary connection for auxiliary communications
 
+        boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
+        boost::posix_time::time_duration elapsed = (now - myInfo.status.lastActive);
+        {
+            lock_guard<mutex> qlock( wip_lqueue_mtx );
+            if( !wip_localqueue.empty() || (elapsed > boost::posix_time::minutes( 5 )) ) {  // kick the corpse every now and then.
+                boost::asio::post(ioContext, std::bind( &Worker::start, std::ref(worker) ));
+            }
+        }
+        {
+            lock_guard<mutex> qlock( wip_queue_mtx );
+            size_t nQ = std::min<size_t>( wip_queue.size(), outTransfers.count() );
+            if( nQ ) {
+                boost::asio::post(ioContext,  std::bind( &Daemon::pokeSlaves, this, nQ ));
+            }
+        }
+    } catch( const exception& e ) {
+        LOG_ERR << "maintenance: exception: " << e.what() << ende;
+    } catch( ... ) {
+        LOG_ERR << "maintenance: unrecognized exception." << ende;
+    }
+
+    // Always re-arm, regardless of what happened above: a thrown exception here must
+    // never silently stop the periodic maintenance from running again.
     timer.expires_after( std::chrono::seconds( 5 ) );
-    
-    boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
-    boost::posix_time::time_duration elapsed = (now - myInfo.status.lastActive);
-    {
-        lock_guard<mutex> qlock( wip_lqueue_mtx );
-        if( !wip_localqueue.empty() || (elapsed > boost::posix_time::minutes( 5 )) ) {  // kick the corpse every now and then.
-            boost::asio::post(ioContext, std::bind( &Worker::start, std::ref(worker) ));
-        }
-    }
-    {
-        lock_guard<mutex> qlock( wip_queue_mtx );
-        size_t nQ = std::min<size_t>( wip_queue.size(), outTransfers.count() );
-        if( nQ ) {
-            boost::asio::post(ioContext,  std::bind( &Daemon::pokeSlaves, this, nQ ));
-        }
-    }
-    
     timer.async_wait( boost::bind( &Daemon::maintenance, this ) );
-    
+
 }
 
 
@@ -781,8 +792,14 @@ void Daemon::die(void) {
     LOG_DEBUG << "Received exit command." << ende;
     std::thread(
         [this](){
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            stop();
+            try {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                stop();
+            } catch( const exception& e ) {
+                LOG_ERR << "die: exception: " << e.what() << ende;
+            } catch( ... ) {
+                LOG_ERR << "die: unrecognized exception." << ende;
+            }
         }).detach();
 
     
@@ -972,19 +989,25 @@ void Daemon::failJobs( string jobString ) {
 void Daemon::removeJobs( const vector<size_t>& jobList ) {
 
     std::thread( [this, jobList](){
-        std::set<size_t> jobSet( jobList.begin(), jobList.end() );
-        vector<Job::JobPtr> removedJobs;
-        unique_lock<mutex> lock( jobsMutex );
-        jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
-                    if( !job ) return true;
-                    if( !job->mayBeDeleted() ) return false;
-                    if( jobSet.count( job->info.id ) ) {
-                        removedJobs.push_back( job );
-                        return true;
-                    }
-                    return false;
-                }), jobs.end() );
-        // here removedJobs will be destructed, and the jobs cleaned up. This might take a while, so we do it in a detached thread.
+        try {
+            std::set<size_t> jobSet( jobList.begin(), jobList.end() );
+            vector<Job::JobPtr> removedJobs;
+            unique_lock<mutex> lock( jobsMutex );
+            jobs.erase( std::remove_if( jobs.begin(), jobs.end(), [&](const Job::JobPtr& job) {
+                        if( !job ) return true;
+                        if( !job->mayBeDeleted() ) return false;
+                        if( jobSet.count( job->info.id ) ) {
+                            removedJobs.push_back( job );
+                            return true;
+                        }
+                        return false;
+                    }), jobs.end() );
+            // here removedJobs will be destructed, and the jobs cleaned up. This might take a while, so we do it in a detached thread.
+        } catch( const exception& e ) {
+            LOG_ERR << "removeJobs: exception: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "removeJobs: unrecognized exception." << ende;
+        }
     }).detach();
     
 }
@@ -1085,23 +1108,29 @@ void Daemon::removeJobs( TcpConnection::Ptr& conn ) {
 
         if( removedJobs.size() ) {
             std::thread( [&,removedJobs](){
-                for( auto &j: removedJobs ) {
-                    if( !j ) continue;
-                    lock_guard<mutex> plock( peerMutex );
-                    for( auto &pw: peerWIP ) {
-                        if( !pw.second ) continue;
-                        Job::JobPtr job = pw.second->job.lock();
-                        if( !job || (j != job) ) continue;
-                        Host::Ptr host = pw.first;
-                        if( host ) {
-                            TcpConnection::Ptr conn = server->getConnection( host );
-                            if( conn ) {
-                                conn->sendUrgent( CMD_RESET );
+                try {
+                    for( auto &j: removedJobs ) {
+                        if( !j ) continue;
+                        lock_guard<mutex> plock( peerMutex );
+                        for( auto &pw: peerWIP ) {
+                            if( !pw.second ) continue;
+                            Job::JobPtr job = pw.second->job.lock();
+                            if( !job || (j != job) ) continue;
+                            Host::Ptr host = pw.first;
+                            if( host ) {
+                                TcpConnection::Ptr conn = server->getConnection( host );
+                                if( conn ) {
+                                    conn->sendUrgent( CMD_RESET );
+                                }
                             }
                         }
                     }
+                    // here removedJobs will be destructed, and the jobs cleaned up. This might take a while, so we do it in a detached thread.
+                } catch( const exception& e ) {
+                    LOG_ERR << "removeJobs: exception: " << e.what() << ende;
+                } catch( ... ) {
+                    LOG_ERR << "removeJobs: unrecognized exception." << ende;
                 }
-                // here removedJobs will be destructed, and the jobs cleaned up. This might take a while, so we do it in a detached thread.
             }).detach();
         }
     }
@@ -1574,9 +1603,15 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
                     data = rdx_get_shared<char>( blockSize );
                     char* ptr = data.get()+sizeof(uint64_t);
                     count += wip->packWork( ptr+count );
-                    std::thread([wip](){
-                        for( auto& part: wip->parts ) {
-                            part->unload();
+                    std::thread([this,wip](){
+                        try {
+                            for( auto& part: wip->parts ) {
+                                part->unload();
+                            }
+                        } catch( const exception& e ) {
+                            LOG_ERR << "sendWork: exception while unloading parts: " << e.what() << ende;
+                        } catch( ... ) {
+                            LOG_ERR << "sendWork: unrecognized exception while unloading parts." << ende;
                         }
                     }).detach();
                     wip->jobID = job->info.id;

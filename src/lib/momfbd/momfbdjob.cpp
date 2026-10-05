@@ -841,8 +841,17 @@ void MomfbdJob::preProcess( void ) {
         }
 
         boost::asio::post(ioContext,  [this](){
+            if( !isOK() ) return;
             THREAD_MARK
-            initCache();
+            try {
+                initCache();
+            } catch( const exception& e ) {
+                fail( string("initCache() failed: ") + e.what() );
+                return;
+            } catch( ... ) {
+                fail( "initCache() failed: unknown reason." );
+                return;
+            }
             THREAD_MARK
             ++progWatch;
             THREAD_UNMARK
@@ -1098,16 +1107,30 @@ void MomfbdJob::writeOutput( void ) {
     THREAD_MARK
     for( auto obj : objects ) {
         boost::asio::post(ioContext,  [this,obj](){
+            if( !isOK() ) return;
             THREAD_MARK
-            obj->writeResults( patches );
+            try {
+                obj->writeResults( patches );
+            } catch( const exception& e ) {
+                fail( "writeResults() failed for object " + to_string(obj->ID) + ": " + e.what() );
+            } catch( ... ) {
+                fail( "writeResults() failed for object " + to_string(obj->ID) + ": unknown reason." );
+            }
             THREAD_UNMARK
         });
     }
     THREAD_MARK
     for( auto tobj : trace_objects ) {
         boost::asio::post(ioContext,  [this,tobj](){
+            if( !isOK() ) return;
             THREAD_MARK
-            tobj->writeResults( patches );
+            try {
+                tobj->writeResults( patches );
+            } catch( const exception& e ) {
+                fail( "writeResults() failed for trace-object " + to_string(tobj->ID) + ": " + e.what() );
+            } catch( ... ) {
+                fail( "writeResults() failed for trace-object " + to_string(tobj->ID) + ": unknown reason." );
+            }
             THREAD_UNMARK
         });
     }

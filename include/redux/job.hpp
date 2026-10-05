@@ -188,6 +188,7 @@ namespace redux {
 
         void setFailed(void);
         bool isOK(void);
+        void fail(const std::string& reason);
         
         virtual void init(void) {};
         virtual void cleanup(void) {};
