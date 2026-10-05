@@ -950,7 +950,10 @@ void Daemon::failJobs( const vector<size_t>& jobList ) {
     std::set<size_t> jobSet( jobList.begin(), jobList.end() );
     unique_lock<mutex> lock( jobsMutex );
     for( const auto& job: jobs ) {
-        if( job && jobSet.count( job->info.id ) ) Job::moveTo( job.get(), Job::JSTATE_ERR );
+        if( job && jobSet.count( job->info.id ) ) {
+            Job::moveTo( job.get(), Job::JSTEP_ERR );
+            job->updateProgressString();
+        }
     }
             
 }
