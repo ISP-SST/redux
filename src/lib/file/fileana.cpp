@@ -365,9 +365,13 @@ int redux::file::Ana::getIDLType(void) {
 
 void redux::file::Ana::readCompressed( ifstream& file, char* data, size_t nElements, const Ana* hdr ) {
 
+    if( hdr->m_CompressedHeader.tsize < 14 ) {
+        throw ios_base::failure( "Ana::readCompressed(): invalid compressed header (tsize too small)." );
+    }
     size_t compressedSize = hdr->m_CompressedHeader.tsize - 14;
 
-    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize+1], []( uint8_t * p ) { delete[] p; } );        // bug in anadecompress makes it go out-of-bounds by 1
+    constexpr size_t decrunchOverreadMargin = 16;
+    shared_ptr<uint8_t> tmp( new uint8_t[compressedSize+decrunchOverreadMargin](), []( uint8_t * p ) { delete[] p; } );
 
     file.read( reinterpret_cast<char*>( tmp.get() ), compressedSize );
     if( !file.good() ) {

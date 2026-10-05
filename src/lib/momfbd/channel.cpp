@@ -600,6 +600,11 @@ void Channel::loadCalib( boost::asio::io_context& ioc ) {     // load through ca
 
     if( !gainFile.empty() ) {
         CachedFile::load<float>( gain, gainFile );
+        if( gain.nElements() != static_cast<size_t>(imgSize.y)*imgSize.x ) {
+            throw logic_error( "Channel::loadCalib(): gain-file \"" + gainFile + "\" has " + to_string(gain.nElements())
+                              + " pixels, but the image size requires " + to_string(imgSize.y) + "x" + to_string(imgSize.x)
+                              + " = " + to_string(static_cast<size_t>(imgSize.y)*imgSize.x) + "." );
+        }
         gainMask = rdx_get_shared<uint8_t>(imgSize.y*imgSize.x);
         make_mask( gain.get(), gainMask.get(), imgSize.y, imgSize.x, 0, 8, true, true ); // filter away larger features than ~8 pixels
     }
