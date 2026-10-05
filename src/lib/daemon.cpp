@@ -2078,13 +2078,13 @@ void Daemon::prepareLocalWork( int count ) {
     tmpJobs.erase( std::remove_if( tmpJobs.begin(), tmpJobs.end(), []( const shared_ptr<Job>& j ) { return !j; }), tmpJobs.end() );
     
     THREAD_MARK
+    // Sort by priority & ID
     std::sort( tmpJobs.begin(), tmpJobs.end(),[&](const Job::JobPtr& a, const Job::JobPtr& b ){
-        if(a->info.step != b->info.step) return (a->info.step > b->info.step);
         if(a->info.priority != b->info.priority) return (a->info.priority > b->info.priority);
         return (a->info.id < b->info.id);
     } );
 
-    
+
     WorkInProgress::Ptr wip(nullptr);
     
     try {

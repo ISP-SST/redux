@@ -346,7 +346,7 @@ bool MomfbdJob::getWork( WorkInProgress::Ptr wip, uint16_t nThreads, const map<J
             return false;
         }
 
-        auto lock = getLock(true);
+        auto lock = getLock();
         if( lock && (info.step == JSTEP_QUEUED) ) {                            // preprocessing ready -> start
             THREAD_MARK
             auto glock = Job::getGlobalLock();
