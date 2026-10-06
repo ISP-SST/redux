@@ -833,15 +833,18 @@ void writehead_fits( int argc, IDL_VPTR* argv, char* argk ) {
 
             string bakFile = bak.string();
             if( kw.async ) {
+                // NOTE: if rdx_writehead_fits is called again, line 822 might delete an async-write file in progress
                 thread( [filename,bakFile,oldHeaderBytes]() {
                     try {
                         appendRemainder( bakFile, filename, oldHeaderBytes );
+                        bfs::remove( bakFile );
                     } catch( const exception& e ) {
                         cerr << "rdx_writehead_fits (async): " << e.what() << endl;
                     }
                 } ).detach();
             } else {
                 appendRemainder( bakFile, filename, oldHeaderBytes );
+                bfs::remove( bak );
             }
 
         }
