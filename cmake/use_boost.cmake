@@ -1,5 +1,11 @@
+if( POLICY CMP0167 )
+    # CMake >= 3.30 has removed the bundled FindBoost module; without explicitly
+    # selecting NEW here, find_package() tries the (now-removed) module first and
+    # fails outright instead of falling back to Boost's own exported config package.
+    cmake_policy( SET CMP0167 NEW )
+endif()
 
-find_package( Boost 1.66 QUIET CONFIG COMPONENTS date_time filesystem program_options serialization system thread regex )
+find_package( Boost 1.66 QUIET COMPONENTS date_time filesystem program_options serialization system thread regex )
 
 if( Boost_FOUND )
     set( Boost_VERSION "${Boost_VERSION_MAJOR}.${Boost_VERSION_MINOR}.${Boost_VERSION_PATCH}" CACHE STRING "Version" FORCE )
