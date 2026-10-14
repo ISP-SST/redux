@@ -91,6 +91,7 @@ namespace redux {
 
         bool isRelative( const bfs::path& );
         std::string cleanPath( std::string path, std::string base = "" );
+        std::string stripLeadingSlashes( std::string path );
         std::string getHome( const std::string& username="" );
         bfs::path weaklyCanonical( bfs::path );
         

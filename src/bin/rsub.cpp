@@ -187,7 +187,7 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 }
 
 
-string filterOldCfg( const string& filename, const string& jobname, const string& logfile, const string& outputDir ) {
+string filterOldCfg( const string& filename, const string& jobname, const string& logfile ) {
     
     std::ifstream in(filename, std::ios::in | std::ios::binary);
     if (!in) {
@@ -219,7 +219,6 @@ string filterOldCfg( const string& filename, const string& jobname, const string
         if( *(text.rbegin()) != '\n') text += "\n";
         text += "NAME " + jobname + "\n";
         text += "LOGFILE " + logfile + "\n";
-        text += "OUTPUT_DIR " + outputDir + "\n";
         if( *(text.rbegin()) != '\n') text += "\n";
         text += "}";
     }
@@ -279,14 +278,6 @@ int main (int argc, char *argv[]) {
             globalName = vm["name"].as<string>();
         }
         
-        bfs::path outputDir = bfs::current_path();
-        if( vm.count ("output-dir") ) {
-            bfs::path tmpPath = vm["output-dir"].as<string>();
-            if( isRelative( tmpPath ) && !outputDir.empty() ) {
-                outputDir = outputDir / tmpPath;
-            }
-        }
-
         stringstream filteredCfg;
         for( auto it: files ) {
             if( ! bfs::is_regular_file( it ) ) {
@@ -296,7 +287,7 @@ int main (int argc, char *argv[]) {
             string bn = bfs::path(it).stem().string();
             string jobName = globalName.empty() ? bn : globalName;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
-            string tmpS = filterOldCfg(it, jobName, logFile, outputDir.string());
+            string tmpS = filterOldCfg(it, jobName, logFile);
             filteredCfg.write(tmpS.c_str(),tmpS.size());
         }
 

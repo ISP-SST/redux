@@ -487,7 +487,7 @@ void ObjectCfg::parseProperties( bpt::ptree& tree, Logger& logger, const Channel
     if( getValue<bool>( tree, "GET_RESIDUAL", defaults.saveMask&SF_SAVE_RESIDUAL ) ) saveMask |= SF_SAVE_RESIDUAL;
     if( getValue<bool>( tree, "SAVE_FFDATA", defaults.saveMask&SF_SAVE_FFDATA ) ) saveMask |= SF_SAVE_FFDATA;
     traceObject = tree.get<bool>( "TRACE_REF", defaults.traceObject );
-    outputFileName = getValue<string>( tree, "OUTPUT_FILE", defaults.outputFileName );
+    outputFileName = stripLeadingSlashes( getValue<string>( tree, "OUTPUT_FILE", defaults.outputFileName ) );
     initFile = getValue<string>( tree, "INIT_FILE", defaults.initFile );
     modeFile = getValue<string>( tree, "MODE_FILE", defaults.modeFile );
     modeFileNormalize = getValue<bool>( tree, "MODE_FILE_NORMALIZE", defaults.modeFileNormalize );

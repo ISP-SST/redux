@@ -140,7 +140,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, red
             Object* tmpObj = new Object( *this, nObj );
             tmpObj->parsePropertyTree( property.second, logger );
             if( nObj < outputFiles.size() ) {
-                tmpObj->outputFileName = outputFiles[nObj];
+                tmpObj->outputFileName = stripLeadingSlashes( outputFiles[nObj] );
             }
             if( nObj < initFiles.size() ) {
                 tmpObj->initFile = initFiles[nObj];
@@ -156,7 +156,7 @@ void MomfbdJob::parsePropertyTree( bpo::variables_map& vm, bpt::ptree& tree, red
     for( uint16_t i=0; i<nObj; ++i ) {
         if( objects[i] ) {
             if( i < outputFiles.size() ) {
-                objects[i]->outputFileName = outputFiles[i];
+                objects[i]->outputFileName = stripLeadingSlashes( outputFiles[i] );
             }
             if( i < initFiles.size() ) {
                 objects[i]->initFile = initFiles[i];

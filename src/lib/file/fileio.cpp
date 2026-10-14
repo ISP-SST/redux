@@ -577,6 +577,12 @@ bool redux::file::isRelative( const bfs::path &p ) {
 }
 
 
+string redux::file::stripLeadingSlashes( string path ) {
+    path.erase( 0, path.find_first_not_of( '/' ) );
+    return path;
+}
+
+
 string expandTilde( string p ) {
 
     if( !p.empty() && p[0] == '~' ) {
