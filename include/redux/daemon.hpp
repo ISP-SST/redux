@@ -119,6 +119,7 @@ namespace redux {
         void cleanupThreads( void );
         size_t nSysThreads( void );
         void threadLoop( void );
+        void dispatchThreadLoop( void );
         
         std::mutex wip_active_mtx, wip_idle_mtx, wip_queue_mtx, wip_lqueue_mtx, wip_completed_mtx;
         std::atomic<uint16_t>  max_local, max_remote;
@@ -136,6 +137,10 @@ namespace redux {
         
         boost::asio::io_context ioContext;
         boost::thread_group pool;
+        // Dedicated context/threads for prepareLocalWork/prepareRemoteWork.
+        boost::asio::io_context dispatchContext;
+        boost::asio::executor_work_guard<boost::asio::io_context::executor_type> dispatchWork;
+        boost::thread_group dispatchPool;
         boost::asio::steady_timer timer;
         std::unique_ptr<network::TcpServer> server;
         

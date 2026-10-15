@@ -53,7 +53,8 @@ namespace {
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
     hostTimeout(RDX_HOST_TIMEOUT), inTransfers(-1), outTransfers(-1), myInfo(Host::myInfo()),
-    max_local(5), max_remote(50), timer( ioContext ), worker( *this ) {
+    max_local(5), max_remote(50), dispatchWork( boost::asio::make_work_guard(dispatchContext) ),
+    timer( ioContext ), worker( *this ) {
 
     file::setErrorHandling( file::EH_THROW );   // we want to catch and print messages to the log.
 
@@ -151,6 +152,8 @@ void Daemon::reset( void ) {
             }
             ioContext.stop();
             pool.interrupt_all();
+            dispatchContext.stop();
+            dispatchPool.interrupt_all();
         } catch( const exception& e ) {
             LOG_ERR << "reset: exception: " << e.what() << ende;
         } catch( ... ) {
@@ -179,6 +182,8 @@ void Daemon::stop( void ) {
     }
     ioContext.stop();
     pool.interrupt_all();
+    dispatchContext.stop();
+    dispatchPool.interrupt_all();
 
 }
 
@@ -319,8 +324,12 @@ bool Daemon::doWork( void ) {
             }
             
             check_limits();
-            
+
             std::thread( std::bind( &Daemon::prepareWork, this ) ).detach();
+
+            // Dedicated threads for prepareLocalWork/prepareRemoteWork.
+            dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
+            dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
 
         } else if( dbg ) {
             uint16_t oport=port;
@@ -1939,6 +1948,25 @@ void Daemon::threadLoop( void ) {
 }
 
 
+void Daemon::dispatchThreadLoop( void ) {
+
+    while( runMode == LOOP ) {
+        try {
+            boost::this_thread::interruption_point();
+            dispatchContext.run();
+            break;      // run() only returns if stopped (dispatchWork keeps it alive otherwise)
+        } catch( const boost::thread_interrupted& ) {
+            break;
+        } catch( exception& e ) {
+            LOG_ERR << "Exception in dispatch thread: " << e.what() << ende;
+        } catch( ... ) {
+            LOG_ERR << "Unhandled exception in dispatch thread." << ende;
+        }
+    }
+
+}
+
+
 void Daemon::putActiveWIP( WorkInProgress::Ptr wip ) {
     
     THREAD_MARK
@@ -2201,7 +2229,7 @@ void Daemon::prepareRemoteWork( int count ) {
     jlock.unlock();
 
     WorkInProgress::Ptr wip(nullptr);
-    
+
     try {
         while( count > 0 ) {
             THREAD_MARK
@@ -2232,7 +2260,8 @@ void Daemon::prepareRemoteWork( int count ) {
             }
             THREAD_MARK
             
-            boost::asio::post( ioContext, [this,wip](){
+            // Posted to dispatchContext, not the main ioContext.
+            boost::asio::post( dispatchContext, [this,wip](){
                 THREAD_MARK
                 try {
                     for( auto& part: wip->parts ) {
@@ -2283,7 +2312,7 @@ void Daemon::prepareWork( void ) {
                 if( nToPrepare > 0 ) {
                     THREAD_MARK
                     preparing_local += nToPrepare;
-                    boost::asio::post( ioContext, std::bind( &Daemon::prepareLocalWork, this, nToPrepare  ) );
+                    boost::asio::post( dispatchContext, std::bind( &Daemon::prepareLocalWork, this, nToPrepare  ) );
                 }
             }
             THREAD_MARK
@@ -2292,7 +2321,7 @@ void Daemon::prepareWork( void ) {
             if( nToPrepare > 0 ) {
                 THREAD_MARK
                 preparing_remote += nToPrepare;
-                boost::asio::post( ioContext, std::bind( &Daemon::prepareRemoteWork, this, nToPrepare ) );
+                boost::asio::post( dispatchContext, std::bind( &Daemon::prepareRemoteWork, this, nToPrepare ) );
             }
             THREAD_MARK
         } catch( const exception& e ) {
