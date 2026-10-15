@@ -27,7 +27,7 @@ namespace redux {
         class FourierTransform : public redux::util::Array<complex_t> {
             
             struct PlansContainer {
-                PlansContainer() { fftw_init_threads(); };
+                PlansContainer() { fftw_init_threads(); fftw_make_planner_thread_safe(); };
                 ~PlansContainer(){ fftw_cleanup_threads(); };
                 std::mutex mtx;
             };
