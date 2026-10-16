@@ -95,7 +95,6 @@ namespace redux {
         bool getWork( WorkInProgress::Ptr&, bool remote=false );
         void returnWork( WorkInProgress::Ptr );
         void prepareLocalWork( int n=1 );
-        void prepareRemoteWork( int n=1 );
         void prepareWork( void );
         std::string workStatus( bool details=false );
         
@@ -122,7 +121,7 @@ namespace redux {
         void dispatchThreadLoop( void );
         
         std::mutex wip_active_mtx, wip_idle_mtx, wip_queue_mtx, wip_lqueue_mtx, wip_completed_mtx;
-        std::atomic<uint16_t>  max_local, max_remote;
+        std::atomic<uint16_t>  max_local;
         std::set<WorkInProgress::Ptr, redux::util::ObjCompare<WorkInProgress>> wip_active;
         std::map<network::Host::Ptr, WorkInProgress::Ptr, network::Host::Compare> peerWIP;
         std::set<WorkInProgress::Ptr> wip_idle;
@@ -137,7 +136,7 @@ namespace redux {
         
         boost::asio::io_context ioContext;
         boost::thread_group pool;
-        // Dedicated context/threads for prepareLocalWork/prepareRemoteWork.
+        // Dedicated context/threads for prepareLocalWork.
         boost::asio::io_context dispatchContext;
         boost::asio::executor_work_guard<boost::asio::io_context::executor_type> dispatchWork;
         boost::thread_group dispatchPool;

@@ -19,8 +19,12 @@
 #include "redux/version.hpp"
 
 #include <chrono>
+#include <cstring>
 #include <functional>
+#include <fcntl.h>
+#include <poll.h>
 #include <sys/resource.h>
+#include <sys/sendfile.h>
 
 #include <boost/asio/time_traits.hpp>
 #include <boost/algorithm/string.hpp>
@@ -40,7 +44,33 @@ namespace {
     std::set<boost::thread::id> old_threads;
 
     std::atomic<uint16_t> preparing_local(0);
-    std::atomic<uint16_t> preparing_remote(0);
+
+    void sendFileDirect( int sockFd, const std::string& path, uint64_t sz ) {
+        int fd = ::open( path.c_str(), O_RDONLY );
+        if( fd < 0 ) throw std::runtime_error( "sendFileDirect: failed to open " + path );
+        off_t offset = 0;
+        while( (uint64_t)offset < sz ) {
+            ssize_t n = ::sendfile( sockFd, fd, &offset, sz - (uint64_t)offset );
+            if( n < 0 ) {
+                if( errno == EINTR ) continue;
+                if( errno == EAGAIN || errno == EWOULDBLOCK ) {
+                    struct pollfd pfd{ sockFd, POLLOUT, 0 };
+                    int pret = ::poll( &pfd, 1, -1 );
+                    if( pret < 0 && errno != EINTR ) {
+                        int e = errno;
+                        ::close(fd);
+                        throw std::runtime_error( "sendFileDirect: poll() failed: " + std::string(strerror(e)) );
+                    }
+                    continue;
+                }
+                int e = errno;
+                ::close(fd);
+                throw std::runtime_error( "sendFileDirect: sendfile() failed: " + std::string(strerror(e)) );
+            }
+            if( n == 0 ) break;
+        }
+        ::close(fd);
+    }
 
 }
 
@@ -53,7 +83,7 @@ namespace {
 
 Daemon::Daemon( po::variables_map& vm ) : Application( vm, LOOP ), params( vm ), jobCounter( 1 ), nQueuedJobs( 0 ),
     hostTimeout(RDX_HOST_TIMEOUT), inTransfers(-1), outTransfers(-1), myInfo(Host::myInfo()),
-    max_local(5), max_remote(50), dispatchWork( boost::asio::make_work_guard(dispatchContext) ),
+    max_local(5), dispatchWork( boost::asio::make_work_guard(dispatchContext) ),
     timer( ioContext ), worker( *this ) {
 
     file::setErrorHandling( file::EH_THROW );   // we want to catch and print messages to the log.
@@ -211,8 +241,7 @@ void Daemon::maintenance( void ) {
             }
         }
         {
-            lock_guard<mutex> qlock( wip_queue_mtx );
-            size_t nQ = std::min<size_t>( wip_queue.size(), outTransfers.count() );
+            size_t nQ = outTransfers.count();
             if( nQ ) {
                 boost::asio::post(ioContext,  std::bind( &Daemon::pokeSlaves, this, nQ ));
             }
@@ -327,7 +356,7 @@ bool Daemon::doWork( void ) {
 
             std::thread( std::bind( &Daemon::prepareWork, this ) ).detach();
 
-            // Dedicated threads for prepareLocalWork/prepareRemoteWork.
+            // Dedicated threads for prepareLocalWork.
             dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
             dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
 
@@ -353,7 +382,7 @@ bool Daemon::doWork( void ) {
         }
         LOG_DEBUG << "Running the asio service." << ende;
         // 
-        while( (runMode == LOOP) || preparing_local || preparing_remote ) {
+        while( (runMode == LOOP) || preparing_local ) {
             std::this_thread::sleep_for( std::chrono::milliseconds(100) );
         }
         pool.join_all();
@@ -774,7 +803,7 @@ void Daemon::cleanup( void ) {
 
 
 void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
-    
+
     if( wip ) {
         Job::JobPtr job = wip->job.lock();
         if( job ) {
@@ -783,8 +812,7 @@ void Daemon::failedWIP( WorkInProgress::Ptr wip ) {
             for( auto& part: wip->parts ) {
                 if( part ) {
                     boost::asio::post(ioContext,  [part](){
-                        part->cacheLoad();
-                        part->cacheStore(true);
+                        part->failedStore();
                     });
                 }
             }
@@ -1372,12 +1400,6 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                         max_local = boost::lexical_cast<int>(argStr);
                     }
                     replyStr = "Ok max_local "+to_string(max_local);
-                } else if( cmdStr == "max_remote" ) {
-                    string argStr = popword(line);
-                    if( !argStr.empty() ) {
-                        max_remote = boost::lexical_cast<int>(argStr);
-                    }
-                    replyStr = "Ok max_remote "+to_string(max_remote);
                 } else if( cmdStr == "max-recv" ) {
                     string argStr = popword(line);
                     if( !argStr.empty() ) {
@@ -1585,13 +1607,16 @@ void Daemon::updateWIP( const network::Host::Ptr& host, WorkInProgress::Ptr& wip
 void Daemon::sendWork( TcpConnection::Ptr conn ) {
 
     shared_ptr<char> data;
-    uint64_t count(0); 
+    uint64_t count(0);
+    string directPath;
+    uint64_t directOffset(0);
+    uint64_t directSize(0);
 
-    
+
     THREAD_MARK
     uint32_t oldJobID(0);
     *conn >> oldJobID;
-    
+
     WorkInProgress::Ptr wip(nullptr);
     THREAD_MARK
     Host::Ptr host = getHost( conn );
@@ -1609,6 +1634,13 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
                     uint64_t blockSize = wip->workSize() + sizeof(uint64_t);
                     host->setStatusString( alignLeft(to_string(job->info.id) + ":" + to_string(wip->parts[0]->id),8) + " ..." );
                     host->active();
+                    bool newJob = (wip->jobID != job->info.id);
+                    bool direct = !wip->parts.empty() && wip->parts[0] && wip->parts[0]->isOnDiskOnly();
+                    if( direct ) {
+                        directOffset = wip->size() + 1 + ( newJob ? job->size() : 0 );
+                        directSize = wip->parts[0]->size();
+                        directPath = wip->parts[0]->getFullPath();
+                    }
                     data = rdx_get_shared<char>( blockSize );
                     char* ptr = data.get()+sizeof(uint64_t);
                     count += wip->packWork( ptr+count );
@@ -1635,7 +1667,16 @@ void Daemon::sendWork( TcpConnection::Ptr conn ) {
             pack( data.get(), count );
             LOG_DETAIL << "Sending work to " << host->info.name << ":" << host->info.pid << "   " << wip->print()
                        << "  (size=" << count << ")" << ende;
-            conn->syncWrite( data.get(), count+sizeof(uint64_t) );
+            if( !directPath.empty() ) {
+                conn->syncWrite( data.get(), sizeof(uint64_t)+directOffset );
+                sendFileDirect( conn->socket().native_handle(), directPath, directSize );
+                uint64_t tailOffset = directOffset+directSize;
+                if( count > tailOffset ) {
+                    conn->syncWrite( data.get()+sizeof(uint64_t)+tailOffset, count-tailOffset );
+                }
+            } else {
+                conn->syncWrite( data.get(), count+sizeof(uint64_t) );
+            }
         } else {
             conn->syncWrite(count);
             host->idle();
@@ -2060,8 +2101,35 @@ WorkInProgress::Ptr Daemon::getRemoteWIP( void ) {
         if( wip_queue.size() ) {
             std::swap(ret, wip_queue.front());
             wip_queue.pop_front();
+            return ret;
         }
     }
+
+    auto glock = Job::getGlobalLock();
+    map<Job::StepID,Job::CountT> activeCounts = Job::counts;
+    glock.unlock();
+
+    unique_lock<mutex> jlock( jobsMutex );
+    vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
+    jlock.unlock();
+
+    getIdleWIP( ret );
+    ret->isRemote = true;
+    try {
+        for( Job::JobPtr job: tmpJobs ) {
+            if( job && job->getWork( ret, 0, activeCounts ) ) {
+                ret->job = job;
+                ret->jobID = job->info.id;
+                return ret;
+            }
+        }
+    } catch( const exception& e ) {
+        LOG_ERR << "getRemoteWIP: exception while scanning jobs for work: " << e.what() << ende;
+    } catch( ... ) {
+        LOG_ERR << "getRemoteWIP: unrecognized exception while scanning jobs for work." << ende;
+    }
+    putIdleWIP( ret );
+    ret.reset();
     return ret;
 }
 
@@ -2218,84 +2286,6 @@ void Daemon::prepareLocalWork( int count ) {
 }
 
 
-void Daemon::prepareRemoteWork( int count ) {
-
-    auto glock = Job::getGlobalLock();
-    map<Job::StepID,Job::CountT> activeCounts = Job::counts;
-    glock.unlock();
-
-    unique_lock<mutex> jlock( jobsMutex );
-    vector<Job::JobPtr> tmpJobs = jobs;        // make a local copy so we can unlock the job-list for other threads.
-    jlock.unlock();
-
-    WorkInProgress::Ptr wip(nullptr);
-
-    try {
-        while( count > 0 ) {
-            THREAD_MARK
-            getIdleWIP( wip );
-            wip->isRemote = true;
-            bool gotJob(false);
-            try {
-                THREAD_MARK
-                for( Job::JobPtr job: tmpJobs ) {
-                THREAD_MARK
-                    if( job && job->getWork( wip, 0, activeCounts ) ) {
-                        wip->job = job;
-                        wip->jobID = job->info.id;
-                        gotJob = true;
-                        break;
-                    }
-                }
-            } catch ( const exception& e ) {
-                LOG_ERR << "prepareRemoteWork: exception while scanning jobs for work: " << e.what() << ende;
-            } catch ( ... ) {
-                LOG_ERR << "prepareRemoteWork: unrecognized exception while scanning jobs for work." << ende;
-            }
-            THREAD_MARK
-
-            if( !gotJob || !wip ) {
-                putIdleWIP( wip );
-                break;
-            }
-            THREAD_MARK
-            
-            // Posted to dispatchContext, not the main ioContext.
-            boost::asio::post( dispatchContext, [this,wip](){
-                THREAD_MARK
-                try {
-                    for( auto& part: wip->parts ) {
-                        if( part ) {
-                            part->load();
-                            part->prePack();
-                        }
-                    }
-                    THREAD_MARK
-                    lock_guard<mutex> qlock( wip_queue_mtx );
-                    wip_queue.push_back( wip );
-                } catch( ... ) {
-                    if( wip ) {
-                        Job::JobPtr job = wip->job.lock();
-                        if( job ) job->ungetWork( wip );
-                    }
-                    THREAD_MARK
-                }
-                --preparing_remote;
-                THREAD_UNMARK
-            });
-            THREAD_MARK
-            --count;
-        }
-    } catch( const exception& e ) {
-        LOG_ERR << "prepareRemoteWork: exception: " << e.what() << ende;
-    } catch( ... ) {
-        LOG_ERR << "prepareRemoteWork: unrecognized exception." << ende;
-    }
-    THREAD_UNMARK
-    preparing_remote -= count;
-}
-
-
 void Daemon::prepareWork( void ) {
 
     while( runMode == LOOP ) {
@@ -2314,14 +2304,6 @@ void Daemon::prepareWork( void ) {
                     preparing_local += nToPrepare;
                     boost::asio::post( dispatchContext, std::bind( &Daemon::prepareLocalWork, this, nToPrepare  ) );
                 }
-            }
-            THREAD_MARK
-            lock_guard<mutex> lock( wip_queue_mtx );
-            int nToPrepare = max_remote - wip_queue.size() - preparing_remote ;
-            if( nToPrepare > 0 ) {
-                THREAD_MARK
-                preparing_remote += nToPrepare;
-                boost::asio::post( dispatchContext, std::bind( &Daemon::prepareRemoteWork, this, nToPrepare ) );
             }
             THREAD_MARK
         } catch( const exception& e ) {
@@ -2348,7 +2330,7 @@ string Daemon::workStatus( bool details ) {
     }
     {
         lock_guard<mutex> qlock( wip_queue_mtx );
-        ret += "  Queue:       " + to_string(wip_queue.size()) + "/" + to_string(max_remote) + "  preparing: " + to_string(preparing_remote) + "\n";
+        ret += "  Queue:       " + to_string(wip_queue.size()) + "\n";
         if( details ) {
             for( const auto& w: wip_queue ) {
                 if( w ) ret += "    " + w->print() + "  @(" + hexString(w.get()) + ")\n";
