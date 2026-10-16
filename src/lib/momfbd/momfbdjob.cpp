@@ -841,7 +841,7 @@ void MomfbdJob::releaseLoadMemory( uint64_t bytes ) {
     loadMemReserved = (bytes < loadMemReserved) ? (loadMemReserved-bytes) : 0;
     for( auto it = loadMemWaitQueue.begin(); it != loadMemWaitQueue.end(); ) {
         uint64_t freeBudget = (loadMemBudget > loadMemReserved) ? (loadMemBudget-loadMemReserved) : 0;
-        if( it->first <= freeBudget ) {
+        if( (it->first <= freeBudget) || (loadMemReserved == 0) ) {
             loadMemReserved += it->first;
             boost::asio::post( ioContext, std::move(it->second) );
             it = loadMemWaitQueue.erase(it);
