@@ -665,6 +665,8 @@ void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchDa
     }
 
     uint64_t neededBytes = (uint64_t)nTotalFrames * imgSize.y * imgSize.x * sizeof(float);
+    LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << " requesting " << (neededBytes>>20)
+              << "MB to load " << nTotalFrames << " frames." << ende;
     myJob.requestLoadMemory( neededBytes, [this,&ioc,&patches,neededBytes](){
         loadDataBody( ioc, patches, neededBytes );
     });
@@ -675,6 +677,9 @@ void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchDa
 void Channel::loadDataBody( boost::asio::io_context& ioc, redux::util::Array<PatchData::Ptr>& patches, uint64_t reservedBytes ) {
 
     size_t nFiles = std::max<size_t>( 1, fileNumbers.size() );       // If no numbers, load template as single file
+    bpx::ptime loadStart = bpx::second_clock::universal_time();
+    LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << " admitted, starting to load "
+              << nFiles << " files (" << (reservedBytes>>20) << "MB)." << ende;
 
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
@@ -687,12 +692,17 @@ void Channel::loadDataBody( boost::asio::io_context& ioc, redux::util::Array<Pat
         myObject.progWatch.increaseTarget( nFiles );    // add saving of calibrated datafiles.
     }
 
-    loadCalib(ioc);
+    {
+        bpx::ptime calibStart = bpx::second_clock::universal_time();
+        loadCalib(ioc);
+        LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << ": dark/gain loaded, took "
+                  << to_simple_string(bpx::second_clock::universal_time()-calibStart) << "." << ende;
+    }
 
     ++myJob.nActiveLoadingChannels;
 
     progWatch.set(patches.dimSize(0)*patches.dimSize(1)+nFiles);
-    progWatch.setHandler( [this,&patches,reservedBytes](){
+    progWatch.setHandler( [this,&patches,reservedBytes,loadStart](){
         cutPatches( patches );
         ++myJob.patchCacheWatch;
         if( !(myJob.runFlags&RF_NOSWAP) ) {
@@ -711,6 +721,8 @@ void Channel::loadDataBody( boost::asio::io_context& ioc, redux::util::Array<Pat
         }
         myJob.releaseLoadMemory( reservedBytes );
         --myJob.nActiveLoadingChannels;
+        LOG_DEBUG << "Channel " << myObject.ID << ":" << ID << ": data loaded and cut into patches, took "
+                  << to_simple_string(bpx::second_clock::universal_time()-loadStart) << "." << ende;
     });
 
     adjustCutouts( patches );

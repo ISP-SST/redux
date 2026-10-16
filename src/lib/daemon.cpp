@@ -8,6 +8,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/network/protocol.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/util/btdump.hpp"
 #include "redux/util/datautil.hpp"
 #include "redux/util/endian.hpp"
 #include "redux/util/stopwatch.hpp"
@@ -22,6 +23,7 @@
 #include <cstring>
 #include <functional>
 #include <fcntl.h>
+#include <sstream>
 #include <poll.h>
 #include <sys/resource.h>
 #include <sys/sendfile.h>
@@ -1491,6 +1493,18 @@ void Daemon::interactiveCB( TcpConnection::Ptr conn ) {
                     replyStr = to_string( Trace::maxDepth() );
                 } else if( cmdStr == "version" ) {
                     replyStr = getLongVersionString();
+                } else if( cmdStr == "jobstat" ) {
+                    unique_lock<mutex> jlock( jobsMutex );
+                    vector<Job::JobPtr> tmpJobs = jobs;
+                    jlock.unlock();
+                    ostringstream ss;
+                    for( auto& j: tmpJobs ) {
+                        auto mj = std::dynamic_pointer_cast<momfbd::MomfbdJob>(j);
+                        if( mj ) ss << mj->dumpProgress();
+                    }
+                    replyStr = ss.str();
+                } else if( cmdStr == "bt" ) {
+                    replyStr = redux::util::dumpAllThreadBacktraces();
                 } else {  // unrecognized
                     if( !cmdStr.empty() ) replyStr = "Huh?";
                 }

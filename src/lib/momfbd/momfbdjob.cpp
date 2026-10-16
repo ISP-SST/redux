@@ -17,6 +17,7 @@
 #include "redux/util/trace.hpp"
 
 #include <fstream>
+#include <sstream>
 #include <thread>
 
 #include <boost/algorithm/string.hpp>
@@ -803,6 +804,8 @@ void MomfbdJob::storePatches( void ) {
         return;
     }
 
+    LOG_DEBUG << "Job #" << info.id << ": writing " << nPatches << " patches to disk." << ende;
+
     patchCacheWatch.set( nPatches );
     patchCacheWatch.setHandler( finishStore );
     for( const PatchData::Ptr& patch: patches ) {
@@ -826,10 +829,15 @@ void MomfbdJob::requestLoadMemory( uint64_t bytes, std::function<void()> onAdmit
     uint64_t freeBudget = (loadMemBudget > loadMemReserved) ? (loadMemBudget-loadMemReserved) : 0;
     if( (bytes <= freeBudget) || (loadMemReserved == 0) ) {
         loadMemReserved += bytes;
+        size_t waiting = loadMemWaitQueue.size();
         lock.unlock();
+        LOG_DEBUG << "requestLoadMemory: admit " << (bytes>>20) << "MB, reserved=" << (loadMemReserved>>20)
+                  << "MB/" << (loadMemBudget>>20) << "MB, waiting=" << waiting << ende;
         boost::asio::post( ioContext, onAdmit );
     } else {
         loadMemWaitQueue.emplace_back( bytes, std::move(onAdmit) );
+        LOG_DEBUG << "requestLoadMemory: queue " << (bytes>>20) << "MB, reserved=" << (loadMemReserved>>20)
+                  << "MB/" << (loadMemBudget>>20) << "MB, waiting=" << loadMemWaitQueue.size() << ende;
     }
 
 }
@@ -843,12 +851,41 @@ void MomfbdJob::releaseLoadMemory( uint64_t bytes ) {
         uint64_t freeBudget = (loadMemBudget > loadMemReserved) ? (loadMemBudget-loadMemReserved) : 0;
         if( (it->first <= freeBudget) || (loadMemReserved == 0) ) {
             loadMemReserved += it->first;
+            LOG_DEBUG << "releaseLoadMemory: admit " << (it->first>>20) << "MB from queue, reserved="
+                      << (loadMemReserved>>20) << "MB/" << (loadMemBudget>>20) << "MB, waiting="
+                      << (loadMemWaitQueue.size()-1) << ende;
             boost::asio::post( ioContext, std::move(it->second) );
             it = loadMemWaitQueue.erase(it);
         } else {
             ++it;
         }
     }
+
+}
+
+
+string MomfbdJob::dumpProgress( void ) {
+
+    ostringstream ss;
+    ss << "Job #" << info.id << " (" << info.name << "):\n";
+    ss << "  progWatch:       " << progWatch.dump() << "\n";
+    ss << "  patchCacheWatch: " << patchCacheWatch.dump() << "\n";
+    {
+        unique_lock<mutex> lock( loadMemMtx );
+        ss << "  loadMem: budget=" << (loadMemBudget>>20) << "MB  reserved=" << (loadMemReserved>>20)
+           << "MB  waiting=" << loadMemWaitQueue.size()
+           << "  activeChannels=" << nActiveLoadingChannels.load()
+           << "  numThreads=" << loadNumThreads.load() << "\n";
+    }
+    for( auto& obj: objects ) {
+        if( !obj ) continue;
+        ss << "  Object " << obj->id() << ": progWatch=" << obj->progWatch.dump() << "\n";
+        for( auto& ch: obj->getChannels() ) {
+            if( !ch ) continue;
+            ss << "    Channel " << ch->id() << ": progWatch=" << ch->progWatch.dump() << "\n";
+        }
+    }
+    return ss.str();
 
 }
 
@@ -883,6 +920,9 @@ void MomfbdJob::preProcess( void ) {
         }
     }
     //boost::asio::post(ioContext,  std::bind( &MomfbdJob::initCache, this) );    // TBD: should cache initialization be parallelized?
+
+    LOG_DEBUG << "Job #" << info.id << ": starting preprocessing of " << objects.size() << " objects, "
+              << nTotalChannels << " channels, " << nTotalImages << " images." << ende;
 
     progWatch.setTarget( nTotalImages );
     progWatch.setHandler( std::bind( &MomfbdJob::unloadCalib, this ) );
@@ -979,8 +1019,13 @@ void MomfbdJob::initCache(void) {
             nModes = obj->modes->dimSize(0);     // FIXME: Now we are assuming all objects have the same number of modes, and that #2/3 are tilts, this should be checked!!
         }
     }
-    globalData->constraints.init();
-    
+    {
+        boost::posix_time::ptime t0 = boost::posix_time::second_clock::universal_time();
+        globalData->constraints.init();
+        LOG_DEBUG << "Job #" << info.id << ": constraints.init() took "
+                  << to_simple_string(boost::posix_time::second_clock::universal_time()-t0) << "." << ende;
+    }
+
     THREAD_MARK;
     generateTraceObjects();
 
@@ -1160,7 +1205,7 @@ void MomfbdJob::writeOutput( void ) {
         LOG << nPatches << " patches, processed in: " << to_simple_string(total)
             << ".  CPU-time: " << (cpu_sum/3600) << " hours." << ende;
         
-        LOG_DETAIL << timings << ende;
+        LOG << timings << ende;
         
         THREAD_MARK;
 

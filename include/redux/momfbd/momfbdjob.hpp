@@ -112,6 +112,8 @@ namespace redux {
             const std::vector<Channel::Ptr>& getChannels(uint16_t objID) const;
             redux::util::Point16 getSmallestImageSize( void );
 
+            std::string dumpProgress( void );
+
             const MomfbdJob& operator=(const GlobalCfg&);
 
         private:
