@@ -8,6 +8,8 @@
 #include "redux/file/fileana.hpp"
 #include "redux/image/utils.hpp"
 
+#include <fstream>
+
 using namespace redux::file;
 using namespace redux::logging;
 using namespace redux::momfbd;
@@ -67,14 +69,18 @@ void ChannelData::initPatch(void) {
 
 
 void ChannelData::clear( void ) {
-    
+
+    images.clear();
+
 }
 
 
 void ChannelData::load( void ) {
-    
-    myChannel->getStorage(*this);
-    
+
+    if( !images.nElements() ) {
+        myChannel->getStorage(*this);
+    }
+
 }
 
 
@@ -437,50 +443,63 @@ void PatchData::initPatch(void) {
 
 
 void PatchData::load( void ) {
-    
-    Part::load();
-    for( auto& obj: objects ) {
-        if(obj) obj->load();
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
+    uint16_t stepBefore = step;
+    if( !CacheItem::cacheLoad() ) {
+        for( auto& obj: objects ) {
+            if(obj) obj->load();
+        }
     }
-    
+    step = stepBefore;
+
 }
 
 
 void PatchData::unload( void ) {
-    
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
     Part::unload();
-    packed.clear();
-    
+
 }
 
-void PatchData::prePack( bool force ) {
-    
-    if( packed.packedSize && !force ) {
-        return;
-    }
-    packed.size = size();
-    if( !packed.size ) {
-        return;
-    }
-    packed.data = rdx_get_shared<char>(packed.size);
-    packed.packedSize = pack( packed.data.get() );
+void PatchData::failedStore( void ) {
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
+    uint16_t stepBefore = step;
+    CacheItem::cacheLoad();
+    CacheItem::cacheStore(true);
+    step = stepBefore;
 
 }
 
 
 void PatchData::clear( void ) {
-    
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
     unload();
     for( auto& obj: objects ) {
         if(obj) obj->clear();
     }
-    
+
+}
+
+
+bool PatchData::isOnDiskOnly( void ) const {
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
+    return !isLoaded && !fullPath.empty() && bfs::exists(fullPath);
+
 }
 
 
 uint64_t PatchData::size( void ) const {
 
-    if( !isLoaded && cachedSize ) return cachedSize;
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
+    if( !isLoaded ) {
+        if( !fullPath.empty() && bfs::exists(fullPath) ) return bfs::file_size( fullPath );
+        if( cachedSize ) return cachedSize;
+    }
     uint64_t sz = Part::size();
     sz += index.size() + position.size() + roi.size();
     sz += sizeof(float);
@@ -497,10 +516,15 @@ uint64_t PatchData::size( void ) const {
 
 
 uint64_t PatchData::pack( char* ptr ) const {
-    
-    if( packed.packedSize ) {
-        memcpy( ptr, packed.data.get(), packed.packedSize );
-        return packed.packedSize;
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
+    if( !isLoaded && !fullPath.empty() && bfs::exists(fullPath) ) {
+        uint64_t sz = bfs::file_size( fullPath );
+        std::ifstream in( fullPath.string(), std::ios::binary );
+        if( in.good() ) {
+            in.read( ptr, sz );
+            return sz;
+        }
     }
 
     using redux::util::pack;
@@ -561,15 +585,13 @@ uint64_t PatchData::unpack( const char* ptr, bool swap_endian ) {
 
 void PatchData::cclear(void) {
 
-}
+    for( auto& obj: objects ) {
+        if(obj) obj->clear();
+    }
+    for( auto& td: trace_data ) {
+        if(td) td->clear();
+    }
 
-
-bool PatchData::cacheLoad(bool removeAfterLoad) {
-    return false;
-}
-
-bool PatchData::cacheStore(bool clearAfterStore) {
-    return false;
 }
 
 
@@ -611,7 +633,9 @@ PatchData& PatchData::operator=( const PatchData& rhs ) {
 
 
 void PatchData::copyResults( const PatchData& rhs ) {
-    
+
+    std::lock_guard<std::recursive_mutex> lock( dispatchMutex );
+    setLoaded( false );
     if( objects.size() != rhs.objects.size() ) {
         throw runtime_error("Can not copy PatchData if they contain different number of objects.");
     }

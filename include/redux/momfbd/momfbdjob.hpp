@@ -116,6 +116,7 @@ namespace redux {
             void checkParts( void );
             bool checkPatchPositions(void);
             void unloadCalib( void );
+            void storePatches( void );
             void preProcess( void );
             void initCache( void );
             void clearPatches( void );
@@ -142,6 +143,7 @@ namespace redux {
             Solver::Ptr solver;
             
             redux::util::ProgressWatch progWatch;
+            redux::util::ProgressWatch patchCacheWatch;
             
             bool cfgChecked;
             bool dataChecked;

@@ -681,7 +681,9 @@ void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchDa
     loadCalib(ioc);
     
     progWatch.set(patches.dimSize(0)*patches.dimSize(1)+nFiles);
-    progWatch.setHandler( [this](){
+    progWatch.setHandler( [this,&patches](){
+        cutPatches( patches );
+        ++myJob.patchCacheWatch;
         if( !(myJob.runFlags&RF_NOSWAP) ) {
             images.clear();
         }
@@ -1293,7 +1295,28 @@ void Channel::getStorage( ChannelData& chData ) {
 
     maybeLoadImages();
     chData.images.wrap(reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1, chData.cutoutRegion.first.y, chData.cutoutRegion.last.y, chData.cutoutRegion.first.x, chData.cutoutRegion.last.x);
- 
+
+}
+
+
+void Channel::cutPatches( redux::util::Array<PatchData::Ptr>& patches ) {
+
+    if( patches.nDimensions() != 2 ) return;
+
+    size_t nPatchesY = patches.dimSize(0);
+    size_t nPatchesX = patches.dimSize(1);
+    for( size_t py=0; py<nPatchesY; ++py ) {
+        for( size_t px=0; px<nPatchesX; ++px ) {
+            PatchData::Ptr& patch = patches(py,px);
+            if( !patch ) continue;
+            ChannelData::Ptr chData = patch->getChannelData( myObject.ID, ID );
+            if( !chData ) continue;
+            chData->images = redux::util::Array<float>( reinterpret_cast<redux::util::Array<float>&>(images), 0, nTotalFrames-1,
+                                                          chData->cutoutRegion.first.y, chData->cutoutRegion.last.y,
+                                                          chData->cutoutRegion.first.x, chData->cutoutRegion.last.x ).copy();
+        }
+    }
+
 }
 
 

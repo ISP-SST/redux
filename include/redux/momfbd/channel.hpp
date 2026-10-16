@@ -114,8 +114,9 @@ namespace redux {
             void addTimeStamps( const bpx::ptime& newStart, const bpx::ptime& newEnd );
             void loadFile( size_t fileIndex, size_t offset );
             void preprocessImage( size_t index );
-            void maybeLoadImages( void );          
-            void getStorage(ChannelData&);          
+            void maybeLoadImages( void );
+            void getStorage(ChannelData&);
+            void cutPatches(redux::util::Array<PatchData::Ptr>&);
             
             redux::util::Point16 getImageSize( bool force=false );
             void logAndThrow( std::string );

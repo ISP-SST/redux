@@ -162,7 +162,8 @@ namespace redux {
             void initPatch(void);
             void load(void) override;
             void unload(void) override;
-            void prePack( bool force=false ) override;
+            void failedStore(void) override;
+            bool isOnDiskOnly(void) const override;
             void clear(void);
             uint64_t size(void) const override;
             uint64_t pack(char*) const override;
@@ -171,8 +172,6 @@ namespace redux {
             uint64_t cpack(char* p) const override { return pack(p); };
             uint64_t cunpack(const char* p, bool e) override { return unpack(p,e); };
             void cclear(void) override;
-            bool cacheLoad(bool removeAfterLoad=false) override;
-            bool cacheStore(bool clearAfterStore=false) override;
 
             bool operator==(const PatchData&);
             PatchData& operator=(const PatchData&);
@@ -192,7 +191,10 @@ namespace redux {
 
             void copyResults( const PatchData& rhs );
             void dump( std::string ) const;
-            
+
+        private:
+            mutable std::recursive_mutex dispatchMutex;
+
         };
        
         struct GlobalData : public Part {   // Used for sending e.g. modes/pupils to the slaves.

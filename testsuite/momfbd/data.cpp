@@ -2,12 +2,16 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/util/cache.hpp"
 
+#include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 
 using namespace redux::momfbd;
 using namespace redux::util;
- 
+
+namespace bfs = boost::filesystem;
+
 using namespace std;
 
 namespace testsuite {
@@ -103,10 +107,50 @@ namespace testsuite {
         }
 
 
+        void patchCacheTest( void ) {
+
+            bfs::path tmpDir = bfs::temp_directory_path() / bfs::unique_path( "redux_test_patchcache_%%%%" );
+            bfs::create_directories( tmpDir );
+            Cache::get().setPath( tmpDir.string() );
+
+            try {
+                MomfbdJob mjob;
+                PatchData pd(mjob);
+                pd.id = 42;
+                pd.index = Point16(3,7);
+                pd.setPath( "cachetest" );
+
+                string expectedPath = (tmpDir / "cachetest" / ("patch_"+(string)pd.index)).string();
+                BOOST_CHECK_EQUAL( pd.getFullPath(), expectedPath );
+
+                auto buf = sharedArray<char>( pd.size() );
+                uint64_t packedSize = pd.pack( buf.get() );
+                BOOST_CHECK_EQUAL( packedSize, pd.size() );
+
+                BOOST_CHECK( pd.cacheStore(true) );
+                BOOST_CHECK( bfs::exists( pd.getFullPath() ) );
+
+                BOOST_CHECK( pd.cacheLoad() );
+
+                auto buf2 = sharedArray<char>( pd.size() );
+                uint64_t packedSize2 = pd.pack( buf2.get() );
+                BOOST_CHECK_EQUAL( packedSize2, packedSize );
+                BOOST_CHECK( std::equal( buf.get(), buf.get()+packedSize, buf2.get() ) );
+
+            } catch( ... ) {
+                bfs::remove_all( tmpDir );
+                throw;
+            }
+            bfs::remove_all( tmpDir );
+
+        }
+
+
         using namespace boost::unit_test;
         void add_data_tests( test_suite* ts ) {
 
             ts->add( BOOST_TEST_CASE_NAME( &dataTest, "Data" ) );
+            ts->add( BOOST_TEST_CASE_NAME( &patchCacheTest, "PatchCache" ) );
 
         }
 

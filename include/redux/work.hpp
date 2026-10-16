@@ -53,6 +53,8 @@ namespace redux {
         virtual void load(void);
         virtual void unload(void);
         virtual void prePack( bool force=false ) {};
+        virtual void failedStore( void ) { cacheLoad(); cacheStore(true); }
+        virtual bool isOnDiskOnly( void ) const { return false; }
         size_t csize(void) const override { return size(); };
         uint64_t cpack(char* p) const override { return pack(p); };
         uint64_t cunpack(const char* p, bool e) override { return unpack(p,e); };

@@ -455,7 +455,7 @@ void MomfbdJob::ungetWork( WorkInProgress::Ptr wip ) {
     for( auto& part : wip->parts ) {
         part->step = JSTEP_QUEUED;
     }
-    
+
 }
 
 
@@ -750,7 +750,23 @@ void MomfbdJob::unloadCalib( void ) {
             ch->unloadCalib();
         }
     }
+    THREAD_UNMARK
+
+}
+
+
+void MomfbdJob::storePatches( void ) {
+
     THREAD_MARK
+    size_t nPatchesY = patches.dimSize(0);
+    size_t nPatchesX = patches.dimSize(1);
+    for( size_t y=0; y<nPatchesY; ++y ) {
+        for( size_t x=0; x<nPatchesX; ++x ) {
+            PatchData::Ptr& patch = patches(y,x);
+            if( patch ) patch->cacheStore(true);
+        }
+    }
+
     if( runFlags & RF_FLATFIELD ) {
         LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") flat-fielding completed." << ende;
         moveTo( this, JSTEP_COMPLETED );
@@ -760,14 +776,11 @@ void MomfbdJob::unloadCalib( void ) {
             << "  nPatches = " << patches.nElements() << ende;
         moveTo( this, JSTEP_QUEUED );
         stopLog();
-        //info.progressString = "Q";
-        //info.step.store( JSTEP_DONE );
-        //check();
     }
     info.state.store( JSTATE_IDLE );
     updateProgressString();
     THREAD_UNMARK
-    
+
 }
 
 
@@ -796,6 +809,9 @@ void MomfbdJob::preProcess( void ) {
 
     progWatch.setTarget( nTotalImages );
     progWatch.setHandler( std::bind( &MomfbdJob::unloadCalib, this ) );
+
+    patchCacheWatch.set( nTotalChannels );
+    patchCacheWatch.setHandler( std::bind( &MomfbdJob::storePatches, this ) );
 
     THREAD_MARK
     if( !(runFlags&RF_FLATFIELD) ) {    // Skip this if we are only doing flatfielding
