@@ -961,9 +961,12 @@ void Object::loadData( boost::asio::io_context& ioc, Array<PatchData::Ptr>& patc
     } );
     
     for( shared_ptr<Channel>& ch: channels ){
-        ch->loadData( ioc, patches );
+        boost::asio::post( ioc, [this,ch,&ioc,&patches](){
+            if( !myJob.isOK() ) return;
+            ch->loadData( ioc, patches );
+        });
     }
- 
+
 }
 
 

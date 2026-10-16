@@ -656,86 +656,137 @@ void Channel::loadCalib( boost::asio::io_context& ioc ) {     // load through ca
 
 void Channel::loadData( boost::asio::io_context& ioc, redux::util::Array<PatchData::Ptr>& patches ) {
 
+    if( nTotalFrames == 0 ) {
+        throw logic_error("No input images for channel " + to_string(myObject.ID) + ":" + to_string(ID));
+    }
+
+    if( !(myJob.runFlags&RF_NOSWAP) ) {    // unless swap is deactivated for this job
+        cacheFile = myJob.cachePath + "images_" + to_string(myObject.ID) + "_" + to_string(ID);
+    }
+
+    uint64_t neededBytes = (uint64_t)nTotalFrames * imgSize.y * imgSize.x * sizeof(float);
+    myJob.requestLoadMemory( neededBytes, [this,&ioc,&patches,neededBytes](){
+        loadDataBody( ioc, patches, neededBytes );
+    });
+
+}
+
+
+void Channel::loadDataBody( boost::asio::io_context& ioc, redux::util::Array<PatchData::Ptr>& patches, uint64_t reservedBytes ) {
+
     size_t nFiles = std::max<size_t>( 1, fileNumbers.size() );       // If no numbers, load template as single file
 
     startT = bpx::pos_infin;
     endT = bpx::neg_infin;
-    
-    if( nTotalFrames == 0 ) {
-        throw logic_error("No input images for channel " + to_string(myObject.ID) + ":" + to_string(ID));
-    }
-    
-    // Prepare needed storage
-    if( !(myJob.runFlags&RF_NOSWAP) ) {    // unless swap is deactivated for this job
-        cacheFile = myJob.cachePath + "images_" + to_string(myObject.ID) + "_" + to_string(ID);
-    }
-    
+
     maybeLoadImages();
     imageStats.resize( nTotalFrames );
-    
+
     bool saveFFData = (myObject.saveMask&SF_SAVE_FFDATA) || (myJob.runFlags&RF_FLATFIELD);
     if( saveFFData ) {
         myObject.progWatch.increaseTarget( nFiles );    // add saving of calibrated datafiles.
     }
-    
+
     loadCalib(ioc);
-    
+
+    ++myJob.nActiveLoadingChannels;
+
     progWatch.set(patches.dimSize(0)*patches.dimSize(1)+nFiles);
-    progWatch.setHandler( [this,&patches](){
+    progWatch.setHandler( [this,&patches,reservedBytes](){
         cutPatches( patches );
         ++myJob.patchCacheWatch;
         if( !(myJob.runFlags&RF_NOSWAP) ) {
             images.clear();
+            if( !cacheFile.empty() ) {
+                bfs::path tmpP(cacheFile);
+                if( bfs::exists(tmpP) ) {
+                    try {
+                        bfs::remove(tmpP);
+                    } catch( exception& e ) {
+                        LOG_ERR << "Channel::loadData: failed to remove storage: " << cacheFile << "  reason: " << e.what() << ende;
+                    }
+                }
+                cacheFile.clear();
+            }
         }
+        myJob.releaseLoadMemory( reservedBytes );
+        --myJob.nActiveLoadingChannels;
     });
 
     adjustCutouts( patches );
     buildPatchCoverageMask( patches );
     progWatch.step( patches.dimSize(0)*patches.dimSize(1) );
-    
-    size_t nPreviousFrames(0);
-    for( size_t i=0; i<nFiles; ++i ) {
-        boost::asio::post( ioc, [&,i,nPreviousFrames,saveFFData](){
-            if( !myJob.isOK() ) return;      // job already failed, no point doing more work
-            try {
-                loadFile(i,nPreviousFrames);
-                if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
-                size_t nF = nFrames[i];
-                for( size_t j=0; j<nF; ++j ) {
-                    preprocessImage( nPreviousFrames+j );
-                    //service.post(std::bind( &Channel::preprocessImage, this, nPreviousFrames+j) );
-                }
-                if( saveFFData ) {
-                    bfs::path fn;
-                    try {
-                        fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).filename();
-                        bfs::path ext = fn.extension();
-                        if(ext.string().empty() || ext.string().length() > 5 ) {     // we assume the filename does not have a proper extenstion, add a temporary dummy
-                            fn = bfs::path( fn.string() + ".ext" );
-                        }
-                        fn.replace_extension(".cor.f0");
-                        LOG_DEBUG << boost::format("Saving dark/flat corrected data (%d:%d:%d) as %s.") % myObject.ID % ID % i % fn.string() << ende;
-                        Image<float> view( images, nPreviousFrames, nPreviousFrames+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
-                        redux::file::Ana::write( fn.string(), view.copy() );   // TODO: other formats
-                    } catch ( const std::exception& e ) {
-                        LOG_ERR << "Failed to save corrected file: " << fn << "  reason: " << e.what() << ende;
-                    }
-                    ++myObject.progWatch;
-                }
-                ++progWatch;
-                return;
-            } catch ( const std::exception& e ) {
-                myJob.fail( "Failed to load/preprocess file " + to_string(fileNumbers[i]) +
-                            " (object " + to_string(myObject.ID) + ", channel " + to_string(ID) + "): " + e.what() );
-            } catch ( ... ) {
-                myJob.fail( "Failed to load/preprocess file " + to_string(fileNumbers[i]) +
-                            " (object " + to_string(myObject.ID) + ", channel " + to_string(ID) + "): unknown reason." );
-            }
-            myJob.progWatch.clear();
-            progWatch.clear();
-        });
-        nPreviousFrames += nFrames[i];
+
+    auto frameOffset = make_shared<vector<size_t>>( nFiles );
+    {
+        size_t acc(0);
+        for( size_t i=0; i<nFiles; ++i ) {
+            (*frameOffset)[i] = acc;
+            acc += nFrames[i];
+        }
     }
+
+    auto nextFileIdx = make_shared<atomic<size_t>>(0);
+    auto inFlight = make_shared<atomic<size_t>>(0);
+    auto tryLaunchMore = make_shared<function<void()>>();
+    *tryLaunchMore = [this,&ioc,saveFFData,frameOffset,nextFileIdx,inFlight,tryLaunchMore,nFiles](){
+        while( true ) {
+            int activeChannels = std::max<int>( 1, myJob.nActiveLoadingChannels.load() );
+            size_t cap = std::max<size_t>( 1, myJob.loadNumThreads.load()/activeChannels );
+            size_t cur = inFlight->load();
+            if( cur >= cap ) return;
+            if( !inFlight->compare_exchange_weak( cur, cur+1 ) ) continue;
+            size_t i = (*nextFileIdx)++;
+            if( i >= nFiles ) {
+                --(*inFlight);
+                return;
+            }
+            boost::asio::post( ioc, [this,i,saveFFData,frameOffset,inFlight,tryLaunchMore](){
+                if( !myJob.isOK() ) { --(*inFlight); return; }      // job already failed, no point doing more work
+                size_t nPreviousFrames = (*frameOffset)[i];
+                try {
+                    loadFile(i,nPreviousFrames);
+                    if( imgSize.y < 1 || imgSize.x < 1 ) throw logic_error("Image size is zero.");
+                    size_t nF = nFrames[i];
+                    for( size_t j=0; j<nF; ++j ) {
+                        preprocessImage( nPreviousFrames+j );
+                    }
+                    if( saveFFData ) {
+                        bfs::path fn;
+                        try {
+                            fn = bfs::path (myJob.info.outputDir) / bfs::path (boost::str (boost::format (imageTemplate) % fileNumbers[i])).filename();
+                            bfs::path ext = fn.extension();
+                            if(ext.string().empty() || ext.string().length() > 5 ) {     // we assume the filename does not have a proper extenstion, add a temporary dummy
+                                fn = bfs::path( fn.string() + ".ext" );
+                            }
+                            fn.replace_extension(".cor.f0");
+                            LOG_DEBUG << boost::format("Saving dark/flat corrected data (%d:%d:%d) as %s.") % myObject.ID % ID % i % fn.string() << ende;
+                            Image<float> view( images, nPreviousFrames, nPreviousFrames+nF-1, 0, imgSize.y-1, 0, imgSize.x-1 );
+                            redux::file::Ana::write( fn.string(), view.copy() );   // TODO: other formats
+                        } catch ( const std::exception& e ) {
+                            LOG_ERR << "Failed to save corrected file: " << fn << "  reason: " << e.what() << ende;
+                        }
+                        ++myObject.progWatch;
+                    }
+                    ++progWatch;
+                    --(*inFlight);
+                    (*tryLaunchMore)();
+                    return;
+                } catch ( const std::exception& e ) {
+                    myJob.fail( "Failed to load/preprocess file " + to_string(fileNumbers[i]) +
+                                " (object " + to_string(myObject.ID) + ", channel " + to_string(ID) + "): " + e.what() );
+                } catch ( ... ) {
+                    myJob.fail( "Failed to load/preprocess file " + to_string(fileNumbers[i]) +
+                                " (object " + to_string(myObject.ID) + ", channel " + to_string(ID) + "): unknown reason." );
+                }
+                myJob.progWatch.clear();
+                progWatch.clear();
+                --(*inFlight);
+            });
+        }
+    };
+
+    (*tryLaunchMore)();
 
 }
 

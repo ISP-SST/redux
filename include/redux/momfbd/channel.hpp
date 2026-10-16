@@ -108,6 +108,7 @@ namespace redux {
             
             void loadCalib(boost::asio::io_context&);
             void loadData(boost::asio::io_context&, redux::util::Array<PatchData::Ptr>&);
+            void loadDataBody(boost::asio::io_context&, redux::util::Array<PatchData::Ptr>&, uint64_t reservedBytes);
             void buildPatchCoverageMask(redux::util::Array<PatchData::Ptr>&);
             void unloadCalib(void);
 

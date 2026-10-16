@@ -224,7 +224,7 @@ bool Worker::getWork( void ) {
                     wip->jobID = thisJob->info.id;
                     currentJob = thisJob;
                 }
-                if( previousJob && (previousJob != currentJob) ) {
+                if( previousJob && (previousJob != currentJob) && (previousJob.use_count() == 1) ) {
                     previousJob->cleanup();    // release the old job's Solver/thread-pool/etc. before our last reference to it goes away.
                 }
                 THREAD_MARK

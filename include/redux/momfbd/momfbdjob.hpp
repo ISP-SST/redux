@@ -14,6 +14,9 @@
 
 #include <atomic>
 #include <chrono>
+#include <deque>
+#include <functional>
+#include <mutex>
 
 #include <boost/program_options.hpp>
 namespace bpo = boost::program_options;
@@ -131,6 +134,17 @@ namespace redux {
             void dumpConfig(void);
             void updateProgressString(void);
             void updateStatus(void);
+
+            void requestLoadMemory( uint64_t bytes, std::function<void()> onAdmit );
+            void releaseLoadMemory( uint64_t bytes );
+
+            std::mutex loadMemMtx;
+            uint64_t loadMemBudget;
+            uint64_t loadMemReserved;
+            std::deque<std::pair<uint64_t,std::function<void()>>> loadMemWaitQueue;
+
+            std::atomic<uint16_t> loadNumThreads{1};
+            std::atomic<int> nActiveLoadingChannels{0};
 
             std::vector<Object::Ptr> objects;
             std::vector<Object::Ptr> trace_objects;

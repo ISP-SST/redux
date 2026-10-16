@@ -16,6 +16,7 @@
 #include "redux/util/stringutil.hpp"
 #include "redux/util/trace.hpp"
 
+#include <fstream>
 #include <thread>
 
 #include <boost/algorithm/string.hpp>
@@ -30,6 +31,25 @@ using namespace redux::file;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
+
+
+namespace {
+
+    uint64_t getAvailableMemory( void ) {
+        ifstream in( "/proc/meminfo" );
+        string line;
+        while( std::getline( in, line ) ) {
+            if( line.compare( 0, 13, "MemAvailable:" ) == 0 ) {
+                uint64_t kB(0);
+                if( sscanf( line.c_str()+13, "%lu", &kB ) == 1 ) {
+                    return kB*1024;
+                }
+            }
+        }
+        return 0;
+    }
+
+}
 
 
 size_t MomfbdJob::jobType = Job::registerJob( "momfbd", momfbd::MomfbdJob::create );
@@ -76,7 +96,7 @@ uint64_t MomfbdJob::packParts( char* ptr, WorkInProgress::Ptr wip  ) const {
     THREAD_MARK
     wip->parts.resize(1);
     THREAD_MARK
-    uint64_t count = wip->parts[0]->pack( ptr );
+    uint64_t count = wip->parts[0]->isOnDiskOnly() ? wip->parts[0]->size() : wip->parts[0]->pack( ptr );
     THREAD_MARK
     if( wip->jobID != info.id ) {           // First part from this job, so we need to send the global info
         THREAD_MARK
@@ -306,6 +326,7 @@ void MomfbdJob::checkParts( void ) {
     THREAD_MARK
     for( auto & patch : patches ) {
         if( (patch->step == JSTEP_RUNNING) && (patch.use_count() == 1) ) {  // no reference in any existing WIP, so it is in limbo.
+            LOG_DEBUG << "checkParts: orphan-reclaim, patch=" << patch->id << " has no remaining WIP reference." << ende;
             patch->step = JSTEP_ERR;
         }
         if( patch->step & JSTEP_ERR ) {
@@ -577,6 +598,7 @@ bool MomfbdJob::run( WorkInProgress::Ptr wip, uint16_t maxThreads ) {
         THREAD_MARK
         progWatch.set(0,0);
         progWatch.setTicker( std::bind( &MomfbdJob::updateProgressString, this) );
+        loadNumThreads = std::max<uint16_t>( 1, nThreads );
         preProcess();                           // preprocess on master: load, flatfield, split in patches
         THREAD_MARK
     } else if( jobStep == JSTEP_RUNNING || jobStep == JSTEP_QUEUED ) {
@@ -758,28 +780,75 @@ void MomfbdJob::unloadCalib( void ) {
 void MomfbdJob::storePatches( void ) {
 
     THREAD_MARK
-    size_t nPatchesY = patches.dimSize(0);
-    size_t nPatchesX = patches.dimSize(1);
-    for( size_t y=0; y<nPatchesY; ++y ) {
-        for( size_t x=0; x<nPatchesX; ++x ) {
-            PatchData::Ptr& patch = patches(y,x);
-            if( patch ) patch->cacheStore(true);
+
+    auto finishStore = [this](){
+        if( runFlags & RF_FLATFIELD ) {
+            LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") flat-fielding completed." << ende;
+            moveTo( this, JSTEP_COMPLETED );
+        } else {
+            LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued:"
+                << "  nObjects = " << objects.size() << "  nImages = " << nImages()
+                << "  nPatches = " << patches.nElements() << ende;
+            moveTo( this, JSTEP_QUEUED );
+            stopLog();
         }
+        info.state.store( JSTATE_IDLE );
+        updateProgressString();
+    };
+
+    size_t nPatches = patches.nElements();
+    if( !nPatches ) {
+        finishStore();
+        THREAD_UNMARK
+        return;
     }
 
-    if( runFlags & RF_FLATFIELD ) {
-        LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") flat-fielding completed." << ende;
-        moveTo( this, JSTEP_COMPLETED );
-    } else {
-        LOG << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processed and queued:"
-            << "  nObjects = " << objects.size() << "  nImages = " << nImages()
-            << "  nPatches = " << patches.nElements() << ende;
-        moveTo( this, JSTEP_QUEUED );
-        stopLog();
+    patchCacheWatch.set( nPatches );
+    patchCacheWatch.setHandler( finishStore );
+    for( const PatchData::Ptr& patch: patches ) {
+        if( patch ) {
+            boost::asio::post( ioContext, [this,patch](){
+                patch->cacheStore(true);
+                ++patchCacheWatch;
+            });
+        } else {
+            ++patchCacheWatch;
+        }
     }
-    info.state.store( JSTATE_IDLE );
-    updateProgressString();
     THREAD_UNMARK
+
+}
+
+
+void MomfbdJob::requestLoadMemory( uint64_t bytes, std::function<void()> onAdmit ) {
+
+    unique_lock<mutex> lock( loadMemMtx );
+    uint64_t freeBudget = (loadMemBudget > loadMemReserved) ? (loadMemBudget-loadMemReserved) : 0;
+    if( (bytes <= freeBudget) || (loadMemReserved == 0) ) {
+        loadMemReserved += bytes;
+        lock.unlock();
+        boost::asio::post( ioContext, onAdmit );
+    } else {
+        loadMemWaitQueue.emplace_back( bytes, std::move(onAdmit) );
+    }
+
+}
+
+
+void MomfbdJob::releaseLoadMemory( uint64_t bytes ) {
+
+    unique_lock<mutex> lock( loadMemMtx );
+    loadMemReserved = (bytes < loadMemReserved) ? (loadMemReserved-bytes) : 0;
+    for( auto it = loadMemWaitQueue.begin(); it != loadMemWaitQueue.end(); ) {
+        uint64_t freeBudget = (loadMemBudget > loadMemReserved) ? (loadMemBudget-loadMemReserved) : 0;
+        if( it->first <= freeBudget ) {
+            loadMemReserved += it->first;
+            boost::asio::post( ioContext, std::move(it->second) );
+            it = loadMemWaitQueue.erase(it);
+        } else {
+            ++it;
+        }
+    }
 
 }
 
@@ -787,6 +856,14 @@ void MomfbdJob::storePatches( void ) {
 void MomfbdJob::preProcess( void ) {
 
     LOG_TRACE << "MomfbdJob #" << info.id << " ("  << info.name << ") pre-processing..." << ende;
+
+    {
+        uint64_t avail = getAvailableMemory();
+        loadMemBudget = avail ? (avail*8/10) : (2ULL<<30);
+        loadMemReserved = 0;
+        LOG_DEBUG << "MomfbdJob #" << info.id << ": load-memory budget = " << (loadMemBudget>>20) << " MB"
+                  << " (MemAvailable=" << (avail>>20) << " MB)" << ende;
+    }
 
     THREAD_MARK;
     uint32_t nTotalImages = 0;
@@ -877,9 +954,12 @@ void MomfbdJob::preProcess( void ) {
 
     THREAD_MARK
     for( shared_ptr<Object>& obj : objects ) {
-        obj->loadData( ioContext, patches );
+        boost::asio::post( ioContext, [this,obj](){
+            if( !isOK() ) return;
+            obj->loadData( ioContext, patches );
+        });
     }
-    
+
     THREAD_MARK
     waveFronts.loadInit( ioContext, patches );
     
