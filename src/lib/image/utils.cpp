@@ -12,6 +12,8 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <utility>
+#include <vector>
 #include <math.h>
 
 #include <gsl/gsl_multifit.h>
@@ -44,18 +46,6 @@ namespace {
         return distMap;
     }
 
-
-    template <typename T>
-    void maskConnected(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int yy, unsigned int xx, unsigned int y_start, unsigned int x_start, T threshold) {
-        if (yy >= sizeY || xx >= sizeX) return;
-        if ( !mask[yy][xx] && ((yy == y_start && xx == x_start) || data[yy][xx] > threshold)) {       // new point inserted, check neighbours
-            mask[yy][xx] = 1;
-            maskConnected(data, mask, sizeY, sizeX, yy + 1, xx, y_start, x_start, threshold);
-            maskConnected(data, mask, sizeY, sizeX, yy - 1, xx, y_start, x_start, threshold);
-            maskConnected(data, mask, sizeY, sizeX, yy, xx + 1, y_start, x_start, threshold);
-            maskConnected(data, mask, sizeY, sizeX, yy, xx - 1, y_start, x_start, threshold);
-        }
-    }
 
 }
 
@@ -295,7 +285,18 @@ template Array<double> redux::image::fitPlane( const Array<double>&, bool, doubl
 template <typename T>
 void redux::image::connectedRegion(T** data, uint8_t** mask, size_t sizeY, size_t sizeX, unsigned int y_start, unsigned int x_start, T threshold) {
     memset(*mask, 0, sizeY * sizeX);
-    maskConnected(data, mask, sizeY, sizeX, y_start, x_start, y_start, x_start, threshold);
+    if (y_start >= sizeY || x_start >= sizeX) return;
+    std::vector<std::pair<unsigned int, unsigned int>> stack;
+    stack.emplace_back(y_start, x_start);
+    mask[y_start][x_start] = 1;
+    while (!stack.empty()) {
+        auto [yy, xx] = stack.back();
+        stack.pop_back();
+        if (yy + 1 < sizeY && !mask[yy + 1][xx] && data[yy + 1][xx] > threshold) { mask[yy + 1][xx] = 1; stack.emplace_back(yy + 1, xx); }
+        if (yy > 0 && !mask[yy - 1][xx] && data[yy - 1][xx] > threshold) { mask[yy - 1][xx] = 1; stack.emplace_back(yy - 1, xx); }
+        if (xx + 1 < sizeX && !mask[yy][xx + 1] && data[yy][xx + 1] > threshold) { mask[yy][xx + 1] = 1; stack.emplace_back(yy, xx + 1); }
+        if (xx > 0 && !mask[yy][xx - 1] && data[yy][xx - 1] > threshold) { mask[yy][xx - 1] = 1; stack.emplace_back(yy, xx - 1); }
+    }
 }
 template void redux::image::connectedRegion(float**, uint8_t**, size_t, size_t, uint, uint, float);
 template void redux::image::connectedRegion(double**, uint8_t**, size_t, size_t, uint, uint, double);
