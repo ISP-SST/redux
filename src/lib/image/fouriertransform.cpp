@@ -70,24 +70,24 @@ void FourierTransform::Plan::init (void) {
     
     if (id.tp == R2C) {
         if (id.sizes.size() == 2) {
-            forward_plan = fftw_plan_dft_r2c_2d( id.sizes[0], id.sizes[1], ptrD, ptrC2, FFTW_MEASURE );
-            backward_plan = fftw_plan_dft_c2r_2d( id.sizes[0], id.sizes[1], ptrC2, ptrD, FFTW_MEASURE );
+            forward_plan = fftw_plan_dft_r2c_2d( id.sizes[0], id.sizes[1], ptrD, ptrC2, FFTW_ESTIMATE );
+            backward_plan = fftw_plan_dft_c2r_2d( id.sizes[0], id.sizes[1], ptrC2, ptrD, FFTW_ESTIMATE );
         } else
             if (id.sizes.size() == 1) {
-                forward_plan = fftw_plan_dft_r2c_1d( nPix, ptrD, ptrC2, FFTW_MEASURE);
-                backward_plan = fftw_plan_dft_c2r_1d( nPix, ptrC2, ptrD, FFTW_MEASURE);
+                forward_plan = fftw_plan_dft_r2c_1d( nPix, ptrD, ptrC2, FFTW_ESTIMATE);
+                backward_plan = fftw_plan_dft_c2r_1d( nPix, ptrC2, ptrD, FFTW_ESTIMATE);
             } else {
                 throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
             }
     } else {
         if (id.tp == C2C) {
             if (id.sizes.size() == 2) {
-                forward_plan = fftw_plan_dft_2d( id.sizes[0], id.sizes[1], ptrC1, ptrC2, FFTW_FORWARD, FFTW_MEASURE );
-                backward_plan = fftw_plan_dft_2d( id.sizes[0], id.sizes[1], ptrC2, ptrC1, FFTW_BACKWARD, FFTW_MEASURE );
+                forward_plan = fftw_plan_dft_2d( id.sizes[0], id.sizes[1], ptrC1, ptrC2, FFTW_FORWARD, FFTW_ESTIMATE );
+                backward_plan = fftw_plan_dft_2d( id.sizes[0], id.sizes[1], ptrC2, ptrC1, FFTW_BACKWARD, FFTW_ESTIMATE );
             } else {
                 if (id.sizes.size() == 1) {
-                    forward_plan = fftw_plan_dft_1d( nPix, ptrC1, ptrC2, FFTW_FORWARD, FFTW_MEASURE);
-                    backward_plan =  fftw_plan_dft_1d( nPix, ptrC2, ptrC1, FFTW_BACKWARD, FFTW_MEASURE);
+                    forward_plan = fftw_plan_dft_1d( nPix, ptrC1, ptrC2, FFTW_FORWARD, FFTW_ESTIMATE);
+                    backward_plan =  fftw_plan_dft_1d( nPix, ptrC2, ptrC1, FFTW_BACKWARD, FFTW_ESTIMATE);
                 } else {
                     throw std::logic_error ("FT::Plan::init() is only implemented for 1/2 dimensions, add more when/if needed: " + printArray (id.sizes, "dims"));
                 }
