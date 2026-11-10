@@ -20,6 +20,8 @@ using namespace redux::util;
 using namespace redux;
 using namespace std;
 
+void idl_fitscube_flip(int argc, IDL_VPTR* argv, char *argk);
+string make_flip_info(int lvl);
 
 namespace {
 
@@ -1056,7 +1058,8 @@ extern "C" {
         IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cachedel}, (char*)"RDX_CACHEDEL", 1, 1, 0, 0 }, 0 , cachedel_info);
         IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cachestore}, (char*)"RDX_CACHESTORE", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cachestore_info);
         IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)cacheload}, (char*)"RDX_CACHELOAD", 1, 1, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , cacheload_info);
-    
+        IdlContainer::registerRoutine( {{(IDL_SYSRTN_GENERIC)idl_fitscube_flip}, (char*)"RDX_FITSCUBE_FLIP", 0, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 }, 0 , make_flip_info);
+        
         static IDL_SYSFUN_DEF2 function_addr[] = {
             { { (IDL_VPTR (*) ()) cbezier2}, (char*) "RDX_CBEZIER2", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },
             { { (IDL_VPTR (*) ()) cbezier3}, (char*) "RDX_CBEZIER3", 3, 3, IDL_SYSFUN_DEF_F_KEYWORDS, 0 },

@@ -60,7 +60,7 @@ if (DEFINED IDL_FOUND)
          "${RDX_LIB_BASE}/file/filemomfbd.cpp"
          "${RDX_LIB_BASE}/math/functions.cpp"
     )
-    set( RDX_RDX_DEPS filetools.cpp idlutil.cpp imgtools.cpp modes.cpp string.cpp
+    set( RDX_RDX_DEPS rdx_fitscube_flip.cpp filetools.cpp idlutil.cpp imgtools.cpp modes.cpp string.cpp
          ${RDX_ANA_DEPS} ${RDX_MOMFBD_DEPS}
          "${RDX_LIB_BASE}/file/fileio.cpp"
          "${RDX_LIB_BASE}/image/descatter.cpp"
