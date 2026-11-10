@@ -55,3 +55,4 @@ FUNCTION        RDX_INPAINT       2       2          KEYWORDS
 FUNCTION        RDX_CDSGRIDNEST   4       4          KEYWORDS
 FUNCTION        RDX_CSTRETCH      2       2          KEYWORDS
 FUNCTION        RDX_INTERPOL      3       3          KEYWORDS
+PROCEDURE       RDX_FITSCUBE_FLIP 0       3          KEYWORDS
