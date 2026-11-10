@@ -96,8 +96,8 @@ namespace testsuite {
             for( int i( 0 ); i < 15; ++i ) {
                 a.i[0] = rand();
                 a.i[1] = rand();
-                //CHECK( (countBits(a.b[0])) == (naiveBitCount(b.s[0])) );
-                //CHECK( (countBits(a.s[0])) == (naiveBitCount(a.s[0])) );
+                CHECK( (countBits(a.b[0])) == (naiveBitCount(a.b[0])) );
+                CHECK( (countBits(a.s[0])) == (naiveBitCount(a.s[0])) );
                 CHECK( (countBits( a.i[0] )) == (naiveBitCount( a.i[0] )) );
                 CHECK( (countBits( a.l )) == (naiveBitCount( a.l )) );
             }

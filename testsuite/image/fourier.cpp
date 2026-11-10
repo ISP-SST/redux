@@ -110,6 +110,7 @@ namespace testsuite {
                     for( size_t x(0); x<ft_sizeX; ++x ) {
                         CHECK( abs(ft1(y,x) - tmpC(y,x)) < tol );     // check that FT matches expectations
                         CHECK( abs(ft2(y,x) - tmpC(y,x)) < tol );     // check that FT matches expectations
+                        // disabled as redundant-and-too-strict, not a bug.
                         //CHECK( (ft1(y,x)) == (tmpC(y,x)) );     // check that FT matches expectations
                         //CHECK( (ft2(y,x)) == (tmpC(y,x)) );     // check that FT matches expectations
                     }
@@ -600,7 +601,7 @@ namespace testsuite {
             ft.ift( bla );
             for( size_t y(0); y<nY; ++y) {
                 for( size_t x(0); x<nX; ++x ) {
-                    //CHECK( (bla(y,x)-peak(y,x)) < (tol) );
+                    CHECK( abs(bla(y,x)-peak(y,x)) < (tol) );
                 }
             }
 
@@ -651,9 +652,54 @@ namespace testsuite {
 
             FourierTransform fullFT( tmp, FULLCOMPLEX );
 
-            Array<float> pwr = fullFT.power();
+            Array<float> pwr = fullFT.power();     // centered by default
 
-            // TODO: test for expected result (never implemented in the original Boost test either)
+            CHECK( pwr.dimSize(0) == nY );
+            CHECK( pwr.dimSize(1) == nX );
+
+            double sumPwr(0), sumInSq(0), sumIn(0);
+            float peak(0);
+            size_t peakY(0), peakX(0);
+            for( size_t y(0); y<nY; ++y ) {
+                for( size_t x(0); x<nX; ++x ) {
+                    float p = pwr(y,x);
+                    CHECK( p >= 0 );                // power spectrum can never be negative
+                    sumPwr += p;
+                    if( p > peak ) {
+                        peak = p;
+                        peakY = y;
+                        peakX = x;
+                    }
+                }
+            }
+            for( size_t y(0); y<nY; ++y ) {
+                for( size_t x(0); x<nX; ++x ) {
+                    sumIn += tmp(y,x);
+                    sumInSq += tmp(y,x)*tmp(y,x);
+                }
+            }
+
+            // Parseval's theorem: sum of the (properly normalized) power spectrum equals
+            // the sum of squared input values.
+            CHECK( fabs(sumPwr - sumInSq) < 1E-3*sumInSq );
+
+            // With center=true (the default), the DC bin (k=0) is relocated to the
+            // middle pixel. For a real input, FT(0,0) == sum(input) exactly (a real
+            // number), so its power is sum(input)^2 / nPixels.
+            CHECK( peakY == nY/2 );
+            CHECK( peakX == nX/2 );
+            double dcPower = sumIn*sumIn/(nY*nX);
+            CHECK( fabs(peak - dcPower) < 1E-3*dcPower );
+
+            // Real input -> Hermitian-symmetric FT -> point-symmetric power spectrum
+            // around the (centered) DC bin.
+            for( size_t y(0); y<nY; ++y ) {
+                size_t ry = (nY - y) % nY;
+                for( size_t x(0); x<nX; ++x ) {
+                    size_t rx = (nX - x) % nX;
+                    CHECK( fabs(pwr(y,x) - pwr(ry,rx)) < 1E-4*peak );
+                }
+            }
 
         }
 
@@ -765,10 +811,11 @@ namespace testsuite {
 
         TEST_CASE( "FT Reverse", "[image]" ) {
             backward_FFT<double>( 64 );
-            // TODO: backward_FFT<float>(53, 64) was already commented out in the original
         }
 
         TEST_CASE( "FT Manipulations", "[image]" ) {
+            fft_operators<double>( 64 );
+            fft_operators<float>( 53 );
         }
 
     }

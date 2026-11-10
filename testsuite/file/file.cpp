@@ -39,7 +39,7 @@ namespace testsuite {
             CHECK( bfs::is_directory(test_dir) );
 
             // TODO: test with resolution of known symlink
-            //CHECK( weaklyCanonical(test_dir / "non/existing/../path/") == (test_dir/"non/path") );
+            CHECK( weaklyCanonical(test_dir / "non/existing/../path/") == (test_dir/"non/path") );
             CHECK( weaklyCanonical( "~root/non/existing/../path/" ) == "/root/non/path" );
 
             CHECK( cleanPath( "non/existing/../path/" ) == "non/path" );

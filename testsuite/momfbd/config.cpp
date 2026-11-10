@@ -1,6 +1,7 @@
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/logging/logger.hpp"
 #include "redux/util/arrayutil.hpp"
+#include "redux/file/fileio.hpp"
 
 #include "catch.hpp"
 
@@ -22,7 +23,7 @@ namespace testsuite {
 
         namespace {
 
-            [[maybe_unused]] void cfgTest() {
+            void cfgTest() {
 
                 MomfbdJob mjob;
                 redux::logging::Logger& logger = mjob.getLogger();
@@ -66,7 +67,15 @@ namespace testsuite {
                     ChannelCfg tmp;                 // default values
                     CHECK(  !(ccfg == tmp)  );
                     tmp.parseProperties( tree, mjob.getLogger() );
-                    CHECK(  ccfg == tmp  );
+                    // parseProperties() applies two deterministic, parse-only transforms that
+                    // getProperties()'s round-trip doesn't reverse
+                    // Update the truth copy to match:
+                    //  - imageDataDir is passed through cleanPath() (e.g. strips trailing slash)
+                    //  - detector auto-fills from imageTemplate when left unset
+                    ChannelCfg expected = ccfg;
+                    if( expected.imageDataDir.empty() ) expected.imageDataDir = "./";
+                    expected.imageDataDir = redux::file::cleanPath( expected.imageDataDir );
+                    CHECK(  expected == tmp  );
                     // pack/unpack and compare
                     auto buf = sharedArray<char>( ccfg.size() );
                     char* ptr = buf.get();
@@ -102,7 +111,10 @@ namespace testsuite {
                     ObjectCfg tmp;                  // default values
                     CHECK(  !(ocfg == tmp)  );
                     tmp.parseProperties( tree, mjob.getLogger() );
-                    CHECK(  ocfg == tmp  );
+                    ObjectCfg expected = ocfg;
+                    if( expected.imageDataDir.empty() ) expected.imageDataDir = "./";
+                    expected.imageDataDir = redux::file::cleanPath( expected.imageDataDir );
+                    CHECK(  expected == tmp  );
                     // pack/unpack and compare
                     auto buf = sharedArray<char>( ocfg.size() );
                     char* ptr = buf.get();
@@ -148,7 +160,11 @@ namespace testsuite {
                     GlobalCfg tmp;                  // default values
                     CHECK(  !(gcfg == tmp)  );
                     tmp.parseProperties( tree, mjob.getLogger() );
-                    CHECK(  gcfg == tmp  );
+                    GlobalCfg expected = gcfg;
+                    if( expected.imageDataDir.empty() ) expected.imageDataDir = "./";
+                    expected.imageDataDir = redux::file::cleanPath( expected.imageDataDir );
+                    if( !expected.tmpDataDir.empty() ) expected.tmpDataDir = redux::file::cleanPath( expected.tmpDataDir );
+                    CHECK(  expected == tmp  );
                     // pack/unpack and compare
                     auto buf = sharedArray<char>( gcfg.size() );
                     char* ptr = buf.get();
@@ -190,7 +206,7 @@ namespace testsuite {
         }
 
         TEST_CASE( "Config", "[momfbd]" ) {
-            // see cfgTest() TODO above -- intentionally not run yet.
+            cfgTest();
         }
 
     }

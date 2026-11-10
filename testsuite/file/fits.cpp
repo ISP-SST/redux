@@ -111,7 +111,6 @@ namespace testsuite {
             }
 
             writeAndVerifyFits( testFileFits, array.copy<uint8_t>() );
-            //writeAndVerifyFits( string("dbg_")+testFileFits, array.copy<int8_t>() );  // FIXME: causes illegal bitpix value on close.
             writeAndVerifyFits( testFileFits, array.copy<int16_t>() );
             writeAndVerifyFits( testFileFits, array.copy<uint16_t>() );
             writeAndVerifyFits( testFileFits, array );                       // int32_t

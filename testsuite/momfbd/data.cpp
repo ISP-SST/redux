@@ -20,7 +20,7 @@ namespace testsuite {
 
         namespace {
 
-            [[maybe_unused]] void dataTest() {
+            void dataTest() {
 
                 MomfbdJob mjob;
 
@@ -49,32 +49,14 @@ namespace testsuite {
                     CHECK( (count) == (pd.size()) );
                     CHECK( (count) == (pd2.size()) );
                     CHECK(  (pd == pd2)  );
-
-                    // with images
-                    //pd.images.resize(10,100,120);
-                    //float cnt(0.3);
-                    //for(auto& it: pd.images) it = (cnt += 1);
-                    //buf = sharedArray<char>( pd.size() );
-                    //ptr = buf.get();
-                    //count = pd.pack( ptr );
-                    //CHECK( (count) == (pd.size()) );
-                    //count = pd2.unpack( ptr, false );
-                    //CHECK( (count) == (pd.size()) );
-                    //CHECK( (count) == (pd2.size()) );
-                    //CHECK( (pd == pd2) );
                 }
-
-                //Array<T> tmp;
-                //count = tmp.unpack( ptr,false );
-                //CHECK( (count) == (array.size()) );
-                //CHECK( (tmp == array) );
 
             }
 
         }
 
         TEST_CASE( "Data", "[momfbd]" ) {
-
+            dataTest();
         }
 
         TEST_CASE( "PatchCache", "[momfbd]" ) {

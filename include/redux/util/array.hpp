@@ -986,12 +986,12 @@ namespace redux {
                 if( ! sameSize( rhs ) ) {
                     return false;
                 }
-                if( ptr() == rhs.ptr() ) {      // shared data, check if it is the same sub-array.
+                if( get()+begin_ == rhs.get()+rhs.begin_ ) {      // shared data, check if it is the same sub-array.
                     return sameSizes(rhs);
                 }
                 // compare data.
                 if( dense_ && rhs.dense_ ) {
-                    return !std::memcmp( ptr(), rhs.ptr(), sizeof(T)*nElements_ );
+                    return !std::memcmp( get()+begin_, rhs.get()+rhs.begin_, sizeof(T)*nElements_ );
                 } else {
                     const_iterator rhsit = rhs.begin();
                     for( const auto & value : *this ) {

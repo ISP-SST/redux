@@ -1,5 +1,3 @@
-// #define private public  //TODO How to fix private access for unit tests ??!!
-
 #include "redux/momfbd/momfbdjob.hpp"
 #include "redux/logging/logger.hpp"
 
@@ -332,11 +330,6 @@ namespace testsuite {
                 CHECK( (cd->cutoutRegion) == (RegionI(6,6,45,45)) );
                 diff = cd->residualOffset - PointF(-0.45, 0.33);
                 CHECK( std::fabs(diff.maxAbs()) < (EPS) );
-
-                //     chan->setClip({ 11, 990, 990, 11 });
-                //     chan->adjustCutout( *cd, patch );
-                //     diff = cd->patchPosition - PointI(511,494);
-                //     CHECK( std::fabs(diff.maxAbs()) < (EPS) );
             }
         }
 

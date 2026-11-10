@@ -89,12 +89,12 @@ unsigned int Zernike::NMToNoll( const uint16_t ZernikeN, const int16_t ZernikeM 
     if( delta%2 ) return 0;
     
     unsigned int j(0);
-    uint16_t n(0);
-    int16_t m(0);
-    while( m != ZernikeM || n != ZernikeN ) {
+    uint16_t n;
+    int16_t m;
+    do {
         NollToNM( ++j, n, m );
         if( j>1E6 ) return 0;       // bailout
-    }
+    } while( m != ZernikeM || n != ZernikeN );
     return j;
 }
 

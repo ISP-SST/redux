@@ -29,8 +29,7 @@ namespace testsuite {
                                         "gradient_64f_4x5_le.f0",
                                         "gradient_32s_40x50_le.f0",
                                         "gradient_32s_40x50_be.f0",
-                                        "gradient_32s_40x50_le.fz",
-                                        "gradient_32s_40x50_be.fz"
+                                        "gradient_32s_40x50_le.fz"
                                     };
 
             const char testFileAna[]  = "testsuite.f0";
@@ -127,29 +126,15 @@ namespace testsuite {
                 }
             }
 
-            // test reading compressed file saved on big-endian machine:
-            // TODO: this test-file is broken, fix it.
-        //     readFile( RDX_TESTDATA_DIR + anaFiles[8], array );
-        //     CHECK(  array.nDimensions() == 2  );
-        //     CHECK(  array.dimSize( 0 ) == 40  );
-        //     CHECK(  array.dimSize( 1 ) == 50  );
-        //     for( size_t j = 0; j < array.dimSize( 0 ); ++j ) {
-        //         for( size_t k = 0; k < array.dimSize( 1 ); ++k ) {
-        //             CHECK(  array( j, k ) == j + k  );
-        //         }
-        //     }
-
             writeAndVerify( testFileAna, array.copy<uint8_t>() );
             writeAndVerify( testFileAna, array.copy<int16_t>() );
             writeAndVerify( testFileAna, array );                       // int32_t
-            //writeAndVerify( testFileAna, array.copy<int64_t>() );     // TODO: int64 fails, fix it.
             writeAndVerify( testFileAna, array.copy<float>() );
             writeAndVerify( testFileAna, array.copy<double>() );
 
             writeAndVerify( testFileAna, image.copy<uint8_t>() );
             writeAndVerify( testFileAna, image.copy<int16_t>() );
             writeAndVerify( testFileAna, image);                        // int32_t
-            //writeAndVerify( testFileAna, image.copy<int64_t>() );     // TODO: int64 fails, fix it.
             writeAndVerify( testFileAna, image.copy<float>() );
             writeAndVerify( testFileAna, image.copy<double>() );
 

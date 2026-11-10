@@ -323,8 +323,8 @@ namespace testsuite {
                 count = tmp.unpack(ptr,false);
                 CHECK( (count) == (tmp2.size()) );
                 CHECK( (count) == (tmp.size()) );
-                //CHECK(  tmp == tmp2  );  FIXME
-                
+                CHECK(  tmp == tmp2  );
+
                 tmp2.resize();                                  // pack/unpack empty array;
                 buf = sharedArray<char>( tmp2.size() );
                 ptr = buf.get();
@@ -458,6 +458,96 @@ namespace testsuite {
             CHECK( (stats.mean) == Approx(avg).epsilon((tiny)/100.0) );
             
             stats.getRmsStddev( array );
+            CHECK( (stats.rms) == Approx(rms).epsilon((tiny)/100.0) );
+            CHECK( (stats.stddev) == Approx(stddev).epsilon((tiny)/100.0) );
+
+            // Stats on a (possibly dense, non-zero-offset) sub-array view
+            Array<T> sub( array, subFirst, subLast );
+            size_t subN = sub.nElements();
+            if( subN ) {
+                T subMn = std::numeric_limits<T>::max();
+                T subMx = std::numeric_limits<T>::min();
+                double subAvg(0), subRms(0);
+                for( const T& v: sub ) {
+                    double tmp = v;
+                    if( v < subMn ) subMn = v;
+                    if( v > subMx ) subMx = v;
+                    subAvg += tmp;
+                    subRms += tmp*tmp;
+                }
+                subAvg /= subN;
+                subRms /= subN;
+                double subStddev = sqrt(subRms - subAvg*subAvg);
+                subRms = sqrt(subRms);
+
+                ArrayStats subStats;
+                subStats.getMinMaxMean( sub );
+                CHECK( (subStats.min) == Approx(double(subMn)).epsilon((tiny)/100.0) );
+                CHECK( (subStats.max) == Approx(double(subMx)).epsilon((tiny)/100.0) );
+                CHECK( (subStats.mean) == Approx(subAvg).epsilon((tiny)/100.0) );
+
+                subStats.getRmsStddev( sub );
+                CHECK( (subStats.rms) == Approx(subRms).epsilon((tiny)/100.0) );
+                CHECK( (subStats.stddev) == Approx(subStddev).epsilon((tiny)/100.0) );
+            }
+
+        }
+
+        // ArrayStats::getStats(borderClip, ...) is only instantiated for these 4 types.
+        template <typename T, typename ...S>
+        void testStatBorderClip( uint32_t borderClip, S ...s ) {
+
+            const size_t range(20);
+            const size_t offset(100-range/2);
+            const double tiny(1E-15);
+
+            std::vector<size_t> dims({static_cast<size_t>(s)...});
+            size_t nDims = dims.size();
+            if( nDims == 0 ) return;
+            for( size_t d: dims ) {
+                if( d > 1 && 2*borderClip >= d ) return;      // would clip everything away
+            }
+
+            Array<T> array( s... );
+            T* rawPtr = array.get();
+            size_t nEl = array.nElements();
+            if( !nEl ) return;
+
+            for( size_t x(0); x < nEl; ++x ) {
+                rawPtr[x] = static_cast<T>(offset+rand()%(range/5)+x%(range+1));
+            }
+
+            std::vector<int64_t> first = array.first();
+            std::vector<int64_t> last = array.last();
+            for( size_t i(0); i<nDims; ++i ) {
+                if( dims[i] > 1 ) {
+                    first[i] += borderClip;
+                    last[i]  -= borderClip;
+                }
+            }
+            Array<T> clipped( array, first, last );
+
+            size_t nClipped = clipped.nElements();
+            T mn = std::numeric_limits<T>::max();
+            T mx = std::numeric_limits<T>::min();
+            double avg(0), rms(0);
+            for( const T& v: clipped ) {
+                double tmp = v;
+                if( v < mn ) mn = v;
+                if( v > mx ) mx = v;
+                avg += tmp;
+                rms += tmp*tmp;
+            }
+            avg /= nClipped;
+            rms /= nClipped;
+            double stddev = sqrt(rms - avg*avg);
+            rms = sqrt(rms);
+
+            ArrayStats stats;
+            stats.getStats( borderClip, array, ST_ALL );
+            CHECK( (stats.min) == Approx(double(mn)).epsilon((tiny)/100.0) );
+            CHECK( (stats.max) == Approx(double(mx)).epsilon((tiny)/100.0) );
+            CHECK( (stats.mean) == Approx(avg).epsilon((tiny)/100.0) );
             CHECK( (stats.rms) == Approx(rms).epsilon((tiny)/100.0) );
             CHECK( (stats.stddev) == Approx(stddev).epsilon((tiny)/100.0) );
 
@@ -715,10 +805,10 @@ namespace testsuite {
             testStat<float>( 4, 100, 100 );
             testStat<double>( 2, 3, 100, 100 );
 
-            // TODO
-            // Stats for sub-array
-            // Stats with clip
-            // Stats for vectors and/or generic iterators?
+            testStatBorderClip<int16_t>( 3, 100, 100 );
+            testStatBorderClip<int32_t>( 3, 2, 100, 100 );
+            testStatBorderClip<float>( 3, 4, 100, 100 );
+            testStatBorderClip<double>( 3, 2, 3, 100, 100 );
         }
 
     }
