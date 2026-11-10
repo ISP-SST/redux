@@ -17,30 +17,32 @@ endif()
 
 include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 
-# Common utilities
-file(GLOB RDX_TEST_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "include/*.cpp")
-#file(GLOB RDX_TEST_HPP RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "include/*.hpp")
-
-# Code for test modules
-file(GLOB RDX_TEST_FILE_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "file/*.cpp")
-file(GLOB RDX_TEST_IMAGE_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "image/*.cpp")
-file(GLOB RDX_TEST_MATH_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "math/*.cpp")
-file(GLOB RDX_TEST_MOMFBD_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "momfbd/*.cpp")
-file(GLOB RDX_TEST_UTIL_SRC  RELATIVE "${CMAKE_CURRENT_LIST_DIR}/" "util/*.cpp")
 set( RDX_TEST_SRC
         "testsuite.cpp"
-        ${RDX_TEST_SRC}
-        ${RDX_TEST_FILE_SRC}
-        ${RDX_TEST_IMAGE_SRC}
-        ${RDX_TEST_MATH_SRC}
-        ${RDX_TEST_MOMFBD_SRC}
-        ${RDX_TEST_UTIL_SRC}
+        "include/stringdiff.cpp"
+        "file/ana.cpp"
+        "file/file.cpp"
+        "file/fits.cpp"
+        "image/fourier.cpp"
+        "image/grid.cpp"
+        "image/util.cpp"
+        "image/zernike.cpp"
+        "util/array.cpp"
+        "util/data.cpp"
+        "util/string.cpp"
+        "util/util.cpp"
+        "math/differentiate.cpp"
+        "math/helpers.cpp"
+        "math/interval.cpp"
+        "math/linalg.cpp"
+        "momfbd/config.cpp"
+        "momfbd/data.cpp"
+        "momfbd/momfbd.cpp"
 )
 
 
 set(RDX_TESTDATA_DIR "${CMAKE_CURRENT_LIST_DIR}/testdata/")
 add_definitions(-DRDX_TESTDATA_DIR="${RDX_TESTDATA_DIR}")
-add_definitions(-DBOOST_TEST_DYN_LINK)
 
 
 # Turn on support for SEH exceptions to let test catch a exe crash
@@ -50,13 +52,9 @@ endif()
 
 RDX_ADD_EXECUTABLE( ${TEST_NAME} ${RDX_TEST_SRC} )
 
-set(TEST_CMD $<TARGET_FILE:${TEST_NAME}> --log_sink=test_log.xml
-                              --log_format=XML
-#                              --log_level=all 
-                              --log_level=warning 
-                              --report_sink=test_report.xml 
-                              --report_format=XML 
-                              --report_level=detailed )
+set(TEST_CMD $<TARGET_FILE:${TEST_NAME}> -r junit -o test_log.xml )
+# Detailed per-assertion XML report (can be GB size!)
+#set(TEST_CMD ${TEST_CMD} COMMAND $<TARGET_FILE:${TEST_NAME}> -r xml -s -o test_report.xml )
 
 
 # Fix linking problems by adding all the link-directories to the path

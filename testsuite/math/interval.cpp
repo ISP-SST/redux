@@ -1,77 +1,58 @@
 #include "redux/math/interval.hpp"
 
-#include <boost/test/unit_test.hpp>
+#include "catch.hpp"
 
 using namespace redux::math;
 
 namespace testsuite {
 
     namespace math {
-        
-        template <typename T>
-        void typedIntervalTest(void) {
 
-            Interval<T> interval(3, 9);
-            BOOST_CHECK_EQUAL(interval.start(), 3);
-            BOOST_CHECK_EQUAL(interval.end(), 9);
+        TEMPLATE_TEST_CASE( "Interval class", "[math]", uint8_t, int, size_t, double ) {
 
-            BOOST_CHECK(interval.contains(5));
-            BOOST_CHECK(!interval.contains(1));
-            BOOST_CHECK(!interval.contains(20));
+                using T = TestType;
+                Interval<T> interval(3, 9);
+                CHECK( interval.start() == 3 );
+                CHECK( interval.end() == 9 );
 
-            BOOST_CHECK(interval.surrounds(Interval<T>(4, 8)));
-            BOOST_CHECK(!interval.inside(Interval<T>(4, 8)));
-            BOOST_CHECK(interval.inside(Interval<T>(1, 10)));
-            BOOST_CHECK(!interval.surrounds(Interval<T>(1, 10)));
+                CHECK( interval.contains(5) );
+                CHECK_FALSE( interval.contains(1) );
+                CHECK_FALSE( interval.contains(20) );
 
-            BOOST_CHECK(interval.intersects(Interval<T>(0, 3)));
-            BOOST_CHECK(interval.intersects(Interval<T>(9, 15)));
-            BOOST_CHECK(interval.intersects(Interval<T>(1, 15)));
-            BOOST_CHECK(!interval.intersects(Interval<T>(10, 15)));
-            BOOST_CHECK(!interval.intersects(Interval<T>(0, 2)));
+                CHECK( interval.surrounds(Interval<T>(4, 8)) );
+                CHECK_FALSE( interval.inside(Interval<T>(4, 8)) );
+                CHECK( interval.inside(Interval<T>(1, 10)) );
+                CHECK_FALSE( interval.surrounds(Interval<T>(1, 10)) );
 
-            BOOST_CHECK((interval == Interval<T>(3, 9)));
-            BOOST_CHECK(!(interval == Interval<T>(2, 9)));
+                CHECK( interval.intersects(Interval<T>(0, 3)) );
+                CHECK( interval.intersects(Interval<T>(9, 15)) );
+                CHECK( interval.intersects(Interval<T>(1, 15)) );
+                CHECK_FALSE( interval.intersects(Interval<T>(10, 15)) );
+                CHECK_FALSE( interval.intersects(Interval<T>(0, 2)) );
 
-            BOOST_CHECK(!(interval != Interval<T>(3, 9)));
-            BOOST_CHECK((interval != Interval<T>(2, 9)));
+                CHECK( (interval == Interval<T>(3, 9)) );
+                CHECK_FALSE( (interval == Interval<T>(2, 9)) );
 
-            BOOST_CHECK((interval > Interval<T>(0, 2)));
-            BOOST_CHECK(!(interval > Interval<T>(10, 20)));
-            BOOST_CHECK(!(interval < Interval<T>(0, 2)));
-            BOOST_CHECK((interval < Interval<T>(10, 20)));
+                CHECK_FALSE( (interval != Interval<T>(3, 9)) );
+                CHECK( (interval != Interval<T>(2, 9)) );
 
-            BOOST_CHECK_THROW(interval.join(Interval<T>(10, 20)), std::logic_error);
-            BOOST_CHECK_THROW(interval.joined(Interval<T>(10, 20)), std::logic_error);
-            BOOST_CHECK_THROW(interval.intersection(Interval<T>(10, 20)), std::logic_error);
+                CHECK( (interval > Interval<T>(0, 2)) );
+                CHECK_FALSE( (interval > Interval<T>(10, 20)) );
+                CHECK_FALSE( (interval < Interval<T>(0, 2)) );
+                CHECK( (interval < Interval<T>(10, 20)) );
 
-            BOOST_CHECK((interval.from(5) == Interval<T>(5, 9)));
-            BOOST_CHECK((interval.until(5) == Interval<T>(3, 5)));
+                CHECK_THROWS_AS( interval.join(Interval<T>(10, 20)), std::logic_error );
+                CHECK_THROWS_AS( interval.joined(Interval<T>(10, 20)), std::logic_error );
+                CHECK_THROWS_AS( interval.intersection(Interval<T>(10, 20)), std::logic_error );
 
-            BOOST_CHECK_THROW(interval.from(10), std::logic_error);
-            BOOST_CHECK_THROW(interval.until(10), std::logic_error);
+                CHECK( (interval.from(5) == Interval<T>(5, 9)) );
+                CHECK( (interval.until(5) == Interval<T>(3, 5)) );
 
-        }
-
-        void intervalTest(void) {
-            
-            // try for signed/unsigned/floats
-            typedIntervalTest<uint8_t>();
-            typedIntervalTest<int>();
-            typedIntervalTest<size_t>();
-            typedIntervalTest<double>();
-
-        }
-
-        
-        using namespace boost::unit_test;
-        void add_interval_tests( test_suite* ts ) {
-            
-            ts->add( BOOST_TEST_CASE_NAME( &intervalTest, "Interval class" ) );
+                CHECK_THROWS_AS( interval.from(10), std::logic_error );
+                CHECK_THROWS_AS( interval.until(10), std::logic_error );
 
         }
 
     }
 
 }
-
