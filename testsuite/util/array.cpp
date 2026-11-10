@@ -6,11 +6,15 @@
 
 #include "catch.hpp"
 
+#include <boost/filesystem.hpp>
+
 using namespace redux::image;
 using namespace redux::math;
 using namespace redux::util;
 using namespace redux;
 using namespace std;
+
+namespace bfs = boost::filesystem;
 
 namespace testsuite {
 
@@ -461,6 +465,18 @@ namespace testsuite {
             CHECK( (stats.rms) == Approx(rms).epsilon((tiny)/100.0) );
             CHECK( (stats.stddev) == Approx(stddev).epsilon((tiny)/100.0) );
 
+            // Same data via a plain std::vector's buffer
+            std::vector<T> vec( rawPtr, rawPtr+nEl );
+            ArrayStats vecStats;
+            vecStats.getMinMaxMean( vec.data(), vec.size() );
+            CHECK( (vecStats.min) == Approx(double(mn)).epsilon((tiny)/100.0) );
+            CHECK( (vecStats.max) == Approx(double(mx)).epsilon((tiny)/100.0) );
+            CHECK( (vecStats.mean) == Approx(avg).epsilon((tiny)/100.0) );
+
+            vecStats.getRmsStddev( vec.data(), vec.size() );
+            CHECK( (vecStats.rms) == Approx(rms).epsilon((tiny)/100.0) );
+            CHECK( (vecStats.stddev) == Approx(stddev).epsilon((tiny)/100.0) );
+
             // Stats on a (possibly dense, non-zero-offset) sub-array view
             Array<T> sub( array, subFirst, subLast );
             size_t subN = sub.nElements();
@@ -809,6 +825,519 @@ namespace testsuite {
             testStatBorderClip<int32_t>( 3, 2, 100, 100 );
             testStatBorderClip<float>( 3, 4, 100, 100 );
             testStatBorderClip<double>( 3, 2, 3, 100, 100 );
+        }
+
+        TEST_CASE( "Array wrap() over raw external memory", "[util]" ) {
+
+            std::vector<int> external(20);
+            for( size_t i=0; i<external.size(); ++i ) external[i] = (int)i;
+
+            {
+                Array<int> view;
+                view.wrap( external.data(), 4, 5 );
+                CHECK( view.nDimensions() == 2 );
+                CHECK( view.dimSize(0) == 4 );
+                CHECK( view.dimSize(1) == 5 );
+                CHECK( view.dense() );
+                CHECK( view.get() == external.data() );        // shares the external buffer, no copy
+
+                for( int i=0; i<4; ++i ) {
+                    for( int j=0; j<5; ++j ) {
+                        CHECK( view(i,j) == external[i*5+j] );
+                    }
+                }
+
+                // writing through the view modifies the external buffer directly
+                view(2,3) = 999;
+                CHECK( external[2*5+3] == 999 );
+            }
+            // view destructed, the external buffer should still be intact (not freed).
+            CHECK( external[2*5+3] == 999 );
+
+        }
+
+        TEST_CASE( "Array resetLimits() restores the full underlying view", "[util]" ) {
+
+            Array<int> array(4,5);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+
+            Array<int> sub( array, 1,2,1,3 );
+            CHECK( sub.nElements() == 2*3 );
+
+            sub.resetLimits();
+            CHECK( sub.dimSize(0) == 4 );
+            CHECK( sub.dimSize(1) == 5 );
+            CHECK( sub.nElements() == 20 );
+            CHECK( sub.dense() );
+            CHECK( sub == array );
+
+        }
+
+        TEST_CASE( "Array setLimits() clamps out-of-range and swaps first>last", "[util]" ) {
+
+            Array<int> array(10);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;        // values 1..10
+
+            Array<int> sub( array, std::vector<int64_t>{2}, std::vector<int64_t>{20} );
+            CHECK( sub.dimSize(0) == 8 );            // indices 2..9
+            CHECK( sub(0) == 3 );
+            CHECK( sub(7) == 10 );
+
+            // first > last -> swapped, not an empty/inverted range
+            Array<int> sub2( array, std::vector<int64_t>{7}, std::vector<int64_t>{3} );
+            CHECK( sub2.dimSize(0) == 5 );           // indices 3..7
+            CHECK( sub2(0) == 4 );
+            CHECK( sub2(4) == 8 );
+
+        }
+
+        TEST_CASE( "Array shift() moves an in-bounds view by the exact requested delta", "[util]" ) {
+
+            Array<int> array(10);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;        // values 1..10
+
+            Array<int> sub( array, std::vector<int64_t>{2}, std::vector<int64_t>{4} );   // indices 2..4 -> 3,4,5
+            CHECK( sub(0) == 3 );
+            CHECK( sub(2) == 5 );
+
+            int actual = sub.shift( 0, 2 );          // well within bounds
+            CHECK( actual == 2 );                    // unclamped: full requested shift performed
+            CHECK( sub(0) == 5 );                    // now indices 4..6 -> 5,6,7
+            CHECK( sub(2) == 7 );
+
+            actual = sub.shift( 0, -1 );
+            CHECK( actual == -1 );
+            CHECK( sub(0) == 4 );
+
+        }
+
+        TEST_CASE( "Array sameSize() (total count) vs sameSizes() (per-dimension shape)", "[util]" ) {
+
+            Array<int> a(4,5);      // 20 elements, shape (4,5)
+            Array<int> b(5,4);      // 20 elements, shape (5,4) -- same count, different shape
+            Array<int> c(2,10);     // 20 elements, shape (2,10)
+            Array<int> d(4,6);      // 24 elements -- different count entirely
+
+            CHECK(  a.sameSize(b)  );
+            CHECK(  a.sameSize(c)  );
+            CHECK(  !a.sameSize(d)  );
+
+            CHECK(  !a.sameSizes(b)  );
+            CHECK(  !a.sameSizes(c)  );
+            CHECK(  !a.sameSizes(d)  );
+
+            Array<int> aCopy(4,5);
+            CHECK(  a.sameSizes(aCopy)  );
+            CHECK(  a.sameSize(aCopy)  );
+
+        }
+
+        TEST_CASE( "Array at() returns correct values; ptr() throws on invalid offset", "[util]" ) {
+
+            Array<int> array(4,5);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+
+            for( int i=0; i<4; ++i ) {
+                for( int j=0; j<5; ++j ) {
+                    CHECK( array.at(i,j) == array(i,j) );
+                }
+            }
+            CHECK( array.at() == array.at(0,0) );    // 0-arg at() returns the very first element
+
+            CHECK_THROWS_AS( array.ptr( std::vector<int64_t>{100,100} ), std::out_of_range );
+
+        }
+
+        TEST_CASE( "Array trim() and in-place copy(Array&) overloads", "[util]" ) {
+
+            Array<int> array(4,5);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+
+            Array<int> sub( array, 1,2,1,3 );        // 2x3 sub-view, non-dense
+            CHECK( !sub.dense() );
+
+            // copy(Array<T>& out): in-place deep copy into a separate, owned target
+            Array<int> target;
+            sub.copy( target );
+            CHECK( target.dense() );
+            CHECK( target.sameSizes(sub) );
+            CHECK( target == sub );
+            CHECK( target.get() != array.get() );
+
+            target(0,0) = -1;                        // must not affect the original view/array
+            CHECK( sub(0,0) != -1 );
+
+            // cross-type copy(Array<U>& out)
+            Array<double> targetD;
+            sub.copy( targetD );
+            CHECK( targetD.sameSizes(sub) );
+            for( size_t i=0; i<sub.dimSize(0); ++i ) {
+                for( size_t j=0; j<sub.dimSize(1); ++j ) {
+                    CHECK( targetD(i,j) == Approx( (double)sub(i,j) ) );
+                }
+            }
+
+            // trim(): collapse a sub-view in-place into a dense, standalone copy of itself
+            Array<int> trimmed( array, 1,2,1,3 );
+            CHECK( !trimmed.dense() );
+            trimmed.trim();
+            CHECK( trimmed.dense() );
+            CHECK( trimmed.sameSizes(sub) );
+            CHECK( trimmed == sub );
+            CHECK( trimmed.get() != array.get() );
+
+        }
+
+        TEST_CASE( "Array cross-type construction, sub-construction, and assignment", "[util]" ) {
+
+            Array<int> src(3,4);
+            int cnt(0);
+            for( auto& v: src ) v = ++cnt;
+
+            Array<double> dst( src );                // converting constructor
+            CHECK( dst.sameSizes(src) );
+            for( size_t i=0; i<3; ++i ) {
+                for( size_t j=0; j<4; ++j ) {
+                    CHECK( dst(i,j) == Approx( (double)src(i,j) ) );
+                }
+            }
+
+            Array<double> dst2;
+            dst2 = src;                               // cross-type operator=
+            CHECK( dst2 == dst );
+
+            Array<double> subD( src, 1,2,1,3 );        // cross-type sub-array constructor
+            Array<int> subI( src, 1,2,1,3 );
+            CHECK( subD.sameSizes(subI) );
+            for( size_t i=0; i<subI.dimSize(0); ++i ) {
+                for( size_t j=0; j<subI.dimSize(1); ++j ) {
+                    CHECK( subD(i,j) == Approx( (double)subI(i,j) ) );
+                }
+            }
+
+        }
+
+        TEST_CASE( "Array-Array arithmetic operators", "[util]" ) {
+
+            Array<int> a(3,4);
+            Array<int> b(3,4);
+            int cnt(0);
+            for( auto& v: a ) v = ++cnt;             // 1..12
+            cnt = 0;
+            for( auto& v: b ) v = (++cnt)*2;         // 2,4,6...24
+
+            Array<int> sum  = a + b;
+            Array<int> diff = a - b;
+            Array<int> prod = a * b;
+            Array<int> quot = b / a;
+
+            for( size_t i=0; i<3; ++i ) {
+                for( size_t j=0; j<4; ++j ) {
+                    CHECK( sum(i,j)  == a(i,j)+b(i,j) );
+                    CHECK( diff(i,j) == a(i,j)-b(i,j) );
+                    CHECK( prod(i,j) == a(i,j)*b(i,j) );
+                    CHECK( quot(i,j) == b(i,j)/a(i,j) );
+                }
+            }
+
+            Array<int> c = a.copy();
+            c += b;
+            CHECK( c == sum );
+            c = a.copy(); c -= b; CHECK( c == diff );
+            c = a.copy(); c *= b; CHECK( c == prod );
+            Array<int> c2 = b.copy(); c2 /= a; CHECK( c2 == quot );
+
+            Array<int> wrongShape(5,5);
+            CHECK_THROWS_AS( a += wrongShape, std::invalid_argument );
+            CHECK_THROWS_AS( a -= wrongShape, std::invalid_argument );
+            CHECK_THROWS_AS( a *= wrongShape, std::invalid_argument );
+            CHECK_THROWS_AS( a /= wrongShape, std::invalid_argument );
+
+        }
+
+        TEST_CASE( "Array iterator neighbourhood() and indexFromPos()", "[util]" ) {
+
+            Array<int> array(10,10);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+
+            auto it = array.pos(5,5);
+            Array<int> nb = it.neighbourhood(2,2);
+            CHECK( nb.dimSize(0) == 5 );             // indices 3..7
+            CHECK( nb.dimSize(1) == 5 );
+            CHECK( nb(0,0) == array(3,3) );
+            CHECK( nb(4,4) == array(7,7) );
+            CHECK( nb.get() == array.get() );        // it's a view, not a copy
+
+            auto idx = array.indexFromPos( it.pos() );
+            CHECK( idx.size() == 2 );
+            CHECK( idx[0] == 5 );
+            CHECK( idx[1] == 5 );
+
+            // near the boundary, the neighbourhood must clip rather than go out of bounds.
+            auto itEdge = array.pos(0,0);
+            Array<int> nbEdge = itEdge.neighbourhood(2,2);
+            CHECK( nbEdge.dimSize(0) == 3 );         // can't go to -2, clamped to 0..2
+            CHECK( nbEdge.dimSize(1) == 3 );
+            CHECK( nbEdge(0,0) == array(0,0) );
+
+        }
+
+        TEST_CASE( "Array permuteDimensions() edge cases", "[util]" ) {
+
+            Array<int> array(2,3,4);
+            Array<int> before = array.copy();
+
+            // too few dims given (<2): silently a no-op
+            array.permuteDimensions( 0 );
+            CHECK( array.dimensions() == before.dimensions() );
+
+            // too many dims given (>nDims_): silently a no-op
+            array.permuteDimensions( 0, 1, 2, 0 );
+            CHECK( array.dimensions() == before.dimensions() );
+
+            array.permuteDimensions( 0, 99 );
+            CHECK( array.dimensions() == before.dimensions() );
+
+            CHECK_THROWS_AS( array.permuteDimensions( 99, 0 ), std::out_of_range );
+
+            Array<int> a2 = array.copy();
+            size_t d0 = a2.dimSize(0), d1 = a2.dimSize(1);
+            a2.permuteDimensions(0,1);
+            CHECK( a2.dimSize(0) == d1 );
+            CHECK( a2.dimSize(1) == d0 );
+
+        }
+
+        TEST_CASE( "Array fill() with a predicate gates which elements change", "[util]" ) {
+
+            Array<int> array(10);
+            int cnt(0);
+            for( auto& v: array ) v = (++cnt) - 5;        // -4,-3,-2,-1,0,1,2,3,4,5
+
+            Array<int> expected = array.copy();
+            for( auto& v: expected ) if( v <= 0 ) v = 99;  // default predicate: v<=0
+
+            array.fill( 99 );                              // use the default predicate
+            CHECK( array == expected );
+
+            // explicit predicate + a fill-function (per-element transform) variant
+            Array<int> array2(10);
+            cnt = 0;
+            for( auto& v: array2 ) v = ++cnt;              // 1..10
+
+            auto doubler = []( const int& v ) { return v*2; };
+            auto isOdd = []( const int& v ) { return (v%2) != 0; };
+            array2.fill( static_cast<int(*)(const int&)>(doubler), isOdd );
+
+            for( int i=0; i<10; ++i ) {
+                int orig = i+1;
+                int expect = (orig%2) ? orig*2 : orig;     // only odd originals got doubled
+                CHECK( array2(i) == expect );
+            }
+
+        }
+
+        TEST_CASE( "Array safeDivide() divides elementwise with an epsilon cutoff", "[util]" ) {
+
+            Array<complex_t> num(4);
+            Array<double> den(4);
+            num(0) = complex_t(10,0); den(0) = 2.0;         // normal division
+            num(1) = complex_t(10,0); den(1) = 0.0;         // below cutoff -> zero
+            num(2) = complex_t(6,8);  den(2) = 5.0;          // normal (|6+8i|/5 doesn't matter, just a/b)
+            num(3) = complex_t(1,0);  den(3) = 1E-12;        // below default eps(0)? no. 1E-12>0, so NOT cut unless eps given
+
+            Array<complex_t> result = num.copy();
+            result.safeDivide( den );                        // default eps=0: only |b|>0 passes
+            CHECK( result(0) == complex_t(5,0) );
+            CHECK( result(1) == complex_t(0,0) );             // |0|>0 is false -> zeroed
+            CHECK( result(2) == complex_t(6,8)/complex_t(5,0) );
+            CHECK( std::abs(result(3) - complex_t(1,0)/complex_t(1E-12,0)) < 1E-3 );
+
+            Array<complex_t> result2 = num.copy();
+            result2.safeDivide( den, 1E-6 );                  // now the tiny denominator is also cut
+            CHECK( result2(3) == complex_t(0,0) );
+
+        }
+
+        TEST_CASE( "Array weighted add()/addTo()/subtract()/mult()", "[util]" ) {
+
+            Array<int> a(5), b(5);
+            int cnt(0);
+            for( auto& v: a ) v = ++cnt;         // 1..5
+            cnt = 0;
+            for( auto& v: b ) v = ++cnt;         // 1..5
+
+            // add(Array rhs, Array weight): this[i] += rhs[i]*weight[i]
+            Array<int> w(5);
+            cnt = 0;
+            for( auto& v: w ) v = (++cnt)%2;     // 1,0,1,0,1
+            Array<int> target = a.copy();
+            target.add( b, w );
+            for( int i=0; i<5; ++i ) CHECK( target(i) == a(i) + b(i)*w(i) );
+
+            // add(Array rhs, scalar weight): this[i] += rhs[i]*weight
+            target = a.copy();
+            target.add( b, 3 );
+            for( int i=0; i<5; ++i ) CHECK( target(i) == a(i) + b(i)*3 );
+
+            // addTo(Array& rhs, weight): rhs[i] += this[i]*weight  (roles reversed vs add())
+            Array<int> dest = b.copy();
+            a.addTo( dest, 2 );
+            for( int i=0; i<5; ++i ) CHECK( dest(i) == b(i) + a(i)*2 );
+
+            // subtract(Array rhs, weight): this[i] -= rhs[i]*weight
+            target = a.copy();
+            target.subtract( b, 2 );
+            for( int i=0; i<5; ++i ) CHECK( target(i) == a(i) - b(i)*2 );
+
+            // mult(Array rhs, weight): this[i] *= rhs[i]*weight
+            target = a.copy();
+            target.mult( b, 2 );
+            for( int i=0; i<5; ++i ) CHECK( target(i) == a(i) * (b(i)*2) );
+
+        }
+
+        TEST_CASE( "Array copyFrom()/copyTo() across dense and sub-array views", "[util]" ) {
+
+            Array<int> array(4,5);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+
+            // dense copyTo/copyFrom, with a type conversion (int -> double)
+            std::vector<double> buf( array.nElements() );
+            array.copyTo<double>( buf.data() );
+            for( size_t i=0; i<buf.size(); ++i ) CHECK( buf[i] == Approx( (double)(i+1) ) );
+
+            Array<int> target( 4, 5 );
+            target.copyFrom<double>( buf.data() );
+            CHECK( target == array );
+
+            // non-dense (sub-array view) copyTo/copyFrom
+            Array<int> sub( array, 1,2,1,3 );
+            size_t subN = sub.nElements();
+            CHECK( !sub.dense() );
+
+            std::vector<int> subBuf( subN );
+            sub.copyTo<int>( subBuf.data() );
+            size_t idx(0);
+            for( const int& v: sub ) CHECK( subBuf[idx++] == v );
+
+            std::vector<int> newVals( subN );
+            for( size_t i=0; i<subN; ++i ) newVals[i] = (int)(1000+i);
+            sub.copyFrom<int>( newVals.data() );
+            idx = 0;
+            for( const int& v: sub ) CHECK( v == newVals[idx++] );
+
+        }
+
+        TEST_CASE( "Array cloneData() returns an independent owned copy", "[util]" ) {
+
+            Array<int> array(3,4);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+
+            int* clone = array.cloneData();
+            for( size_t i=0; i<array.nElements(); ++i ) CHECK( clone[i] == (int)(i+1) );
+
+            clone[0] = -1;
+            CHECK( array(0,0) != -1 );        // independent memory, not shared
+
+            delete[] clone;
+
+            // also works for a non-dense sub-array view
+            Array<int> sub( array, 1,2,1,2 );
+            int* subClone = sub.cloneData();
+            size_t idx(0);
+            for( const int& v: sub ) CHECK( subClone[idx++] == v );
+            delete[] subClone;
+
+        }
+
+        TEST_CASE( "Array use_count()/empty()/valid()/mid()/getData()", "[util]" ) {
+
+            Array<int> defaultArray;
+            CHECK( defaultArray.empty() );
+            CHECK( !defaultArray.valid() );          // never allocated -> null datablock
+
+            Array<int> array(10);
+            CHECK( !array.empty() );
+            CHECK( array.valid() );
+            CHECK( array.use_count() == 1 );
+
+            {
+                Array<int> shared = array;           // shallow copy, shares the datablock
+                CHECK( array.use_count() == 2 );
+                CHECK( shared.use_count() == 2 );
+                CHECK( shared.getData().get() == array.get() );
+            }
+            CHECK( array.use_count() == 1 );          // back down after the copy went out of scope
+
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;          // 1..10
+            CHECK( *array.mid() == array(5) );        // midpoint of the flat index range
+
+        }
+
+        TEST_CASE( "Array setBlock() copies a raw buffer in at a given index", "[util]" ) {
+
+            Array<int> array(3,4);
+            int cnt(0);
+            for( auto& v: array ) v = ++cnt;
+            Array<int> before = array.copy();
+
+            int patch[2] = { -1, -2 };
+            array.setBlock( patch, 2, 1, 1 );          // write 2 elements starting at (1,1)
+
+            CHECK( array(1,1) == -1 );
+            CHECK( array(1,2) == -2 );
+            // everything else is unchanged
+            for( size_t i=0; i<3; ++i ) {
+                for( size_t j=0; j<4; ++j ) {
+                    if( (i==1 && j==1) || (i==1 && j==2) ) continue;
+                    CHECK( array(i,j) == before(i,j) );
+                }
+            }
+
+        }
+
+        TEST_CASE( "Array createMmap()/openMmap() round-trip through a backing file", "[util]" ) {
+
+            bfs::path tmpFile = bfs::temp_directory_path() / bfs::unique_path( "redux_test_array_mmap_%%%%" );
+
+            try {
+                {
+                    Array<double> mapped;
+                    mapped.createMmap( tmpFile.string(), 3, 4 );
+                    CHECK( mapped.nDimensions() == 2 );
+                    CHECK( mapped.dimSize(0) == 3 );
+                    CHECK( mapped.dimSize(1) == 4 );
+                    int cnt(0);
+                    for( auto& v: mapped ) v = (++cnt)*1.5;
+                }
+                // mapped went out of scope (munmap'd), but the backing file must persist
+                // with the written values.
+                CHECK( bfs::exists( tmpFile ) );
+
+                Array<double> reopened;
+                reopened.openMmap( tmpFile.string(), 3, 4 );
+                CHECK( reopened.nDimensions() == 2 );
+                CHECK( reopened.dimSize(0) == 3 );
+                CHECK( reopened.dimSize(1) == 4 );
+                int cnt(0);
+                for( auto& v: reopened ) CHECK( v == Approx((++cnt)*1.5) );
+
+            } catch( ... ) {
+                bfs::remove( tmpFile );
+                throw;
+            }
+            bfs::remove( tmpFile );
+
         }
 
     }

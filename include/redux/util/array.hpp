@@ -7,6 +7,7 @@
 #include "redux/util/trace.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <stdexcept>
 #include <memory>
 #include <cstddef>
@@ -569,8 +570,9 @@ namespace redux {
                 else if( sz == 0 ) {
                     return *datablock.get();
                 }
+                size_t dimDiff = nDims_ - sz;
                 for( size_t i = 0; i < sz; ++i ) {
-                    if( tmp[i] < 0 || static_cast<size_t>(tmp[i]) >= currentSizes[nDims_ - i - 1] ) {
+                    if( tmp[i] < 0 || static_cast<size_t>(tmp[i]) >= currentSizes[dimDiff + i] ) {
                         throw std::out_of_range( "Array::at() Index out of range." );
                     }
                 }
@@ -589,7 +591,7 @@ namespace redux {
             }
             
             template <typename ...S>
-            void setBlock( T* data, size_t count, S ...s ) const {
+            void setBlock( T* data, size_t count, S ...s ) {
                 memcpy( ptr( s... ), data, count * sizeof( T ) );
             }
 
@@ -660,23 +662,20 @@ namespace redux {
             void assign( S ...values ) {   assign( std::vector<T>({static_cast<T>( values )...}) ); }
 
 
-            template <typename Predicate>
-            void fill( T val, Predicate predicate = []( const T& v ) { return v <= T(0); } ) {
+            void fill( T val, std::function<bool(const T&)> predicate = []( const T& v ) { return v <= T(0); } ) {
                 if( dense_ ) {
-                    std::fill(get()+begin_, get()+end_, val );
+                    std::transform(get()+begin_, get()+end_, get()+begin_, [val,predicate](const T& a){ return predicate(a) ? val : a; } );
                 } else {
-                    //std::copy(rhs.begin(), rhs.end(), begin());
-                    std::transform(begin(), end(), begin(), [val](const T& a){ return val; } );
+                    std::transform(begin(), end(), begin(), [val,predicate](const T& a){ return predicate(a) ? val : a; } );
                 }
             }
-            
-            template <typename FillFunction, typename Predicate>
-            void fill( FillFunction* filler, Predicate predicate = []( const T& v ) { return v <= T(0); } ) {
+
+            template <typename FillFunction>
+            void fill( FillFunction* filler, std::function<bool(const T&)> predicate = []( const T& v ) { return v <= T(0); } ) {
                 if( dense_ ) {
-                    std::transform(get()+begin_, get()+end_, get()+begin_, filler );
+                    std::transform(get()+begin_, get()+end_, get()+begin_, [filler,predicate](const T& a){ return predicate(a) ? filler(a) : a; } );
                 } else {
-                    //std::copy(rhs.begin(), rhs.end(), begin());
-                    std::transform(begin(), end(), begin(), filler);
+                    std::transform(begin(), end(), begin(), [filler,predicate](const T& a){ return predicate(a) ? filler(a) : a; } );
                 }
             }
             
