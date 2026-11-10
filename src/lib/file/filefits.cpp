@@ -981,24 +981,22 @@ void Fits::splitCard( const std::string& card, std::string& key, std::string& va
 
 
 vector<string> Fits::splitLongString( const string& card ) {
-    
+
     vector<string> ret;
 
     if( (card.size() <= 80) || (card[8] != '=') || (card[9] != ' ') ) { // Nothing to do, either too short or does not have a value field
-    cout <<"splitLongString: " << __LINE__ << "  cS=" << card.size() << "  C8=\"" << card[8] << "\"  C9=\"" << card[9] << "\"" << endl;
         ret.push_back( card );
         ret[0].resize( 80, ' ' );
         return ret;
     }
-    
+
     size_t pos = card.find_first_not_of( " ", 9 );
     if( (pos == string::npos) || (card[pos] != '\'') ) {                // does not meet the FITS standard, truncate and return
-    cout <<"splitLongString: " << __LINE__ << "  pos=" << pos << "  CP=\"" << card[pos] << "\"" << endl;
         ret.push_back( card );
         ret[0].resize( 80, ' ' );
         return ret;
     }
-    
+
     string::const_iterator vBeg = card.cbegin()+pos;
     string::const_iterator vEnd = vBeg;
     while( ++vEnd != card.cend() ) {
@@ -1010,54 +1008,42 @@ vector<string> Fits::splitLongString( const string& card ) {
             break;
         }
     }
-    
+
     if( vEnd >= card.cend() ) {                                         // end of string not located.
-    cout <<"splitLongString: " << __LINE__ << "  vEnd=" << (vEnd-card.cbegin()) << "  cEnd=" << (card.cend()-card.cbegin()) << endl;
         ret.push_back( card );
         ret[0].resize( 80, ' ' );
         return ret;
-       
+
     }
-    
-    string key = card.substr( 0, 8 );
-    string value( vBeg, vEnd+1 );
+
     string tmpCard( card.cbegin(), vEnd+1 );
     const string cs = "&'CONTINUE  '";
     while( tmpCard.size() > 80 ) {
-    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl;
         tmpCard.insert( 78, cs );
-    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl<<endl;
         ret.push_back( tmpCard.substr(0,80) );
         tmpCard.erase( 0, 80 );
     }
-    
+
     const string cs2 = " / ";
     string comment( vEnd+1, card.cend() );
     pos = comment.find_first_not_of( " /" );
     if( pos != string::npos ) comment = comment.substr(pos);
-    cout <<"splitLongString: " << __LINE__ << "  N_tc=" << tmpCard.size() << "  N_c=" << comment.size() << endl;
     while( (tmpCard.size()+comment.size()) > 0 ) {
         size_t N_tc = tmpCard.size();
-        size_t N_c = comment.size();
-        if( (N_tc + N_c) < 78 ) {
+        if( (N_tc + comment.size()) < 78 ) {
             if( tmpCard == "CONTINUE  ''" ) tmpCard.append(" ");    // just to prettify by aligning the slashes for multi-line comments
-            ret.push_back( tmpCard + " / " + comment );
+            ret.push_back( comment.empty() ? tmpCard : (tmpCard + " / " + comment) );
             break;
         }
-    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl;
         tmpCard.insert( N_tc-1, "&" );
         size_t remainder = 80-tmpCard.size();
-    cout <<"splitLongString: " << __LINE__ << "  N_tc=" << N_tc << "  N_c=" << N_c << "  remainder=" << remainder << endl;
         if( remainder > 5 ) {   // else don't bother appending the comment here
             remainder -= 3;
             tmpCard.append( cs2+comment.substr( 0, remainder ) );
-    cout <<"splitLongString: " << __LINE__ << "  remainder=" << remainder << "  tmpcSz=" << tmpCard.size() << endl;
-    cout <<"splitLongString: " << __LINE__ << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl;
             comment.erase( 0, remainder );
         }
         tmpCard.resize( 80, ' ' );
         tmpCard.append( "CONTINUE  ''" );
-    cout <<"splitLongString: " << __LINE__ << "  N=" << N_tc << "  N0=" << tmpCard.size() << "  tmpCard=\"" << tmpCard.substr(0,80) << "\"" << endl<<endl;
         ret.push_back( tmpCard.substr(0,80) );
         tmpCard.erase( 0, 80 );
     }
@@ -1066,17 +1052,12 @@ vector<string> Fits::splitLongString( const string& card ) {
         r.resize( 80, ' ' );    // pad any too short cards to 80
     }
 
-
-    cout <<"Key=\"" << key << "\"  Value=\"" << value << "\"  Comment=\"" << comment << "\"" << endl;
-
     return ret;
 }
 
 
 string Fits::mergeLongString( vector<string> cards ) {
-cout << "mergeLongString: " << __LINE__ << "  nC = " << cards.size() << endl;
     mergeLongStrings( cards );
-cout << "mergeLongString: " << __LINE__ << "  nC = " << cards.size() << endl;
     string ret;
     if( cards.size() ) ret = cards[0];
     return ret;
@@ -1084,12 +1065,47 @@ cout << "mergeLongString: " << __LINE__ << "  nC = " << cards.size() << endl;
 
 
 void Fits::splitLongStrings( vector<string>& cards ) {
-    
+
+    for( size_t i=0; i<cards.size(); ++i ) {
+        if( cards[i].size() > 80 ) {
+            vector<string> split = splitLongString( cards[i] );
+            if( split.size() > 1 ) {
+                cards.erase( cards.begin()+i );
+                cards.insert( cards.begin()+i, split.begin(), split.end() );
+                i += split.size()-1;
+            }
+        }
+    }
+
 }
 
 
 void Fits::mergeLongStrings( vector<string>& cards ) {
-    
+
+    for( size_t i=0; i<cards.size(); ) {
+        string key, value, comment;
+        splitCard( cards[i], key, value, comment );
+        value = trimStringValue( value );
+        size_t consumed = 1;
+        while( !value.empty() && (value.back() == '&') && ((i+consumed) < cards.size()) ) {
+            string nextKey = cards[i+consumed].substr(0,8);
+            boost::trim( nextKey );
+            if( !boost::iequals( nextKey, "CONTINUE" ) ) break;
+            string ck, cv, cc;
+            splitCard( cards[i+consumed], ck, cv, cc );
+            value.pop_back();                          // strip the '&' continuation marker
+            value += trimStringValue( cv );
+            comment += cc;
+            ++consumed;
+        }
+        if( consumed > 1 ) {
+            string merged = makeCard( key, value, comment, true );
+            cards.erase( cards.begin()+i, cards.begin()+i+consumed );
+            cards.insert( cards.begin()+i, merged );
+        }
+        ++i;
+    }
+
 }
 
 

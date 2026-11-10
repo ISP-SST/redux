@@ -305,13 +305,168 @@ namespace testsuite {
             //CardRuler: |0       1|0       2|0       3|0       4|0       5|0       6|0       7|0       8|0
             CHECK(  "END                                                                             " == Fits::makeCard("END")  );
             CHECK(  "LONGCOMMToo long string to fit inside a single card, let's see if it will be tru" == Fits::makeCard("LongComment", ls)  );
-            // makeCard should truncate too long keys/values/comments. TODO: a makeCardS routine to split long strings in multiple lines
             CHECK(  "TOOLONGK= 'strVal'             / comment                                        " == Fits::makeCard("TooLongKey", ss, c )  );
             CHECK(  "LONGSTR = 'Too long string to fit inside a single card, let''s see if it will b'" == Fits::makeCard("LongSTR", ls, c )  );
             CHECK(  "LONGCOMM= 'strVal'             / Too long string to fit inside a single card, le" == Fits::makeCard("LongComment", ss, ls )  );
             CHECK(  "NOVALUE Too long string to fit inside a single card, let's see if it will be tru" == Fits::makeCard("NoValue", string(), ls )  );
 
-            // TODO lots of card-tests missing. Modification, change to/from long-cards etc.
+            {
+
+                string longCard = Fits::makeCard( "LongComment", ls, c, true );
+                vector<string> split = Fits::splitLongString( longCard );
+                CHECK( split.size() == 2 );
+                for( auto& s: split ) CHECK( s.size() == 80 );
+                CHECK( Fits::mergeLongString( split ) == longCard );
+
+                // long enough to need several CONTINUE cards.
+                string veryLong( 300, 'x' );
+                for( size_t i=0; i<veryLong.size(); i+=10 ) veryLong[i] = '-';
+                string veryLongCard = Fits::makeCard( "VeryLong", veryLong,
+                                                        "a reasonably long comment too, just to stress things", true );
+                vector<string> split2 = Fits::splitLongString( veryLongCard );
+                CHECK( split2.size() > 2 );
+                for( auto& s: split2 ) CHECK( s.size() == 80 );
+                CHECK( Fits::mergeLongString( split2 ) == veryLongCard );
+
+                // no comment at all
+                string noCommentCard = Fits::makeCard( "NoComment", ls, "", true );
+                vector<string> split3 = Fits::splitLongString( noCommentCard );
+                CHECK( split3.size() == 2 );
+                CHECK( Fits::mergeLongString( split3 ) == noCommentCard );
+
+                string shortCard = Fits::makeCard( "Short", ss, c );
+                vector<string> split4 = Fits::splitLongString( shortCard );
+                CHECK( split4.size() == 1 );
+                CHECK( split4[0] == shortCard );
+            }
+
+            {   // splitLongStrings()/mergeLongStrings(): same, but operating in-place
+                vector<string> hdr;
+                Fits::addCard( hdr, Fits::makeCard("Foo", 1) );
+                Fits::addCard( hdr, Fits::makeCard("LongComment", ls, c, true) );
+                Fits::addCard( hdr, Fits::makeCard("Bar", 2.5) );
+                vector<string> hdrOrig = hdr;
+
+                Fits::splitLongStrings( hdr );
+                CHECK( hdr.size() == 4 );                         // one card became two
+                CHECK( hdr[0] == hdrOrig[0] );
+                CHECK( hdr[3] == hdrOrig[2] );
+                for( auto& s: hdr ) CHECK( s.size() == 80 );
+
+                Fits::mergeLongStrings( hdr );
+                CHECK( hdr == hdrOrig );                          // exact round-trip
+
+                vector<string> hdr2 = hdrOrig;
+                Fits::mergeLongStrings( hdr2 );
+                CHECK( hdr2 == hdrOrig );
+            }
+
+            {   // getCard() / removeCards()
+                vector<string> hdr;
+                Fits::addCard( hdr, Fits::makeCard("Foo", 1, "first") );
+                Fits::addCard( hdr, Fits::makeCard("Bar", 2, "second") );
+
+                CHECK( Fits::getCard( hdr, "Foo" ) == hdr[0] );
+                CHECK( Fits::getCard( hdr, "Bar" ) == hdr[1] );
+                CHECK( Fits::getCard( hdr, "NoSuchKey" ) == "" );
+
+                Fits::removeCards( hdr, "Foo" );
+                CHECK( hdr.size() == 1 );
+                CHECK( Fits::getCard( hdr, "Foo" ) == "" );
+                CHECK( Fits::getCard( hdr, "Bar" ) == hdr[0] );
+            }
+
+            {   // insertCard() / insertCardAfter() / insertCardBefore()
+                vector<string> hdr;
+                string cA = Fits::makeCard("A", 1);
+                string cB = Fits::makeCard("B", 2);
+                string cC = Fits::makeCard("C", 3);
+                Fits::addCard( hdr, cA );
+                Fits::addCard( hdr, cC );
+
+                Fits::insertCardAfter( hdr, cB, "A" );
+                CHECK( hdr.size() == 3 );
+                CHECK( hdr[0] == cA );
+                CHECK( hdr[1] == cB );
+                CHECK( hdr[2] == cC );
+
+                vector<string> hdr2;
+                Fits::addCard( hdr2, cA );
+                Fits::addCard( hdr2, cC );
+                Fits::insertCardBefore( hdr2, cB, "C" );
+                CHECK( hdr2.size() == 3 );
+                CHECK( hdr2[0] == cA );
+                CHECK( hdr2[1] == cB );
+                CHECK( hdr2[2] == cC );
+
+                // insertCard at an explicit (in-range and out-of-range) location
+                vector<string> hdr3 = { cA, cC };
+                Fits::insertCard( hdr3, cB, 1 );
+                CHECK( hdr3 == vector<string>({ cA, cB, cC }) );
+                Fits::insertCard( hdr3, cB, 1000 );             // out-of-range -> append
+                CHECK( hdr3.back() == cB );
+                CHECK( hdr3.size() == 4 );
+
+                // insertCardAfter/Before with a non-existent anchor key -> appended
+                vector<string> hdr4 = { cA };
+                Fits::insertCardAfter( hdr4, cB, "NoSuchKey" );
+                CHECK( hdr4.size() == 2 );
+                CHECK( hdr4.back() == cB );
+            }
+
+            {   // updateCard() (3 overloads) / emplaceCard() (2 overloads)
+                string cA1 = Fits::makeCard("A", 1);
+                string cA2 = Fits::makeCard("A", 2);
+                string cB  = Fits::makeCard("B", 99);
+
+                vector<string> hdr = { cA1 };
+                CHECK( Fits::updateCard( hdr, (size_t)0, cA2 ) );       // by location
+                CHECK( hdr[0] == cA2 );
+                CHECK_FALSE( Fits::updateCard( hdr, (size_t)5, cA1 ) );  // out of range
+
+                hdr = { cA1 };
+                CHECK( Fits::updateCard( hdr, "A", cA2 ) );             // by key
+                CHECK( hdr[0] == cA2 );
+                CHECK_FALSE( Fits::updateCard( hdr, "NoSuchKey", cB ) );
+
+                hdr = { cA1 };
+                CHECK( Fits::updateCard( hdr, cA2 ) );                  // key extracted from card itself
+                CHECK( hdr[0] == cA2 );
+
+                // emplaceCard: updates in place if the key exists, otherwise appends.
+                // Returns true iff it inserted (i.e. no prior card existed).
+                hdr = { cA1 };
+                CHECK_FALSE( Fits::emplaceCard( hdr, "A", cA2 ) );      // existed -> updated, not inserted
+                CHECK( hdr.size() == 1 );
+                CHECK( hdr[0] == cA2 );
+                CHECK( Fits::emplaceCard( hdr, "B", cB ) );             // new -> inserted
+                CHECK( hdr.size() == 2 );
+                CHECK( hdr[1] == cB );
+
+                hdr = { cA1 };
+                CHECK_FALSE( Fits::emplaceCard( hdr, cA2 ) );
+                CHECK( hdr[0] == cA2 );
+                CHECK( Fits::emplaceCard( hdr, cB ) );
+                CHECK( hdr.size() == 2 );
+            }
+
+            {   // splitCard(): parse key/value/comment back out of cards makeCard() built.
+                string key, value, comment;
+
+                Fits::splitCard( Fits::makeCard("Foo", 42, "the answer"), key, value, comment );
+                CHECK( key == "FOO" );
+                CHECK( value == "42" );
+                CHECK( comment == "the answer" );
+
+                Fits::splitCard( Fits::makeCard("Str", ss, c), key, value, comment );
+                CHECK( key == "STR" );
+                CHECK( value == "'" + ss + "'" );      // splitCard keeps the surrounding quotes
+                CHECK( comment == c );
+
+                Fits::splitCard( Fits::makeCard("END"), key, value, comment );
+                CHECK( key == "END" );
+                CHECK( value == "" );
+            }
 
         }
 
