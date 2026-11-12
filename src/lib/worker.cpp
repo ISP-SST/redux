@@ -167,6 +167,9 @@ bool Worker::fetchWork( void ) {
         } catch ( ... ) {}
         ret = false;
         if( conn ) conn->socket().close();
+        // A genuine transfer failure (as opposed to the benign "no work available")
+        // reset the worker instead of going to "idle".
+        resetWhenDone();
     }
     
     if(conn) daemon.unlockMaster();
