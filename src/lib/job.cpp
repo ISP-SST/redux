@@ -17,6 +17,7 @@
 #include "redux/application.hpp"
 #include "redux/version.hpp"
 
+#include <fstream>
 #include <mutex>
 
 #include <boost/algorithm/string.hpp>
@@ -106,6 +107,60 @@ vector<Job::JobPtr> Job::parseTree(bpo::variables_map& vm, bpt::ptree& tree, red
         }
     }
     return tmp;
+}
+
+
+namespace {
+    bool replaceAll( string& str, const string& from, const string& to ) {
+        size_t start_pos = str.find( from );
+        bool found = false;
+        while( start_pos != string::npos ) {
+            str.replace( start_pos, from.length(), to );
+            found = true;
+            start_pos = str.find( from );
+        }
+        return found;
+    }
+}
+
+
+string Job::filterOldCfg( const string& filename, const string& jobname, const string& logfile ) {
+
+    std::ifstream in( filename, std::ios::in | std::ios::binary );
+    if( !in ) {
+        throw std::runtime_error( "Failed to open \"" + filename + "\": " + strerror( errno ) );
+    }
+
+    string text;
+    in.seekg( 0, std::ios::end );
+    text.reserve( in.tellg() );
+    in.seekg( 0, std::ios::beg );
+    std::copy( (std::istreambuf_iterator<char>( in )), std::istreambuf_iterator<char>(), std::back_inserter( text ) );
+    in.close();
+
+    replaceAll( text, " ", "" );     // spaces not allowed in cfg-values (e.g. DIVERSITY=0.00 mm)
+    bool found = replaceAll( text, "channel{", "channel {" );
+    found |= replaceAll( text, "object{", "object {" );
+
+    if( found ) { // old cfg file, wrap inside momfbd { ... }
+        bool newLine( true );
+        for( auto& c: text ) {
+            if( newLine && c == '=' ) {
+                newLine = false;
+                c = ' ';
+            } else if( c == '\n' ) {
+                newLine = true;
+            }
+        }
+        text = "momfbd { \n" + text;
+        if( *(text.rbegin()) != '\n' ) text += "\n";
+        text += "NAME " + jobname + "\n";
+        text += "LOGFILE " + logfile + "\n";
+        if( *(text.rbegin()) != '\n' ) text += "\n";
+        text += "}";
+    }
+
+    return text;
 }
 
 

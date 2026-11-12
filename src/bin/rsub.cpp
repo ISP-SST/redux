@@ -175,58 +175,6 @@ void uploadJobs(TcpConnection::Ptr conn, vector<Job::JobPtr>& jobs, int prio, Lo
 }
 
 
-bool replace(std::string& str, const std::string& from, const std::string& to) {
-    size_t start_pos = str.find(from);
-    bool found = false;
-    while(start_pos != std::string::npos) {
-        str.replace(start_pos, from.length(), to);
-        found = true;
-        start_pos = str.find(from);
-    }
-    return found;
-}
-
-
-string filterOldCfg( const string& filename, const string& jobname, const string& logfile ) {
-    
-    std::ifstream in(filename, std::ios::in | std::ios::binary);
-    if (!in) {
-        throw std::runtime_error( "Failed to open \"" + filename + "\": " + strerror(errno) );
-    }
-
-    std::string text;
-    in.seekg (0, std::ios::end);
-    text.reserve (in.tellg());
-    in.seekg (0, std::ios::beg);
-    std::copy ( (std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>(), std::back_inserter (text));
-    in.close();
-
-    replace(text, " ", "");     // spaces not allowed in cfg-values (e.g. DIVERSITY=0.00 mm)
-    bool found = replace(text, "channel{", "channel {");
-    found |= replace(text, "object{", "object {");
-    
-    if (found) { // old cfg file, wrap inside momfbd { ... }
-        bool newLine(true);
-        for( auto& c: text ) {
-            if( newLine && c == '=' ) {
-                newLine = false;
-                c = ' ';
-            } else if( c == '\n' ) {
-                newLine = true;
-            }
-        }
-        text = "momfbd { \n" + text;
-        if( *(text.rbegin()) != '\n') text += "\n";
-        text += "NAME " + jobname + "\n";
-        text += "LOGFILE " + logfile + "\n";
-        if( *(text.rbegin()) != '\n') text += "\n";
-        text += "}";
-    }
-
-    return text;
-}
-
-
 int main (int argc, char *argv[]) {
     
     bpo::variables_map vm;
@@ -287,7 +235,7 @@ int main (int argc, char *argv[]) {
             string bn = bfs::path(it).stem().string();
             string jobName = globalName.empty() ? bn : globalName;
             string logFile = globalLog.empty() ? bn + ".log" : globalLog;
-            string tmpS = filterOldCfg(it, jobName, logFile);
+            string tmpS = Job::filterOldCfg(it, jobName, logFile);
             filteredCfg.write(tmpS.c_str(),tmpS.size());
         }
 

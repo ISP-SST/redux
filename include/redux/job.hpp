@@ -119,6 +119,7 @@ namespace redux {
         static size_t registerJob( const std::string&, JobCreator f );
         static std::vector<JobPtr> parseTree( bpo::variables_map& vm, bpt::ptree& tree, redux::logging::Logger&, bool check=false );
         static JobPtr newJob( const std::string& );
+        static std::string filterOldCfg( const std::string& filename, const std::string& jobname, const std::string& logfile );
         
         static std::string stateString(uint8_t);
         static std::string stateTag(uint8_t);
