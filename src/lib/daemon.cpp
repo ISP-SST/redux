@@ -47,28 +47,44 @@ namespace {
 
     std::atomic<uint16_t> preparing_local(0);
 
+    // Limits sendfile() stall (EAGAIN/EWOULDBLOCK, socket send-buffer full)
+    constexpr int SENDFILE_STALL_TIMEOUT_MS = 60000;
+    constexpr int SENDFILE_MAX_CONSECUTIVE_STALLS = 10;
+
     void sendFileDirect( int sockFd, const std::string& path, uint64_t sz ) {
         int fd = ::open( path.c_str(), O_RDONLY );
         if( fd < 0 ) throw std::runtime_error( "sendFileDirect: failed to open " + path );
         off_t offset = 0;
+        int consecutiveStalls = 0;
         while( (uint64_t)offset < sz ) {
             ssize_t n = ::sendfile( sockFd, fd, &offset, sz - (uint64_t)offset );
             if( n < 0 ) {
                 if( errno == EINTR ) continue;
                 if( errno == EAGAIN || errno == EWOULDBLOCK ) {
                     struct pollfd pfd{ sockFd, POLLOUT, 0 };
-                    int pret = ::poll( &pfd, 1, -1 );
+                    int pret = ::poll( &pfd, 1, SENDFILE_STALL_TIMEOUT_MS );
                     if( pret < 0 && errno != EINTR ) {
                         int e = errno;
                         ::close(fd);
                         throw std::runtime_error( "sendFileDirect: poll() failed: " + std::string(strerror(e)) );
                     }
+                    if( pret == 0 ) {      // timed out, peer still hasn't drained the buffer.
+                        if( ++consecutiveStalls > SENDFILE_MAX_CONSECUTIVE_STALLS ) {
+                            ::close(fd);
+                            throw std::runtime_error( "sendFileDirect: peer stopped reading, giving up after " +
+                                to_string(SENDFILE_MAX_CONSECUTIVE_STALLS) + " stalls of " +
+                                to_string(SENDFILE_STALL_TIMEOUT_MS) + "ms each." );
+                        }
+                        continue;
+                    }
+                    consecutiveStalls = 0;
                     continue;
                 }
                 int e = errno;
                 ::close(fd);
                 throw std::runtime_error( "sendFileDirect: sendfile() failed: " + std::string(strerror(e)) );
             }
+            consecutiveStalls = 0;
             if( n == 0 ) break;
         }
         ::close(fd);
@@ -358,9 +374,11 @@ bool Daemon::doWork( void ) {
 
             std::thread( std::bind( &Daemon::prepareWork, this ) ).detach();
 
-            // Dedicated threads for prepareLocalWork.
-            dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
-            dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
+            // Dedicated threads for prepareLocalWork/prepareRemoteWork.
+            uint16_t nDispatchThreads = std::max<uint16_t>( 2, thread::hardware_concurrency()/8 );
+            for( uint16_t i=0; i<nDispatchThreads; ++i ) {
+                dispatchPool.create_thread( boost::bind( &Daemon::dispatchThreadLoop, this ) );
+            }
 
         } else if( dbg ) {
             uint16_t oport=port;
