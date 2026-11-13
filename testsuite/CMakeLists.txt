@@ -37,6 +37,7 @@ set( RDX_TEST_SRC
         "math/linalg.cpp"
         "momfbd/config.cpp"
         "momfbd/data.cpp"
+        "momfbd/job.cpp"
         "momfbd/momfbd.cpp"
 )
 

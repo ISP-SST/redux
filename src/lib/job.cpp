@@ -362,7 +362,7 @@ void Job::parsePropertyTree(bpo::variables_map& vm, bpt::ptree& tree, redux::log
     info.verbosity = tree.get<uint8_t>("VERBOSITY", defaults.verbosity);
     info.maxThreads = tree.get<uint16_t>("MAX_THREADS", defaults.maxThreads);
     info.maxPartRetries = tree.get<uint8_t>("MAX_PART_RETRIES", defaults.maxPartRetries);
-    info.logFile = stripLeadingSlashes( tree.get<string>("LOGFILE", defaults.logFile) );
+    info.logFile = tree.get<string>("LOGFILE", defaults.logFile);
     info.outputDir = tree.get<string>( "OUTPUT_DIR", defaults.outputDir );
     if( vm.count( "output-dir" ) ) info.outputDir = vm["output-dir"].as<string>();    // cmd-line override
     if( info.outputDir.empty() ) {
