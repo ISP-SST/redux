@@ -451,9 +451,11 @@ bool SubImage::adjustShifts( const T* alpha ) {
     std::swap( xyDims.x, xyDims.y );
 #endif
     const PointI& tm = modes->tiltMode;
-    const PointD thisAlpha = PointD( alpha[tm.y], alpha[tm.x] ) + currentTiltOffset;
-
+    const PointD thisAlpha = PointD( alpha[tm.y], alpha[tm.x] );
+    // Note: currentTiltOffset should not be added here. That would apply the total
+    // shifts to the shifted subimage.
     const PointI thisShift = -modes->alphaToShift( thisAlpha ).round();
+
     
     PointI actualShift;
     if( thisShift.x ) {
@@ -515,11 +517,8 @@ void SubImage::addToPhi( const T* a, double* phiPtr ) const {
 
     for( int mi(0); mi <nModes; ++mi ) {
         double alpha = a[mi];
-        if( mi == modes->tiltMode.x ) {
-            alpha += currentTiltOffset.x;
-        } else if( mi == modes->tiltMode.y ) {
-            alpha += currentTiltOffset.y;
-        }
+        // Note: currentTiltOffset should not be added here. That would apply the total
+        // shifts to the shifted subimage.
         if( fabs(alpha) > ALPHA_CUTOFF ) {
             const double* modePtr = modes->modePointers[mi];
             transform( phiPtr, phiPtr+pupilSize2, modePtr, phiPtr,

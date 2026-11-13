@@ -419,8 +419,13 @@ void Object::restorePatch( ObjectData& od, const vector<uint32_t>& wf ) {
     if( saveMask & SF_SAVE_ALPHA ){
         od.alpha.resize( imgCount, nModes );
         float* aPtr = od.alpha.get();
+        const PointI& tm = modes->tiltMode;
         for( shared_ptr<SubImage>& si: images ) {
             std::copy( si->wfAlpha, si->wfAlpha+nModes, aPtr );
+            // wfAlpha contains the residuals after adjustShifts, add the shifts back in so the
+            // reported alpha reflects the true, total tilt rather than just the residual.
+            if( tm.x >= 0 ) aPtr[tm.x] += si->currentTiltOffset.x;
+            if( tm.y >= 0 ) aPtr[tm.y] += si->currentTiltOffset.y;
             aPtr += nModes;
         }
     } else {
